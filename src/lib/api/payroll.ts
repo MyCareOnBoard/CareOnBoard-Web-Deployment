@@ -1,5 +1,7 @@
 import axiosClient from "../axios";
 import type { AgencyMode } from "@/store/redux/agencyModeSlice";
+import type { OperationalBillingRequestContext } from "@/lib/operational-agency/types";
+import { operationalAgencyId, withOperationalAgency } from "@/lib/operational-agency/request";
 
 export type PayrollInvoiceStatus = "pending" | "paid";
 
@@ -152,7 +154,6 @@ export type PayrollInvoicesListQuery = {
 };
 
 export type CreatePayrollInvoicePayload = {
-  agencyId: string;
   employeeId: string;
   periodStart: string;
   periodEnd: string;
@@ -277,11 +278,12 @@ export function getPayrollBlockedShifts(error: unknown): PayrollBlockedShift[] {
 }
 
 export async function getPayrollDashboard(
-  query: PayrollDashboardQuery,
+  input: { context: OperationalBillingRequestContext; query: PayrollDashboardQuery; signal?: AbortSignal },
 ): Promise<PayrollDashboardSummary> {
+  const { context, query, signal } = input;
   const response = await axiosClient.get<PayrollDashboardResponse>(
     "/billing/payroll/dashboard",
-    { params: query },
+    { params: withOperationalAgency(context, query), ...(signal ? { signal } : {}) },
   );
 
   if (!response.data.success || !response.data.data) {
@@ -291,9 +293,15 @@ export async function getPayrollDashboard(
   return response.data.data;
 }
 
-export async function getStaffToPay(query: StaffToPayQuery): Promise<StaffToPaySummary> {
+export async function getStaffToPay(input: {
+  context: OperationalBillingRequestContext;
+  query: StaffToPayQuery;
+  signal?: AbortSignal;
+}): Promise<StaffToPaySummary> {
+  const { context, query, signal } = input;
   const response = await axiosClient.get<StaffToPayResponse>("/billing/payroll/due", {
-    params: query,
+    params: withOperationalAgency(context, query),
+    ...(signal ? { signal } : {}),
   });
 
   if (!response.data.success || !response.data.data) {
@@ -304,11 +312,16 @@ export async function getStaffToPay(query: StaffToPayQuery): Promise<StaffToPayS
 }
 
 export async function listPayrollInvoices(
-  query: PayrollInvoicesListQuery,
+  input: {
+    context: OperationalBillingRequestContext;
+    query: PayrollInvoicesListQuery;
+    signal?: AbortSignal;
+  },
 ): Promise<{ invoices: PayrollInvoiceListItem[]; total: number }> {
+  const { context, query, signal } = input;
   const response = await axiosClient.get<PayrollInvoicesListResponse>(
     "/billing/payroll/invoices",
-    { params: query },
+    { params: withOperationalAgency(context, query), ...(signal ? { signal } : {}) },
   );
 
   if (!response.data.success || !response.data.data) {
@@ -318,9 +331,15 @@ export async function listPayrollInvoices(
   return response.data.data;
 }
 
-export async function getPayrollInvoiceById(invoiceId: string): Promise<PayrollInvoiceDetail> {
+export async function getPayrollInvoiceById(input: {
+  context: OperationalBillingRequestContext;
+  invoiceId: string;
+  signal?: AbortSignal;
+}): Promise<PayrollInvoiceDetail> {
+  const { context, invoiceId, signal } = input;
   const response = await axiosClient.get<PayrollInvoiceDetailResponse>(
-    `/billing/payroll/invoices/${invoiceId}`,
+    `/billing/payroll/invoices/${encodeURIComponent(invoiceId)}`,
+    { params: { agencyId: operationalAgencyId(context) }, ...(signal ? { signal } : {}) },
   );
 
   if (!response.data.success || !response.data.data) {
@@ -331,11 +350,16 @@ export async function getPayrollInvoiceById(invoiceId: string): Promise<PayrollI
 }
 
 export async function getPayrollInvoicePreview(
-  query: PayrollInvoicePreviewQuery,
+  input: {
+    context: OperationalBillingRequestContext;
+    query: PayrollInvoicePreviewQuery;
+    signal?: AbortSignal;
+  },
 ): Promise<PayrollInvoicePreview> {
+  const { context, query, signal } = input;
   const response = await axiosClient.get<PayrollInvoicePreviewResponse>(
     "/billing/payroll/invoices/preview",
-    { params: query },
+    { params: withOperationalAgency(context, query), ...(signal ? { signal } : {}) },
   );
 
   if (!response.data.success || !response.data.data) {
@@ -346,11 +370,17 @@ export async function getPayrollInvoicePreview(
 }
 
 export async function createPayrollInvoice(
-  payload: CreatePayrollInvoicePayload,
+  input: {
+    context: OperationalBillingRequestContext;
+    payload: CreatePayrollInvoicePayload;
+    signal?: AbortSignal;
+  },
 ): Promise<PayrollInvoiceDetail> {
+  const { context, payload, signal } = input;
   const response = await axiosClient.post<PayrollInvoiceMutationResponse>(
     "/billing/payroll/invoices",
-    payload,
+    withOperationalAgency(context, payload),
+    { params: { agencyId: operationalAgencyId(context) }, ...(signal ? { signal } : {}) },
   );
 
   if (!response.data.success || !response.data.data) {
@@ -360,10 +390,16 @@ export async function createPayrollInvoice(
   return response.data.data;
 }
 
-export async function markPayrollInvoicePaid(invoiceId: string): Promise<void> {
+export async function markPayrollInvoicePaid(input: {
+  context: OperationalBillingRequestContext;
+  invoiceId: string;
+  signal?: AbortSignal;
+}): Promise<void> {
+  const { context, invoiceId, signal } = input;
   const response = await axiosClient.patch<PayrollInvoiceMutationResponse>(
-    `/billing/payroll/invoices/${invoiceId}/status`,
+    `/billing/payroll/invoices/${encodeURIComponent(invoiceId)}/status`,
     { status: "paid" },
+    { params: { agencyId: operationalAgencyId(context) }, ...(signal ? { signal } : {}) },
   );
 
   if (!response.data.success) {
@@ -371,9 +407,15 @@ export async function markPayrollInvoicePaid(invoiceId: string): Promise<void> {
   }
 }
 
-export async function cancelPayrollInvoice(invoiceId: string): Promise<void> {
+export async function cancelPayrollInvoice(input: {
+  context: OperationalBillingRequestContext;
+  invoiceId: string;
+  signal?: AbortSignal;
+}): Promise<void> {
+  const { context, invoiceId, signal } = input;
   const response = await axiosClient.delete<PayrollInvoiceMutationResponse>(
-    `/billing/payroll/invoices/${invoiceId}`,
+    `/billing/payroll/invoices/${encodeURIComponent(invoiceId)}`,
+    { params: { agencyId: operationalAgencyId(context) }, ...(signal ? { signal } : {}) },
   );
 
   if (!response.data.success) {

@@ -1,19 +1,18 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useRef, useState } from "react";
 import { X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { getAgencyById } from "@/lib/api/agencies";
 import type { RecentClaim } from "../../data/mockClaimsDashboardData";
 import type { ClaimReportFormState, ClaimSignaturePayload } from "../../data/mockClaimReportData";
 import { buildClaimReportFromClaim } from "../../utils/claimReportUtils";
 import type { ClaimReportPrefillSnapshot } from "../../utils/claimReportPrefillUtils";
 import { downloadClaimReportPdf } from "../../utils/claimReportPrintUtils";
 import { normalizeSignaturePayload } from "../../utils/claimReportSignatureUtils";
-import { useAuth } from "@/utils/auth";
 import {
   CLAIM_REPORT_PRINT_ROOT_CLASS,
   CLAIMS_REPORT_MODAL_CLASS,
@@ -49,7 +48,6 @@ export default function ClaimReportModal({
   onClose,
 }: ClaimReportModalProps) {
   const printRef = useRef<HTMLDivElement>(null);
-  const { user } = useAuth();
   const [form, setForm] = useState<ClaimReportFormState>(() =>
     buildClaimReportFromClaim(claim, initialPrefill),
   );
@@ -59,42 +57,6 @@ export default function ClaimReportModal({
   const updateForm = useCallback((patch: Partial<ClaimReportFormState>) => {
     setForm((prev) => ({ ...prev, ...patch }));
   }, []);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const agencyId = user?.agencyId;
-    if (!agencyId) return;
-
-    let cancelled = false;
-
-    getAgencyById(agencyId)
-      .then((agency) => {
-        if (cancelled) return;
-
-        const nipId = agency.npi?.trim() ?? "";
-        const providerId =
-          agency.providerId?.trim() ?? agency.medicaidProviderId?.trim() ?? "";
-
-        setForm((prev) => ({
-          ...prev,
-          serviceLines: prev.serviceLines.map((line) => ({
-            ...line,
-            nipId,
-            providerId,
-          })),
-        }));
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          console.error("Failed to load agency for claim report:", error);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [open, user?.agencyId]);
 
   const updateDiagnosis = useCallback((letter: string, value: string) => {
     setForm((prev) => ({
@@ -134,8 +96,8 @@ export default function ClaimReportModal({
     setIsDownloading(true);
     try {
       await downloadClaimReportPdf(printRef.current, form.clientName);
-    } catch (error) {
-      console.error("Error generating claim report PDF:", error);
+    } catch {
+      console.error("Error generating claim report PDF.");
     } finally {
       setIsDownloading(false);
     }
@@ -204,6 +166,9 @@ export default function ClaimReportModal({
                   </span>
                 </button>
               </div>
+              <DialogDescription className="sr-only">
+                Review claim details, add signatures, download, or send the report.
+              </DialogDescription>
             </DialogHeader>
 
             <div key={claim.id} className="claim-report-modal-body flex-1 overflow-x-hidden overflow-y-auto pb-6">

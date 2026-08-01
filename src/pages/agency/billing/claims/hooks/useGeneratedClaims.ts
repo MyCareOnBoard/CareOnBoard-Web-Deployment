@@ -9,7 +9,7 @@ import {
   type UpdateBillingClaimStatusPayload,
 } from "@/lib/api/claims";
 import { filterClaimsByClientSearch } from "../utils/savedClaimUtils";
-import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
+import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
 
 function hasCompleteDateRange(dateRange: DateRangeValues) {
   return Boolean(dateRange.startDate && dateRange.endDate);
@@ -35,11 +35,12 @@ export function useGeneratedClaims(
     selectedClientName,
   }: UseGeneratedClaimsOptions = {},
 ) {
+  const { agencyId, mode } = useOperationalAgency();
   const [rawClaims, setRawClaims] = useState<BillingClaimListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
-  const mode = useEffectiveAgencyMode();
+  const controllerRef = useRef<AbortController | null>(null);
 
   const refetch = useCallback(
     async ({ force = false }: RefetchOptions = {}) => {
@@ -47,21 +48,28 @@ export function useGeneratedClaims(
         return;
       }
 
-      if (!hasCompleteDateRange(dateRange)) {
+      if (!agencyId || !hasCompleteDateRange(dateRange)) {
         return;
       }
 
       const requestId = requestIdRef.current + 1;
       requestIdRef.current = requestId;
+      controllerRef.current?.abort();
+      const controller = new AbortController();
+      controllerRef.current = controller;
       setLoading(true);
       setError(null);
 
       try {
         const { claims } = await listBillingClaims({
-          startDate: dateRange.startDate,
-          endDate: dateRange.endDate,
-          ...(statusFilter !== "all" ? { status: statusFilter } : {}),
-          ...(mode ? { mode } : {}),
+          context: { agencyId },
+          query: {
+            startDate: dateRange.startDate,
+            endDate: dateRange.endDate,
+            ...(statusFilter !== "all" ? { status: statusFilter } : {}),
+            ...(mode ? { mode } : {}),
+          },
+          signal: controller.signal,
         });
 
         if (requestIdRef.current !== requestId) {
@@ -70,6 +78,7 @@ export function useGeneratedClaims(
 
         setRawClaims(claims);
       } catch (fetchError) {
+        if (controller.signal.aborted) return;
         if (requestIdRef.current !== requestId) {
           return;
         }
@@ -84,11 +93,15 @@ export function useGeneratedClaims(
         }
       }
     },
-    [dateRange.endDate, dateRange.startDate, enabled, statusFilter, mode],
+    [agencyId, dateRange.endDate, dateRange.startDate, enabled, statusFilter, mode],
   );
 
   useEffect(() => {
     void refetch();
+    return () => {
+      requestIdRef.current += 1;
+      controllerRef.current?.abort();
+    };
   }, [refetch]);
 
   const claims = useMemo(
@@ -101,7 +114,11 @@ export function useGeneratedClaims(
   );
 
   const updateClaimStatus = useCallback(
-    async (claimId: string, payload: UpdateBillingClaimStatusPayload) => {
+    async (
+      claimId: string,
+      payload: UpdateBillingClaimStatusPayload,
+      signal?: AbortSignal,
+    ) => {
       setRawClaims((previous) =>
         previous.map((claim) =>
           claim.id === claimId
@@ -118,27 +135,27 @@ export function useGeneratedClaims(
       );
 
       try {
-        await updateBillingClaimStatus(claimId, payload);
+        await updateBillingClaimStatus({ context: { agencyId }, claimId, payload, signal });
       } catch (mutationError) {
-        await refetch({ force: true });
+        if (!signal?.aborted) await refetch({ force: true });
         throw mutationError;
       }
     },
-    [refetch],
+    [agencyId, refetch],
   );
 
   const cancelClaim = useCallback(
-    async (claimId: string) => {
+    async (claimId: string, signal?: AbortSignal) => {
       setRawClaims((previous) => previous.filter((claim) => claim.id !== claimId));
 
       try {
-        await cancelBillingClaim(claimId);
+        await cancelBillingClaim({ context: { agencyId }, claimId, signal });
       } catch (mutationError) {
-        await refetch({ force: true });
+        if (!signal?.aborted) await refetch({ force: true });
         throw mutationError;
       }
     },
-    [refetch],
+    [agencyId, refetch],
   );
 
   return {

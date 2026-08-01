@@ -1,6 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/utils/auth";
 import type { AgencyExpenseListItem, ExpenseStatus } from "@/lib/api/billing-expenses";
 import {
   useApproveExpenseMutation,
@@ -10,7 +9,8 @@ import {
   useRejectExpenseMutation,
 } from "@/lib/api/billing-expenses";
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
-import { useStaffLabels } from "@/hooks/useStaffLabels";
+import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
+import { staffLabels } from "@/lib/roleLabel";
 import { formatCurrency } from "@/pages/agency/billing-and-approvals/billingUtils";
 import {
   mapExpenseMutationError,
@@ -33,8 +33,10 @@ const RejectExpenseModal = lazy(() => import("./components/RejectExpenseModal"))
 
 const LIST_PAGE_SIZE = 25;
 
-export default function ExpensesDashboardPage() {
-  const { user } = useAuth();
+type AbortableExpenseRequest = { abort: () => void };
+
+export function ExpensesDashboardContent() {
+  const { agencyId, agency, mode } = useOperationalAgency();
   const { toast } = useToast();
   const [dateRange, setDateRange] = useState(getCurrentWeekDateRange);
   const [activeTab, setActiveTab] = useState<ExpensesWorkspaceTab>("pending");
@@ -45,10 +47,12 @@ export default function ExpensesDashboardPage() {
   const [deleteTarget, setDeleteTarget] = useState<AgencyExpenseListItem | null>(null);
   const lastDashboardErrorRef = useRef<string | null>(null);
   const lastListErrorRef = useRef<string | null>(null);
+  const activeAgencyRef = useRef(agencyId);
+  const mutationRequestsRef = useRef(new Set<AbortableExpenseRequest>());
 
-  const hasAgency = Boolean(user?.agencyId);
+  const hasAgency = Boolean(agencyId);
   const hasDateRange = Boolean(dateRange.startDate && dateRange.endDate);
-  const { mode, labels } = useStaffLabels();
+  const labels = staffLabels(mode ? [mode] : [...agency.supportedClientTypes]);
   const staffNoun = labels.noun;
 
   const {
@@ -57,12 +61,13 @@ export default function ExpensesDashboardPage() {
     isError: dashboardError,
     error: dashboardErrorPayload,
   } = useGetExpensesDashboardQuery(
-    { startDate: dateRange.startDate, endDate: dateRange.endDate, mode: mode ?? undefined },
-    { skip: !hasDateRange },
+    { agencyId, startDate: dateRange.startDate, endDate: dateRange.endDate, mode: mode ?? undefined },
+    { skip: !hasAgency || !hasDateRange },
   );
 
   const pendingQuery = useGetAgencyExpensesQuery(
     {
+      agencyId,
       startDate: dateRange.startDate,
       endDate: dateRange.endDate,
       status: "pending",
@@ -70,11 +75,12 @@ export default function ExpensesDashboardPage() {
       limit: 50,
       mode: mode ?? undefined,
     },
-    { skip: !hasDateRange || activeTab !== "pending" },
+    { skip: !hasAgency || !hasDateRange || activeTab !== "pending" },
   );
 
   const allQuery = useGetAgencyExpensesQuery(
     {
+      agencyId,
       startDate: dateRange.startDate,
       endDate: dateRange.endDate,
       status: statusFilter,
@@ -82,7 +88,7 @@ export default function ExpensesDashboardPage() {
       limit: LIST_PAGE_SIZE,
       mode: mode ?? undefined,
     },
-    { skip: !hasDateRange || activeTab !== "all" },
+    { skip: !hasAgency || !hasDateRange || activeTab !== "all" },
   );
 
   const [approveExpense, { isLoading: isApproving }] = useApproveExpenseMutation();
@@ -106,22 +112,28 @@ export default function ExpensesDashboardPage() {
         return;
       }
 
+      const request = approveExpense({ agencyId, expenseId: expense.id });
+      mutationRequestsRef.current.add(request);
       try {
-        await approveExpense({ expenseId: expense.id }).unwrap();
+        await request.unwrap();
+        if (activeAgencyRef.current !== agencyId) return;
         setApproveTarget(null);
         toast({
           title: "Expense approved",
           description: `Included in this ${staffNoun}'s next payroll for the expense date.`,
         });
       } catch (error) {
+        if (activeAgencyRef.current !== agencyId) return;
         toast({
           title: "Couldn't update expense",
           description: mapExpenseMutationError(error),
           variant: "destructive",
         });
+      } finally {
+        mutationRequestsRef.current.delete(request);
       }
     },
-    [approveExpense, hasAgency, toast, staffNoun],
+    [agencyId, approveExpense, hasAgency, toast, staffNoun],
   );
 
   const handleRequestApprove = useCallback((expense: AgencyExpenseListItem) => {
@@ -146,22 +158,28 @@ export default function ExpensesDashboardPage() {
         return;
       }
 
+      const request = deleteExpense({ agencyId, expenseId: expense.id });
+      mutationRequestsRef.current.add(request);
       try {
-        await deleteExpense({ expenseId: expense.id }).unwrap();
+        await request.unwrap();
+        if (activeAgencyRef.current !== agencyId) return;
         setDeleteTarget(null);
         toast({
           title: "Expense deleted",
           description: "The pending expense was removed.",
         });
       } catch (error) {
+        if (activeAgencyRef.current !== agencyId) return;
         toast({
           title: "Couldn't delete expense",
           description: mapExpenseMutationError(error),
           variant: "destructive",
         });
+      } finally {
+        mutationRequestsRef.current.delete(request);
       }
     },
-    [deleteExpense, hasAgency, toast],
+    [agencyId, deleteExpense, hasAgency, toast],
   );
 
   const handleRequestDelete = useCallback((expense: AgencyExpenseListItem) => {
@@ -188,25 +206,32 @@ export default function ExpensesDashboardPage() {
         return;
       }
 
+      const request = rejectExpense({
+        agencyId,
+        expenseId: declineTarget.id,
+        reviewerNotes,
+      });
+      mutationRequestsRef.current.add(request);
       try {
-        await rejectExpense({
-          expenseId: declineTarget.id,
-          reviewerNotes,
-        }).unwrap();
+        await request.unwrap();
+        if (activeAgencyRef.current !== agencyId) return;
         setDeclineTarget(null);
         toast({
           title: "Expense declined",
           description: `The ${staffNoun} will see your reason in their app.`,
         });
       } catch (error) {
+        if (activeAgencyRef.current !== agencyId) return;
         toast({
           title: "Couldn't update expense",
           description: mapExpenseMutationError(error),
           variant: "destructive",
         });
+      } finally {
+        mutationRequestsRef.current.delete(request);
       }
     },
-    [declineTarget, hasAgency, rejectExpense, toast, staffNoun],
+    [agencyId, declineTarget, hasAgency, rejectExpense, toast, staffNoun],
   );
 
   const handleStatusSegmentClick = useCallback((segmentLabel: string) => {
@@ -231,6 +256,16 @@ export default function ExpensesDashboardPage() {
     },
     [],
   );
+
+  useEffect(() => {
+    activeAgencyRef.current = agencyId;
+    const requests = mutationRequestsRef.current;
+    return () => {
+      activeAgencyRef.current = "";
+      requests.forEach((request) => request.abort());
+      requests.clear();
+    };
+  }, [agencyId]);
 
   // Reset pagination when the agency mode changes (the list re-filters server-side).
   useEffect(() => {
@@ -377,4 +412,9 @@ export default function ExpensesDashboardPage() {
       ) : null}
     </div>
   );
+}
+
+export default function ExpensesDashboardPage() {
+  const { agencyId } = useOperationalAgency();
+  return <ExpensesDashboardContent key={agencyId} />;
 }

@@ -9,11 +9,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { DotGridIcon } from "@/components/ui/dot-grid-menu";
 import { cn } from "@/lib/utils";
-import { Routes } from "@/routes/constants";
 import { formatCurrency } from "@/pages/agency/billing-and-approvals/billingUtils";
 import type { DuePayrollEntry } from "@/lib/api/payroll";
 import { formatPayrollDateRangeLabel } from "../utils/payrollDashboardUtils";
 import { TABLE_ROW_CLASS } from "./tableColumns";
+import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
 
 const MISSING_STAFF_ID = "—";
 const STAFF_ID_DISPLAY_LENGTH = 6;
@@ -36,18 +36,42 @@ function formatStaffIdDisplay(staffId: string): string {
 }
 
 function StaffIdLink({ staffId, employeeId }: { staffId: string; employeeId: string }) {
+  const { capabilities, directoryRoutes } = useOperationalAgency();
   const displayId = formatStaffIdDisplay(staffId);
+  const detailsRoute = capabilities.canAccessStaffDirectory
+    ? directoryRoutes?.staffDetails
+    : undefined;
 
-  if (!isStaffIdLinkable(staffId)) {
+  if (!isStaffIdLinkable(staffId) || !detailsRoute || !employeeId.trim()) {
     return <span className="text-[13px] text-[#808081]">{displayId}</span>;
   }
 
   return (
     <Link
-      to={Routes.agency.dspProfile.replace(":dspId", employeeId.trim())}
+      to={detailsRoute(employeeId.trim())}
       className="text-[13px] font-medium text-[#10141a] transition-colors hover:text-[#00b4b8] hover:underline"
     >
       {displayId}
+    </Link>
+  );
+}
+
+function StaffName({ name, employeeId }: { name: string; employeeId: string }) {
+  const { capabilities, directoryRoutes } = useOperationalAgency();
+  const detailsRoute = capabilities.canAccessStaffDirectory
+    ? directoryRoutes?.staffDetails
+    : undefined;
+
+  if (!detailsRoute || !employeeId.trim()) {
+    return <span className="truncate text-[14px] font-medium text-[#10141a]">{name}</span>;
+  }
+
+  return (
+    <Link
+      to={detailsRoute(employeeId.trim())}
+      className="truncate text-[14px] font-medium text-[#10141a] transition-colors hover:text-[#00b4b8] hover:underline"
+    >
+      {name}
     </Link>
   );
 }
@@ -169,7 +193,9 @@ function DuePayrollRow({
           />
         </div>
 
-        <span className="pr-14 text-[15px] font-semibold text-[#10141a]">{entry.staffName}</span>
+        <div className="pr-14 text-[15px] font-semibold text-[#10141a]">
+          <StaffName name={entry.staffName} employeeId={entry.employeeId} />
+        </div>
 
         <div className="mt-4 space-y-3">
           <div className="flex justify-between gap-4">
@@ -215,7 +241,7 @@ function DuePayrollRow({
 
   return (
     <div className={TABLE_ROW_CLASS}>
-      <span className="truncate text-[14px] font-medium text-[#10141a]">{entry.staffName}</span>
+      <StaffName name={entry.staffName} employeeId={entry.employeeId} />
       <StaffIdLink staffId={entry.staffId} employeeId={entry.employeeId} />
       <span className="text-[13px] tabular-nums text-[#10141a]">{entry.hoursWorked}</span>
       <DateRange start={entry.dateRangeStart} end={entry.dateRangeEnd} />

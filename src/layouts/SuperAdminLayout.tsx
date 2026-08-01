@@ -1,6 +1,6 @@
 import type {ReactNode} from "react";
 import {useEffect, useMemo} from "react";
-import {Outlet, useNavigate, useLocation} from "react-router";
+import {matchPath, Outlet, useNavigate, useLocation} from "react-router";
 import {useAuth} from "@/utils/auth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import {Routes} from "@/routes/constants";
@@ -22,30 +22,70 @@ import {
   Settings,
   UserLock,
   Briefcase,
-  Wrench,
+  CalendarRange,
 } from "lucide-react";
 
 const allNavItems: NavItem[] = [
   {label: "Dashboard", path: Routes.superAdmin.dashboard, icon: Home}, // Always accessible
   {label: "Agency directory", path: Routes.superAdmin.agencies, icon: Building2, accessKey: "Agency Directory"},
+  {label: "Clients Directory", path: Routes.superAdmin.clientDirectory, icon: UserLock, accessKey: "Clients Directory"},
+  {label: "Shift Management", path: Routes.superAdmin.shifts.index, icon: CalendarRange, accessKey: "Shift Management"},
   {label: "User Access Control", path: Routes.superAdmin.userAccessControl, icon: Users, accessKey: "User Access Control"},
   {label: "Compliance Monitor", path: Routes.superAdmin.complianceMonitor, icon: Shield, accessKey: "Compliance Monitor"},
+  {label: "Billing Management", path: Routes.superAdmin.billing.index, icon: DollarSign, accessKey: "Billing Management"},
   {label: "Global Notes Quality", path: Routes.superAdmin.globalNotesQuality, icon: FileText, accessKey: "Global Notes Quality"},
   {label: "Agency Billing Monitor", path: Routes.superAdmin.agencyBillingMonitor, icon: DollarSign, accessKey: "Agency Billing Monitor"},
   {label: "Corporate Support", path: Routes.superAdmin.corporateSupport, icon: HelpCircle, accessKey: "Corporate Support"},
   {label: "Oversight Center", path: Routes.superAdmin.oversightCenter, icon: BarChart3, accessKey: "Oversight Center"},
-  {label: "Clients Directory", path: Routes.superAdmin.clientDirectory, icon: UserLock, accessKey: "Clients Directory"},
-  {label: "Shift Maintenance", path: Routes.superAdmin.shiftMaintenance, icon: Wrench, accessKey: "Shift Maintenance"},
   {label: "Reports", path: Routes.superAdmin.reports.index, icon: ChartGantt, accessKey: "Reports"},
   {label: "Services", path: Routes.superAdmin.services, icon: Briefcase, accessKey: "Services"},
   {label: "System Settings", path: Routes.superAdmin.systemSettings, icon: Settings, accessKey: "System Settings"},
 ];
+
+function withCurrentSearch(path: string, search: string): string {
+  return search ? `${path}${search}` : path;
+}
+
+function getNavItemsWithBillingChildren(search: string): NavItem[] {
+  return allNavItems.map((item) => {
+    if (item.path !== Routes.superAdmin.billing.index) return item;
+
+    return {
+      ...item,
+      children: [
+        {label: "Financial overview", path: withCurrentSearch(Routes.superAdmin.billing.financialOverview, search)},
+        {label: "Payroll management", path: withCurrentSearch(Routes.superAdmin.billing.payrollManagement, search)},
+        {label: "Claims dashboard", path: withCurrentSearch(Routes.superAdmin.billing.claims, search)},
+        {label: "Expenses", path: withCurrentSearch(Routes.superAdmin.billing.expenses, search)},
+        {label: "Submitted timesheets", path: withCurrentSearch(Routes.superAdmin.billing.staffTimesheets, search)},
+      ],
+    };
+  });
+}
+
+function mostSpecificNavItem(pathname: string): NavItem | undefined {
+  if (pathname === Routes.superAdmin.shifts.maintenance) {
+    return {
+      label: "Shift Management",
+      path: Routes.superAdmin.shifts.maintenance,
+      icon: CalendarRange,
+      accessKey: "Shift Maintenance",
+    };
+  }
+
+  return allNavItems
+    .filter((item) => item.path && matchPath({ path: item.path, end: false }, pathname))
+    .sort((left, right) => (right.path?.length ?? 0) - (left.path?.length ?? 0))[0];
+}
 
 export default function SuperAdminLayout({children}: { children?: ReactNode }) {
   const {user, logout} = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed] = useSidebarCollapsed();
+  const currentNavItem = mostSpecificNavItem(location.pathname);
+  const canRenderCurrentRoute = !currentNavItem?.accessKey
+    || Boolean(user?.profile?.accessList?.includes(currentNavItem.accessKey));
 
   const handleLogout = async () => {
     try {
@@ -57,18 +97,31 @@ export default function SuperAdminLayout({children}: { children?: ReactNode }) {
   };
 
   const navItems = useMemo(() => {
+    const items = getNavItemsWithBillingChildren(location.search);
     if (!user?.profile?.accessList) {
-      return allNavItems.filter(item => !item.accessKey);
+      return items.filter(item => !item.accessKey);
     }
 
     const accessList = user.profile.accessList;
+    const canManageShifts = accessList.includes("Shift Management");
+    const canMaintainShifts = accessList.includes("Shift Maintenance");
     
-    return allNavItems.filter(item => {
-      if (!item.accessKey) return true;
+    return items.flatMap(item => {
+      if (!item.accessKey) return [item];
+
+      if (item.path === Routes.superAdmin.shifts.index) {
+        if (!canManageShifts && !canMaintainShifts) return [];
+        return [{
+          ...item,
+          path: canManageShifts
+            ? Routes.superAdmin.shifts.index
+            : Routes.superAdmin.shifts.maintenance,
+        }];
+      }
       
-      return accessList.includes(item.accessKey);
+      return accessList.includes(item.accessKey) ? [item] : [];
     });
-  }, [user?.profile?.accessList]);
+  }, [location.search, user?.profile?.accessList]);
 
   useEffect(() => {
     if (!user || (user?.userType !== UserType.SUPER_ADMIN)) {
@@ -79,10 +132,6 @@ export default function SuperAdminLayout({children}: { children?: ReactNode }) {
   useEffect(() => {
     if (!user) return;
 
-    const currentPath = location.pathname;
-    
-    const currentNavItem = allNavItems.find((item) => item.path && currentPath.includes(item.path));
-    
     if (!currentNavItem || !currentNavItem.accessKey) {
       return;
     }
@@ -94,7 +143,7 @@ export default function SuperAdminLayout({children}: { children?: ReactNode }) {
       console.warn(`[SuperAdminLayout] Access denied to ${currentNavItem.label}. Redirecting to dashboard.`);
       navigate(Routes.superAdmin.dashboard, {replace: true});
     }
-  }, [user, location.pathname, navigate]);
+  }, [user, currentNavItem, navigate]);
 
   return (
     <ProtectedRoute>
@@ -108,7 +157,7 @@ export default function SuperAdminLayout({children}: { children?: ReactNode }) {
       />
       <DashboardSidebar navItems={navItems}/>
       <main className={`ml-0 ${collapsed ? "md:ml-[112px]" : "md:ml-[240px]"} pt-[130px] pb-10 transition-[margin] duration-200`}>
-        <div className="px-8">{children ?? <Outlet/>}</div>
+        <div className="px-8">{canRenderCurrentRoute ? (children ?? <Outlet/>) : null}</div>
       </main>
     </div>
     </ProtectedRoute>

@@ -1,12 +1,9 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight, Search, X, Loader2, CheckCircle, Check, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router";
-import { Routes } from "@/routes/constants";
 import { format } from "date-fns";
 import { listShifts, Shift, updateShift, ShiftStatus, formatShiftLocation } from "@/lib/api/shifts";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/utils/auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Dialog,
@@ -16,6 +13,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
+import { useLocation } from "react-router";
+import {
+  loadAllShiftPages,
+  operationAgencyId,
+  scopedShiftListParams,
+} from "@/lib/operational-agency/shiftScope";
 
 const getInitialsFromName = (name: string) => {
   const parts = name.split(" ").filter(Boolean);
@@ -27,9 +31,10 @@ const getInitialsFromName = (name: string) => {
 };
 
 export default function ApprovalsPage() {
-  const navigate = useNavigate();
-  const { user } = useAuth();
   const { toast } = useToast();
+  const { agencyId, agency } = useOperationalAgency();
+  const location = useLocation();
+  const operationScopeRef = useRef(0);
   
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -58,23 +63,21 @@ export default function ApprovalsPage() {
   
   const itemsPerPage = 7;
 
-  // Fetch shifts from API
-  useEffect(() => {
-    const fetchShifts = async () => {
+  const fetchShifts = useCallback(async (signal?: AbortSignal) => {
       try {
         setLoading(true);
-        const response = await listShifts({
-          limit: 100,
-          agencyId: user?.agencyId,
-          client: true,
-          employee: true,
-        });
+        const loadedShifts = await loadAllShiftPages(
+          (params) => listShifts(params, { signal }),
+          scopedShiftListParams(agencyId, location.search),
+        );
+        if (signal?.aborted) return;
         // Get all completed shifts (we'll filter by approved status based on filterStatus)
-        const completedShifts = (response.shifts || []).filter(shift => 
+        const completedShifts = loadedShifts.filter(shift =>
           shift.status === ShiftStatus.COMPLETED
         );
         setShifts(completedShifts);
       } catch (error) {
+        if (signal?.aborted) return;
         console.error("Failed to fetch shifts:", error);
         toast({
           title: "Error",
@@ -82,17 +85,35 @@ export default function ApprovalsPage() {
           variant: "destructive",
         });
       } finally {
-        setLoading(false);
+        if (!signal?.aborted) setLoading(false);
       }
-    };
+  }, [agencyId, location.search, toast]);
 
-    if (user?.agencyId) {
-      fetchShifts();
-    } else {
-      setLoading(false);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.agencyId]);
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetchShifts(controller.signal);
+    return () => controller.abort();
+  }, [fetchShifts]);
+
+  useEffect(() => {
+    operationScopeRef.current += 1;
+    setSearchQuery("");
+    setCurrentPage(1);
+    setFilterStatus("inactive");
+    setShifts([]);
+    setShowApproveModal(false);
+    setShowRejectModal(false);
+    setShowSuccessModal(false);
+    setShowCancelSuccessModal(false);
+    setShiftToApprove(null);
+    setApprovedShiftInfo(null);
+    setCancelledShiftInfo(null);
+    setIsApproving(false);
+    setIsRejecting(false);
+    return () => {
+      operationScopeRef.current += 1;
+    };
+  }, [agencyId]);
 
   // Filter shifts based on search and filter status (active/inactive)
   const filteredShifts = useMemo(() => {
@@ -140,9 +161,16 @@ export default function ApprovalsPage() {
   };
 
   const confirmApproveShift = async (shiftId: string) => {
+    const operationScope = operationScopeRef.current;
     try {
       setIsApproving(true);
-      await updateShift(shiftId, { approved: true });
+      if (!shiftToApprove) throw new Error("Shift is missing.");
+      await updateShift(
+        shiftId,
+        { approved: true },
+        { agencyId: operationAgencyId(shiftToApprove, agencyId) },
+      );
+      if (operationScope !== operationScopeRef.current) return;
       
       // Capture info for success modal before we update the shift
       if (shiftToApprove) {
@@ -178,6 +206,7 @@ export default function ApprovalsPage() {
       setShiftToApprove(null);
       setShowSuccessModal(true);
     } catch (error) {
+      if (operationScope !== operationScopeRef.current) return;
       console.error("Failed to approve shift:", error);
       toast({
         title: "Error",
@@ -185,14 +214,21 @@ export default function ApprovalsPage() {
         variant: "destructive",
       });
     } finally {
-      setIsApproving(false);
+      if (operationScope === operationScopeRef.current) setIsApproving(false);
     }
   };
 
   const confirmRejectShift = async (shiftId: string) => {
+    const operationScope = operationScopeRef.current;
     try {
       setIsRejecting(true);
-      await updateShift(shiftId, { approved: false });
+      if (!shiftToApprove) throw new Error("Shift is missing.");
+      await updateShift(
+        shiftId,
+        { approved: false },
+        { agencyId: operationAgencyId(shiftToApprove, agencyId) },
+      );
+      if (operationScope !== operationScopeRef.current) return;
       
       // Capture info for success modal before we update the shift
       if (shiftToApprove) {
@@ -229,6 +265,7 @@ export default function ApprovalsPage() {
       setShiftToApprove(null);
       setShowCancelSuccessModal(true);
     } catch (error) {
+      if (operationScope !== operationScopeRef.current) return;
       console.error("Failed to reject shift:", error);
       toast({
         title: "Error",
@@ -236,7 +273,7 @@ export default function ApprovalsPage() {
         variant: "destructive",
       });
     } finally {
-      setIsRejecting(false);
+      if (operationScope === operationScopeRef.current) setIsRejecting(false);
     }
   };
 
@@ -397,7 +434,7 @@ export default function ApprovalsPage() {
                           {clientName}
                         </span>
                         <span className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-                          Client
+                          {agencyId ? "Client" : apiShift.agency?.name || "Unknown agency"}
                         </span>
                       </div>
                     </div>
@@ -519,7 +556,7 @@ export default function ApprovalsPage() {
                     ? `${shiftToApprove.client.firstName || ""} ${shiftToApprove.client.lastName || ""}`.trim() || "Unknown Client"
                     : "Unknown Client"}
                 </span>
-                ?
+                {` at ${agency.name}?`}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter className="flex justify-end gap-3 mt-2">
@@ -570,7 +607,7 @@ export default function ApprovalsPage() {
                     ? `${shiftToApprove.client.firstName || ""} ${shiftToApprove.client.lastName || ""}`.trim() || "Unknown Client"
                     : "Unknown Client"}
                 </span>
-                ? This action cannot be undone.
+                {` at ${agency.name}? This action cannot be undone.`}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter className="flex justify-end gap-3 mt-2">

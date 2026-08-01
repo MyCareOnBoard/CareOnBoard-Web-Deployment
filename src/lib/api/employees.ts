@@ -234,9 +234,12 @@ export async function getCurrentEmployee(): Promise<Employee> {
  * ✅ Get employee by ID
  * Endpoint: GET /employees/:employeeId
  */
-export async function getEmployeeById(employeeId: string): Promise<Employee> {
+export async function getEmployeeById(employeeId: string, agencyId?: string, options: { signal?: AbortSignal } = {}): Promise<Employee> {
     try {
-        const response = await axiosClient.get<EmployeeResponse>(`/employees/${employeeId}`);
+        const response = await axiosClient.get<EmployeeResponse>(`/employees/${employeeId}`, {
+            params: agencyId ? { agencyId } : undefined,
+            signal: options.signal,
+        });
 
         if (!response.data.success) {
             throw new Error('Employee not found');
@@ -450,12 +453,14 @@ export interface ListActivityLogsResponse {
  * Endpoint: POST /employees/activity-logs
  */
 export async function createEmployeeActivityLog(
-    data: CreateActivityLogRequest
+    data: CreateActivityLogRequest,
+    options: { signal?: AbortSignal } = {},
 ): Promise<ActivityLogResponse> {
     try {
         const response = await axiosClient.post<ActivityLogResponse>(
             '/employees/activity-logs',
-            data
+            data,
+            { signal: options.signal },
         );
         return response.data;
     } catch (err: any) {

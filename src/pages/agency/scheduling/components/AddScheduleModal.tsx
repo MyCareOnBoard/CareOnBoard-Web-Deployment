@@ -3,20 +3,16 @@ import { X, ChevronDown, Calendar, Upload, ChevronLeft, ChevronRight, FileText, 
 import { Button } from "@/components/ui/button";
 import TimePicker from "@/components/TimePicker";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, eachDayOfInterval as eachDayOfIntervalDateFns, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, parseISO, isValid } from "date-fns";
-import { searchClients, Client, ClientService, ClientDsp, getAgencyClientById } from "@/lib/api/clients";
+import type { Client, ClientService, ClientDsp } from "@/lib/api/clients";
 import { CoverageFields } from "@/components/CoverageFields";
 import { COVERAGE, isValidSplit, resolveLineCoverage, type Coverage, type SplitMode } from "@/lib/coverage";
-import { getEmployeeById } from "@/lib/api/employees";
 import { useAuth } from "@/utils/auth";
-import { useSelector } from "react-redux";
-import type { RootState } from "@/store/redux/store";
-import { Routes } from "@/routes/constants";
 import { useToast } from "@/hooks/use-toast";
 import { listShifts, Shift, ShiftStatus, createShift, ShiftType, SubmissionStatus, updateShift, CreateShiftRequest, ShiftActionStatus, ShiftLocation, formatShiftLocation, ShiftResponse } from "@/lib/api/shifts";
-import { createEmployeeActivityLog, CreateActivityLogRequest } from "@/lib/api/employees";
+import type { CreateActivityLogRequest } from "@/lib/api/employees";
 import ScheduleSuccessModal from "./ScheduleSuccessModal";
 import ScheduleSavedModal from "./ScheduleSavedModal";
-import { createGoalDocument, DocumentType, CreateGoalDocumentRequest } from "@/lib/api/goals-and-documents";
+import { DocumentType } from "@/lib/api/goals-and-documents";
 import { noteTypesForClientType, getNoteTitle, HHA_PERSONAL_CARE, HHA_SERVICE_LOG } from "@/lib/notes/noteTypes";
 import { resolveHhaNoteType } from "@/pages/agency/scheduling/utils/resolveHhaNoteType";
 import { getClientBasicInfo } from "@/lib/notes/clientBasicInfo";
@@ -47,6 +43,11 @@ import {
   type WeeklyDistributionSnapshot,
 } from "@/pages/agency/scheduling/weeklyDistributionSchedule";
 import { staffLabels } from "@/lib/roleLabel";
+import type { AgencyMode } from "@/store/redux/agencyModeSlice";
+import type {
+  OperationalAgencyDataAdapter,
+  OperationalClientOption,
+} from "@/lib/operational-agency/types";
 
 function tryParseServiceAuthDate(raw?: string): Date | null {
   if (!raw?.trim()) return null;
@@ -176,6 +177,11 @@ function resolveIspOutcomeActivityLabel(
 interface AddScheduleModalProps {
   isOpen: boolean;
   onClose: () => void;
+  agencyId: string;
+  agencyName: string;
+  agencyMode: AgencyMode | null;
+  supportedClientTypes: readonly ("ddd" | "hha")[];
+  data: OperationalAgencyDataAdapter;
   onShiftsUpdated?: (shifts: Shift[]) => void;
   editData?: ScheduleFormData | null; // For edit mode
   mode?: "create" | "edit";
@@ -330,13 +336,22 @@ const convertTo12Hour = (time24h: string): string => {
   return `${hours.toString().padStart(2, "0")}:${minutes}:${period}`;
 };
 
-export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, editData, mode = "create" }: AddScheduleModalProps) {
+export default function AddScheduleModal({
+  isOpen,
+  onClose,
+  agencyId,
+  agencyName,
+  agencyMode,
+  supportedClientTypes,
+  data,
+  onShiftsUpdated,
+  editData,
+  mode = "create",
+}: AddScheduleModalProps) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const agencyId = user?.agencyId || user?.agency?.id || "";
-  const agencyMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId]);
   const isHhaAgencyMode = agencyMode === "hha";
-  const labels = staffLabels(agencyMode ? [agencyMode] : user?.agency?.supportedClientTypes);
+  const labels = staffLabels(agencyMode ? [agencyMode] : [...supportedClientTypes]);
   const [formData, setFormData] = useState<ScheduleFormData>(initialFormData);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -359,18 +374,42 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     useState<WeeklyDistributionSnapshot | null>(null);
 
   // API search states
-  const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
+  const [clientSearchResults, setClientSearchResults] = useState<OperationalClientOption[]>([]);
   const [selectedClientServices, setSelectedClientServices] = useState<ClientService[]>([]);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isSearchingClients, setIsSearchingClients] = useState(false);
 
   // Debounce refs
   const clientSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const clientSearchAbortRef = useRef<AbortController | null>(null);
+  const clientContextAbortRef = useRef<AbortController | null>(null);
+  const staffContextAbortRef = useRef<AbortController | null>(null);
+  const mutationAbortRef = useRef<AbortController | null>(null);
+  const mutationGenerationRef = useRef(0);
+  const mountedRef = useRef(true);
+  const isOpenRef = useRef(isOpen);
+  isOpenRef.current = isOpen;
   /** Discards stale async results when the user selects another client quickly. */
   const latestClientSelectIdRef = useRef<string | null>(null);
   /** Discards stale `getEmployeeById` when service or DSP selection changes quickly. */
   const dspVerifyTokenRef = useRef(0);
   const serviceDropdownRef = useRef<HTMLDivElement>(null);
+
+  const isCurrentMutation = useCallback((generation: number, controller: AbortController) => (
+    mountedRef.current &&
+    isOpenRef.current &&
+    mutationGenerationRef.current === generation &&
+    mutationAbortRef.current === controller &&
+    !controller.signal.aborted
+  ), []);
+
+  const beginMutation = useCallback(() => {
+    mutationAbortRef.current?.abort();
+    const controller = new AbortController();
+    const generation = ++mutationGenerationRef.current;
+    mutationAbortRef.current = controller;
+    return { controller, generation };
+  }, []);
 
   // Success / saved modals state
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -396,18 +435,36 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
   // Reset form when modal opens/closes or when editData changes
   useEffect(() => {
+    isOpenRef.current = isOpen;
+    mutationGenerationRef.current += 1;
+    mutationAbortRef.current?.abort();
+    clientContextAbortRef.current?.abort();
+    staffContextAbortRef.current?.abort();
+    dspVerifyTokenRef.current += 1;
     if (isOpen) {
       if (editData && mode === "edit") {
         setFormData(editData);
 
         // Fetch client data to populate services dropdown
         if (editData.clientId) {
-          getAgencyClientById(editData.clientId)
+          const requestKey = `${agencyId}:${editData.clientId}`;
+          const controller = new AbortController();
+          clientContextAbortRef.current = controller;
+          latestClientSelectIdRef.current = requestKey;
+          data.getClientSchedulingContext(editData.clientId, { signal: controller.signal })
             .then((client) => {
+              if (
+                controller.signal.aborted ||
+                clientContextAbortRef.current !== controller ||
+                latestClientSelectIdRef.current !== requestKey ||
+                !mountedRef.current ||
+                !isOpenRef.current
+              ) return;
               setSelectedClient(client);
               setSelectedClientServices(getClientServicesForOperations(client));
             })
             .catch((error) => {
+              if (controller.signal.aborted || clientContextAbortRef.current !== controller) return;
               console.error("Failed to fetch client for edit:", error);
             });
         }
@@ -428,12 +485,22 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         setSelectedClientServices([]);
       }
     }
-  }, [isOpen, editData, mode]);
+  }, [agencyId, data, isOpen, editData, mode]);
 
   // Cleanup timeouts on unmount
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
+      isOpenRef.current = false;
       if (clientSearchTimeoutRef.current) clearTimeout(clientSearchTimeoutRef.current);
+      clientSearchAbortRef.current?.abort();
+      clientContextAbortRef.current?.abort();
+      staffContextAbortRef.current?.abort();
+      mutationAbortRef.current?.abort();
+      mutationGenerationRef.current += 1;
+      dspVerifyTokenRef.current += 1;
+      latestClientSelectIdRef.current = null;
     };
   }, []);
 
@@ -454,7 +521,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
    * For recurring schedules with selected weekdays, only creates shifts on those days
    */
   const buildShiftRequests = (data: ScheduleFormData): CreateShiftRequest[] => {
-    if (!user?.agencyId || !data.assignedDspId) return [];
+    if (!agencyId || !data.assignedDspId) return [];
 
     const weekdaySchedulesForBuild = effectiveWeekdaySchedulesForShiftBuild({
       weekdaySchedules: selectedWeekdays,
@@ -492,7 +559,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
             if (weekdaySchedule) {
               const baseShiftData = {
                 employeeId: data.assignedDspId,
-                agencyId: user?.agencyId || "",
+                agencyId,
                 location: data.clientLocation || "",
                 startTime: weekdaySchedule.clockInTime,
                 endTime: weekdaySchedule.clockOutTime,
@@ -520,7 +587,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         dateRange.forEach((date) => {
           const baseShiftData = {
             employeeId: data.assignedDspId,
-            agencyId: user?.agencyId || "",
+            agencyId,
             location: data.clientLocation || "",
             startTime: data.clockInTime,
             endTime: data.clockOutTime,
@@ -547,7 +614,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         weekdaySchedulesForBuild.length === 1 ? weekdaySchedulesForBuild[0] : null;
       const baseShiftData = {
         employeeId: data.assignedDspId,
-        agencyId: user?.agencyId || "",
+        agencyId,
         location: data.clientLocation || "",
         startTime: weekdaySchedule?.clockInTime || data.clockInTime,
         endTime: weekdaySchedule?.clockOutTime || data.clockOutTime,
@@ -581,6 +648,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
     // If query is too short, clear results
     if (query.trim().length < 2) {
+      clientSearchAbortRef.current?.abort();
+      setIsSearchingClients(false);
       setClientSearchResults([]);
       setShowClientDropdown(false);
       return;
@@ -588,26 +657,31 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
     // Debounce the search
     clientSearchTimeoutRef.current = setTimeout(async () => {
+      const controller = new AbortController();
       try {
         setIsSearchingClients(true);
-        const results = await searchClients(query, user?.agencyId, agencyMode ?? undefined);
-        // Only active clients can be scheduled (HHA clients without an approved
-        // Form 485 are kept non-active). Mirrors the backend CLIENT_INACTIVE gate.
-        const schedulable = results.filter(
-          (c) =>
-            (!c.status || c.status === "active") &&
-            (!agencyMode || (c.type ?? "ddd") === agencyMode),
-        );
-        setClientSearchResults(schedulable);
-        setShowClientDropdown(schedulable.length > 0);
+        clientSearchAbortRef.current?.abort();
+        clientSearchAbortRef.current = controller;
+        const results = await data.searchClients({
+          search: query,
+          mode: agencyMode ?? undefined,
+          limit: 50,
+          signal: controller.signal,
+        });
+        if (controller.signal.aborted) return;
+        setClientSearchResults(results.items);
+        setShowClientDropdown(results.items.length > 0);
       } catch (error) {
+        if (controller.signal.aborted) return;
         console.error("Failed to search clients:", error);
         setClientSearchResults([]);
       } finally {
-        setIsSearchingClients(false);
+        if (clientSearchAbortRef.current === controller && !controller.signal.aborted) {
+          setIsSearchingClients(false);
+        }
       }
     }, 300);
-  }, [user?.agencyId, agencyMode]);
+  }, [agencyMode, data]);
 
   const getClientPrimaryAddress = (client: Client): ShiftLocation | null => {
     if (client.primaryAddress) {
@@ -633,41 +707,72 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
     return null;
   };
 
-  const handleClientSelect = (client: Client) => {
-    const selectId = client.id;
-    latestClientSelectIdRef.current = selectId;
+  const handleClientSelect = (clientOption: OperationalClientOption) => {
+    const requestKey = `${agencyId}:${clientOption.id}`;
+    const controller = new AbortController();
+    clientContextAbortRef.current?.abort();
+    clientContextAbortRef.current = controller;
+    latestClientSelectIdRef.current = requestKey;
     dspVerifyTokenRef.current += 1;
     setShowAssignDspDropdown(false);
     setShowServiceDropdown(false);
 
     setFormData((prev) => ({
       ...prev,
-      client:
-        client.firstName && client.lastName
-          ? `${client.firstName} ${client.lastName}`
-          : client.id,
-      clientId: client.id,
-      clientLocation: getClientPrimaryAddress(client),
+      client: clientOption.name,
+      clientId: clientOption.id,
+      clientLocation: null,
       serviceCode: "",
       serviceAuthorizationId: "",
       assignedDsp: "",
       assignedDspId: "",
       billingRate: "",
-      // Seed coverage from the client's default; the user can change it before saving.
-      ...(() => {
-        const c = resolveLineCoverage(null, client);
-        return { coverage: c.coverage, splitMode: c.splitMode, splitValue: c.splitValue };
-      })(),
       ispOutcome: "",
       notesType: "",
       goalsType: "",
     }));
-    setSelectedClient(client);
-    setSelectedClientServices(getClientServicesForOperations(client));
+    setSelectedClient(null);
+    setSelectedClientServices([]);
     setSelectedWeeklyDistributionIndex(null);
     setSelectedDistributionSnapshot(null);
     setShowClientDropdown(false);
     setClientSearchResults([]);
+    void data.getClientSchedulingContext(clientOption.id, { signal: controller.signal })
+      .then((client) => {
+        if (
+          controller.signal.aborted ||
+          clientContextAbortRef.current !== controller ||
+          latestClientSelectIdRef.current !== requestKey ||
+          !mountedRef.current ||
+          !isOpenRef.current
+        ) return;
+        const coverage = resolveLineCoverage(null, client);
+        setFormData((prev) => ({
+          ...prev,
+          client: `${client.firstName || ""} ${client.lastName || ""}`.trim() || clientOption.name,
+          clientLocation: getClientPrimaryAddress(client),
+          coverage: coverage.coverage,
+          splitMode: coverage.splitMode,
+          splitValue: coverage.splitValue,
+        }));
+        setSelectedClient(client);
+        setSelectedClientServices(getClientServicesForOperations(client));
+      })
+      .catch((error) => {
+        if (
+          controller.signal.aborted ||
+          clientContextAbortRef.current !== controller ||
+          latestClientSelectIdRef.current !== requestKey ||
+          !mountedRef.current ||
+          !isOpenRef.current
+        ) return;
+        console.error("Failed to load selected client:", error);
+        toast({
+          title: "Couldn't load client details",
+          description: "Choose the client again or try another client.",
+          variant: "destructive",
+        });
+      });
   };
 
   // Calendar days calculation
@@ -853,8 +958,17 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         return;
       }
       try {
-        const emp = await getEmployeeById(dspId);
-        if (token !== dspVerifyTokenRef.current) return;
+        staffContextAbortRef.current?.abort();
+        const controller = new AbortController();
+        staffContextAbortRef.current = controller;
+        const emp = await data.getStaffSchedulingContext(dspId, { signal: controller.signal });
+        if (
+          token !== dspVerifyTokenRef.current ||
+          controller.signal.aborted ||
+          staffContextAbortRef.current !== controller ||
+          !mountedRef.current ||
+          !isOpenRef.current
+        ) return;
         if (emp.workAvailability !== true) {
           setFormData((prev) => ({ ...prev, assignedDsp: "", assignedDspId: "" }));
           toast({
@@ -867,7 +981,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         }
         setFormData((prev) => ({ ...prev, assignedDsp: dspName, assignedDspId: dspId }));
       } catch {
-        if (token !== dspVerifyTokenRef.current) return;
+        if (token !== dspVerifyTokenRef.current || !mountedRef.current || !isOpenRef.current) return;
         setFormData((prev) => ({ ...prev, assignedDsp: "", assignedDspId: "" }));
         toast({
           title: `Could not verify assigned ${labels.noun}`,
@@ -876,7 +990,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         });
       }
     },
-    [toast, labels.noun],
+    [data, toast, labels.noun],
   );
 
   const handleServiceRowChange = useCallback(
@@ -1377,14 +1491,14 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       activityType: effectiveNotesType,
       shiftId,
       employeeId: formData.assignedDspId,
-      agencyId: user?.agencyId || "",
+      agencyId,
       description: "",
       metadata: {
         employee: formData.assignedDsp,
         individual: formData.client || "Unknown Client",
         clientId: formData.clientId || "",
         agency: user?.fullName || "",
-        agencyName: user?.agency?.name || "",
+        agencyName,
         serviceYear: shiftDate.getFullYear(),
         serviceCode: formData.serviceCode || "",
         ISPOutcome: resolveIspOutcomeActivityLabel(selectedClient, selectedClientServices, formData),
@@ -1407,26 +1521,36 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
   };
 
   // Keeps the shift's activity log in sync after an edit (upsert by shiftId).
-  const reconcileShiftActivityLog = async (shiftId: string) => {
+  const reconcileShiftActivityLog = async (
+    shiftId: string,
+    operation: { controller: AbortController; generation: number },
+  ): Promise<boolean> => {
     const effectiveNotesType = isHhaClient ? resolvedHhaNoteType : formData.notesType;
-    if (!shiftId || !effectiveNotesType) return;
+    if (!shiftId || !effectiveNotesType) return isCurrentMutation(operation.generation, operation.controller);
     // DDD: only reconcile when the note type actually changed (avoids an extra
     // read+write per edit). HHA may also have updated service-derived metadata
     // (goal, times, service code), so always reconcile.
-    if (!isHhaClient && editData?.notesType === effectiveNotesType) return;
+    if (!isHhaClient && editData?.notesType === effectiveNotesType) {
+      return isCurrentMutation(operation.generation, operation.controller);
+    }
     const shiftDate = formData.date ? new Date(formData.date) : new Date();
     try {
-      await createEmployeeActivityLog(
+      await data.createStaffActivity(
+        formData.assignedDspId,
         buildShiftActivityLogPayload(shiftId, formData.clockInTime, formData.clockOutTime, shiftDate),
+        { signal: operation.controller.signal },
       );
+      return isCurrentMutation(operation.generation, operation.controller);
     } catch (error) {
+      if (!isCurrentMutation(operation.generation, operation.controller)) return false;
       console.error("Failed to reconcile activity log for shift:", shiftId, error);
+      return true;
     }
   };
 
   // Handle saving schedule as draft
   const handleSaveDraft = async () => {
-    if (!user?.agencyId) {
+    if (!agencyId) {
       toast({
         title: "Authentication Error",
         description: "User not authenticated. Please log in and try again.",
@@ -1451,6 +1575,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       return format(new Date(), "d MMMM");
     };
 
+    const operation = beginMutation();
     setIsSubmitting(true);
     try {
       // Edit existing shift as draft
@@ -1476,8 +1601,13 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
             updatePayload.date = format(formData.date, "yyyy-MM-dd");
           }
 
-          await updateShift(formData.shiftId, updatePayload);
-          await reconcileShiftActivityLog(formData.shiftId);
+          await updateShift(formData.shiftId, updatePayload, {
+            agencyId,
+            signal: operation.controller.signal,
+          });
+          if (!isCurrentMutation(operation.generation, operation.controller)) return;
+          if (!(await reconcileShiftActivityLog(formData.shiftId, operation))) return;
+          if (!isCurrentMutation(operation.generation, operation.controller)) return;
 
           setSavedShiftInfo({
             clientName: formData.client || "Client",
@@ -1486,12 +1616,16 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           });
           setShowSavedModal(true);
 
-          const response = await listShifts({
-            limit: 100,
-            agencyId: user?.agencyId || "",
-            client: true,
-            employee: true,
-          });
+          const response = await listShifts(
+            {
+              limit: 100,
+              agencyId,
+              client: true,
+              employee: true,
+            },
+            { signal: operation.controller.signal },
+          );
+          if (!isCurrentMutation(operation.generation, operation.controller)) return;
           onShiftsUpdated?.(response.shifts || []);
 
           toast({
@@ -1499,6 +1633,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
             description: "Shift has been saved as draft successfully.",
           });
         } catch (error: any) {
+          if (!isCurrentMutation(operation.generation, operation.controller)) return;
           console.error("Failed to save draft schedule:", error);
           toast({
             title: error?.response?.data?.code || "Save Failed",
@@ -1506,7 +1641,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
             variant: "destructive",
           });
         } finally {
-          setIsSubmitting(false);
+          if (isCurrentMutation(operation.generation, operation.controller)) {
+            setIsSubmitting(false);
+          }
         }
         return;
       }
@@ -1520,7 +1657,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
             formData,
             weekdaySchedules: selectedWeekdays,
             weekdayLabelByIndex: WEEKDAY_LABEL_BY_INDEX,
-            hasAgencyId: Boolean(user?.agencyId),
+            hasAgencyId: Boolean(agencyId),
             hasAssignedDspId: Boolean(formData.assignedDspId.trim()),
             action: "save",
           }),
@@ -1531,9 +1668,13 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
       const results = await createShiftsCapAware(
         shiftRequests,
-        (request) => createShift(request),
+        (request) => createShift(request, {
+          agencyId,
+          signal: operation.controller.signal,
+        }),
         selectedDistributionSnapshot,
       );
+      if (!isCurrentMutation(operation.generation, operation.controller)) return;
 
       const failures = results.filter((r) => r.status === "rejected");
       const successes = results.filter((r) => r.status === "fulfilled");
@@ -1562,15 +1703,20 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         });
         setShowSavedModal(true);
 
-        const response = await listShifts({
-          limit: 100,
-          agencyId: user?.agencyId || "",
-          client: true,
-          employee: true,
-        });
+        const response = await listShifts(
+          {
+            limit: 100,
+            agencyId,
+            client: true,
+            employee: true,
+          },
+          { signal: operation.controller.signal },
+        );
+        if (!isCurrentMutation(operation.generation, operation.controller)) return;
         onShiftsUpdated?.(response.shifts || []);
       }
     } catch (error: any) {
+      if (!isCurrentMutation(operation.generation, operation.controller)) return;
       console.error("Failed to save draft schedule:", error);
       toast({
         title: error?.response?.data?.code || "Save Failed",
@@ -1578,13 +1724,15 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         variant: "destructive",
       });
     } finally {
-      setIsSubmitting(false);
+      if (isCurrentMutation(operation.generation, operation.controller)) {
+        setIsSubmitting(false);
+      }
     }
   };
 
   // Handle scheduling (submitting) shifts
   const handleSubmit = async () => {
-    if (!user?.agencyId) {
+    if (!agencyId) {
       toast({
         title: "Authentication Error",
         description: "User not authenticated. Please log in and try again.",
@@ -1608,6 +1756,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
       return;
     }
 
+    const operation = beginMutation();
     setIsSubmitting(true);
     try {
       const getDisplayDate = () => {
@@ -1657,8 +1806,13 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
           updatePayload.date = format(formData.date, "yyyy-MM-dd");
         }
 
-        await updateShift(formData.shiftId, updatePayload);
-        await reconcileShiftActivityLog(formData.shiftId);
+        await updateShift(formData.shiftId, updatePayload, {
+          agencyId,
+          signal: operation.controller.signal,
+        });
+        if (!isCurrentMutation(operation.generation, operation.controller)) return;
+        if (!(await reconcileShiftActivityLog(formData.shiftId, operation))) return;
+        if (!isCurrentMutation(operation.generation, operation.controller)) return;
 
         setUpdatedShiftInfo({
           clientName: formData.client || "Client",
@@ -1673,12 +1827,16 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         });
         setShowUpdatedModal(true);
 
-        const response = await listShifts({
-          limit: 100,
-          agencyId: user?.agencyId || "",
-          client: true,
-          employee: true,
-        });
+        const response = await listShifts(
+          {
+            limit: 100,
+            agencyId,
+            client: true,
+            employee: true,
+          },
+          { signal: operation.controller.signal },
+        );
+        if (!isCurrentMutation(operation.generation, operation.controller)) return;
         onShiftsUpdated?.(response.shifts || []);
 
         toast({
@@ -1700,7 +1858,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
             formData,
             weekdaySchedules: selectedWeekdays,
             weekdayLabelByIndex: WEEKDAY_LABEL_BY_INDEX,
-            hasAgencyId: Boolean(user?.agencyId),
+            hasAgencyId: Boolean(agencyId),
             hasAssignedDspId: Boolean(formData.assignedDspId.trim()),
             action: "schedule",
           }),
@@ -1719,9 +1877,13 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
       const results = await createShiftsCapAware(
         finalShiftRequests,
-        (request) => createShift(request),
+        (request) => createShift(request, {
+          agencyId,
+          signal: operation.controller.signal,
+        }),
         selectedDistributionSnapshot,
       );
+      if (!isCurrentMutation(operation.generation, operation.controller)) return;
 
       const activityLogPromises = results
         .map((result, index) => {
@@ -1733,15 +1895,19 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                 ? new Date(finalShiftRequests[index].date)
                 : new Date();
 
-              return createEmployeeActivityLog(
+              return data.createStaffActivity(
+                formData.assignedDspId,
                 buildShiftActivityLogPayload(
                   shiftId,
                   createdShift.shift?.startTime || "",
                   createdShift.shift?.endTime || "",
                   shiftDate,
                 ),
+                { signal: operation.controller.signal },
               ).catch((error) => {
-                console.error("Failed to create activity log for shift:", shiftId, error);
+                if (isCurrentMutation(operation.generation, operation.controller)) {
+                  console.error("Failed to create activity log for shift:", shiftId, error);
+                }
                 return null;
               });
             }
@@ -1752,6 +1918,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
       if (activityLogPromises.length > 0) {
         await Promise.allSettled(activityLogPromises as Promise<unknown>[]);
+        if (!isCurrentMutation(operation.generation, operation.controller)) return;
       }
 
       // Create goal documents if goalsType is set (DDD only; HHA uses the
@@ -1767,34 +1934,42 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         // Create goal documents with shiftId at top level
         const goalResults = await Promise.all(
           successfulShifts.map((shift) =>
-            createGoalDocument({
-              agencyId: user?.agencyId || "",
-              clientId: formData.clientId || undefined,
-              createdBy: user?.id,
-              documentType: formData.goalsType as DocumentType,
-              status: SubmissionStatus.DRAFT,
-              shiftId: shift.id,
-              metadata: {
-                name: formData.client,
-                completedBy: formData.assignedDsp,
-                completionDate: shift.date || format(new Date(), "yyyy-MM-dd"),
-              } as any,
-            }).catch((err) => {
-              console.error("Failed to create goal document:", err);
+            data.createGoalDocument(
+              formData.clientId,
+              shift.id,
+              {
+                documentType: formData.goalsType as DocumentType,
+                metadata: {
+                  name: formData.client,
+                  completedBy: formData.assignedDsp,
+                  completionDate: shift.date || format(new Date(), "yyyy-MM-dd"),
+                } as any,
+              },
+              { signal: operation.controller.signal },
+            ).catch((err) => {
+              if (isCurrentMutation(operation.generation, operation.controller)) {
+                console.error("Failed to create goal document:", err);
+              }
               return null;
             })
           )
         );
+        if (!isCurrentMutation(operation.generation, operation.controller)) return;
 
         // Update shifts with goalsAndDocumentsId
         const shiftUpdates = successfulShifts
           .map((shift, index) => {
             const goalResult = goalResults[index];
-            if (goalResult && goalResult.document?.id) {
+            if (goalResult?.id) {
               return updateShift(shift.id, {
-                goalsAndDocumentsId: goalResult.document.id,
+                goalsAndDocumentsId: goalResult.id,
+              }, {
+                agencyId,
+                signal: operation.controller.signal,
               }).catch((err) => {
-                console.error(`Failed to update shift ${shift.id} with goal doc ID:`, err);
+                if (isCurrentMutation(operation.generation, operation.controller)) {
+                  console.error(`Failed to update shift ${shift.id} with goal doc ID:`, err);
+                }
                 return null;
               });
             }
@@ -1804,6 +1979,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
         if (shiftUpdates.length > 0) {
           await Promise.all(shiftUpdates);
+          if (!isCurrentMutation(operation.generation, operation.controller)) return;
         }
       }
 
@@ -1836,12 +2012,16 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         });
         setShowSuccessModal(true);
 
-        const response = await listShifts({
-          limit: 100,
-          agencyId: user?.agencyId || "",
-          client: true,
-          employee: true,
-        });
+        const response = await listShifts(
+          {
+            limit: 100,
+            agencyId,
+            client: true,
+            employee: true,
+          },
+          { signal: operation.controller.signal },
+        );
+        if (!isCurrentMutation(operation.generation, operation.controller)) return;
         onShiftsUpdated?.(response.shifts || []);
 
         toast({
@@ -1852,6 +2032,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         onClose();
       }
     } catch (error: any) {
+      if (!isCurrentMutation(operation.generation, operation.controller)) return;
       console.error("Failed to create schedule:", error);
       toast({
         title: error?.response?.data?.code || "Scheduling Failed",
@@ -1859,7 +2040,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
         variant: "destructive",
       });
     } finally {
-      setIsSubmitting(false);
+      if (isCurrentMutation(operation.generation, operation.controller)) {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -1875,6 +2058,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
 
           {/* Modal */}
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Schedule editor"
             className="relative bg-white rounded-[30px] border border-[rgba(255,255,255,0.3)] w-full max-w-[500px] max-h-[90vh] shadow-xl flex flex-col"
           >
             {/* Title Bar - Fixed */}
@@ -1883,6 +2069,8 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                 {mode === "edit" ? "Edit Schedule" : "Add new Schedule"}
               </h2>
               <button
+                type="button"
+                aria-label="Close schedule editor"
                 onClick={onClose}
                 disabled={isSubmitting}
                 className="bg-[#eff2f3] border border-[rgba(255,255,255,0.3)] rounded-full p-2 hover:bg-gray-200 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1894,6 +2082,17 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
             {/* Form - Scrollable */}
             <div className="flex-1 overflow-y-auto px-5 py-4">
               <div className="flex flex-col gap-4">
+                <div
+                  role="status"
+                  className="rounded-xl border border-[#00b4b8]/30 bg-[#00b4b8]/10 px-4 py-3"
+                >
+                  <p className="text-[12px] font-medium uppercase tracking-wide text-[#006f72]">
+                    Selected operational agency
+                  </p>
+                  <p className="mt-0.5 text-[15px] font-semibold text-[#10141a]">
+                    Scheduling for {agencyName}
+                  </p>
+                </div>
                 {/* Client Field */}
                 <div className="flex flex-col gap-1 relative">
                   <label className="text-[12px] font-normal text-[#10141a]">Client</label>
@@ -1903,6 +2102,9 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                       value={formData.client}
                       onChange={(e) => {
                         const value = e.target.value;
+                        clientContextAbortRef.current?.abort();
+                        staffContextAbortRef.current?.abort();
+                        latestClientSelectIdRef.current = null;
                         dspVerifyTokenRef.current += 1;
                         setShowAssignDspDropdown(false);
                         setShowServiceDropdown(false);
@@ -1954,12 +2156,7 @@ export default function AddScheduleModal({ isOpen, onClose, onShiftsUpdated, edi
                           className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer border-b border-[#f0f0f0] last:border-b-0"
                         >
                           <p className="text-[14px] font-normal text-black">
-                            {client.firstName && client.lastName
-                              ? `${client.firstName} ${client.lastName}`
-                              : client.id}
-                          </p>
-                          <p className="text-[12px] font-normal text-[#808081]">
-                            {formatShiftLocation(getClientPrimaryAddress(client))}
+                            {client.name}
                           </p>
                         </button>
                       ))}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
 import ClaimsByStatusChart from "../claims/components/ClaimsByStatusChart";
 import { getCurrentWeekDateRange } from "../claims/utils/claimsDashboardUtils";
 import PayrollSummaryChart from "../payroll/components/PayrollSummaryChart";
@@ -8,7 +9,7 @@ import FinancialOverviewHeader from "./components/FinancialOverviewHeader";
 import RecentActivityTable from "./components/RecentActivityTable";
 import { useFinancialOverview } from "./hooks/useFinancialOverview";
 
-export default function FinancialOverviewPage() {
+function FinancialOverviewContent() {
   const { toast } = useToast();
   const [dateRange, setDateRange] = useState(getCurrentWeekDateRange);
   const overview = useFinancialOverview(dateRange);
@@ -54,4 +55,9 @@ export default function FinancialOverviewPage() {
       <RecentActivityTable activity={overview.recentActivity} loading={overview.loading} />
     </div>
   );
+}
+
+export default function FinancialOverviewPage() {
+  const { agencyId } = useOperationalAgency();
+  return <FinancialOverviewContent key={agencyId} />;
 }

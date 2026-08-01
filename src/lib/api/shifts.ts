@@ -129,6 +129,7 @@ export interface Shift {
     goalsAndDocumentsId?: string;
     employee?: Employee;
     agency?: Agency;
+    anomalyCodes?: AnomalyCode[];
 }
 
 // ==================== Request/Response Types ====================
@@ -252,6 +253,7 @@ export interface ListShiftsParams {
     date?: string; // Format: YYYY-MM-DD (exact day; not used with startDate/endDate)
     startDate?: string; // YYYY-MM-DD inclusive range (requires endDate; use with clientId or employeeId)
     endDate?: string; // YYYY-MM-DD inclusive range (requires startDate)
+    startAfter?: string; // Shift ID cursor returned by a previous list response
     limit?: number; // 1–100 default 50; up to 200 when startDate+endDate are set
     agencyId?: string; // Filter by agency ID
     employeeId?: string; // Filter by employee ID
@@ -270,6 +272,102 @@ export interface ListShiftsParams {
     clientType?: 'hha' | 'ddd';
 }
 
+export interface ShiftRequestOptions {
+    agencyId?: string;
+    signal?: AbortSignal;
+}
+
+export interface CalendarShiftsParams {
+    agencyId: string;
+    month: string;
+    clientType?: "ddd" | "hha";
+    cursor?: string;
+    limit?: number;
+}
+
+export interface CompactCalendarShift {
+    id: string;
+    date: string;
+    startTime: string | null;
+    endTime: string | null;
+    status: ShiftStatus | null;
+    clientId: string | null;
+    clientName: string | null;
+    employeeId: string | null;
+    staffName: string | null;
+    serviceCode: string | null;
+    anomalyCodes: AnomalyCode[];
+}
+
+export interface CalendarShiftPage {
+    month: string;
+    shifts: CompactCalendarShift[];
+    nextCursor: string | null;
+}
+
+const CALENDAR_ANOMALY_CODES = new Set<AnomalyCode>([
+    "missed",
+    "incomplete_clock",
+    "late_clock_in",
+    "unassigned",
+    "invalid_time",
+]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function nullableString(value: unknown): value is string | null {
+    return value === null || typeof value === "string";
+}
+
+function validCalendarDate(value: unknown, month: string): value is string {
+    if (typeof value !== "string" || !value.startsWith(`${month}-`)) return false;
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (!match) return false;
+    const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+    return date.toISOString().slice(0, 10) === value;
+}
+
+function compactCalendarShift(value: unknown, month: string): CompactCalendarShift | null {
+    if (!isRecord(value)) return null;
+    const anomalyCodes = value.anomalyCodes;
+    const validAnomalies = Array.isArray(anomalyCodes)
+        && anomalyCodes.every((code): code is AnomalyCode =>
+            typeof code === "string" && CALENDAR_ANOMALY_CODES.has(code as AnomalyCode))
+        && new Set(anomalyCodes).size === anomalyCodes.length;
+    const validStatus = value.status === null ||
+        (typeof value.status === "string" && Object.values(ShiftStatus).includes(value.status as ShiftStatus));
+    if (
+        typeof value.id !== "string" || !value.id.trim() ||
+        !validCalendarDate(value.date, month) ||
+        !nullableString(value.startTime) ||
+        !nullableString(value.endTime) ||
+        !validStatus ||
+        !nullableString(value.clientId) ||
+        !nullableString(value.clientName) ||
+        !nullableString(value.employeeId) ||
+        !nullableString(value.staffName) ||
+        !nullableString(value.serviceCode) ||
+        !validAnomalies
+    ) {
+        return null;
+    }
+    return {
+        id: value.id,
+        date: value.date,
+        startTime: value.startTime,
+        endTime: value.endTime,
+        status: value.status as ShiftStatus | null,
+        clientId: value.clientId,
+        clientName: value.clientName,
+        employeeId: value.employeeId,
+        staffName: value.staffName,
+        serviceCode: value.serviceCode,
+        anomalyCodes,
+    };
+}
+
 /**
  * Shift API Response
  */
@@ -286,6 +384,7 @@ export interface ListShiftsResponse {
     success: boolean;
     count: number;
     shifts: Shift[];
+    nextCursor?: string | null;
 }
 
 /**
@@ -471,11 +570,18 @@ export const categorizeShifts = (shifts: Shift[]): CategorizedShifts => {
  * @param data - The shift data to create
  * @returns Promise with shift response
  */
-export const createShift = async (data: CreateShiftRequest): Promise<ShiftResponse> => {
+export const createShift = async (
+    data: CreateShiftRequest,
+    options?: ShiftRequestOptions,
+): Promise<ShiftResponse> => {
     try {
         const response = await axiosClient.post<ShiftResponse>(
             `${SHIFT_BASE}`,
-            data
+            data,
+            {
+                params: options?.agencyId ? { agencyId: options.agencyId } : undefined,
+                signal: options?.signal,
+            },
         );
 
         return response.data;
@@ -493,12 +599,13 @@ export const createShift = async (data: CreateShiftRequest): Promise<ShiftRespon
  */
 export const getShiftById = async (
     shiftId: string,
-    options?: { agencyId?: string; client?: boolean; employee?: boolean; agency?: boolean },
+    options?: ShiftRequestOptions & { client?: boolean; employee?: boolean; agency?: boolean },
 ): Promise<ShiftResponse> => {
     try {
+        const { signal, ...params } = options ?? {};
         const response = await axiosClient.get<ShiftResponse>(
             `${SHIFT_BASE}/${shiftId}`,
-            { params: options },
+            { params, signal },
         );
 
         return response.data;
@@ -529,6 +636,51 @@ export const listShifts = async (
         console.error('Failed to fetch shifts:', error);
         throw error;
     }
+};
+
+export const listCalendarShifts = async (
+    params: CalendarShiftsParams,
+    options?: { signal?: AbortSignal },
+): Promise<CalendarShiftPage> => {
+    if (!params.agencyId.trim()) {
+        throw new Error("agencyId is required.");
+    }
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(params.month)) {
+        throw new Error("month must use YYYY-MM.");
+    }
+
+    const response = await axiosClient.get<unknown>(`${SHIFT_BASE}/calendar`, {
+        params: {
+            agencyId: params.agencyId,
+            month: params.month,
+            ...(params.clientType ? { clientType: params.clientType } : {}),
+            ...(params.cursor ? { cursor: params.cursor } : {}),
+            ...(params.limit ? { limit: Math.min(200, Math.max(1, params.limit)) } : {}),
+        },
+        signal: options?.signal,
+    });
+
+    if (!isRecord(response.data) || response.data.success !== true || !isRecord(response.data.data)) {
+        throw new Error("Invalid shift calendar response.");
+    }
+    const data = response.data.data;
+    const nextCursor = data.nextCursor;
+    if (
+        data.month !== params.month ||
+        !Array.isArray(data.shifts) ||
+        !(nextCursor === null || (typeof nextCursor === "string" && Boolean(nextCursor)))
+    ) {
+        throw new Error("Invalid shift calendar response.");
+    }
+    const shifts = data.shifts.map((shift) => compactCalendarShift(shift, params.month));
+    if (shifts.some((shift) => shift === null)) {
+        throw new Error("Invalid shift calendar response.");
+    }
+    return {
+        month: params.month,
+        shifts: shifts as CompactCalendarShift[],
+        nextCursor,
+    };
 };
 
 /**
@@ -570,12 +722,17 @@ export const getShiftStats = async (
  */
 export const updateShift = async (
     shiftId: string,
-    data: UpdateShiftRequest
+    data: UpdateShiftRequest,
+    options?: ShiftRequestOptions,
 ): Promise<ShiftResponse> => {
     try {
         const response = await axiosClient.put<ShiftResponse>(
             `${SHIFT_BASE}/${shiftId}`,
-            data
+            data,
+            {
+                params: options?.agencyId ? { agencyId: options.agencyId } : undefined,
+                signal: options?.signal,
+            },
         );
 
         return response.data;
@@ -590,10 +747,17 @@ export const updateShift = async (
  * @param shiftId - The ID of the shift to delete
  * @returns Promise with deletion confirmation
  */
-export const deleteShift = async (shiftId: string): Promise<DeleteShiftResponse> => {
+export const deleteShift = async (
+    shiftId: string,
+    options?: ShiftRequestOptions,
+): Promise<DeleteShiftResponse> => {
     try {
         const response = await axiosClient.delete<DeleteShiftResponse>(
-            `${SHIFT_BASE}/${shiftId}`
+            `${SHIFT_BASE}/${shiftId}`,
+            {
+                params: options?.agencyId ? { agencyId: options.agencyId } : undefined,
+                signal: options?.signal,
+            },
         );
 
         return response.data;
@@ -839,6 +1003,7 @@ export type AnomalyCode = "missed" | "incomplete_clock" | "late_clock_in" | "una
 
 export interface ShiftAnomaly {
     id: string;
+    agencyId: string;
     date: string;
     startTime: string | null;
     endTime: string | null;
@@ -897,11 +1062,14 @@ export interface FetchAuditResponse {
     nextCursor: string | null;
 }
 
-export const fetchShiftAnomalies = async (params: FetchAnomaliesParams): Promise<FetchAnomaliesResponse> => {
+export const fetchShiftAnomalies = async (
+    params: FetchAnomaliesParams,
+    options?: { signal?: AbortSignal },
+): Promise<FetchAnomaliesResponse> => {
     try {
         const response = await axiosClient.get<FetchAnomaliesResponse>(
             `${SHIFT_BASE}/maintenance/anomalies`,
-            { params }
+            { params, signal: options?.signal }
         );
         return response.data;
     } catch (error) {
@@ -910,11 +1078,14 @@ export const fetchShiftAnomalies = async (params: FetchAnomaliesParams): Promise
     }
 };
 
-export const fetchShiftMaintenanceAudit = async (params: FetchAuditParams): Promise<FetchAuditResponse> => {
+export const fetchShiftMaintenanceAudit = async (
+    params: FetchAuditParams,
+    options?: { signal?: AbortSignal },
+): Promise<FetchAuditResponse> => {
     try {
         const response = await axiosClient.get<FetchAuditResponse>(
             `${SHIFT_BASE}/maintenance/audit`,
-            { params }
+            { params, signal: options?.signal }
         );
         return response.data;
     } catch (error) {

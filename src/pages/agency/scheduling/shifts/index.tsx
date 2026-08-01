@@ -1,13 +1,16 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { Plus, ChevronLeft, ChevronRight, Search, Pencil, X, Calendar, Loader2, CheckCircle } from "lucide-react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { Plus, ChevronLeft, ChevronRight, Search, Pencil, X, Calendar, CheckCircle, ChevronDown, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router";
-import { Routes } from "@/routes/constants";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import { listShifts, Shift, deleteShift, updateShift, ShiftType, SubmissionStatus, formatShiftLocation } from "@/lib/api/shifts";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/utils/auth";
-import { useStaffLabels } from "@/hooks/useStaffLabels";
 import AddScheduleModal, { ScheduleFormData } from "../components/AddScheduleModal";
 import { shiftToScheduleFormData } from "../shift-to-schedule-form";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -15,6 +18,16 @@ import {
   ConfirmDialog,
   ConfirmDialogContent,
 } from "@/components/ui/confirm-dialog";
+import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
+import { staffLabels } from "@/lib/roleLabel";
+import { useLocation, useNavigate } from "react-router";
+import { menuItemClassName } from "@/components/ui/dot-grid-menu";
+import {
+  loadAllShiftPages,
+  operationAgencyId,
+  scopedShiftListParams,
+} from "@/lib/operational-agency/shiftScope";
+import { matchesShiftCategory, parseShiftCategory } from "@/lib/shift-category";
 
 const getInitialsFromName = (name: string) => {
   const parts = name.split(" ").filter(Boolean);
@@ -25,11 +38,52 @@ const getInitialsFromName = (name: string) => {
   return `${first}${last}`.toUpperCase();
 };
 
+function ShiftListRowsSkeleton() {
+  return (
+    <div className="space-y-3" aria-busy="true" aria-label="Loading shift list">
+      {Array.from({ length: 5 }).map((_, index) => (
+        <div
+          key={index}
+          data-testid="shift-list-skeleton-row"
+          className="flex min-h-[76px] flex-wrap items-center gap-4 rounded-[20px] px-1 py-2"
+        >
+          <div className="flex w-[256px] items-center gap-4">
+            <Skeleton className="h-[60px] w-[52px] shrink-0 rounded-lg" />
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+          </div>
+          <div className="flex w-[256px] items-center gap-4">
+            <Skeleton className="h-[60px] w-[52px] shrink-0 rounded-lg" />
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-3 w-16" />
+            </div>
+          </div>
+          <div className="flex min-w-[240px] flex-1 items-center gap-10">
+            <div className="space-y-2">
+              <Skeleton className="h-3 w-16" />
+              <Skeleton className="h-4 w-32" />
+            </div>
+            <Skeleton className="h-7 w-16 rounded-full" />
+          </div>
+          <div className="ml-auto flex min-w-[8rem] justify-end">
+            <Skeleton className="h-9 w-24 rounded-full" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function ShiftsListPage() {
-  const navigate = useNavigate();
-  const { user } = useAuth();
   const { toast } = useToast();
-  const { mode, labels } = useStaffLabels();
+  const { agencyId, agency, mode, data, actor, routes } = useOperationalAgency();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const labels = staffLabels(mode ? [mode] : [...agency.supportedClientTypes]);
+  const operationScopeRef = useRef(0);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -56,26 +110,29 @@ export default function ShiftsListPage() {
   const [isApproving, setIsApproving] = useState(false);
 
   const itemsPerPage = 7;
+  const shiftCategory = parseShiftCategory(location.search);
+  const shiftRequestSearch = useMemo(() => {
+    const query = new URLSearchParams(location.search);
+    query.delete("shiftCategory");
+    const value = query.toString();
+    return value ? `?${value}` : "";
+  }, [location.search]);
 
-  // Fetch shifts from API
-  useEffect(() => {
-    const fetchShifts = async () => {
+  const fetchShifts = useCallback(async (signal?: AbortSignal) => {
       try {
         setLoading(true);
-        const response = await listShifts({
-          limit: 100,
-          // For agency users the backend can infer agencyId, but we pass profile.data.id when available
-          agencyId: user?.agencyId,
-          client: true,
-          employee: true,
-          clientType: mode ?? undefined,
-        });
+        const loadedShifts = await loadAllShiftPages(
+          (params) => listShifts(params, { signal }),
+          scopedShiftListParams(agencyId, shiftRequestSearch, mode ?? undefined),
+        );
+        if (signal?.aborted) return;
         // Filter out shifts with type="manual" and submissionStatus="draft"
-        const filteredShifts = (response.shifts || []).filter(shift =>
+        const filteredShifts = loadedShifts.filter(shift =>
           !(shift.type === ShiftType.MANUAL && shift.submissionStatus === SubmissionStatus.DRAFT)
         );
         setShifts(filteredShifts);
       } catch (error) {
+        if (signal?.aborted) return;
         console.error("Failed to fetch shifts:", error);
         toast({
           title: "Error",
@@ -83,19 +140,38 @@ export default function ShiftsListPage() {
           variant: "destructive",
         });
       } finally {
-        setLoading(false);
+        if (!signal?.aborted) setLoading(false);
       }
-    };
+  }, [agencyId, mode, shiftRequestSearch, toast]);
 
-    // Always attempt to fetch when profile is present; loading will be cleared in finally
-    if (user?.agencyId) {
-      fetchShifts();
-    } else {
-      // If there is no profile yet, don't get stuck in loading
-      setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.agencyId, mode]);
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetchShifts(controller.signal);
+    return () => controller.abort();
+  }, [fetchShifts]);
+
+  useEffect(() => {
+    operationScopeRef.current += 1;
+    setSearchQuery("");
+    setCurrentPage(1);
+    setSelectedDate(null);
+    setShowDatePicker(false);
+    setShifts([]);
+    setShowAddScheduleModal(false);
+    setShowCancelModal(false);
+    setShiftToCancel(null);
+    setIsCancelling(false);
+    setShowCancelledModal(false);
+    setCancelledShiftInfo(null);
+    setEditFormData(null);
+    setModalMode("create");
+    setShowApproveModal(false);
+    setShiftToApprove(null);
+    setIsApproving(false);
+    return () => {
+      operationScopeRef.current += 1;
+    };
+  }, [agencyId]);
 
   // Calendar days calculation
   const calendarDays = useMemo(() => {
@@ -111,7 +187,7 @@ export default function ShiftsListPage() {
 
   // Filter shifts based on search and date
   const filteredShifts = useMemo(() => {
-    let result = shifts;
+    let result = shifts.filter((shift) => matchesShiftCategory(shift, shiftCategory));
 
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -128,7 +204,9 @@ export default function ShiftsListPage() {
     }
 
     return result;
-  }, [shifts, searchQuery, selectedDate]);
+  }, [shiftCategory, shifts, searchQuery, selectedDate]);
+
+  useEffect(() => setCurrentPage(1), [shiftCategory]);
 
   // Pagination
   const totalPages = Math.max(1, Math.ceil(filteredShifts.length / itemsPerPage));
@@ -138,12 +216,20 @@ export default function ShiftsListPage() {
   );
 
   const handleEdit = (shift: Shift) => {
+    if (!agencyId) {
+      toast({
+        title: "Select an agency",
+        description: "Choose an agency before editing a shift.",
+      });
+      return;
+    }
     setEditFormData(shiftToScheduleFormData(shift));
     setModalMode("edit");
     setShowAddScheduleModal(true);
   };
 
   const confirmCancelShift = async (shiftId: string) => {
+    const operationScope = operationScopeRef.current;
     try {
       setIsCancelling(true);
 
@@ -170,19 +256,24 @@ export default function ShiftsListPage() {
         });
       }
 
-      await deleteShift(shiftId);
+      if (!shiftToCancel) throw new Error("Shift is missing.");
+      await deleteShift(shiftId, { agencyId: operationAgencyId(shiftToCancel, agencyId) });
+      if (operationScope !== operationScopeRef.current) return;
       setShifts(prev => prev.filter(s => s.id !== shiftId));
       setShowCancelledModal(true);
     } catch (error) {
+      if (operationScope !== operationScopeRef.current) return;
       toast({
         title: "Error",
         description: "Failed to cancel shift. Please try again.",
         variant: "destructive",
       });
     } finally {
-      setIsCancelling(false);
-      setShowCancelModal(false);
-      setShiftToCancel(null);
+      if (operationScope === operationScopeRef.current) {
+        setIsCancelling(false);
+        setShowCancelModal(false);
+        setShiftToCancel(null);
+      }
     }
   };
 
@@ -196,10 +287,29 @@ export default function ShiftsListPage() {
     setShowApproveModal(true);
   };
 
+  const openShiftDetails = (shift: Shift) => {
+    if (actor === "super_admin") {
+      const params = new URLSearchParams({
+        agencyId: operationAgencyId(shift, agencyId),
+        returnTo: `${location.pathname}${location.search}`,
+      });
+      navigate(routes.details(shift.id, params.toString()));
+      return;
+    }
+    navigate(routes.details(shift.id));
+  };
+
   const confirmApproveShift = async (shiftId: string) => {
+    const operationScope = operationScopeRef.current;
     try {
       setIsApproving(true);
-      await updateShift(shiftId, { type: ShiftType.AUTOMATIC });
+      if (!shiftToApprove) throw new Error("Shift is missing.");
+      await updateShift(
+        shiftId,
+        { type: ShiftType.AUTOMATIC },
+        { agencyId: operationAgencyId(shiftToApprove, agencyId) },
+      );
+      if (operationScope !== operationScopeRef.current) return;
 
       // Update the shift in the local state
       setShifts(prev => prev.map(shift =>
@@ -217,6 +327,7 @@ export default function ShiftsListPage() {
       setShowApproveModal(false);
       setShiftToApprove(null);
     } catch (error) {
+      if (operationScope !== operationScopeRef.current) return;
       console.error("Failed to approve shift:", error);
       toast({
         title: "Error",
@@ -224,7 +335,7 @@ export default function ShiftsListPage() {
         variant: "destructive",
       });
     } finally {
-      setIsApproving(false);
+      if (operationScope === operationScopeRef.current) setIsApproving(false);
     }
   };
 
@@ -290,6 +401,8 @@ export default function ShiftsListPage() {
             Shift Management
           </h1>
           <Button
+            disabled={!agencyId}
+            title={!agencyId ? "Select an agency to add a schedule" : undefined}
             onClick={() => {
               setModalMode("create");
               setEditFormData(null);
@@ -423,9 +536,7 @@ export default function ShiftsListPage() {
             {/* Shifts List */}
             <div className="space-y-3">
               {loading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-8 h-8 animate-spin text-[#00b4b8]" />
-                </div>
+                <ShiftListRowsSkeleton />
               ) : paginatedShifts.length === 0 ? (
                 <div className="flex items-center justify-center py-12">
                   <p className="text-[14px] text-[#808081]">No shifts found</p>
@@ -466,7 +577,7 @@ export default function ShiftsListPage() {
                             {clientName}
                           </span>
                           <span className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-                            Client
+                            {agencyId ? "Client" : apiShift.agency?.name || "Unknown agency"}
                           </span>
                         </div>
                       </div>
@@ -509,36 +620,52 @@ export default function ShiftsListPage() {
                           </span>
                         </div>
                       </div>
-                      <div className="flex-1 flex items-center gap-[55px] w-[256px]">
-                        {/* Action Buttons */}
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => handleEdit(apiShift)}
-                            className="bg-[#b2b2b3] hover:bg-[#9a9a9b] text-white rounded-full px-4 py-3 h-auto text-[12px] font-semibold flex items-center gap-1"
-                          >
-                            <Pencil className="w-4 h-4" />
-                            Edit
-                          </Button>
-                          {apiShift.type === ShiftType.MANUAL && apiShift.submissionStatus === SubmissionStatus.SUBMITTED && (
+                      <div className="ml-auto flex min-w-[9rem] flex-1 items-center justify-end">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
                             <Button
-                              size="sm"
-                              onClick={() => handleApprove(apiShift)}
-                              className="bg-[#0eaf52] hover:bg-[#0d9a47] text-white rounded-full px-4 py-3 h-auto text-[12px] font-semibold flex items-center gap-1"
+                              type="button"
+                              variant="outline"
+                              className="h-9 gap-1.5 rounded-full border-[#dce3e3] bg-white px-4 text-[14px] font-semibold text-[#10141a] shadow-sm hover:bg-[#f5f9f9]"
+                              aria-label={`Shift actions for ${clientName}`}
                             >
-                              <CheckCircle className="w-4 h-4" />
-                              Approve
+                              Actions
+                              <ChevronDown className="size-4 opacity-70" aria-hidden />
                             </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            onClick={() => handleCancel(apiShift)}
-                            className="bg-[#d53411] hover:bg-[#c02e0f] text-white rounded-full px-4 py-3 h-auto text-[12px] font-semibold flex items-center gap-1"
-                          >
-                            <X className="w-3 h-3" />
-                            Cancel
-                          </Button>
-                        </div>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="z-[100] min-w-[180px] rounded-xl border-0 bg-white p-0 shadow-lg">
+                            <DropdownMenuItem
+                              className={menuItemClassName}
+                              aria-label="Open full shift details page"
+                              onClick={() => openShiftDetails(apiShift)}
+                            >
+                              <FileText className="text-[#808081]" aria-hidden />
+                              Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className={menuItemClassName}
+                              disabled={!agencyId}
+                              title={!agencyId ? "Select an agency to edit this shift" : undefined}
+                              onClick={() => handleEdit(apiShift)}
+                            >
+                              <Pencil className="text-[#808081]" aria-hidden />
+                              Edit
+                            </DropdownMenuItem>
+                            {apiShift.type === ShiftType.MANUAL && apiShift.submissionStatus === SubmissionStatus.SUBMITTED ? (
+                              <DropdownMenuItem className={menuItemClassName} onClick={() => handleApprove(apiShift)}>
+                                <CheckCircle className="text-[#0eaf52]" aria-hidden />
+                                Approve
+                              </DropdownMenuItem>
+                            ) : null}
+                            <DropdownMenuItem
+                              className={`${menuItemClassName} text-[#d53411] hover:bg-[#fff2ef] focus:bg-[#fff2ef] focus:text-[#d53411]`}
+                              onClick={() => handleCancel(apiShift)}
+                            >
+                              <X className="text-[#d53411]" aria-hidden />
+                              Cancel
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   );
@@ -576,6 +703,11 @@ export default function ShiftsListPage() {
       {/* Add Schedule Modal */}
       <AddScheduleModal
         isOpen={showAddScheduleModal}
+        agencyId={agencyId}
+        agencyName={agency.name}
+        agencyMode={mode}
+        supportedClientTypes={agency.supportedClientTypes}
+        data={data}
         onClose={() => {
           setShowAddScheduleModal(false);
           setModalMode("create");
@@ -602,7 +734,7 @@ export default function ShiftsListPage() {
           description={shiftToCancel ? `Are you sure you want to cancel this shift for ${shiftToCancel.client
             ? `${shiftToCancel.client.firstName || ""} ${shiftToCancel.client.lastName || ""}`.trim() || "Unknown Client"
             : "Unknown Client"
-            }? This action cannot be undone.` : ""}
+            } at ${agency.name}? This action cannot be undone.` : ""}
           confirmText="Cancel Shift"
           cancelText="Keep Shift"
           onConfirm={() => shiftToCancel && confirmCancelShift(shiftToCancel.id)}
@@ -650,7 +782,7 @@ export default function ShiftsListPage() {
           description={shiftToApprove ? `Are you sure you want to approve this manual shift for ${shiftToApprove.client
             ? `${shiftToApprove.client.firstName || ""} ${shiftToApprove.client.lastName || ""}`.trim() || "Unknown Client"
             : "Unknown Client"
-            }? This will convert it to an automatic shift.` : ""}
+            } at ${agency.name}? This will convert it to an automatic shift.` : ""}
           confirmText="Approve Shift"
           cancelText="Cancel"
           onConfirm={() => shiftToApprove && confirmApproveShift(shiftToApprove.id)}

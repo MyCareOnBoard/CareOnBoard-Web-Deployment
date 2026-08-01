@@ -16,6 +16,14 @@ export function useEffectiveAgencyMode(): AgencyMode | null {
     (state: RootState) => state.agencyMode.modeByAgency[agencyId]
   );
 
+  return resolveEffectiveAgencyMode(supportedTypes, storedMode);
+}
+
+/** Resolves a mode from an explicitly supplied agency summary and stored toggle. */
+export function resolveEffectiveAgencyMode(
+  supportedTypes: readonly ("ddd" | "hha")[],
+  storedMode: AgencyMode | null | undefined,
+): AgencyMode | null {
   const supportsBoth =
     supportedTypes.includes("ddd") && supportedTypes.includes("hha");
   if (supportsBoth) return storedMode ?? null;

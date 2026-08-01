@@ -1,6 +1,12 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Send, X } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import DocumentDownloadIcon from "@/assets/icons/document-download.svg?react";
 import CareOnboardLogo from "@/assets/icons/care-onboard.svg?react";
 import { useToast } from "@/hooks/use-toast";
@@ -12,6 +18,7 @@ import {
 } from "../../components/billingModalStyles";
 import { downloadPayrollInvoicePdf } from "../../payroll/utils/payrollInvoicePrintUtils";
 import { sendOutOfPocketInvoice, type OutOfPocketInvoiceDetail } from "@/lib/api/out-of-pocket";
+import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
 
 const MODAL_CLASS =
   "fixed !left-auto !right-6 !top-6 !translate-x-0 !translate-y-0 w-[calc(100vw-32px)] max-w-[720px] rounded-[20px] border border-[#e5e5e6] bg-white p-0 shadow-lg sm:!right-6";
@@ -28,12 +35,16 @@ type Props = {
 };
 
 export default function OutOfPocketInvoiceModal({ open, invoice, onClose, onSent }: Props) {
+  const { agencyId } = useOperationalAgency();
   const printRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const [downloading, setDownloading] = useState(false);
   const [sending, setSending] = useState(false);
   const [emailStatus, setEmailStatus] = useState(invoice.emailStatus);
   const [emailedTo, setEmailedTo] = useState(invoice.emailedTo);
+  const sendControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => sendControllerRef.current?.abort(), []);
 
   const doc = invoice.invoice;
   const periodLabel =
@@ -46,8 +57,8 @@ export default function OutOfPocketInvoiceModal({ open, invoice, onClose, onSent
     setDownloading(true);
     try {
       await downloadPayrollInvoicePdf(printRef.current, invoice.invoiceNumber, "invoice");
-    } catch (error) {
-      console.error("Error generating invoice PDF:", error);
+    } catch {
+      console.error("Error generating invoice PDF.");
       toast({ title: "Couldn't download this invoice. Try Print instead.", variant: "destructive" });
     } finally {
       setDownloading(false);
@@ -61,13 +72,22 @@ export default function OutOfPocketInvoiceModal({ open, invoice, onClose, onSent
       return;
     }
     setSending(true);
+    sendControllerRef.current?.abort();
+    const controller = new AbortController();
+    sendControllerRef.current = controller;
     try {
-      const result = await sendOutOfPocketInvoice(invoice.id);
+      const result = await sendOutOfPocketInvoice({
+        context: { agencyId },
+        invoiceId: invoice.id,
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted) return;
       setEmailStatus(result.emailStatus);
       setEmailedTo(result.emailedTo);
       toast({ title: `Invoice sent to ${result.emailedTo}.` });
       onSent?.(invoice.id, result.emailedTo);
     } catch (error) {
+      if (controller.signal.aborted) return;
       setEmailStatus("failed");
       toast({
         title: "Couldn't send the invoice",
@@ -75,9 +95,9 @@ export default function OutOfPocketInvoiceModal({ open, invoice, onClose, onSent
         variant: "destructive",
       });
     } finally {
-      setSending(false);
+      if (!controller.signal.aborted) setSending(false);
     }
-  }, [doc.payerEmail, invoice.id, onSent, sending, toast]);
+  }, [agencyId, doc.payerEmail, invoice.id, onSent, sending, toast]);
 
   const sendLabel = sending
     ? "Sending…"
@@ -96,6 +116,9 @@ export default function OutOfPocketInvoiceModal({ open, invoice, onClose, onSent
                 <DialogTitle className={cn("mt-3 text-left font-bold", TEXT)}>
                   Invoice {invoice.invoiceNumber}
                 </DialogTitle>
+                <DialogDescription className="sr-only">
+                  Review this out-of-pocket invoice, download it, or email it to the payer.
+                </DialogDescription>
                 <p className={cn("mt-1 font-medium", MUTED)}>
                   {doc.agencyName}
                   {periodLabel ? ` · ${periodLabel}` : ""}

@@ -7,7 +7,7 @@ import {
   type PayrollInvoiceListItem,
   type PayrollInvoiceStatus,
 } from "@/lib/api/payroll";
-import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
+import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
 
 type RefetchOptions = {
   force?: boolean;
@@ -22,21 +22,23 @@ export function usePayrollInvoices(
   dateRange: DateRangeValues,
   { enabled = true, statusFilter = "all" }: UsePayrollInvoicesOptions = {},
 ) {
+  const { agencyId, mode } = useOperationalAgency();
   const [invoices, setInvoices] = useState<PayrollInvoiceListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mutating, setMutating] = useState(false);
   const requestIdRef = useRef(0);
-  const mode = useEffectiveAgencyMode();
+  const requestControllerRef = useRef<AbortController | null>(null);
 
   const refetch = useCallback(
     async ({ force = false }: RefetchOptions = {}) => {
+      requestControllerRef.current?.abort();
       if (!enabled && !force) {
         return;
       }
 
-      if (!dateRange.startDate || !dateRange.endDate) {
+      if (!agencyId || !dateRange.startDate || !dateRange.endDate) {
         setInvoices([]);
         setTotal(0);
         setLoading(false);
@@ -46,26 +48,32 @@ export function usePayrollInvoices(
 
       const requestId = requestIdRef.current + 1;
       requestIdRef.current = requestId;
+      const controller = new AbortController();
+      requestControllerRef.current = controller;
       setLoading(true);
       setError(null);
 
       try {
         const data = await listPayrollInvoices({
-          startDate: dateRange.startDate,
-          endDate: dateRange.endDate,
-          status: statusFilter === "all" ? undefined : statusFilter,
-          limit: 50,
-          ...(mode ? { mode } : {}),
+          context: { agencyId },
+          query: {
+            startDate: dateRange.startDate,
+            endDate: dateRange.endDate,
+            status: statusFilter === "all" ? undefined : statusFilter,
+            limit: 50,
+            ...(mode ? { mode } : {}),
+          },
+          signal: controller.signal,
         });
 
-        if (requestIdRef.current !== requestId) {
+        if (controller.signal.aborted || requestIdRef.current !== requestId) {
           return;
         }
 
         setInvoices(data.invoices);
         setTotal(data.total);
       } catch (fetchError) {
-        if (requestIdRef.current !== requestId) {
+        if (controller.signal.aborted || requestIdRef.current !== requestId) {
           return;
         }
 
@@ -75,42 +83,44 @@ export function usePayrollInvoices(
           fetchError instanceof Error ? fetchError.message : "Failed to load payroll invoices",
         );
       } finally {
-        if (requestIdRef.current === requestId) {
+        if (!controller.signal.aborted && requestIdRef.current === requestId) {
           setLoading(false);
         }
       }
     },
-    [dateRange.endDate, dateRange.startDate, enabled, statusFilter, mode],
+    [agencyId, dateRange.endDate, dateRange.startDate, enabled, statusFilter, mode],
   );
 
   useEffect(() => {
     void refetch();
+    return () => {
+      requestIdRef.current += 1;
+      requestControllerRef.current?.abort();
+    };
   }, [refetch]);
 
   const markPaid = useCallback(
-    async (invoiceId: string) => {
+    async (invoiceId: string, signal?: AbortSignal) => {
       setMutating(true);
       try {
-        await markPayrollInvoicePaid(invoiceId);
-        await refetch({ force: true });
+        await markPayrollInvoicePaid({ context: { agencyId }, invoiceId, signal });
       } finally {
-        setMutating(false);
+        if (!signal?.aborted) setMutating(false);
       }
     },
-    [refetch],
+    [agencyId],
   );
 
   const cancelInvoice = useCallback(
-    async (invoiceId: string) => {
+    async (invoiceId: string, signal?: AbortSignal) => {
       setMutating(true);
       try {
-        await cancelPayrollInvoice(invoiceId);
-        await refetch({ force: true });
+        await cancelPayrollInvoice({ context: { agencyId }, invoiceId, signal });
       } finally {
-        setMutating(false);
+        if (!signal?.aborted) setMutating(false);
       }
     },
-    [refetch],
+    [agencyId],
   );
 
   return {
@@ -124,4 +134,4 @@ export function usePayrollInvoices(
     cancelInvoice,
   };
 }
-
+

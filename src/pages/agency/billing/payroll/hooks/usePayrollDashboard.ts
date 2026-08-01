@@ -4,28 +4,30 @@ import {
   getPayrollDashboard,
   type PayrollDashboardSummary,
 } from "@/lib/api/payroll";
-import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 import {
   mapDashboardToOverviewStats,
   mapDashboardToStatusChart,
 } from "../utils/payrollDashboardUtils";
 import type { OvertimeAlert } from "../types";
+import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
 
 function hasCompleteDateRange(dateRange: DateRangeValues) {
   return Boolean(dateRange.startDate && dateRange.endDate);
 }
 
 export function usePayrollDashboard(dateRange: DateRangeValues) {
+  const { agencyId, mode } = useOperationalAgency();
   const [rawData, setRawData] = useState<PayrollDashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [isRefetching, setIsRefetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
+  const requestControllerRef = useRef<AbortController | null>(null);
   const hasLoadedOnceRef = useRef(false);
-  const mode = useEffectiveAgencyMode();
 
   const refetch = useCallback(async () => {
-    if (!hasCompleteDateRange(dateRange)) {
+    requestControllerRef.current?.abort();
+    if (!agencyId || !hasCompleteDateRange(dateRange)) {
       setRawData(null);
       setLoading(false);
       setIsRefetching(false);
@@ -36,6 +38,8 @@ export function usePayrollDashboard(dateRange: DateRangeValues) {
 
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
+    const controller = new AbortController();
+    requestControllerRef.current = controller;
 
     if (hasLoadedOnceRef.current) {
       setIsRefetching(true);
@@ -46,19 +50,23 @@ export function usePayrollDashboard(dateRange: DateRangeValues) {
 
     try {
       const data = await getPayrollDashboard({
-        startDate: dateRange.startDate,
-        endDate: dateRange.endDate,
-        ...(mode ? { mode } : {}),
+        context: { agencyId },
+        query: {
+          startDate: dateRange.startDate,
+          endDate: dateRange.endDate,
+          ...(mode ? { mode } : {}),
+        },
+        signal: controller.signal,
       });
 
-      if (requestIdRef.current !== requestId) {
+      if (controller.signal.aborted || requestIdRef.current !== requestId) {
         return;
       }
 
       setRawData(data);
       hasLoadedOnceRef.current = true;
     } catch (fetchError) {
-      if (requestIdRef.current !== requestId) {
+      if (controller.signal.aborted || requestIdRef.current !== requestId) {
         return;
       }
 
@@ -69,15 +77,19 @@ export function usePayrollDashboard(dateRange: DateRangeValues) {
         fetchError instanceof Error ? fetchError.message : "Failed to load payroll dashboard",
       );
     } finally {
-      if (requestIdRef.current === requestId) {
+      if (!controller.signal.aborted && requestIdRef.current === requestId) {
         setLoading(false);
         setIsRefetching(false);
       }
     }
-  }, [dateRange.endDate, dateRange.startDate, mode]);
+  }, [agencyId, dateRange.endDate, dateRange.startDate, mode]);
 
   useEffect(() => {
     void refetch();
+    return () => {
+      requestIdRef.current += 1;
+      requestControllerRef.current?.abort();
+    };
   }, [refetch]);
 
   const overviewStats = useMemo(

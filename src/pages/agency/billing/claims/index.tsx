@@ -9,6 +9,16 @@ import {
 } from "@/lib/api/claims";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/utils/auth";
+import { useSelector } from "react-redux";
+import { createAgencyOperationalDataAdapter } from "@/lib/operational-agency/dataAdapters";
+import {
+  OperationalAgencyProvider,
+  useOperationalAgency,
+} from "@/lib/operational-agency/OperationalAgencyProvider";
+import { resolveEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
+import { agencyDirectoryRoutes } from "@/lib/operational-agency/routes";
+import type { RootState } from "@/store/redux/store";
+import { UserType } from "@/utils/auth/types/user.types";
 import ClaimsDashboardHeader from "./components/ClaimsDashboardHeader";
 import ClaimsOverviewCards from "./components/ClaimsOverviewCards";
 import ClaimsByStatusChart from "./components/ClaimsByStatusChart";
@@ -51,8 +61,8 @@ const OutOfPocketInvoiceModal = lazy(
   () => import("../out-of-pocket/components/OutOfPocketInvoiceModal"),
 );
 
-export default function ClaimsDashboardPage() {
-  const { user } = useAuth();
+export function ClaimsDashboardContent() {
+  const { agencyId } = useOperationalAgency();
   const { toast } = useToast();
   const [dateRange, setDateRange] = useState(getCurrentWeekDateRange);
   const [activeTab, setActiveTab] = useState<ClaimsWorkspaceTab>("shifts");
@@ -130,6 +140,10 @@ export default function ClaimsDashboardPage() {
   const [generatingInvoice, setGeneratingInvoice] = useState(false);
   const [openingReport, setOpeningReport] = useState<{ claimNumber: string } | null>(null);
   const openingReportRequestIdRef = useRef(0);
+  const openingReportControllerRef = useRef<AbortController | null>(null);
+  const openingInvoiceControllerRef = useRef<AbortController | null>(null);
+  const mutationRequestIdRef = useRef(0);
+  const mutationControllerRef = useRef<AbortController | null>(null);
   const [mutationSaving, setMutationSaving] = useState(false);
   const [statusModalClaim, setStatusModalClaim] = useState<BillingClaimListItem | null>(null);
   const [cancelModalClaim, setCancelModalClaim] = useState<BillingClaimListItem | null>(null);
@@ -140,6 +154,31 @@ export default function ClaimsDashboardPage() {
     claim: RecentClaim;
     savedClaim: SavedBillingClaim;
   } | null>(null);
+
+  useEffect(() => () => {
+    openingReportRequestIdRef.current += 1;
+    openingReportControllerRef.current?.abort();
+    openingInvoiceControllerRef.current?.abort();
+    mutationRequestIdRef.current += 1;
+    mutationControllerRef.current?.abort();
+  }, []);
+
+  const beginMutation = useCallback(() => {
+    mutationControllerRef.current?.abort();
+    const requestId = mutationRequestIdRef.current + 1;
+    mutationRequestIdRef.current = requestId;
+    const controller = new AbortController();
+    mutationControllerRef.current = controller;
+    return { requestId, controller };
+  }, []);
+
+  const isMutationCurrent = useCallback(
+    (requestId: number, controller: AbortController) =>
+      mutationRequestIdRef.current === requestId
+      && mutationControllerRef.current === controller
+      && !controller.signal.aborted,
+    [],
+  );
 
   useEffect(() => {
     if (!dashboard.error) {
@@ -218,9 +257,9 @@ export default function ClaimsDashboardPage() {
       claimSelections: ClaimConfirmSelection[],
       invoiceSelections: ClaimConfirmSelection[],
     ) => {
-      if (!user?.agencyId) return;
       if (claimSelections.length === 0 && invoiceSelections.length === 0) return;
 
+      const { requestId, controller } = beginMutation();
       setSavingClaim(true);
       let claimError: unknown = null;
       let invoiceError: unknown = null;
@@ -232,14 +271,17 @@ export default function ClaimsDashboardPage() {
         if (selection.shifts.length === 0 && selection.rides.length === 0) continue;
         try {
           const result = await saveGeneratedClaim({
-            agencyId: user.agencyId,
+            context: { agencyId },
             selectedShifts: selection.shifts,
             selectedRides: selection.rides,
             serviceCode: selection.serviceCode,
             weekRange: selection.weekRange,
+            signal: controller.signal,
           });
+          if (!isMutationCurrent(requestId, controller)) return;
           claimResults.push({ savedClaim: result.savedClaim, anchorClaim: result.anchorClaim });
         } catch (error) {
+          if (!isMutationCurrent(requestId, controller)) return;
           claimError = error;
           break;
         }
@@ -252,18 +294,25 @@ export default function ClaimsDashboardPage() {
         setGeneratingInvoice(true);
         try {
           createdInvoice = await createOutOfPocketInvoice({
-            clientId,
-            shiftIds: invoiceShiftIds,
-            rideIds: invoiceRideIds,
+            context: { agencyId },
+            payload: {
+              clientId,
+              shiftIds: invoiceShiftIds,
+              rideIds: invoiceRideIds,
+            },
+            signal: controller.signal,
           });
+          if (!isMutationCurrent(requestId, controller)) return;
         } catch (error) {
+          if (!isMutationCurrent(requestId, controller)) return;
           invoiceError = error;
         } finally {
-          setGeneratingInvoice(false);
+          if (isMutationCurrent(requestId, controller)) setGeneratingInvoice(false);
         }
       }
 
       await refreshAfterCreateOrCancel();
+      if (!isMutationCurrent(requestId, controller)) return;
       setSavingClaim(false);
 
       if (!claimError && !invoiceError) {
@@ -304,7 +353,7 @@ export default function ClaimsDashboardPage() {
         });
       }
     },
-    [refreshAfterCreateOrCancel, toast, user?.agencyId],
+    [agencyId, beginMutation, isMutationCurrent, refreshAfterCreateOrCancel, toast],
   );
 
   const closeGenerateModal = useCallback(() => {
@@ -322,7 +371,7 @@ export default function ClaimsDashboardPage() {
       );
 
       if (!hasBillableEntry) {
-        console.warn("Ready to bill client group missing source metadata", group.clientKey);
+        console.warn("Ready to bill client group missing source metadata.");
         toast({
           title: "Couldn't open billing",
           description: "Refresh the list and try again.",
@@ -339,9 +388,18 @@ export default function ClaimsDashboardPage() {
 
   const handleViewInvoice = useCallback(
     async (item: OutOfPocketInvoiceListItem) => {
+      openingInvoiceControllerRef.current?.abort();
+      const controller = new AbortController();
+      openingInvoiceControllerRef.current = controller;
       try {
-        setOpenInvoice(await getOutOfPocketInvoice(item.id));
+        const detail = await getOutOfPocketInvoice({
+          context: { agencyId },
+          invoiceId: item.id,
+          signal: controller.signal,
+        });
+        if (!controller.signal.aborted) setOpenInvoice(detail);
       } catch (error) {
+        if (controller.signal.aborted) return;
         toast({
           title: "Couldn't open invoice",
           description: error instanceof Error ? error.message : undefined,
@@ -349,28 +407,43 @@ export default function ClaimsDashboardPage() {
         });
       }
     },
-    [toast],
+    [agencyId, toast],
   );
 
   const handleConfirmCancelInvoice = useCallback(async () => {
     if (!cancelModalInvoice) return;
 
+    const { requestId, controller } = beginMutation();
     setMutationSaving(true);
     try {
-      await cancelOutOfPocketInvoice(cancelModalInvoice.id);
+      await cancelOutOfPocketInvoice({
+        context: { agencyId },
+        invoiceId: cancelModalInvoice.id,
+        signal: controller.signal,
+      });
+      if (!isMutationCurrent(requestId, controller)) return;
       setCancelModalInvoice(null);
-      toast({ title: "Invoice cancelled. Its items are billable again." });
       await refreshAfterCreateOrCancel();
+      if (!isMutationCurrent(requestId, controller)) return;
+      toast({ title: "Invoice cancelled. Its items are billable again." });
     } catch (error) {
+      if (!isMutationCurrent(requestId, controller)) return;
       toast({
         title: "Couldn't cancel invoice",
         description: error instanceof Error ? error.message : undefined,
         variant: "destructive",
       });
     } finally {
-      setMutationSaving(false);
+      if (isMutationCurrent(requestId, controller)) setMutationSaving(false);
     }
-  }, [cancelModalInvoice, refreshAfterCreateOrCancel, toast]);
+  }, [
+    agencyId,
+    beginMutation,
+    cancelModalInvoice,
+    isMutationCurrent,
+    refreshAfterCreateOrCancel,
+    toast,
+  ]);
 
   const handleCloseReportModal = useCallback(() => {
     setClaimReport(null);
@@ -380,10 +453,17 @@ export default function ClaimsDashboardPage() {
     async (claim: BillingClaimListItem) => {
       const requestId = openingReportRequestIdRef.current + 1;
       openingReportRequestIdRef.current = requestId;
+      openingReportControllerRef.current?.abort();
+      const controller = new AbortController();
+      openingReportControllerRef.current = controller;
       setOpeningReport({ claimNumber: claim.claimNumber });
 
       try {
-        const detail = await getBillingClaimById(claim.id);
+        const detail = await getBillingClaimById({
+          context: { agencyId },
+          claimId: claim.id,
+          signal: controller.signal,
+        });
 
         if (openingReportRequestIdRef.current !== requestId) {
           return;
@@ -403,6 +483,7 @@ export default function ClaimsDashboardPage() {
           },
         });
       } catch (error) {
+        if (controller.signal.aborted) return;
         if (openingReportRequestIdRef.current !== requestId) {
           return;
         }
@@ -418,57 +499,79 @@ export default function ClaimsDashboardPage() {
         }
       }
     },
-    [toast],
+    [agencyId, toast],
   );
 
   const handleConfirmStatusUpdate = useCallback(
     async (payload: { status: Exclude<BillingClaimStatus, "pending">; rejectionReason?: string }) => {
       if (!statusModalClaim) return;
 
+      const { requestId, controller } = beginMutation();
       setMutationSaving(true);
       try {
-        await generatedClaims.updateClaimStatus(statusModalClaim.id, payload);
+        await generatedClaims.updateClaimStatus(statusModalClaim.id, payload, controller.signal);
+        if (!isMutationCurrent(requestId, controller)) return;
         setStatusModalClaim(null);
         await refreshAfterStatusUpdate();
+        if (!isMutationCurrent(requestId, controller)) return;
         toast({
           title: "Claim status updated",
           description: `${statusModalClaim.claimNumber} is now ${payload.status}.`,
         });
       } catch (error) {
+        if (!isMutationCurrent(requestId, controller)) return;
         toast({
           title: "Couldn't update claim status",
           description: getBillingClaimMutationErrorMessage(error),
           variant: "destructive",
         });
       } finally {
-        setMutationSaving(false);
+        if (isMutationCurrent(requestId, controller)) setMutationSaving(false);
       }
     },
-    [generatedClaims, refreshAfterStatusUpdate, statusModalClaim, toast],
+    [
+      beginMutation,
+      generatedClaims,
+      isMutationCurrent,
+      refreshAfterStatusUpdate,
+      statusModalClaim,
+      toast,
+    ],
   );
 
   const handleConfirmCancelClaim = useCallback(async () => {
     if (!cancelModalClaim) return;
 
+    const { requestId, controller } = beginMutation();
     setMutationSaving(true);
     try {
-      await generatedClaims.cancelClaim(cancelModalClaim.id);
+      await generatedClaims.cancelClaim(cancelModalClaim.id, controller.signal);
+      if (!isMutationCurrent(requestId, controller)) return;
       setCancelModalClaim(null);
       await refreshAfterCreateOrCancel();
+      if (!isMutationCurrent(requestId, controller)) return;
       toast({
         title: "Claim cancelled",
         description: `${cancelModalClaim.claimNumber} was removed and its shifts are claimable again.`,
       });
     } catch (error) {
+      if (!isMutationCurrent(requestId, controller)) return;
       toast({
         title: "Couldn't cancel claim",
         description: getBillingClaimMutationErrorMessage(error),
         variant: "destructive",
       });
     } finally {
-      setMutationSaving(false);
+      if (isMutationCurrent(requestId, controller)) setMutationSaving(false);
     }
-  }, [cancelModalClaim, generatedClaims, refreshAfterCreateOrCancel, toast]);
+  }, [
+    beginMutation,
+    cancelModalClaim,
+    generatedClaims,
+    isMutationCurrent,
+    refreshAfterCreateOrCancel,
+    toast,
+  ]);
 
   const handleStatusSegmentClick = useCallback((segmentLabel: string) => {
     const nextFilter = STATUS_LABEL_TO_FILTER[segmentLabel];
@@ -619,5 +722,52 @@ export default function ClaimsDashboardPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function ClaimsDashboardPage() {
+  const { agencyId } = useOperationalAgency();
+  return <ClaimsDashboardContent key={agencyId} />;
+}
+
+export function AgencyClaimsDashboardPage() {
+  const { user } = useAuth();
+  const agencyId = user?.agencyId || user?.agency?.id || "";
+  const supportedClientTypes = user?.agency?.supportedClientTypes ?? [];
+  const storedMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId]);
+  const mode = resolveEffectiveAgencyMode(supportedClientTypes, storedMode);
+  const data = useMemo(() => createAgencyOperationalDataAdapter(agencyId), [agencyId]);
+  const accessList = user?.profile?.accessList ?? [];
+  const isAgencyOwner = user?.userType === UserType.AGENCY;
+
+  if (!agencyId) {
+    return <p role="alert" className="px-4 py-8 text-sm text-[#808081]">Sign in again to manage billing.</p>;
+  }
+
+  return (
+    <OperationalAgencyProvider
+      key={agencyId}
+      actor="agency"
+      agencyId={agencyId}
+      agency={{
+        id: agencyId,
+        name: user?.agency?.name || user?.fullName || "Agency",
+        status: "active",
+        supportedClientTypes,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+      }}
+      mode={mode}
+      capabilities={{
+        canManageShifts: true,
+        canManageBilling: true,
+        shiftMaintenance: true,
+        canAccessClientDirectory: isAgencyOwner || accessList.includes("Client Management"),
+        canAccessStaffDirectory: isAgencyOwner || accessList.includes("DSP Management"),
+      }}
+      directoryRoutes={agencyDirectoryRoutes}
+      data={data}
+    >
+      <ClaimsDashboardPage />
+    </OperationalAgencyProvider>
   );
 }

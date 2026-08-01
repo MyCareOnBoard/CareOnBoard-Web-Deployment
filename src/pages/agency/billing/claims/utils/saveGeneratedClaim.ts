@@ -4,13 +4,15 @@ import type { MileageRide } from "@/lib/api/mileage";
 import type { RecentClaim } from "../data/mockClaimsDashboardData";
 import { mapRideToRecentClaim } from "./rideToRecentClaim";
 import { mapShiftToRecentClaim } from "./shiftToRecentClaim";
+import type { OperationalBillingRequestContext } from "@/lib/operational-agency/types";
 
 type SaveGeneratedClaimInput = {
-  agencyId: string;
+  context: OperationalBillingRequestContext;
   selectedShifts?: Shift[];
   selectedRides?: MileageRide[];
   serviceCode: string;
   weekRange?: string;
+  signal?: AbortSignal;
 };
 
 type SaveGeneratedClaimResult = {
@@ -19,11 +21,12 @@ type SaveGeneratedClaimResult = {
 };
 
 export async function saveGeneratedClaim({
-  agencyId,
+  context,
   selectedShifts = [],
   selectedRides = [],
   serviceCode,
   weekRange,
+  signal,
 }: SaveGeneratedClaimInput): Promise<SaveGeneratedClaimResult> {
   if (selectedShifts.length === 0 && selectedRides.length === 0) {
     throw new Error("Select at least one shift or ride to create a claim.");
@@ -42,11 +45,14 @@ export async function saveGeneratedClaim({
     }
 
     const savedClaim = await createBillingClaim({
-      agencyId,
-      clientId,
-      rideIds: selectedRides.map((ride) => ride.id),
-      serviceCode: normalizedServiceCode,
-      weekRange,
+      context,
+      signal,
+      payload: {
+        clientId,
+        rideIds: selectedRides.map((ride) => ride.id),
+        serviceCode: normalizedServiceCode,
+        weekRange,
+      },
     });
 
     return {
@@ -66,11 +72,14 @@ export async function saveGeneratedClaim({
   }
 
   const savedClaim = await createBillingClaim({
-    agencyId,
-    clientId,
-    shiftIds: selectedShifts.map((shift) => shift.id),
-    serviceCode: normalizedServiceCode,
-    weekRange,
+    context,
+    signal,
+    payload: {
+      clientId,
+      shiftIds: selectedShifts.map((shift) => shift.id),
+      serviceCode: normalizedServiceCode,
+      weekRange,
+    },
   });
 
   return {

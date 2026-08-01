@@ -1,5 +1,11 @@
 import axiosClient from "../axios";
 import type { AgencyMode } from "@/store/redux/agencyModeSlice";
+import type { OperationalBillingRequestContext } from "@/lib/operational-agency/types";
+import {
+  operationalAgencyId,
+  withOperationalAgency,
+  withoutAgencyId,
+} from "@/lib/operational-agency/request";
 
 export type StaffTimesheetStatus = "draft" | "pending" | "approved" | "rejected";
 
@@ -15,6 +21,14 @@ export type StaffTimesheetEntry = {
 export type StaffTimesheetSignature = {
   signatureType: string;
   signatureData: string;
+};
+
+export type StaffTimesheetPayPreview = {
+  /** Aggregate for this staff member's eligible timesheets in the billing-list response. */
+  billingType: "hourly" | "monthly";
+  billingRate: number;
+  totalHours: number;
+  grossAmount: number;
 };
 
 export type StaffTimesheet = {
@@ -35,6 +49,7 @@ export type StaffTimesheet = {
   reviewedBy: string | null;
   reviewerNotes: string | null;
   payrollInvoiceId: string | null;
+  payPreview?: StaffTimesheetPayPreview;
   createdAt: string;
   updatedAt: string;
 };
@@ -56,6 +71,17 @@ export type ListStaffTimesheetsQuery = {
   scope?: "mine" | "agency";
   mode?: AgencyMode;
   limit?: number;
+  cursor?: string;
+  payroll?: boolean;
+};
+
+export type StaffTimesheetListPage = {
+  timesheets: StaffTimesheet[];
+  returnedCount: number;
+  scannedCount: number;
+  total: number | null;
+  nextCursor: string | null;
+  truncated: boolean;
 };
 
 export type CreateStaffPayrollInvoicePayload = {
@@ -67,7 +93,7 @@ export type CreateStaffPayrollInvoicePayload = {
 
 type ListResponse = {
   success: boolean;
-  data: { timesheets: StaffTimesheet[]; total: number };
+  data: StaffTimesheetListPage;
   message?: string;
 };
 
@@ -87,17 +113,46 @@ type MutationResponse = {
 const BASE = "/agencyStaff/timesheets";
 
 export async function listStaffTimesheets(
-  query: ListStaffTimesheetsQuery = {},
-): Promise<{ timesheets: StaffTimesheet[]; total: number }> {
-  const response = await axiosClient.get<ListResponse>(BASE, { params: query });
+  input: {
+    context: OperationalBillingRequestContext;
+    query?: ListStaffTimesheetsQuery;
+    signal?: AbortSignal;
+  },
+): Promise<StaffTimesheetListPage> {
+  const { context, query = {}, signal } = input;
+  const response = await axiosClient.get<ListResponse>(BASE, {
+    params: withOperationalAgency(context, query),
+    ...(signal ? { signal } : {}),
+  });
   if (!response.data.success || !response.data.data) {
     throw new Error(response.data.message || "Failed to list timesheets");
   }
   return response.data.data;
 }
 
-export async function getStaffTimesheet(id: string): Promise<StaffTimesheet> {
-  const response = await axiosClient.get<ItemResponse>(`${BASE}/${id}`);
+export async function listMyStaffTimesheets(
+  query: ListStaffTimesheetsQuery = {},
+): Promise<StaffTimesheetListPage> {
+  const { scope: _untrustedScope, ...selfQuery } = withoutAgencyId(query);
+  const response = await axiosClient.get<ListResponse>(BASE, {
+    params: { ...selfQuery, scope: "mine" },
+  });
+  if (!response.data.success || !response.data.data) {
+    throw new Error(response.data.message || "Failed to list timesheets");
+  }
+  return response.data.data;
+}
+
+export async function getStaffTimesheet(input: {
+  context: OperationalBillingRequestContext;
+  timesheetId: string;
+  signal?: AbortSignal;
+}): Promise<StaffTimesheet> {
+  const { context, timesheetId, signal } = input;
+  const response = await axiosClient.get<ItemResponse>(`${BASE}/${encodeURIComponent(timesheetId)}`, {
+    params: { agencyId: operationalAgencyId(context) },
+    ...(signal ? { signal } : {}),
+  });
   if (!response.data.success || !response.data.data) {
     throw new Error(response.data.message || "Failed to fetch timesheet");
   }
@@ -126,13 +181,21 @@ export async function updateStaffTimesheet(
 }
 
 export async function reviewStaffTimesheet(
-  id: string,
-  status: "approved" | "rejected",
-  reviewerNotes?: string,
+  input: {
+    context: OperationalBillingRequestContext;
+    timesheetId: string;
+    status: "approved" | "rejected";
+    reviewerNotes?: string;
+    signal?: AbortSignal;
+  },
 ): Promise<void> {
-  const response = await axiosClient.patch<MutationResponse>(`${BASE}/${id}/status`, {
+  const { context, timesheetId, status, reviewerNotes, signal } = input;
+  const response = await axiosClient.patch<MutationResponse>(`${BASE}/${encodeURIComponent(timesheetId)}/status`, {
     status,
     ...(reviewerNotes ? { reviewerNotes } : {}),
+  }, {
+    params: { agencyId: operationalAgencyId(context) },
+    ...(signal ? { signal } : {}),
   });
   if (!response.data.success) {
     throw new Error(response.data.message || "Failed to review timesheet");
@@ -140,11 +203,17 @@ export async function reviewStaffTimesheet(
 }
 
 export async function createStaffPayrollInvoice(
-  payload: CreateStaffPayrollInvoicePayload,
+  input: {
+    context: OperationalBillingRequestContext;
+    payload: CreateStaffPayrollInvoicePayload;
+    signal?: AbortSignal;
+  },
 ): Promise<{ id: string }> {
+  const { context, payload, signal } = input;
   const response = await axiosClient.post<{ success: boolean; data?: { id: string }; message?: string }>(
     `${BASE}/payroll`,
-    payload,
+    withoutAgencyId(payload),
+    { params: { agencyId: operationalAgencyId(context) }, ...(signal ? { signal } : {}) },
   );
   if (!response.data.success || !response.data.data) {
     throw new Error(response.data.message || "Failed to create payroll invoice");

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSelector } from "react-redux";
 import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -6,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -19,7 +21,7 @@ import {
 import { DotGridIcon, menuItemClassName } from "@/components/ui/dot-grid-menu";
 import { Check, CornerDownLeft, Eye, Loader2, Search, Wallet, CalendarClock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
+import { resolveEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 import {
   listStaffTimesheets,
   reviewStaffTimesheet,
@@ -28,6 +30,15 @@ import {
   type StaffTimesheet,
   type StaffTimesheetStatus,
 } from "@/lib/api/staff-timesheets";
+import { useAuth } from "@/utils/auth";
+import {
+  OperationalAgencyProvider,
+  useOperationalAgency,
+} from "@/lib/operational-agency/OperationalAgencyProvider";
+import { createAgencyOperationalDataAdapter } from "@/lib/operational-agency/dataAdapters";
+import { agencyDirectoryRoutes } from "@/lib/operational-agency/routes";
+import type { RootState } from "@/store/redux/store";
+import { UserType } from "@/utils/auth/types/user.types";
 
 const STATUS_META: Record<string, { label: string; border: string; dot: string }> = {
   pending: { label: "Pending", border: "border-[#FF6C10] text-[#FF6C10]", dot: "bg-[#FF6C10]" },
@@ -92,9 +103,17 @@ function SkeletonRow() {
   );
 }
 
-export default function StaffTimesheetsApprovalPage() {
+function isAbort(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { code?: string; name?: string };
+  return candidate.code === "ERR_CANCELED"
+    || candidate.name === "CanceledError"
+    || candidate.name === "AbortError";
+}
+
+export function StaffTimesheetsApprovalContent() {
+  const { agencyId, mode } = useOperationalAgency();
   const { toast } = useToast();
-  const mode = useEffectiveAgencyMode();
 
   const [timesheets, setTimesheets] = useState<StaffTimesheet[]>([]);
   const [loading, setLoading] = useState(true);
@@ -104,26 +123,60 @@ export default function StaffTimesheetsApprovalPage() {
   const [viewing, setViewing] = useState<StaffTimesheet | null>(null);
   const [rejectTarget, setRejectTarget] = useState<StaffTimesheet | null>(null);
   const [rejectNotes, setRejectNotes] = useState("");
+  const loadControllerRef = useRef<AbortController | null>(null);
+  const loadRequestIdRef = useRef(0);
+  const mutationControllerRef = useRef<AbortController | null>(null);
 
   const load = useCallback(async () => {
+    const requestId = ++loadRequestIdRef.current;
+    loadControllerRef.current?.abort();
+    const controller = new AbortController();
+    loadControllerRef.current = controller;
+    if (!agencyId) {
+      setTimesheets([]);
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
-      const { timesheets: rows } = await listStaffTimesheets({ scope: "agency", ...(mode ? { mode } : {}) });
+      const { timesheets: rows } = await listStaffTimesheets({
+        context: { agencyId },
+        query: { scope: "agency", ...(mode ? { mode } : {}) },
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted || loadRequestIdRef.current !== requestId) return;
       setTimesheets(rows);
     } catch (error) {
+      if (controller.signal.aborted || loadRequestIdRef.current !== requestId || isAbort(error)) return;
       toast({
         title: "Failed to load timesheets",
         description: getStaffTimesheetErrorMessage(error),
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted && loadRequestIdRef.current === requestId) {
+        setLoading(false);
+      }
     }
-  }, [mode, toast]);
+  }, [agencyId, mode, toast]);
 
   useEffect(() => {
-    load();
+    void load();
+    return () => {
+      loadRequestIdRef.current += 1;
+      loadControllerRef.current?.abort();
+      loadControllerRef.current = null;
+      mutationControllerRef.current?.abort();
+      mutationControllerRef.current = null;
+    };
   }, [load]);
+
+  const beginMutation = useCallback(() => {
+    mutationControllerRef.current?.abort();
+    const controller = new AbortController();
+    mutationControllerRef.current = controller;
+    return controller;
+  }, []);
 
   // Drafts are the staff's own in-progress sheets; the review queue only shows submitted ones.
   const reviewable = useMemo(
@@ -144,15 +197,26 @@ export default function StaffTimesheetsApprovalPage() {
   const pendingCount = useMemo(() => reviewable.filter((t) => t.status === "pending").length, [reviewable]);
 
   async function handleApprove(t: StaffTimesheet) {
+    const controller = beginMutation();
     setBusyId(t.id);
     try {
-      await reviewStaffTimesheet(t.id, "approved");
+      await reviewStaffTimesheet({
+        context: { agencyId },
+        timesheetId: t.id,
+        status: "approved",
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted) return;
       toast({ title: "Timesheet approved", variant: "success" });
       await load();
     } catch (error) {
+      if (controller.signal.aborted || isAbort(error)) return;
       toast({ title: "Approval failed", description: getStaffTimesheetErrorMessage(error), variant: "destructive" });
     } finally {
-      setBusyId(null);
+      if (!controller.signal.aborted && mutationControllerRef.current === controller) {
+        setBusyId(null);
+        mutationControllerRef.current = null;
+      }
     }
   }
 
@@ -162,29 +226,47 @@ export default function StaffTimesheetsApprovalPage() {
       toast({ title: "Add a reason", description: "A reason is required to reject.", variant: "destructive" });
       return;
     }
+    const controller = beginMutation();
     setBusyId(rejectTarget.id);
     try {
-      await reviewStaffTimesheet(rejectTarget.id, "rejected", rejectNotes.trim());
+      await reviewStaffTimesheet({
+        context: { agencyId },
+        timesheetId: rejectTarget.id,
+        status: "rejected",
+        reviewerNotes: rejectNotes.trim(),
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted) return;
       toast({ title: "Timesheet rejected", variant: "success" });
       setRejectTarget(null);
       setRejectNotes("");
       await load();
     } catch (error) {
+      if (controller.signal.aborted || isAbort(error)) return;
       toast({ title: "Rejection failed", description: getStaffTimesheetErrorMessage(error), variant: "destructive" });
     } finally {
-      setBusyId(null);
+      if (!controller.signal.aborted && mutationControllerRef.current === controller) {
+        setBusyId(null);
+        mutationControllerRef.current = null;
+      }
     }
   }
 
   async function handleCreatePayroll(t: StaffTimesheet) {
+    const controller = beginMutation();
     setBusyId(t.id);
     try {
       await createStaffPayrollInvoice({
-        staffUid: t.staffUid,
-        periodStart: t.periodStart,
-        periodEnd: t.periodEnd,
-        staffTimesheetIds: [t.id],
+        context: { agencyId },
+        payload: {
+          staffUid: t.staffUid,
+          periodStart: t.periodStart,
+          periodEnd: t.periodEnd,
+          staffTimesheetIds: [t.id],
+        },
+        signal: controller.signal,
       });
+      if (controller.signal.aborted) return;
       toast({
         title: "Payroll created",
         description: `Invoice created for ${t.staffName}. Find it in Payroll → Generated.`,
@@ -192,9 +274,13 @@ export default function StaffTimesheetsApprovalPage() {
       });
       await load();
     } catch (error) {
+      if (controller.signal.aborted || isAbort(error)) return;
       toast({ title: "Couldn't create payroll", description: getStaffTimesheetErrorMessage(error), variant: "destructive" });
     } finally {
-      setBusyId(null);
+      if (!controller.signal.aborted && mutationControllerRef.current === controller) {
+        setBusyId(null);
+        mutationControllerRef.current = null;
+      }
     }
   }
 
@@ -399,6 +485,9 @@ export default function StaffTimesheetsApprovalPage() {
                 <DialogTitle className="pr-6 text-[20px] font-bold leading-snug text-[#10141a]">
                   {viewing.staffName || "Staff timesheet"}
                 </DialogTitle>
+                <DialogDescription className="sr-only">
+                  Review submitted hours, signature, and payroll status for this staff timesheet.
+                </DialogDescription>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <StatusPill status={viewing.status} />
                   <span className="text-[13px] text-[#6b7280]">{fmtPeriod(viewing.periodStart, viewing.periodEnd)}</span>
@@ -514,10 +603,10 @@ export default function StaffTimesheetsApprovalPage() {
         <DialogContent className="rounded-[24px]">
           <DialogHeader>
             <DialogTitle>Reject timesheet</DialogTitle>
+            <DialogDescription className="text-sm text-[#808081]">
+              Let {rejectTarget?.staffName || "the staff member"} know why this timesheet is being rejected.
+            </DialogDescription>
           </DialogHeader>
-          <p className="text-sm text-[#808081]">
-            Let {rejectTarget?.staffName || "the staff member"} know why this timesheet is being rejected.
-          </p>
           <Textarea
             value={rejectNotes}
             onChange={(e) => setRejectNotes(e.target.value)}
@@ -540,5 +629,52 @@ export default function StaffTimesheetsApprovalPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function StaffTimesheetsApprovalPage() {
+  const { agencyId, mode } = useOperationalAgency();
+  return <StaffTimesheetsApprovalContent key={`${agencyId}:${mode ?? "all"}`} />;
+}
+
+export function AgencyStaffTimesheetsApprovalPage() {
+  const { user } = useAuth();
+  const agencyId = user?.agencyId || user?.agency?.id || "";
+  const supportedClientTypes = user?.agency?.supportedClientTypes ?? [];
+  const storedMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId]);
+  const mode = resolveEffectiveAgencyMode(supportedClientTypes, storedMode);
+  const data = useMemo(() => createAgencyOperationalDataAdapter(agencyId), [agencyId]);
+  const accessList = user?.profile?.accessList ?? [];
+  const isAgencyOwner = user?.userType === UserType.AGENCY;
+
+  if (!agencyId) {
+    return <p role="alert" className="px-4 py-8 text-sm text-[#808081]">Sign in again to manage billing.</p>;
+  }
+
+  return (
+    <OperationalAgencyProvider
+      key={agencyId}
+      actor="agency"
+      agencyId={agencyId}
+      agency={{
+        id: agencyId,
+        name: user?.agency?.name || user?.fullName || "Agency",
+        status: "active",
+        supportedClientTypes,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+      }}
+      mode={mode}
+      capabilities={{
+        canManageShifts: true,
+        canManageBilling: true,
+        shiftMaintenance: true,
+        canAccessClientDirectory: isAgencyOwner || accessList.includes("Client Management"),
+        canAccessStaffDirectory: isAgencyOwner || accessList.includes("DSP Management"),
+      }}
+      directoryRoutes={agencyDirectoryRoutes}
+      data={data}
+    >
+      <StaffTimesheetsApprovalPage />
+    </OperationalAgencyProvider>
   );
 }

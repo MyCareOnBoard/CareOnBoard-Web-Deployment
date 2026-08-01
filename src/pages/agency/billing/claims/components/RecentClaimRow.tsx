@@ -1,12 +1,12 @@
 import { memo } from "react";
 import { Link } from "react-router";
 import { ArrowRight } from "lucide-react";
-import { Routes } from "@/routes/constants";
 import type { RecentClaim } from "../data/mockClaimsDashboardData";
 import ClientNameLink from "./ClientNameLink";
 import CoverageBadge from "./CoverageBadge";
 import { GROUPED_TABLE_ROW_CLASS, TABLE_ROW_CLASS } from "./tableColumns";
 import { useStaffLabels } from "@/hooks/useStaffLabels";
+import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
 
 const MISSING_STAFF_ID = "—";
 const STAFF_ID_DISPLAY_LENGTH = 6;
@@ -24,16 +24,18 @@ function formatStaffIdDisplay(staffId: string): string {
 }
 
 function StaffLink({ staffId, staffName }: { staffId: string; staffName?: string }) {
+  const { capabilities, directoryRoutes } = useOperationalAgency();
   // Prefer the resolved staff name; fall back to the (truncated) id when it's missing.
   const label = staffName?.trim() || formatStaffIdDisplay(staffId);
 
-  if (!isStaffIdLinkable(staffId)) {
+  const staffDetailsRoute = directoryRoutes?.staffDetails;
+  if (!isStaffIdLinkable(staffId) || !capabilities.canAccessStaffDirectory || !staffDetailsRoute) {
     return <span className="text-[13px] text-[#808081]">{label}</span>;
   }
 
   return (
     <Link
-      to={Routes.agency.dspProfile.replace(":dspId", staffId.trim())}
+      to={staffDetailsRoute(staffId.trim())}
       className="text-[13px] font-medium text-[#10141a] transition-colors hover:text-[#00b4b8] hover:underline"
     >
       {label}

@@ -29,7 +29,7 @@ import {
   entriesToWeekData,
 } from "./timesheetEntries";
 import {
-  listStaffTimesheets,
+  listMyStaffTimesheets,
   createStaffTimesheet,
   updateStaffTimesheet,
   getStaffTimesheetErrorMessage,
@@ -89,7 +89,7 @@ export default function StaffTimesheetPage() {
     let active = true;
     (async () => {
       try {
-        const { timesheets } = await listStaffTimesheets({ scope: "mine", status: "draft", limit: 1 });
+        const { timesheets } = await listMyStaffTimesheets({ scope: "mine", status: "draft", limit: 1 });
         if (!active) return;
         const draft = timesheets[0];
         if (draft) {

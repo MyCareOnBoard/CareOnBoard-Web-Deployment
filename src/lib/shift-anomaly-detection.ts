@@ -142,6 +142,7 @@ export function shiftToAnomalyRecord(shift: Shift): ShiftAnomaly | null {
 
   return {
     id: shift.id,
+    agencyId: shift.agencyId ?? shift.agency?.id ?? "",
     date: shift.date,
     startTime: shift.startTime ?? null,
     endTime: shift.endTime ?? null,

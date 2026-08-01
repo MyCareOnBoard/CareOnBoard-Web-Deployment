@@ -3,6 +3,7 @@ import { Printer, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -275,9 +276,9 @@ export default function PayrollInvoiceModal({
                 <DialogTitle className={cn("mt-3 text-left font-bold", INVOICE_TEXT_CLASS)}>
                   Paystub Invoice
                 </DialogTitle>
-                <p className={cn("mt-1 font-medium", INVOICE_TEXT_MUTED_CLASS)}>
+                <DialogDescription className={cn("mt-1 font-medium", INVOICE_TEXT_MUTED_CLASS)}>
                   {staffName} · {invoice.dateRangeLabel}
-                </p>
+                </DialogDescription>
               </div>
               <button
                 type="button"

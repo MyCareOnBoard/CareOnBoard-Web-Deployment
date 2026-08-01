@@ -1,6 +1,12 @@
 import axiosClient from "../axios";
 import type { ReadyToClaimRow } from "./claims";
 import type { AgencyMode } from "@/store/redux/agencyModeSlice";
+import type { OperationalBillingRequestContext } from "@/lib/operational-agency/types";
+import {
+  operationalAgencyId,
+  withOperationalAgency,
+  withoutAgencyId,
+} from "@/lib/operational-agency/request";
 
 export type OutOfPocketReadyRow = ReadyToClaimRow;
 
@@ -73,10 +79,15 @@ export type CreateOutOfPocketInvoicePayload = {
 
 type ApiEnvelope<T> = { success: boolean; data: T; message?: string; error?: string };
 
-export async function listOutOfPocketReady(params?: { limit?: number; mode?: AgencyMode }): Promise<OutOfPocketReadyResponse> {
+export async function listOutOfPocketReady(input: {
+  context: OperationalBillingRequestContext;
+  query?: { limit?: number; mode?: AgencyMode };
+  signal?: AbortSignal;
+}): Promise<OutOfPocketReadyResponse> {
+  const { context, query = {}, signal } = input;
   const res = await axiosClient.get<ApiEnvelope<OutOfPocketReadyResponse>>(
     "/billing/out-of-pocket/ready-to-bill",
-    { params },
+    { params: withOperationalAgency(context, query), ...(signal ? { signal } : {}) },
   );
   if (!res.data.success || !res.data.data) {
     throw new Error(res.data.message || "Failed to fetch out-of-pocket items");
@@ -85,11 +96,17 @@ export async function listOutOfPocketReady(params?: { limit?: number; mode?: Age
 }
 
 export async function createOutOfPocketInvoice(
-  payload: CreateOutOfPocketInvoicePayload,
+  input: {
+    context: OperationalBillingRequestContext;
+    payload: CreateOutOfPocketInvoicePayload;
+    signal?: AbortSignal;
+  },
 ): Promise<OutOfPocketInvoiceDetail> {
+  const { context, payload, signal } = input;
   const res = await axiosClient.post<ApiEnvelope<OutOfPocketInvoiceDetail>>(
     "/billing/out-of-pocket/invoices",
-    payload,
+    withoutAgencyId(payload),
+    { params: { agencyId: operationalAgencyId(context) }, ...(signal ? { signal } : {}) },
   );
   if (!res.data.success || !res.data.data) {
     throw new Error(res.data.message || "Failed to create invoice");
@@ -97,10 +114,15 @@ export async function createOutOfPocketInvoice(
   return res.data.data;
 }
 
-export async function listOutOfPocketInvoices(params?: { limit?: number; mode?: AgencyMode }): Promise<OutOfPocketInvoiceListItem[]> {
+export async function listOutOfPocketInvoices(input: {
+  context: OperationalBillingRequestContext;
+  query?: { limit?: number; mode?: AgencyMode };
+  signal?: AbortSignal;
+}): Promise<OutOfPocketInvoiceListItem[]> {
+  const { context, query = {}, signal } = input;
   const res = await axiosClient.get<ApiEnvelope<{ invoices: OutOfPocketInvoiceListItem[] }>>(
     "/billing/out-of-pocket/invoices",
-    { params },
+    { params: withOperationalAgency(context, query), ...(signal ? { signal } : {}) },
   );
   if (!res.data.success || !res.data.data) {
     throw new Error(res.data.message || "Failed to list invoices");
@@ -108,9 +130,15 @@ export async function listOutOfPocketInvoices(params?: { limit?: number; mode?: 
   return res.data.data.invoices;
 }
 
-export async function getOutOfPocketInvoice(invoiceId: string): Promise<OutOfPocketInvoiceDetail> {
+export async function getOutOfPocketInvoice(input: {
+  context: OperationalBillingRequestContext;
+  invoiceId: string;
+  signal?: AbortSignal;
+}): Promise<OutOfPocketInvoiceDetail> {
+  const { context, invoiceId, signal } = input;
   const res = await axiosClient.get<ApiEnvelope<OutOfPocketInvoiceDetail>>(
-    `/billing/out-of-pocket/invoices/${invoiceId}`,
+    `/billing/out-of-pocket/invoices/${encodeURIComponent(invoiceId)}`,
+    { params: { agencyId: operationalAgencyId(context) }, ...(signal ? { signal } : {}) },
   );
   if (!res.data.success || !res.data.data) {
     throw new Error(res.data.message || "Failed to fetch invoice");
@@ -119,20 +147,31 @@ export async function getOutOfPocketInvoice(invoiceId: string): Promise<OutOfPoc
 }
 
 export async function sendOutOfPocketInvoice(
-  invoiceId: string,
+  input: { context: OperationalBillingRequestContext; invoiceId: string; signal?: AbortSignal },
 ): Promise<{ emailStatus: OutOfPocketInvoiceEmailStatus; emailedTo: string; emailedAt: string }> {
+  const { context, invoiceId, signal } = input;
   const res = await axiosClient.post<
     ApiEnvelope<{ emailStatus: OutOfPocketInvoiceEmailStatus; emailedTo: string; emailedAt: string }>
-  >(`/billing/out-of-pocket/invoices/${invoiceId}/send`);
+  >(
+    `/billing/out-of-pocket/invoices/${encodeURIComponent(invoiceId)}/send`,
+    undefined,
+    { params: { agencyId: operationalAgencyId(context) }, ...(signal ? { signal } : {}) },
+  );
   if (!res.data.success || !res.data.data) {
     throw new Error(res.data.message || "Failed to send invoice");
   }
   return res.data.data;
 }
 
-export async function cancelOutOfPocketInvoice(invoiceId: string): Promise<void> {
+export async function cancelOutOfPocketInvoice(input: {
+  context: OperationalBillingRequestContext;
+  invoiceId: string;
+  signal?: AbortSignal;
+}): Promise<void> {
+  const { context, invoiceId, signal } = input;
   const res = await axiosClient.delete<ApiEnvelope<unknown>>(
-    `/billing/out-of-pocket/invoices/${invoiceId}`,
+    `/billing/out-of-pocket/invoices/${encodeURIComponent(invoiceId)}`,
+    { params: { agencyId: operationalAgencyId(context) }, ...(signal ? { signal } : {}) },
   );
   if (!res.data.success) {
     throw new Error(res.data.message || "Failed to cancel invoice");

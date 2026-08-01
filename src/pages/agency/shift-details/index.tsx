@@ -1,5 +1,5 @@
-import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router";
 import { format, parseISO } from "date-fns";
 import { ArrowLeft, Loader2, StickyNote } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -12,9 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useAuth } from "@/utils/auth";
 import { useToast } from "@/hooks/use-toast";
-import { Routes } from "@/routes/constants";
 import {
   deleteShift,
   fetchShiftMaintenanceAudit,
@@ -36,6 +34,8 @@ import {
   formatShiftAuditTimestamp,
   summarizeChanges,
 } from "@/pages/shared/shift-maintenance/audit-display";
+import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
+import { resolveOperationalReturnTo } from "@/lib/operational-agency/urlState";
 
 const AddScheduleModal = lazy(() => import("@/pages/agency/scheduling/components/AddScheduleModal"));
 const ShiftDetailsModal = lazy(() => import("@/components/ShiftDetailsModal"));
@@ -76,12 +76,12 @@ function getInitialsFromName(name: string) {
   return `${parts[0].charAt(0)}${parts[parts.length - 1].charAt(0)}`.toUpperCase();
 }
 
-function shiftDeleteConfirmMessage(shift: Shift): string {
+function shiftDeleteConfirmMessage(shift: Shift, agencyName: string): string {
   const clientLabel = shift.client
     ? `${shift.client.firstName || ""} ${shift.client.lastName || ""}`.trim() || "this client"
     : "this client";
   const when = shift.date ? format(parseISO(shift.date), "MMMM d, yyyy") : "the scheduled date";
-  return `Removes ${clientLabel}'s shift on ${when} from the schedule. This can't be undone.`;
+  return `At ${agencyName}, removes ${clientLabel}'s shift on ${when} from the schedule. This can't be undone.`;
 }
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -96,12 +96,17 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
 export default function AgencyShiftDetailsPage() {
   const { shiftId } = useParams<{ shiftId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const location = useLocation();
   const { toast } = useToast();
+  const { actor, agencyId, agency, mode, capabilities, data, routes } = useOperationalAgency();
+
+  const fallbackRoute = routes.list(
+    actor === "super_admin" ? new URLSearchParams({ agencyId }).toString() : undefined,
+  );
 
   const goBack = useCallback(() => {
-    navigate(-1);
-  }, [navigate]);
+    navigate(resolveOperationalReturnTo(location.search, fallbackRoute), { replace: true });
+  }, [fallbackRoute, location.search, navigate]);
 
   const [shift, setShift] = useState<Shift | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
@@ -125,80 +130,151 @@ export default function AgencyShiftDetailsPage() {
     when: string;
     who: string;
   } | null>(null);
-
-  const agencyId = user?.agencyId;
+  const requestVersion = useRef(0);
+  const deleteRequestVersion = useRef(0);
+  const auditLoadMoreAbortRef = useRef<AbortController | null>(null);
 
   const refetchShiftAndRelated = useCallback(
-    async (options?: { silent?: boolean }) => {
+    async (options?: { silent?: boolean; signal?: AbortSignal }) => {
       if (!shiftId || !agencyId) return;
+      const requestId = ++requestVersion.current;
       const silent = options?.silent === true;
       if (!silent) {
         setPageLoading(true);
       }
       setLoadError(null);
       try {
-        const res = await getShiftById(shiftId, { agencyId, client: true, employee: true });
+        const res = await getShiftById(shiftId, {
+          agencyId,
+          client: true,
+          employee: true,
+          signal: options?.signal,
+        });
+        if (options?.signal?.aborted || requestId !== requestVersion.current) return;
         const s = res.shift;
         setShift(s);
 
-        const auditRes = await fetchShiftMaintenanceAudit({
-          agencyId,
-          shiftId,
-          limit: AUDIT_PAGE_SIZE,
-        });
-
-        setAudits(auditRes.audits);
-        setAuditCursor(auditRes.nextCursor);
-        setAuditHasNext(auditRes.hasNextPage);
+        if (capabilities.shiftMaintenance) {
+          const auditRes = await fetchShiftMaintenanceAudit(
+            {
+              agencyId,
+              shiftId,
+              limit: AUDIT_PAGE_SIZE,
+            },
+            { signal: options?.signal },
+          );
+          if (options?.signal?.aborted || requestId !== requestVersion.current) return;
+          setAudits(auditRes.audits);
+          setAuditCursor(auditRes.nextCursor);
+          setAuditHasNext(auditRes.hasNextPage);
+        } else {
+          setAudits([]);
+          setAuditCursor(null);
+          setAuditHasNext(false);
+        }
       } catch (e) {
+        if (options?.signal?.aborted || requestId !== requestVersion.current) return;
         console.error(e);
         setLoadError("We couldn't load this shift. It may have been removed or you may not have access.");
         setShift(null);
       } finally {
-        if (!silent) {
+        if (!silent && !options?.signal?.aborted && requestId === requestVersion.current) {
           setPageLoading(false);
         }
       }
     },
-    [shiftId, agencyId]
+    [agencyId, capabilities.shiftMaintenance, shiftId]
   );
 
   useEffect(() => {
+    deleteRequestVersion.current += 1;
+    auditLoadMoreAbortRef.current?.abort();
+    setShift(null);
+    setAudits([]);
+    setAuditCursor(null);
+    setAuditHasNext(false);
+    setAuditLoadingMore(false);
+    setShowAddScheduleModal(false);
+    setEditFormData(null);
+    setShowShiftDetailsModal(false);
+    setShiftPendingDelete(false);
+    setIsDeletingShift(false);
+    setAuditNoteModal(null);
     if (!shiftId || !agencyId) {
       setPageLoading(false);
       if (!agencyId) setLoadError("Sign in again to view shift details.");
       else setLoadError("Missing shift.");
       return;
     }
-    refetchShiftAndRelated();
+    const controller = new AbortController();
+    void refetchShiftAndRelated({ signal: controller.signal });
+    return () => {
+      controller.abort();
+      auditLoadMoreAbortRef.current?.abort();
+      requestVersion.current += 1;
+      deleteRequestVersion.current += 1;
+    };
   }, [shiftId, agencyId, refetchShiftAndRelated]);
 
   const loadMoreAudits = async () => {
-    if (!agencyId || !shiftId || !auditCursor || auditLoadingMore) return;
+    if (!capabilities.shiftMaintenance || !agencyId || !shiftId || !auditCursor || auditLoadingMore) return;
+    const requestId = requestVersion.current;
+    const requestedCursor = auditCursor;
+    auditLoadMoreAbortRef.current?.abort();
+    const controller = new AbortController();
+    auditLoadMoreAbortRef.current = controller;
     setAuditLoadingMore(true);
     try {
-      const res = await fetchShiftMaintenanceAudit({
-        agencyId,
-        shiftId,
-        limit: AUDIT_PAGE_SIZE,
-        startAfter: auditCursor,
-      });
+      const res = await fetchShiftMaintenanceAudit(
+        {
+          agencyId,
+          shiftId,
+          limit: AUDIT_PAGE_SIZE,
+          startAfter: requestedCursor,
+        },
+        { signal: controller.signal },
+      );
+      if (
+        controller.signal.aborted ||
+        auditLoadMoreAbortRef.current !== controller ||
+        requestId !== requestVersion.current
+      ) return;
+      if (res.hasNextPage && res.nextCursor === requestedCursor) {
+        setAuditCursor(null);
+        setAuditHasNext(false);
+        toast({
+          title: "Couldn't load more activity",
+          description: "The activity cursor did not advance. Refresh the shift and try again.",
+          variant: "destructive",
+        });
+        return;
+      }
       setAudits((prev) => [...prev, ...res.audits]);
       setAuditCursor(res.nextCursor);
       setAuditHasNext(res.hasNextPage);
     } catch {
+      if (
+        controller.signal.aborted ||
+        auditLoadMoreAbortRef.current !== controller ||
+        requestId !== requestVersion.current
+      ) return;
       toast({
         title: "Couldn't load more activity",
         description: "Try again in a moment.",
         variant: "destructive",
       });
     } finally {
-      setAuditLoadingMore(false);
+      if (
+        auditLoadMoreAbortRef.current === controller &&
+        requestId === requestVersion.current
+      ) {
+        setAuditLoadingMore(false);
+      }
     }
   };
 
   const openUpdateModal = () => {
-    if (!shift) return;
+    if (!shift || !capabilities.canManageShifts) return;
     setEditFormData(shiftToScheduleFormData(shift));
     setShowAddScheduleModal(true);
   };
@@ -210,10 +286,12 @@ export default function AgencyShiftDetailsPage() {
   };
 
   const confirmDeleteShift = async () => {
-    if (!shift || !shiftId) return;
+    if (!shift || !shiftId || !capabilities.canManageShifts) return;
+    const requestId = ++deleteRequestVersion.current;
     setIsDeletingShift(true);
     try {
-      await deleteShift(shiftId);
+      await deleteShift(shiftId, { agencyId });
+      if (requestId !== deleteRequestVersion.current) return;
       toast({
         title: "Shift deleted",
         description: "This shift was removed from the schedule.",
@@ -221,6 +299,7 @@ export default function AgencyShiftDetailsPage() {
       setShiftPendingDelete(false);
       goBack();
     } catch (err) {
+      if (requestId !== deleteRequestVersion.current) return;
       console.error(err);
       toast({
         title: "Couldn't delete shift",
@@ -228,7 +307,7 @@ export default function AgencyShiftDetailsPage() {
         variant: "destructive",
       });
     } finally {
-      setIsDeletingShift(false);
+      if (requestId === deleteRequestVersion.current) setIsDeletingShift(false);
     }
   };
 
@@ -302,31 +381,41 @@ export default function AgencyShiftDetailsPage() {
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2 sm:shrink-0">
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-full border-[rgba(255,255,255,0.5)] bg-[rgba(255,255,255,0.5)] px-4 font-semibold text-[#10141a] shadow-sm hover:bg-white/80"
-              onClick={openUpdateModal}
-            >
-              Update shift
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-full border-[rgba(255,255,255,0.5)] bg-white px-4 font-semibold text-[#10141a] shadow-sm hover:bg-white/90"
-              onClick={() => setShowShiftDetailsModal(true)}
-            >
-              Edit clock times
-            </Button>
-            <Button
-              type="button"
-              className="rounded-full bg-[#d93c24] px-4 font-semibold text-white hover:bg-[#c52d16]"
-              onClick={() => setShiftPendingDelete(true)}
-            >
-              Delete shift
-            </Button>
-          </div>
+          {capabilities.canManageShifts || capabilities.shiftMaintenance ? (
+            <div className="flex flex-wrap gap-2 sm:shrink-0">
+              {capabilities.canManageShifts ? (
+              <>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-full border-[rgba(255,255,255,0.5)] bg-[rgba(255,255,255,0.5)] px-4 font-semibold text-[#10141a] shadow-sm hover:bg-white/80"
+                onClick={openUpdateModal}
+              >
+                Update shift
+              </Button>
+              </>
+              ) : null}
+              {capabilities.shiftMaintenance ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-full border-[rgba(255,255,255,0.5)] bg-white px-4 font-semibold text-[#10141a] shadow-sm hover:bg-white/90"
+                onClick={() => setShowShiftDetailsModal(true)}
+              >
+                Edit clock times
+              </Button>
+              ) : null}
+              {capabilities.canManageShifts ? (
+              <Button
+                type="button"
+                className="rounded-full bg-[#d93c24] px-4 font-semibold text-white hover:bg-[#c52d16]"
+                onClick={() => setShiftPendingDelete(true)}
+              >
+                Delete shift
+              </Button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         <div className="rounded-[20px] border border-white bg-[#FFFFFF4D] p-6 shadow-sm">
@@ -372,7 +461,7 @@ export default function AgencyShiftDetailsPage() {
         <div className="rounded-[20px] border border-white bg-[#FFFFFF4D] p-6 shadow-sm">
           <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-[18px] font-semibold text-[#10141a]">What needs attention</h2>
-            {derivedAnomaly ? (
+            {derivedAnomaly && capabilities.shiftMaintenance ? (
               <Button
                 type="button"
                 variant="outline"
@@ -395,7 +484,7 @@ export default function AgencyShiftDetailsPage() {
                 </span>
               ))}
             </div>
-          ) : (
+          ) : capabilities.shiftMaintenance ? (
             <p className="text-[14px] text-[#808081]">
               Nothing stands out from this shift&apos;s schedule and clock times. Use{" "}
               <span className="font-semibold text-[#10141a]">Edit clock times</span> above to adjust clocks or
@@ -403,11 +492,17 @@ export default function AgencyShiftDetailsPage() {
               <button
                 type="button"
                 className="font-semibold text-[#10141a] underline underline-offset-2"
-                onClick={() => navigate(Routes.agency.shiftMaintenance)}
+                onClick={() => navigate(routes.maintenance(
+                  actor === "super_admin" ? new URLSearchParams({ agencyId }).toString() : undefined,
+                ))}
               >
                 Shift maintenance
               </button>
               .
+            </p>
+          ) : (
+            <p className="text-[14px] text-[#808081]">
+              Nothing stands out from this shift&apos;s schedule and clock times.
             </p>
           )}
         </div>
@@ -456,6 +551,7 @@ export default function AgencyShiftDetailsPage() {
           </div>
         )}
 
+        {capabilities.shiftMaintenance ? (
         <div className="rounded-[20px] border border-white bg-[#FFFFFF4D] p-6 shadow-sm">
           <h2 className="mb-4 text-[18px] font-semibold text-[#10141a]">Activity on this shift</h2>
           {audits.length === 0 ? (
@@ -547,12 +643,18 @@ export default function AgencyShiftDetailsPage() {
             </>
           )}
         </div>
+        ) : null}
       </div>
 
-      {showAddScheduleModal && editFormData && (
+      {capabilities.canManageShifts && showAddScheduleModal && editFormData && (
         <Suspense fallback={null}>
           <AddScheduleModal
             isOpen={showAddScheduleModal}
+            agencyId={agencyId}
+            agencyName={agency.name}
+            agencyMode={mode}
+            supportedClientTypes={agency.supportedClientTypes}
+            data={data}
             onClose={() => {
               setShowAddScheduleModal(false);
               setEditFormData(null);
@@ -564,13 +666,15 @@ export default function AgencyShiftDetailsPage() {
         </Suspense>
       )}
 
-      {showShiftDetailsModal ? (
+      {showShiftDetailsModal && capabilities.shiftMaintenance ? (
         <Suspense fallback={null}>
           <ShiftDetailsModal
             isOpen={showShiftDetailsModal}
             shift={shift}
             anomalyCodes={derivedAnomaly?.anomalyCodes ?? []}
             hydrateFromServer={false}
+            agencyId={agencyId}
+            agencyName={agency.name}
             onClose={() => setShowShiftDetailsModal(false)}
             onShiftUpdated={(updated) => {
               setShift(updated);
@@ -611,6 +715,7 @@ export default function AgencyShiftDetailsPage() {
         </DialogContent>
       </Dialog>
 
+      {capabilities.canManageShifts ? (
       <DeleteConfirmationModal
         isOpen={shiftPendingDelete}
         onClose={() => {
@@ -619,10 +724,11 @@ export default function AgencyShiftDetailsPage() {
         onConfirm={confirmDeleteShift}
         isDeleting={isDeletingShift}
         title="Delete this shift?"
-        message={shiftDeleteConfirmMessage(shift)}
+        message={shiftDeleteConfirmMessage(shift, agency.name)}
         confirmText="Delete shift"
         cancelText="Cancel"
       />
+      ) : null}
     </>
   );
 }

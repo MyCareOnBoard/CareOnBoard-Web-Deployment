@@ -1,7 +1,7 @@
-import {createApi} from "@reduxjs/toolkit/query/react";
-import {customBaseQuery} from "@/lib/baseQuery";
-import {Agency} from "@/lib/api/agencies";
-import {ListAgenciesResponse} from "@/lib/api/agencies";
+import { createApi } from "@reduxjs/toolkit/query/react";
+import { customBaseQuery } from "@/lib/baseQuery";
+import { Agency } from "@/lib/api/agencies";
+import { ListAgenciesResponse } from "@/lib/api/agencies";
 import {
   GetDraftAgencyResponse, GetSingleAgencyUsersItem,
   GetSummaryAgencyInfoResponse,
@@ -150,7 +150,7 @@ export const superAdminApi = createApi({
       invalidatesTags: ['Agencies']
     }),
     uploadAgencyFile: builder.mutation<UploadFileResponse, { file: File; fileType: 'logo' | 'letterhead'; }>({
-      query: ({file, fileType}) => {
+      query: ({ file, fileType }) => {
         const formData = new FormData();
         formData.append('file', file);
 
@@ -169,14 +169,15 @@ export const superAdminApi = createApi({
     }),
     listAllAgencies: builder.query<
       ListAgenciesResponse,
-      { limit?: number; status?: Agency["status"] }
+      { limit?: number; status?: Agency["status"], features?: string }
     >({
-      query: ({ limit, status }) => ({
+      query: ({ limit, status, features }) => ({
         url: "/agencies",
         method: "GET",
         params: {
           ...(limit ? { limit } : {}),
           ...(status ? { status } : {}),
+          ...(features ? { features } : {}),
         },
         requiresAuth: true,
       }),
@@ -244,7 +245,7 @@ export const superAdminApi = createApi({
       void,
       { agencyId: string, data: CreateAgencyWithUserPayload }
     >({
-      query: ({agencyId, data}) => ({
+      query: ({ agencyId, data }) => ({
         url: `/agencyManagement/agencies/${agencyId}`,
         method: "PATCH",
         data,
@@ -255,7 +256,7 @@ export const superAdminApi = createApi({
       { success: boolean, message: string },
       { agencyId: string, data: { status: "active" | "inactive" } }
     >({
-      query: ({agencyId, data}) => ({
+      query: ({ agencyId, data }) => ({
         url: `/agencyManagement/agencies/${agencyId}/status/update`,
         method: "PATCH",
         data,

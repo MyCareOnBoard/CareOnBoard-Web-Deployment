@@ -3,7 +3,7 @@ import { Loader2 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { MultiSelect, MultiSelectItem } from "@/components/ui/multi-select";
 import type { ReadyToClaimRow } from "@/lib/api/claims";
-import { getClientById, searchClients, type Client, type ClientService } from "@/lib/api/clients";
+import type { Client, ClientService } from "@/lib/api/clients";
 import { listShifts, ShiftStatus, type Shift } from "@/lib/api/shifts";
 import { mileageApi, type MileageRide } from "@/lib/api/mileage";
 import BillingCornerModalHeader from "@/pages/agency/billing/components/BillingCornerModalHeader";
@@ -16,8 +16,8 @@ import {
   BILLING_SECONDARY_BUTTON_CLASS,
 } from "@/pages/agency/billing/components/billingModalStyles";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/utils/auth";
-import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
+import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
+import type { OperationalClientOption } from "@/lib/operational-agency/types";
 import {
   buildClaimableRowsForClient,
   buildCombinedPreviewListTitle,
@@ -83,10 +83,9 @@ export default function GenerateClaimModal({
   onClose,
   onGenerate,
 }: GenerateClaimModalProps) {
-  const { user } = useAuth();
-  const agencyMode = useEffectiveAgencyMode();
+  const { agencyId, mode, data } = useOperationalAgency();
   const [clientQuery, setClientQuery] = useState("");
-  const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
+  const [clientSearchResults, setClientSearchResults] = useState<OperationalClientOption[]>([]);
   const [isSearchingClients, setIsSearchingClients] = useState(false);
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
@@ -97,6 +96,9 @@ export default function GenerateClaimModal({
   const [loadingItems, setLoadingItems] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const clientSearchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clientSearchControllerRef = useRef<AbortController | null>(null);
+  const clientSearchRequestIdRef = useRef(0);
+  const clientLoadControllerRef = useRef<AbortController | null>(null);
   const prefillRequestIdRef = useRef(0);
 
   const services = useMemo(
@@ -169,6 +171,7 @@ export default function GenerateClaimModal({
   const resetWizard = useCallback(() => {
     setClientQuery("");
     setClientSearchResults([]);
+    setIsSearchingClients(false);
     setShowClientDropdown(false);
     setSelectedClient(null);
     setSelectedServiceIds([]);
@@ -188,22 +191,30 @@ export default function GenerateClaimModal({
       if (clientSearchTimeoutRef.current) {
         clearTimeout(clientSearchTimeoutRef.current);
       }
+      clientSearchRequestIdRef.current += 1;
+      clientSearchControllerRef.current?.abort();
+      clientLoadControllerRef.current?.abort();
     };
   }, []);
 
   useEffect(() => {
     const clientId = initialClientGroup?.clientId;
-    if (!open || !clientId || !user?.agencyId) {
+    if (!open || !clientId) {
       return;
     }
 
     const requestId = prefillRequestIdRef.current + 1;
     prefillRequestIdRef.current = requestId;
+    clientLoadControllerRef.current?.abort();
+    const controller = new AbortController();
+    clientLoadControllerRef.current = controller;
 
     const loadPrefill = async () => {
       setLoadingClient(true);
       try {
-        const fullClient = await getClientById(clientId, user.agencyId);
+        const fullClient = await data.getClientSchedulingContext(clientId, {
+          signal: controller.signal,
+        });
         if (prefillRequestIdRef.current !== requestId) {
           return;
         }
@@ -223,11 +234,12 @@ export default function GenerateClaimModal({
                 readyToClaimRows,
               );
         setSelectedServiceIds(defaultIds);
-      } catch (error) {
+      } catch {
+        if (controller.signal.aborted) return;
         if (prefillRequestIdRef.current !== requestId) {
           return;
         }
-        console.error("Failed to load client for claim generation:", error);
+        console.error("Failed to load client for claim generation.");
         setSelectedClient(null);
       } finally {
         if (prefillRequestIdRef.current === requestId) {
@@ -237,13 +249,18 @@ export default function GenerateClaimModal({
     };
 
     void loadPrefill();
-  }, [open, initialClientGroup, readyToClaimRows, user?.agencyId]);
+    return () => controller.abort();
+  }, [data, open, initialClientGroup, readyToClaimRows]);
 
   const handleClientSearch = useCallback(
     (searchQuery: string) => {
       if (clientSearchTimeoutRef.current) {
         clearTimeout(clientSearchTimeoutRef.current);
       }
+      const requestId = clientSearchRequestIdRef.current + 1;
+      clientSearchRequestIdRef.current = requestId;
+      clientSearchControllerRef.current?.abort();
+      setIsSearchingClients(false);
 
       if (searchQuery.trim().length < 2) {
         setClientSearchResults([]);
@@ -252,34 +269,47 @@ export default function GenerateClaimModal({
       }
 
       clientSearchTimeoutRef.current = setTimeout(async () => {
+        const controller = new AbortController();
+        clientSearchControllerRef.current = controller;
         try {
-          setIsSearchingClients(true);
-          const results = await searchClients(searchQuery, user?.agencyId, agencyMode ?? undefined);
-          setClientSearchResults(results);
-          setShowClientDropdown(results.length > 0);
-        } catch (error) {
-          console.error("Failed to search clients:", error);
+          if (clientSearchRequestIdRef.current === requestId) setIsSearchingClients(true);
+          const response = await data.searchClients({
+            search: searchQuery,
+            mode: mode ?? undefined,
+            limit: 20,
+            signal: controller.signal,
+          });
+          if (controller.signal.aborted || clientSearchRequestIdRef.current !== requestId) return;
+          setClientSearchResults(response.items);
+          setShowClientDropdown(response.items.length > 0);
+        } catch {
+          if (controller.signal.aborted || clientSearchRequestIdRef.current !== requestId) return;
+          console.error("Failed to search clients.");
           setClientSearchResults([]);
           setShowClientDropdown(false);
         } finally {
-          setIsSearchingClients(false);
+          if (clientSearchRequestIdRef.current === requestId) setIsSearchingClients(false);
         }
       }, 300);
     },
-    [user?.agencyId, agencyMode],
+    [agencyId, data, mode],
   );
 
   const handleClientSelect = useCallback(
-    async (client: Client) => {
-      if (!user?.agencyId) return;
-
-      setClientQuery(getClientDisplayName(client));
+    async (client: OperationalClientOption) => {
+      setClientQuery(client.name);
       setShowClientDropdown(false);
       setClientSearchResults([]);
       setLoadingClient(true);
+      clientLoadControllerRef.current?.abort();
+      const controller = new AbortController();
+      clientLoadControllerRef.current = controller;
 
       try {
-        const fullClient = await getClientById(client.id, user.agencyId);
+        const fullClient = await data.getClientSchedulingContext(client.id, {
+          signal: controller.signal,
+        });
+        if (controller.signal.aborted) return;
         setSelectedClient(fullClient);
         const nextServices = flattenClientServices(fullClient);
         const defaultIds = getDefaultServiceIdsFromReadyRows(
@@ -288,18 +318,19 @@ export default function GenerateClaimModal({
           readyToClaimRows,
         );
         setSelectedServiceIds(defaultIds);
-      } catch (error) {
-        console.error("Failed to load client:", error);
+      } catch {
+        if (controller.signal.aborted) return;
+        console.error("Failed to load client.");
         setSelectedClient(null);
       } finally {
-        setLoadingClient(false);
+        if (!controller.signal.aborted) setLoadingClient(false);
       }
     },
-    [readyToClaimRows, user?.agencyId],
+    [data, readyToClaimRows],
   );
 
   useEffect(() => {
-    if (!open || !selectedClient?.id || !user?.agencyId) {
+    if (!open || !selectedClient?.id) {
       setShifts([]);
       setRides([]);
       return;
@@ -330,6 +361,18 @@ export default function GenerateClaimModal({
     const fetchItems = async () => {
       try {
         setLoadingItems(true);
+        const rideQuery: NonNullable<Parameters<typeof mileageApi.listAgency>[0]> & {
+          agencyId: string;
+        } = {
+          clientId: selectedClient.id,
+          status: "completed",
+          approved: true,
+          unclaimed: true,
+          limit: 100,
+          skipEnrichment: true,
+          agencyId,
+          ...(mode ? { clientType: mode } : {}),
+        };
         const [shiftResponse, rideResponse] = await Promise.all([
           needsShifts
             ? listShifts(
@@ -341,24 +384,14 @@ export default function GenerateClaimModal({
                   approved: true,
                   employee: true,
                   billingClaim: true,
-                  agencyId: user.agencyId,
+                  agencyId,
                   limit: 200,
                 },
                 { signal: controller.signal },
               )
             : Promise.resolve({ shifts: [] as Shift[] }),
           needsRides
-            ? mileageApi.listAgency(
-                {
-                  clientId: selectedClient.id,
-                  status: "completed",
-                  approved: true,
-                  unclaimed: true,
-                  limit: 100,
-                  skipEnrichment: true,
-                },
-                { signal: controller.signal },
-              )
+            ? mileageApi.listAgency(rideQuery, { signal: controller.signal })
             : Promise.resolve({ data: [] as MileageRide[] }),
         ]);
 
@@ -366,9 +399,9 @@ export default function GenerateClaimModal({
 
         setShifts(shiftResponse.shifts ?? []);
         setRides(rideResponse.data ?? []);
-      } catch (error) {
+      } catch {
         if (controller.signal.aborted) return;
-        console.error("Failed to fetch claim wizard items:", error);
+        console.error("Failed to fetch claim wizard items.");
         setShifts([]);
         setRides([]);
       } finally {
@@ -383,7 +416,7 @@ export default function GenerateClaimModal({
     return () => {
       controller.abort();
     };
-  }, [open, readyToClaimRows, selectedClient, selectedServiceCodes, user?.agencyId]);
+  }, [agencyId, mode, open, readyToClaimRows, selectedClient, selectedServiceCodes]);
 
   useEffect(() => {
     if (!open) {
@@ -502,8 +535,8 @@ export default function GenerateClaimModal({
                       onClick={() => void handleClientSelect(client)}
                       className="flex w-full cursor-pointer items-center justify-between gap-2 border-b border-[#f0f0f0] px-4 py-3 text-left last:border-b-0 hover:bg-gray-50"
                     >
-                      <span className="text-[14px] text-[#10141a]">{getClientDisplayName(client)}</span>
-                      {client.billingDirection === "out-of-pocket" && <OutOfPocketBadge />}
+                      <span className="text-[14px] text-[#10141a]">{client.name}</span>
+                      <span className="text-[12px] uppercase text-[#808081]">{client.mode}</span>
                     </button>
                   ))}
                 </div>

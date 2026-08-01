@@ -23,7 +23,7 @@ export default function ClientClaimsPage() {
   const { data, isLoading, error } = useGetClientClaimsQuery(
     {
       clientId: clientId || "",
-      agencyId: user?.agencyId || "",
+      context: { agencyId: user?.agencyId || "" },
       serviceCode: undefined,
     },
     {

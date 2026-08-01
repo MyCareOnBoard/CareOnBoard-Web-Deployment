@@ -9,7 +9,9 @@ const { get, post, patch } = vi.hoisted(() => ({
 vi.mock("../axios", () => ({ default: { get, post, patch } }));
 
 import {
+  AccessScope,
   createSuperAdminUser,
+  getAccessScopes,
   getSuperAdminAccessConfig,
   listAssignableAgencies,
   updateSuperAdminUser,
@@ -20,6 +22,15 @@ describe("super-admin access API", () => {
     get.mockReset();
     post.mockReset();
     patch.mockReset();
+  });
+
+  it("offers shift and billing management as independent UAC permissions", () => {
+    const accessScopes = getAccessScopes();
+
+    expect(AccessScope.SHIFT_MANAGEMENT).toBe("Shift Management");
+    expect(AccessScope.BILLING_MANAGEMENT).toBe("Billing Management");
+    expect(accessScopes.filter((scope) => scope === "Shift Management")).toHaveLength(1);
+    expect(accessScopes.filter((scope) => scope === "Billing Management")).toHaveLength(1);
   });
 
   it("loads the canonical access configuration", async () => {

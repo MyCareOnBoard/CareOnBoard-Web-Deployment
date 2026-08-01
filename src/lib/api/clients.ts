@@ -908,6 +908,7 @@ export async function listAgencyClients(params?: ListClientsParams): Promise<Cli
     const response = await axiosClient.get<ListAgencyClientsResponse>('/clientManagement', {
       params: {
         agencyId: params?.agencyId,
+        type: params?.type,
         status: params?.status,
         service: params?.service,
         search: params?.search,
@@ -986,6 +987,7 @@ export async function listClients(params?: ListClientsParams): Promise<Client[]>
     const response = await axiosClient.get<ListClientsResponse>('/clients', {
       params: {
         agencyId: params?.agencyId,
+        type: params?.type,
         status: params?.status,
         service: params?.service,
         search: params?.search,
@@ -1037,10 +1039,15 @@ export async function getClients(page: number = 1, pageSize: number = 10): Promi
  * Endpoint: GET /clients/:clientId
  * Employees must supply agencyId via query parameter
  */
-export async function getClientById(clientId: string, agencyId?: string): Promise<Client> {
+export async function getClientById(
+  clientId: string,
+  agencyId?: string,
+  options: { signal?: AbortSignal } = {},
+): Promise<Client> {
   try {
     const response = await axiosClient.get<{ success: boolean; data: Client }>(`/clients/${clientId}`, {
-      params: agencyId ? { agencyId } : undefined
+      params: agencyId ? { agencyId } : undefined,
+      signal: options.signal,
     });
 
     if (!response.data.success) {
@@ -1163,6 +1170,7 @@ export const clientsApi = createApi({
       query: (params = {}) => {
         const queryParams = new URLSearchParams();
         if (params?.agencyId) queryParams.append('agencyId', params.agencyId);
+        if (params?.type) queryParams.append('type', params.type);
         if (params?.status) queryParams.append('status', params.status);
         if (params?.service) queryParams.append('service', params.service);
         if (params?.search) queryParams.append('search', params.search);

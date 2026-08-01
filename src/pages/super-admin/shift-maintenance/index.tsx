@@ -1,5 +1,7 @@
-import ShiftMaintenancePage from "@/pages/shared/shift-maintenance";
+import { Navigate, useLocation } from "react-router";
+import { Routes } from "@/routes/constants";
 
 export default function SuperAdminShiftMaintenance() {
-  return <ShiftMaintenancePage isSuperAdmin />;
+  const location = useLocation();
+  return <Navigate replace to={`${Routes.superAdmin.shifts.maintenance}${location.search}`} />;
 }

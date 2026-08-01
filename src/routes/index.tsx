@@ -67,18 +67,24 @@ const BillingAndApprovalsPage = lazy(() => import("@/pages/agency/billing-and-ap
 const BillingFinancialOverviewPage = lazy(() =>
     import("@/pages/agency/billing/pages").then((module) => ({ default: module.FinancialOverview }))
 );
-const BillingPayrollManagementPage = lazy(() => import("@/pages/agency/billing/payroll"));
+const BillingPayrollManagementPage = lazy(() =>
+    import("@/pages/agency/billing/payroll").then((module) => ({ default: module.AgencyPayrollDashboardPage }))
+);
 const StaffTimesheetPage = lazy(() => import("@/pages/agency/staff-timesheet"));
-const StaffTimesheetsApprovalPage = lazy(() => import("@/pages/agency/billing/staff-timesheets"));
+const StaffTimesheetsApprovalPage = lazy(() =>
+    import("@/pages/agency/billing/staff-timesheets").then((module) => ({ default: module.AgencyStaffTimesheetsApprovalPage }))
+);
 const BillingClaimsDashboardPage = lazy(() =>
-    import("@/pages/agency/billing/pages").then((module) => ({ default: module.ClaimsDashboard }))
+    import("@/pages/agency/billing/claims").then((module) => ({ default: module.AgencyClaimsDashboardPage }))
 );
 const BillingExpensesDashboardPage = lazy(() =>
     import("@/pages/agency/billing/pages").then((module) => ({ default: module.ExpensesDashboard }))
 );
 const BillingIndexRedirect = lazy(() => import("@/pages/agency/billing/BillingIndexRedirect"));
 const ClientClaimsPage = lazy(() => import("@/pages/agency/billing-and-approvals/client-claims"));
-const SchedulingPage = lazy(() => import("@/pages/agency/scheduling"));
+const AgencySchedulingRoute = lazy(() =>
+    import("@/pages/agency/scheduling/AgencyShiftOperationsRoutes").then((module) => ({ default: module.AgencySchedulingRoute }))
+);
 const SupportPage = lazy(() => import("@/pages/agency/support"));
 const AnalyticsPage = lazy(() => import("@/pages/agency/analytics"));
 const AnalyticsPrintPage = lazy(() => import("@/pages/agency/analytics/print"));
@@ -90,11 +96,19 @@ const ApplicantProfilePage = lazy(() => import("@/pages/agency/applicant-directo
 const ComplianceAlertsPage = lazy(() => import("@/pages/agency/compliance-alerts"));
 const ManualStaffOnboardingPage = lazy(() => import("@/pages/agency/dsp-management/ManualStaffOnboarding"));
 const ShiftsPage = lazy(() => import("@/pages/agency/shifts"));
-const ShiftsListPage = lazy(() => import("@/pages/agency/scheduling/shifts"));
-const ApprovalsPage = lazy(() => import("@/pages/agency/scheduling/approvals"));
-const ActivityLogsPage = lazy(() => import("@/pages/agency/scheduling/activity-logs"));
+const AgencyShiftsListRoute = lazy(() =>
+    import("@/pages/agency/scheduling/AgencyShiftOperationsRoutes").then((module) => ({ default: module.AgencyShiftsListRoute }))
+);
+const AgencyShiftApprovalsRoute = lazy(() =>
+    import("@/pages/agency/scheduling/AgencyShiftOperationsRoutes").then((module) => ({ default: module.AgencyShiftApprovalsRoute }))
+);
+const AgencyShiftActivityLogsRoute = lazy(() =>
+    import("@/pages/agency/scheduling/AgencyShiftOperationsRoutes").then((module) => ({ default: module.AgencyShiftActivityLogsRoute }))
+);
 const AgencyShiftMaintenancePage = lazy(() => import("@/pages/agency/shift-maintenance"));
-const AgencyShiftDetailsPage = lazy(() => import("@/pages/agency/shift-details"));
+const AgencyShiftDetailsRoute = lazy(() =>
+    import("@/pages/agency/scheduling/AgencyShiftOperationsRoutes").then((module) => ({ default: module.AgencyShiftDetailsRoute }))
+);
 const NotesPage = lazy(() => import("@/pages/userPanel/notes"));
 const AgencyNotesPage = lazy(() => import("@/pages/agency/notes"));
 const SuperAdminLayout = lazy(() => import("@/layouts/SuperAdminLayout"));
@@ -127,6 +141,25 @@ const ServicesManagementPage = lazy(() => import("@/pages/super-admin/services")
 const AgencyTrainings = lazy(() => import("@/pages/agency/trainings"));
 const GlobalNotesQualityPage = lazy(() => import("@/pages/super-admin/global-notes-quality"));
 const SuperAdminShiftMaintenancePage = lazy(() => import("@/pages/super-admin/shift-maintenance"));
+const SuperAdminShiftManagementPage = lazy(() => import("@/pages/super-admin/shift-management"));
+const SuperAdminShiftWorkspaceIndexPage = lazy(() =>
+    import("@/pages/super-admin/shift-management").then((module) => ({ default: module.SuperAdminShiftWorkspaceIndex }))
+);
+const SuperAdminShiftListPage = lazy(() => import("@/pages/super-admin/shift-management/SuperAdminShiftList"));
+const SuperAdminShiftMaintenanceWorkspacePage = lazy(() => import("@/pages/super-admin/shift-management/SuperAdminShiftMaintenance"));
+const LegacyShiftSectionRedirect = lazy(() => import("@/pages/super-admin/shift-management/LegacyShiftSectionRedirect"));
+const SuperAdminShiftDetailsPage = lazy(() => import("@/pages/super-admin/shift-management/SuperAdminShiftDetails"));
+const SuperAdminBillingPage = lazy(() => import("@/pages/super-admin/billing"));
+const SuperAdminBillingIndexPage = lazy(() =>
+    import("@/pages/super-admin/billing").then((module) => ({ default: module.SuperAdminBillingIndex }))
+);
+const SuperAdminBillingFinancialOverviewPage = lazy(() =>
+    import("@/pages/agency/billing/financial-overview")
+);
+const SuperAdminBillingClaimsPage = lazy(() => import("@/pages/agency/billing/claims"));
+const SuperAdminBillingPayrollPage = lazy(() => import("@/pages/agency/billing/payroll"));
+const SuperAdminBillingExpensesPage = lazy(() => import("@/pages/agency/billing/expenses"));
+const SuperAdminBillingStaffTimesheetsPage = lazy(() => import("@/pages/agency/billing/staff-timesheets"));
 const AgencyBillingMonitorPage = lazy(() => import("@/pages/super-admin/agency-billing-monitor"));
 const AIAutomationPage = lazy(() => import("@/pages/agency/ai-automation"));
 const AgencyMileagePage = lazy(() => import("@/pages/agency/mileage"));
@@ -366,11 +399,11 @@ export const router = createBrowserRouter([
             },
             {
                 path: Routes.agency.scheduling,
-                Component: SchedulingPage,
+                Component: AgencySchedulingRoute,
             },
             {
                 path: Routes.agency.shiftsList,
-                Component: ShiftsListPage,
+                Component: AgencyShiftsListRoute,
             },
             {
                 path: Routes.agency.supportConversation,
@@ -382,11 +415,11 @@ export const router = createBrowserRouter([
             },
             {
                 path: Routes.agency.approvals,
-                Component: ApprovalsPage,
+                Component: AgencyShiftApprovalsRoute,
             },
             {
                 path: Routes.agency.activityLogs,
-                Component: ActivityLogsPage,
+                Component: AgencyShiftActivityLogsRoute,
             },
             {
                 path: Routes.agency.shiftMaintenance,
@@ -394,7 +427,7 @@ export const router = createBrowserRouter([
             },
             {
                 path: Routes.agency.shiftDetails,
-                Component: AgencyShiftDetailsPage,
+                Component: AgencyShiftDetailsRoute,
             },
             {
                 path: Routes.agency.analytics,
@@ -741,6 +774,66 @@ export const router = createBrowserRouter([
             {
                 path: Routes.superAdmin.shiftMaintenance,
                 Component: SuperAdminShiftMaintenancePage,
+            },
+            {
+                path: Routes.superAdmin.shifts.index,
+                Component: SuperAdminShiftManagementPage,
+                children: [
+                    {
+                        index: true,
+                        Component: SuperAdminShiftWorkspaceIndexPage,
+                    },
+                    {
+                        path: "list",
+                        Component: SuperAdminShiftListPage,
+                    },
+                    {
+                        path: "maintenance",
+                        Component: SuperAdminShiftMaintenanceWorkspacePage,
+                    },
+                    {
+                        path: "approvals",
+                        Component: LegacyShiftSectionRedirect,
+                    },
+                    {
+                        path: "activity-logs",
+                        Component: LegacyShiftSectionRedirect,
+                    },
+                    {
+                        path: ":shiftId",
+                        Component: SuperAdminShiftDetailsPage,
+                    },
+                ],
+            },
+            {
+                path: Routes.superAdmin.billing.index,
+                Component: SuperAdminBillingPage,
+                children: [
+                    {
+                        index: true,
+                        Component: SuperAdminBillingIndexPage,
+                    },
+                    {
+                        path: "financial-overview",
+                        Component: SuperAdminBillingFinancialOverviewPage,
+                    },
+                    {
+                        path: "payroll-management",
+                        Component: SuperAdminBillingPayrollPage,
+                    },
+                    {
+                        path: "claims",
+                        Component: SuperAdminBillingClaimsPage,
+                    },
+                    {
+                        path: "expenses",
+                        Component: SuperAdminBillingExpensesPage,
+                    },
+                    {
+                        path: "staff-timesheets",
+                        Component: SuperAdminBillingStaffTimesheetsPage,
+                    },
+                ],
             },
             {
                 path: Routes.superAdmin.reports.index,

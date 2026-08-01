@@ -1,17 +1,21 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { parseISO } from "date-fns";
 import { ArrowUpRight, ChevronLeft, ChevronRight, Loader2, Plus, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { listShifts, Shift, ShiftStatus } from "@/lib/api/shifts";
 import { useToast } from "@/hooks/use-toast";
-import { useNavigate } from "react-router";
-import { Routes } from "@/routes/constants";
+import { useLocation, useNavigate } from "react-router";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import AddScheduleModal, { ScheduleFormData } from "../components/AddScheduleModal";
+import {
+  loadAllShiftPages,
+  operationAgencyId,
+  scopedShiftListParams,
+} from "@/lib/operational-agency/shiftScope";
 import { shiftToScheduleFormData } from "../shift-to-schedule-form";
-import { useAuth } from "@/utils/auth";
 import ShiftDetailsModal from "@/components/ShiftDetailsModal";
 import { detectShiftAnomalyCodes } from "@/lib/shift-anomaly-detection";
+import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
 
 type ActivityFilter = "all" | "active" | "completed" | "missed" | "incomplete";
 
@@ -178,7 +182,8 @@ const getInitialsFromName = (name: string) => {
 
 export default function ActivityLogsPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const location = useLocation();
+  const { actor, agencyId, agency, mode, routes, capabilities, data } = useOperationalAgency();
   const { toast } = useToast();
   const [showAddScheduleModal, setShowAddScheduleModal] = useState(false);
   const [showShiftDetails, setShowShiftDetails] = useState(false);
@@ -193,23 +198,29 @@ export default function ActivityLogsPage() {
   const itemsPerPage = 6;
 
   const handleEdit = (shift: Shift) => {
+    if (!agencyId) {
+      toast({
+        title: "Select an agency",
+        description: "Choose an agency before editing a shift.",
+      });
+      return;
+    }
     setEditFormData(shiftToScheduleFormData(shift));
     setModalMode("edit");
     setShowAddScheduleModal(true);
   };
 
-  useEffect(() => {
-    const fetchShifts = async () => {
+  const fetchShifts = useCallback(async (signal?: AbortSignal) => {
       try {
         setLoading(true);
-        const response = await listShifts({
-          limit: 100,
-          agencyId: user?.agencyId,
-          client: true,
-          employee: true,
-        });
-        setShifts(response.shifts || []);
+        const loadedShifts = await loadAllShiftPages(
+          (params) => listShifts(params, { signal }),
+          scopedShiftListParams(agencyId, location.search, mode ?? undefined),
+        );
+        if (signal?.aborted) return;
+        setShifts(loadedShifts);
       } catch (error) {
+        if (signal?.aborted) return;
         console.error("Failed to fetch shifts:", error);
         toast({
           title: "Error",
@@ -217,15 +228,38 @@ export default function ActivityLogsPage() {
           variant: "destructive",
         });
       } finally {
-        setLoading(false);
+        if (!signal?.aborted) setLoading(false);
       }
-    };
+  }, [agencyId, location.search, mode, toast]);
 
-    if (user?.agencyId) {
-      fetchShifts();
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetchShifts(controller.signal);
+    return () => controller.abort();
+  }, [fetchShifts]);
+
+  useEffect(() => {
+    setShowAddScheduleModal(false);
+    setShowShiftDetails(false);
+    setSelectedShift(null);
+    setEditFormData(null);
+    setModalMode("create");
+    setActivityPage(1);
+    setActiveFilter("all");
+    setShifts([]);
+  }, [agencyId]);
+
+  const openShiftDetails = (shift: Shift) => {
+    if (capabilities.shiftMaintenance) {
+      setSelectedShift(shift);
+      setShowShiftDetails(true);
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.agencyId]);
+    const params = new URLSearchParams();
+    if (actor === "super_admin") params.set("agencyId", operationAgencyId(shift, agencyId));
+    params.set("returnTo", `${location.pathname}${location.search}`);
+    navigate(routes.details(shift.id, params.toString()));
+  };
 
   const incompleteShifts = useMemo(() => {
     return shifts.filter(
@@ -285,6 +319,8 @@ export default function ActivityLogsPage() {
             Shift Management
           </h1>
           <Button
+            disabled={!agencyId}
+            title={!agencyId ? "Select an agency to add a schedule" : undefined}
             onClick={() => {
               setEditFormData(null);
               setModalMode("create");
@@ -330,13 +366,21 @@ export default function ActivityLogsPage() {
             </div>
 
             {/* Cross-link to Shift Maintenance for relevant filters */}
-            {(activeFilter === "missed" || activeFilter === "incomplete") && filteredShifts.length > 0 && (
+            {capabilities.shiftMaintenance && Boolean(agencyId) && (activeFilter === "missed" || activeFilter === "incomplete") && filteredShifts.length > 0 && (
               <div
                 className="flex items-center gap-3 mb-4 px-4 py-3 rounded-2xl border border-[#00b4b8]/20 bg-[#00b4b8]/5 cursor-pointer hover:bg-[#00b4b8]/10 transition-colors"
-                onClick={() => navigate(Routes.agency.shiftMaintenance)}
+                onClick={() => navigate(routes.maintenance(
+                  actor === "super_admin" ? new URLSearchParams({ agencyId }).toString() : undefined,
+                ))}
                 role="button"
                 tabIndex={0}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") navigate(Routes.agency.shiftMaintenance); }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    navigate(routes.maintenance(
+                      actor === "super_admin" ? new URLSearchParams({ agencyId }).toString() : undefined,
+                    ));
+                  }
+                }}
               >
                 <Wrench className="w-4 h-4 text-[#00b4b8] shrink-0" />
                 <span className="text-[13px] font-medium text-[#10141a]">
@@ -391,7 +435,7 @@ export default function ActivityLogsPage() {
                             {clientName}
                           </span>
                           <span className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-                            Client
+                            {agencyId ? "Client" : shift.agency?.name || "Unknown agency"}
                           </span>
                         </div>
                       </div>
@@ -451,10 +495,7 @@ export default function ActivityLogsPage() {
 
                       <Button
                         variant="outline"
-                        onClick={() => {
-                          setSelectedShift(shift);
-                          setShowShiftDetails(true);
-                        }}
+                        onClick={() => openShiftDetails(shift)}
                         className="bg-[#b2b2b3] border-[#b2b2b3] text-white rounded-full px-6 py-2.5 h-9 w-[121px] text-[14px] font-semibold hover:bg-[#9a9a9b] hover:text-white"
                       >
                         Details
@@ -493,6 +534,11 @@ export default function ActivityLogsPage() {
 
       <AddScheduleModal
         isOpen={showAddScheduleModal}
+        agencyId={agencyId}
+        agencyName={agency.name}
+        agencyMode={mode}
+        supportedClientTypes={agency.supportedClientTypes}
+        data={data}
         onClose={() => {
           setShowAddScheduleModal(false);
           setEditFormData(null);
@@ -502,9 +548,11 @@ export default function ActivityLogsPage() {
         editData={editFormData}
         mode={modalMode}
       />
-      <ShiftDetailsModal
+      {capabilities.shiftMaintenance ? <ShiftDetailsModal
         isOpen={showShiftDetails}
         shift={selectedShift}
+        agencyId={selectedShift ? operationAgencyId(selectedShift, agencyId) : agencyId}
+        agencyName={agency.name}
         onClose={() => {
           setShowShiftDetails(false);
           setSelectedShift(null);
@@ -512,7 +560,7 @@ export default function ActivityLogsPage() {
         onShiftUpdated={(updatedShift) =>
           setShifts((prev) => prev.map((shift) => (shift.id === updatedShift.id ? updatedShift : shift)))
         }
-      />
+      /> : null}
     </>
   );
 }

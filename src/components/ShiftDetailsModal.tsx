@@ -33,6 +33,7 @@ type ShiftDetailsModalProps = {
   /** When true, load full shift (client/employee) via `getShiftById` using `agencyId`. */
   hydrateFromServer?: boolean;
   agencyId?: string;
+  agencyName?: string;
   onShiftUpdated?: (shift: Shift) => void;
   /** e.g. shift maintenance: refresh list after a successful save. */
   onMaintenanceComplete?: () => void;
@@ -176,6 +177,7 @@ export default function ShiftDetailsModal({
   anomalyCodes = [],
   hydrateFromServer = false,
   agencyId,
+  agencyName,
   onShiftUpdated,
   onMaintenanceComplete,
 }: ShiftDetailsModalProps) {
@@ -200,6 +202,7 @@ export default function ShiftDetailsModal({
 
   const shiftRef = useRef(shift);
   shiftRef.current = shift;
+  const operationScopeRef = useRef(0);
 
   const shiftResetKey = shift
     ? `${shift.id}|${String(shift.clockedInAt)}|${String(shift.clockedOutAt)}|${shift.status}|${String(shift.approved)}`
@@ -221,6 +224,7 @@ export default function ShiftDetailsModal({
   }, []);
 
   useEffect(() => {
+    const operationScope = ++operationScopeRef.current;
     if (!isOpen) return;
     const s = shiftRef.current;
     if (!s) return;
@@ -258,6 +262,9 @@ export default function ShiftDetailsModal({
 
     return () => {
       cancelled = true;
+      if (operationScopeRef.current === operationScope) {
+        operationScopeRef.current += 1;
+      }
     };
   }, [isOpen, shiftResetKey, hydrateFromServer, agencyId, toast, resetDraftsFromShift]);
 
@@ -379,8 +386,10 @@ export default function ShiftDetailsModal({
     }
 
     setIsSubmitting(true);
+    const operationScope = operationScopeRef.current;
     try {
-      const response = await updateShift(resolvedShift.id, payload);
+      const response = await updateShift(resolvedShift.id, payload, { agencyId });
+      if (operationScope !== operationScopeRef.current) return;
       if (hydrateFromServer) setFetchedShift(response.shift);
       resetDraftsFromShift(response.shift);
       setReason("");
@@ -391,6 +400,7 @@ export default function ShiftDetailsModal({
         description: "The shift was updated.",
       });
     } catch (e) {
+      if (operationScope !== operationScopeRef.current) return;
       if (typeof e === "object" && e !== null && "response" in e && typeof e.response === "object" && e.response !== null && "data" in e.response) {
         const errorData = e.response.data as { code?: string; error?: string };
         toast({
@@ -400,7 +410,7 @@ export default function ShiftDetailsModal({
         });
       }
     } finally {
-      setIsSubmitting(false);
+      if (operationScope === operationScopeRef.current) setIsSubmitting(false);
     }
   }
   const showBody = !hydrateFromServer || !loadingFull;
@@ -427,6 +437,11 @@ export default function ShiftDetailsModal({
           <p className="text-[14px] leading-[1.4] font-medium text-[#808081]">
             {resolvedShift ? getShiftDateLabel(resolvedShift) : getShiftDateLabel(shift)}
           </p>
+          {agencyName?.trim() ? (
+            <p className="mt-2 rounded-lg border border-[#00b4b8]/30 bg-[#00b4b8]/10 px-3 py-2 text-[13px] font-semibold text-[#006f72]">
+              Maintenance changes for {agencyName.trim()}
+            </p>
+          ) : null}
         </div>
 
         {loadingFull && hydrateFromServer ? (

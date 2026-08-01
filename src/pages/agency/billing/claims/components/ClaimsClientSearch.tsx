@@ -1,58 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { searchClients, type Client } from "@/lib/api/clients";
-import { formatShiftLocation, type ShiftLocation } from "@/lib/api/shifts";
-import { useAuth } from "@/utils/auth";
-import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
+import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
+import type { OperationalClientOption } from "@/lib/operational-agency/types";
 
 type ClaimsClientSearchProps = {
   onFilterChange: (query: string, selectedClientName?: string) => void;
 };
 
-function getClientPrimaryAddress(client: Client): ShiftLocation | null {
-  if (client.primaryAddress) {
-    return {
-      address: client.primaryAddress.address,
-      countyState: client.primaryAddress.countyState,
-      zipCode: client.primaryAddress.zipCode,
-      latlon: client.primaryAddress.location,
-    };
-  }
-
-  const fallback: ShiftLocation = {
-    address: client.address,
-    countyState: client.countyState,
-    zipCode: client.zipCode,
-    latlon: client.location,
-  };
-
-  if (fallback.address || fallback.countyState || fallback.zipCode || fallback.latlon) {
-    return fallback;
-  }
-
-  return null;
-}
-
-function getClientDisplayName(client: Client) {
-  return client.firstName && client.lastName
-    ? `${client.firstName} ${client.lastName}`
-    : client.id;
-}
-
 export default function ClaimsClientSearch({ onFilterChange }: ClaimsClientSearchProps) {
-  const { user } = useAuth();
-  const agencyMode = useEffectiveAgencyMode();
+  const { agencyId, mode, data } = useOperationalAgency();
   const [query, setQuery] = useState("");
-  const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
+  const [clientSearchResults, setClientSearchResults] = useState<OperationalClientOption[]>([]);
   const [isSearchingClients, setIsSearchingClients] = useState(false);
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const clientSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const searchControllerRef = useRef<AbortController | null>(null);
+  const searchRequestIdRef = useRef(0);
 
   useEffect(() => {
     return () => {
       if (clientSearchTimeoutRef.current) {
         clearTimeout(clientSearchTimeoutRef.current);
       }
+      searchRequestIdRef.current += 1;
+      searchControllerRef.current?.abort();
     };
   }, []);
 
@@ -61,6 +32,10 @@ export default function ClaimsClientSearch({ onFilterChange }: ClaimsClientSearc
       if (clientSearchTimeoutRef.current) {
         clearTimeout(clientSearchTimeoutRef.current);
       }
+      const requestId = searchRequestIdRef.current + 1;
+      searchRequestIdRef.current = requestId;
+      searchControllerRef.current?.abort();
+      setIsSearchingClients(false);
 
       if (searchQuery.trim().length < 2) {
         setClientSearchResults([]);
@@ -69,25 +44,34 @@ export default function ClaimsClientSearch({ onFilterChange }: ClaimsClientSearc
       }
 
       clientSearchTimeoutRef.current = setTimeout(async () => {
+        const controller = new AbortController();
+        searchControllerRef.current = controller;
         try {
-          setIsSearchingClients(true);
-          const results = await searchClients(searchQuery, user?.agencyId, agencyMode ?? undefined);
-          setClientSearchResults(results);
-          setShowClientDropdown(results.length > 0);
-        } catch (error) {
-          console.error("Failed to search clients:", error);
+          if (searchRequestIdRef.current === requestId) setIsSearchingClients(true);
+          const response = await data.searchClients({
+            search: searchQuery,
+            mode: mode ?? undefined,
+            limit: 20,
+            signal: controller.signal,
+          });
+          if (controller.signal.aborted || searchRequestIdRef.current !== requestId) return;
+          setClientSearchResults(response.items);
+          setShowClientDropdown(response.items.length > 0);
+        } catch {
+          if (controller.signal.aborted || searchRequestIdRef.current !== requestId) return;
+          console.error("Failed to search clients.");
           setClientSearchResults([]);
           setShowClientDropdown(false);
         } finally {
-          setIsSearchingClients(false);
+          if (searchRequestIdRef.current === requestId) setIsSearchingClients(false);
         }
       }, 300);
     },
-    [user?.agencyId, agencyMode]
+    [agencyId, data, mode]
   );
 
-  const handleClientSelect = (client: Client) => {
-    const clientName = getClientDisplayName(client);
+  const handleClientSelect = (client: OperationalClientOption) => {
+    const clientName = client.name;
     setQuery(clientName);
     setShowClientDropdown(false);
     setClientSearchResults([]);
@@ -121,10 +105,8 @@ export default function ClaimsClientSearch({ onFilterChange }: ClaimsClientSearc
               onClick={() => handleClientSelect(client)}
               className="w-full cursor-pointer border-b border-[#f0f0f0] px-4 py-3 text-left first:rounded-t-[12px] last:rounded-b-[12px] last:border-b-0 hover:bg-gray-50"
             >
-              <p className="text-[14px] font-normal text-black">{getClientDisplayName(client)}</p>
-              <p className="text-[12px] font-normal text-[#808081]">
-                {formatShiftLocation(getClientPrimaryAddress(client))}
-              </p>
+              <p className="text-[14px] font-normal text-black">{client.name}</p>
+              <p className="text-[12px] font-normal uppercase text-[#808081]">{client.mode}</p>
             </button>
           ))}
         </div>

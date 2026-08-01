@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useMemo, useState } from "react";
+import { useSelector } from "react-redux";
 import { useNavigate, generatePath } from "react-router";
 import { Button } from "@/components/ui/button";
 import { ShiftsMonthCalendar } from "@/components/shifts/ShiftsMonthCalendar";
@@ -24,6 +25,9 @@ import { formatShiftRowClockDisplay } from "@/lib/shift-row-time";
 import { detectShiftAnomalyCodes } from "@/lib/shift-anomaly-detection";
 import { DspShiftScheduleListRow } from "./DspShiftScheduleListRow";
 import { ConfirmDialog, ConfirmDialogContent } from "@/components/ui/confirm-dialog";
+import { createAgencyOperationalDataAdapter } from "@/lib/operational-agency/dataAdapters";
+import type { RootState } from "@/store/redux/store";
+import { useAuth } from "@/utils/auth";
 
 const AddScheduleModal = lazy(() => import("@/pages/agency/scheduling/components/AddScheduleModal"));
 const ShiftDetailsModal = lazy(() => import("@/components/ShiftDetailsModal"));
@@ -106,6 +110,12 @@ export function ShiftsTab({
 }: ShiftsTabProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const agencyMode = useSelector((state: RootState) => state.agencyMode.modeByAgency[agencyId]) ?? null;
+  const supportedClientTypes = user?.agency?.supportedClientTypes?.length
+    ? user.agency.supportedClientTypes
+    : (["ddd", "hha"] as const);
+  const operationalData = useMemo(() => createAgencyOperationalDataAdapter(agencyId), [agencyId]);
   const [shiftsView, setShiftsView] = useState<"calendar" | "list">("calendar");
   const [shiftsTab, setShiftsTab] = useState<"previous" | "ongoing" | "upcoming">("previous");
   const [page, setPage] = useState(1);
@@ -196,7 +206,7 @@ export function ShiftsTab({
     if (!shiftPendingDelete) return;
     setIsDeletingShift(true);
     try {
-      await deleteShift(shiftPendingDelete.id);
+      await deleteShift(shiftPendingDelete.id, { agencyId });
       toast({
         title: "Shift deleted",
         description: "This shift was removed from the schedule.",
@@ -213,13 +223,13 @@ export function ShiftsTab({
     } finally {
       setIsDeletingShift(false);
     }
-  }, [shiftPendingDelete, toast, onShiftsUpdated]);
+  }, [agencyId, shiftPendingDelete, toast, onShiftsUpdated]);
 
   const confirmApproveShift = useCallback(async () => {
     if (!shiftToApprove) return;
     setIsApproving(true);
     try {
-      await updateShift(shiftToApprove.id, { type: ShiftType.AUTOMATIC });
+      await updateShift(shiftToApprove.id, { type: ShiftType.AUTOMATIC }, { agencyId });
       toast({
         title: "Success",
         description: "Shift has been approved and converted to automatic.",
@@ -237,7 +247,7 @@ export function ShiftsTab({
     } finally {
       setIsApproving(false);
     }
-  }, [shiftToApprove, toast, onShiftsUpdated]);
+  }, [agencyId, shiftToApprove, toast, onShiftsUpdated]);
 
   const tabClass = (tab: "previous" | "ongoing" | "upcoming") =>
     `px-5 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer border ${
@@ -419,6 +429,11 @@ export function ShiftsTab({
           <>
             <AddScheduleModal
               isOpen={showAddScheduleModal}
+              agencyId={agencyId}
+              agencyName={user?.agency?.name || "Agency"}
+              agencyMode={agencyMode}
+              supportedClientTypes={supportedClientTypes}
+              data={operationalData}
               onClose={() => {
                 setShowAddScheduleModal(false);
                 setEditFormData(null);
