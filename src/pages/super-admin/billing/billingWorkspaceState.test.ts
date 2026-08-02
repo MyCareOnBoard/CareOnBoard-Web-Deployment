@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  billingWorkspaceGeneration,
   canonicalizeBillingWorkspaceSearch,
   parseBillingWorkspace,
   updateBillingWorkspaceDateRange,
@@ -94,5 +95,24 @@ describe("billing workspace URL state", () => {
       endDate: "2026-06-30",
       clientType: "ddd",
     });
+  });
+
+  it("changes outlet generation only when the normalized dataset changes", () => {
+    const base = {
+      scope: { kind: "network" } as const,
+      startDate: "2026-07-01",
+      endDate: "2026-07-31",
+      mode: null,
+    };
+
+    expect(billingWorkspaceGeneration({ ...base })).toBe(billingWorkspaceGeneration(base));
+    expect(billingWorkspaceGeneration({ ...base, scope: { kind: "agency", agencyId: "atlas" } }))
+      .not.toBe(billingWorkspaceGeneration(base));
+    expect(billingWorkspaceGeneration({ ...base, startDate: "2026-07-02" }))
+      .not.toBe(billingWorkspaceGeneration(base));
+    expect(billingWorkspaceGeneration({ ...base, endDate: "2026-08-01" }))
+      .not.toBe(billingWorkspaceGeneration(base));
+    expect(billingWorkspaceGeneration({ ...base, mode: "ddd" }))
+      .not.toBe(billingWorkspaceGeneration(base));
   });
 });

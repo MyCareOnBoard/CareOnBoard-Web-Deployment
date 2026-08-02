@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { MemoryRouter, Outlet, Route, Routes as ReactRoutes, useLocation, useNavigate } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -283,6 +284,39 @@ function BillingWorkspaceProbe() {
   );
 }
 
+function AgencyWorkspaceContextProbe() {
+  const workspace = useBillingWorkspaceContext();
+  const operational = useOperationalAgency();
+  const location = useLocation();
+  return (
+    <>
+      <output aria-label="Context program mode">{workspace.mode ?? "all"}</output>
+      <output aria-label="Provider program mode">{operational.mode ?? "all"}</output>
+      <output aria-label="Context date range">{`${workspace.startDate}:${workspace.endDate}`}</output>
+      <output aria-label="Billing location">{`${location.pathname}${location.search}`}</output>
+    </>
+  );
+}
+
+let datasetProbeSerial = 0;
+
+function DatasetResetProbe() {
+  const workspace = useBillingWorkspaceContext();
+  const [instance] = useState(() => ++datasetProbeSerial);
+  const [selection, setSelection] = useState("");
+  return (
+    <>
+      <output aria-label="Dataset instance">{instance}</output>
+      <output aria-label="Dataset mode">{workspace.mode ?? "all"}</output>
+      <output aria-label="Dataset dates">{`${workspace.startDate}:${workspace.endDate}`}</output>
+      <label>
+        Page selection
+        <input value={selection} onChange={(event) => setSelection(event.target.value)} />
+      </label>
+    </>
+  );
+}
+
 function DirectoryCapabilityProbe() {
   const operational = useOperationalAgency();
   return (
@@ -320,6 +354,7 @@ function renderWorkspace(entry: string, nested = <BillingWorkspaceProbe />) {
 describe("SuperAdminBillingWorkspace", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    datasetProbeSerial = 0;
     auth.accessList = ["Billing Management"];
     auth.agency = undefined;
     operationsApi.listOperationalAgencies.mockResolvedValue({
@@ -341,12 +376,16 @@ describe("SuperAdminBillingWorkspace", () => {
     expect(operationsApi.listOperationalAgencies).not.toHaveBeenCalled();
   });
 
-  it("defaults to network scope and mounts child content without singular agency resolution", async () => {
-    renderWorkspace("/super-admin/billing/financial-overview?status=open");
+  it("defaults to a context-aware provider-free network bridge without mounting an agency child", async () => {
+    renderWorkspace(
+      "/super-admin/billing/financial-overview?status=open&clientType=ddd&startDate=2026-07-01&endDate=2026-07-31",
+      <BillingDomainProbe />,
+    );
 
-    expect(screen.getByLabelText("Billing workspace scope")).toHaveTextContent("network");
-    expect(screen.getByLabelText("Billing workspace actor")).toHaveTextContent("super-1");
-    expect(screen.getByLabelText("Billing workspace environment")).toHaveTextContent("staging");
+    const bridge = screen.getByLabelText("Network billing workspace");
+    expect(bridge).toHaveAttribute("data-scope", "network");
+    expect(bridge).toHaveAttribute("data-mode", "ddd");
+    expect(bridge).toHaveAttribute("data-date-range", "2026-07-01:2026-07-31");
     expect(screen.getByRole("button", { name: "Select an agency, all authorized agencies" })).toBeVisible();
     await waitFor(() => expect(operationsApi.listOperationalAgencies).toHaveBeenCalledWith(
       "billing-management",
@@ -368,6 +407,49 @@ describe("SuperAdminBillingWorkspace", () => {
       expect.any(AbortSignal),
     );
     expect(domainRequest).toHaveBeenCalledWith("atlas");
+  });
+
+  it("normalizes agency mode once and gives the provider and child the same workspace context", async () => {
+    renderWorkspace(
+      "/super-admin/billing/financial-overview?agencyId=atlas&clientType=hha&startDate=2026-07-01&endDate=2026-07-31",
+      <AgencyWorkspaceContextProbe />,
+    );
+
+    expect(await screen.findByLabelText("Context program mode")).toHaveTextContent("ddd");
+    expect(screen.getByLabelText("Provider program mode")).toHaveTextContent("ddd");
+    expect(screen.getByLabelText("Context date range")).toHaveTextContent("2026-07-01:2026-07-31");
+    await waitFor(() => {
+      const location = screen.getByLabelText("Billing location").textContent ?? "";
+      expect(new URL(location, "https://careonboard.test").searchParams.get("clientType")).toBe("ddd");
+    });
+  });
+
+  it("remounts child selection state when a header control changes the normalized dataset", async () => {
+    operationsApi.getOperationalAgencyContext.mockResolvedValue(dualAtlas);
+    const user = userEvent.setup();
+    renderWorkspace(
+      "/super-admin/billing/financial-overview?agencyId=atlas&clientType=ddd&startDate=2026-07-01&endDate=2026-07-31&status=open&cursor=next&page=4",
+      <DatasetResetProbe />,
+    );
+
+    const initialInstance = Number((await screen.findByLabelText("Dataset instance")).textContent);
+    await user.type(screen.getByRole("textbox", { name: "Page selection" }), "selected-row");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Program mode" }), "hha");
+
+    await waitFor(() => expect(screen.getByLabelText("Dataset mode")).toHaveTextContent("hha"));
+    expect(Number(screen.getByLabelText("Dataset instance").textContent)).toBeGreaterThan(initialInstance);
+    expect(screen.getByRole("textbox", { name: "Page selection" })).toHaveValue("");
+    const payrollHref = screen.getByRole("link", { name: "Payroll" }).getAttribute("href") ?? "";
+    const search = new URL(payrollHref, "https://careonboard.test").searchParams;
+    expect(Object.fromEntries(search)).toMatchObject({
+      agencyId: "atlas",
+      clientType: "hha",
+      startDate: "2026-07-01",
+      endDate: "2026-07-31",
+      status: "open",
+    });
+    expect(search.has("cursor")).toBe(false);
+    expect(search.has("page")).toBe(false);
   });
 
   it("derives separate directory capabilities and selected-agency routes from access scopes", async () => {
@@ -462,6 +544,7 @@ describe("SuperAdminBillingWorkspace", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Choose exactly one agency to manage billing.");
     expect(operationsApi.getOperationalAgencyContext).not.toHaveBeenCalled();
     expect(domainRequest).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText("Billing domain agency")).not.toBeInTheDocument();
   });
 
   it("uses structural workspace regions instead of a generic spinner while an agency resolves", () => {
@@ -475,5 +558,26 @@ describe("SuperAdminBillingWorkspace", () => {
     expect(screen.getByTestId("billing-skeleton-nav")).toBeVisible();
     expect(screen.getByTestId("billing-skeleton-content")).toBeVisible();
     expect(screen.queryByLabelText("Loading agency")).not.toBeInTheDocument();
+
+    const header = screen.getByTestId("billing-skeleton-header");
+    const headerLayout = screen.getByTestId("billing-skeleton-header-layout");
+    const controls = screen.getByTestId("billing-skeleton-controls");
+    expect(header).toHaveClass("rounded-2xl", "border-[#dce3e3]", "bg-[#f9fbfb]", "px-4", "py-4", "sm:px-5");
+    expect(headerLayout).toHaveClass(
+      "xl:grid-cols-[minmax(12rem,1fr)_minmax(0,48rem)]",
+      "xl:items-end",
+    );
+    expect(controls).toHaveClass(
+      "sm:grid-cols-2",
+      "lg:grid-cols-[minmax(14rem,1fr)_minmax(17rem,1fr)_minmax(10rem,0.65fr)]",
+    );
+    expect(screen.getAllByTestId("billing-skeleton-control")).toHaveLength(3);
+    for (const control of screen.getAllByTestId("billing-skeleton-control")) {
+      expect(control.querySelector(".h-11")).not.toBeNull();
+    }
+
+    const nav = screen.getByTestId("billing-skeleton-nav");
+    const kpis = screen.getByTestId("billing-skeleton-kpis");
+    expect(nav.compareDocumentPosition(kpis) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

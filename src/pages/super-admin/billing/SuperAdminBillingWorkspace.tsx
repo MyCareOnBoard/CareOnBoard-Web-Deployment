@@ -12,9 +12,11 @@ import BillingManagementHeader from "./BillingManagementHeader";
 import {
   BillingWorkspaceProvider,
   type BillingWorkspaceContextValue,
+  useBillingWorkspaceContext,
 } from "./BillingWorkspaceContext";
 import BillingWorkspaceSkeleton from "./BillingWorkspaceSkeleton";
 import {
+  billingWorkspaceGeneration,
   canonicalizeBillingWorkspaceSearch,
   parseBillingWorkspace,
   updateBillingWorkspaceDateRange,
@@ -22,6 +24,7 @@ import {
   updateBillingWorkspaceScope,
   type BillingProgramMode,
   type BillingWorkspaceDateRange,
+  type BillingWorkspaceState,
 } from "./billingWorkspaceState";
 import type { BillingWorkspaceScope } from "./types";
 
@@ -43,14 +46,48 @@ function rememberAgencies(
     .sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id));
 }
 
+function normalizeAgencyWorkspace(
+  workspace: BillingWorkspaceState,
+  agency: OperationalAgencySummary | null,
+): BillingWorkspaceState {
+  if (workspace.scope.kind !== "agency" || agency?.id !== workspace.scope.agencyId) {
+    return workspace;
+  }
+  const mode = workspace.mode && agency.supportedClientTypes.includes(workspace.mode)
+    ? workspace.mode
+    : agency.supportedClientTypes.length === 1
+      ? agency.supportedClientTypes[0]
+      : null;
+  return mode === workspace.mode ? workspace : { ...workspace, mode };
+}
+
+function NetworkBillingBridge() {
+  const workspace = useBillingWorkspaceContext();
+  return (
+    <section
+      aria-label="Network billing workspace"
+      data-scope={workspace.scope.kind}
+      data-mode={workspace.mode ?? "all"}
+      data-date-range={`${workspace.startDate}:${workspace.endDate}`}
+      className="rounded-2xl border border-dashed border-[#cbd8d8] bg-[#f8fbfb] px-5 py-8"
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#5f7778]">Network scope</p>
+      <h2 className="mt-1 text-lg font-semibold text-[#20282a]">All authorized agencies</h2>
+      <p className="mt-2 max-w-2xl text-sm text-[#687173]">
+        Network billing totals for this date range are being prepared. Agency billing remains available from the scope selector.
+      </p>
+    </section>
+  );
+}
+
 function AgencyBillingOutlet({
   accessList,
   agency,
-  mode,
+  workspace,
 }: {
   accessList: readonly string[];
   agency: OperationalAgencySummary;
-  mode: BillingProgramMode | null;
+  workspace: BillingWorkspaceState;
 }) {
   const data = useMemo(
     () => createSuperAdminOperationalDataAdapter("billing-management", agency.id),
@@ -60,11 +97,7 @@ function AgencyBillingOutlet({
     () => createSuperAdminDirectoryRoutes(agency.id),
     [agency.id],
   );
-  const effectiveMode = mode && agency.supportedClientTypes.includes(mode)
-    ? mode
-    : agency.supportedClientTypes.length === 1
-      ? agency.supportedClientTypes[0]
-      : null;
+  const generation = billingWorkspaceGeneration(workspace);
 
   return (
     <OperationalAgencyProvider
@@ -72,7 +105,7 @@ function AgencyBillingOutlet({
       actor="super_admin"
       agencyId={agency.id}
       agency={agency}
-      mode={effectiveMode}
+      mode={workspace.mode}
       capabilities={{
         canManageShifts: accessList.includes("Shift Management"),
         canManageBilling: true,
@@ -83,7 +116,7 @@ function AgencyBillingOutlet({
       directoryRoutes={directoryRoutes}
       data={data}
     >
-      <Outlet />
+      <Outlet key={generation} />
     </OperationalAgencyProvider>
   );
 }
@@ -135,10 +168,10 @@ function WorkspaceFrame({
             </Button>
           </div>
         ) : context.scope.kind === "network" ? (
-          <div className="min-w-0"><Outlet /></div>
+          <div className="min-w-0"><NetworkBillingBridge /></div>
         ) : resolvedAgency ? (
           <div className="min-w-0">
-            <AgencyBillingOutlet accessList={accessList} agency={resolvedAgency} mode={context.mode} />
+            <AgencyBillingOutlet accessList={accessList} agency={resolvedAgency} workspace={context} />
           </div>
         ) : null}
       </section>
@@ -172,14 +205,6 @@ function AuthorizedBillingWorkspace({
   const [loading, setLoading] = useState(Boolean(agencyId));
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retryVersion, setRetryVersion] = useState(0);
-
-  useEffect(() => {
-    if (!workspace) return;
-    const canonicalSearch = canonicalizeBillingWorkspaceSearch(location.search);
-    if (canonicalSearch !== location.search) {
-      navigate({ pathname: location.pathname, search: canonicalSearch }, { replace: true });
-    }
-  }, [location.pathname, location.search, navigate, workspace]);
 
   useEffect(() => {
     if (!agencyId) {
@@ -218,6 +243,22 @@ function AuthorizedBillingWorkspace({
     setKnownAgencies((current) => rememberAgencies(current, agencies));
   }, []);
 
+  const normalizedWorkspace = useMemo(
+    () => workspace ? normalizeAgencyWorkspace(workspace, resolvedAgency) : null,
+    [resolvedAgency, workspace],
+  );
+
+  useEffect(() => {
+    if (!workspace || !normalizedWorkspace) return;
+    let canonicalSearch = canonicalizeBillingWorkspaceSearch(location.search);
+    if (normalizedWorkspace.mode !== workspace.mode) {
+      canonicalSearch = updateBillingWorkspaceMode(canonicalSearch, normalizedWorkspace.mode);
+    }
+    if (canonicalSearch !== location.search) {
+      navigate({ pathname: location.pathname, search: canonicalSearch }, { replace: true });
+    }
+  }, [location.pathname, location.search, navigate, normalizedWorkspace, workspace]);
+
   if (!workspace) {
     return (
       <p role="alert" className="rounded-2xl border border-[#efcbc6] bg-[#fff5f3] px-5 py-8 text-sm font-medium text-[#7e3029]">
@@ -230,8 +271,9 @@ function AuthorizedBillingWorkspace({
     return <BillingWorkspaceSkeleton />;
   }
 
+  const activeWorkspace = normalizedWorkspace ?? workspace;
   const context: BillingWorkspaceContextValue = {
-    ...workspace,
+    ...activeWorkspace,
     actorUid,
     environment: apiEnvironment,
   };

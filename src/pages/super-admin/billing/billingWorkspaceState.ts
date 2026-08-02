@@ -14,6 +14,16 @@ export interface BillingWorkspaceDateRange {
   endDate: string;
 }
 
+export function billingWorkspaceGeneration(state: BillingWorkspaceState): string {
+  return JSON.stringify([
+    state.scope.kind,
+    state.scope.kind === "agency" ? state.scope.agencyId : null,
+    state.startDate,
+    state.endDate,
+    state.mode,
+  ]);
+}
+
 const DAY_MS = 86_400_000;
 const MAX_RANGE_DAYS = 366;
 const TRANSIENT_KEYS = ["cursor", "page"] as const;

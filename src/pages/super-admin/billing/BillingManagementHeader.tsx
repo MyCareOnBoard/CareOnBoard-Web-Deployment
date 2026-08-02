@@ -28,6 +28,11 @@ const sections = [
   { label: "Timesheets", pathname: Routes.superAdmin.billing.staffTimesheets },
 ] as const;
 
+export const BILLING_HEADER_CLASS = "rounded-2xl border border-[#dce3e3] bg-[#f9fbfb] px-4 py-4 sm:px-5";
+export const BILLING_HEADER_LAYOUT_CLASS = "grid min-w-0 gap-4 xl:grid-cols-[minmax(12rem,1fr)_minmax(0,48rem)] xl:items-end";
+export const BILLING_CONTROL_GRID_CLASS = "grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(14rem,1fr)_minmax(17rem,1fr)_minmax(10rem,0.65fr)]";
+export const BILLING_NAV_CLASS = "flex min-w-0 flex-wrap gap-2 rounded-xl border border-[#dce3e3] bg-white/70 p-2";
+
 export default function BillingManagementHeader({
   workspace,
   search,
@@ -44,10 +49,10 @@ export default function BillingManagementHeader({
   return (
     <>
       <header
-        className="rounded-2xl border border-[#dce3e3] bg-[#f9fbfb] px-4 py-4 sm:px-5"
+        className={BILLING_HEADER_CLASS}
         aria-labelledby="billing-management-title"
       >
-        <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(12rem,1fr)_minmax(0,48rem)] xl:items-end">
+        <div className={BILLING_HEADER_LAYOUT_CLASS}>
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#5f7778]">
               Operations
@@ -60,7 +65,7 @@ export default function BillingManagementHeader({
             </h1>
           </div>
 
-          <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(14rem,1fr)_minmax(17rem,1fr)_minmax(10rem,0.65fr)]">
+          <div className={BILLING_CONTROL_GRID_CLASS}>
             <div className="min-w-0">
               <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-[#687173]">
                 Agency scope
@@ -86,6 +91,8 @@ export default function BillingManagementHeader({
               <ShiftDateRangeControl
                 value={{ startDate: workspace.startDate, endDate: workspace.endDate }}
                 onApply={onDateRangeChange}
+                controlLabel="Change billing date range"
+                dialogTitle="Select billing date range"
                 description="Choose the dates to show in billing management"
                 maxRangeDays={366}
               />
@@ -115,7 +122,7 @@ export default function BillingManagementHeader({
 
       <nav
         aria-label="Billing workspace sections"
-        className="flex min-w-0 flex-wrap gap-2 rounded-xl border border-[#dce3e3] bg-white/70 p-2"
+        className={BILLING_NAV_CLASS}
       >
         {sections.map(({ label, pathname }) => (
           <NavLink

@@ -19,13 +19,18 @@ vi.mock("@/components/operational-agency/OperationalAgencySelector", () => ({
 }));
 
 vi.mock("@/components/shifts/ShiftDateRangeControl", () => ({
-  default: ({ onApply, value }: {
+  default: ({ controlLabel, dialogTitle, onApply, value }: {
+    controlLabel?: string;
+    dialogTitle?: string;
     onApply: (range: { startDate: string; endDate: string }) => void;
     value: { startDate: string; endDate: string };
   }) => (
-    <button type="button" onClick={() => onApply({ startDate: "2026-06-01", endDate: "2026-06-30" })}>
-      Dates {value.startDate} to {value.endDate}
-    </button>
+    <div>
+      <output aria-label="Date control copy">{`${controlLabel}|${dialogTitle}`}</output>
+      <button type="button" onClick={() => onApply({ startDate: "2026-06-01", endDate: "2026-06-30" })}>
+        Dates {value.startDate} to {value.endDate}
+      </button>
+    </div>
   ),
 }));
 
@@ -60,6 +65,9 @@ describe("BillingManagementHeader", () => {
     expect(screen.getByRole("heading", { name: "Billing Management" })).toBeVisible();
     expect(screen.getByRole("button", { name: "All authorized agencies" })).toBeVisible();
     expect(screen.getByRole("button", { name: /Dates 2026-07-01 to 2026-07-31/ })).toBeVisible();
+    expect(screen.getByLabelText("Date control copy")).toHaveTextContent(
+      "Change billing date range|Select billing date range",
+    );
     expect(screen.getByRole("combobox", { name: "Program mode" })).toBeVisible();
     expect(screen.getByRole("navigation", { name: "Billing workspace sections" })).toBeVisible();
     for (const name of ["Overview", "Claims", "Payroll", "Expenses", "Timesheets"]) {
