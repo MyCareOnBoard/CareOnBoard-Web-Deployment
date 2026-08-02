@@ -32,37 +32,35 @@ type QueryContext = {
   scope: BillingWorkspaceScope;
 };
 
-type NetworkBillingFilters = {
+type DatePageContext = QueryContext & {
   startDate?: string;
   endDate?: string;
-  mode?: "ddd" | "hha";
-  status?: "pending" | "paid" | "rejected" | "approved";
-  clientId?: string;
-  clientAgencyId?: string;
-  employeeId?: string;
-  employeeAgencyId?: string;
-  sort?: "createdAt:desc" | "createdAt:asc";
-  cursor?: string;
   limit?: number;
+  cursor?: string;
 };
 
-export type ClaimsNetworkBillingArgs = QueryContext & NetworkBillingFilters & {
-  tab: "ready" | "saved";
-};
+type ClientFilter = { clientId?: string; clientAgencyId?: string };
+type StaffFilter = { employeeId?: string; employeeAgencyId?: string };
+type ModeFilter = { mode?: "ddd" | "hha" };
 
-export type PayrollNetworkBillingArgs = QueryContext & NetworkBillingFilters & {
-  tab: "due" | "saved";
-};
+export type ClaimsNetworkBillingArgs = DatePageContext & ClientFilter & (
+  | { tab: "ready"; mode?: "ddd" | "hha"; status?: never; sort?: never; employeeId?: never; employeeAgencyId?: never }
+  | { tab: "saved"; status?: "pending" | "paid" | "rejected"; sort?: "createdAt:desc" | "createdAt:asc"; mode?: never; employeeId?: never; employeeAgencyId?: never }
+);
 
-export type ExpensesNetworkBillingArgs = QueryContext & NetworkBillingFilters & {
-  tab: "pending" | "history";
-};
+export type PayrollNetworkBillingArgs = DatePageContext & StaffFilter & ModeFilter & (
+  | { tab: "due"; status?: never; clientId?: never; clientAgencyId?: never; sort?: never }
+  | { tab: "saved"; status?: "pending" | "paid"; clientId?: never; clientAgencyId?: never; sort?: never }
+);
 
-export type TimesheetsNetworkBillingArgs = QueryContext & Omit<NetworkBillingFilters, "clientId" | "clientAgencyId"> & {
-  tab: "list";
-};
+export type ExpensesNetworkBillingArgs = DatePageContext & StaffFilter & ModeFilter & (
+  | { tab: "pending"; status?: "pending"; clientId?: never; clientAgencyId?: never; sort?: never }
+  | { tab: "history"; status?: "approved" | "rejected"; clientId?: never; clientAgencyId?: never; sort?: never }
+);
 
-export type OverviewNetworkBillingArgs = QueryContext & Pick<NetworkBillingFilters, "startDate" | "endDate" | "mode"> & {
+export type TimesheetsNetworkBillingArgs = DatePageContext & StaffFilter & ModeFilter & { tab: "list"; status?: "pending" | "approved" | "rejected"; clientId?: never; clientAgencyId?: never; sort?: never };
+
+export type OverviewNetworkBillingArgs = QueryContext & Pick<DatePageContext, "startDate" | "endDate"> & ModeFilter & {
   tab: "overview";
 };
 
@@ -363,20 +361,21 @@ function validateOptions(value: unknown): NetworkBillingOption[] {
   });
 }
 
-function params(args: NetworkBillingFilters & { tab?: string }, keys: readonly (keyof NetworkBillingFilters | "tab")[]): QueryParams {
+type RuntimeFilters = { startDate?: string; endDate?: string; mode?: "ddd" | "hha"; status?: string; clientId?: string; clientAgencyId?: string; employeeId?: string; employeeAgencyId?: string; sort?: string; cursor?: string; limit?: number };
+function params(args: RuntimeFilters & { tab?: string }, keys: readonly (keyof RuntimeFilters | "tab")[]): QueryParams {
   return Object.fromEntries(keys.map((key) => [key, key === "tab" ? args.tab : args[key]])
     .filter(([, value]) => value !== undefined)) as QueryParams;
 }
 
 function claimsParams(args: ClaimsNetworkBillingArgs): QueryParams {
-  const keys: (keyof NetworkBillingFilters | "tab")[] = ["startDate", "endDate", "tab", "limit", "cursor"];
+  const keys: (keyof RuntimeFilters | "tab")[] = ["startDate", "endDate", "tab", "limit", "cursor"];
   if (args.tab === "saved") keys.push("status", "sort", "clientId", "clientAgencyId");
   else keys.push("mode", "clientId", "clientAgencyId");
   return params(args, keys);
 }
 
 function payrollParams(args: PayrollNetworkBillingArgs): QueryParams {
-  const keys: (keyof NetworkBillingFilters | "tab")[] = ["startDate", "endDate", "tab", "mode", "employeeId", "employeeAgencyId", "limit", "cursor"];
+  const keys: (keyof RuntimeFilters | "tab")[] = ["startDate", "endDate", "tab", "mode", "employeeId", "employeeAgencyId", "limit", "cursor"];
   if (args.tab === "saved") keys.push("status");
   return params(args, keys);
 }

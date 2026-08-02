@@ -1,6 +1,6 @@
 type RefreshCommittedAccessOptions<T> = {
   refreshProfile: () => Promise<T | null>;
-  resetCaches?: () => void;
+  resetCaches: () => void;
   onFailure?: (error: unknown) => void;
 };
 
@@ -11,7 +11,7 @@ export async function refreshCommittedAccessProfile<T>({
 }: RefreshCommittedAccessOptions<T>): Promise<T | null> {
   try {
     // Invalidate before refreshProfile publishes a new authorization profile to React/Redux.
-    resetCaches?.();
+    resetCaches();
     const profile = await refreshProfile();
     if (profile == null) {
       throw new Error("Profile refresh returned no active profile.");

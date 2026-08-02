@@ -22,7 +22,7 @@ describe("agency access refresh toast", () => {
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ uid: "super-1" });
 
-    showAgencyAccessRefreshWarning(refreshProfile);
+    showAgencyAccessRefreshWarning(refreshProfile, vi.fn());
     expect(warning).toHaveBeenCalledOnce();
     expect(warning.mock.calls[0][1]).toMatchObject({
       id: AGENCY_ACCESS_REFRESH_TOAST_ID,
@@ -49,7 +49,7 @@ describe("agency access refresh toast", () => {
       }
     ).dismissAgencyAccessRefreshWarning;
 
-    showAgencyAccessRefreshWarning(vi.fn());
+    showAgencyAccessRefreshWarning(vi.fn(), vi.fn());
     expect(dismissWarning).toBeTypeOf("function");
     await finalizeAgencyCreation({
       isRestricted: true,
@@ -57,6 +57,7 @@ describe("agency access refresh toast", () => {
       navigate: vi.fn(),
       refreshProfile: vi.fn().mockResolvedValue({uid: "super-1"}),
       onRefreshFailure: vi.fn(),
+      resetCaches: vi.fn(),
       onRefreshSuccess: dismissWarning,
     });
 

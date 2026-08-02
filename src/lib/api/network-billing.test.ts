@@ -28,7 +28,6 @@ const baseArgs = {
   scope: { kind: "network" as const },
   startDate: "2026-07-01",
   endDate: "2026-07-31",
-  mode: "ddd" as const,
   tab: "saved" as const,
   sort: "createdAt:desc" as const,
   limit: 25,
@@ -132,12 +131,12 @@ describe("network billing API", () => {
     expect(axiosAdapter.mock.calls.map(([request]) => [request.url, request.params])).toEqual([
       ["/superAdminOperations/billing/claims/bootstrap", { startDate: "2026-07-01", endDate: "2026-07-31", tab: "saved", sort: "createdAt:desc", limit: 25 }],
       ["/superAdminOperations/billing/claims", { startDate: "2026-07-01", endDate: "2026-07-31", tab: "saved", sort: "createdAt:desc", limit: 25 }],
-      ["/superAdminOperations/billing/payroll/bootstrap", { startDate: "2026-07-01", endDate: "2026-07-31", mode: "ddd", tab: "saved", status: "paid", limit: 25 }],
+      ["/superAdminOperations/billing/payroll/bootstrap", { startDate: "2026-07-01", endDate: "2026-07-31", tab: "saved", status: "paid", limit: 25 }],
       ["/superAdminOperations/billing/payroll", { startDate: "2026-07-01", endDate: "2026-07-31", mode: "ddd", tab: "due", employeeId: "staff-a", employeeAgencyId: "agency-a", limit: 25 }],
       ["/superAdminOperations/billing/expenses/bootstrap", { startDate: "2026-07-01", endDate: "2026-07-31", mode: "ddd", tab: "pending", status: "pending", employeeId: "staff-a", employeeAgencyId: "agency-a", limit: 25 }],
-      ["/superAdminOperations/billing/expenses", { startDate: "2026-07-01", endDate: "2026-07-31", mode: "ddd", tab: "history", status: "approved", employeeId: "staff-a", employeeAgencyId: "agency-a", limit: 25 }],
+      ["/superAdminOperations/billing/expenses", { startDate: "2026-07-01", endDate: "2026-07-31", tab: "history", status: "approved", employeeId: "staff-a", employeeAgencyId: "agency-a", limit: 25 }],
       ["/superAdminOperations/billing/timesheets", { startDate: "2026-07-01", endDate: "2026-07-31", mode: "ddd", tab: "list", status: "approved", employeeId: "staff-a", employeeAgencyId: "agency-a", limit: 25 }],
-      ["/superAdminOperations/billing/overview/bootstrap", { startDate: "2026-07-01", endDate: "2026-07-31", mode: "ddd", tab: "overview" }],
+      ["/superAdminOperations/billing/overview/bootstrap", { startDate: "2026-07-01", endDate: "2026-07-31", tab: "overview" }],
       ["/superAdminOperations/billing/options", { kind: "client", q: "cli" }],
     ]);
   });
