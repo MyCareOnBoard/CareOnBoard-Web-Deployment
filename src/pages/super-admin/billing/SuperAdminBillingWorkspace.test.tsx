@@ -71,6 +71,7 @@ vi.mock("@/pages/agency/billing/expenses", () => ({ default: () => null }));
 
 import SuperAdminBillingWorkspace from "./SuperAdminBillingWorkspace";
 import { SuperAdminBillingIndex } from "./index";
+import { useBillingWorkspaceContext } from "./BillingWorkspaceContext";
 import { FinancialOverview } from "@/pages/agency/billing/pages";
 
 const atlas = {
@@ -265,6 +266,23 @@ function BillingDomainProbe() {
   );
 }
 
+function BillingWorkspaceProbe() {
+  const workspace = useBillingWorkspaceContext();
+  const location = useLocation();
+  return (
+    <div>
+      <output aria-label="Billing workspace scope">
+        {workspace.scope.kind === "network" ? "network" : workspace.scope.agencyId}
+      </output>
+      <output aria-label="Billing workspace actor">{workspace.actorUid}</output>
+      <output aria-label="Billing workspace environment">{workspace.environment}</output>
+      <output aria-label="Billing workspace dates">{`${workspace.startDate}:${workspace.endDate}`}</output>
+      <output aria-label="Billing workspace mode">{workspace.mode ?? "all"}</output>
+      <output aria-label="Billing location">{`${location.pathname}${location.search}`}</output>
+    </div>
+  );
+}
+
 function DirectoryCapabilityProbe() {
   const operational = useOperationalAgency();
   return (
@@ -286,7 +304,7 @@ function SwitchAgency() {
   return <button type="button" onClick={() => navigate("/super-admin/billing/financial-overview?agencyId=beacon")}>Switch agency</button>;
 }
 
-function renderWorkspace(entry: string, nested = <BillingDomainProbe />) {
+function renderWorkspace(entry: string, nested = <BillingWorkspaceProbe />) {
   return render(
     <MemoryRouter initialEntries={[entry]}>
       <ReactRoutes>
@@ -315,7 +333,7 @@ describe("SuperAdminBillingWorkspace", () => {
 
   it("fails closed before loading agencies or mounting content without Billing Management", () => {
     auth.accessList = ["Agency Billing Monitor"];
-    renderWorkspace("/super-admin/billing/financial-overview?agencyId=atlas");
+    renderWorkspace("/super-admin/billing/financial-overview?agencyId=atlas", <BillingDomainProbe />);
 
     expect(screen.getByRole("alert")).toHaveTextContent("You do not have Billing Management access.");
     expect(screen.queryByLabelText("Billing domain agency")).not.toBeInTheDocument();
@@ -323,10 +341,13 @@ describe("SuperAdminBillingWorkspace", () => {
     expect(operationsApi.listOperationalAgencies).not.toHaveBeenCalled();
   });
 
-  it("shows one singular selector and makes no billing domain request without a selection", async () => {
-    renderWorkspace("/super-admin/billing");
+  it("defaults to network scope and mounts child content without singular agency resolution", async () => {
+    renderWorkspace("/super-admin/billing/financial-overview?status=open");
 
-    expect(screen.getByRole("button", { name: "Select an agency, none selected" })).toBeVisible();
+    expect(screen.getByLabelText("Billing workspace scope")).toHaveTextContent("network");
+    expect(screen.getByLabelText("Billing workspace actor")).toHaveTextContent("super-1");
+    expect(screen.getByLabelText("Billing workspace environment")).toHaveTextContent("staging");
+    expect(screen.getByRole("button", { name: "Select an agency, all authorized agencies" })).toBeVisible();
     await waitFor(() => expect(operationsApi.listOperationalAgencies).toHaveBeenCalledWith(
       "billing-management",
       expect.objectContaining({ limit: 50, signal: expect.any(AbortSignal) }),
@@ -336,11 +357,11 @@ describe("SuperAdminBillingWorkspace", () => {
   });
 
   it("revalidates a direct-link agency before mounting nested billing content", async () => {
-    renderWorkspace("/super-admin/billing/financial-overview?agencyId=atlas");
+    renderWorkspace("/super-admin/billing/financial-overview?agencyId=atlas", <BillingDomainProbe />);
 
     expect(await screen.findByLabelText("Billing domain agency")).toHaveTextContent("Atlas Care");
     expect(screen.getByRole("heading", { name: "Billing Management" })).toBeVisible();
-    expect(screen.getByText("Billing workspace · America/New_York")).toBeVisible();
+    expect(screen.queryByText("Billing workspace · America/New_York")).not.toBeInTheDocument();
     expect(operationsApi.getOperationalAgencyContext).toHaveBeenCalledWith(
       "billing-management",
       "atlas",
@@ -377,10 +398,10 @@ describe("SuperAdminBillingWorkspace", () => {
     const user = userEvent.setup();
     renderWorkspace("/super-admin/billing");
 
-    await user.click(screen.getByRole("button", { name: "Select an agency, none selected" }));
+    await user.click(screen.getByRole("button", { name: "Select an agency, all authorized agencies" }));
     await user.click(await screen.findByRole("option", { name: "Beacon Supports" }));
 
-    expect(await screen.findByLabelText("Billing domain agency")).toHaveTextContent("Beacon Supports");
+    expect(await screen.findByLabelText("Billing workspace scope")).toHaveTextContent("beacon");
     expect(screen.getByLabelText("Billing location")).toHaveTextContent(
       "/super-admin/billing/financial-overview?agencyId=beacon",
     );
@@ -389,7 +410,7 @@ describe("SuperAdminBillingWorkspace", () => {
   it("redirects an indexed direct link with its resolved agencyId intact", async () => {
     renderWorkspace("/super-admin/billing?agencyId=atlas");
 
-    expect(await screen.findByLabelText("Billing domain agency")).toHaveTextContent("Atlas Care");
+    expect(await screen.findByLabelText("Billing workspace scope")).toHaveTextContent("atlas");
     expect(screen.getByLabelText("Billing location")).toHaveTextContent(
       "/super-admin/billing/financial-overview?agencyId=atlas",
     );
@@ -399,9 +420,14 @@ describe("SuperAdminBillingWorkspace", () => {
     operationsApi.getOperationalAgencyContext.mockResolvedValue(dualAtlas);
     renderWorkspace("/super-admin/billing?agencyId=atlas&clientType=hha&view=summary");
 
-    expect(await screen.findByLabelText("Billing location")).toHaveTextContent(
-      "/super-admin/billing/financial-overview?clientType=hha&view=summary&agencyId=atlas",
-    );
+    const location = (await screen.findByLabelText("Billing location")).textContent ?? "";
+    const target = new URL(location, "https://careonboard.test");
+    expect(target.pathname).toBe("/super-admin/billing/financial-overview");
+    expect(Object.fromEntries(target.searchParams)).toMatchObject({
+      agencyId: "atlas",
+      clientType: "hha",
+      view: "summary",
+    });
   });
 
   it("unmounts the previous agency immediately while a new URL agency is being revalidated", async () => {
@@ -434,8 +460,20 @@ describe("SuperAdminBillingWorkspace", () => {
     renderWorkspace("/super-admin/billing/financial-overview?agencyId=atlas&agencyId=beacon");
 
     expect(screen.getByRole("alert")).toHaveTextContent("Choose exactly one agency to manage billing.");
-    await waitFor(() => expect(operationsApi.listOperationalAgencies).toHaveBeenCalled());
     expect(operationsApi.getOperationalAgencyContext).not.toHaveBeenCalled();
     expect(domainRequest).not.toHaveBeenCalled();
+  });
+
+  it("uses structural workspace regions instead of a generic spinner while an agency resolves", () => {
+    operationsApi.getOperationalAgencyContext.mockReturnValue(new Promise(() => undefined));
+    renderWorkspace("/super-admin/billing/financial-overview?agencyId=atlas", <BillingDomainProbe />);
+
+    const skeleton = screen.getByLabelText("Loading billing workspace");
+    expect(skeleton).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByTestId("billing-skeleton-header")).toBeVisible();
+    expect(screen.getByTestId("billing-skeleton-kpis")).toBeVisible();
+    expect(screen.getByTestId("billing-skeleton-nav")).toBeVisible();
+    expect(screen.getByTestId("billing-skeleton-content")).toBeVisible();
+    expect(screen.queryByLabelText("Loading agency")).not.toBeInTheDocument();
   });
 });

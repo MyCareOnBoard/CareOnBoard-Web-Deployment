@@ -1,17 +1,31 @@
-import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Building2, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { AlertTriangle } from "lucide-react";
 import { Outlet, useLocation, useNavigate } from "react-router";
-import OperationalAgencySelector from "@/components/operational-agency/OperationalAgencySelector";
 import { Button } from "@/components/ui/button";
 import { getOperationalAgencyContext } from "@/lib/api/super-admin-operations";
 import { createSuperAdminOperationalDataAdapter } from "@/lib/operational-agency/dataAdapters";
 import { OperationalAgencyProvider } from "@/lib/operational-agency/OperationalAgencyProvider";
-import {
-  createSuperAdminDirectoryRoutes,
-  superAdminBillingRoutes,
-} from "@/lib/operational-agency/routes";
+import { createSuperAdminDirectoryRoutes } from "@/lib/operational-agency/routes";
 import type { OperationalAgencySummary } from "@/lib/operational-agency/types";
 import { useAuth } from "@/utils/auth";
+import BillingManagementHeader from "./BillingManagementHeader";
+import {
+  BillingWorkspaceProvider,
+  type BillingWorkspaceContextValue,
+} from "./BillingWorkspaceContext";
+import BillingWorkspaceSkeleton from "./BillingWorkspaceSkeleton";
+import {
+  canonicalizeBillingWorkspaceSearch,
+  parseBillingWorkspace,
+  updateBillingWorkspaceDateRange,
+  updateBillingWorkspaceMode,
+  updateBillingWorkspaceScope,
+  type BillingProgramMode,
+  type BillingWorkspaceDateRange,
+} from "./billingWorkspaceState";
+import type { BillingWorkspaceScope } from "./types";
+
+const apiEnvironment = import.meta.env.VITE_API_ENVIRONMENT || "staging";
 
 function isAbort(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
@@ -21,64 +35,176 @@ function isAbort(error: unknown): boolean {
     || candidate.name === "AbortError";
 }
 
-function billingSearch(search: string, agencyId?: string): string {
-  const params = new URLSearchParams(search);
-  params.delete("agencyId");
-  if (agencyId) params.set("agencyId", agencyId);
-  const value = params.toString();
-  return value ? `?${value}` : "";
+function rememberAgencies(
+  current: readonly OperationalAgencySummary[],
+  incoming: readonly OperationalAgencySummary[],
+): OperationalAgencySummary[] {
+  return [...new Map([...current, ...incoming].map((agency) => [agency.id, agency])).values()]
+    .sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id));
 }
 
-export default function SuperAdminBillingWorkspace() {
-  const { user } = useAuth();
-  const location = useLocation();
-  const navigate = useNavigate();
-  const accessList = user?.profile?.accessList ?? [];
-  const canManageBilling = accessList.includes("Billing Management");
-  const requestedIds = useMemo(
-    () => new URLSearchParams(location.search)
-      .getAll("agencyId")
-      .map((id) => id.trim())
-      .filter(Boolean),
-    [location.search],
-  );
-  const agencyId = requestedIds.length === 1 ? requestedIds[0] : "";
-  const [resolvedAgency, setResolvedAgency] = useState<OperationalAgencySummary | null>(null);
-  const [loading, setLoading] = useState(Boolean(agencyId));
-  const [error, setError] = useState<string | null>(null);
-  const [retryVersion, setRetryVersion] = useState(0);
+function AgencyBillingOutlet({
+  accessList,
+  agency,
+  mode,
+}: {
+  accessList: readonly string[];
+  agency: OperationalAgencySummary;
+  mode: BillingProgramMode | null;
+}) {
   const data = useMemo(
-    () => createSuperAdminOperationalDataAdapter("billing-management", agencyId),
-    [agencyId],
+    () => createSuperAdminOperationalDataAdapter("billing-management", agency.id),
+    [agency.id],
   );
   const directoryRoutes = useMemo(
-    () => createSuperAdminDirectoryRoutes(agencyId),
-    [agencyId],
+    () => createSuperAdminDirectoryRoutes(agency.id),
+    [agency.id],
   );
+  const effectiveMode = mode && agency.supportedClientTypes.includes(mode)
+    ? mode
+    : agency.supportedClientTypes.length === 1
+      ? agency.supportedClientTypes[0]
+      : null;
+
+  return (
+    <OperationalAgencyProvider
+      key={agency.id}
+      actor="super_admin"
+      agencyId={agency.id}
+      agency={agency}
+      mode={effectiveMode}
+      capabilities={{
+        canManageShifts: accessList.includes("Shift Management"),
+        canManageBilling: true,
+        shiftMaintenance: accessList.includes("Shift Maintenance"),
+        canAccessClientDirectory: accessList.includes("Clients Directory"),
+        canAccessStaffDirectory: accessList.includes("Staff Directory"),
+      }}
+      directoryRoutes={directoryRoutes}
+      data={data}
+    >
+      <Outlet />
+    </OperationalAgencyProvider>
+  );
+}
+
+function WorkspaceFrame({
+  accessList,
+  agencies,
+  context,
+  error,
+  onAgenciesDiscovered,
+  onDateRangeChange,
+  onModeChange,
+  onRetry,
+  onScopeChange,
+  resolvedAgency,
+  search,
+}: {
+  accessList: readonly string[];
+  agencies: OperationalAgencySummary[];
+  context: BillingWorkspaceContextValue;
+  error: string | null;
+  onAgenciesDiscovered: (agencies: OperationalAgencySummary[]) => void;
+  onDateRangeChange: (range: BillingWorkspaceDateRange) => void;
+  onModeChange: (mode: BillingProgramMode | null) => void;
+  onRetry: () => void;
+  onScopeChange: (scope: BillingWorkspaceScope) => void;
+  resolvedAgency: OperationalAgencySummary | null;
+  search: string;
+}) {
+  return (
+    <BillingWorkspaceProvider value={context}>
+      <section className="min-w-0 space-y-5 pb-6" aria-labelledby="billing-management-title">
+        <BillingManagementHeader
+          workspace={context}
+          search={search}
+          onScopeChange={onScopeChange}
+          onDateRangeChange={onDateRangeChange}
+          onModeChange={onModeChange}
+          initialAgencies={agencies.length ? agencies : undefined}
+          onAgenciesDiscovered={onAgenciesDiscovered}
+        />
+
+        {error ? (
+          <div role="alert" className="rounded-2xl border border-[#efcbc6] bg-[#fff5f3] px-5 py-8 text-center">
+            <AlertTriangle className="mx-auto size-7 text-[#9a4038]" aria-hidden="true" />
+            <p className="mt-2 text-sm font-semibold text-[#7e3029]">{error}</p>
+            <Button type="button" variant="outline" className="mt-4 min-h-11" onClick={onRetry}>
+              Try again
+            </Button>
+          </div>
+        ) : context.scope.kind === "network" ? (
+          <div className="min-w-0"><Outlet /></div>
+        ) : resolvedAgency ? (
+          <div className="min-w-0">
+            <AgencyBillingOutlet accessList={accessList} agency={resolvedAgency} mode={context.mode} />
+          </div>
+        ) : null}
+      </section>
+    </BillingWorkspaceProvider>
+  );
+}
+
+function AuthorizedBillingWorkspace({
+  accessList,
+  actorUid,
+}: {
+  accessList: readonly string[];
+  actorUid: string;
+}) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const parsed = useMemo(() => {
+    try {
+      return { workspace: parseBillingWorkspace(location.search), error: null };
+    } catch (error) {
+      return {
+        workspace: null,
+        error: error instanceof Error ? error.message : "Could not open billing management.",
+      };
+    }
+  }, [location.search]);
+  const workspace = parsed.workspace;
+  const agencyId = workspace?.scope.kind === "agency" ? workspace.scope.agencyId : "";
+  const [resolvedAgency, setResolvedAgency] = useState<OperationalAgencySummary | null>(null);
+  const [knownAgencies, setKnownAgencies] = useState<OperationalAgencySummary[]>([]);
+  const [loading, setLoading] = useState(Boolean(agencyId));
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retryVersion, setRetryVersion] = useState(0);
 
   useEffect(() => {
-    if (!canManageBilling || !agencyId) {
+    if (!workspace) return;
+    const canonicalSearch = canonicalizeBillingWorkspaceSearch(location.search);
+    if (canonicalSearch !== location.search) {
+      navigate({ pathname: location.pathname, search: canonicalSearch }, { replace: true });
+    }
+  }, [location.pathname, location.search, navigate, workspace]);
+
+  useEffect(() => {
+    if (!agencyId) {
       setResolvedAgency(null);
       setLoading(false);
-      setError(null);
+      setLoadError(null);
       return;
     }
 
     const controller = new AbortController();
     setResolvedAgency(null);
     setLoading(true);
-    setError(null);
+    setLoadError(null);
     void getOperationalAgencyContext("billing-management", agencyId, controller.signal)
       .then((agency) => {
-        if (agency.id !== agencyId) {
-          throw new Error("Could not load this agency.");
+        if (agency.id !== agencyId) throw new Error("Could not load this agency.");
+        if (!controller.signal.aborted) {
+          setResolvedAgency(agency);
+          setKnownAgencies((current) => rememberAgencies(current, [agency]));
         }
-        if (!controller.signal.aborted) setResolvedAgency(agency);
       })
-      .catch((loadError: unknown) => {
-        if (!controller.signal.aborted && !isAbort(loadError)) {
-          setError(loadError instanceof Error && loadError.message
-            ? loadError.message
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted && !isAbort(error)) {
+          setLoadError(error instanceof Error && error.message
+            ? error.message
             : "Could not load this agency.");
         }
       })
@@ -86,9 +212,54 @@ export default function SuperAdminBillingWorkspace() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [agencyId, canManageBilling, retryVersion]);
+  }, [agencyId, retryVersion]);
 
-  if (!canManageBilling) {
+  const onAgenciesDiscovered = useCallback((agencies: OperationalAgencySummary[]) => {
+    setKnownAgencies((current) => rememberAgencies(current, agencies));
+  }, []);
+
+  if (!workspace) {
+    return (
+      <p role="alert" className="rounded-2xl border border-[#efcbc6] bg-[#fff5f3] px-5 py-8 text-sm font-medium text-[#7e3029]">
+        {parsed.error}
+      </p>
+    );
+  }
+
+  if (loading || (agencyId && !loadError && resolvedAgency?.id !== agencyId)) {
+    return <BillingWorkspaceSkeleton />;
+  }
+
+  const context: BillingWorkspaceContextValue = {
+    ...workspace,
+    actorUid,
+    environment: apiEnvironment,
+  };
+  const navigateWithSearch = (search: string) => {
+    navigate({ pathname: location.pathname, search });
+  };
+
+  return (
+    <WorkspaceFrame
+      accessList={accessList}
+      agencies={knownAgencies}
+      context={context}
+      error={loadError}
+      resolvedAgency={resolvedAgency}
+      search={location.search}
+      onAgenciesDiscovered={onAgenciesDiscovered}
+      onRetry={() => setRetryVersion((value) => value + 1)}
+      onScopeChange={(scope) => navigateWithSearch(updateBillingWorkspaceScope(location.search, scope))}
+      onDateRangeChange={(range) => navigateWithSearch(updateBillingWorkspaceDateRange(location.search, range))}
+      onModeChange={(mode) => navigateWithSearch(updateBillingWorkspaceMode(location.search, mode))}
+    />
+  );
+}
+
+export default function SuperAdminBillingWorkspace() {
+  const { user } = useAuth();
+  const accessList = user?.profile?.accessList ?? [];
+  if (!accessList.includes("Billing Management")) {
     return (
       <p role="alert" className="px-4 py-8 text-sm font-medium text-[#7e3029]">
         You do not have Billing Management access.
@@ -96,102 +267,5 @@ export default function SuperAdminBillingWorkspace() {
     );
   }
 
-  const selectAgency = (selectedIds: string[]) => {
-    const selectedAgencyId = selectedIds.length === 1 ? selectedIds[0] : "";
-    const search = billingSearch(location.search, selectedAgencyId);
-    navigate(selectedAgencyId
-      ? superAdminBillingRoutes.financialOverview(search)
-      : superAdminBillingRoutes.index(search));
-  };
-
-  const hasAmbiguousAgency = requestedIds.length > 1;
-  const requestedMode = new URLSearchParams(location.search).get("clientType");
-  const mode = resolvedAgency
-    ? (requestedMode === "ddd" || requestedMode === "hha")
-      && resolvedAgency.supportedClientTypes.includes(requestedMode)
-      ? requestedMode
-      : resolvedAgency.supportedClientTypes.length === 1
-        ? resolvedAgency.supportedClientTypes[0]
-        : null
-    : null;
-
-  return (
-    <section className="min-w-0 space-y-6" aria-labelledby="billing-management-title">
-      <div className="rounded-2xl border border-[#dce5e5] bg-white px-4 py-5 shadow-[0_8px_24px_rgba(30,64,66,0.06)] sm:px-6">
-        <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(260px,380px)] lg:items-end">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#087f82]">Agency operations</p>
-            <h1 id="billing-management-title" className="mt-1 text-2xl font-bold text-[#10141a] sm:text-3xl">
-              Billing Management
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm font-medium text-[#687173]">
-              Review one authorized agency&apos;s financial overview and billing operations.
-            </p>
-          </div>
-          <div className="min-w-0">
-            <p className="mb-2 text-xs font-semibold text-[#3c4749]">Operational agency</p>
-            <OperationalAgencySelector
-              feature="billing-management"
-              selectionMode="single"
-              selectedIds={agencyId ? [agencyId] : []}
-              onSelectionChange={selectAgency}
-              initialAgencies={resolvedAgency ? [resolvedAgency] : undefined}
-            />
-          </div>
-        </div>
-      </div>
-
-      {hasAmbiguousAgency ? (
-        <p role="alert" className="rounded-2xl border border-[#efcbc6] bg-[#fff5f3] px-5 py-8 text-sm font-medium text-[#7e3029]">
-          Choose exactly one agency to manage billing.
-        </p>
-      ) : !agencyId ? (
-        <div className="rounded-2xl border border-dashed border-[#cbd8d8] bg-[#f8fbfb] px-5 py-12 text-center">
-          <Building2 aria-hidden className="mx-auto size-8 text-[#4e9193]" />
-          <p className="mt-3 text-sm font-semibold text-[#263234]">Choose an agency to open its billing workspace.</p>
-          <p className="mt-1 text-xs text-[#687173]">Only agencies assigned to your operational scope are available.</p>
-        </div>
-      ) : error ? (
-        <div role="alert" className="rounded-2xl border border-[#efcbc6] bg-[#fff5f3] px-5 py-8 text-center">
-          <AlertTriangle className="mx-auto size-7 text-[#9a4038]" aria-hidden />
-          <p className="mt-2 text-sm font-semibold text-[#7e3029]">{error}</p>
-          <Button type="button" variant="outline" className="mt-4" onClick={() => setRetryVersion((value) => value + 1)}>
-            Try again
-          </Button>
-        </div>
-      ) : loading || resolvedAgency?.id !== agencyId ? (
-        <div className="flex min-h-64 items-center justify-center" aria-busy="true">
-          <Loader2 className="size-7 animate-spin text-[#008f92]" aria-label="Loading agency" />
-        </div>
-      ) : (
-        <OperationalAgencyProvider
-          key={`${agencyId}:${resolvedAgency.id}`}
-          actor="super_admin"
-          agencyId={resolvedAgency.id}
-          agency={resolvedAgency}
-          mode={mode}
-          capabilities={{
-            canManageShifts: accessList.includes("Shift Management"),
-            canManageBilling: true,
-            shiftMaintenance: accessList.includes("Shift Maintenance"),
-            canAccessClientDirectory: accessList.includes("Clients Directory"),
-            canAccessStaffDirectory: accessList.includes("Staff Directory"),
-          }}
-          directoryRoutes={directoryRoutes}
-          data={data}
-        >
-          <div className="min-w-0 space-y-6">
-            <div className="flex min-w-0 items-center gap-3 rounded-xl border border-[#dce5e5] bg-[#f8fbfb] px-4 py-3">
-              <Building2 aria-hidden className="size-5 shrink-0 text-[#087f82]" />
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-[#20282a]">{resolvedAgency.name}</p>
-                <p className="truncate text-xs text-[#687173]">Billing workspace · {resolvedAgency.timezone}</p>
-              </div>
-            </div>
-            <div className="min-w-0"><Outlet /></div>
-          </div>
-        </OperationalAgencyProvider>
-      )}
-    </section>
-  );
+  return <AuthorizedBillingWorkspace accessList={accessList} actorUid={user?.uid ?? ""} />;
 }
