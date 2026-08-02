@@ -1,4 +1,4 @@
-import { combineReducers, configureStore, type Middleware } from "@reduxjs/toolkit";
+import { combineReducers, configureStore, type Middleware, type UnknownAction } from "@reduxjs/toolkit";
 import {
     persistStore,
     persistReducer,
@@ -84,7 +84,7 @@ export const networkBillingLogoutResetMiddleware: Middleware = ({ dispatch }) =>
 };
 
 // Root reducer resets ALL slice state (including every RTK Query cache) on logout
-const rootReducer = (state: ReturnType<typeof appReducer> | undefined, action: any) => {
+const rootReducer = (state: ReturnType<typeof appReducer> | undefined, action: UnknownAction) => {
     if (action.type === logoutUser.fulfilled.type) {
         return appReducer(undefined, action);
     }

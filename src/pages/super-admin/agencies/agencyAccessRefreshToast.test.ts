@@ -18,11 +18,19 @@ vi.mock("sonner", () => ({
 
 describe("agency access refresh toast", () => {
   it("reuses one warning toast and dismisses it after a successful retry", async () => {
+    const events: string[] = [];
     const refreshProfile = vi.fn()
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ uid: "super-1" });
+      .mockImplementationOnce(() => {
+        events.push("auth-published-1");
+        return Promise.resolve(null);
+      })
+      .mockImplementationOnce(() => {
+        events.push("auth-published-2");
+        return Promise.resolve({ uid: "super-1" });
+      });
+    const resetCaches = vi.fn(() => events.push("reset"));
 
-    showAgencyAccessRefreshWarning(refreshProfile, vi.fn());
+    showAgencyAccessRefreshWarning(refreshProfile, resetCaches);
     expect(warning).toHaveBeenCalledOnce();
     expect(warning.mock.calls[0][1]).toMatchObject({
       id: AGENCY_ACCESS_REFRESH_TOAST_ID,
@@ -40,6 +48,7 @@ describe("agency access refresh toast", () => {
     await warning.mock.calls[1][1].action.onClick();
     expect(dismiss).toHaveBeenCalledWith(AGENCY_ACCESS_REFRESH_TOAST_ID);
     expect(warning).toHaveBeenCalledTimes(2);
+    expect(events).toEqual(["reset", "auth-published-1", "reset", "auth-published-2"]);
   });
 
   it("dismisses an older warning after a later initial refresh succeeds", async () => {

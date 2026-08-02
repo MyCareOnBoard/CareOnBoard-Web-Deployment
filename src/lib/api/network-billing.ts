@@ -4,14 +4,26 @@ import axiosClient from "@/lib/axios";
 import type {
   BillingWorkspaceScope,
   NetworkBillingActivityRow,
+  NetworkBillingAmount,
   NetworkBillingClaimRow,
+  NetworkBillingClaimsSummary,
   NetworkBillingExpenseRow,
+  NetworkBillingExpensesPageResponse,
+  NetworkBillingExpensesSummary,
+  NetworkBillingJsonValue,
   NetworkBillingOption,
   NetworkBillingOverview,
   NetworkBillingPage,
   NetworkBillingPageResponse,
+  NetworkBillingPartialErrorKey,
+  NetworkBillingPayrollDueRow,
   NetworkBillingPayrollRow,
+  NetworkBillingPayrollSavedRow,
+  NetworkBillingPayrollSummary,
   NetworkBillingPublicScope,
+  NetworkBillingReadyRideRow,
+  NetworkBillingReadyShiftRow,
+  NetworkBillingSavedClaimRow,
   NetworkBillingTimesheetRow,
 } from "@/pages/super-admin/billing/types";
 
@@ -39,26 +51,36 @@ type DatePageContext = QueryContext & {
   cursor?: string;
 };
 
-type ClientFilter = { clientId?: string; clientAgencyId?: string };
-type StaffFilter = { employeeId?: string; employeeAgencyId?: string };
+type ClientSelection =
+  | { clientId: string; clientAgencyId: string }
+  | { clientId?: never; clientAgencyId?: never };
+type StaffSelection =
+  | { employeeId: string; employeeAgencyId: string }
+  | { employeeId?: never; employeeAgencyId?: never };
 type ModeFilter = { mode?: "ddd" | "hha" };
 
-export type ClaimsNetworkBillingArgs = DatePageContext & ClientFilter & (
+export type ClaimsNetworkBillingArgs = DatePageContext & ClientSelection & (
   | { tab: "ready"; mode?: "ddd" | "hha"; status?: never; sort?: never; employeeId?: never; employeeAgencyId?: never }
   | { tab: "saved"; status?: "pending" | "paid" | "rejected"; sort?: "createdAt:desc" | "createdAt:asc"; mode?: never; employeeId?: never; employeeAgencyId?: never }
 );
 
-export type PayrollNetworkBillingArgs = DatePageContext & StaffFilter & ModeFilter & (
+export type PayrollNetworkBillingArgs = DatePageContext & StaffSelection & ModeFilter & (
   | { tab: "due"; status?: never; clientId?: never; clientAgencyId?: never; sort?: never }
   | { tab: "saved"; status?: "pending" | "paid"; clientId?: never; clientAgencyId?: never; sort?: never }
 );
 
-export type ExpensesNetworkBillingArgs = DatePageContext & StaffFilter & ModeFilter & (
+export type ExpensesNetworkBillingArgs = DatePageContext & StaffSelection & ModeFilter & (
   | { tab: "pending"; status?: "pending"; clientId?: never; clientAgencyId?: never; sort?: never }
   | { tab: "history"; status?: "approved" | "rejected"; clientId?: never; clientAgencyId?: never; sort?: never }
 );
 
-export type TimesheetsNetworkBillingArgs = DatePageContext & StaffFilter & ModeFilter & { tab: "list"; status?: "pending" | "approved" | "rejected"; clientId?: never; clientAgencyId?: never; sort?: never };
+export type TimesheetsNetworkBillingArgs = DatePageContext & StaffSelection & ModeFilter & {
+  tab: "list";
+  status?: "pending" | "approved" | "rejected";
+  clientId?: never;
+  clientAgencyId?: never;
+  sort?: never;
+};
 
 export type OverviewNetworkBillingArgs = QueryContext & Pick<DatePageContext, "startDate" | "endDate"> & ModeFilter & {
   tab: "overview";
@@ -87,9 +109,19 @@ function record(value: unknown, context: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+function onlyKeys(source: Record<string, unknown>, allowed: readonly string[], context: string): void {
+  for (const key of Object.keys(source)) {
+    if (!allowed.includes(key)) fail(`${context}.${key} is not supported by this response contract.`);
+  }
+}
+
+function has(source: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(source, key);
+}
+
 function requiredString(source: Record<string, unknown>, key: string, context: string): string {
   const value = source[key];
-  if (typeof value !== "string" || !value.trim()) fail(`${context}.${key} must be a non-empty string.`);
+  if (typeof value !== "string") fail(`${context}.${key} must be a string.`);
   return value;
 }
 
@@ -99,12 +131,12 @@ function nullableString(source: Record<string, unknown>, key: string, context: s
   return value;
 }
 
-function nullableNumber(source: Record<string, unknown>, key: string, context: string): number | null {
-  const value = source[key];
-  if (value !== null && (typeof value !== "number" || !Number.isFinite(value))) {
-    fail(`${context}.${key} must be a finite number or null.`);
-  }
-  return value;
+function optionalNullableString(
+  source: Record<string, unknown>,
+  key: string,
+  context: string,
+): string | null | undefined {
+  return has(source, key) ? nullableString(source, key, context) : undefined;
 }
 
 function requiredNumber(source: Record<string, unknown>, key: string, context: string): number {
@@ -113,14 +145,32 @@ function requiredNumber(source: Record<string, unknown>, key: string, context: s
   return value;
 }
 
+function nullableNumber(source: Record<string, unknown>, key: string, context: string): number | null {
+  const value = source[key];
+  if (value === null) return null;
+  return requiredNumber(source, key, context);
+}
+
+function optionalNullableNumber(
+  source: Record<string, unknown>,
+  key: string,
+  context: string,
+): number | null | undefined {
+  return has(source, key) ? nullableNumber(source, key, context) : undefined;
+}
+
 function requiredBoolean(source: Record<string, unknown>, key: string, context: string): boolean {
   const value = source[key];
   if (typeof value !== "boolean") fail(`${context}.${key} must be a boolean.`);
   return value;
 }
 
-function optionalNullableString(source: Record<string, unknown>, key: string, context: string): void {
-  if (source[key] !== undefined) nullableString(source, key, context);
+function optionalBoolean(
+  source: Record<string, unknown>,
+  key: string,
+  context: string,
+): boolean | undefined {
+  return has(source, key) ? requiredBoolean(source, key, context) : undefined;
 }
 
 function nonNegativeInteger(source: Record<string, unknown>, key: string, context: string): number {
@@ -129,10 +179,12 @@ function nonNegativeInteger(source: Record<string, unknown>, key: string, contex
   return value;
 }
 
-function onlyKeys(source: Record<string, unknown>, allowed: readonly string[], context: string): void {
-  for (const key of Object.keys(source)) {
-    if (!allowed.includes(key)) fail(`${context}.${key} is not supported by this response contract.`);
-  }
+function optionalNonNegativeInteger(
+  source: Record<string, unknown>,
+  key: string,
+  context: string,
+): number | undefined {
+  return has(source, key) ? nonNegativeInteger(source, key, context) : undefined;
 }
 
 function requiredEnum<T extends string>(
@@ -142,9 +194,7 @@ function requiredEnum<T extends string>(
   context: string,
 ): T {
   const value = source[key];
-  if (typeof value !== "string" || !values.includes(value as T)) {
-    fail(`${context}.${key} is invalid.`);
-  }
+  if (typeof value !== "string" || !values.includes(value as T)) fail(`${context}.${key} is invalid.`);
   return value as T;
 }
 
@@ -154,45 +204,69 @@ function nullableEnum<T extends string>(
   values: readonly T[],
   context: string,
 ): T | null {
-  const value = source[key];
-  if (value === null) return null;
-  if (typeof value !== "string" || !values.includes(value as T)) fail(`${context}.${key} is invalid.`);
-  return value as T;
+  if (source[key] === null) return null;
+  return requiredEnum(source, key, values, context);
 }
 
-function agencyRow(value: unknown, context: string): Record<string, unknown> {
-  const row = record(value, context);
-  requiredString(row, "id", context);
-  requiredString(row, "agencyId", context);
-  requiredString(row, "agencyName", context);
-  return row;
+function optionalNullableEnum<T extends string>(
+  source: Record<string, unknown>,
+  key: string,
+  values: readonly T[],
+  context: string,
+): T | null | undefined {
+  return has(source, key) ? nullableEnum(source, key, values, context) : undefined;
+}
+
+function jsonValue(value: unknown, context: string): NetworkBillingJsonValue {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) fail(`${context} must contain only finite JSON values.`);
+    return value;
+  }
+  if (Array.isArray(value)) return value.map((item, index) => jsonValue(item, `${context}[${index}]`));
+  const source = record(value, context);
+  return Object.fromEntries(
+    Object.entries(source).map(([key, entry]) => [key, jsonValue(entry, `${context}.${key}`)]),
+  );
+}
+
+function optionalJsonValue(
+  source: Record<string, unknown>,
+  key: string,
+  context: string,
+): NetworkBillingJsonValue | undefined {
+  return has(source, key) ? jsonValue(source[key], `${context}.${key}`) : undefined;
 }
 
 function validatePublicScope(value: unknown): NetworkBillingPublicScope {
   const scope = record(value, "scope");
-  const kind = requiredEnum(scope, "kind", ["global", "assigned"] as const, "scope");
-  const agencyCount = nonNegativeInteger(scope, "agencyCount", "scope");
-  return { kind, agencyCount };
+  onlyKeys(scope, ["kind", "agencyCount"], "scope");
+  return {
+    kind: requiredEnum(scope, "kind", ["global", "assigned"] as const, "scope"),
+    agencyCount: nonNegativeInteger(scope, "agencyCount", "scope"),
+  };
 }
 
 function validatePage<T>(value: unknown, validateRow: (row: unknown, context: string) => T): NetworkBillingPage<T> {
   const page = record(value, "page");
+  onlyKeys(page, ["rows", "total", "loadedCount", "nextCursor", "hasMore", "totalsExact", "partialData"], "page");
   if (!Array.isArray(page.rows)) fail("page.rows must be an array.");
   const total = nullableNumber(page, "total", "page");
   if (total !== null && (!Number.isInteger(total) || total < 0)) fail("page.total must be a non-negative integer or null.");
   const nextCursor = nullableString(page, "nextCursor", "page");
-  if (nextCursor !== null && !/^[A-Za-z0-9_-]+$/.test(nextCursor)) fail("page.nextCursor must be an opaque cursor or null.");
+  if (nextCursor !== null && (nextCursor.length > 2048 || !/^[A-Za-z0-9_-]+$/.test(nextCursor))) {
+    fail("page.nextCursor must be an opaque cursor or null.");
+  }
   const hasMore = requiredBoolean(page, "hasMore", "page");
   if (!hasMore && nextCursor !== null) fail("page.nextCursor must be null when page.hasMore is false.");
-  if (page.loadedCount !== undefined && (typeof page.loadedCount !== "number" || !Number.isInteger(page.loadedCount) || page.loadedCount < 0)) {
-    fail("page.loadedCount must be a non-negative integer when present.");
-  }
-  if (page.totalsExact !== undefined && typeof page.totalsExact !== "boolean") fail("page.totalsExact must be a boolean when present.");
+  const loadedCount = optionalNonNegativeInteger(page, "loadedCount", "page");
+  const totalsExact = optionalBoolean(page, "totalsExact", "page");
   let partialData: NetworkBillingPage<T>["partialData"];
-  if (page.partialData !== undefined) {
+  if (has(page, "partialData")) {
     if (page.partialData === null) partialData = null;
     else {
       const partial = record(page.partialData, "page.partialData");
+      onlyKeys(partial, ["reason", "exactTotalsAvailable"], "page.partialData");
       partialData = {
         reason: requiredString(partial, "reason", "page.partialData"),
         exactTotalsAvailable: requiredBoolean(partial, "exactTotalsAvailable", "page.partialData"),
@@ -204,145 +278,538 @@ function validatePage<T>(value: unknown, validateRow: (row: unknown, context: st
     total,
     nextCursor,
     hasMore,
-    ...(typeof page.loadedCount === "number"
-      ? { loadedCount: page.loadedCount }
-      : {}),
-    ...(typeof page.totalsExact === "boolean" ? { totalsExact: page.totalsExact } : {}),
-    ...(partialData !== undefined ? { partialData } : {}),
+    ...(loadedCount === undefined ? {} : { loadedCount }),
+    ...(totalsExact === undefined ? {} : { totalsExact }),
+    ...(partialData === undefined ? {} : { partialData }),
+  };
+}
+
+function agencyFields(source: Record<string, unknown>, context: string) {
+  return {
+    id: requiredString(source, "id", context),
+    agencyId: requiredString(source, "agencyId", context),
+    agencyName: requiredString(source, "agencyName", context),
+  };
+}
+
+function validateSavedClaimRow(source: Record<string, unknown>, context: string): NetworkBillingSavedClaimRow {
+  onlyKeys(source, [
+    "id", "agencyId", "agencyName", "kind", "amount", "status", "clientId", "clientName", "serviceCode",
+    "createdAt", "claimNumber", "invoiceNumber", "emailStatus", "payerName", "payerEmail", "serviceDate",
+    "shiftCount", "rideCount", "emailedTo", "emailedAt", "rejectionReason",
+  ], context);
+  const result: NetworkBillingSavedClaimRow = {
+    ...agencyFields(source, context),
+    kind: requiredEnum(source, "kind", ["claim", "invoice"] as const, context),
+    amount: requiredNumber(source, "amount", context),
+  };
+  const stringFields = [
+    "status", "clientId", "clientName", "serviceCode", "claimNumber", "invoiceNumber", "emailStatus",
+    "payerName", "payerEmail", "serviceDate", "emailedTo", "rejectionReason",
+  ] as const;
+  for (const key of stringFields) {
+    const field = optionalNullableString(source, key, context);
+    if (field !== undefined) result[key] = field;
+  }
+  const shiftCount = optionalNonNegativeInteger(source, "shiftCount", context);
+  const rideCount = optionalNonNegativeInteger(source, "rideCount", context);
+  const createdAt = optionalJsonValue(source, "createdAt", context);
+  const emailedAt = optionalJsonValue(source, "emailedAt", context);
+  if (shiftCount !== undefined) result.shiftCount = shiftCount;
+  if (rideCount !== undefined) result.rideCount = rideCount;
+  if (createdAt !== undefined) result.createdAt = createdAt;
+  if (emailedAt !== undefined) result.emailedAt = emailedAt;
+  return result;
+}
+
+const READY_COMMON_KEYS = [
+  "id", "agencyId", "agencyName", "sourceType", "sourceId", "serviceCode", "needsClaim", "needsInvoice",
+  "coverage", "splitMode", "splitValue", "claimId", "outOfPocketInvoiceId", "clientId", "clientName",
+  "clientAvatarUrl", "staffId", "staffName", "sortDate", "weekRange",
+] as const;
+
+function readyClaimBase(source: Record<string, unknown>, context: string) {
+  return {
+    ...agencyFields(source, context),
+    sourceId: requiredString(source, "sourceId", context),
+    serviceCode: requiredString(source, "serviceCode", context),
+    needsClaim: requiredBoolean(source, "needsClaim", context),
+    needsInvoice: requiredBoolean(source, "needsInvoice", context),
+    coverage: optionalNullableString(source, "coverage", context),
+    splitMode: optionalNullableString(source, "splitMode", context),
+    splitValue: optionalJsonValue(source, "splitValue", context),
+    claimId: optionalNullableString(source, "claimId", context),
+    outOfPocketInvoiceId: optionalNullableString(source, "outOfPocketInvoiceId", context),
+    clientId: optionalNullableString(source, "clientId", context),
+    clientName: optionalNullableString(source, "clientName", context),
+    clientAvatarUrl: optionalNullableString(source, "clientAvatarUrl", context),
+    staffId: optionalNullableString(source, "staffId", context),
+    staffName: optionalNullableString(source, "staffName", context),
+    sortDate: optionalNullableString(source, "sortDate", context),
+    weekRange: optionalNullableString(source, "weekRange", context),
+  };
+}
+
+function definedReadyFields(source: ReturnType<typeof readyClaimBase>) {
+  return {
+    ...(source.coverage === undefined ? {} : { coverage: source.coverage }),
+    ...(source.splitMode === undefined ? {} : { splitMode: source.splitMode }),
+    ...(source.splitValue === undefined ? {} : { splitValue: source.splitValue }),
+    ...(source.claimId === undefined ? {} : { claimId: source.claimId }),
+    ...(source.outOfPocketInvoiceId === undefined ? {} : { outOfPocketInvoiceId: source.outOfPocketInvoiceId }),
+    ...(source.clientId === undefined ? {} : { clientId: source.clientId }),
+    ...(source.clientName === undefined ? {} : { clientName: source.clientName }),
+    ...(source.clientAvatarUrl === undefined ? {} : { clientAvatarUrl: source.clientAvatarUrl }),
+    ...(source.staffId === undefined ? {} : { staffId: source.staffId }),
+    ...(source.staffName === undefined ? {} : { staffName: source.staffName }),
+    ...(source.sortDate === undefined ? {} : { sortDate: source.sortDate }),
+    ...(source.weekRange === undefined ? {} : { weekRange: source.weekRange }),
+  };
+}
+
+function validateReadyShiftRow(source: Record<string, unknown>, context: string): NetworkBillingReadyShiftRow {
+  onlyKeys(source, [...READY_COMMON_KEYS, "paNumber", "shiftDate", "clockedInAt", "clockedOutAt", "startTime", "endTime", "clientRate", "clientPayType"], context);
+  const base = readyClaimBase(source, context);
+  return {
+    id: base.id,
+    agencyId: base.agencyId,
+    agencyName: base.agencyName,
+    sourceType: "shift",
+    sourceId: base.sourceId,
+    serviceCode: base.serviceCode,
+    needsClaim: base.needsClaim,
+    needsInvoice: base.needsInvoice,
+    ...definedReadyFields(base),
+    ...(has(source, "paNumber") ? { paNumber: nullableString(source, "paNumber", context) } : {}),
+    ...(has(source, "shiftDate") ? { shiftDate: nullableString(source, "shiftDate", context) } : {}),
+    ...(has(source, "clockedInAt") ? { clockedInAt: jsonValue(source.clockedInAt, `${context}.clockedInAt`) } : {}),
+    ...(has(source, "clockedOutAt") ? { clockedOutAt: jsonValue(source.clockedOutAt, `${context}.clockedOutAt`) } : {}),
+    ...(has(source, "startTime") ? { startTime: jsonValue(source.startTime, `${context}.startTime`) } : {}),
+    ...(has(source, "endTime") ? { endTime: jsonValue(source.endTime, `${context}.endTime`) } : {}),
+    ...(has(source, "clientRate") ? { clientRate: nullableString(source, "clientRate", context) } : {}),
+    ...(has(source, "clientPayType") ? { clientPayType: nullableString(source, "clientPayType", context) } : {}),
+  };
+}
+
+function validateReadyRideRow(source: Record<string, unknown>, context: string): NetworkBillingReadyRideRow {
+  onlyKeys(source, [...READY_COMMON_KEYS, "completedAt", "scheduledStartTime", "actualDistance", "isManual", "clientAgreedRate"], context);
+  const base = readyClaimBase(source, context);
+  return {
+    id: base.id,
+    agencyId: base.agencyId,
+    agencyName: base.agencyName,
+    sourceType: "ride",
+    sourceId: base.sourceId,
+    serviceCode: base.serviceCode,
+    needsClaim: base.needsClaim,
+    needsInvoice: base.needsInvoice,
+    ...definedReadyFields(base),
+    ...(has(source, "completedAt") ? { completedAt: jsonValue(source.completedAt, `${context}.completedAt`) } : {}),
+    ...(has(source, "scheduledStartTime") ? { scheduledStartTime: jsonValue(source.scheduledStartTime, `${context}.scheduledStartTime`) } : {}),
+    ...(has(source, "actualDistance") ? { actualDistance: nullableNumber(source, "actualDistance", context) } : {}),
+    ...(has(source, "isManual") ? { isManual: requiredBoolean(source, "isManual", context) } : {}),
+    ...(has(source, "clientAgreedRate") ? { clientAgreedRate: nullableNumber(source, "clientAgreedRate", context) } : {}),
   };
 }
 
 function validateClaimRow(value: unknown, context: string): NetworkBillingClaimRow {
-  const row = agencyRow(value, context);
-  const kind = row.kind;
-  const sourceType = row.sourceType;
-  if (typeof kind === "string" && ["claim", "invoice"].includes(kind) && sourceType === undefined) {
-    requiredNumber(row, "amount", context);
-    optionalNullableString(row, "status", context);
-    optionalNullableString(row, "clientId", context);
-    optionalNullableString(row, "clientName", context);
-    optionalNullableString(row, "serviceCode", context);
-    return row as NetworkBillingClaimRow;
-  }
-  if (kind === undefined && typeof sourceType === "string" && ["shift", "ride"].includes(sourceType)) {
-    requiredString(row, "sourceId", context);
-    requiredString(row, "serviceCode", context);
-    requiredBoolean(row, "needsClaim", context);
-    requiredBoolean(row, "needsInvoice", context);
-    optionalNullableString(row, "clientId", context);
-    optionalNullableString(row, "clientName", context);
-    optionalNullableString(row, "staffId", context);
-    optionalNullableString(row, "staffName", context);
-    return row as NetworkBillingClaimRow;
-  }
-  fail(`${context} must be exactly one supported claims row union.`);
+  const source = record(value, context);
+  if (source.kind !== undefined) return validateSavedClaimRow(source, context);
+  const sourceType = requiredEnum(source, "sourceType", ["shift", "ride"] as const, context);
+  return sourceType === "shift"
+    ? validateReadyShiftRow(source, context)
+    : validateReadyRideRow(source, context);
 }
 
-function validatePayrollRow(value: unknown, context: string): NetworkBillingPayrollRow {
-  const row = agencyRow(value, context);
-  requiredString(row, "staffKey", context);
-  nullableNumber(row, "grossAmount", context);
-  nullableNumber(row, "totalHours", context);
-  nullableEnum(row, "mode", ["ddd", "hha"] as const, context);
-  optionalNullableString(row, "employeeId", context);
-  if (row.kind === "payrollInvoice" && row.sourceType === undefined) return row as NetworkBillingPayrollRow;
-  if (row.kind === undefined && (row.sourceType === "shift" || row.sourceType === "ride")) {
-    requiredString(row, "sourceId", context);
-    return row as NetworkBillingPayrollRow;
-  }
-  fail(`${context} must be exactly one supported payroll row union.`);
-}
+const PAYROLL_BASE_KEYS = ["id", "agencyId", "agencyName", "staffKey", "grossAmount", "totalHours", "mode", "employeeId"] as const;
 
-function validateTimesheetRow(value: unknown, context: string): NetworkBillingTimesheetRow {
-  const row = agencyRow(value, context);
-  requiredString(row, "staffKey", context);
-  requiredEnum(row, "status", ["pending", "approved", "rejected"] as const, context);
-  nullableEnum(row, "mode", ["ddd", "hha"] as const, context);
-  nullableString(row, "staffUid", context);
-  nullableString(row, "staffName", context);
-  if (row.payPreview !== null && (typeof row.payPreview !== "object" || Array.isArray(row.payPreview))) {
-    fail(`${context}.payPreview must be an object or null.`);
-  }
-  return row as NetworkBillingTimesheetRow;
-}
-
-function validateExpenseRow(value: unknown, context: string): NetworkBillingExpenseRow {
-  const row = agencyRow(value, context);
-  requiredString(row, "staffKey", context);
-  requiredEnum(row, "status", ["pending", "approved", "rejected"] as const, context);
-  nullableEnum(row, "mode", ["ddd", "hha"] as const, context);
-  requiredNumber(row, "amount", context);
-  optionalNullableString(row, "employeeId", context);
-  return row as NetworkBillingExpenseRow;
-}
-
-function validatePageResponse<T>(
-  value: unknown,
-  validateRow: (row: unknown, context: string) => T,
-  summaryKeys?: readonly string[],
-): NetworkBillingPageResponse<T> {
-  const envelope = record(value, "response");
-  if (envelope.success !== true) fail("response.success must be true.");
-  const data = record(envelope.data, "response.data");
-  const result: NetworkBillingPageResponse<T> = {
-    scope: validatePublicScope(data.scope),
-    page: validatePage(data.page, validateRow),
+function payrollBase(source: Record<string, unknown>, context: string) {
+  return {
+    ...agencyFields(source, context),
+    staffKey: requiredString(source, "staffKey", context),
+    grossAmount: nullableNumber(source, "grossAmount", context),
+    totalHours: nullableNumber(source, "totalHours", context),
+    mode: nullableEnum(source, "mode", ["ddd", "hha"] as const, context),
+    employeeId: optionalNullableString(source, "employeeId", context),
   };
-  if (data.summary !== undefined) {
-    const summary = record(data.summary, "response.data.summary");
-    if (summaryKeys) onlyKeys(summary, summaryKeys, "response.data.summary");
-    for (const [key, section] of Object.entries(summary)) {
-      if (section !== null && (typeof section !== "object" || Array.isArray(section))) fail(`response.data.summary.${key} must be an object or null.`);
-    }
-    result.summary = summary;
-  }
-  if (data.meta !== undefined) {
-    const meta = record(data.meta, "response.data.meta");
-    onlyKeys(meta, ["branchCount"], "response.data.meta");
-    if (meta.branchCount !== undefined) nonNegativeInteger(meta, "branchCount", "response.data.meta");
-    result.meta = meta;
-  }
+}
+
+function validatePayrollSavedRow(source: Record<string, unknown>, context: string): NetworkBillingPayrollSavedRow {
+  onlyKeys(source, [...PAYROLL_BASE_KEYS, "kind", "invoiceNumber", "status", "employeeName", "periodStart", "periodEnd", "shiftCount", "createdAt", "paidAt"], context);
+  const base = payrollBase(source, context);
+  const result: NetworkBillingPayrollSavedRow = {
+    id: base.id,
+    agencyId: base.agencyId,
+    agencyName: base.agencyName,
+    kind: requiredEnum(source, "kind", ["payrollInvoice"] as const, context),
+    staffKey: base.staffKey,
+    grossAmount: base.grossAmount,
+    totalHours: base.totalHours,
+    mode: base.mode,
+  };
+  if (base.employeeId !== undefined) result.employeeId = base.employeeId;
+  const invoiceNumber = optionalNullableString(source, "invoiceNumber", context);
+  const status = optionalNullableEnum(source, "status", ["pending", "paid"] as const, context);
+  const employeeName = optionalNullableString(source, "employeeName", context);
+  const shiftCount = optionalNonNegativeInteger(source, "shiftCount", context);
+  const periodStart = optionalJsonValue(source, "periodStart", context);
+  const periodEnd = optionalJsonValue(source, "periodEnd", context);
+  const createdAt = optionalJsonValue(source, "createdAt", context);
+  const paidAt = optionalJsonValue(source, "paidAt", context);
+  if (invoiceNumber !== undefined) result.invoiceNumber = invoiceNumber;
+  if (status !== undefined) result.status = status;
+  if (employeeName !== undefined) result.employeeName = employeeName;
+  if (shiftCount !== undefined) result.shiftCount = shiftCount;
+  if (periodStart !== undefined) result.periodStart = periodStart;
+  if (periodEnd !== undefined) result.periodEnd = periodEnd;
+  if (createdAt !== undefined) result.createdAt = createdAt;
+  if (paidAt !== undefined) result.paidAt = paidAt;
   return result;
 }
 
-function validateOverview(value: unknown): NetworkBillingOverview {
-  const envelope = record(value, "response");
-  if (envelope.success !== true) fail("response.success must be true.");
-  const data = record(envelope.data, "response.data");
-  const validateAmounts = (candidate: unknown, context: string) => {
-    const source = record(candidate, context);
-    return ["claims", "payroll", "expenses"].reduce<Record<"claims" | "payroll" | "expenses", { count: number; amount: number } | null>>((result, key) => {
-      const amount = source[key];
-      if (amount === null) result[key as "claims" | "payroll" | "expenses"] = null;
-      else {
-        const entry = record(amount, `${context}.${key}`);
-        result[key as "claims" | "payroll" | "expenses"] = {
-          count: nonNegativeInteger(entry, "count", `${context}.${key}`),
-          amount: requiredNumber(entry, "amount", `${context}.${key}`),
-        };
-      }
-      return result;
-    }, { claims: null, payroll: null, expenses: null });
+function validatePayrollDueRow(source: Record<string, unknown>, context: string): NetworkBillingPayrollDueRow {
+  onlyKeys(source, [...PAYROLL_BASE_KEYS, "sourceType", "sourceId", "totalsExact"], context);
+  const base = payrollBase(source, context);
+  return {
+    id: base.id,
+    agencyId: base.agencyId,
+    agencyName: base.agencyName,
+    sourceType: requiredEnum(source, "sourceType", ["shift", "ride"] as const, context),
+    sourceId: requiredString(source, "sourceId", context),
+    staffKey: base.staffKey,
+    grossAmount: base.grossAmount,
+    totalHours: base.totalHours,
+    mode: base.mode,
+    totalsExact: requiredBoolean(source, "totalsExact", context),
+    ...(base.employeeId === undefined ? {} : { employeeId: base.employeeId }),
   };
+}
+
+function validatePayrollRow(value: unknown, context: string): NetworkBillingPayrollRow {
+  const source = record(value, context);
+  if (source.kind !== undefined) return validatePayrollSavedRow(source, context);
+  return validatePayrollDueRow(source, context);
+}
+
+function validatePayPreview(value: unknown, context: string) {
+  const source = record(value, context);
+  onlyKeys(source, ["billingType", "billingRate", "totalHours", "grossAmount"], context);
+  return {
+    billingType: requiredEnum(source, "billingType", ["hourly", "monthly"] as const, context),
+    billingRate: requiredNumber(source, "billingRate", context),
+    totalHours: requiredNumber(source, "totalHours", context),
+    grossAmount: requiredNumber(source, "grossAmount", context),
+  };
+}
+
+function validateTimesheetRow(value: unknown, context: string): NetworkBillingTimesheetRow {
+  const source = record(value, context);
+  onlyKeys(source, ["id", "agencyId", "agencyName", "staffKey", "status", "mode", "staffUid", "staffName", "periodStart", "periodEnd", "payrollInvoiceId", "createdAt", "payPreview"], context);
+  const payPreview = source.payPreview === null ? null : validatePayPreview(source.payPreview, `${context}.payPreview`);
+  return {
+    ...agencyFields(source, context),
+    staffKey: requiredString(source, "staffKey", context),
+    status: requiredEnum(source, "status", ["pending", "approved", "rejected"] as const, context),
+    mode: nullableEnum(source, "mode", ["ddd", "hha"] as const, context),
+    staffUid: nullableString(source, "staffUid", context),
+    staffName: nullableString(source, "staffName", context),
+    periodStart: jsonValue(source.periodStart, `${context}.periodStart`),
+    periodEnd: jsonValue(source.periodEnd, `${context}.periodEnd`),
+    payPreview,
+    ...(has(source, "payrollInvoiceId") ? { payrollInvoiceId: nullableString(source, "payrollInvoiceId", context) } : {}),
+    ...(has(source, "createdAt") ? { createdAt: jsonValue(source.createdAt, `${context}.createdAt`) } : {}),
+  };
+}
+
+function validateExpenseRow(value: unknown, context: string): NetworkBillingExpenseRow {
+  const source = record(value, context);
+  onlyKeys(source, ["id", "agencyId", "agencyName", "staffKey", "status", "mode", "amount", "employeeId", "employeeUid", "employeeName", "category", "date", "submittedAt", "reviewedAt", "payrollInvoiceId"], context);
+  return {
+    ...agencyFields(source, context),
+    staffKey: requiredString(source, "staffKey", context),
+    status: requiredEnum(source, "status", ["pending", "approved", "rejected"] as const, context),
+    mode: nullableEnum(source, "mode", ["ddd", "hha"] as const, context),
+    amount: requiredNumber(source, "amount", context),
+    ...(has(source, "employeeId") ? { employeeId: nullableString(source, "employeeId", context) } : {}),
+    ...(has(source, "employeeUid") ? { employeeUid: nullableString(source, "employeeUid", context) } : {}),
+    ...(has(source, "employeeName") ? { employeeName: requiredString(source, "employeeName", context) } : {}),
+    ...(has(source, "category") ? { category: nullableString(source, "category", context) } : {}),
+    ...(has(source, "date") ? { date: nullableString(source, "date", context) } : {}),
+    ...(has(source, "submittedAt") ? { submittedAt: jsonValue(source.submittedAt, `${context}.submittedAt`) } : {}),
+    ...(has(source, "reviewedAt") ? { reviewedAt: jsonValue(source.reviewedAt, `${context}.reviewedAt`) } : {}),
+    ...(has(source, "payrollInvoiceId") ? { payrollInvoiceId: nullableString(source, "payrollInvoiceId", context) } : {}),
+  };
+}
+
+function validateAmount(value: unknown, context: string): NetworkBillingAmount {
+  const source = record(value, context);
+  onlyKeys(source, ["count", "amount"], context);
+  return {
+    count: nonNegativeInteger(source, "count", context),
+    amount: requiredNumber(source, "amount", context),
+  };
+}
+
+function validateStatusBreakdown<T extends string>(
+  value: unknown,
+  context: string,
+  statuses: readonly T[],
+): { total: number; segments: Array<{ status: T; count: number }> } {
+  const source = record(value, context);
+  onlyKeys(source, ["total", "segments"], context);
+  if (!Array.isArray(source.segments)) fail(`${context}.segments must be an array.`);
+  return {
+    total: nonNegativeInteger(source, "total", context),
+    segments: source.segments.map((segment, index) => {
+      const segmentContext = `${context}.segments[${index}]`;
+      const row = record(segment, segmentContext);
+      onlyKeys(row, ["status", "count"], segmentContext);
+      return {
+        status: requiredEnum(row, "status", statuses, segmentContext),
+        count: nonNegativeInteger(row, "count", segmentContext),
+      };
+    }),
+  };
+}
+
+function validateClaimsSummary(value: unknown): NetworkBillingClaimsSummary {
+  const source = record(value, "response.data.summary");
+  onlyKeys(source, ["overview", "claimsByStatus", "rejectionReasons", "meta"], "response.data.summary");
+  const overview = record(source.overview, "response.data.summary.overview");
+  onlyKeys(overview, ["submitted", "pending", "paid", "rejected", "atRisk"], "response.data.summary.overview");
+  const rejectionReasons = record(source.rejectionReasons, "response.data.summary.rejectionReasons");
+  onlyKeys(rejectionReasons, ["total", "segments"], "response.data.summary.rejectionReasons");
+  if (!Array.isArray(rejectionReasons.segments)) fail("response.data.summary.rejectionReasons.segments must be an array.");
+  const meta = record(source.meta, "response.data.summary.meta");
+  onlyKeys(meta, ["atRiskDays", "evaluatedAt"], "response.data.summary.meta");
+  return {
+    overview: {
+      submitted: validateAmount(overview.submitted, "response.data.summary.overview.submitted"),
+      pending: validateAmount(overview.pending, "response.data.summary.overview.pending"),
+      paid: validateAmount(overview.paid, "response.data.summary.overview.paid"),
+      rejected: validateAmount(overview.rejected, "response.data.summary.overview.rejected"),
+      atRisk: validateAmount(overview.atRisk, "response.data.summary.overview.atRisk"),
+    },
+    claimsByStatus: validateStatusBreakdown(source.claimsByStatus, "response.data.summary.claimsByStatus", ["pending", "paid", "rejected"] as const),
+    rejectionReasons: {
+      total: nonNegativeInteger(rejectionReasons, "total", "response.data.summary.rejectionReasons"),
+      segments: rejectionReasons.segments.map((segment, index) => {
+        const context = `response.data.summary.rejectionReasons.segments[${index}]`;
+        const row = record(segment, context);
+        onlyKeys(row, ["reason", "count"], context);
+        return { reason: requiredString(row, "reason", context), count: nonNegativeInteger(row, "count", context) };
+      }),
+    },
+    meta: {
+      atRiskDays: nonNegativeInteger(meta, "atRiskDays", "response.data.summary.meta"),
+      evaluatedAt: requiredString(meta, "evaluatedAt", "response.data.summary.meta"),
+    },
+  };
+}
+
+function validatePayrollSummary(value: unknown, tab: PayrollNetworkBillingArgs["tab"]): NetworkBillingPayrollSummary {
+  const source = record(value, "response.data.summary");
+  onlyKeys(source, ["overview", "meta"], "response.data.summary");
+  const overview = record(source.overview, "response.data.summary.overview");
+  const meta = record(source.meta, "response.data.summary.meta");
+  onlyKeys(meta, ["evaluatedAt", "totalsExact"], "response.data.summary.meta");
+  const validatedOverview: NetworkBillingPayrollSummary["overview"] = tab === "due"
+    ? (() => {
+      onlyKeys(overview, ["totalDue"], "response.data.summary.overview");
+      const totalDue = record(overview.totalDue, "response.data.summary.overview.totalDue");
+      onlyKeys(totalDue, ["amount", "count", "exact"], "response.data.summary.overview.totalDue");
+      return { totalDue: {
+        amount: nullableNumber(totalDue, "amount", "response.data.summary.overview.totalDue"),
+        count: nonNegativeInteger(totalDue, "count", "response.data.summary.overview.totalDue"),
+        exact: requiredBoolean(totalDue, "exact", "response.data.summary.overview.totalDue"),
+      } };
+    })()
+    : (() => {
+      onlyKeys(overview, ["savedInvoices"], "response.data.summary.overview");
+      const saved = record(overview.savedInvoices, "response.data.summary.overview.savedInvoices");
+      onlyKeys(saved, ["count", "exact"], "response.data.summary.overview.savedInvoices");
+      return { savedInvoices: {
+        count: nonNegativeInteger(saved, "count", "response.data.summary.overview.savedInvoices"),
+        exact: requiredBoolean(saved, "exact", "response.data.summary.overview.savedInvoices"),
+      } };
+    })();
+  return {
+    overview: validatedOverview,
+    meta: {
+      evaluatedAt: requiredString(meta, "evaluatedAt", "response.data.summary.meta"),
+      totalsExact: requiredBoolean(meta, "totalsExact", "response.data.summary.meta"),
+    },
+  };
+}
+
+function validateExpensesSummary(value: unknown): NetworkBillingExpensesSummary {
+  const source = record(value, "response.data.summary");
+  onlyKeys(source, ["overview", "expensesByStatus", "meta"], "response.data.summary");
+  const overview = record(source.overview, "response.data.summary.overview");
+  onlyKeys(overview, ["submitted", "awaitingReview", "approved", "declined"], "response.data.summary.overview");
+  const meta = record(source.meta, "response.data.summary.meta");
+  onlyKeys(meta, ["evaluatedAt", "totalsExact", "branchCount"], "response.data.summary.meta");
+  return {
+    overview: {
+      submitted: validateAmount(overview.submitted, "response.data.summary.overview.submitted"),
+      awaitingReview: validateAmount(overview.awaitingReview, "response.data.summary.overview.awaitingReview"),
+      approved: validateAmount(overview.approved, "response.data.summary.overview.approved"),
+      declined: validateAmount(overview.declined, "response.data.summary.overview.declined"),
+    },
+    expensesByStatus: validateStatusBreakdown(source.expensesByStatus, "response.data.summary.expensesByStatus", ["pending", "approved", "rejected"] as const),
+    meta: {
+      evaluatedAt: requiredString(meta, "evaluatedAt", "response.data.summary.meta"),
+      totalsExact: requiredBoolean(meta, "totalsExact", "response.data.summary.meta"),
+      branchCount: nonNegativeInteger(meta, "branchCount", "response.data.summary.meta"),
+    },
+  };
+}
+
+function validateTimingMeta(value: unknown) {
+  const meta = record(value, "response.meta");
+  onlyKeys(meta, ["durationMs", "resultCount", "branchCount"], "response.meta");
+  return {
+    durationMs: nonNegativeInteger(meta, "durationMs", "response.meta"),
+    resultCount: nonNegativeInteger(meta, "resultCount", "response.meta"),
+    branchCount: nonNegativeInteger(meta, "branchCount", "response.meta"),
+  };
+}
+
+function successfulData(value: unknown, timed: boolean): Record<string, unknown> {
+  const envelope = record(value, "response");
+  onlyKeys(envelope, timed ? ["success", "data", "meta"] : ["success", "data"], "response");
+  if (envelope.success !== true) fail("response.success must be true.");
+  if (timed) validateTimingMeta(envelope.meta);
+  return record(envelope.data, "response.data");
+}
+
+function pageData<T>(
+  data: Record<string, unknown>,
+  validateRow: (row: unknown, context: string) => T,
+): { scope: NetworkBillingPublicScope; page: NetworkBillingPage<T> } {
+  return { scope: validatePublicScope(data.scope), page: validatePage(data.page, validateRow) };
+}
+
+function validateClaimsPage(value: unknown): NetworkBillingPageResponse<NetworkBillingClaimRow> {
+  const data = successfulData(value, false);
+  onlyKeys(data, ["scope", "page"], "response.data");
+  return pageData(data, validateClaimRow);
+}
+
+function validateClaimsBootstrap(value: unknown): NetworkBillingPageResponse<NetworkBillingClaimRow, NetworkBillingClaimsSummary> {
+  const data = successfulData(value, false);
+  onlyKeys(data, ["scope", "page", "summary"], "response.data");
+  return { ...pageData(data, validateClaimRow), summary: validateClaimsSummary(data.summary) };
+}
+
+function validatePayrollPage(value: unknown): NetworkBillingPageResponse<NetworkBillingPayrollRow> {
+  const data = successfulData(value, true);
+  onlyKeys(data, ["scope", "page"], "response.data");
+  return pageData(data, validatePayrollRow);
+}
+
+function validatePayrollBootstrap(
+  value: unknown,
+  tab: PayrollNetworkBillingArgs["tab"],
+): NetworkBillingPageResponse<NetworkBillingPayrollRow, NetworkBillingPayrollSummary> {
+  const data = successfulData(value, true);
+  onlyKeys(data, ["scope", "page", "summary"], "response.data");
+  return { ...pageData(data, validatePayrollRow), summary: validatePayrollSummary(data.summary, tab) };
+}
+
+function branchMeta(value: unknown) {
+  const meta = record(value, "response.data.meta");
+  onlyKeys(meta, ["branchCount"], "response.data.meta");
+  return { branchCount: nonNegativeInteger(meta, "branchCount", "response.data.meta") };
+}
+
+function validateExpensesPage(value: unknown): NetworkBillingExpensesPageResponse<NetworkBillingExpenseRow> {
+  const data = successfulData(value, true);
+  onlyKeys(data, ["scope", "page", "meta"], "response.data");
+  return { ...pageData(data, validateExpenseRow), meta: branchMeta(data.meta) };
+}
+
+function validateExpensesBootstrap(value: unknown): NetworkBillingExpensesPageResponse<NetworkBillingExpenseRow, NetworkBillingExpensesSummary> {
+  const data = successfulData(value, true);
+  onlyKeys(data, ["scope", "page", "summary", "meta"], "response.data");
+  return {
+    ...pageData(data, validateExpenseRow),
+    summary: validateExpensesSummary(data.summary),
+    meta: branchMeta(data.meta),
+  };
+}
+
+function validateTimesheetsPage(value: unknown): NetworkBillingPageResponse<NetworkBillingTimesheetRow> {
+  const data = successfulData(value, true);
+  onlyKeys(data, ["scope", "page"], "response.data");
+  return pageData(data, validateTimesheetRow);
+}
+
+function validatePeriod(value: unknown, context: string) {
+  const period = record(value, context);
+  onlyKeys(period, ["start", "end"], context);
+  const start = requiredString(period, "start", context);
+  const end = requiredString(period, "end", context);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) {
+    fail(`${context} must contain YYYY-MM-DD dates.`);
+  }
+  return { start, end };
+}
+
+function validateOverviewAmounts(value: unknown, context: string) {
+  const source = record(value, context);
+  onlyKeys(source, ["claims", "payroll", "expenses"], context);
+  return {
+    claims: source.claims === null ? null : validateAmount(source.claims, `${context}.claims`),
+    payroll: source.payroll === null ? null : validateAmount(source.payroll, `${context}.payroll`),
+    expenses: source.expenses === null ? null : validateAmount(source.expenses, `${context}.expenses`),
+  };
+}
+
+function validateActivityRow(value: unknown, context: string): NetworkBillingActivityRow {
+  const source = record(value, context);
+  onlyKeys(source, ["id", "agencyId", "agencyName", "kind", "amount", "status", "date"], context);
+  return {
+    ...agencyFields(source, context),
+    kind: requiredEnum(source, "kind", ["claim", "payroll", "expense"] as const, context),
+    amount: requiredNumber(source, "amount", context),
+    status: nullableString(source, "status", context),
+    date: jsonValue(source.date, `${context}.date`),
+  };
+}
+
+const PARTIAL_ERROR_KEYS = [
+  "current.claims", "previous.claims", "current.payroll", "previous.payroll",
+  "current.expenses", "previous.expenses", "activity",
+] as const satisfies readonly NetworkBillingPartialErrorKey[];
+
+function validatePartialErrors(value: unknown): Partial<Record<NetworkBillingPartialErrorKey, string>> {
+  const source = record(value, "response.data.partialErrors");
+  onlyKeys(source, PARTIAL_ERROR_KEYS, "response.data.partialErrors");
+  return Object.fromEntries(Object.keys(source).map((key) => [
+    key,
+    requiredString(source, key, "response.data.partialErrors"),
+  ])) as Partial<Record<NetworkBillingPartialErrorKey, string>>;
+}
+
+function validateOverview(value: unknown): NetworkBillingOverview {
+  const data = successfulData(value, true);
+  onlyKeys(data, ["scope", "periods", "current", "previous", "recentActivity", "partialErrors", "meta"], "response.data");
+  const periods = record(data.periods, "response.data.periods");
+  onlyKeys(periods, ["current", "previous"], "response.data.periods");
   if (!Array.isArray(data.recentActivity)) fail("response.data.recentActivity must be an array.");
   const meta = record(data.meta, "response.data.meta");
-  const partialErrors = data.partialErrors === undefined ? undefined : record(data.partialErrors, "response.data.partialErrors");
-  if (partialErrors) Object.values(partialErrors).forEach((error) => {
-    if (typeof error !== "string") fail("response.data.partialErrors values must be strings.");
-  });
+  onlyKeys(meta, ["totalsExact", "branchCount"], "response.data.meta");
   return {
     scope: validatePublicScope(data.scope),
-    periods: record(data.periods, "response.data.periods"),
-    current: validateAmounts(data.current, "response.data.current"),
-    previous: validateAmounts(data.previous, "response.data.previous"),
-    recentActivity: data.recentActivity.map((activity, index) => {
-      const row = agencyRow(activity, `response.data.recentActivity[${index}]`);
-      requiredEnum(row, "kind", ["claim", "payroll", "expense"] as const, `response.data.recentActivity[${index}]`);
-      requiredNumber(row, "amount", `response.data.recentActivity[${index}]`);
-      nullableString(row, "status", `response.data.recentActivity[${index}]`);
-      return row as NetworkBillingActivityRow;
-    }),
-    ...(partialErrors ? { partialErrors: partialErrors as Record<string, string> } : {}),
+    periods: {
+      current: validatePeriod(periods.current, "response.data.periods.current"),
+      previous: validatePeriod(periods.previous, "response.data.periods.previous"),
+    },
+    current: validateOverviewAmounts(data.current, "response.data.current"),
+    previous: validateOverviewAmounts(data.previous, "response.data.previous"),
+    recentActivity: data.recentActivity.map((activity, index) => validateActivityRow(activity, `response.data.recentActivity[${index}]`)),
+    ...(has(data, "partialErrors") ? { partialErrors: validatePartialErrors(data.partialErrors) } : {}),
     meta: {
       totalsExact: requiredBoolean(meta, "totalsExact", "response.data.meta"),
       branchCount: nonNegativeInteger(meta, "branchCount", "response.data.meta"),
@@ -352,16 +819,37 @@ function validateOverview(value: unknown): NetworkBillingOverview {
 
 function validateOptions(value: unknown): NetworkBillingOption[] {
   const envelope = record(value, "response");
-  if (envelope.success !== true || !Array.isArray(envelope.data)) fail("options response must contain a successful data array.");
-  return envelope.data.map((option, index) => {
-    const row = agencyRow(option, `response.data[${index}]`);
-    requiredString(row, "name", `response.data[${index}]`);
-    requiredEnum(row, "kind", ["client", "staff"] as const, `response.data[${index}]`);
-    return row as NetworkBillingOption;
+  onlyKeys(envelope, ["success", "data"], "response");
+  if (envelope.success !== true || !Array.isArray(envelope.data)) {
+    fail("options response must contain a successful data array.");
+  }
+  if (envelope.data.length > 20) fail("response.data must contain at most 20 options.");
+  return envelope.data.map((optionValue, index) => {
+    const context = `response.data[${index}]`;
+    const option = record(optionValue, context);
+    onlyKeys(option, ["id", "agencyId", "agencyName", "name", "kind"], context);
+    return {
+      ...agencyFields(option, context),
+      name: requiredString(option, "name", context),
+      kind: requiredEnum(option, "kind", ["client", "staff"] as const, context),
+    };
   });
 }
 
-type RuntimeFilters = { startDate?: string; endDate?: string; mode?: "ddd" | "hha"; status?: string; clientId?: string; clientAgencyId?: string; employeeId?: string; employeeAgencyId?: string; sort?: string; cursor?: string; limit?: number };
+type RuntimeFilters = {
+  startDate?: string;
+  endDate?: string;
+  mode?: "ddd" | "hha";
+  status?: string;
+  clientId?: string;
+  clientAgencyId?: string;
+  employeeId?: string;
+  employeeAgencyId?: string;
+  sort?: string;
+  cursor?: string;
+  limit?: number;
+};
+
 function params(args: RuntimeFilters & { tab?: string }, keys: readonly (keyof RuntimeFilters | "tab")[]): QueryParams {
   return Object.fromEntries(keys.map((key) => [key, key === "tab" ? args.tab : args[key]])
     .filter(([, value]) => value !== undefined)) as QueryParams;
@@ -392,11 +880,33 @@ function overviewParams(args: OverviewNetworkBillingArgs): QueryParams {
   return params(args, ["startDate", "endDate", "mode", "tab"]);
 }
 
-function query<T, TArgs>(path: string, params: (args: TArgs) => QueryParams, validate: (value: unknown) => T) {
+function optionsParams(args: NetworkBillingOptionsArgs): QueryParams {
+  return { kind: args.kind, q: args.q };
+}
+
+function cacheContext(args: QueryContext) {
+  return {
+    actorUid: args.actorUid,
+    environment: args.environment,
+    scope: args.scope.kind === "agency"
+      ? { kind: "agency" as const, agencyId: args.scope.agencyId }
+      : { kind: "network" as const },
+  };
+}
+
+function cacheArgs<T extends QueryContext>(args: T, requestParams: QueryParams) {
+  return { ...cacheContext(args), ...requestParams };
+}
+
+function query<T, TArgs>(
+  path: string,
+  requestParams: (args: TArgs) => QueryParams,
+  validate: (value: unknown, args: TArgs) => T,
+) {
   return async (args: TArgs, api: { signal: AbortSignal }): Promise<{ data: T } | { error: NetworkBillingError }> => {
     try {
-      const response = await axiosClient.get<unknown>(path, { params: params(args), signal: api.signal });
-      return { data: validate(response.data) };
+      const response = await axiosClient.get<unknown>(path, { params: requestParams(args), signal: api.signal });
+      return { data: validate(response.data, args) };
     } catch (error) {
       if (error instanceof NetworkBillingContractError) {
         return { error: { status: "PARSING_ERROR", data: null, error: error.message } };
@@ -426,38 +936,47 @@ export const networkBillingApi = createApi({
   endpoints: (build) => ({
     getOverviewBootstrap: build.query<NetworkBillingOverview, OverviewNetworkBillingArgs>({
       queryFn: query("/superAdminOperations/billing/overview/bootstrap", overviewParams, validateOverview),
+      serializeQueryArgs: ({ queryArgs }) => cacheArgs(queryArgs, overviewParams(queryArgs)),
       providesTags: tags("Overview"),
     }),
-    getClaimsBootstrap: build.query<NetworkBillingPageResponse<NetworkBillingClaimRow>, ClaimsNetworkBillingArgs>({
-      queryFn: query("/superAdminOperations/billing/claims/bootstrap", claimsParams, (value) => validatePageResponse(value, validateClaimRow, ["overview", "claimsByStatus", "rejectionReasons", "meta"])),
+    getClaimsBootstrap: build.query<NetworkBillingPageResponse<NetworkBillingClaimRow, NetworkBillingClaimsSummary>, ClaimsNetworkBillingArgs>({
+      queryFn: query("/superAdminOperations/billing/claims/bootstrap", claimsParams, validateClaimsBootstrap),
+      serializeQueryArgs: ({ queryArgs }) => cacheArgs(queryArgs, claimsParams(queryArgs)),
       providesTags: tags("Claims"),
     }),
     getClaimsPage: build.query<NetworkBillingPageResponse<NetworkBillingClaimRow>, ClaimsNetworkBillingArgs>({
-      queryFn: query("/superAdminOperations/billing/claims", claimsParams, (value) => validatePageResponse(value, validateClaimRow)),
+      queryFn: query("/superAdminOperations/billing/claims", claimsParams, validateClaimsPage),
+      serializeQueryArgs: ({ queryArgs }) => cacheArgs(queryArgs, claimsParams(queryArgs)),
       providesTags: tags("Claims"),
     }),
-    getPayrollBootstrap: build.query<NetworkBillingPageResponse<NetworkBillingPayrollRow>, PayrollNetworkBillingArgs>({
-      queryFn: query("/superAdminOperations/billing/payroll/bootstrap", payrollParams, (value) => validatePageResponse(value, validatePayrollRow, ["overview", "meta"])),
+    getPayrollBootstrap: build.query<NetworkBillingPageResponse<NetworkBillingPayrollRow, NetworkBillingPayrollSummary>, PayrollNetworkBillingArgs>({
+      queryFn: query("/superAdminOperations/billing/payroll/bootstrap", payrollParams, (value, args) => validatePayrollBootstrap(value, args.tab)),
+      serializeQueryArgs: ({ queryArgs }) => cacheArgs(queryArgs, payrollParams(queryArgs)),
       providesTags: tags("Payroll"),
     }),
     getPayrollPage: build.query<NetworkBillingPageResponse<NetworkBillingPayrollRow>, PayrollNetworkBillingArgs>({
-      queryFn: query("/superAdminOperations/billing/payroll", payrollParams, (value) => validatePageResponse(value, validatePayrollRow)),
+      queryFn: query("/superAdminOperations/billing/payroll", payrollParams, validatePayrollPage),
+      serializeQueryArgs: ({ queryArgs }) => cacheArgs(queryArgs, payrollParams(queryArgs)),
       providesTags: tags("Payroll"),
     }),
-    getExpensesBootstrap: build.query<NetworkBillingPageResponse<NetworkBillingExpenseRow>, ExpensesNetworkBillingArgs>({
-      queryFn: query("/superAdminOperations/billing/expenses/bootstrap", expensesParams, (value) => validatePageResponse(value, validateExpenseRow, ["overview", "expensesByStatus", "meta"])),
+    getExpensesBootstrap: build.query<NetworkBillingExpensesPageResponse<NetworkBillingExpenseRow, NetworkBillingExpensesSummary>, ExpensesNetworkBillingArgs>({
+      queryFn: query("/superAdminOperations/billing/expenses/bootstrap", expensesParams, validateExpensesBootstrap),
+      serializeQueryArgs: ({ queryArgs }) => cacheArgs(queryArgs, expensesParams(queryArgs)),
       providesTags: tags("Expenses"),
     }),
-    getExpensesPage: build.query<NetworkBillingPageResponse<NetworkBillingExpenseRow>, ExpensesNetworkBillingArgs>({
-      queryFn: query("/superAdminOperations/billing/expenses", expensesParams, (value) => validatePageResponse(value, validateExpenseRow)),
+    getExpensesPage: build.query<NetworkBillingExpensesPageResponse<NetworkBillingExpenseRow>, ExpensesNetworkBillingArgs>({
+      queryFn: query("/superAdminOperations/billing/expenses", expensesParams, validateExpensesPage),
+      serializeQueryArgs: ({ queryArgs }) => cacheArgs(queryArgs, expensesParams(queryArgs)),
       providesTags: tags("Expenses"),
     }),
     getTimesheetsPage: build.query<NetworkBillingPageResponse<NetworkBillingTimesheetRow>, TimesheetsNetworkBillingArgs>({
-      queryFn: query("/superAdminOperations/billing/timesheets", timesheetsParams, (value) => validatePageResponse(value, validateTimesheetRow)),
+      queryFn: query("/superAdminOperations/billing/timesheets", timesheetsParams, validateTimesheetsPage),
+      serializeQueryArgs: ({ queryArgs }) => cacheArgs(queryArgs, timesheetsParams(queryArgs)),
       providesTags: tags("Timesheets"),
     }),
     searchBillingOptions: build.query<NetworkBillingOption[], NetworkBillingOptionsArgs>({
-      queryFn: query("/superAdminOperations/billing/options", (args) => ({ kind: args.kind, q: args.q }), validateOptions),
+      queryFn: query("/superAdminOperations/billing/options", optionsParams, validateOptions),
+      serializeQueryArgs: ({ queryArgs }) => cacheArgs(queryArgs, optionsParams(queryArgs)),
       providesTags: tags("Options"),
     }),
   }),
