@@ -9,6 +9,7 @@ import { agencyStaffApi } from "@/lib/api/agency-staff";
 import { userMessagingApi } from "@/lib/api/userMessaging";
 import { billingExpensesApi } from "@/lib/api/billing-expenses";
 import { servicesApi } from "@/lib/api/services";
+import { networkBillingApi } from "@/lib/api/network-billing";
 
 const scopedApis = [
   superAdminApi,
@@ -21,6 +22,7 @@ const scopedApis = [
   userMessagingApi,
   billingExpensesApi,
   servicesApi,
+  networkBillingApi,
 ] as const;
 
 export function resetSuperAdminCaches(dispatch: AppDispatch): void {

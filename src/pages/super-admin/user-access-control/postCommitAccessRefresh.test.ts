@@ -15,6 +15,20 @@ describe("refreshCommittedAccess", () => {
     expect(resetCaches).toHaveBeenCalledOnce();
   });
 
+  it("resets scoped caches before resolving access refresh to the route caller", async () => {
+    const events: string[] = [];
+    const completion = refreshCommittedAccessProfile({
+      refreshProfile: vi.fn().mockResolvedValue({ uid: "u1" }),
+      resetCaches: () => { events.push("reset"); },
+    }).then((profile) => {
+      events.push("resolved");
+      return profile;
+    });
+
+    await expect(completion).resolves.toEqual({ uid: "u1" });
+    expect(events).toEqual(["reset", "resolved"]);
+  });
+
   it("reports refresh failure without rejecting the committed operation", async () => {
     const failure = new Error("refresh unavailable");
     const onFailure = vi.fn();
