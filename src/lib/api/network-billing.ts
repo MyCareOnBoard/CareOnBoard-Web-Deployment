@@ -121,6 +121,22 @@ function requiredBoolean(source: Record<string, unknown>, key: string, context: 
   return value;
 }
 
+function optionalNullableString(source: Record<string, unknown>, key: string, context: string): void {
+  if (source[key] !== undefined) nullableString(source, key, context);
+}
+
+function nonNegativeInteger(source: Record<string, unknown>, key: string, context: string): number {
+  const value = requiredNumber(source, key, context);
+  if (!Number.isInteger(value) || value < 0) fail(`${context}.${key} must be a non-negative integer.`);
+  return value;
+}
+
+function onlyKeys(source: Record<string, unknown>, allowed: readonly string[], context: string): void {
+  for (const key of Object.keys(source)) {
+    if (!allowed.includes(key)) fail(`${context}.${key} is not supported by this response contract.`);
+  }
+}
+
 function requiredEnum<T extends string>(
   source: Record<string, unknown>,
   key: string,
@@ -157,8 +173,7 @@ function agencyRow(value: unknown, context: string): Record<string, unknown> {
 function validatePublicScope(value: unknown): NetworkBillingPublicScope {
   const scope = record(value, "scope");
   const kind = requiredEnum(scope, "kind", ["global", "assigned"] as const, "scope");
-  const agencyCount = requiredNumber(scope, "agencyCount", "scope");
-  if (!Number.isInteger(agencyCount) || agencyCount < 0) fail("scope.agencyCount must be a non-negative integer.");
+  const agencyCount = nonNegativeInteger(scope, "agencyCount", "scope");
   return { kind, agencyCount };
 }
 
@@ -205,6 +220,10 @@ function validateClaimRow(value: unknown, context: string): NetworkBillingClaimR
   const sourceType = row.sourceType;
   if (typeof kind === "string" && ["claim", "invoice"].includes(kind) && sourceType === undefined) {
     requiredNumber(row, "amount", context);
+    optionalNullableString(row, "status", context);
+    optionalNullableString(row, "clientId", context);
+    optionalNullableString(row, "clientName", context);
+    optionalNullableString(row, "serviceCode", context);
     return row as NetworkBillingClaimRow;
   }
   if (kind === undefined && typeof sourceType === "string" && ["shift", "ride"].includes(sourceType)) {
@@ -212,6 +231,10 @@ function validateClaimRow(value: unknown, context: string): NetworkBillingClaimR
     requiredString(row, "serviceCode", context);
     requiredBoolean(row, "needsClaim", context);
     requiredBoolean(row, "needsInvoice", context);
+    optionalNullableString(row, "clientId", context);
+    optionalNullableString(row, "clientName", context);
+    optionalNullableString(row, "staffId", context);
+    optionalNullableString(row, "staffName", context);
     return row as NetworkBillingClaimRow;
   }
   fail(`${context} must be exactly one supported claims row union.`);
@@ -223,6 +246,7 @@ function validatePayrollRow(value: unknown, context: string): NetworkBillingPayr
   nullableNumber(row, "grossAmount", context);
   nullableNumber(row, "totalHours", context);
   nullableEnum(row, "mode", ["ddd", "hha"] as const, context);
+  optionalNullableString(row, "employeeId", context);
   if (row.kind === "payrollInvoice" && row.sourceType === undefined) return row as NetworkBillingPayrollRow;
   if (row.kind === undefined && (row.sourceType === "shift" || row.sourceType === "ride")) {
     requiredString(row, "sourceId", context);
@@ -250,12 +274,14 @@ function validateExpenseRow(value: unknown, context: string): NetworkBillingExpe
   requiredEnum(row, "status", ["pending", "approved", "rejected"] as const, context);
   nullableEnum(row, "mode", ["ddd", "hha"] as const, context);
   requiredNumber(row, "amount", context);
+  optionalNullableString(row, "employeeId", context);
   return row as NetworkBillingExpenseRow;
 }
 
 function validatePageResponse<T>(
   value: unknown,
   validateRow: (row: unknown, context: string) => T,
+  summaryKeys?: readonly string[],
 ): NetworkBillingPageResponse<T> {
   const envelope = record(value, "response");
   if (envelope.success !== true) fail("response.success must be true.");
@@ -264,8 +290,20 @@ function validatePageResponse<T>(
     scope: validatePublicScope(data.scope),
     page: validatePage(data.page, validateRow),
   };
-  if (data.summary !== undefined) result.summary = record(data.summary, "response.data.summary");
-  if (data.meta !== undefined) result.meta = record(data.meta, "response.data.meta");
+  if (data.summary !== undefined) {
+    const summary = record(data.summary, "response.data.summary");
+    if (summaryKeys) onlyKeys(summary, summaryKeys, "response.data.summary");
+    for (const [key, section] of Object.entries(summary)) {
+      if (section !== null && (typeof section !== "object" || Array.isArray(section))) fail(`response.data.summary.${key} must be an object or null.`);
+    }
+    result.summary = summary;
+  }
+  if (data.meta !== undefined) {
+    const meta = record(data.meta, "response.data.meta");
+    onlyKeys(meta, ["branchCount"], "response.data.meta");
+    if (meta.branchCount !== undefined) nonNegativeInteger(meta, "branchCount", "response.data.meta");
+    result.meta = meta;
+  }
   return result;
 }
 
@@ -281,7 +319,7 @@ function validateOverview(value: unknown): NetworkBillingOverview {
       else {
         const entry = record(amount, `${context}.${key}`);
         result[key as "claims" | "payroll" | "expenses"] = {
-          count: requiredNumber(entry, "count", `${context}.${key}`),
+          count: nonNegativeInteger(entry, "count", `${context}.${key}`),
           amount: requiredNumber(entry, "amount", `${context}.${key}`),
         };
       }
@@ -309,7 +347,7 @@ function validateOverview(value: unknown): NetworkBillingOverview {
     ...(partialErrors ? { partialErrors: partialErrors as Record<string, string> } : {}),
     meta: {
       totalsExact: requiredBoolean(meta, "totalsExact", "response.data.meta"),
-      branchCount: requiredNumber(meta, "branchCount", "response.data.meta"),
+      branchCount: nonNegativeInteger(meta, "branchCount", "response.data.meta"),
     },
   };
 }
@@ -325,21 +363,34 @@ function validateOptions(value: unknown): NetworkBillingOption[] {
   });
 }
 
-function requestParams(args: NetworkBillingFilters & { tab?: string }): QueryParams {
-  return Object.fromEntries(Object.entries({
-    startDate: args.startDate,
-    endDate: args.endDate,
-    mode: args.mode,
-    tab: args.tab,
-    status: args.status,
-    clientId: args.clientId,
-    clientAgencyId: args.clientAgencyId,
-    employeeId: args.employeeId,
-    employeeAgencyId: args.employeeAgencyId,
-    sort: args.sort,
-    cursor: args.cursor,
-    limit: args.limit,
-  }).filter(([, value]) => value !== undefined));
+function params(args: NetworkBillingFilters & { tab?: string }, keys: readonly (keyof NetworkBillingFilters | "tab")[]): QueryParams {
+  return Object.fromEntries(keys.map((key) => [key, key === "tab" ? args.tab : args[key]])
+    .filter(([, value]) => value !== undefined)) as QueryParams;
+}
+
+function claimsParams(args: ClaimsNetworkBillingArgs): QueryParams {
+  const keys: (keyof NetworkBillingFilters | "tab")[] = ["startDate", "endDate", "tab", "limit", "cursor"];
+  if (args.tab === "saved") keys.push("status", "sort", "clientId", "clientAgencyId");
+  else keys.push("mode", "clientId", "clientAgencyId");
+  return params(args, keys);
+}
+
+function payrollParams(args: PayrollNetworkBillingArgs): QueryParams {
+  const keys: (keyof NetworkBillingFilters | "tab")[] = ["startDate", "endDate", "tab", "mode", "employeeId", "employeeAgencyId", "limit", "cursor"];
+  if (args.tab === "saved") keys.push("status");
+  return params(args, keys);
+}
+
+function expensesParams(args: ExpensesNetworkBillingArgs): QueryParams {
+  return params(args, ["startDate", "endDate", "mode", "tab", "status", "employeeId", "employeeAgencyId", "limit", "cursor"]);
+}
+
+function timesheetsParams(args: TimesheetsNetworkBillingArgs): QueryParams {
+  return params(args, ["startDate", "endDate", "mode", "tab", "status", "employeeId", "employeeAgencyId", "limit", "cursor"]);
+}
+
+function overviewParams(args: OverviewNetworkBillingArgs): QueryParams {
+  return params(args, ["startDate", "endDate", "mode", "tab"]);
 }
 
 function query<T, TArgs>(path: string, params: (args: TArgs) => QueryParams, validate: (value: unknown) => T) {
@@ -375,35 +426,35 @@ export const networkBillingApi = createApi({
   keepUnusedDataFor: NETWORK_BILLING_KEEP_UNUSED_DATA_FOR,
   endpoints: (build) => ({
     getOverviewBootstrap: build.query<NetworkBillingOverview, OverviewNetworkBillingArgs>({
-      queryFn: query("/superAdminOperations/billing/overview/bootstrap", requestParams, validateOverview),
+      queryFn: query("/superAdminOperations/billing/overview/bootstrap", overviewParams, validateOverview),
       providesTags: tags("Overview"),
     }),
     getClaimsBootstrap: build.query<NetworkBillingPageResponse<NetworkBillingClaimRow>, ClaimsNetworkBillingArgs>({
-      queryFn: query("/superAdminOperations/billing/claims/bootstrap", requestParams, (value) => validatePageResponse(value, validateClaimRow)),
+      queryFn: query("/superAdminOperations/billing/claims/bootstrap", claimsParams, (value) => validatePageResponse(value, validateClaimRow, ["overview", "claimsByStatus", "rejectionReasons", "meta"])),
       providesTags: tags("Claims"),
     }),
     getClaimsPage: build.query<NetworkBillingPageResponse<NetworkBillingClaimRow>, ClaimsNetworkBillingArgs>({
-      queryFn: query("/superAdminOperations/billing/claims", requestParams, (value) => validatePageResponse(value, validateClaimRow)),
+      queryFn: query("/superAdminOperations/billing/claims", claimsParams, (value) => validatePageResponse(value, validateClaimRow)),
       providesTags: tags("Claims"),
     }),
     getPayrollBootstrap: build.query<NetworkBillingPageResponse<NetworkBillingPayrollRow>, PayrollNetworkBillingArgs>({
-      queryFn: query("/superAdminOperations/billing/payroll/bootstrap", requestParams, (value) => validatePageResponse(value, validatePayrollRow)),
+      queryFn: query("/superAdminOperations/billing/payroll/bootstrap", payrollParams, (value) => validatePageResponse(value, validatePayrollRow, ["overview", "meta"])),
       providesTags: tags("Payroll"),
     }),
     getPayrollPage: build.query<NetworkBillingPageResponse<NetworkBillingPayrollRow>, PayrollNetworkBillingArgs>({
-      queryFn: query("/superAdminOperations/billing/payroll", requestParams, (value) => validatePageResponse(value, validatePayrollRow)),
+      queryFn: query("/superAdminOperations/billing/payroll", payrollParams, (value) => validatePageResponse(value, validatePayrollRow)),
       providesTags: tags("Payroll"),
     }),
     getExpensesBootstrap: build.query<NetworkBillingPageResponse<NetworkBillingExpenseRow>, ExpensesNetworkBillingArgs>({
-      queryFn: query("/superAdminOperations/billing/expenses/bootstrap", requestParams, (value) => validatePageResponse(value, validateExpenseRow)),
+      queryFn: query("/superAdminOperations/billing/expenses/bootstrap", expensesParams, (value) => validatePageResponse(value, validateExpenseRow, ["overview", "expensesByStatus", "meta"])),
       providesTags: tags("Expenses"),
     }),
     getExpensesPage: build.query<NetworkBillingPageResponse<NetworkBillingExpenseRow>, ExpensesNetworkBillingArgs>({
-      queryFn: query("/superAdminOperations/billing/expenses", requestParams, (value) => validatePageResponse(value, validateExpenseRow)),
+      queryFn: query("/superAdminOperations/billing/expenses", expensesParams, (value) => validatePageResponse(value, validateExpenseRow)),
       providesTags: tags("Expenses"),
     }),
     getTimesheetsPage: build.query<NetworkBillingPageResponse<NetworkBillingTimesheetRow>, TimesheetsNetworkBillingArgs>({
-      queryFn: query("/superAdminOperations/billing/timesheets", requestParams, (value) => validatePageResponse(value, validateTimesheetRow)),
+      queryFn: query("/superAdminOperations/billing/timesheets", timesheetsParams, (value) => validatePageResponse(value, validateTimesheetRow)),
       providesTags: tags("Timesheets"),
     }),
     searchBillingOptions: build.query<NetworkBillingOption[], NetworkBillingOptionsArgs>({

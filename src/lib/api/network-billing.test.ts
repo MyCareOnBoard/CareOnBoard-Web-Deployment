@@ -95,7 +95,6 @@ describe("network billing API", () => {
     expect(request.params).toEqual({
       startDate: "2026-07-01",
       endDate: "2026-07-31",
-      mode: "ddd",
       tab: "saved",
       sort: "createdAt:desc",
       limit: 25,
@@ -105,6 +104,42 @@ describe("network billing API", () => {
       cursor: "cursorA",
     });
     expect(NETWORK_BILLING_QUERY_OPTIONS).toEqual({ refetchOnMountOrArgChange: 30 });
+  });
+
+  it("uses endpoint-specific outbound parameter allowlists for all nine reads", async () => {
+    const store = createStore();
+    const payrollRow = { id: "payroll-1", kind: "payrollInvoice", agencyId: "agency-a", agencyName: "Agency A", staffKey: "agency-a:staff-a", grossAmount: null, totalHours: null, mode: null };
+    const expenseRow = { id: "expense-1", agencyId: "agency-a", agencyName: "Agency A", staffKey: "agency-a:staff-a", status: "pending", mode: null, amount: 5 };
+    const timesheetRow = { id: "timesheet-1", agencyId: "agency-a", agencyName: "Agency A", staffKey: "agency-a:staff-a", status: "pending", mode: null, staffUid: null, staffName: null, periodStart: null, periodEnd: null, payPreview: null };
+    const page = (rows: unknown[]) => ({ success: true, data: { scope: { kind: "global", agencyCount: 1 }, page: { rows, total: null, nextCursor: null, hasMore: false } } });
+    const overview = { success: true, data: { scope: { kind: "global", agencyCount: 1 }, periods: {}, current: { claims: null, payroll: null, expenses: null }, previous: { claims: null, payroll: null, expenses: null }, recentActivity: [], meta: { totalsExact: false, branchCount: 0 } } };
+    const option = { id: "client-1", agencyId: "agency-a", agencyName: "Agency A", name: "Client", kind: "client" };
+    const responses = [page([savedClaim]), page([savedClaim]), page([payrollRow]), page([payrollRow]), page([expenseRow]), page([expenseRow]), page([timesheetRow]), overview, { success: true, data: [option] }];
+    axiosAdapter.mockImplementation((config: RequestConfig) => Promise.resolve({ data: responses.shift(), status: 200, statusText: "OK", headers: {}, config }));
+
+    await Promise.all([
+      store.dispatch(networkBillingApi.endpoints.getClaimsBootstrap.initiate({ ...baseArgs, mode: "ddd", employeeId: "staff-a", employeeAgencyId: "agency-a" } as never)).unwrap(),
+      store.dispatch(networkBillingApi.endpoints.getClaimsPage.initiate({ ...baseArgs, mode: "ddd", employeeId: "staff-a", employeeAgencyId: "agency-a" } as never)).unwrap(),
+      store.dispatch(networkBillingApi.endpoints.getPayrollBootstrap.initiate({ ...baseArgs, tab: "saved", status: "paid", clientId: "client-a", clientAgencyId: "agency-a" } as never)).unwrap(),
+      store.dispatch(networkBillingApi.endpoints.getPayrollPage.initiate({ ...baseArgs, tab: "due", mode: "ddd", employeeId: "staff-a", employeeAgencyId: "agency-a" } as never)).unwrap(),
+      store.dispatch(networkBillingApi.endpoints.getExpensesBootstrap.initiate({ ...baseArgs, tab: "pending", status: "pending", mode: "ddd", employeeId: "staff-a", employeeAgencyId: "agency-a", clientId: "client-a" } as never)).unwrap(),
+      store.dispatch(networkBillingApi.endpoints.getExpensesPage.initiate({ ...baseArgs, tab: "history", status: "approved", employeeId: "staff-a", employeeAgencyId: "agency-a" } as never)).unwrap(),
+      store.dispatch(networkBillingApi.endpoints.getTimesheetsPage.initiate({ ...baseArgs, tab: "list", status: "approved", mode: "ddd", employeeId: "staff-a", employeeAgencyId: "agency-a", clientId: "client-a" } as never)).unwrap(),
+      store.dispatch(networkBillingApi.endpoints.getOverviewBootstrap.initiate({ ...baseArgs, tab: "overview" })).unwrap(),
+      store.dispatch(networkBillingApi.endpoints.searchBillingOptions.initiate({ actorUid: "super-admin-a", environment: "staging", scope: { kind: "network" }, kind: "client", q: "cli" })).unwrap(),
+    ]);
+
+    expect(axiosAdapter.mock.calls.map(([request]) => [request.url, request.params])).toEqual([
+      ["/superAdminOperations/billing/claims/bootstrap", { startDate: "2026-07-01", endDate: "2026-07-31", tab: "saved", sort: "createdAt:desc", limit: 25 }],
+      ["/superAdminOperations/billing/claims", { startDate: "2026-07-01", endDate: "2026-07-31", tab: "saved", sort: "createdAt:desc", limit: 25 }],
+      ["/superAdminOperations/billing/payroll/bootstrap", { startDate: "2026-07-01", endDate: "2026-07-31", mode: "ddd", tab: "saved", status: "paid", limit: 25 }],
+      ["/superAdminOperations/billing/payroll", { startDate: "2026-07-01", endDate: "2026-07-31", mode: "ddd", tab: "due", employeeId: "staff-a", employeeAgencyId: "agency-a", limit: 25 }],
+      ["/superAdminOperations/billing/expenses/bootstrap", { startDate: "2026-07-01", endDate: "2026-07-31", mode: "ddd", tab: "pending", status: "pending", employeeId: "staff-a", employeeAgencyId: "agency-a", limit: 25 }],
+      ["/superAdminOperations/billing/expenses", { startDate: "2026-07-01", endDate: "2026-07-31", mode: "ddd", tab: "history", status: "approved", employeeId: "staff-a", employeeAgencyId: "agency-a", limit: 25 }],
+      ["/superAdminOperations/billing/timesheets", { startDate: "2026-07-01", endDate: "2026-07-31", mode: "ddd", tab: "list", status: "approved", employeeId: "staff-a", employeeAgencyId: "agency-a", limit: 25 }],
+      ["/superAdminOperations/billing/overview/bootstrap", { startDate: "2026-07-01", endDate: "2026-07-31", mode: "ddd", tab: "overview" }],
+      ["/superAdminOperations/billing/options", { kind: "client", q: "cli" }],
+    ]);
   });
 
   it("rejects malformed public scopes, cursor pages, and cross-agency rows", async () => {

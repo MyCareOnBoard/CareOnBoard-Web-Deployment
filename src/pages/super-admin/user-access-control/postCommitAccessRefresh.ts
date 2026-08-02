@@ -10,12 +10,12 @@ export async function refreshCommittedAccessProfile<T>({
   onFailure,
 }: RefreshCommittedAccessOptions<T>): Promise<T | null> {
   try {
+    // Invalidate before refreshProfile publishes a new authorization profile to React/Redux.
+    resetCaches?.();
     const profile = await refreshProfile();
     if (profile == null) {
       throw new Error("Profile refresh returned no active profile.");
     }
-    // This callback dispatches resetApiState synchronously before callers can mount a new route.
-    resetCaches?.();
     return profile;
   } catch (error) {
     onFailure?.(error);

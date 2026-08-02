@@ -392,9 +392,9 @@ export default function UserAccessControlPage() {
     try {
       const refreshed = await refreshCommittedAccessProfile({
         refreshProfile,
+        resetCaches: () => resetSuperAdminCaches(dispatch),
       });
       if (refreshed) {
-        resetSuperAdminCaches(dispatch);
         const refreshedAccess = refreshed.profile?.accessList;
         if (!refreshedAccess?.includes("User Access Control")) {
           setIsSuccessModalOpen(false);
