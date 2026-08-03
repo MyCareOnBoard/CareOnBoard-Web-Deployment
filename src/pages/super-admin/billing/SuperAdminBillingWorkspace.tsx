@@ -87,7 +87,10 @@ function NetworkBillingOutlet() {
   const generation = billingWorkspaceGeneration(workspace);
   const pathname = location.pathname.replace(/\/+$/, "") || "/";
 
-  return pathname === Routes.superAdmin.billing.financialOverview || pathname === Routes.superAdmin.billing.claims
+  return pathname === Routes.superAdmin.billing.financialOverview
+    || pathname === Routes.superAdmin.billing.claims
+    || pathname === Routes.superAdmin.billing.payrollManagement
+    || pathname === Routes.superAdmin.billing.staffTimesheets
     ? <Outlet key={generation} />
     : <NetworkBillingBridge />;
 }

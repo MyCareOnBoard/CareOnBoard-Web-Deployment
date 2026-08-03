@@ -157,9 +157,9 @@ const SuperAdminBillingFinancialOverviewPage = lazy(() =>
     import("@/pages/super-admin/billing/SuperAdminBillingFinancialOverview")
 );
 const SuperAdminBillingClaimsPage = lazy(() => import("@/pages/super-admin/billing/SuperAdminBillingClaims"));
-const SuperAdminBillingPayrollPage = lazy(() => import("@/pages/agency/billing/payroll"));
+const SuperAdminBillingPayrollPage = lazy(() => import("@/pages/super-admin/billing/SuperAdminBillingPayroll"));
 const SuperAdminBillingExpensesPage = lazy(() => import("@/pages/agency/billing/expenses"));
-const SuperAdminBillingStaffTimesheetsPage = lazy(() => import("@/pages/agency/billing/staff-timesheets"));
+const SuperAdminBillingStaffTimesheetsPage = lazy(() => import("@/pages/super-admin/billing/SuperAdminBillingTimesheets"));
 const AgencyBillingMonitorPage = lazy(() => import("@/pages/super-admin/agency-billing-monitor"));
 const AIAutomationPage = lazy(() => import("@/pages/agency/ai-automation"));
 const AgencyMileagePage = lazy(() => import("@/pages/agency/mileage"));

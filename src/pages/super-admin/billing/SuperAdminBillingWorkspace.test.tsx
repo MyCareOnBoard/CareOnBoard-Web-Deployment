@@ -386,6 +386,7 @@ function renderWorkspace(entry: string, nested = <BillingWorkspaceProbe />) {
           <Route index element={<SuperAdminBillingIndex />} />
           <Route path="financial-overview" element={nested} />
           <Route path="claims" element={nested} />
+          <Route path="expenses" element={nested} />
         </Route>
       </ReactRoutes>
     </MemoryRouter>,
@@ -474,9 +475,9 @@ describe("SuperAdminBillingWorkspace", () => {
     expect(screen.queryByLabelText("Network billing workspace")).not.toBeInTheDocument();
   });
 
-  it("keeps unfinished network children on the provider-free bridge", async () => {
+  it("keeps the unfinished network expenses child on the provider-free bridge", async () => {
     renderActualBillingRoute(
-      "/super-admin/billing/claims?clientType=ddd&startDate=2026-07-01&endDate=2026-07-31",
+      "/super-admin/billing/expenses?clientType=ddd&startDate=2026-07-01&endDate=2026-07-31",
     );
 
     const bridge = await screen.findByLabelText("Network billing workspace");
@@ -486,9 +487,9 @@ describe("SuperAdminBillingWorkspace", () => {
     expect(operationsApi.getOperationalAgencyContext).not.toHaveBeenCalled();
   });
 
-  it("defaults to a context-aware provider-free network bridge without mounting an agency child", async () => {
+  it("keeps the unfinished network expenses bridge context-aware without mounting an agency child", async () => {
     renderWorkspace(
-      "/super-admin/billing/claims?status=open&clientType=ddd&startDate=2026-07-01&endDate=2026-07-31",
+      "/super-admin/billing/expenses?status=open&clientType=ddd&startDate=2026-07-01&endDate=2026-07-31",
       <BillingDomainProbe />,
     );
 
