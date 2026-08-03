@@ -8,6 +8,7 @@ const { axiosAdapter, testAxiosClient } = vi.hoisted(() => {
     axiosAdapter: adapter,
     testAxiosClient: {
       get: (url: string, config: AxiosRequestConfig) => adapter({ ...config, url }),
+      post: (url: string, _body: unknown, config: AxiosRequestConfig) => adapter({ ...config, url, method: "post" }),
     },
   };
 });
@@ -341,6 +342,40 @@ describe("network billing API", () => {
       cursor: "cursorA",
     });
     expect(NETWORK_BILLING_QUERY_OPTIONS).toEqual({ refetchOnMountOrArgChange: 30 });
+  });
+
+  it("preserves bounded unresolved ownership diagnostics from network preparation", async () => {
+    const store = createStore();
+    const diagnostic = {
+      collection: "expenses",
+      documentId: "expense-a",
+      reason: "NO_AUTHORITATIVE_AGENCY",
+      relationships: { clientIds: [], staffIds: ["staff-a"] },
+      candidateAgencyIds: [],
+    };
+    respond({
+      success: true,
+      data: {
+        examined: 1,
+        updated: 0,
+        missing: 0,
+        invalid: 0,
+        ready: true,
+        ownership: {
+          repaired: 0,
+          unresolved: 1,
+          byCollection: { expenses: { repaired: 0, unresolved: 1 } },
+          unresolvedRecords: [diagnostic],
+          deletedRecords: [],
+        },
+      },
+    });
+
+    await expect(store.dispatch(networkBillingApi.endpoints.prepareNetworkBilling.initiate({
+      actorUid: "super-admin-a",
+      environment: "staging",
+      scope: { kind: "network" },
+    })).unwrap()).resolves.toMatchObject({ ownership: { unresolvedRecords: [diagnostic] } });
   });
 
   it("uses endpoint-specific outbound parameter allowlists for all nine reads", async () => {

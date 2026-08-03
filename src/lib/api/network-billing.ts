@@ -101,6 +101,19 @@ export type NetworkBillingPreparationResult = {
     repaired: number;
     unresolved: number;
     byCollection: Record<string, { repaired: number; unresolved: number }>;
+    unresolvedRecords: Array<{
+      collection: string;
+      documentId: string;
+      reason: "NO_AUTHORITATIVE_AGENCY" | "CONFLICTING_AUTHORITATIVE_AGENCIES";
+      relationships: { clientIds: string[]; staffIds: string[] };
+      candidateAgencyIds: string[];
+    }>;
+    deletedRecords: Array<{
+      collection: "employees";
+      documentId: string;
+      userUid: string | null;
+      userDocumentDeleted: boolean;
+    }>;
   };
 };
 
@@ -837,8 +850,14 @@ function validatePreparation(value: unknown): NetworkBillingPreparationResult {
   const data = successfulData(value, false);
   onlyKeys(data, ["examined", "updated", "missing", "invalid", "ready", "ownership"], "response.data");
   const ownership = record(data.ownership, "response.data.ownership");
-  onlyKeys(ownership, ["repaired", "unresolved", "byCollection"], "response.data.ownership");
+  onlyKeys(ownership, ["repaired", "unresolved", "byCollection", "unresolvedRecords", "deletedRecords"], "response.data.ownership");
   const byCollection = record(ownership.byCollection, "response.data.ownership.byCollection");
+  if (!Array.isArray(ownership.unresolvedRecords) || ownership.unresolvedRecords.length > 100) {
+    fail("response.data.ownership.unresolvedRecords must be an array of at most 100 records.");
+  }
+  if (!Array.isArray(ownership.deletedRecords) || ownership.deletedRecords.length > 100) {
+    fail("response.data.ownership.deletedRecords must be an array of at most 100 records.");
+  }
   return {
     examined: nonNegativeInteger(data, "examined", "response.data"),
     updated: nonNegativeInteger(data, "updated", "response.data"),
@@ -856,6 +875,39 @@ function validatePreparation(value: unknown): NetworkBillingPreparationResult {
           unresolved: nonNegativeInteger(summary, "unresolved", `response.data.ownership.byCollection.${collection}`),
         }];
       })),
+      unresolvedRecords: ownership.unresolvedRecords.map((value, index) => {
+        const context = `response.data.ownership.unresolvedRecords[${index}]`;
+        const diagnostic = record(value, context);
+        onlyKeys(diagnostic, ["collection", "documentId", "reason", "relationships", "candidateAgencyIds"], context);
+        const relationships = record(diagnostic.relationships, `${context}.relationships`);
+        onlyKeys(relationships, ["clientIds", "staffIds"], `${context}.relationships`);
+        const stringArray = (input: unknown, name: string) => {
+          if (!Array.isArray(input) || input.some((item) => typeof item !== "string")) fail(`${name} must be a string array.`);
+          return input as string[];
+        };
+        return {
+          collection: requiredString(diagnostic, "collection", context),
+          documentId: requiredString(diagnostic, "documentId", context),
+          reason: requiredEnum(diagnostic, "reason", ["NO_AUTHORITATIVE_AGENCY", "CONFLICTING_AUTHORITATIVE_AGENCIES"] as const, context),
+          relationships: {
+            clientIds: stringArray(relationships.clientIds, `${context}.relationships.clientIds`),
+            staffIds: stringArray(relationships.staffIds, `${context}.relationships.staffIds`),
+          },
+          candidateAgencyIds: stringArray(diagnostic.candidateAgencyIds, `${context}.candidateAgencyIds`),
+        };
+      }),
+      deletedRecords: ownership.deletedRecords.map((value, index) => {
+        const context = `response.data.ownership.deletedRecords[${index}]`;
+        const diagnostic = record(value, context);
+        onlyKeys(diagnostic, ["collection", "documentId", "userUid", "userDocumentDeleted"], context);
+        if (diagnostic.collection !== "employees") fail(`${context}.collection must be employees.`);
+        return {
+          collection: "employees" as const,
+          documentId: requiredString(diagnostic, "documentId", context),
+          userUid: nullableString(diagnostic, "userUid", context),
+          userDocumentDeleted: requiredBoolean(diagnostic, "userDocumentDeleted", context),
+        };
+      }),
     },
   };
 }

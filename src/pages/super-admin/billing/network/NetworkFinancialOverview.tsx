@@ -197,6 +197,12 @@ function preparationErrorMessage(error: unknown): string {
     return "Preparation completed, but some billing records still need attention.";
   }
   const { missing, invalid, ownership } = result as { missing?: unknown; invalid?: unknown; ownership?: unknown };
+  if (typeof ownership === "object" && ownership !== null) {
+    const unresolvedRecords = (ownership as { unresolvedRecords?: unknown }).unresolvedRecords;
+    if (Array.isArray(unresolvedRecords) && unresolvedRecords.length > 0) {
+      console.warn("Network billing ownership records require review", JSON.stringify(unresolvedRecords));
+    }
+  }
   const missingCount = typeof missing === "number" ? missing : 0;
   const invalidCount = typeof invalid === "number" ? invalid : 0;
   const unresolved = typeof ownership === "object" && ownership !== null
@@ -240,6 +246,9 @@ export default function NetworkFinancialOverview() {
         environment: workspace.environment,
         scope: workspace.scope,
       }).unwrap();
+      if (result.ownership.deletedRecords.length > 0) {
+        console.warn("Network billing records deleted", JSON.stringify(result.ownership.deletedRecords));
+      }
       if (!result.ready) {
         setPreparationError("Preparation completed, but some billing records still need attention. Please retry after resolving them.");
         return;
