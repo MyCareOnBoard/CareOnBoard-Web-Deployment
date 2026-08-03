@@ -1,8 +1,10 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router";
+import { createMemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import BillingManagementHeader from "./BillingManagementHeader";
+
+vi.mock("react-router", async () => vi.importActual<typeof import("react-router")>("react-router"));
 
 vi.mock("@/components/operational-agency/OperationalAgencySelector", () => ({
   default: ({ emptySelectionLabel, onSelectionChange, selectedIds }: {
@@ -34,27 +36,42 @@ vi.mock("@/components/shifts/ShiftDateRangeControl", () => ({
   ),
 }));
 
-function renderHeader(path = "/super-admin/billing/claims?scope=network&status=open") {
+function renderHeader({
+  path = "/super-admin/billing/claims?scope=network&status=open",
+  payrollTab = "due" as const,
+}: {
+  path?: string;
+  payrollTab?: "due" | "saved";
+} = {}) {
+  cleanup();
   const onScopeChange = vi.fn();
   const onDateRangeChange = vi.fn();
   const onModeChange = vi.fn();
-  render(
-    <MemoryRouter initialEntries={[path]}>
-      <BillingManagementHeader
-        search="?scope=network&status=open"
-        workspace={{
-          scope: { kind: "network" },
-          startDate: "2026-07-01",
-          endDate: "2026-07-31",
-          mode: null,
-        }}
-        onScopeChange={onScopeChange}
-        onDateRangeChange={onDateRangeChange}
-        onModeChange={onModeChange}
-      />
-    </MemoryRouter>,
-  );
-  return { onScopeChange, onDateRangeChange, onModeChange };
+  const onPayrollWeekChange = vi.fn();
+  const router = createMemoryRouter([
+    {
+      path: "*",
+      element: (
+          <BillingManagementHeader
+            search="?scope=network&status=open"
+            workspace={{
+              scope: { kind: "network" },
+              startDate: "2026-07-01",
+              endDate: "2026-07-31",
+              mode: null,
+              payrollWeekStart: "2026-07-27",
+              payrollTab,
+            }}
+            onScopeChange={onScopeChange}
+            onDateRangeChange={onDateRangeChange}
+            onModeChange={onModeChange}
+            onPayrollWeekChange={onPayrollWeekChange}
+          />
+      ),
+    },
+  ], { initialEntries: [path] });
+  render(<RouterProvider router={router} />);
+  return { onScopeChange, onDateRangeChange, onModeChange, onPayrollWeekChange };
 }
 
 describe("BillingManagementHeader", () => {
@@ -100,5 +117,23 @@ describe("BillingManagementHeader", () => {
       "href",
       "/super-admin/billing/payroll-management?scope=network&status=open",
     );
+  });
+
+  it("uses an accessible payroll-week control only for network due payroll", async () => {
+    const user = userEvent.setup();
+    const callbacks = renderHeader({
+      path: "/super-admin/billing/payroll-management?scope=network&payrollTab=due",
+    });
+
+    expect(screen.getByLabelText("Payroll week")).toHaveTextContent("Jul 27, 2026");
+    expect(screen.queryByRole("button", { name: /Dates 2026-07-01/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Previous payroll week" }));
+    expect(callbacks.onPayrollWeekChange).toHaveBeenCalledWith("2026-07-20");
+
+    renderHeader({
+      path: "/super-admin/billing/payroll-management?scope=network&payrollTab=saved",
+      payrollTab: "saved",
+    });
+    expect(screen.getAllByRole("button", { name: /Dates 2026-07-01/ })).toHaveLength(1);
   });
 });
