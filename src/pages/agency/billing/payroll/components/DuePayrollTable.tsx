@@ -4,22 +4,27 @@ import type { DuePayrollEntry } from "@/lib/api/payroll";
 import DuePayrollRow from "./DuePayrollRow";
 import PayrollStaffSearch from "./PayrollStaffSearch";
 import { TABLE_HEADER_CLASS, TABLE_MIN_WIDTH, TABLE_ROW_CLASS } from "./tableColumns";
+import { NETWORK_TABLE_GRID } from "./tableColumns";
+import ClaimsTablePagination from "../../claims/components/ClaimsTablePagination";
 
 const SKELETON_ROW_COUNT = 10;
 
 type DuePayrollTableProps = {
-  entries: DuePayrollEntry[];
+  entries: Array<DuePayrollEntry & { agencyId?: string; agencyName?: string }>;
   dueTotal?: number;
   loading?: boolean;
   isRefetching?: boolean;
+  showAgency?: boolean;
+  nextCursor?: string | null;
+  onLoadMore?: () => void;
   onCreateInvoiceClick: (entry: DuePayrollEntry) => void;
   actionsDisabled?: boolean;
 };
 
-function DuePayrollSkeletonRow() {
+function DuePayrollSkeletonRow({ showAgency = false }: { showAgency?: boolean }) {
   return (
-    <div className={`${TABLE_ROW_CLASS} animate-pulse`} aria-hidden="true">
-      {Array.from({ length: 9 }).map((_, index) => (
+    <div className={`${showAgency ? `${NETWORK_TABLE_GRID} py-3.5 border-b border-[#e5e5e6] last:border-b-0` : TABLE_ROW_CLASS} animate-pulse`} aria-hidden="true">
+      {Array.from({ length: showAgency ? 10 : 9 }).map((_, index) => (
         <span key={index} className="h-4 rounded bg-[#eef4f5]" />
       ))}
     </div>
@@ -47,6 +52,9 @@ export default function DuePayrollTable({
   dueTotal = 0,
   loading = false,
   isRefetching = false,
+  showAgency = false,
+  nextCursor,
+  onLoadMore,
   onCreateInvoiceClick,
   actionsDisabled = false,
 }: DuePayrollTableProps) {
@@ -60,6 +68,18 @@ export default function DuePayrollTable({
 
     return entries.filter((entry) => entry.staffName.toLowerCase().includes(query));
   }, [entries, filterQuery]);
+
+  const groupedEntries = useMemo(() => {
+    if (!showAgency) return [["agency", filteredEntries]] as const;
+    const groups = new Map<string, typeof filteredEntries>();
+    for (const entry of filteredEntries) {
+      const key = `${entry.agencyId ?? "unknown"}:${entry.employeeId}`;
+      const group = groups.get(key) ?? [];
+      group.push(entry);
+      groups.set(key, group);
+    }
+    return Array.from(groups.entries());
+  }, [filteredEntries, showAgency]);
 
   const emptyMessage = useMemo(() => {
     if (loading) return "";
@@ -101,8 +121,9 @@ export default function DuePayrollTable({
       >
       <div className="hidden overflow-hidden rounded-[16px] border border-[#e5e5e6] bg-white lg:block">
         <div className="overflow-x-auto">
-          <div className={TABLE_MIN_WIDTH}>
-            <div className={TABLE_HEADER_CLASS}>
+            <div className={TABLE_MIN_WIDTH}>
+            <div className={showAgency ? `${NETWORK_TABLE_GRID} py-3 text-[13px] font-semibold text-[#10141a] border-b border-[#e5e5e6]` : TABLE_HEADER_CLASS}>
+              {showAgency ? <span>Agency</span> : null}
               <span>Staff name</span>
               <span>Staff ID</span>
               <span>Hours worked</span>
@@ -116,17 +137,26 @@ export default function DuePayrollTable({
 
             {loading ? (
               Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
-                <DuePayrollSkeletonRow key={`due-skeleton-desktop-${index}`} />
+                <DuePayrollSkeletonRow key={`due-skeleton-desktop-${index}`} showAgency={showAgency} />
               ))
             ) : filteredEntries.length > 0 ? (
-              filteredEntries.map((entry) => (
-                <DuePayrollRow
-                  key={entry.id}
-                  variant="desktop"
-                  entry={entry}
-                  onCreateInvoiceClick={onCreateInvoiceClick}
-                  actionsDisabled={actionsDisabled}
-                />
+              groupedEntries.map(([groupKey, group]) => (
+                <div
+                  key={groupKey}
+                  className="contents"
+                  data-testid={showAgency ? `payroll-staff-group-${groupKey}` : undefined}
+                >
+                  {group.map((entry) => (
+                    <DuePayrollRow
+                      key={entry.id}
+                      variant="desktop"
+                      entry={entry}
+                      showAgency={showAgency}
+                      onCreateInvoiceClick={onCreateInvoiceClick}
+                      actionsDisabled={actionsDisabled}
+                    />
+                  ))}
+                </div>
               ))
             ) : (
               <div className="px-4 py-10 text-center">
@@ -143,11 +173,12 @@ export default function DuePayrollTable({
             <DuePayrollMobileSkeletonCard key={`due-skeleton-mobile-${index}`} />
           ))
         ) : filteredEntries.length > 0 ? (
-          filteredEntries.map((entry) => (
+          groupedEntries.flatMap(([, group]) => group).map((entry) => (
             <DuePayrollRow
               key={entry.id}
               variant="mobile"
               entry={entry}
+              showAgency={showAgency}
               onCreateInvoiceClick={onCreateInvoiceClick}
               actionsDisabled={actionsDisabled}
             />
@@ -158,6 +189,13 @@ export default function DuePayrollTable({
           </div>
         )}
       </div>
+      <ClaimsTablePagination
+        isRefetching={isRefetching}
+        nextCursor={nextCursor}
+        onLoadMore={onLoadMore}
+        loadMoreLabel="Load more payroll staff"
+        terminalLabel="All payroll staff loaded"
+      />
       </div>
     </section>
   );
