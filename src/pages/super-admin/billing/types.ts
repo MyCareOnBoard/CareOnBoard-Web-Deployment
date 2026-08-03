@@ -102,6 +102,7 @@ export type NetworkBillingClaimRow =
 
 type NetworkBillingPayrollBase = NetworkBillingRowBase & {
   staffKey: string;
+  staffName?: string | null;
   grossAmount: number | null;
   totalHours: number | null;
   mode: "ddd" | "hha" | null;

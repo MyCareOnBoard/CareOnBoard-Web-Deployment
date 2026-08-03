@@ -14,7 +14,7 @@ import type { DuePayrollEntry } from "@/lib/api/payroll";
 import { formatPayrollDateRangeLabel } from "../utils/payrollDashboardUtils";
 import { TABLE_ROW_CLASS } from "./tableColumns";
 import { NETWORK_TABLE_GRID } from "./tableColumns";
-import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
+import { useOptionalOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
 
 const MISSING_STAFF_ID = "—";
 const STAFF_ID_DISPLAY_LENGTH = 6;
@@ -37,10 +37,10 @@ function formatStaffIdDisplay(staffId: string): string {
 }
 
 function StaffIdLink({ staffId, employeeId }: { staffId: string; employeeId: string }) {
-  const { capabilities, directoryRoutes } = useOperationalAgency();
+  const operationalAgency = useOptionalOperationalAgency();
   const displayId = formatStaffIdDisplay(staffId);
-  const detailsRoute = capabilities.canAccessStaffDirectory
-    ? directoryRoutes?.staffDetails
+  const detailsRoute = operationalAgency?.capabilities.canAccessStaffDirectory
+    ? operationalAgency.directoryRoutes?.staffDetails
     : undefined;
 
   if (!isStaffIdLinkable(staffId) || !detailsRoute || !employeeId.trim()) {
@@ -58,9 +58,9 @@ function StaffIdLink({ staffId, employeeId }: { staffId: string; employeeId: str
 }
 
 function StaffName({ name, employeeId }: { name: string; employeeId: string }) {
-  const { capabilities, directoryRoutes } = useOperationalAgency();
-  const detailsRoute = capabilities.canAccessStaffDirectory
-    ? directoryRoutes?.staffDetails
+  const operationalAgency = useOptionalOperationalAgency();
+  const detailsRoute = operationalAgency?.capabilities.canAccessStaffDirectory
+    ? operationalAgency.directoryRoutes?.staffDetails
     : undefined;
 
   if (!detailsRoute || !employeeId.trim()) {

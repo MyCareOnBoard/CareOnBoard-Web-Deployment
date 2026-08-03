@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   OperationalAgencyProvider,
   useOperationalAgency,
+  useOptionalOperationalAgency,
 } from "./OperationalAgencyProvider";
 import { agencyShiftRoutes, superAdminShiftRoutes } from "./routes";
 
@@ -29,6 +30,11 @@ describe("OperationalAgencyProvider", () => {
     expect(() => renderHook(() => useOperationalAgency())).toThrow(
       "useOperationalAgency must be used within an OperationalAgencyProvider",
     );
+  });
+
+  it("permits provider-free network consumers to opt out of agency links", () => {
+    const { result } = renderHook(() => useOptionalOperationalAgency());
+    expect(result.current).toBeNull();
   });
 
   it("exposes the explicit agency actor context without consulting auth", () => {

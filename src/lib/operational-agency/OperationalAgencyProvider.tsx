@@ -67,3 +67,11 @@ export function useOperationalAgency(): OperationalAgencyContextValue {
   }
   return context;
 }
+
+/**
+ * Network views can reuse display-only agency components without inventing a
+ * selected-agency provider. Callers must treat a missing context as no links.
+ */
+export function useOptionalOperationalAgency(): OperationalAgencyContextValue | null {
+  return useContext(OperationalAgencyContext);
+}

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { BillingWorkspaceProvider, type BillingWorkspaceContextValue } from "../BillingWorkspaceContext";
@@ -13,33 +13,45 @@ vi.mock("react-redux", () => ({ useDispatch: () => vi.fn() }));
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: vi.fn() }) }));
 vi.mock("@/components/ui/button", () => ({ Button: (p: ButtonHTMLAttributes<HTMLButtonElement>) => <button {...p} /> }));
 vi.mock("@/components/ui/dialog", () => ({ Dialog: ({ open, children }: { open: boolean; children: ReactNode }) => open ? <div role="dialog">{children}</div> : null, DialogContent: ({ children }: { children: ReactNode }) => <div>{children}</div>, DialogDescription: ({ children }: { children: ReactNode }) => <p>{children}</p>, DialogFooter: ({ children }: { children: ReactNode }) => <div>{children}</div>, DialogHeader: ({ children }: { children: ReactNode }) => <div>{children}</div>, DialogTitle: ({ children }: { children: ReactNode }) => <h2>{children}</h2> }));
-vi.mock("@/components/modals/DeleteConfirmationModal", () => ({ DeleteConfirmationModal: ({ isOpen, title }: { isOpen: boolean; title: string }) => isOpen ? <div role="dialog" aria-label={title} /> : null }));
+vi.mock("@/components/modals/DeleteConfirmationModal", () => ({ DeleteConfirmationModal: ({ isOpen, title, onConfirm }: { isOpen: boolean; title: string; onConfirm: () => void }) => isOpen ? <div role="dialog" aria-label={title}><button onClick={onConfirm}>Confirm {title}</button></div> : null }));
 vi.mock("@/lib/api/payroll", () => ({ ...payroll }));
 vi.mock("@/lib/api/network-billing", () => ({ NETWORK_BILLING_QUERY_OPTIONS: {}, networkBillingApi: { useGetPayrollBootstrapQuery: api.bootstrap, useLazyGetPayrollPageQuery: () => [api.page, { isFetching: false }], useLazySearchBillingOptionsQuery: () => [api.search, api.options()], util: { invalidateTags: api.invalidate } } }));
 vi.mock("@/pages/agency/billing/payroll/components/PayrollOverviewCards", () => ({ default: ({ stats }: { stats: Array<{ label: string }> }) => <div aria-label="Payroll overview">{stats.map((stat) => <span key={stat.label}>{stat.label}</span>)}</div> }));
 vi.mock("@/pages/agency/billing/payroll/components/PayrollSummaryChart", () => ({ default: () => <div aria-label="Payroll summary chart" /> }));
 vi.mock("@/pages/agency/billing/payroll/components/TopOvertimeAlerts", () => ({ default: () => <div aria-label="Top overtime alerts" /> }));
 vi.mock("@/pages/agency/billing/payroll/components/PayrollWorkspaceTabs", () => ({ default: ({ onTabChange }: { onTabChange: (value: "staff" | "generated") => void }) => <><button onClick={() => onTabChange("staff")}>Due</button><button onClick={() => onTabChange("generated")}>Saved</button></> }));
-vi.mock("@/pages/agency/billing/payroll/components/DuePayrollTable", () => ({ default: ({ entries }: { entries: Array<{ staffName: string; agencyName: string }> }) => <div>{entries.map((entry) => <span key={`${entry.agencyName}:${entry.staffName}`}>{entry.staffName}</span>)}</div> }));
-vi.mock("@/pages/agency/billing/payroll/components/SavedPayrollTable", () => ({ default: () => <div>Saved payroll table</div> }));
-vi.mock("@/pages/agency/billing/payroll/components/MarkPayrollInvoicePaidDialog", () => ({ default: () => null }));
+vi.mock("@/pages/agency/billing/payroll/components/DuePayrollTable", () => ({ default: ({ entries, onCreateInvoiceClick }: { entries: Array<{ id: string; staffName: string; agencyName: string }>; onCreateInvoiceClick: (entry: unknown) => void }) => <div>{entries.map((entry) => <div key={`${entry.agencyName}:${entry.staffName}`}><span>{entry.staffName}</span><button onClick={() => onCreateInvoiceClick(entry)}>Create invoice for {entry.staffName}</button></div>)}</div> }));
+vi.mock("@/pages/agency/billing/payroll/components/SavedPayrollTable", () => ({ default: ({ invoices, onViewInvoice, onMarkPaid, onCancel }: { invoices: Array<{ id: string; employeeName: string }>; onViewInvoice: (invoice: unknown) => void; onMarkPaid: (invoice: unknown) => void; onCancel: (invoice: unknown) => void }) => <div>{invoices.map((invoice) => <div key={invoice.id}><span>{invoice.employeeName}</span><button onClick={() => onViewInvoice(invoice)}>View invoice</button><button onClick={() => onMarkPaid(invoice)}>Mark paid</button><button onClick={() => onCancel(invoice)}>Cancel invoice</button></div>)}</div> }));
+vi.mock("@/pages/agency/billing/payroll/components/MarkPayrollInvoicePaidDialog", () => ({ default: ({ open, onConfirm }: { open: boolean; onConfirm: () => void }) => open ? <button onClick={onConfirm}>Confirm mark paid</button> : null }));
 vi.mock("@/pages/agency/billing/payroll/utils/buildPayrollInvoiceDocument", () => ({ buildPayrollInvoiceDocument: () => null }));
 import NetworkPayroll from "./NetworkPayroll";
 
-const rows: NetworkBillingPayrollRow[] = [{ id: "due-1", agencyId: "atlas", agencyName: "Atlas Care", staffKey: "opaque-staff-key", sourceType: "shift", sourceId: "shift-1", totalsExact: true, grossAmount: 100, totalHours: 42, mode: "ddd" }];
+const rows: NetworkBillingPayrollRow[] = [{ id: "due-1", agencyId: "atlas", agencyName: "Atlas Care", staffKey: "atlas:staff-1", staffName: "Avery Nurse", employeeId: "staff-1", sourceType: "shift", sourceId: "shift-1", totalsExact: true, grossAmount: 100, totalHours: 42, mode: "ddd" }];
 const workspace: BillingWorkspaceContextValue = { scope: { kind: "network" }, startDate: "2026-07-01", endDate: "2026-07-31", mode: "ddd", actorUid: "super-1", environment: "staging", onDateRangeChange: vi.fn() };
 
 describe("NetworkPayroll", () => {
-  it("renders provider-free due and saved demand tabs, using authorized staff labels rather than opaque row keys", () => {
-    api.options.mockReturnValue({ data: [{ id: "opaque-staff-key", name: "Avery Nurse", agencyId: "atlas", agencyName: "Atlas Care", kind: "staff" }] });
+  it("uses the authorized staff name projected by the payroll page without issuing label lookups", () => {
+    const labeledRows = [{ ...rows[0], staffKey: "atlas:staff-1", staffName: "Avery Nurse" }] as unknown as NetworkBillingPayrollRow[];
+    api.options.mockReturnValue({ data: [] });
+    api.bootstrap.mockReturnValue({ data: { page: { rows: labeledRows, nextCursor: null, total: 1, hasMore: false }, summary: { overview: { totalDue: { amount: null, count: 1, exact: false } }, meta: { evaluatedAt: "2026-08-03", totalsExact: false } } }, isLoading: false, isFetching: false });
+    api.search.mockReturnValue({ unwrap: vi.fn().mockResolvedValue([]), abort: vi.fn() });
+    render(<BillingWorkspaceProvider value={workspace}><NetworkPayroll /></BillingWorkspaceProvider>);
+    expect(screen.getByText("Avery Nurse")).toBeVisible();
+    expect(screen.queryByText("atlas:staff-1")).toBeNull();
+    expect(api.search).not.toHaveBeenCalled();
+  });
+
+  it("renders provider-free due and saved demand tabs without fabricating aggregate payroll charts", () => {
+    api.options.mockReturnValue({ data: [{ id: "staff-1", name: "Avery Nurse", agencyId: "atlas", agencyName: "Atlas Care", kind: "staff" }] });
     api.bootstrap.mockReturnValue({ data: { page: { rows, nextCursor: null, total: 1, hasMore: false }, summary: { overview: { totalDue: { amount: 100, count: 1, exact: true } }, meta: { evaluatedAt: "2026-08-03", totalsExact: true } } }, isLoading: false, isFetching: false });
     api.search.mockReturnValue({ unwrap: vi.fn().mockResolvedValue([]), abort: vi.fn() });
     render(<BillingWorkspaceProvider value={workspace}><NetworkPayroll /></BillingWorkspaceProvider>);
     expect(screen.getByRole("region", { name: "Network payroll" })).toBeVisible();
-    expect(screen.getByLabelText("Payroll summary chart")).toBeVisible();
-    expect(screen.getByLabelText("Top overtime alerts")).toBeVisible();
+    expect(screen.getByLabelText("Network payroll aggregate status")).toBeVisible();
+    expect(screen.queryByLabelText("Payroll summary chart")).toBeNull();
+    expect(screen.queryByLabelText("Top overtime alerts")).toBeNull();
     expect(screen.getByText("Avery Nurse")).toBeVisible();
-    expect(screen.queryByText("opaque-staff-key")).toBeNull();
+    expect(screen.queryByText("atlas:staff-1")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Saved" }));
     expect(api.bootstrap).toHaveBeenLastCalledWith(expect.objectContaining({ tab: "saved", scope: { kind: "network" } }), expect.anything());
   });
@@ -57,5 +69,35 @@ describe("NetworkPayroll", () => {
     fireEvent.change(screen.getByLabelText("Find a staff member"), { target: { value: "Bea" } });
     expect(first.abort).toHaveBeenCalled();
     vi.useRealTimers();
+  });
+
+  it("binds every payroll invoice action to the row agency and invalidates network data", async () => {
+    const savedRows = [{ id: "invoice-1", agencyId: "beacon", agencyName: "Beacon Supports", staffKey: "beacon:staff-2", employeeId: "staff-2", employeeName: "Blair Support", kind: "payrollInvoice" as const, grossAmount: 80, totalHours: 4, mode: "ddd" as const, invoiceNumber: "PAY-1", status: "pending" as const }];
+    api.options.mockReturnValue({ data: [] });
+    api.bootstrap.mockImplementation((args: { tab: string }) => ({ data: args.tab === "saved"
+      ? { page: { rows: savedRows, nextCursor: null, total: 1, hasMore: false }, summary: { overview: { savedInvoices: { count: 1, exact: true } }, meta: { evaluatedAt: "2026-08-03", totalsExact: true } } }
+      : { page: { rows, nextCursor: null, total: 1, hasMore: false }, summary: { overview: { totalDue: { amount: null, count: 1, exact: false } }, meta: { evaluatedAt: "2026-08-03", totalsExact: false } } }, isLoading: false, isFetching: false }));
+    api.search.mockReturnValue({ unwrap: vi.fn().mockResolvedValue([]), abort: vi.fn() });
+    payroll.createPayrollInvoice.mockResolvedValue({ id: "created-1", grossAmount: 100, totalHours: 2, invoiceNumber: "PAY-NEW", status: "pending", employeeName: "Avery Nurse", periodStart: "2026-07-01", periodEnd: "2026-07-31", shiftIds: ["shift-1"] });
+    payroll.getPayrollInvoiceById.mockResolvedValue({ id: "invoice-1" });
+    payroll.markPayrollInvoicePaid.mockResolvedValue(undefined);
+    payroll.cancelPayrollInvoice.mockResolvedValue(undefined);
+    render(<BillingWorkspaceProvider value={workspace}><NetworkPayroll /></BillingWorkspaceProvider>);
+
+    fireEvent.click(screen.getByRole("button", { name: "Create invoice for Avery Nurse" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm Create payroll invoice?" }));
+    await waitFor(() => expect(payroll.createPayrollInvoice).toHaveBeenCalledWith(expect.objectContaining({ context: { agencyId: "atlas" } })));
+
+    fireEvent.click(screen.getByRole("button", { name: "Saved" }));
+    fireEvent.click(await screen.findByRole("button", { name: "View invoice" }));
+    await waitFor(() => expect(payroll.getPayrollInvoiceById).toHaveBeenCalledWith({ context: { agencyId: "beacon" }, invoiceId: "invoice-1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Mark paid" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm mark paid" }));
+    await waitFor(() => expect(payroll.markPayrollInvoicePaid).toHaveBeenCalledWith({ context: { agencyId: "beacon" }, invoiceId: "invoice-1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel invoice" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm Cancel this payroll invoice?" }));
+    await waitFor(() => expect(payroll.cancelPayrollInvoice).toHaveBeenCalledWith({ context: { agencyId: "beacon" }, invoiceId: "invoice-1" }));
+    expect(api.invalidate).toHaveBeenCalledWith(expect.arrayContaining([{ type: "Payroll", id: "NETWORK" }, { type: "NETWORK", id: "atlas" }]));
+    expect(api.invalidate).toHaveBeenCalledWith(expect.arrayContaining([{ type: "Payroll", id: "NETWORK" }, { type: "NETWORK", id: "beacon" }]));
   });
 });

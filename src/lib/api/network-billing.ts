@@ -421,12 +421,13 @@ function validateClaimRow(value: unknown, context: string): NetworkBillingClaimR
     : validateReadyRideRow(source, context);
 }
 
-const PAYROLL_BASE_KEYS = ["id", "agencyId", "agencyName", "staffKey", "grossAmount", "totalHours", "mode", "employeeId"] as const;
+const PAYROLL_BASE_KEYS = ["id", "agencyId", "agencyName", "staffKey", "staffName", "grossAmount", "totalHours", "mode", "employeeId"] as const;
 
 function payrollBase(source: Record<string, unknown>, context: string) {
   return {
     ...agencyFields(source, context),
     staffKey: requiredString(source, "staffKey", context),
+    staffName: optionalNullableString(source, "staffName", context),
     grossAmount: nullableNumber(source, "grossAmount", context),
     totalHours: nullableNumber(source, "totalHours", context),
     mode: nullableEnum(source, "mode", ["ddd", "hha"] as const, context),
@@ -448,6 +449,7 @@ function validatePayrollSavedRow(source: Record<string, unknown>, context: strin
     mode: base.mode,
   };
   if (base.employeeId !== undefined) result.employeeId = base.employeeId;
+  if (base.staffName !== undefined) result.staffName = base.staffName;
   const invoiceNumber = optionalNullableString(source, "invoiceNumber", context);
   const status = optionalNullableEnum(source, "status", ["pending", "paid"] as const, context);
   const employeeName = optionalNullableString(source, "employeeName", context);
@@ -477,6 +479,7 @@ function validatePayrollDueRow(source: Record<string, unknown>, context: string)
     sourceType: requiredEnum(source, "sourceType", ["shift", "ride"] as const, context),
     sourceId: requiredString(source, "sourceId", context),
     staffKey: base.staffKey,
+    ...(base.staffName === undefined ? {} : { staffName: base.staffName }),
     grossAmount: base.grossAmount,
     totalHours: base.totalHours,
     mode: base.mode,
