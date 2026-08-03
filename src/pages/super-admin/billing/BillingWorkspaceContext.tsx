@@ -1,9 +1,13 @@
 import { createContext, useContext, type ReactNode } from "react";
-import type { BillingWorkspaceState } from "./billingWorkspaceState";
+import type {
+  BillingWorkspaceDateRange,
+  BillingWorkspaceState,
+} from "./billingWorkspaceState";
 
 export interface BillingWorkspaceContextValue extends BillingWorkspaceState {
   actorUid: string;
   environment: string;
+  onDateRangeChange: (range: BillingWorkspaceDateRange) => void;
 }
 
 const BillingWorkspaceContext = createContext<BillingWorkspaceContextValue | null>(null);
@@ -23,9 +27,13 @@ export function BillingWorkspaceProvider({
 }
 
 export function useBillingWorkspaceContext(): BillingWorkspaceContextValue {
-  const value = useContext(BillingWorkspaceContext);
+  const value = useOptionalBillingWorkspaceContext();
   if (!value) {
     throw new Error("useBillingWorkspaceContext must be used within BillingWorkspaceProvider.");
   }
   return value;
+}
+
+export function useOptionalBillingWorkspaceContext(): BillingWorkspaceContextValue | null {
+  return useContext(BillingWorkspaceContext);
 }

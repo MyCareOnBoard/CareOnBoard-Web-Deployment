@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
+import { useOptionalBillingWorkspaceContext } from "@/pages/super-admin/billing/BillingWorkspaceContext";
 import ClaimsByStatusChart from "../claims/components/ClaimsByStatusChart";
 import { getCurrentWeekDateRange } from "../claims/utils/claimsDashboardUtils";
 import PayrollSummaryChart from "../payroll/components/PayrollSummaryChart";
@@ -11,7 +12,12 @@ import { useFinancialOverview } from "./hooks/useFinancialOverview";
 
 function FinancialOverviewContent() {
   const { toast } = useToast();
-  const [dateRange, setDateRange] = useState(getCurrentWeekDateRange);
+  const workspace = useOptionalBillingWorkspaceContext();
+  const [standaloneDateRange, setStandaloneDateRange] = useState(getCurrentWeekDateRange);
+  const dateRange = workspace
+    ? { startDate: workspace.startDate, endDate: workspace.endDate }
+    : standaloneDateRange;
+  const onDateRangeChange = workspace?.onDateRangeChange ?? setStandaloneDateRange;
   const overview = useFinancialOverview(dateRange);
 
   useEffect(() => {
@@ -40,7 +46,7 @@ function FinancialOverviewContent() {
 
   return (
     <div className="min-h-[calc(100vh-200px)] space-y-8 pb-8">
-      <FinancialOverviewHeader dateRange={dateRange} onDateRangeChange={setDateRange} />
+      <FinancialOverviewHeader dateRange={dateRange} onDateRangeChange={onDateRangeChange} />
       <FinancialOverviewCards
         stats={overview.overviewStats}
         loading={overview.loading}

@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { MemoryRouter, Outlet, Route, Routes as ReactRoutes, useLocation, useNavigate } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   OperationalAgencyProvider,
   useOperationalAgency,
@@ -74,6 +74,7 @@ import SuperAdminBillingWorkspace from "./SuperAdminBillingWorkspace";
 import { SuperAdminBillingIndex } from "./index";
 import { useBillingWorkspaceContext } from "./BillingWorkspaceContext";
 import { FinancialOverview } from "@/pages/agency/billing/pages";
+import FinancialOverviewPage from "@/pages/agency/billing/financial-overview";
 
 const atlas = {
   id: "atlas",
@@ -143,6 +144,10 @@ function deferred<T>() {
   const promise = new Promise<T>((next) => { resolve = next; });
   return { promise, resolve };
 }
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("shared financial overview context", () => {
   beforeEach(() => {
@@ -242,13 +247,19 @@ describe("shared financial overview context", () => {
   });
 
   it("preserves the agency overview ddd fallback when supported client types are missing", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-08-03T12:00:00"));
     render(<FinancialOverview />);
 
     await waitFor(() => expect(billingApi.getClaimsDashboard).toHaveBeenCalled());
     const currentRequest = billingApi.getClaimsDashboard.mock.calls[0]?.[0];
     expect(currentRequest).toEqual(expect.objectContaining({
       context: { agencyId: "actor-agency" },
-      query: expect.objectContaining({ mode: "ddd" }),
+      query: expect.objectContaining({
+        startDate: "2026-08-03",
+        endDate: "2026-08-09",
+        mode: "ddd",
+      }),
     }));
   });
 });
@@ -422,6 +433,58 @@ describe("SuperAdminBillingWorkspace", () => {
       const location = screen.getByLabelText("Billing location").textContent ?? "";
       expect(new URL(location, "https://careonboard.test").searchParams.get("clientType")).toBe("ddd");
     });
+  });
+
+  it("drives the production financial overview render and requests from workspace dates", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-08-03T12:00:00"));
+    const user = userEvent.setup();
+    billingApi.getClaimsDashboard.mockResolvedValue(claimsDashboard);
+    billingApi.getPayrollDashboard.mockResolvedValue(payrollDashboard);
+    billingApi.listBillingClaims.mockResolvedValue({ claims: [], total: 0 });
+    billingApi.listPayrollInvoices.mockResolvedValue({ invoices: [], total: 0 });
+
+    renderWorkspace(
+      "/super-admin/billing/financial-overview?agencyId=atlas&clientType=ddd&startDate=2026-07-01&endDate=2026-07-31",
+      <FinancialOverviewPage />,
+    );
+
+    const financialDateControl = await screen.findByRole("button", { name: "July 1 - July 31, 2026" });
+    expect(financialDateControl).toBeVisible();
+    await waitFor(() => expect(billingApi.getPayrollDashboard).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: { agencyId: "atlas" },
+        query: { startDate: "2026-07-01", endDate: "2026-07-31", mode: "ddd" },
+      }),
+    ));
+    expect(billingApi.listBillingClaims).toHaveBeenCalledWith(expect.objectContaining({
+      query: expect.objectContaining({ startDate: "2026-07-01", endDate: "2026-07-31" }),
+    }));
+    expect(billingApi.listPayrollInvoices).toHaveBeenCalledWith(expect.objectContaining({
+      query: expect.objectContaining({ startDate: "2026-07-01", endDate: "2026-07-31" }),
+    }));
+
+    const expectedRange = {
+      startDate: "2026-07-27",
+      endDate: "2026-08-03",
+    };
+    await user.click(financialDateControl);
+    await user.click(screen.getByRole("button", { name: "Last 7 days" }));
+    await user.click(screen.getByRole("button", { name: "Use this date range" }));
+
+    expect(await screen.findByRole("button", { name: "July 27 - August 3, 2026" })).toBeVisible();
+    await waitFor(() => expect(billingApi.getPayrollDashboard).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: { agencyId: "atlas" },
+        query: { ...expectedRange, mode: "ddd" },
+      }),
+    ));
+    const updatedSearch = new URL(
+      screen.getByRole("link", { name: "Payroll" }).getAttribute("href") ?? "",
+      "https://careonboard.test",
+    ).searchParams;
+    expect(updatedSearch.get("startDate")).toBe(expectedRange.startDate);
+    expect(updatedSearch.get("endDate")).toBe(expectedRange.endDate);
   });
 
   it("remounts child selection state when a header control changes the normalized dataset", async () => {

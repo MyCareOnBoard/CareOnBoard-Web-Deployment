@@ -272,13 +272,17 @@ function AuthorizedBillingWorkspace({
   }
 
   const activeWorkspace = normalizedWorkspace ?? workspace;
+  const navigateWithSearch = (search: string) => {
+    navigate({ pathname: location.pathname, search });
+  };
+  const onDateRangeChange = (range: BillingWorkspaceDateRange) => {
+    navigateWithSearch(updateBillingWorkspaceDateRange(location.search, range));
+  };
   const context: BillingWorkspaceContextValue = {
     ...activeWorkspace,
     actorUid,
     environment: apiEnvironment,
-  };
-  const navigateWithSearch = (search: string) => {
-    navigate({ pathname: location.pathname, search });
+    onDateRangeChange,
   };
 
   return (
@@ -292,7 +296,7 @@ function AuthorizedBillingWorkspace({
       onAgenciesDiscovered={onAgenciesDiscovered}
       onRetry={() => setRetryVersion((value) => value + 1)}
       onScopeChange={(scope) => navigateWithSearch(updateBillingWorkspaceScope(location.search, scope))}
-      onDateRangeChange={(range) => navigateWithSearch(updateBillingWorkspaceDateRange(location.search, range))}
+      onDateRangeChange={onDateRangeChange}
       onModeChange={(mode) => navigateWithSearch(updateBillingWorkspaceMode(location.search, mode))}
     />
   );
