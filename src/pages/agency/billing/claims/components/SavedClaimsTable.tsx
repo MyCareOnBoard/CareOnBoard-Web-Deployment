@@ -40,6 +40,9 @@ type SavedClaimsTableProps = {
   isRefetching?: boolean;
   nextCursor?: string | null;
   onLoadMore?: () => void;
+  providerFree?: boolean;
+  showControls?: boolean;
+  loadMoreError?: string | null;
 };
 
 function SavedClaimSkeletonRow({
@@ -96,6 +99,9 @@ export default function SavedClaimsTable({
   isRefetching = false,
   nextCursor,
   onLoadMore,
+  providerFree = false,
+  showControls = true,
+  loadMoreError,
 }: SavedClaimsTableProps) {
   const groupedClaims = useMemo(
     () => groupSavedClaimsByClient(claims, { showAgency }),
@@ -119,7 +125,7 @@ export default function SavedClaimsTable({
     <section>
       <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <h2 className="text-[18px] font-semibold text-[#10141a]">Claims &amp; invoices</h2>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        {showControls ? <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <label className="flex items-center gap-2 text-[13px] text-[#10141a]">
             <span className="whitespace-nowrap text-[#808081]">Status</span>
             <select
@@ -137,7 +143,7 @@ export default function SavedClaimsTable({
             </select>
           </label>
           <ClaimsClientSearch onFilterChange={onClientSearchChange} />
-        </div>
+        </div> : null}
       </div>
 
       <div className="hidden overflow-hidden rounded-[16px] border border-[#e5e5e6] bg-white lg:block">
@@ -171,6 +177,7 @@ export default function SavedClaimsTable({
                       clientId={group.clientId}
                       count={group.claims.length}
                       variant="desktop"
+                      providerFree={providerFree}
                     />
                     {group.claims.map((claim) => (
                       <SavedClaimRow
@@ -194,6 +201,7 @@ export default function SavedClaimsTable({
                       clientId={group.clientId}
                       count={group.invoices.length}
                       variant="desktop"
+                      providerFree={providerFree}
                       itemNoun="invoice"
                       outOfPocket
                     />
@@ -235,6 +243,7 @@ export default function SavedClaimsTable({
                   count={group.claims.length}
                   variant="mobile"
                   agencyName={showAgency ? group.agencyName : undefined}
+                  providerFree={providerFree}
                 />
                 {group.claims.map((claim) => (
                   <SavedClaimRow
@@ -260,6 +269,7 @@ export default function SavedClaimsTable({
                   itemNoun="invoice"
                   outOfPocket
                   agencyName={showAgency ? group.agencyName : undefined}
+                  providerFree={providerFree}
                 />
                 {group.invoices.map((invoice) => (
                   <SavedInvoiceRow
@@ -287,6 +297,7 @@ export default function SavedClaimsTable({
           onLoadMore={onLoadMore}
           loadMoreLabel="Load more claims and invoices"
           terminalLabel="All claims and invoices loaded"
+          loadMoreError={loadMoreError}
         />
       ) : null}
     </section>

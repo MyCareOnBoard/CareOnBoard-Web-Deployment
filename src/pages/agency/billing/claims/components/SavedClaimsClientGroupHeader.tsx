@@ -1,4 +1,4 @@
-import ClientNameLink from "./ClientNameLink";
+import ClientNameLink, { ProviderFreeClientName } from "./ClientNameLink";
 import OutOfPocketBadge, { PayerInsuranceBadge } from "./OutOfPocketBadge";
 
 type SavedClaimsClientGroupHeaderProps = {
@@ -10,6 +10,7 @@ type SavedClaimsClientGroupHeaderProps = {
   itemNoun?: string;
   outOfPocket?: boolean;
   agencyName?: string;
+  providerFree?: boolean;
 };
 
 export default function SavedClaimsClientGroupHeader({
@@ -20,6 +21,7 @@ export default function SavedClaimsClientGroupHeader({
   itemNoun = "claim",
   outOfPocket = false,
   agencyName,
+  providerFree = false,
 }: SavedClaimsClientGroupHeaderProps) {
   const label = count === 1 ? `1 ${itemNoun}` : `${count} ${itemNoun}s`;
 
@@ -27,11 +29,7 @@ export default function SavedClaimsClientGroupHeader({
     return (
       <div className="px-1 pb-1 pt-3">
         <div className="flex items-center gap-2">
-          <ClientNameLink
-            name={clientName}
-            clientId={clientId}
-            className="text-[16px] font-semibold text-[#10141a]"
-          />
+          {providerFree ? <ProviderFreeClientName name={clientName} className="text-[16px] font-semibold text-[#10141a]" /> : <ClientNameLink name={clientName} clientId={clientId} className="text-[16px] font-semibold text-[#10141a]" />}
           {outOfPocket ? <OutOfPocketBadge /> : <PayerInsuranceBadge />}
         </div>
         <p className="mt-1 text-[13px] text-[#808081]">{label}</p>
@@ -42,11 +40,7 @@ export default function SavedClaimsClientGroupHeader({
 
   return (
     <div className="flex items-center gap-3 border-b border-[#e5e5e6] bg-[#eef4f5] px-4 py-3 pr-8">
-      <ClientNameLink
-        name={clientName}
-        clientId={clientId}
-        className="text-[14px] font-semibold text-[#10141a]"
-      />
+      {providerFree ? <ProviderFreeClientName name={clientName} className="text-[14px] font-semibold text-[#10141a]" /> : <ClientNameLink name={clientName} clientId={clientId} className="text-[14px] font-semibold text-[#10141a]" />}
       {outOfPocket ? <OutOfPocketBadge /> : <PayerInsuranceBadge />}
       <span className="shrink-0 text-[13px] text-[#808081]">{label}</span>
     </div>

@@ -28,9 +28,16 @@ type RecentClaimsTableProps = {
   generateDisabled?: boolean;
   /** Enables the super-admin network table identity column and agency-separated grouping. */
   showAgency?: boolean;
+  /** Keeps singular claim actions within one service-code/week billing bundle. */
+  groupByBillingPeriod?: boolean;
   isRefetching?: boolean;
   nextCursor?: string | null;
   onLoadMore?: () => void;
+  /** Avoids agency context hooks when rendered by the super-admin network workspace. */
+  providerFree?: boolean;
+  /** Lets the network workspace retain its single server-backed client search. */
+  showControls?: boolean;
+  loadMoreError?: string | null;
 };
 
 function RecentClaimSkeletonRow({
@@ -75,9 +82,13 @@ export default function RecentClaimsTable({
   onGenerateClaim,
   generateDisabled = false,
   showAgency = false,
+  groupByBillingPeriod = false,
   isRefetching = false,
   nextCursor,
   onLoadMore,
+  providerFree = false,
+  showControls = true,
+  loadMoreError,
 }: RecentClaimsTableProps) {
   const [filterQuery, setFilterQuery] = useState("");
   const [selectedClientName, setSelectedClientName] = useState<string | undefined>();
@@ -111,8 +122,8 @@ export default function RecentClaimsTable({
   }, [sortedClaims, filterQuery, selectedClientName, typeFilter]);
 
   const groupedClaims = useMemo(
-    () => groupRecentClaimsByClient(filteredClaims, { showAgency }),
-    [filteredClaims, showAgency],
+    () => groupRecentClaimsByClient(filteredClaims, { showAgency, groupByBillingPeriod }),
+    [filteredClaims, groupByBillingPeriod, showAgency],
   );
 
   const handleFilterChange = (query: string, clientName?: string) => {
@@ -141,7 +152,7 @@ export default function RecentClaimsTable({
     <section>
       <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <h2 className="text-[18px] font-semibold text-[#10141a]">Ready to bill</h2>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        {showControls ? <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <label className="flex items-center gap-2 text-[13px] text-[#10141a]">
             <span className="whitespace-nowrap text-[#808081]">Type</span>
             <select
@@ -160,7 +171,7 @@ export default function RecentClaimsTable({
             </select>
           </label>
           <ClaimsClientSearch onFilterChange={handleFilterChange} />
-        </div>
+        </div> : null}
       </div>
 
       {truncated && !isInitialLoading ? (
@@ -201,6 +212,8 @@ export default function RecentClaimsTable({
                     variant="desktop"
                     onGenerateClaim={handleGenerateClaim}
                     generateDisabled={generateDisabled}
+                    showAgency={showAgency}
+                    providerFree={providerFree}
                   />
                   {group.claims.map((claim) => (
                     <RecentClaimRow
@@ -209,6 +222,7 @@ export default function RecentClaimsTable({
                       showClient={false}
                       claim={claim}
                       showAgency={showAgency}
+                      providerFree={providerFree}
                     />
                   ))}
                 </Fragment>
@@ -236,6 +250,7 @@ export default function RecentClaimsTable({
                 onGenerateClaim={handleGenerateClaim}
                 generateDisabled={generateDisabled}
                 showAgency={showAgency}
+                providerFree={providerFree}
               />
               {group.claims.map((claim) => (
                 <RecentClaimRow
@@ -243,6 +258,7 @@ export default function RecentClaimsTable({
                   variant="mobile"
                   showClient={false}
                   claim={claim}
+                  providerFree={providerFree}
                 />
               ))}
             </div>
@@ -260,6 +276,7 @@ export default function RecentClaimsTable({
           onLoadMore={onLoadMore}
           loadMoreLabel="Load more ready-to-bill items"
           terminalLabel="All ready-to-bill items loaded"
+          loadMoreError={loadMoreError}
         />
       ) : null}
     </section>

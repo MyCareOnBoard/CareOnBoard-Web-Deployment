@@ -2,7 +2,7 @@ import { memo } from "react";
 import { Link } from "react-router";
 import { ArrowRight } from "lucide-react";
 import type { RecentClaim } from "../data/mockClaimsDashboardData";
-import ClientNameLink from "./ClientNameLink";
+import ClientNameLink, { ProviderFreeClientName } from "./ClientNameLink";
 import CoverageBadge from "./CoverageBadge";
 import {
   GROUPED_TABLE_ROW_CLASS,
@@ -47,6 +47,10 @@ function StaffLink({ staffId, staffName }: { staffId: string; staffName?: string
   );
 }
 
+function ProviderFreeStaff({ staffId, staffName }: { staffId: string; staffName?: string }) {
+  return <span className="text-[13px] text-[#808081]">{staffName?.trim() || formatStaffIdDisplay(staffId)}</span>;
+}
+
 type RowVariant = "mobile" | "desktop";
 
 type RecentClaimRowProps = {
@@ -54,6 +58,7 @@ type RecentClaimRowProps = {
   variant: RowVariant;
   showClient?: boolean;
   showAgency?: boolean;
+  providerFree?: boolean;
 };
 
 function DurationRange({ start, end }: { start: string; end: string }) {
@@ -66,17 +71,13 @@ function DurationRange({ start, end }: { start: string; end: string }) {
   );
 }
 
-function RecentClaimRow({ claim, variant, showClient = true, showAgency = false }: RecentClaimRowProps) {
+function RecentClaimRow({ claim, variant, showClient = true, showAgency = false, providerFree = false }: RecentClaimRowProps) {
   const { labels } = useStaffLabels();
   if (variant === "mobile") {
     return (
       <div className="rounded-[16px] border border-[#e5e5e6] bg-white px-4 py-4">
         {showClient ? (
-          <ClientNameLink
-            name={claim.client}
-            clientId={claim.clientId}
-            className="text-[15px] font-semibold text-[#10141a]"
-          />
+          providerFree ? <ProviderFreeClientName name={claim.client} className="text-[15px] font-semibold text-[#10141a]" /> : <ClientNameLink name={claim.client} clientId={claim.clientId} className="text-[15px] font-semibold text-[#10141a]" />
         ) : null}
 
         {showAgency && claim.agencyName ? (
@@ -89,7 +90,7 @@ function RecentClaimRow({ claim, variant, showClient = true, showAgency = false 
         <div className={showClient ? "mt-4 space-y-3" : "space-y-3"}>
           <div className="flex justify-between gap-4">
             <span className="text-[13px] text-[#808081]">{labels.noun}</span>
-            <StaffLink staffId={claim.staffId} staffName={claim.staffName} />
+            {providerFree ? <ProviderFreeStaff staffId={claim.staffId} staffName={claim.staffName} /> : <StaffLink staffId={claim.staffId} staffName={claim.staffName} />}
           </div>
           <div className="flex justify-between gap-4">
             <span className="text-[13px] text-[#808081]">Service date</span>
@@ -134,16 +135,12 @@ function RecentClaimRow({ claim, variant, showClient = true, showAgency = false 
   return (
     <div className={showClient ? TABLE_ROW_CLASS : showAgency ? NETWORK_GROUPED_TABLE_ROW_CLASS : GROUPED_TABLE_ROW_CLASS}>
       {showClient ? (
-        <ClientNameLink
-          name={claim.client}
-          clientId={claim.clientId}
-          className="text-[14px] font-medium text-[#10141a]"
-        />
+        providerFree ? <ProviderFreeClientName name={claim.client} className="text-[14px] font-medium text-[#10141a]" /> : <ClientNameLink name={claim.client} clientId={claim.clientId} className="text-[14px] font-medium text-[#10141a]" />
       ) : null}
       {!showClient && showAgency ? (
         <span className="text-[13px] text-[#10141a]">{claim.agencyName ?? "â€”"}</span>
       ) : null}
-      <StaffLink staffId={claim.staffId} staffName={claim.staffName} />
+      {providerFree ? <ProviderFreeStaff staffId={claim.staffId} staffName={claim.staffName} /> : <StaffLink staffId={claim.staffId} staffName={claim.staffName} />}
       <span className="text-[13px] text-[#10141a]">{claim.serviceCode}</span>
       <span className="text-[13px] text-[#10141a]">{claim.paNumber}</span>
       <span className="text-[13px] text-[#10141a]">{claim.serviceDate}</span>

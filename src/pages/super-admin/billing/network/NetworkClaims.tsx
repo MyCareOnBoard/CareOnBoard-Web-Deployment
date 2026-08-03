@@ -9,7 +9,10 @@ import { cancelOutOfPocketInvoice, createOutOfPocketInvoice, getOutOfPocketInvoi
 import { NETWORK_BILLING_QUERY_OPTIONS, networkBillingApi, type ClaimsNetworkBillingArgs } from "@/lib/api/network-billing";
 import ClaimsOverviewCards from "@/pages/agency/billing/claims/components/ClaimsOverviewCards";
 import ClaimsWorkspaceTabs from "@/pages/agency/billing/claims/components/ClaimsWorkspaceTabs";
+import RecentClaimsTable from "@/pages/agency/billing/claims/components/RecentClaimsTable";
+import SavedClaimsTable from "@/pages/agency/billing/claims/components/SavedClaimsTable";
 import type { RecentClaim } from "@/pages/agency/billing/claims/data/mockClaimsDashboardData";
+import type { RecentClaimClientGroup } from "@/pages/agency/billing/claims/utils/groupRecentClaimsByClient";
 import { useBillingWorkspaceContext } from "../BillingWorkspaceContext";
 import type { NetworkBillingClaimRow, NetworkBillingOption, NetworkBillingSavedClaimRow } from "../types";
 
@@ -20,13 +23,12 @@ type Tab = "ready" | "saved";
 type AgencyClaim = BillingClaimListItem & { agencyId: string; agencyName: string };
 type AgencyInvoice = OutOfPocketInvoiceListItem & { agencyId: string; agencyName: string };
 type ReadyClaim = Extract<NetworkBillingClaimRow, { sourceType: "shift" | "ride" }>;
-type ReadyClaimGroup = {
-  agencyId: string;
-  agencyName: string;
-  clientId: string | null | undefined;
-  clientName: string | null | undefined;
-  serviceCode: string;
-  rows: ReadyClaim[];
+type BillingLeg = "claim" | "invoice";
+type GenerateState = {
+  claims: RecentClaim[];
+  completed: BillingLeg[];
+  failed: BillingLeg[];
+  submitting: boolean;
 };
 
 function textDate(value: unknown): string | null {
@@ -108,24 +110,6 @@ function dedupe(rows: readonly NetworkBillingClaimRow[]): NetworkBillingClaimRow
   return [...new Map(rows.map((row) => [`${row.agencyId}:${row.id}`, row])).values()];
 }
 
-function readyClaimGroups(rows: readonly ReadyClaim[]): ReadyClaimGroup[] {
-  const groups = new Map<string, ReadyClaimGroup>();
-  rows.forEach((row) => {
-    const key = [row.agencyId, row.clientId ?? "unknown-client", row.serviceCode, row.weekRange ?? ""].join(":");
-    const group = groups.get(key);
-    if (group) group.rows.push(row);
-    else groups.set(key, {
-      agencyId: row.agencyId,
-      agencyName: row.agencyName,
-      clientId: row.clientId,
-      clientName: row.clientName,
-      serviceCode: row.serviceCode,
-      rows: [row],
-    });
-  });
-  return [...groups.values()];
-}
-
 export function ClaimDetailBody({ detail, error, loading }: { detail?: BillingClaimDetail; error?: string; loading: boolean }) {
   if (loading) return <DialogDescription>Loading the selected agency claim...</DialogDescription>;
   if (error) return <DialogDescription>{error}</DialogDescription>;
@@ -155,26 +139,23 @@ export default function NetworkClaims() {
   const [tab, setTab] = useState<Tab>("ready");
   const [status, setStatus] = useState<BillingClaimStatus | "all">("all");
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [client, setClient] = useState<NetworkBillingOption | null>(null);
   const [rows, setRows] = useState<NetworkBillingClaimRow[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const seenCursors = useRef(new Set<string>());
   const [statusClaim, setStatusClaim] = useState<AgencyClaim | null>(null);
   const [cancelClaim, setCancelClaim] = useState<AgencyClaim | null>(null);
-  const [generating, setGenerating] = useState<RecentClaim[]>([]);
+  const [generating, setGenerating] = useState<GenerateState | null>(null);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+  const activeSearch = useRef<{ abort?: () => void } | null>(null);
   const [claimDetail, setClaimDetail] = useState<{ claim: AgencyClaim; detail?: BillingClaimDetail; loading: boolean; error?: string } | null>(null);
   const [invoiceDetail, setInvoiceDetail] = useState<{ invoice: AgencyInvoice; detail?: OutOfPocketInvoiceDetail; loading: boolean; error?: string } | null>(null);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
-    return () => window.clearTimeout(timer);
-  }, [search]);
 
   useEffect(() => {
     setClient(null);
     setCursor(null);
     seenCursors.current.clear();
+    setLoadMoreError(null);
   }, [tab, status, workspace.startDate, workspace.endDate, workspace.mode]);
 
   const base = {
@@ -189,13 +170,30 @@ export default function NetworkClaims() {
     : { ...base, tab: "saved", ...(client ? { clientId: client.id, clientAgencyId: client.agencyId } : {}), ...(status === "all" ? {} : { status }) };
   const bootstrap = networkBillingApi.useGetClaimsBootstrapQuery(args, NETWORK_BILLING_QUERY_OPTIONS);
   const [loadPage, page] = networkBillingApi.useLazyGetClaimsPageQuery();
-  const options = networkBillingApi.useSearchBillingOptionsQuery({
-    actorUid: workspace.actorUid,
-    environment: workspace.environment,
-    scope: workspace.scope,
-    kind: "client",
-    q: debouncedSearch,
-  }, { skip: client !== null || debouncedSearch.length < 2 });
+  const [searchOptions, options] = networkBillingApi.useLazySearchBillingOptionsQuery();
+
+  useEffect(() => {
+    const query = search.trim();
+    activeSearch.current?.abort?.();
+    activeSearch.current = null;
+    if (client || query.length < 2) return;
+    const timer = window.setTimeout(() => {
+      const request = searchOptions({
+        actorUid: workspace.actorUid,
+        environment: workspace.environment,
+        scope: workspace.scope,
+        kind: "client",
+        q: query,
+      });
+      activeSearch.current = request;
+      void request.unwrap().catch(() => undefined);
+    }, 300);
+    return () => {
+      window.clearTimeout(timer);
+      activeSearch.current?.abort?.();
+      activeSearch.current = null;
+    };
+  }, [client, search, searchOptions, workspace.actorUid, workspace.environment, workspace.scope]);
 
   useEffect(() => {
     if (!bootstrap.data) return;
@@ -205,7 +203,7 @@ export default function NetworkClaims() {
   }, [bootstrap.data]);
 
   const ready = useMemo(() => rows.filter((row): row is ReadyClaim => "sourceType" in row), [rows]);
-  const readyGroups = useMemo(() => readyClaimGroups(ready), [ready]);
+  const readyClaims = useMemo(() => ready.map(readyClaim), [ready]);
   const claims = useMemo(() => rows.filter((row): row is NetworkBillingSavedClaimRow & { kind: "claim" } => "kind" in row && row.kind === "claim").map(savedClaim), [rows]);
   const invoices = useMemo(() => rows.filter((row): row is NetworkBillingSavedClaimRow & { kind: "invoice" } => "kind" in row && row.kind === "invoice").map(savedInvoice), [rows]);
   const invalidate = (agencyId: string) => dispatch(networkBillingApi.util.invalidateTags([
@@ -221,8 +219,10 @@ export default function NetworkClaims() {
       const result = await loadPage({ ...args, cursor: requestedCursor }).unwrap();
       setRows((current) => dedupe([...current, ...result.page.rows]));
       setCursor(result.page.nextCursor === requestedCursor ? null : result.page.nextCursor);
+      setLoadMoreError(null);
     } catch {
       seenCursors.current.delete(requestedCursor);
+      setLoadMoreError(tab === "ready" ? "Couldn't load more ready-to-bill items. Your current rows are still available." : "Couldn't load more claims and invoices. Your current rows are still available.");
     }
   };
 
@@ -254,13 +254,45 @@ export default function NetworkClaims() {
     }));
   }, [bootstrap.data]);
 
+  const openGenerate = (group: RecentClaimClientGroup) => {
+    if (generating?.submitting || group.claims.length === 0) return;
+    setGenerating({ claims: group.claims, completed: [], failed: [], submitting: false });
+  };
+
+  const submitGenerate = async () => {
+    if (!generating || generating.submitting) return;
+    const selected = generating.claims;
+    const agencyId = selected[0]?.agencyId;
+    const clientId = selected[0]?.clientId;
+    if (!agencyId || !clientId) return;
+    const planned = generating.failed.length > 0
+      ? generating.failed
+      : ([...(selected.some((row) => row.needsClaim) ? ["claim" as const] : []), ...(selected.some((row) => row.needsInvoice) ? ["invoice" as const] : [])] as BillingLeg[]).filter((leg) => !generating.completed.includes(leg));
+    if (planned.length === 0) return;
+    setGenerating((current) => current ? { ...current, submitting: true, failed: [] } : current);
+    const shiftsFor = (leg: BillingLeg) => selected.filter((row) => (leg === "claim" ? row.needsClaim : row.needsInvoice) && row.sourceType !== "ride").map((row) => row.sourceId!).filter(Boolean);
+    const ridesFor = (leg: BillingLeg) => selected.filter((row) => (leg === "claim" ? row.needsClaim : row.needsInvoice) && row.sourceType === "ride").map((row) => row.sourceId!).filter(Boolean);
+    const results = await Promise.allSettled(planned.map(async (leg) => {
+      if (leg === "claim") return createBillingClaim({ context: { agencyId }, payload: { clientId, shiftIds: shiftsFor(leg), rideIds: ridesFor(leg), serviceCode: selected[0]!.serviceCode, ...(selected[0]!.weekRange ? { weekRange: selected[0]!.weekRange } : {}) } });
+      return createOutOfPocketInvoice({ context: { agencyId }, payload: { clientId, shiftIds: shiftsFor(leg), rideIds: ridesFor(leg) } });
+    }));
+    const succeeded = planned.filter((_, index) => results[index]?.status === "fulfilled");
+    const failed = planned.filter((_, index) => results[index]?.status === "rejected");
+    if (succeeded.length) invalidate(agencyId);
+    setGenerating((current) => {
+      if (!current) return current;
+      const completed = [...new Set([...current.completed, ...succeeded])];
+      return failed.length ? { ...current, completed, failed, submitting: false } : null;
+    });
+  };
+
   return <section aria-label="Network claims" aria-busy={bootstrap.isLoading || page.isFetching} className="min-w-0 space-y-6 pb-8">
     <ClaimsOverviewCards stats={summaryStats} loading={bootstrap.isLoading && !bootstrap.data} />
     <ClaimsWorkspaceTabs activeTab={tab === "ready" ? "shifts" : "saved"} onTabChange={(next) => setTab(next === "shifts" ? "ready" : "saved")} />
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
       <label className="sr-only" htmlFor="network-claims-client">Find a client</label>
       <input id="network-claims-client" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search authorized clients" className="h-11 w-full rounded-md border border-[#e5e5e6] bg-white px-3 text-sm sm:max-w-xs" />
-      {client ? <Button type="button" variant="outline" className="min-h-11" onClick={() => { setClient(null); setSearch(""); setDebouncedSearch(""); }}>Clear client</Button> : null}
+      {client ? <Button type="button" variant="outline" className="min-h-11" onClick={() => { setClient(null); setSearch(""); }}>Clear client</Button> : null}
     </div>
     {options.data?.length ? <div role="listbox" aria-label="Authorized clients" className="rounded-xl border border-[#e5e5e6] bg-white p-2">
       {options.data.map((option) => <button key={`${option.agencyId}:${option.id}`} type="button" role="option" className="block min-h-11 w-full rounded-lg px-3 text-left text-sm hover:bg-[#eef4f5]" onClick={() => { setClient(option); setSearch(option.name); }}>
@@ -268,23 +300,60 @@ export default function NetworkClaims() {
       </button>)}
     </div> : null}
     {tab === "ready" ? <section aria-label="Ready to bill">
-      <h2 className="mb-4 text-lg font-semibold text-[#10141a]">Ready to bill</h2>
-      <div className="space-y-3">
-        {readyGroups.map((group) => <div key={`${group.agencyId}:${group.clientId}:${group.serviceCode}`} role="rowgroup" aria-label={`Ready billing group ${group.agencyName} ${group.clientName ?? "Unknown client"}`} className="overflow-x-auto rounded-2xl border border-[#e5e5e6] bg-white">
-          <div className="flex min-h-11 flex-wrap items-center justify-between gap-3 border-b border-[#e5e5e6] bg-[#f8fbfb] px-3 text-sm"><span><strong>{group.agencyName}</strong> · {group.clientName ?? "Unknown client"} · {group.serviceCode}</span><Button type="button" variant="outline" className="min-h-11" onClick={() => setGenerating(group.rows.map(readyClaim))}>Generate bills</Button></div>
-          <table className="min-w-[640px] w-full text-left text-sm"><thead className="border-b border-[#e5e5e6] text-[#687173]"><tr><th className="p-3">Service line</th><th>Date</th><th className="p-3 text-right">Billing legs</th></tr></thead><tbody>{group.rows.map((row) => <tr key={`${row.agencyId}:${row.id}`} className="border-b border-[#eef1f1] last:border-0"><td className="p-3">{row.sourceType === "ride" ? "Mileage" : "Shift"}</td><td>{row.sortDate ?? "-"}</td><td className="p-3 text-right">{row.needsClaim ? "Claim" : ""}{row.needsClaim && row.needsInvoice ? " + " : ""}{row.needsInvoice ? "Invoice" : ""}</td></tr>)}</tbody></table>
-        </div>)}
-      </div>
-      {cursor ? <Button type="button" variant="outline" className="mt-4 min-h-11" disabled={page.isFetching} onClick={loadMore}>Load more ready-to-bill items</Button> : null}
+      <RecentClaimsTable
+        claims={readyClaims}
+        loading={bootstrap.isLoading}
+        showAgency
+        groupByBillingPeriod
+        providerFree
+        showControls={false}
+        onGenerateClaim={openGenerate}
+        generateDisabled={Boolean(generating?.submitting)}
+        isRefetching={page.isFetching}
+        nextCursor={cursor}
+        onLoadMore={loadMore}
+        loadMoreError={loadMoreError}
+      />
     </section> : <section aria-label="Claims and invoices">
-      <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-semibold text-[#10141a]">Claims &amp; invoices</h2><label className="text-sm">Status <select value={status} onChange={(event) => setStatus(event.target.value as BillingClaimStatus | "all")} className="ml-2 h-11 rounded-md border border-[#e5e5e6] bg-white px-3"><option value="all">All</option><option value="pending">Pending</option><option value="paid">Paid</option><option value="rejected">Rejected</option></select></label></div>
-      <div className="space-y-2">{claims.map((claim) => <div key={`${claim.agencyId}:${claim.id}`} className="flex flex-wrap items-center gap-3 rounded-xl border border-[#e5e5e6] bg-white p-3 text-sm"><span className="font-semibold">{claim.claimNumber}</span><span>{claim.agencyName}</span><span>{claim.clientName}</span><span className="ml-auto">{claim.status}</span><Button type="button" variant="outline" className="min-h-11" onClick={() => void openReport(claim)}>View report</Button><Button type="button" variant="outline" className="min-h-11" onClick={() => setStatusClaim(claim)}>Update status</Button><Button type="button" variant="outline" className="min-h-11" onClick={() => setCancelClaim(claim)}>Cancel</Button></div>)}{invoices.map((invoice) => <div key={`${invoice.agencyId}:${invoice.id}`} className="flex flex-wrap items-center gap-3 rounded-xl border border-[#e5e5e6] bg-white p-3 text-sm"><span className="font-semibold">{invoice.invoiceNumber}</span><span>{invoice.agencyName}</span><span>{invoice.clientName}</span><Button type="button" variant="outline" className="ml-auto min-h-11" onClick={() => void openInvoice(invoice)}>View invoice</Button><Button type="button" variant="outline" className="min-h-11" onClick={() => void cancelOutOfPocketInvoice({ context: { agencyId: invoice.agencyId }, invoiceId: invoice.id }).then(() => invalidate(invoice.agencyId))}>Cancel</Button></div>)}</div>
-      {cursor ? <Button type="button" variant="outline" className="mt-4 min-h-11" disabled={page.isFetching} onClick={loadMore}>Load more claims and invoices</Button> : null}
+      <SavedClaimsTable
+        claims={claims}
+        invoices={invoices}
+        totalCount={bootstrap.data?.page.total ?? rows.length}
+        loading={bootstrap.isLoading}
+        statusFilter={status}
+        onStatusFilterChange={setStatus}
+        onClientSearchChange={() => undefined}
+        onViewReport={openReport}
+        onUpdateStatus={setStatusClaim}
+        onCancelClaim={setCancelClaim}
+        onViewInvoice={openInvoice}
+        onCancelInvoice={(invoice) => void cancelOutOfPocketInvoice({ context: { agencyId: invoice.agencyId }, invoiceId: invoice.id }).then(() => invalidate(invoice.agencyId))}
+        actionsDisabled={Boolean(generating?.submitting)}
+        showAgency
+        providerFree
+        showControls={false}
+        isRefetching={page.isFetching}
+        nextCursor={cursor}
+        onLoadMore={loadMore}
+        loadMoreError={loadMoreError}
+      />
     </section>}
     {statusClaim ? <Suspense fallback={null}><UpdateClaimStatusModal open claim={statusClaim} onClose={() => setStatusClaim(null)} onConfirm={async (payload) => { await updateBillingClaimStatus({ context: { agencyId: statusClaim.agencyId }, claimId: statusClaim.id, payload }); invalidate(statusClaim.agencyId); setStatusClaim(null); }} /></Suspense> : null}
     {cancelClaim ? <Suspense fallback={null}><CancelClaimDialog open claim={cancelClaim} onClose={() => setCancelClaim(null)} onConfirm={async () => { await cancelBillingClaim({ context: { agencyId: cancelClaim.agencyId }, claimId: cancelClaim.id }); invalidate(cancelClaim.agencyId); setCancelClaim(null); }} /></Suspense> : null}
     <Dialog open={Boolean(claimDetail)} onOpenChange={(open) => !open && setClaimDetail(null)}><DialogContent><DialogHeader><DialogTitle>Claim report</DialogTitle></DialogHeader><ClaimDetailBody detail={claimDetail?.detail} error={claimDetail?.error} loading={Boolean(claimDetail?.loading)} /></DialogContent></Dialog>
     <Dialog open={Boolean(invoiceDetail)} onOpenChange={(open) => !open && setInvoiceDetail(null)}><DialogContent><DialogHeader><DialogTitle>{invoiceDetail?.invoice.invoiceNumber ?? "Invoice"}</DialogTitle></DialogHeader><InvoiceDetailBody detail={invoiceDetail?.detail} error={invoiceDetail?.error} loading={Boolean(invoiceDetail?.loading)} />{invoiceDetail ? <div className="flex justify-end gap-2"><Button type="button" variant="outline" className="min-h-11" onClick={() => void sendOutOfPocketInvoice({ context: { agencyId: invoiceDetail.invoice.agencyId }, invoiceId: invoiceDetail.invoice.id }).then(() => invalidate(invoiceDetail.invoice.agencyId))}>Send invoice</Button><Button type="button" variant="outline" className="min-h-11" onClick={() => void cancelOutOfPocketInvoice({ context: { agencyId: invoiceDetail.invoice.agencyId }, invoiceId: invoiceDetail.invoice.id }).then(() => { invalidate(invoiceDetail.invoice.agencyId); setInvoiceDetail(null); })}>Cancel invoice</Button></div> : null}</DialogContent></Dialog>
-    <Dialog open={generating.length > 0} onOpenChange={(open) => !open && setGenerating([])}><DialogContent><DialogHeader><DialogTitle>Generate bills</DialogTitle><DialogDescription>{generating.length ? `Create bills for ${generating.length} selected service line${generating.length === 1 ? "" : "s"} at ${generating[0]!.agencyName}.` : ""}</DialogDescription></DialogHeader>{generating.length ? <div className="flex justify-end gap-2"><Button type="button" variant="outline" className="min-h-11" onClick={() => setGenerating([])}>Cancel</Button><Button type="button" className="min-h-11" onClick={() => void Promise.all([...(generating.some((row) => row.needsClaim) ? [createBillingClaim({ context: { agencyId: generating[0]!.agencyId! }, payload: { clientId: generating[0]!.clientId!, shiftIds: generating.filter((row) => row.needsClaim && row.sourceType !== "ride").map((row) => row.sourceId!), rideIds: generating.filter((row) => row.needsClaim && row.sourceType === "ride").map((row) => row.sourceId!), serviceCode: generating[0]!.serviceCode, ...(generating[0]!.weekRange ? { weekRange: generating[0]!.weekRange } : {}) } })] : []), ...(generating.some((row) => row.needsInvoice) ? [createOutOfPocketInvoice({ context: { agencyId: generating[0]!.agencyId! }, payload: { clientId: generating[0]!.clientId!, shiftIds: generating.filter((row) => row.needsInvoice && row.sourceType !== "ride").map((row) => row.sourceId!), rideIds: generating.filter((row) => row.needsInvoice && row.sourceType === "ride").map((row) => row.sourceId!) } })] : [])]).then(() => { invalidate(generating[0]!.agencyId!); setGenerating([]); })}>Generate bills</Button></div> : null}</DialogContent></Dialog>
+    <Dialog open={Boolean(generating)} onOpenChange={(open) => !open && !generating?.submitting && setGenerating(null)}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Generate bills</DialogTitle>
+          <DialogDescription>{generating ? `Create bills for ${generating.claims.length} selected service line${generating.claims.length === 1 ? "" : "s"} at ${generating.claims[0]?.agencyName}.` : ""}</DialogDescription>
+        </DialogHeader>
+        {generating?.failed.length ? <p role="alert" aria-live="polite" className="text-sm text-[#b42318]">{generating.completed.length ? "The completed billing leg will not be repeated. " : ""}Couldn&apos;t create {generating.failed.join(" and ")}. Retry the remaining leg.</p> : null}
+        {generating ? <div className="flex justify-end gap-2">
+          <Button type="button" variant="outline" className="min-h-11" disabled={generating.submitting} onClick={() => setGenerating(null)}>Cancel</Button>
+          <Button type="button" className="min-h-11" disabled={generating.submitting} onClick={() => void submitGenerate()}>{generating.submitting ? "Generating bills…" : generating.failed.length ? "Retry remaining bills" : "Generate bills"}</Button>
+        </div> : null}
+      </DialogContent>
+    </Dialog>
   </section>;
 }

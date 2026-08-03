@@ -11,21 +11,22 @@ export type RecentClaimClientGroup = {
   billingDirection: "claims" | "out-of-pocket";
 };
 
-function getClientKey(claim: RecentClaim, showAgency: boolean) {
+function getClientKey(claim: RecentClaim, showAgency: boolean, groupByBillingPeriod: boolean) {
   const clientKey = claim.clientId?.trim() || claim.client.trim() || "unknown";
-  if (!showAgency) return clientKey;
+  const agencyKey = showAgency ? `${claim.agencyId?.trim() || "unknown-agency"}:${clientKey}` : clientKey;
+  if (!groupByBillingPeriod) return agencyKey;
 
-  return `${claim.agencyId?.trim() || "unknown-agency"}:${clientKey}`;
+  return `${agencyKey}:${claim.serviceCode}:${claim.weekRange ?? ""}`;
 }
 
 export function groupRecentClaimsByClient(
   claims: RecentClaim[],
-  { showAgency = false }: { showAgency?: boolean } = {},
+  { showAgency = false, groupByBillingPeriod = false }: { showAgency?: boolean; groupByBillingPeriod?: boolean } = {},
 ): RecentClaimClientGroup[] {
   const grouped = new Map<string, RecentClaimClientGroup>();
 
   for (const claim of claims) {
-    const clientKey = getClientKey(claim, showAgency);
+    const clientKey = getClientKey(claim, showAgency, groupByBillingPeriod);
     const existing = grouped.get(clientKey);
 
     if (existing) {
