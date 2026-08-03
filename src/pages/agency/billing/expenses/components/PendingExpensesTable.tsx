@@ -7,24 +7,34 @@ import {
   NETWORK_EXPENSES_TABLE_HEADER_CLASS,
   NETWORK_EXPENSES_TABLE_MIN_WIDTH,
 } from "./tableColumns";
+import {
+  assertNetworkExpenseRows,
+  type ExpenseActionCallbacks,
+  type NetworkAgencyExpense,
+} from "./expenseTableTypes";
 
 const SKELETON_ROW_COUNT = 8;
 
-type AgencyAwareExpense = AgencyExpenseListItem & {
-  agencyId?: string;
-  agencyName?: string;
-};
-
-type PendingExpensesTableProps = {
-  expenses: AgencyAwareExpense[];
+type SharedPendingExpensesTableProps<T extends AgencyExpenseListItem> = Omit<
+  ExpenseActionCallbacks<T>,
+  "onApprove" | "onDecline" | "onDelete"
+> & {
+  expenses: T[];
   loading?: boolean;
-  onApprove: (expense: AgencyExpenseListItem) => void;
-  onDecline: (expense: AgencyExpenseListItem) => void;
-  onDelete: (expense: AgencyExpenseListItem) => void;
+  onApprove: (expense: T) => void;
+  onDecline: (expense: T) => void;
+  onDelete: (expense: T) => void;
   actionsDisabled?: boolean;
   noun?: string;
-  showAgency?: boolean;
 };
+
+type PendingExpensesTableProps =
+  | (SharedPendingExpensesTableProps<AgencyExpenseListItem> & {
+      showAgency?: false;
+    })
+  | (SharedPendingExpensesTableProps<NetworkAgencyExpense> & {
+      showAgency: true;
+    });
 
 function SkeletonRow({ showAgency = false }: { showAgency?: boolean }) {
   return (
@@ -39,16 +49,18 @@ function SkeletonRow({ showAgency = false }: { showAgency?: boolean }) {
   );
 }
 
-export default function PendingExpensesTable({
-  expenses,
-  loading = false,
-  onApprove,
-  onDecline,
-  onDelete,
-  actionsDisabled = false,
-  noun = "DSP",
-  showAgency = false,
-}: PendingExpensesTableProps) {
+export default function PendingExpensesTable(props: PendingExpensesTableProps) {
+  const {
+    expenses,
+    loading = false,
+    actionsDisabled = false,
+    noun = "DSP",
+  } = props;
+  const showAgency = props.showAgency === true;
+
+  if (showAgency) {
+    assertNetworkExpenseRows(expenses);
+  }
   const [searchQuery, setSearchQuery] = useState("");
   const isInitialLoading = loading && expenses.length === 0;
 
@@ -69,6 +81,38 @@ export default function PendingExpensesTable({
       : filteredExpenses.length === 0
         ? "No expenses match your search."
         : "";
+  const expenseKey = (expense: AgencyExpenseListItem) =>
+    props.showAgency
+      ? `${(expense as NetworkAgencyExpense).agencyId}:${expense.id}`
+      : expense.id;
+  const renderExpenseRow = (
+    expense: AgencyExpenseListItem,
+    variant: "desktop" | "mobile",
+  ) =>
+    props.showAgency ? (
+      <ExpenseRow
+        key={expenseKey(expense)}
+        expense={expense as NetworkAgencyExpense}
+        showAgency
+        variant={variant}
+        showActions
+        actionsDisabled={actionsDisabled}
+        onApprove={props.onApprove}
+        onDecline={props.onDecline}
+        onDelete={props.onDelete}
+      />
+    ) : (
+      <ExpenseRow
+        key={expenseKey(expense)}
+        expense={expense}
+        variant={variant}
+        showActions
+        actionsDisabled={actionsDisabled}
+        onApprove={props.onApprove}
+        onDecline={props.onDecline}
+        onDelete={props.onDelete}
+      />
+    );
 
   return (
     <section>
@@ -115,22 +159,9 @@ export default function PendingExpensesTable({
                 <SkeletonRow key={index} showAgency={showAgency} />
               ))
             ) : filteredExpenses.length > 0 ? (
-              filteredExpenses.map((expense) => (
-                <ExpenseRow
-                  key={
-                    showAgency
-                      ? `${expense.agencyId}:${expense.id}`
-                      : expense.id
-                  }
-                  expense={expense}
-                  showActions
-                  actionsDisabled={actionsDisabled}
-                  showAgency={showAgency}
-                  onApprove={onApprove}
-                  onDecline={onDecline}
-                  onDelete={onDelete}
-                />
-              ))
+              filteredExpenses.map((expense) =>
+                renderExpenseRow(expense, "desktop"),
+              )
             ) : (
               <div className="px-4 py-10 text-center text-[14px] text-[#808081]">
                 {emptyMessage}
@@ -149,21 +180,7 @@ export default function PendingExpensesTable({
             />
           ))
         ) : filteredExpenses.length > 0 ? (
-          filteredExpenses.map((expense) => (
-            <ExpenseRow
-              key={
-                showAgency ? `${expense.agencyId}:${expense.id}` : expense.id
-              }
-              expense={expense}
-              variant="mobile"
-              showActions
-              actionsDisabled={actionsDisabled}
-              showAgency={showAgency}
-              onApprove={onApprove}
-              onDecline={onDecline}
-              onDelete={onDelete}
-            />
-          ))
+          filteredExpenses.map((expense) => renderExpenseRow(expense, "mobile"))
         ) : (
           <div className="rounded-[16px] border border-[#e5e5e6] bg-white px-4 py-10 text-center text-[14px] text-[#808081]">
             {emptyMessage}

@@ -11,16 +11,15 @@ import {
   NETWORK_EXPENSES_TABLE_HEADER_CLASS,
   NETWORK_EXPENSES_TABLE_MIN_WIDTH,
 } from "./tableColumns";
+import {
+  assertNetworkExpenseRows,
+  type NetworkAgencyExpense,
+} from "./expenseTableTypes";
 
 const SKELETON_ROW_COUNT = 8;
 
-type AgencyAwareExpense = AgencyExpenseListItem & {
-  agencyId?: string;
-  agencyName?: string;
-};
-
-type ExpensesHistoryTableProps = {
-  expenses: AgencyAwareExpense[];
+type SharedExpensesHistoryTableProps<T extends AgencyExpenseListItem> = {
+  expenses: T[];
   totalCount: number;
   hasMore: boolean;
   page: number;
@@ -29,10 +28,17 @@ type ExpensesHistoryTableProps = {
   onStatusFilterChange: (status: ExpenseStatus | "all") => void;
   onLoadMore?: () => void;
   noun?: string;
-  showAgency?: boolean;
   isRefetching?: boolean;
   nextCursor?: string | null;
 };
+
+type ExpensesHistoryTableProps =
+  | (SharedExpensesHistoryTableProps<AgencyExpenseListItem> & {
+      showAgency?: false;
+    })
+  | (SharedExpensesHistoryTableProps<NetworkAgencyExpense> & {
+      showAgency: true;
+    });
 
 function SkeletonRow({ showAgency = false }: { showAgency?: boolean }) {
   return (
@@ -47,20 +53,25 @@ function SkeletonRow({ showAgency = false }: { showAgency?: boolean }) {
   );
 }
 
-export default function ExpensesHistoryTable({
-  expenses,
-  totalCount,
-  hasMore,
-  page,
-  loading = false,
-  statusFilter,
-  onStatusFilterChange,
-  onLoadMore,
-  noun = "DSP",
-  showAgency = false,
-  isRefetching = false,
-  nextCursor,
-}: ExpensesHistoryTableProps) {
+export default function ExpensesHistoryTable(props: ExpensesHistoryTableProps) {
+  const {
+    expenses,
+    totalCount,
+    hasMore,
+    page,
+    loading = false,
+    statusFilter,
+    onStatusFilterChange,
+    onLoadMore,
+    noun = "DSP",
+    isRefetching = false,
+    nextCursor,
+  } = props;
+  const showAgency = props.showAgency === true;
+
+  if (showAgency) {
+    assertNetworkExpenseRows(expenses);
+  }
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredExpenses = useMemo(() => {
@@ -82,6 +93,28 @@ export default function ExpensesHistoryTable({
       : filteredExpenses.length === 0
         ? "No expenses match your search."
         : "";
+  const expenseKey = (expense: AgencyExpenseListItem) =>
+    props.showAgency
+      ? `${(expense as NetworkAgencyExpense).agencyId}:${expense.id}`
+      : expense.id;
+  const renderExpenseRow = (
+    expense: AgencyExpenseListItem,
+    variant: "desktop" | "mobile",
+  ) =>
+    props.showAgency ? (
+      <ExpenseRow
+        key={expenseKey(expense)}
+        expense={expense as NetworkAgencyExpense}
+        showAgency
+        variant={variant}
+      />
+    ) : (
+      <ExpenseRow
+        key={expenseKey(expense)}
+        expense={expense}
+        variant={variant}
+      />
+    );
 
   return (
     <section>
@@ -148,17 +181,9 @@ export default function ExpensesHistoryTable({
                 <SkeletonRow key={index} showAgency={showAgency} />
               ))
             ) : filteredExpenses.length > 0 ? (
-              filteredExpenses.map((expense) => (
-                <ExpenseRow
-                  key={
-                    showAgency
-                      ? `${expense.agencyId}:${expense.id}`
-                      : expense.id
-                  }
-                  expense={expense}
-                  showAgency={showAgency}
-                />
-              ))
+              filteredExpenses.map((expense) =>
+                renderExpenseRow(expense, "desktop"),
+              )
             ) : (
               <div className="px-4 py-10 text-center text-[14px] text-[#808081]">
                 {emptyMessage}
@@ -177,16 +202,7 @@ export default function ExpensesHistoryTable({
             />
           ))
         ) : filteredExpenses.length > 0 ? (
-          filteredExpenses.map((expense) => (
-            <ExpenseRow
-              key={
-                showAgency ? `${expense.agencyId}:${expense.id}` : expense.id
-              }
-              expense={expense}
-              showAgency={showAgency}
-              variant="mobile"
-            />
-          ))
+          filteredExpenses.map((expense) => renderExpenseRow(expense, "mobile"))
         ) : (
           <div className="rounded-[16px] border border-[#e5e5e6] bg-white px-4 py-10 text-center text-[14px] text-[#808081]">
             {emptyMessage}

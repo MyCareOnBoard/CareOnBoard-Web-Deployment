@@ -7,10 +7,27 @@ import {
   ACTIVITY_TABLE_ROW_CLASS,
 } from "./activityTableColumns";
 
-type AgencyAwareActivity = RecentActivity & {
-  agencyId?: string;
-  agencyName?: string;
+type NetworkAgencyActivity = RecentActivity & {
+  agencyId: string;
+  agencyName: string;
 };
+
+function assertNetworkActivityRows(
+  activity: readonly RecentActivity[],
+): asserts activity is readonly NetworkAgencyActivity[] {
+  if (
+    activity.some(
+      (row) =>
+        typeof (row as Partial<NetworkAgencyActivity>).agencyId !== "string" ||
+        !(row as Partial<NetworkAgencyActivity>).agencyId ||
+        typeof (row as Partial<NetworkAgencyActivity>).agencyName !==
+          "string" ||
+        !(row as Partial<NetworkAgencyActivity>).agencyName,
+    )
+  ) {
+    throw new Error("Network activity rows require agencyId and agencyName");
+  }
+}
 
 const NETWORK_ACTIVITY_TABLE_MIN_WIDTH = "min-w-[940px]";
 const NETWORK_ACTIVITY_TABLE_GRID =
@@ -38,7 +55,7 @@ function ActivityStatusBadge({ activity }: { activity: RecentActivity }) {
 }
 
 type RecentActivityRowProps = {
-  activity: AgencyAwareActivity;
+  activity: NetworkAgencyActivity | RecentActivity;
   variant: "desktop" | "mobile";
   showAgency: boolean;
 };
@@ -49,6 +66,9 @@ const RecentActivityRow = memo(function RecentActivityRow({
   showAgency,
 }: RecentActivityRowProps) {
   const formattedAmount = currencyFormatter.format(activity.amount);
+  const agencyName = showAgency
+    ? (activity as NetworkAgencyActivity).agencyName
+    : undefined;
 
   if (variant === "mobile") {
     return (
@@ -60,9 +80,7 @@ const RecentActivityRow = memo(function RecentActivityRow({
           {showAgency ? (
             <div className="flex justify-between gap-4">
               <dt className="text-[#808081]">Agency</dt>
-              <dd className="font-medium text-[#10141a]">
-                {activity.agencyName ?? "—"}
-              </dd>
+              <dd className="font-medium text-[#10141a]">{agencyName}</dd>
             </div>
           ) : null}
           <div className="flex justify-between gap-4">
@@ -99,9 +117,9 @@ const RecentActivityRow = memo(function RecentActivityRow({
       {showAgency ? (
         <span
           className="truncate text-[13px] font-medium text-[#10141a]"
-          title={activity.agencyName}
+          title={agencyName}
         >
-          {activity.agencyName ?? "—"}
+          {agencyName}
         </span>
       ) : null}
       <span className="text-[13px] text-[#10141a]">{activity.date}</span>
@@ -150,23 +168,33 @@ function ActivityRowSkeleton({
   );
 }
 
-type RecentActivityTableProps = {
-  activity: AgencyAwareActivity[];
+type SharedRecentActivityTableProps<T extends RecentActivity> = {
+  activity: T[];
   loading?: boolean;
-  showAgency?: boolean;
   isRefetching?: boolean;
   nextCursor?: string | null;
   onLoadMore?: () => void;
 };
 
-export default function RecentActivityTable({
-  activity,
-  loading = false,
-  showAgency = false,
-  isRefetching = false,
-  nextCursor,
-  onLoadMore,
-}: RecentActivityTableProps) {
+type RecentActivityTableProps =
+  | (SharedRecentActivityTableProps<RecentActivity> & { showAgency?: false })
+  | (SharedRecentActivityTableProps<NetworkAgencyActivity> & {
+      showAgency: true;
+    });
+
+export default function RecentActivityTable(props: RecentActivityTableProps) {
+  const {
+    activity,
+    loading = false,
+    isRefetching = false,
+    nextCursor,
+    onLoadMore,
+  } = props;
+  const showAgency = props.showAgency === true;
+
+  if (showAgency) {
+    assertNetworkActivityRows(activity);
+  }
   const [searchQuery, setSearchQuery] = useState("");
   const isInitialLoading = loading && activity.length === 0;
   const isBusy = loading || isRefetching;
@@ -179,7 +207,10 @@ export default function RecentActivityTable({
         row.module.toLowerCase().includes(query) ||
         row.date.toLowerCase().includes(query) ||
         row.status.toLowerCase().includes(query) ||
-        (showAgency && row.agencyName?.toLowerCase().includes(query)),
+        (showAgency &&
+          (row as NetworkAgencyActivity).agencyName
+            .toLowerCase()
+            .includes(query)),
     );
   }, [activity, searchQuery, showAgency]);
 
@@ -188,6 +219,10 @@ export default function RecentActivityTable({
     : activity.length === 0
       ? "No recent activity in this date range."
       : "No activity matches your search.";
+  const activityKey = (row: RecentActivity) =>
+    props.showAgency
+      ? `${(row as NetworkAgencyActivity).agencyId}:${row.id}`
+      : row.id;
 
   return (
     <section>
@@ -239,7 +274,7 @@ export default function RecentActivityTable({
             ) : filteredActivity.length > 0 ? (
               filteredActivity.map((row) => (
                 <RecentActivityRow
-                  key={showAgency ? `${row.agencyId}:${row.id}` : row.id}
+                  key={activityKey(row)}
                   activity={row}
                   variant="desktop"
                   showAgency={showAgency}
@@ -265,7 +300,7 @@ export default function RecentActivityTable({
         ) : filteredActivity.length > 0 ? (
           filteredActivity.map((row) => (
             <RecentActivityRow
-              key={showAgency ? `${row.agencyId}:${row.id}` : row.id}
+              key={activityKey(row)}
               activity={row}
               variant="mobile"
               showAgency={showAgency}

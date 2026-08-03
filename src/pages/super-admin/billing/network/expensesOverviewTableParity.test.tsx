@@ -45,6 +45,39 @@ const activity = (
 });
 
 describe("network expense and overview table parity", () => {
+  it("rejects network rows without canonical agency identity", () => {
+    const missingAgency = {
+      ...expense("atlas", "Atlas Care"),
+      agencyId: undefined,
+      agencyName: undefined,
+    };
+
+    expect(() =>
+      render(
+        // @ts-expect-error Network tables require canonical agency identity.
+        <PendingExpensesTable
+          expenses={[missingAgency]}
+          showAgency
+          onApprove={vi.fn()}
+          onDecline={vi.fn()}
+          onDelete={vi.fn()}
+        />,
+      ),
+    ).toThrow("Network expense rows require agencyId and agencyName");
+
+    const missingActivityAgency = {
+      ...activity("atlas", "Atlas Care"),
+      agencyId: undefined,
+      agencyName: undefined,
+    };
+    expect(() =>
+      render(
+        // @ts-expect-error Network activity requires canonical agency identity.
+        <RecentActivityTable activity={[missingActivityAgency]} showAgency />,
+      ),
+    ).toThrow("Network activity rows require agencyId and agencyName");
+  });
+
   it("keeps agency tables unchanged without Agency headers or labels", () => {
     render(
       <>
