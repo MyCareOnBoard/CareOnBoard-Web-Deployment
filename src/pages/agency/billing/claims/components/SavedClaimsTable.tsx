@@ -41,6 +41,10 @@ type SavedClaimsTableProps = {
   nextCursor?: string | null;
   onLoadMore?: () => void;
   providerFree?: boolean;
+  /** Lets network billing retain status filtering without mounting agency client search. */
+  showStatusFilter?: boolean;
+  /** Lets network billing provide its own authorized-client control. */
+  showClientSearch?: boolean;
   showControls?: boolean;
   loadMoreError?: string | null;
 };
@@ -101,6 +105,8 @@ export default function SavedClaimsTable({
   onLoadMore,
   providerFree = false,
   showControls = true,
+  showStatusFilter = showControls,
+  showClientSearch = showControls,
   loadMoreError,
 }: SavedClaimsTableProps) {
   const groupedClaims = useMemo(
@@ -125,7 +131,8 @@ export default function SavedClaimsTable({
     <section>
       <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <h2 className="text-[18px] font-semibold text-[#10141a]">Claims &amp; invoices</h2>
-        {showControls ? <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        {showStatusFilter || showClientSearch ? <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          {showStatusFilter ? (
           <label className="flex items-center gap-2 text-[13px] text-[#10141a]">
             <span className="whitespace-nowrap text-[#808081]">Status</span>
             <select
@@ -142,7 +149,8 @@ export default function SavedClaimsTable({
               ))}
             </select>
           </label>
-          <ClaimsClientSearch onFilterChange={onClientSearchChange} />
+          ) : null}
+          {showClientSearch ? <ClaimsClientSearch onFilterChange={onClientSearchChange} /> : null}
         </div> : null}
       </div>
 

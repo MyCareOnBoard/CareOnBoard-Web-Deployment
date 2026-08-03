@@ -112,6 +112,8 @@ describe("network claims table parity", () => {
     expect(screen.queryByText("Atlas Care")).not.toBeInTheDocument();
     expect(screen.getAllByText("Payer / Insurance").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Out of pocket").length).toBeGreaterThan(0);
+    expect(screen.getByRole("combobox", { name: "Status" })).toBeVisible();
+    expect(screen.getByPlaceholderText("Search client name...")).toBeVisible();
   });
 
   it("separates duplicate client IDs by agency and preserves ready-claim badges and callbacks on desktop and mobile", async () => {
@@ -125,9 +127,11 @@ describe("network claims table parity", () => {
     expect(screen.getAllByText("Beacon Supports").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Payer / Insurance").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Out of pocket").length).toBeGreaterThan(0);
-    expect(screen.getAllByLabelText("Claim actions for Alex Client")).toHaveLength(4);
+    const atlasActions = screen.getAllByRole("button", { name: "Claim actions for Alex Client at Atlas Care for S1 during this billing period" });
+    expect(atlasActions).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Claim actions for Alex Client at Beacon Supports for S1 during this billing period" })).toHaveLength(2);
 
-    await user.click(screen.getAllByLabelText("Claim actions for Alex Client")[0]!);
+    await user.click(atlasActions[0]!);
     await user.click(screen.getByText("Generate bills"));
 
     expect(onGenerateClaim).toHaveBeenCalledWith(expect.objectContaining({

@@ -94,7 +94,10 @@ vi.mock("@/components/ui/dropdown-menu", () => ({
   DropdownMenu: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   DropdownMenuTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
   DropdownMenuContent: ({ children }: { children: ReactNode }) => <div role="menu">{children}</div>,
-  DropdownMenuItem: ({ children, onSelect }: { children: ReactNode; onSelect: () => void }) => <button type="button" role="menuitem" onClick={onSelect}>{children}</button>,
+  DropdownMenuItem: ({ children, onClick, onSelect }: { children: ReactNode; onClick?: () => void; onSelect?: () => void }) => <button type="button" role="menuitem" onClick={onClick ?? onSelect}>{children}</button>,
+}));
+vi.mock("@/components/modals/DeleteConfirmationModal", () => ({
+  DeleteConfirmationModal: ({ isOpen, onClose, onConfirm, isDeleting, title, message, confirmText, cancelText }: { isOpen: boolean; onClose: () => void; onConfirm: () => void; isDeleting?: boolean; title: string; message: string; confirmText: string; cancelText: string }) => isOpen ? <div role="dialog" aria-label={title}><p>{message}</p><button type="button" disabled={isDeleting} onClick={onClose}>{cancelText}</button><button type="button" disabled={isDeleting} onClick={onConfirm}>{confirmText}</button></div> : null,
 }));
 vi.mock("@/pages/agency/billing/claims/components/UpdateClaimStatusModal", () => ({
   default: ({ open, onConfirm }: { open: boolean; onConfirm: (value: { status: "paid" }) => Promise<void> }) => open ? <button type="button" onClick={() => void onConfirm({ status: "paid" })}>Confirm status</button> : null,
@@ -122,6 +125,9 @@ const readyRows: NetworkBillingClaimRow[] = [
   { id: "atlas-shift-4", agencyId: "atlas", agencyName: "Atlas Care", sourceType: "shift", sourceId: "shift-4", serviceCode: "T1005", needsClaim: true, needsInvoice: false, clientId: "client-1", clientName: "Ada", sortDate: "2026-07-04", weekRange: "Jul 1-7" },
   { id: "beacon-shift-1", agencyId: "beacon", agencyName: "Beacon Care", sourceType: "shift", sourceId: "shift-3", serviceCode: "S5125", needsClaim: true, needsInvoice: false, clientId: "client-1", clientName: "Ada", sortDate: "2026-07-03", weekRange: "Jul 1-7" },
 ];
+const savedInvoiceRows: NetworkBillingClaimRow[] = [
+  { id: "atlas-invoice-1", agencyId: "atlas", agencyName: "Atlas Care", kind: "invoice", invoiceNumber: "INV-ATLAS-1", amount: 125, status: "draft", emailStatus: "not_sent", clientId: "client-1", clientName: "Ada", payerName: "Ada payer", payerEmail: "payer@example.test", serviceCode: "S5125", serviceDate: "2026-07-03", shiftCount: 1, rideCount: 0, createdAt: "2026-07-03" },
+];
 function workspace(overrides: Partial<BillingWorkspaceContextValue> = {}): BillingWorkspaceContextValue {
   return {
     scope: { kind: "network" }, startDate: "2026-07-01", endDate: "2026-07-31", mode: "ddd", actorUid: "super-1", environment: "staging", onDateRangeChange: vi.fn(), ...overrides,
@@ -137,7 +143,7 @@ function renderClaims(value = workspace()) {
 }
 
 async function openAtlasGenerateDialog(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getAllByRole("button", { name: "Claim actions for Ada at Atlas Care for S5125" })[0]!);
+  await user.click(screen.getAllByRole("button", { name: "Claim actions for Ada at Atlas Care for S5125 during Jul 1-7" })[0]!);
   await user.click(screen.getAllByRole("menuitem", { name: "Generate bills" })[1]!);
   return screen.getByRole("dialog");
 }
@@ -206,6 +212,7 @@ describe("NetworkClaims", () => {
     expect(screen.getAllByText("Atlas Care").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Beacon Care").length).toBeGreaterThan(0);
     expect(screen.getAllByRole("button", { name: /Claim actions for Ada at / })).toHaveLength(6);
+    expect(screen.getAllByRole("button", { name: "Claim actions for Ada at Atlas Care for S5125 during Jul 1-7" })).toHaveLength(2);
     await user.click(screen.getByRole("button", { name: "Claims & invoices" }));
     expect(api.bootstrap).toHaveBeenLastCalledWith(expect.objectContaining({ tab: "saved" }), expect.any(Object));
   });
@@ -292,8 +299,51 @@ describe("NetworkClaims", () => {
   });
 
   it("renders fetched claim and invoice detail content instead of placeholder copy", () => {
-    render(<><ClaimDetailBody loading={false} detail={{ id: "claim-1", claimNumber: "CLM-001", clientName: "Ada", serviceCode: "S5125", serviceDate: "2026-07-03", shiftIds: ["shift-1"], rideIds: [], status: "pending", amount: 50, clientId: "client-1", weekRange: "Jul 1-7", rejectionReason: null, reportPrefill: {}, createdAt: "2026-07-03", updatedAt: "2026-07-03", shifts: [] }} /><InvoiceDetailBody loading={false} detail={{ id: "invoice-1", invoiceNumber: "INV-001", clientName: "Ada", payerName: "Ada payer", payerEmail: "payer@example.test", status: "draft", emailStatus: "not_sent", amount: 15, clientId: "client-1", serviceCode: "S5125", serviceDate: "2026-07-03", shiftCount: 1, rideCount: 0, emailedTo: null, emailedAt: null, createdAt: "2026-07-03", shiftIds: ["shift-3"], rideIds: [], invoice: { payerName: "Ada payer", payerEmail: "payer@example.test", clientName: "Ada", agencyName: "Beacon Care", periodStart: "2026-07-01", periodEnd: "2026-07-07", lines: [{ description: "Support", quantity: "1", rate: "$15", amount: "$15" }], total: 15, totalLabel: "$15" } }} /></>);
+    render(<><ClaimDetailBody loading={false} detail={{ id: "claim-1", claimNumber: "CLM-001", clientName: "Ada", serviceCode: "S5125", serviceDate: "2026-07-03", shiftIds: ["shift-1"], rideIds: [], status: "pending", amount: 50, clientId: "client-1", weekRange: "Jul 1-7", rejectionReason: null, reportPrefill: {} as import("@/lib/api/claims").BillingClaimDetail["reportPrefill"], createdAt: "2026-07-03", updatedAt: "2026-07-03", shifts: [] }} /><InvoiceDetailBody loading={false} detail={{ id: "invoice-1", invoiceNumber: "INV-001", clientName: "Ada", payerName: "Ada payer", payerEmail: "payer@example.test", status: "draft", emailStatus: "not_sent", amount: 15, clientId: "client-1", serviceCode: "S5125", serviceDate: "2026-07-03", shiftCount: 1, rideCount: 0, emailedTo: null, emailedAt: null, createdAt: "2026-07-03", shiftIds: ["shift-3"], rideIds: [], invoice: { payerName: "Ada payer", payerEmail: "payer@example.test", clientName: "Ada", agencyName: "Beacon Care", periodStart: "2026-07-01", periodEnd: "2026-07-07", lines: [{ description: "Support", quantity: "1", rate: "$15", amount: "$15" }], total: 15, totalLabel: "$15" } }} /></>);
     expect(screen.getByText("Service: S5125")).toBeVisible();
     expect(screen.getByText("Support · $15")).toBeVisible();
+  });
+
+  it("keeps the network saved status filter while hiding the agency client search", async () => {
+    const user = userEvent.setup();
+    api.bootstrap.mockReturnValue(result(savedInvoiceRows, null));
+    renderClaims();
+
+    await user.click(screen.getByRole("button", { name: "Claims & invoices" }));
+
+    const statusFilter = screen.getByRole("combobox", { name: "Status" });
+    expect(statusFilter).toBeVisible();
+    expect(screen.queryByPlaceholderText("Search client name...")).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Search authorized clients")).toBeVisible();
+    await user.selectOptions(statusFilter, "paid");
+    expect(api.bootstrap).toHaveBeenLastCalledWith(expect.objectContaining({ tab: "saved", status: "paid" }), expect.any(Object));
+  });
+
+  it("confirms a saved invoice cancellation with its clicked agency, keeps it pending, and localizes failures", async () => {
+    const user = userEvent.setup();
+    let rejectCancellation: ((error: Error) => void) | undefined;
+    invoices.cancelOutOfPocketInvoice.mockImplementationOnce(() => new Promise((_, reject) => {
+      rejectCancellation = reject;
+    })).mockResolvedValueOnce(undefined);
+    api.bootstrap.mockReturnValue(result(savedInvoiceRows, null));
+    renderClaims();
+
+    await user.click(screen.getByRole("button", { name: "Claims & invoices" }));
+    await user.click(screen.getAllByRole("button", { name: "Actions for invoice INV-ATLAS-1" })[0]!);
+    await user.click(screen.getAllByRole("menuitem", { name: "Cancel invoice" })[0]!);
+    const confirmation = screen.getByRole("dialog", { name: "Cancel this invoice?" });
+    const confirm = within(confirmation).getByRole("button", { name: "Cancel invoice" });
+    await user.click(confirm);
+
+    expect(invoices.cancelOutOfPocketInvoice).toHaveBeenCalledWith({ context: { agencyId: "atlas" }, invoiceId: "atlas-invoice-1" });
+    expect(confirm).toBeDisabled();
+    rejectCancellation?.(new Error("Invoice is already locked"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't cancel invoice. Invoice is already locked");
+    expect(api.invalidateTags).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "Cancel this invoice?" })).toBeVisible();
+
+    await user.click(within(screen.getByRole("dialog", { name: "Cancel this invoice?" })).getByRole("button", { name: "Cancel invoice" }));
+    await waitFor(() => expect(api.invalidateTags).toHaveBeenCalledWith([{ type: "Claims", id: "NETWORK" }, { type: "NETWORK", id: "atlas" }]));
+    expect(screen.queryByRole("dialog", { name: "Cancel this invoice?" })).toBeNull();
   });
 });

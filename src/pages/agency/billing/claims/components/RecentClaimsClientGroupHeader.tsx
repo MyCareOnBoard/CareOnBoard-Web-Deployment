@@ -35,7 +35,7 @@ export default function RecentClaimsClientGroupHeader({
   // Coverage is now per line (shown in the row's Coverage column), so the group action is generic.
   const generateLabel = "Generate bills";
   const actionLabel = showAgency && group.agencyName
-    ? `Claim actions for ${group.clientName} at ${group.agencyName} for ${group.claims[0]?.serviceCode ?? "this service"}`
+    ? `Claim actions for ${group.clientName} at ${group.agencyName} for ${group.claims[0]?.serviceCode ?? "this service"} during ${group.claims[0]?.weekRange ?? "this billing period"}`
     : `Claim actions for ${group.clientName}`;
 
   const actionsMenu = (

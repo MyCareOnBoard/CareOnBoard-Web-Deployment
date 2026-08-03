@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
 import type { BillingClaimDetail, BillingClaimListItem, BillingClaimStatus } from "@/lib/api/claims";
 import { cancelBillingClaim, createBillingClaim, getBillingClaimById, updateBillingClaimStatus } from "@/lib/api/claims";
 import type { OutOfPocketInvoiceDetail, OutOfPocketInvoiceListItem } from "@/lib/api/out-of-pocket";
@@ -145,6 +146,9 @@ export default function NetworkClaims() {
   const seenCursors = useRef(new Set<string>());
   const [statusClaim, setStatusClaim] = useState<AgencyClaim | null>(null);
   const [cancelClaim, setCancelClaim] = useState<AgencyClaim | null>(null);
+  const [cancelInvoice, setCancelInvoice] = useState<AgencyInvoice | null>(null);
+  const [cancellingInvoice, setCancellingInvoice] = useState(false);
+  const [invoiceCancelError, setInvoiceCancelError] = useState<string | null>(null);
   const [generating, setGenerating] = useState<GenerateState | null>(null);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const activeSearch = useRef<{ abort?: () => void } | null>(null);
@@ -165,9 +169,22 @@ export default function NetworkClaims() {
     startDate: workspace.startDate,
     endDate: workspace.endDate,
   };
-  const args: ClaimsNetworkBillingArgs = tab === "ready"
-    ? { ...base, tab: "ready", ...(client ? { clientId: client.id, clientAgencyId: client.agencyId } : {}), ...(workspace.mode ? { mode: workspace.mode } : {}) }
-    : { ...base, tab: "saved", ...(client ? { clientId: client.id, clientAgencyId: client.agencyId } : {}), ...(status === "all" ? {} : { status }) };
+  let args: ClaimsNetworkBillingArgs;
+  if (tab === "ready") {
+    if (client) {
+      args = workspace.mode
+        ? { ...base, tab: "ready", clientId: client.id, clientAgencyId: client.agencyId, mode: workspace.mode }
+        : { ...base, tab: "ready", clientId: client.id, clientAgencyId: client.agencyId };
+    } else {
+      args = workspace.mode ? { ...base, tab: "ready", mode: workspace.mode } : { ...base, tab: "ready" };
+    }
+  } else if (client) {
+    args = status === "all"
+      ? { ...base, tab: "saved", clientId: client.id, clientAgencyId: client.agencyId }
+      : { ...base, tab: "saved", clientId: client.id, clientAgencyId: client.agencyId, status };
+  } else {
+    args = status === "all" ? { ...base, tab: "saved" } : { ...base, tab: "saved", status };
+  }
   const bootstrap = networkBillingApi.useGetClaimsBootstrapQuery(args, NETWORK_BILLING_QUERY_OPTIONS);
   const [loadPage, page] = networkBillingApi.useLazyGetClaimsPageQuery();
   const [searchOptions, options] = networkBillingApi.useLazySearchBillingOptionsQuery();
@@ -241,6 +258,29 @@ export default function NetworkClaims() {
       setInvoiceDetail({ invoice, detail: await getOutOfPocketInvoice({ context: { agencyId: invoice.agencyId }, invoiceId: invoice.id }), loading: false });
     } catch (error) {
       setInvoiceDetail({ invoice, loading: false, error: error instanceof Error ? error.message : "Couldn't load this invoice." });
+    }
+  };
+
+  const requestInvoiceCancellation = (invoice: AgencyInvoice) => {
+    if (cancellingInvoice) return;
+    setInvoiceCancelError(null);
+    setCancelInvoice(invoice);
+  };
+
+  const confirmInvoiceCancellation = async () => {
+    if (!cancelInvoice || cancellingInvoice) return;
+    setCancellingInvoice(true);
+    setInvoiceCancelError(null);
+    try {
+      await cancelOutOfPocketInvoice({ context: { agencyId: cancelInvoice.agencyId }, invoiceId: cancelInvoice.id });
+      invalidate(cancelInvoice.agencyId);
+      if (invoiceDetail?.invoice.id === cancelInvoice.id) setInvoiceDetail(null);
+      setCancelInvoice(null);
+    } catch (error) {
+      const detail = error instanceof Error && error.message ? ` ${error.message}` : " Please try again.";
+      setInvoiceCancelError(`Couldn't cancel invoice.${detail}`);
+    } finally {
+      setCancellingInvoice(false);
     }
   };
 
@@ -323,15 +363,17 @@ export default function NetworkClaims() {
         statusFilter={status}
         onStatusFilterChange={setStatus}
         onClientSearchChange={() => undefined}
-        onViewReport={openReport}
-        onUpdateStatus={setStatusClaim}
-        onCancelClaim={setCancelClaim}
-        onViewInvoice={openInvoice}
-        onCancelInvoice={(invoice) => void cancelOutOfPocketInvoice({ context: { agencyId: invoice.agencyId }, invoiceId: invoice.id }).then(() => invalidate(invoice.agencyId))}
-        actionsDisabled={Boolean(generating?.submitting)}
+        onViewReport={(claim) => void openReport(claim as AgencyClaim)}
+        onUpdateStatus={(claim) => setStatusClaim(claim as AgencyClaim)}
+        onCancelClaim={(claim) => setCancelClaim(claim as AgencyClaim)}
+        onViewInvoice={(invoice) => void openInvoice(invoice as AgencyInvoice)}
+        onCancelInvoice={(invoice) => requestInvoiceCancellation(invoice as AgencyInvoice)}
+        actionsDisabled={Boolean(generating?.submitting) || cancellingInvoice}
         showAgency
         providerFree
         showControls={false}
+        showStatusFilter
+        showClientSearch={false}
         isRefetching={page.isFetching}
         nextCursor={cursor}
         onLoadMore={loadMore}
@@ -341,7 +383,22 @@ export default function NetworkClaims() {
     {statusClaim ? <Suspense fallback={null}><UpdateClaimStatusModal open claim={statusClaim} onClose={() => setStatusClaim(null)} onConfirm={async (payload) => { await updateBillingClaimStatus({ context: { agencyId: statusClaim.agencyId }, claimId: statusClaim.id, payload }); invalidate(statusClaim.agencyId); setStatusClaim(null); }} /></Suspense> : null}
     {cancelClaim ? <Suspense fallback={null}><CancelClaimDialog open claim={cancelClaim} onClose={() => setCancelClaim(null)} onConfirm={async () => { await cancelBillingClaim({ context: { agencyId: cancelClaim.agencyId }, claimId: cancelClaim.id }); invalidate(cancelClaim.agencyId); setCancelClaim(null); }} /></Suspense> : null}
     <Dialog open={Boolean(claimDetail)} onOpenChange={(open) => !open && setClaimDetail(null)}><DialogContent><DialogHeader><DialogTitle>Claim report</DialogTitle></DialogHeader><ClaimDetailBody detail={claimDetail?.detail} error={claimDetail?.error} loading={Boolean(claimDetail?.loading)} /></DialogContent></Dialog>
-    <Dialog open={Boolean(invoiceDetail)} onOpenChange={(open) => !open && setInvoiceDetail(null)}><DialogContent><DialogHeader><DialogTitle>{invoiceDetail?.invoice.invoiceNumber ?? "Invoice"}</DialogTitle></DialogHeader><InvoiceDetailBody detail={invoiceDetail?.detail} error={invoiceDetail?.error} loading={Boolean(invoiceDetail?.loading)} />{invoiceDetail ? <div className="flex justify-end gap-2"><Button type="button" variant="outline" className="min-h-11" onClick={() => void sendOutOfPocketInvoice({ context: { agencyId: invoiceDetail.invoice.agencyId }, invoiceId: invoiceDetail.invoice.id }).then(() => invalidate(invoiceDetail.invoice.agencyId))}>Send invoice</Button><Button type="button" variant="outline" className="min-h-11" onClick={() => void cancelOutOfPocketInvoice({ context: { agencyId: invoiceDetail.invoice.agencyId }, invoiceId: invoiceDetail.invoice.id }).then(() => { invalidate(invoiceDetail.invoice.agencyId); setInvoiceDetail(null); })}>Cancel invoice</Button></div> : null}</DialogContent></Dialog>
+    <Dialog open={Boolean(invoiceDetail)} onOpenChange={(open) => !open && !cancellingInvoice && setInvoiceDetail(null)}><DialogContent><DialogHeader><DialogTitle>{invoiceDetail?.invoice.invoiceNumber ?? "Invoice"}</DialogTitle></DialogHeader><InvoiceDetailBody detail={invoiceDetail?.detail} error={invoiceDetail?.error} loading={Boolean(invoiceDetail?.loading)} />{invoiceDetail ? <div className="flex justify-end gap-2"><Button type="button" variant="outline" className="min-h-11" disabled={cancellingInvoice} onClick={() => void sendOutOfPocketInvoice({ context: { agencyId: invoiceDetail.invoice.agencyId }, invoiceId: invoiceDetail.invoice.id }).then(() => invalidate(invoiceDetail.invoice.agencyId))}>Send invoice</Button><Button type="button" variant="outline" className="min-h-11" disabled={cancellingInvoice} onClick={() => requestInvoiceCancellation(invoiceDetail.invoice)}>Cancel invoice</Button></div> : null}</DialogContent></Dialog>
+    {invoiceCancelError ? <p role="alert" aria-live="polite" className="text-sm text-[#b42318]">{invoiceCancelError}</p> : null}
+    <DeleteConfirmationModal
+      isOpen={Boolean(cancelInvoice)}
+      onClose={() => {
+        if (cancellingInvoice) return;
+        setCancelInvoice(null);
+        setInvoiceCancelError(null);
+      }}
+      onConfirm={() => void confirmInvoiceCancellation()}
+      isDeleting={cancellingInvoice}
+      title="Cancel this invoice?"
+      message={cancelInvoice ? `Invoice ${cancelInvoice.invoiceNumber} will be deleted and its items will become billable again.` : "This invoice will be deleted and its items will become billable again."}
+      confirmText="Cancel invoice"
+      cancelText="Keep invoice"
+    />
     <Dialog open={Boolean(generating)} onOpenChange={(open) => !open && !generating?.submitting && setGenerating(null)}>
       <DialogContent>
         <DialogHeader>
