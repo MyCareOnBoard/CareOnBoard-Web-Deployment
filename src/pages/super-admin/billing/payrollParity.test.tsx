@@ -887,6 +887,34 @@ describe("shared payroll operational parity", () => {
     );
   });
 
+  it("renders an unavailable network gross-pay projection as a dash while preserving a real zero", () => {
+    const onCreateInvoiceClick = vi.fn();
+    const view = render(
+      <Scope actor="super_admin">
+        <DuePayrollRow
+          entry={{ ...dueEntry, grossAmount: undefined }}
+          variant="desktop"
+          showAgency
+          onCreateInvoiceClick={onCreateInvoiceClick}
+        />
+      </Scope>,
+    );
+    expect(screen.getByLabelText("Gross pay unavailable")).toHaveTextContent("—");
+    expect(screen.queryByText("$0.00")).not.toBeInTheDocument();
+
+    view.rerender(
+      <Scope actor="super_admin">
+        <DuePayrollRow
+          entry={{ ...dueEntry, grossAmount: 0 }}
+          variant="desktop"
+          showAgency
+          onCreateInvoiceClick={onCreateInvoiceClick}
+        />
+      </Scope>,
+    );
+    expect(screen.getByLabelText("Gross pay")).toHaveTextContent("$0.00");
+  });
+
   it("lazily registers payroll beneath the existing super-admin billing workspace", () => {
     const findRoute = (routes: typeof router.routes, path: string): (typeof router.routes)[number] | undefined => {
       for (const route of routes) {

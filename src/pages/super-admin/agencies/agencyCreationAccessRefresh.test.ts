@@ -16,9 +16,10 @@ describe("finalizeAgencyCreation", () => {
         throw refreshFailure;
       }),
       onRefreshFailure,
+      resetCaches: () => events.push("reset"),
     })).resolves.toBeUndefined();
 
-    expect(events).toEqual(["success", "navigate", "refresh", "warning"]);
+    expect(events).toEqual(["success", "navigate", "reset", "refresh", "warning"]);
     expect(onRefreshFailure).toHaveBeenCalledWith(refreshFailure);
   });
 
@@ -30,6 +31,7 @@ describe("finalizeAgencyCreation", () => {
       navigate: vi.fn(),
       refreshProfile,
       onRefreshFailure: vi.fn(),
+      resetCaches: vi.fn(),
     });
     expect(refreshProfile).not.toHaveBeenCalled();
   });
@@ -43,6 +45,7 @@ describe("finalizeAgencyCreation", () => {
       navigate: vi.fn(),
       refreshProfile: vi.fn().mockResolvedValue({ uid: "super-1" }),
       onRefreshFailure: vi.fn(),
+      resetCaches: vi.fn(),
       onRefreshSuccess,
     });
 

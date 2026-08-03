@@ -5,11 +5,14 @@ import {
   type RecentClaimClientGroup,
 } from "../utils/groupRecentClaimsByClient";
 import ClaimsClientSearch from "./ClaimsClientSearch";
+import ClaimsTablePagination from "./ClaimsTablePagination";
 import RecentClaimRow from "./RecentClaimRow";
 import RecentClaimsClientGroupHeader from "./RecentClaimsClientGroupHeader";
 import {
   GROUPED_TABLE_HEADER_CLASS,
   GROUPED_TABLE_ROW_CLASS,
+  NETWORK_GROUPED_TABLE_HEADER_CLASS,
+  NETWORK_GROUPED_TABLE_ROW_CLASS,
   TABLE_MIN_WIDTH,
   TABLE_ROW_CLASS,
 } from "./tableColumns";
@@ -23,15 +26,33 @@ type RecentClaimsTableProps = {
   truncated?: boolean;
   onGenerateClaim?: (group: RecentClaimClientGroup) => void;
   generateDisabled?: boolean;
+  /** Enables the super-admin network table identity column and agency-separated grouping. */
+  showAgency?: boolean;
+  /** Keeps singular claim actions within one service-code/week billing bundle. */
+  groupByBillingPeriod?: boolean;
+  isRefetching?: boolean;
+  nextCursor?: string | null;
+  onLoadMore?: () => void;
+  /** Avoids agency context hooks when rendered by the super-admin network workspace. */
+  providerFree?: boolean;
+  /** Lets the network workspace retain its single server-backed client search. */
+  showControls?: boolean;
+  loadMoreError?: string | null;
 };
 
-function RecentClaimSkeletonRow({ grouped = false }: { grouped?: boolean }) {
+function RecentClaimSkeletonRow({
+  grouped = false,
+  showAgency = false,
+}: {
+  grouped?: boolean;
+  showAgency?: boolean;
+}) {
   return (
     <div
-      className={`${grouped ? GROUPED_TABLE_ROW_CLASS : TABLE_ROW_CLASS} animate-pulse`}
+      className={`${grouped ? showAgency ? NETWORK_GROUPED_TABLE_ROW_CLASS : GROUPED_TABLE_ROW_CLASS : TABLE_ROW_CLASS} animate-pulse`}
       aria-hidden="true"
     >
-      {Array.from({ length: grouped ? 8 : 9 }).map((_, index) => (
+      {Array.from({ length: grouped ? showAgency ? 9 : 8 : 9 }).map((_, index) => (
         <span key={index} className="h-4 rounded bg-[#eef4f5]" />
       ))}
     </div>
@@ -60,6 +81,14 @@ export default function RecentClaimsTable({
   truncated = false,
   onGenerateClaim,
   generateDisabled = false,
+  showAgency = false,
+  groupByBillingPeriod = false,
+  isRefetching = false,
+  nextCursor,
+  onLoadMore,
+  providerFree = false,
+  showControls = true,
+  loadMoreError,
 }: RecentClaimsTableProps) {
   const [filterQuery, setFilterQuery] = useState("");
   const [selectedClientName, setSelectedClientName] = useState<string | undefined>();
@@ -93,8 +122,8 @@ export default function RecentClaimsTable({
   }, [sortedClaims, filterQuery, selectedClientName, typeFilter]);
 
   const groupedClaims = useMemo(
-    () => groupRecentClaimsByClient(filteredClaims),
-    [filteredClaims],
+    () => groupRecentClaimsByClient(filteredClaims, { showAgency, groupByBillingPeriod }),
+    [filteredClaims, groupByBillingPeriod, showAgency],
   );
 
   const handleFilterChange = (query: string, clientName?: string) => {
@@ -111,18 +140,19 @@ export default function RecentClaimsTable({
   );
 
   const emptyMessage = useMemo(() => {
-    if (loading) return "";
+    if (loading && claims.length === 0) return "";
     if (claims.length === 0) {
       return "No approved shifts or transportation mileage found.";
     }
     return "No items match your filters.";
   }, [claims.length, loading]);
+  const isInitialLoading = loading && claims.length === 0;
 
   return (
     <section>
       <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <h2 className="text-[18px] font-semibold text-[#10141a]">Ready to bill</h2>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        {showControls ? <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <label className="flex items-center gap-2 text-[13px] text-[#10141a]">
             <span className="whitespace-nowrap text-[#808081]">Type</span>
             <select
@@ -141,10 +171,10 @@ export default function RecentClaimsTable({
             </select>
           </label>
           <ClaimsClientSearch onFilterChange={handleFilterChange} />
-        </div>
+        </div> : null}
       </div>
 
-      {truncated && !loading ? (
+      {truncated && !isInitialLoading ? (
         <p className="mb-3 text-[13px] text-[#808081]">
           Showing the first 100 shifts and rides. Use client search or Generate claim to narrow
           results.
@@ -154,7 +184,8 @@ export default function RecentClaimsTable({
       <div className="hidden overflow-hidden rounded-[16px] border border-[#e5e5e6] bg-white lg:block">
         <div className="overflow-x-auto">
           <div className={TABLE_MIN_WIDTH}>
-            <div className={GROUPED_TABLE_HEADER_CLASS}>
+            <div className={showAgency ? NETWORK_GROUPED_TABLE_HEADER_CLASS : GROUPED_TABLE_HEADER_CLASS}>
+              {showAgency ? <span>Agency</span> : null}
               <span>{labels.noun}</span>
               <span>Service code</span>
               <span>PA Number</span>
@@ -165,9 +196,13 @@ export default function RecentClaimsTable({
               <span>Coverage</span>
             </div>
 
-            {loading ? (
+            {isInitialLoading ? (
               Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
-                <RecentClaimSkeletonRow key={`skeleton-desktop-${index}`} grouped />
+                <RecentClaimSkeletonRow
+                  key={`skeleton-desktop-${index}`}
+                  grouped
+                  showAgency={showAgency}
+                />
               ))
             ) : groupedClaims.length > 0 ? (
               groupedClaims.map((group) => (
@@ -177,6 +212,8 @@ export default function RecentClaimsTable({
                     variant="desktop"
                     onGenerateClaim={handleGenerateClaim}
                     generateDisabled={generateDisabled}
+                    showAgency={showAgency}
+                    providerFree={providerFree}
                   />
                   {group.claims.map((claim) => (
                     <RecentClaimRow
@@ -184,6 +221,8 @@ export default function RecentClaimsTable({
                       variant="desktop"
                       showClient={false}
                       claim={claim}
+                      showAgency={showAgency}
+                      providerFree={providerFree}
                     />
                   ))}
                 </Fragment>
@@ -198,7 +237,7 @@ export default function RecentClaimsTable({
       </div>
 
       <div className="space-y-2 lg:hidden">
-        {loading ? (
+        {isInitialLoading ? (
           Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
             <RecentClaimMobileSkeletonCard key={`skeleton-mobile-${index}`} />
           ))
@@ -210,6 +249,8 @@ export default function RecentClaimsTable({
                 variant="mobile"
                 onGenerateClaim={handleGenerateClaim}
                 generateDisabled={generateDisabled}
+                showAgency={showAgency}
+                providerFree={providerFree}
               />
               {group.claims.map((claim) => (
                 <RecentClaimRow
@@ -217,6 +258,7 @@ export default function RecentClaimsTable({
                   variant="mobile"
                   showClient={false}
                   claim={claim}
+                  providerFree={providerFree}
                 />
               ))}
             </div>
@@ -227,6 +269,16 @@ export default function RecentClaimsTable({
           </div>
         )}
       </div>
+      {!isInitialLoading ? (
+        <ClaimsTablePagination
+          isRefetching={isRefetching}
+          nextCursor={nextCursor}
+          onLoadMore={onLoadMore}
+          loadMoreLabel="Load more ready-to-bill items"
+          terminalLabel="All ready-to-bill items loaded"
+          loadMoreError={loadMoreError}
+        />
+      ) : null}
     </section>
   );
 }

@@ -8,33 +8,39 @@ import {
 import { DotGridIcon } from "@/components/ui/dot-grid-menu";
 import { cn } from "@/lib/utils";
 import type { AgencyExpenseListItem } from "@/lib/api/billing-expenses";
+import {
+  assertNetworkExpenseRows,
+  type ExpenseActionCallbacks,
+  type NetworkAgencyExpense,
+} from "./expenseTableTypes";
 
 const menuItemBaseClassName =
   "flex min-h-[44px] w-full cursor-pointer items-center justify-between rounded-none px-4 py-3 text-[14px] font-medium";
 
 const neutralMenuItemClassName = `${menuItemBaseClassName} text-[#10141a] hover:bg-[#eef4f5] focus:bg-[#eef4f5]`;
 
-const approveMenuItemClassName =
-  `${menuItemBaseClassName} text-[#0EAF52] hover:bg-[#ecfdf3] focus:bg-[#ecfdf3] focus:text-[#0EAF52]`;
+const approveMenuItemClassName = `${menuItemBaseClassName} text-[#0EAF52] hover:bg-[#ecfdf3] focus:bg-[#ecfdf3] focus:text-[#0EAF52]`;
 
-const declineMenuItemClassName =
-  `${menuItemBaseClassName} text-[#FF6900] hover:bg-[#fff7ed] focus:bg-[#fff7ed] focus:text-[#FF6900]`;
+const declineMenuItemClassName = `${menuItemBaseClassName} text-[#FF6900] hover:bg-[#fff7ed] focus:bg-[#fff7ed] focus:text-[#FF6900]`;
 
-const deleteMenuItemClassName =
-  `${menuItemBaseClassName} text-[#ef4444] hover:bg-[#fef2f2] focus:bg-[#fef2f2] focus:text-[#ef4444]`;
+const deleteMenuItemClassName = `${menuItemBaseClassName} text-[#ef4444] hover:bg-[#fef2f2] focus:bg-[#fef2f2] focus:text-[#ef4444]`;
 
+type SharedExpenseActionsMenuProps<T extends AgencyExpenseListItem> =
+  ExpenseActionCallbacks<T> & {
+    expense: T;
+    variant?: "mobile" | "desktop";
+    disabled?: boolean;
+  };
 
-type ExpenseActionsMenuProps = {
-  expense: AgencyExpenseListItem;
-  variant?: "mobile" | "desktop";
-  disabled?: boolean;
-  onViewReceipt?: (expense: AgencyExpenseListItem) => void;
-  onApprove?: (expense: AgencyExpenseListItem) => void;
-  onDecline?: (expense: AgencyExpenseListItem) => void;
-  onDelete?: (expense: AgencyExpenseListItem) => void;
-};
+type ExpenseActionsMenuProps =
+  | (SharedExpenseActionsMenuProps<AgencyExpenseListItem> & {
+      showAgency?: false;
+    })
+  | (SharedExpenseActionsMenuProps<NetworkAgencyExpense> & {
+      showAgency: true;
+    });
 
-export default function ExpenseActionsMenu({
+function ExpenseActionsMenuContent<T extends AgencyExpenseListItem>({
   expense,
   variant = "desktop",
   disabled = false,
@@ -42,7 +48,7 @@ export default function ExpenseActionsMenu({
   onApprove,
   onDecline,
   onDelete,
-}: ExpenseActionsMenuProps) {
+}: SharedExpenseActionsMenuProps<T>) {
   const isMobile = variant === "mobile";
   const isPending = expense.status === "pending";
   const hasReceipt = Boolean(expense.receiptUrl);
@@ -120,4 +126,13 @@ export default function ExpenseActionsMenu({
       </DropdownMenuContent>
     </DropdownMenu>
   );
+}
+
+export default function ExpenseActionsMenu(props: ExpenseActionsMenuProps) {
+  if (props.showAgency) {
+    assertNetworkExpenseRows([props.expense]);
+    return <ExpenseActionsMenuContent {...props} />;
+  }
+
+  return <ExpenseActionsMenuContent {...props} />;
 }

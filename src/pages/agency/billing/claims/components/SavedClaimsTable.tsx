@@ -2,11 +2,14 @@ import { Fragment, useMemo } from "react";
 import type { BillingClaimListItem, BillingClaimStatus } from "@/lib/api/claims";
 import type { OutOfPocketInvoiceListItem } from "@/lib/api/out-of-pocket";
 import ClaimsClientSearch from "./ClaimsClientSearch";
+import ClaimsTablePagination from "./ClaimsTablePagination";
 import SavedClaimRow from "./SavedClaimRow";
 import SavedInvoiceRow from "./SavedInvoiceRow";
 import SavedClaimsClientGroupHeader from "./SavedClaimsClientGroupHeader";
 import {
   GROUPED_SAVED_CLAIMS_TABLE_HEADER_CLASS,
+  NETWORK_GROUPED_SAVED_CLAIMS_TABLE_ROW_CLASS,
+  NETWORK_GROUPED_SAVED_CLAIMS_TABLE_HEADER_CLASS,
   SAVED_CLAIMS_TABLE_MIN_WIDTH,
 } from "./tableColumns";
 import { groupSavedClaimsByClient } from "../utils/groupSavedClaimsByClient";
@@ -15,8 +18,10 @@ import { STATUS_FILTER_OPTIONS } from "../utils/savedClaimUtils";
 
 const SKELETON_ROW_COUNT = 8;
 
+type AgencyIdentity = { agencyId?: string; agencyName?: string };
+
 type SavedClaimsTableProps = {
-  claims: BillingClaimListItem[];
+  claims: Array<BillingClaimListItem & AgencyIdentity>;
   totalCount: number;
   loading?: boolean;
   statusFilter: BillingClaimStatus | "all";
@@ -27,18 +32,38 @@ type SavedClaimsTableProps = {
   onCancelClaim: (claim: BillingClaimListItem) => void;
   actionsDisabled?: boolean;
   /** Out-of-pocket invoices mixed into this tab, badged and grouped by client. */
-  invoices?: OutOfPocketInvoiceListItem[];
+  invoices?: Array<OutOfPocketInvoiceListItem & AgencyIdentity>;
   onViewInvoice?: (invoice: OutOfPocketInvoiceListItem) => void;
   onCancelInvoice?: (invoice: OutOfPocketInvoiceListItem) => void;
+  /** Enables the super-admin network table identity column and agency-separated grouping. */
+  showAgency?: boolean;
+  isRefetching?: boolean;
+  nextCursor?: string | null;
+  onLoadMore?: () => void;
+  providerFree?: boolean;
+  /** Lets network billing retain status filtering without mounting agency client search. */
+  showStatusFilter?: boolean;
+  /** Lets network billing provide its own authorized-client control. */
+  showClientSearch?: boolean;
+  showControls?: boolean;
+  loadMoreError?: string | null;
 };
 
-function SavedClaimSkeletonRow({ grouped = false }: { grouped?: boolean }) {
+function SavedClaimSkeletonRow({
+  grouped = false,
+  showAgency = false,
+}: {
+  grouped?: boolean;
+  showAgency?: boolean;
+}) {
   return (
     <div
-      className={`${GROUPED_SAVED_CLAIMS_TABLE_HEADER_CLASS.replace("font-semibold", "")} animate-pulse`}
+      className={`${(showAgency
+        ? NETWORK_GROUPED_SAVED_CLAIMS_TABLE_ROW_CLASS
+        : GROUPED_SAVED_CLAIMS_TABLE_HEADER_CLASS.replace("font-semibold", ""))} animate-pulse`}
       aria-hidden="true"
     >
-      {Array.from({ length: grouped ? 7 : 8 }).map((_, index) => (
+      {Array.from({ length: grouped ? showAgency ? 8 : 7 : 8 }).map((_, index) => (
         <span key={index} className="h-4 rounded bg-[#eef4f5]" />
       ))}
     </div>
@@ -74,11 +99,27 @@ export default function SavedClaimsTable({
   invoices = [],
   onViewInvoice,
   onCancelInvoice,
+  showAgency = false,
+  isRefetching = false,
+  nextCursor,
+  onLoadMore,
+  providerFree = false,
+  showControls = true,
+  showStatusFilter = showControls,
+  showClientSearch = showControls,
+  loadMoreError,
 }: SavedClaimsTableProps) {
-  const groupedClaims = useMemo(() => groupSavedClaimsByClient(claims), [claims]);
-  const groupedInvoices = useMemo(() => groupInvoicesByClient(invoices), [invoices]);
+  const groupedClaims = useMemo(
+    () => groupSavedClaimsByClient(claims, { showAgency }),
+    [claims, showAgency],
+  );
+  const groupedInvoices = useMemo(
+    () => groupInvoicesByClient(invoices, { showAgency }),
+    [invoices, showAgency],
+  );
 
-  const emptyMessage = loading
+  const isInitialLoading = loading && claims.length === 0 && invoices.length === 0;
+  const emptyMessage = isInitialLoading
     ? ""
     : totalCount === 0 && invoices.length === 0
       ? "No generated claims or invoices found for this date range."
@@ -90,7 +131,8 @@ export default function SavedClaimsTable({
     <section>
       <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <h2 className="text-[18px] font-semibold text-[#10141a]">Claims &amp; invoices</h2>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        {showStatusFilter || showClientSearch ? <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          {showStatusFilter ? (
           <label className="flex items-center gap-2 text-[13px] text-[#10141a]">
             <span className="whitespace-nowrap text-[#808081]">Status</span>
             <select
@@ -107,14 +149,16 @@ export default function SavedClaimsTable({
               ))}
             </select>
           </label>
-          <ClaimsClientSearch onFilterChange={onClientSearchChange} />
-        </div>
+          ) : null}
+          {showClientSearch ? <ClaimsClientSearch onFilterChange={onClientSearchChange} /> : null}
+        </div> : null}
       </div>
 
       <div className="hidden overflow-hidden rounded-[16px] border border-[#e5e5e6] bg-white lg:block">
         <div className="overflow-x-auto">
           <div className={SAVED_CLAIMS_TABLE_MIN_WIDTH}>
-            <div className={GROUPED_SAVED_CLAIMS_TABLE_HEADER_CLASS}>
+            <div className={showAgency ? NETWORK_GROUPED_SAVED_CLAIMS_TABLE_HEADER_CLASS : GROUPED_SAVED_CLAIMS_TABLE_HEADER_CLASS}>
+              {showAgency ? <span>Agency</span> : null}
               <span>Claim #</span>
               <span>Service code</span>
               <span>Service date</span>
@@ -124,9 +168,13 @@ export default function SavedClaimsTable({
               <span className="text-right">Action</span>
             </div>
 
-            {loading ? (
+            {isInitialLoading ? (
               Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
-                <SavedClaimSkeletonRow key={`saved-skeleton-desktop-${index}`} grouped />
+                <SavedClaimSkeletonRow
+                  key={`saved-skeleton-desktop-${index}`}
+                  grouped
+                  showAgency={showAgency}
+                />
               ))
             ) : groupedClaims.length > 0 || groupedInvoices.length > 0 ? (
               <>
@@ -137,6 +185,7 @@ export default function SavedClaimsTable({
                       clientId={group.clientId}
                       count={group.claims.length}
                       variant="desktop"
+                      providerFree={providerFree}
                     />
                     {group.claims.map((claim) => (
                       <SavedClaimRow
@@ -148,6 +197,7 @@ export default function SavedClaimsTable({
                         onUpdateStatus={onUpdateStatus}
                         onCancelClaim={onCancelClaim}
                         actionsDisabled={actionsDisabled}
+                        showAgency={showAgency}
                       />
                     ))}
                   </Fragment>
@@ -159,6 +209,7 @@ export default function SavedClaimsTable({
                       clientId={group.clientId}
                       count={group.invoices.length}
                       variant="desktop"
+                      providerFree={providerFree}
                       itemNoun="invoice"
                       outOfPocket
                     />
@@ -170,6 +221,7 @@ export default function SavedClaimsTable({
                         onViewInvoice={onViewInvoice ?? (() => {})}
                         onCancelInvoice={onCancelInvoice ?? (() => {})}
                         actionsDisabled={actionsDisabled}
+                        showAgency={showAgency}
                       />
                     ))}
                   </Fragment>
@@ -185,7 +237,7 @@ export default function SavedClaimsTable({
       </div>
 
       <div className="space-y-2 lg:hidden">
-        {loading ? (
+        {isInitialLoading ? (
           Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
             <SavedClaimMobileSkeletonCard key={`saved-skeleton-mobile-${index}`} />
           ))
@@ -198,6 +250,8 @@ export default function SavedClaimsTable({
                   clientId={group.clientId}
                   count={group.claims.length}
                   variant="mobile"
+                  agencyName={showAgency ? group.agencyName : undefined}
+                  providerFree={providerFree}
                 />
                 {group.claims.map((claim) => (
                   <SavedClaimRow
@@ -222,6 +276,8 @@ export default function SavedClaimsTable({
                   variant="mobile"
                   itemNoun="invoice"
                   outOfPocket
+                  agencyName={showAgency ? group.agencyName : undefined}
+                  providerFree={providerFree}
                 />
                 {group.invoices.map((invoice) => (
                   <SavedInvoiceRow
@@ -242,6 +298,16 @@ export default function SavedClaimsTable({
           </div>
         )}
       </div>
+      {!isInitialLoading ? (
+        <ClaimsTablePagination
+          isRefetching={isRefetching}
+          nextCursor={nextCursor}
+          onLoadMore={onLoadMore}
+          loadMoreLabel="Load more claims and invoices"
+          terminalLabel="All claims and invoices loaded"
+          loadMoreError={loadMoreError}
+        />
+      ) : null}
     </section>
   );
 }

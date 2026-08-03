@@ -22,4 +22,8 @@ export type RecentClaim = {
   coverage?: import("@/lib/coverage").Coverage;
   needsClaim?: boolean;
   needsInvoice?: boolean;
+  /** Present only for super-admin network billing rows. */
+  agencyId?: string;
+  /** Present only for super-admin network billing rows. */
+  agencyName?: string;
 };

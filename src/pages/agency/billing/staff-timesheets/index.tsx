@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -12,14 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { DotGridIcon, menuItemClassName } from "@/components/ui/dot-grid-menu";
-import { Check, CornerDownLeft, Eye, Loader2, Search, Wallet, CalendarClock } from "lucide-react";
+import { Check, CornerDownLeft, Loader2, Wallet } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { resolveEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 import {
@@ -39,43 +31,16 @@ import { createAgencyOperationalDataAdapter } from "@/lib/operational-agency/dat
 import { agencyDirectoryRoutes } from "@/lib/operational-agency/routes";
 import type { RootState } from "@/store/redux/store";
 import { UserType } from "@/utils/auth/types/user.types";
+import StaffTimesheetsTable, { StaffTimesheetStatusPill } from "./StaffTimesheetsTable";
 
-const STATUS_META: Record<string, { label: string; border: string; dot: string }> = {
-  pending: { label: "Pending", border: "border-[#FF6C10] text-[#FF6C10]", dot: "bg-[#FF6C10]" },
-  approved: { label: "Approved", border: "border-[#0eaf52] text-[#0eaf52]", dot: "bg-[#0eaf52]" },
-  rejected: { label: "Rejected", border: "border-[#ef4444] text-[#ef4444]", dot: "bg-[#ef4444]" },
-  draft: { label: "Draft", border: "border-[#b2b2b3] text-[#b2b2b3]", dot: "bg-[#b2b2b3]" },
-};
-
-type StatusFilter = "All" | "pending" | "approved" | "rejected";
-
-const STATUS_FILTERS: Array<{ value: StatusFilter; label: string }> = [
-  { value: "All", label: "All" },
-  { value: "pending", label: "Pending" },
-  { value: "approved", label: "Approved" },
-  { value: "rejected", label: "Rejected" },
-];
 
 // Shared column template (header/rows/skeleton) — full literal class string so Tailwind JIT
-// picks it up. Fixed/fr tracks only, so header and rows align.
-const GRID = "gap-2 md:grid-cols-[minmax(160px,2fr)_minmax(110px,1fr)_minmax(150px,1.4fr)_80px_120px_72px]";
-
 function fmtPeriod(start: string, end: string) {
   try {
     return `${format(parseISO(start), "MMM d")} – ${format(parseISO(end), "MMM d, yyyy")}`;
   } catch {
     return `${start} – ${end}`;
   }
-}
-
-function StatusPill({ status }: { status: string }) {
-  const meta = STATUS_META[status] || STATUS_META.draft;
-  return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border bg-transparent px-3 py-1 text-[13px] font-medium ${meta.border}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} />
-      {meta.label}
-    </span>
-  );
 }
 
 function SignaturePreview({ signature }: { signature: StaffTimesheet["signature"] }) {
@@ -88,19 +53,6 @@ function SignaturePreview({ signature }: { signature: StaffTimesheet["signature"
     );
   }
   return <img src={signature.signatureData} alt="Signature" className="max-h-[80px] max-w-[220px] object-contain" />;
-}
-
-function SkeletonRow() {
-  return (
-    <div className={`grid grid-cols-1 border-b border-[#e5e5e6] px-4 py-4 md:items-center ${GRID}`}>
-      <Skeleton className="h-3.5 w-36 max-w-full" />
-      <Skeleton className="h-3.5 w-24" />
-      <Skeleton className="h-3.5 w-32" />
-      <Skeleton className="h-3.5 w-10" />
-      <Skeleton className="h-6 w-20 rounded-full" />
-      <Skeleton className="h-8 w-8 rounded-md" />
-    </div>
-  );
 }
 
 function isAbort(error: unknown): boolean {
@@ -117,8 +69,6 @@ export function StaffTimesheetsApprovalContent() {
 
   const [timesheets, setTimesheets] = useState<StaffTimesheet[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [viewing, setViewing] = useState<StaffTimesheet | null>(null);
   const [rejectTarget, setRejectTarget] = useState<StaffTimesheet | null>(null);
@@ -177,24 +127,6 @@ export function StaffTimesheetsApprovalContent() {
     mutationControllerRef.current = controller;
     return controller;
   }, []);
-
-  // Drafts are the staff's own in-progress sheets; the review queue only shows submitted ones.
-  const reviewable = useMemo(
-    () => timesheets.filter((t) => t.status !== "draft"),
-    [timesheets],
-  );
-
-  const filtered = useMemo(
-    () =>
-      reviewable.filter((t) => {
-        if (searchQuery && !(t.staffName || "").toLowerCase().includes(searchQuery.toLowerCase())) return false;
-        if (statusFilter !== "All" && t.status !== statusFilter) return false;
-        return true;
-      }),
-    [reviewable, searchQuery, statusFilter],
-  );
-
-  const pendingCount = useMemo(() => reviewable.filter((t) => t.status === "pending").length, [reviewable]);
 
   async function handleApprove(t: StaffTimesheet) {
     const controller = beginMutation();
@@ -284,16 +216,6 @@ export function StaffTimesheetsApprovalContent() {
     }
   }
 
-  const tableHead = (
-    <div className={`hidden border-b border-[#e5e5e6] bg-[#f9fafb] px-4 py-3 md:grid ${GRID}`}>
-      {["Staff", "Role", "Pay period", "Hours", "Status", "Actions"].map((h) => (
-        <span key={h} className="text-left text-[12px] font-semibold uppercase tracking-wide text-[#808081]">
-          {h}
-        </span>
-      ))}
-    </div>
-  );
-
   return (
     <div className="min-h-[calc(100vh-200px)] px-4 sm:px-6 lg:px-0">
       <div className="mb-4 sm:mb-6">
@@ -302,179 +224,18 @@ export function StaffTimesheetsApprovalContent() {
         </h1>
       </div>
 
-      <div className="min-w-0 overflow-hidden rounded-xl bg-white shadow-sm sm:rounded-2xl">
-        {/* Card header */}
-        <div className="border-b border-[#e5e7eb] p-4 sm:p-6">
-          <div className="mb-1 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-            <div>
-              <h2 className="text-[20px] font-bold text-[#10141a] sm:text-[22px]">Submitted timesheets</h2>
-              <p className="mt-0.5 text-[13px] text-[#6b7280] sm:text-[14px]">
-                Review staff timesheets and send approved ones to payroll
-                {pendingCount > 0 ? ` · ${pendingCount} awaiting approval` : ""}
-              </p>
-            </div>
-          </div>
-
-          {/* Filter bar */}
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <div className="relative flex h-9 min-w-[200px] items-center gap-2 rounded-full border border-[#e5e7eb] px-3">
-              <Search className="h-3.5 w-3.5 shrink-0 text-[#808081]" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search staff…"
-                className="h-full w-full min-w-0 border-0 bg-transparent px-0 py-0 text-[13px] text-[#10141a] outline-none placeholder:text-[#808081] focus:ring-0"
-              />
-            </div>
-
-            <div className="h-5 w-px bg-[#e5e7eb]" />
-
-            <div className="flex flex-wrap items-center gap-1">
-              {STATUS_FILTERS.map((s) => (
-                <button
-                  key={s.value}
-                  onClick={() => setStatusFilter(s.value)}
-                  className={`rounded-full border px-3 py-1 text-[13px] font-medium transition-colors ${
-                    statusFilter === s.value
-                      ? "border-[#00b4b8] bg-[#00b4b8] text-white"
-                      : "border-[#e5e7eb] text-[#6b7280] hover:border-[#cccccd]"
-                  }`}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
-
-            {!loading && (
-              <span className="ml-auto text-[13px] text-[#6b7280]">
-                {filtered.length} of {reviewable.length}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Table body */}
-        {loading ? (
-          <div className="overflow-x-auto">
-            {tableHead}
-            {Array.from({ length: 6 }).map((_, i) => (
-              <SkeletonRow key={i} />
-            ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="p-8 text-center sm:p-12">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#f3f4f6]">
-              <CalendarClock className="h-7 w-7 text-[#b2b2b3]" />
-            </div>
-            <p className="text-[14px] font-semibold text-[#10141a]">
-              {reviewable.length === 0 ? "No timesheets submitted yet" : "No timesheets match your filters"}
-            </p>
-            <p className="mt-1 text-[13px] text-[#6b7280]">
-              {reviewable.length === 0
-                ? "Staff timesheets will appear here once they’re submitted"
-                : "Try adjusting your search or status filter"}
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            {tableHead}
-            {filtered.map((t) => {
-              const canPay = t.status === "approved" && !t.payrollInvoiceId;
-              const rowBusy = busyId === t.id;
-              return (
-                <div
-                  key={t.id}
-                  className={`grid grid-cols-1 border-b border-[#e5e5e6] px-4 py-4 transition-colors last:border-b-0 hover:bg-[#f9fafb] md:items-center ${GRID}`}
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-[14px] font-semibold text-[#10141a]">{t.staffName || "—"}</p>
-                  </div>
-
-                  <div className="text-[14px] text-[#6b7280]">
-                    <span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] md:hidden">Role</span>
-                    {t.role || <span className="text-[#b2b2b3]">—</span>}
-                  </div>
-
-                  <div className="text-[14px] text-[#6b7280]">
-                    <span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] md:hidden">Pay period</span>
-                    {fmtPeriod(t.periodStart, t.periodEnd)}
-                  </div>
-
-                  <div className="text-[14px] text-[#10141a]">
-                    <span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] md:hidden">Hours</span>
-                    {t.totalHours}h
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="mr-1 text-[11px] font-semibold uppercase text-[#808081] md:hidden">Status</span>
-                    <StatusPill status={t.status} />
-                    {t.status === "approved" && t.payrollInvoiceId && (
-                      <span className="text-[11px] font-medium text-[#008f93]">Invoiced</span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center md:justify-self-start">
-                    {rowBusy ? (
-                      <span className="inline-flex h-8 w-8 items-center justify-center">
-                        <Loader2 className="h-4 w-4 animate-spin text-[#00b4b8]" />
-                      </span>
-                    ) : (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button
-                            type="button"
-                            aria-label="Timesheet actions"
-                            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md bg-white transition-colors hover:bg-[#e5e5e6] active:bg-[#e5e5e6]"
-                          >
-                            <DotGridIcon />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="z-[100] min-w-[170px] rounded-xl border-0 bg-white p-0 shadow-lg">
-                          <DropdownMenuItem className={menuItemClassName} onClick={() => setViewing(t)}>
-                            <Eye className="mr-2 h-3.5 w-3.5" />
-                            View
-                          </DropdownMenuItem>
-                          {t.status === "pending" && (
-                            <>
-                              <DropdownMenuItem
-                                className={`${menuItemClassName} text-[#0eaf52] hover:bg-[#0eaf520d] focus:bg-[#0eaf520d] focus:text-[#0eaf52]`}
-                                onClick={() => handleApprove(t)}
-                              >
-                                <Check className="mr-2 h-3.5 w-3.5" />
-                                Approve
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className={`${menuItemClassName} text-[#ef4444] hover:bg-[#fef2f2] focus:bg-[#fef2f2] focus:text-[#ef4444]`}
-                                onClick={() => {
-                                  setRejectTarget(t);
-                                  setRejectNotes("");
-                                }}
-                              >
-                                <CornerDownLeft className="mr-2 h-3.5 w-3.5" />
-                                Reject
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                          {canPay && (
-                            <DropdownMenuItem
-                              className={`${menuItemClassName} text-[#008f93] hover:bg-[#f0fbfb] focus:bg-[#f0fbfb] focus:text-[#008f93]`}
-                              onClick={() => handleCreatePayroll(t)}
-                            >
-                              <Wallet className="mr-2 h-3.5 w-3.5" />
-                              Create payroll
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      <StaffTimesheetsTable
+        timesheets={timesheets}
+        loading={loading}
+        busyId={busyId}
+        onView={setViewing}
+        onApprove={handleApprove}
+        onReject={(timesheet) => {
+          setRejectTarget(timesheet);
+          setRejectNotes("");
+        }}
+        onCreatePayroll={handleCreatePayroll}
+      />
 
       {/* Detail modal */}
       <Dialog open={!!viewing} onOpenChange={(open) => !open && setViewing(null)}>
@@ -489,7 +250,7 @@ export function StaffTimesheetsApprovalContent() {
                   Review submitted hours, signature, and payroll status for this staff timesheet.
                 </DialogDescription>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <StatusPill status={viewing.status} />
+                  <StaffTimesheetStatusPill status={viewing.status} />
                   <span className="text-[13px] text-[#6b7280]">{fmtPeriod(viewing.periodStart, viewing.periodEnd)}</span>
                 </div>
               </DialogHeader>

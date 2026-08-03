@@ -13,7 +13,8 @@ import { formatCurrency } from "@/pages/agency/billing-and-approvals/billingUtil
 import type { DuePayrollEntry } from "@/lib/api/payroll";
 import { formatPayrollDateRangeLabel } from "../utils/payrollDashboardUtils";
 import { TABLE_ROW_CLASS } from "./tableColumns";
-import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
+import { NETWORK_TABLE_GRID } from "./tableColumns";
+import { useOptionalOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
 
 const MISSING_STAFF_ID = "—";
 const STAFF_ID_DISPLAY_LENGTH = 6;
@@ -36,10 +37,10 @@ function formatStaffIdDisplay(staffId: string): string {
 }
 
 function StaffIdLink({ staffId, employeeId }: { staffId: string; employeeId: string }) {
-  const { capabilities, directoryRoutes } = useOperationalAgency();
+  const operationalAgency = useOptionalOperationalAgency();
   const displayId = formatStaffIdDisplay(staffId);
-  const detailsRoute = capabilities.canAccessStaffDirectory
-    ? directoryRoutes?.staffDetails
+  const detailsRoute = operationalAgency?.capabilities.canAccessStaffDirectory
+    ? operationalAgency.directoryRoutes?.staffDetails
     : undefined;
 
   if (!isStaffIdLinkable(staffId) || !detailsRoute || !employeeId.trim()) {
@@ -57,9 +58,9 @@ function StaffIdLink({ staffId, employeeId }: { staffId: string; employeeId: str
 }
 
 function StaffName({ name, employeeId }: { name: string; employeeId: string }) {
-  const { capabilities, directoryRoutes } = useOperationalAgency();
-  const detailsRoute = capabilities.canAccessStaffDirectory
-    ? directoryRoutes?.staffDetails
+  const operationalAgency = useOptionalOperationalAgency();
+  const detailsRoute = operationalAgency?.capabilities.canAccessStaffDirectory
+    ? operationalAgency.directoryRoutes?.staffDetails
     : undefined;
 
   if (!detailsRoute || !employeeId.trim()) {
@@ -168,8 +169,9 @@ function grossPayBreakdown(entry: DuePayrollEntry) {
 }
 
 type DuePayrollRowProps = {
-  entry: DuePayrollEntry;
+  entry: DuePayrollEntry & { agencyId?: string; agencyName?: string };
   variant: "mobile" | "desktop";
+  showAgency?: boolean;
   actionsDisabled?: boolean;
   onCreateInvoiceClick: (entry: DuePayrollEntry) => void;
 };
@@ -177,6 +179,7 @@ type DuePayrollRowProps = {
 function DuePayrollRow({
   entry,
   variant,
+  showAgency = false,
   actionsDisabled = false,
   onCreateInvoiceClick,
 }: DuePayrollRowProps) {
@@ -198,6 +201,12 @@ function DuePayrollRow({
         </div>
 
         <div className="mt-4 space-y-3">
+          {showAgency ? (
+            <div className="flex justify-between gap-4">
+              <span className="text-[13px] text-[#808081]">Agency</span>
+              <span className="text-right text-[13px] font-medium text-[#10141a]">{entry.agencyName ?? "—"}</span>
+            </div>
+          ) : null}
           <div className="flex justify-between gap-4">
             <span className="text-[13px] text-[#808081]">Staff ID</span>
             <StaffIdLink staffId={entry.staffId} employeeId={entry.employeeId} />
@@ -240,7 +249,8 @@ function DuePayrollRow({
   }
 
   return (
-    <div className={TABLE_ROW_CLASS}>
+    <div className={showAgency ? `${NETWORK_TABLE_GRID} py-3.5 border-b border-[#e5e5e6] last:border-b-0` : TABLE_ROW_CLASS}>
+      {showAgency ? <span className="truncate text-[13px] text-[#10141a]">{entry.agencyName ?? "—"}</span> : null}
       <StaffName name={entry.staffName} employeeId={entry.employeeId} />
       <StaffIdLink staffId={entry.staffId} employeeId={entry.employeeId} />
       <span className="text-[13px] tabular-nums text-[#10141a]">{entry.hoursWorked}</span>
@@ -250,8 +260,12 @@ function DuePayrollRow({
       <span className="text-[13px] tabular-nums text-[#10141a]">
         {(entry.expenseTotal ?? 0) > 0 ? formatCurrency(entry.expenseTotal ?? 0) : "—"}
       </span>
-      <span className="text-[13px] font-medium tabular-nums text-[#10141a]" title={breakdown ?? undefined}>
-        {formatCurrency(entry.grossAmount ?? 0)}
+      <span
+        aria-label={entry.grossAmount === undefined ? "Gross pay unavailable" : "Gross pay"}
+        className="text-[13px] font-medium tabular-nums text-[#10141a]"
+        title={breakdown ?? undefined}
+      >
+        {entry.grossAmount === undefined ? "—" : formatCurrency(entry.grossAmount)}
       </span>
       <div className="flex justify-end">
         <PayrollActionsMenu
