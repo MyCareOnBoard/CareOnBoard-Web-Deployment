@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
 import {
   createMemoryRouter,
   MemoryRouter,
@@ -39,6 +40,8 @@ const reduxState = vi.hoisted(() => ({
 }));
 const networkBilling = vi.hoisted(() => ({
   overview: vi.fn(),
+  expensesBootstrap: vi.fn(),
+  expensesPage: vi.fn(),
   refetch: vi.fn(),
 }));
 const unfinishedClaimsPage = vi.hoisted(() => vi.fn());
@@ -57,6 +60,7 @@ vi.mock("@/hooks/useEffectiveAgencyMode", async () => ({
   useEffectiveAgencyMode: () => "hha",
 }));
 vi.mock("react-redux", () => ({
+  useDispatch: () => vi.fn(),
   useSelector: (selector: (state: unknown) => unknown) => selector({
     agencyMode: { modeByAgency: reduxState.modeByAgency },
   }),
@@ -82,8 +86,37 @@ vi.mock("@/lib/operational-agency/dataAdapters", () => ({
 }));
 vi.mock("@/lib/api/network-billing", () => ({
   NETWORK_BILLING_QUERY_OPTIONS: { refetchOnMountOrArgChange: 30 },
-  networkBillingApi: { useGetOverviewBootstrapQuery: networkBilling.overview },
+  networkBillingApi: {
+    useGetOverviewBootstrapQuery: networkBilling.overview,
+    useGetExpensesBootstrapQuery: networkBilling.expensesBootstrap,
+    useLazyGetExpensesPageQuery: networkBilling.expensesPage,
+    util: { invalidateTags: vi.fn() },
+  },
 }));
+vi.mock("@/lib/api/billing-expenses", () => ({
+  useApproveExpenseMutation: () => [vi.fn(), { isLoading: false }],
+  useDeleteExpenseMutation: () => [vi.fn(), { isLoading: false }],
+  useRejectExpenseMutation: () => [vi.fn(), { isLoading: false }],
+}));
+vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: vi.fn() }) }));
+vi.mock("react-loader-spinner", () => ({ Oval: () => null }));
+vi.mock("@/components/ui/button", () => ({ Button: (props: ButtonHTMLAttributes<HTMLButtonElement>) => <button {...props} /> }));
+vi.mock("@/components/ui/dialog", () => ({
+  Dialog: ({ open, children }: { open: boolean; children: ReactNode }) => open ? <div role="dialog">{children}</div> : null,
+  DialogContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DialogDescription: ({ children }: { children: ReactNode }) => <p>{children}</p>,
+  DialogHeader: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DialogTitle: ({ children }: { children: ReactNode }) => <h2>{children}</h2>,
+}));
+vi.mock("@/components/modals/DeleteConfirmationModal", () => ({
+  DeleteConfirmationModal: () => null,
+}));
+vi.mock("@/pages/agency/billing/expenses/components/RejectExpenseModal", () => ({ default: () => null }));
+vi.mock("@/pages/agency/billing/expenses/components/ExpensesOverviewCards", () => ({ default: () => null }));
+vi.mock("@/pages/agency/billing/expenses/components/ExpensesByStatusChart", () => ({ default: () => null }));
+vi.mock("@/pages/agency/billing/expenses/components/ExpensesWorkspaceTabs", () => ({ default: () => null }));
+vi.mock("@/pages/agency/billing/expenses/components/PendingExpensesTable", () => ({ default: () => null }));
+vi.mock("@/pages/agency/billing/expenses/components/ExpensesHistoryTable", () => ({ default: () => null }));
 vi.mock("@/layouts/SuperAdminLayout", async () => {
   const React = await import("react");
   const { Outlet: RouteOutlet } = await import("react-router");
@@ -394,9 +427,13 @@ function renderWorkspace(entry: string, nested = <BillingWorkspaceProbe />) {
 }
 
 function renderActualBillingRoute(entry: string) {
-  return render(
-    <RouterProvider router={createMemoryRouter(router.routes, { initialEntries: [entry] })} />,
-  );
+  const configuredRouter = createMemoryRouter(router.routes, { initialEntries: [entry] });
+  return {
+    configuredRouter,
+    ...render(
+      <RouterProvider router={configuredRouter} />,
+    ),
+  };
 }
 
 describe("SuperAdminBillingWorkspace", () => {
@@ -433,6 +470,14 @@ describe("SuperAdminBillingWorkspace", () => {
       isError: false,
       refetch: networkBilling.refetch,
     });
+    networkBilling.expensesBootstrap.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isFetching: false,
+      isError: true,
+      refetch: networkBilling.refetch,
+    });
+    networkBilling.expensesPage.mockReturnValue([vi.fn(), { isFetching: false }]);
   });
 
   it("fails closed before loading agencies or mounting content without Billing Management", () => {
@@ -475,21 +520,26 @@ describe("SuperAdminBillingWorkspace", () => {
     expect(screen.queryByLabelText("Network billing workspace")).not.toBeInTheDocument();
   });
 
-  it("mounts the completed provider-free network expenses child instead of the staging bridge", async () => {
-    renderWorkspace(
+  it("mounts the configured provider-free network expenses controller instead of the staging bridge", async () => {
+    const { configuredRouter } = renderActualBillingRoute(
       "/super-admin/billing/expenses?status=open&clientType=ddd&startDate=2026-07-01&endDate=2026-07-31",
-      <BillingWorkspaceProbe />,
     );
 
-    expect(await screen.findByLabelText("Billing workspace scope")).toHaveTextContent("network");
-    expect(screen.getByLabelText("Billing workspace mode")).toHaveTextContent("ddd");
-    expect(screen.getByLabelText("Billing workspace dates")).toHaveTextContent("2026-07-01:2026-07-31");
+    await waitFor(() => expect(configuredRouter.state.errors).toBeNull());
+    await waitFor(() => expect(networkBilling.expensesBootstrap).toHaveBeenCalled());
+    expect(await screen.findByRole("region", { name: "Network expenses" })).toBeVisible();
     expect(screen.queryByLabelText("Network billing workspace")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Select an agency, all authorized agencies" })).toBeVisible();
-    await waitFor(() => expect(operationsApi.listOperationalAgencies).toHaveBeenCalledWith(
-      "billing-management",
-      expect.objectContaining({ limit: 50, signal: expect.any(AbortSignal) }),
-    ));
+    expect(networkBilling.expensesBootstrap).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scope: { kind: "network" },
+        startDate: "2026-07-01",
+        endDate: "2026-07-31",
+        mode: "ddd",
+        tab: "pending",
+      }),
+      expect.objectContaining({ skip: false }),
+    );
     expect(operationsApi.getOperationalAgencyContext).not.toHaveBeenCalled();
   });
 
