@@ -90,6 +90,7 @@ function NetworkBillingOutlet() {
   return pathname === Routes.superAdmin.billing.financialOverview
     || pathname === Routes.superAdmin.billing.claims
     || pathname === Routes.superAdmin.billing.payrollManagement
+    || pathname === Routes.superAdmin.billing.expenses
     || pathname === Routes.superAdmin.billing.staffTimesheets
     ? <Outlet key={generation} />
     : <NetworkBillingBridge />;

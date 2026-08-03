@@ -475,35 +475,22 @@ describe("SuperAdminBillingWorkspace", () => {
     expect(screen.queryByLabelText("Network billing workspace")).not.toBeInTheDocument();
   });
 
-  it("keeps the unfinished network expenses child on the provider-free bridge", async () => {
-    renderActualBillingRoute(
-      "/super-admin/billing/expenses?clientType=ddd&startDate=2026-07-01&endDate=2026-07-31",
-    );
-
-    const bridge = await screen.findByLabelText("Network billing workspace");
-    expect(bridge).toHaveAttribute("data-scope", "network");
-    expect(networkBilling.overview).not.toHaveBeenCalled();
-    expect(unfinishedClaimsPage).not.toHaveBeenCalled();
-    expect(operationsApi.getOperationalAgencyContext).not.toHaveBeenCalled();
-  });
-
-  it("keeps the unfinished network expenses bridge context-aware without mounting an agency child", async () => {
+  it("mounts the completed provider-free network expenses child instead of the staging bridge", async () => {
     renderWorkspace(
       "/super-admin/billing/expenses?status=open&clientType=ddd&startDate=2026-07-01&endDate=2026-07-31",
-      <BillingDomainProbe />,
+      <BillingWorkspaceProbe />,
     );
 
-    const bridge = screen.getByLabelText("Network billing workspace");
-    expect(bridge).toHaveAttribute("data-scope", "network");
-    expect(bridge).toHaveAttribute("data-mode", "ddd");
-    expect(bridge).toHaveAttribute("data-date-range", "2026-07-01:2026-07-31");
+    expect(await screen.findByLabelText("Billing workspace scope")).toHaveTextContent("network");
+    expect(screen.getByLabelText("Billing workspace mode")).toHaveTextContent("ddd");
+    expect(screen.getByLabelText("Billing workspace dates")).toHaveTextContent("2026-07-01:2026-07-31");
+    expect(screen.queryByLabelText("Network billing workspace")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Select an agency, all authorized agencies" })).toBeVisible();
     await waitFor(() => expect(operationsApi.listOperationalAgencies).toHaveBeenCalledWith(
       "billing-management",
       expect.objectContaining({ limit: 50, signal: expect.any(AbortSignal) }),
     ));
     expect(operationsApi.getOperationalAgencyContext).not.toHaveBeenCalled();
-    expect(domainRequest).not.toHaveBeenCalled();
   });
 
   it("revalidates a direct-link agency before mounting nested billing content", async () => {
