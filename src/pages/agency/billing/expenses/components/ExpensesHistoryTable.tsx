@@ -26,6 +26,7 @@ type SharedExpensesHistoryTableProps<T extends AgencyExpenseListItem> = {
   loading?: boolean;
   statusFilter: ExpenseStatus | "all";
   onStatusFilterChange: (status: ExpenseStatus | "all") => void;
+  statusFilterOptions?: Array<{ value: ExpenseStatus | "all"; label: string }>;
   onLoadMore?: () => void;
   noun?: string;
   isRefetching?: boolean;
@@ -62,6 +63,7 @@ export default function ExpensesHistoryTable(props: ExpensesHistoryTableProps) {
     loading = false,
     statusFilter,
     onStatusFilterChange,
+    statusFilterOptions = STATUS_FILTER_OPTIONS,
     onLoadMore,
     noun = "DSP",
     isRefetching = false,
@@ -134,7 +136,7 @@ export default function ExpensesHistoryTable(props: ExpensesHistoryTableProps) {
               }
               className="min-h-[44px] rounded-md border border-[#e5e5e6] bg-white px-3 py-2 text-[13px] text-[#10141a]"
             >
-              {STATUS_FILTER_OPTIONS.map((option) => (
+              {statusFilterOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>

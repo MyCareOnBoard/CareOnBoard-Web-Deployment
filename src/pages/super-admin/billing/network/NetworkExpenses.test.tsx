@@ -37,10 +37,10 @@ vi.mock("@/lib/api/network-billing", () => ({
   },
 }));
 vi.mock("@/pages/agency/billing/expenses/components/ExpensesOverviewCards", () => ({ default: () => <output>Expense overview</output> }));
-vi.mock("@/pages/agency/billing/expenses/components/ExpensesByStatusChart", () => ({ default: ({ onStatusSegmentClick }: { onStatusSegmentClick: (label: string) => void }) => <button onClick={() => onStatusSegmentClick("Approved")}>Approved chart segment</button> }));
-vi.mock("@/pages/agency/billing/expenses/components/ExpensesWorkspaceTabs", () => ({ default: ({ activeTab, onTabChange }: { activeTab: string; onTabChange: (tab: "pending" | "all") => void }) => <div><output>active:{activeTab}</output><button onClick={() => onTabChange("all")}>History</button></div> }));
+vi.mock("@/pages/agency/billing/expenses/components/ExpensesByStatusChart", () => ({ default: ({ onStatusSegmentClick }: { onStatusSegmentClick: (label: string) => void }) => <div><button onClick={() => onStatusSegmentClick("Approved")}>Approved chart segment</button><button onClick={() => onStatusSegmentClick("Awaiting review")}>Awaiting review chart segment</button></div> }));
+vi.mock("@/pages/agency/billing/expenses/components/ExpensesWorkspaceTabs", () => ({ default: ({ activeTab, onTabChange }: { activeTab: string; onTabChange: (tab: "pending" | "all") => void }) => <div><output>active:{activeTab}</output><button onClick={() => onTabChange("all")}>History</button><button onClick={() => onTabChange("pending")}>Awaiting review</button></div> }));
 vi.mock("@/pages/agency/billing/expenses/components/PendingExpensesTable", () => ({ default: ({ expenses, onApprove, onDecline, onDelete, showAgency }: { expenses: Array<{ employeeName: string; agencyName: string }>; onApprove: (row: unknown) => void; onDecline: (row: unknown) => void; onDelete: (row: unknown) => void; showAgency: boolean }) => <section aria-label="Pending expenses"><output>{showAgency ? expenses.map((row) => `${row.employeeName} at ${row.agencyName}`).join(",") : "missing-agency"}</output>{expenses[0] ? <><button onClick={() => onApprove(expenses[0])}>Approve row</button><button onClick={() => onDecline(expenses[0])}>Decline row</button><button onClick={() => onDelete(expenses[0])}>Delete row</button></> : null}</section> }));
-vi.mock("@/pages/agency/billing/expenses/components/ExpensesHistoryTable", () => ({ default: ({ expenses, statusFilter, onStatusFilterChange, onLoadMore, nextCursor, isRefetching, showAgency }: { expenses: Array<{ employeeName: string; agencyName: string }>; statusFilter: string; onStatusFilterChange: (status: "approved") => void; onLoadMore: () => void; nextCursor: string | null; isRefetching: boolean; showAgency: boolean }) => <section aria-label="Expense history"><output>{showAgency ? expenses.map((row) => `${row.employeeName} at ${row.agencyName}`).join(",") : "missing-agency"}</output><output>status:{statusFilter}</output><output>cursor:{nextCursor ?? "none"}</output><output>refresh:{String(isRefetching)}</output><button onClick={() => onStatusFilterChange("approved")}>Approved filter</button><button onClick={onLoadMore}>Load more</button></section> }));
+vi.mock("@/pages/agency/billing/expenses/components/ExpensesHistoryTable", () => ({ default: ({ expenses, statusFilter, onStatusFilterChange, onLoadMore, nextCursor, hasMore, isRefetching, showAgency, statusFilterOptions }: { expenses: Array<{ employeeName: string; agencyName: string }>; statusFilter: string; onStatusFilterChange: (status: "all" | "approved" | "rejected" | "pending") => void; onLoadMore: () => void; nextCursor: string | null; hasMore: boolean; isRefetching: boolean; showAgency: boolean; statusFilterOptions?: Array<{ value: string; label: string }> }) => <section aria-label="Expense history"><output>{showAgency ? expenses.map((row) => `${row.employeeName} at ${row.agencyName}`).join(",") : "missing-agency"}</output><output>status:{statusFilter}</output><output>cursor:{nextCursor ?? "none"}</output><output>has-more:{String(hasMore)}</output><output>refresh:{String(isRefetching)}</output><select aria-label="History status" value={statusFilter} onChange={(event) => onStatusFilterChange(event.target.value as "all" | "approved" | "rejected" | "pending")}>{(statusFilterOptions ?? []).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>{hasMore ? <button onClick={onLoadMore}>Load more</button> : <output>End of history</output>}</section> }));
 
 import NetworkExpenses from "./NetworkExpenses";
 import SuperAdminBillingExpenses from "../SuperAdminBillingExpenses";
@@ -62,24 +62,48 @@ describe("NetworkExpenses", () => {
     expect(screen.getByText("Agency expenses")).toBeVisible();
   });
 
-  it("loads only the active pending/history dataset with agency context, filters, and cursor paging", async () => {
+  it("loads valid approved and declined history together, then carries both cursors to a terminal state", async () => {
     const responses = {
       pending: { data: { page: { rows: [row], total: 1, nextCursor: null, hasMore: false }, summary }, isLoading: false, isFetching: false },
-      history: { data: { page: { rows: [row], total: 1, nextCursor: "after-1", hasMore: true }, summary }, isLoading: false, isFetching: false },
+      approved: { data: { page: { rows: [{ ...row, id: "expense-approved", employeeName: "Approved Avery", status: "approved" as const }], total: 1, nextCursor: "after-approved", hasMore: true }, summary }, isLoading: false, isFetching: false },
+      rejected: { data: { page: { rows: [{ ...row, id: "expense-rejected", employeeName: "Declined Avery", status: "rejected" as const }], total: 1, nextCursor: "after-rejected", hasMore: true }, summary }, isLoading: false, isFetching: false },
     };
-    api.bootstrap.mockImplementation((args: { tab: string }) => args.tab === "history" ? responses.history : responses.pending);
-    api.page.mockReturnValue({ unwrap: vi.fn().mockResolvedValue({ page: { rows: [{ ...row, id: "expense-2" }], total: 2, nextCursor: null, hasMore: false } }) });
+    api.bootstrap.mockImplementation((args: { tab: string; status: string }) => args.tab === "pending" ? responses.pending : args.status === "approved" ? responses.approved : responses.rejected);
+    api.page.mockImplementation((args: { status: string }) => ({ unwrap: vi.fn().mockResolvedValue({ page: { rows: [{ ...row, id: `expense-${args.status}-2`, status: args.status }], total: 2, nextCursor: null, hasMore: false } }) }));
     renderPage();
     expect(screen.getByRole("region", { name: "Network expenses" })).toBeVisible();
     expect(screen.getByText("Avery Nurse at Atlas Care")).toBeVisible();
-    expect(api.bootstrap).toHaveBeenLastCalledWith(expect.objectContaining({ tab: "pending", status: "pending", mode: "ddd" }), expect.anything());
+    expect(api.bootstrap).toHaveBeenCalledWith(expect.objectContaining({ tab: "pending", status: "pending", mode: "ddd" }), expect.anything());
     fireEvent.click(screen.getByRole("button", { name: "History" }));
     expect(await screen.findByRole("region", { name: "Expense history" })).toBeVisible();
-    expect(api.bootstrap).toHaveBeenLastCalledWith(expect.objectContaining({ tab: "history" }), expect.anything());
-    fireEvent.click(screen.getByRole("button", { name: "Approved filter" }));
-    expect(api.bootstrap).toHaveBeenLastCalledWith(expect.objectContaining({ tab: "history", status: "approved" }), expect.anything());
+    expect(screen.getByText("Approved Avery at Atlas Care,Declined Avery at Atlas Care")).toBeVisible();
+    expect(screen.getByText("status:all")).toBeVisible();
+    expect(api.bootstrap).toHaveBeenCalledWith(expect.objectContaining({ tab: "history", status: "approved" }), expect.anything());
+    expect(api.bootstrap).toHaveBeenCalledWith(expect.objectContaining({ tab: "history", status: "rejected" }), expect.anything());
     fireEvent.click(screen.getByRole("button", { name: "Load more" }));
-    await waitFor(() => expect(api.page).toHaveBeenCalledWith(expect.objectContaining({ tab: "history", status: "approved", cursor: "after-1" })));
+    await waitFor(() => expect(api.page).toHaveBeenCalledWith(expect.objectContaining({ tab: "history", status: "approved", cursor: "after-approved" })));
+    expect(api.page).toHaveBeenCalledWith(expect.objectContaining({ tab: "history", status: "rejected", cursor: "after-rejected" }));
+    await waitFor(() => expect(screen.getByText("End of history")).toBeVisible());
+    expect(screen.getByText("has-more:false")).toBeVisible();
+  });
+
+  it("maps history filters and chart segments to valid network datasets", async () => {
+    const responses = {
+      pending: { data: { page: { rows: [row], total: 1, nextCursor: null, hasMore: false }, summary }, isLoading: false, isFetching: false },
+      approved: { data: { page: { rows: [{ ...row, id: "expense-approved", status: "approved" as const }], total: 1, nextCursor: null, hasMore: false }, summary }, isLoading: false, isFetching: false },
+      rejected: { data: { page: { rows: [{ ...row, id: "expense-rejected", status: "rejected" as const }], total: 1, nextCursor: null, hasMore: false }, summary }, isLoading: false, isFetching: false },
+    };
+    api.bootstrap.mockImplementation((args: { tab: string; status: string }) => args.tab === "pending" ? responses.pending : args.status === "approved" ? responses.approved : responses.rejected);
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "History" }));
+    await screen.findByText("status:all");
+    fireEvent.change(screen.getByRole("combobox", { name: "History status" }), { target: { value: "rejected" } });
+    expect(screen.getByText("status:rejected")).toBeVisible();
+    expect(api.bootstrap).toHaveBeenCalledWith(expect.objectContaining({ tab: "history", status: "rejected" }), expect.anything());
+    fireEvent.click(screen.getByRole("button", { name: "Awaiting review chart segment" }));
+    await waitFor(() => expect(screen.getByText("active:pending")).toBeVisible());
+    expect(api.bootstrap).toHaveBeenCalledWith(expect.objectContaining({ tab: "pending", status: "pending" }), expect.anything());
   });
 
   it("binds approval, decline, and deletion to the row agency then invalidates network summaries and tables", async () => {
@@ -128,5 +152,15 @@ describe("NetworkExpenses", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("current rows are still available");
     rerender(<BillingWorkspaceProvider value={{ ...workspace, scope: { kind: "agency", agencyId: "beacon" } }}><NetworkExpenses /></BillingWorkspaceProvider>);
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("keeps cached rows visible and offers a local retry when a background bootstrap refresh fails", async () => {
+    const retry = vi.fn();
+    api.bootstrap.mockReturnValue({ data: { page: { rows: [row], total: 1, nextCursor: null, hasMore: false }, summary }, isError: true, isLoading: false, isFetching: false, refetch: retry });
+    renderPage();
+    expect(screen.getByText("Avery Nurse at Atlas Care")).toBeVisible();
+    expect(screen.getByRole("alert")).toHaveTextContent("may be out of date");
+    fireEvent.click(screen.getByRole("button", { name: "Retry network expenses" }));
+    expect(retry).toHaveBeenCalledTimes(1);
   });
 });
