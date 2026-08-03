@@ -9,6 +9,7 @@ export function dismissAgencyAccessRefreshWarning(): void {
 
 export function showAgencyAccessRefreshWarning(
   refreshProfile: () => Promise<unknown>,
+  resetCaches: () => void,
 ): void {
   toast.warning("Agency created, but access refresh failed", {
     id: AGENCY_ACCESS_REFRESH_TOAST_ID,
@@ -16,20 +17,21 @@ export function showAgencyAccessRefreshWarning(
     duration: Infinity,
     action: {
       label: "Retry",
-      onClick: () => retryAgencyAccessRefresh(refreshProfile),
+      onClick: () => retryAgencyAccessRefresh(refreshProfile, resetCaches),
     },
   });
 }
 
 async function retryAgencyAccessRefresh(
   refreshProfile: () => Promise<unknown>,
+  resetCaches: () => void,
 ): Promise<boolean> {
-  const refreshed = await refreshCommittedAccess({refreshProfile});
+  const refreshed = await refreshCommittedAccess({refreshProfile, resetCaches});
 
   if (refreshed) {
     dismissAgencyAccessRefreshWarning();
   } else {
-    showAgencyAccessRefreshWarning(refreshProfile);
+    showAgencyAccessRefreshWarning(refreshProfile, resetCaches);
   }
 
   return refreshed;

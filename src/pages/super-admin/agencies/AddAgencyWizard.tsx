@@ -23,6 +23,8 @@ import Step9Billing from "@/pages/super-admin/agencies/components/StepSix";
 import Step10Subscription from "@/pages/super-admin/agencies/components/StepSeven";
 import {GetDraftAgencyResponse} from "@/pages/super-admin/agencies/apiTypes";
 import {useAuth} from "@/utils/auth";
+import {useDispatch} from "react-redux";
+import {resetSuperAdminCaches} from "@/pages/super-admin/user-access-control/resetSuperAdminCaches";
 import {finalizeAgencyCreation} from "./agencyCreationAccessRefresh";
 import {
     dismissAgencyAccessRefreshWarning,
@@ -226,6 +228,7 @@ const STEPS = [
 ];
 
 export default function AddAgencyWizard() {
+    const dispatch = useDispatch();
     const {user, refreshProfile} = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
@@ -724,7 +727,8 @@ export default function AddAgencyWizard() {
                     }),
                     navigate: () => navigate(Routes.superAdmin.agencies),
                     refreshProfile,
-                    onRefreshFailure: () => showAgencyAccessRefreshWarning(refreshProfile),
+                    resetCaches: () => resetSuperAdminCaches(dispatch),
+                    onRefreshFailure: () => showAgencyAccessRefreshWarning(refreshProfile, () => resetSuperAdminCaches(dispatch)),
                     onRefreshSuccess: dismissAgencyAccessRefreshWarning,
                 });
                 return;

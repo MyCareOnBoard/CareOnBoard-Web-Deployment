@@ -1,4 +1,4 @@
-import { combineReducers, configureStore } from "@reduxjs/toolkit";
+import { combineReducers, configureStore, type Middleware, type UnknownAction } from "@reduxjs/toolkit";
 import {
     persistStore,
     persistReducer,
@@ -36,6 +36,7 @@ import { userMessagingApi } from "@/lib/api/userMessaging";
 import { aiAutomationApi } from "@/pages/agency/ai-automation/api";
 import { agencyStaffTasksApi } from "@/pages/agency/staff-tasks/api";
 import { remindersApi } from "@/pages/agency/reminders/api";
+import { networkBillingApi } from "@/lib/api/network-billing";
 
 const appReducer = combineReducers({
     auth: authReducer,
@@ -64,10 +65,26 @@ const appReducer = combineReducers({
     [aiAutomationApi.reducerPath]: aiAutomationApi.reducer,
     [agencyStaffTasksApi.reducerPath]: agencyStaffTasksApi.reducer,
     [remindersApi.reducerPath]: remindersApi.reducer,
+    [networkBillingApi.reducerPath]: networkBillingApi.reducer,
 });
 
+const isLogoutFulfilled = (action: unknown): boolean => (
+    typeof action === "object" &&
+    action !== null &&
+    "type" in action &&
+    (action as { type?: unknown }).type === logoutUser.fulfilled.type
+);
+
+// Dispatch before logout reaches route consumers so a remounted account never sees prior billing data.
+export const networkBillingLogoutResetMiddleware: Middleware = ({ dispatch }) => (next) => (action) => {
+    if (isLogoutFulfilled(action)) {
+        dispatch(networkBillingApi.util.resetApiState());
+    }
+    return next(action);
+};
+
 // Root reducer resets ALL slice state (including every RTK Query cache) on logout
-const rootReducer = (state: ReturnType<typeof appReducer> | undefined, action: any) => {
+const rootReducer = (state: ReturnType<typeof appReducer> | undefined, action: UnknownAction) => {
     if (action.type === logoutUser.fulfilled.type) {
         return appReducer(undefined, action);
     }
@@ -91,6 +108,7 @@ export const store = configureStore({
                 ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
             },
         }).concat(applicationApi.middleware)
+            .concat(networkBillingLogoutResetMiddleware)
             .concat(documentsApi.middleware)
             .concat(userPanelDashboardApi.middleware)
             .concat(userPanelNotesApi.middleware)
@@ -113,7 +131,8 @@ export const store = configureStore({
             .concat(userMessagingApi.middleware)
             .concat(aiAutomationApi.middleware)
             .concat(agencyStaffTasksApi.middleware)
-            .concat(remindersApi.middleware),
+            .concat(remindersApi.middleware)
+            .concat(networkBillingApi.middleware),
     devTools: process.env.VITE_ENVIRONMENT !== 'production',
 });
 

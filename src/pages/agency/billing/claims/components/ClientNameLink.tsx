@@ -8,6 +8,10 @@ type ClientNameLinkProps = {
   className?: string;
 };
 
+export function ProviderFreeClientName({ name, className }: Omit<ClientNameLinkProps, "clientId">) {
+  return <span className={className}>{name}</span>;
+}
+
 export default function ClientNameLink({ name, clientId, className }: ClientNameLinkProps) {
   const { capabilities, directoryRoutes } = useOperationalAgency();
   const trimmedClientId = clientId?.trim();

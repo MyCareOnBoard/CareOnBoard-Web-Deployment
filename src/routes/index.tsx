@@ -154,12 +154,12 @@ const SuperAdminBillingIndexPage = lazy(() =>
     import("@/pages/super-admin/billing").then((module) => ({ default: module.SuperAdminBillingIndex }))
 );
 const SuperAdminBillingFinancialOverviewPage = lazy(() =>
-    import("@/pages/agency/billing/financial-overview")
+    import("@/pages/super-admin/billing/SuperAdminBillingFinancialOverview")
 );
-const SuperAdminBillingClaimsPage = lazy(() => import("@/pages/agency/billing/claims"));
-const SuperAdminBillingPayrollPage = lazy(() => import("@/pages/agency/billing/payroll"));
-const SuperAdminBillingExpensesPage = lazy(() => import("@/pages/agency/billing/expenses"));
-const SuperAdminBillingStaffTimesheetsPage = lazy(() => import("@/pages/agency/billing/staff-timesheets"));
+const SuperAdminBillingClaimsPage = lazy(() => import("@/pages/super-admin/billing/SuperAdminBillingClaims"));
+const SuperAdminBillingPayrollPage = lazy(() => import("@/pages/super-admin/billing/SuperAdminBillingPayroll"));
+const SuperAdminBillingExpensesPage = lazy(() => import("@/pages/super-admin/billing/SuperAdminBillingExpenses"));
+const SuperAdminBillingStaffTimesheetsPage = lazy(() => import("@/pages/super-admin/billing/SuperAdminBillingTimesheets"));
 const AgencyBillingMonitorPage = lazy(() => import("@/pages/super-admin/agency-billing-monitor"));
 const AIAutomationPage = lazy(() => import("@/pages/agency/ai-automation"));
 const AgencyMileagePage = lazy(() => import("@/pages/agency/mileage"));

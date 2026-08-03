@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { DotGridIcon } from "@/components/ui/dot-grid-menu";
 import { cn } from "@/lib/utils";
-import ClientNameLink from "./ClientNameLink";
+import ClientNameLink, { ProviderFreeClientName } from "./ClientNameLink";
 import type { RecentClaimClientGroup } from "../utils/groupRecentClaimsByClient";
 
 const menuItemClassName =
@@ -18,6 +18,8 @@ type RecentClaimsClientGroupHeaderProps = {
   variant: "mobile" | "desktop";
   onGenerateClaim: (group: RecentClaimClientGroup) => void;
   generateDisabled?: boolean;
+  showAgency?: boolean;
+  providerFree?: boolean;
 };
 
 export default function RecentClaimsClientGroupHeader({
@@ -25,18 +27,23 @@ export default function RecentClaimsClientGroupHeader({
   variant,
   onGenerateClaim,
   generateDisabled = false,
+  showAgency = false,
+  providerFree = false,
 }: RecentClaimsClientGroupHeaderProps) {
   const itemLabel = group.claims.length === 1 ? "1 item" : `${group.claims.length} items`;
   const isMobile = variant === "mobile";
   // Coverage is now per line (shown in the row's Coverage column), so the group action is generic.
   const generateLabel = "Generate bills";
+  const actionLabel = showAgency && group.agencyName
+    ? `Claim actions for ${group.clientName} at ${group.agencyName} for ${group.claims[0]?.serviceCode ?? "this service"} during ${group.claims[0]?.weekRange ?? "this billing period"}`
+    : `Claim actions for ${group.clientName}`;
 
   const actionsMenu = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild disabled={generateDisabled}>
         <button
           type="button"
-          aria-label={`Claim actions for ${group.clientName}`}
+          aria-label={actionLabel}
           disabled={generateDisabled}
           className={cn(
             "inline-flex cursor-pointer items-center justify-center rounded-md bg-white transition-colors hover:bg-[#e5e5e6] active:bg-[#e5e5e6]",
@@ -71,13 +78,12 @@ export default function RecentClaimsClientGroupHeader({
       <div className="flex items-center justify-between gap-3 px-1 pb-1 pt-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <ClientNameLink
-              name={group.clientName}
-              clientId={group.clientId}
-              className="text-[16px] font-semibold text-[#10141a]"
-            />
+            {providerFree ? <ProviderFreeClientName name={group.clientName} className="text-[16px] font-semibold text-[#10141a]" /> : <ClientNameLink name={group.clientName} clientId={group.clientId} className="text-[16px] font-semibold text-[#10141a]" />}
           </div>
           <p className="mt-1 text-[13px] text-[#808081]">{itemLabel}</p>
+          {showAgency && group.agencyName ? (
+            <p className="mt-1 text-[13px] text-[#808081]">Agency: {group.agencyName}</p>
+          ) : null}
         </div>
         {actionsMenu}
       </div>
@@ -87,11 +93,7 @@ export default function RecentClaimsClientGroupHeader({
   return (
     <div className="flex items-center justify-between gap-4 border-b border-[#e5e5e6] bg-[#eef4f5] px-4 py-3 pr-8">
       <div className="flex min-w-0 items-center gap-3">
-        <ClientNameLink
-          name={group.clientName}
-          clientId={group.clientId}
-          className="text-[14px] font-semibold text-[#10141a]"
-        />
+        {providerFree ? <ProviderFreeClientName name={group.clientName} className="text-[14px] font-semibold text-[#10141a]" /> : <ClientNameLink name={group.clientName} clientId={group.clientId} className="text-[14px] font-semibold text-[#10141a]" />}
         <span className="shrink-0 text-[13px] text-[#808081]">{itemLabel}</span>
       </div>
       {actionsMenu}

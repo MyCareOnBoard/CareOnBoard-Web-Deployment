@@ -11,6 +11,8 @@ export interface ShiftDateRangeValue {
 interface ShiftDateRangeControlProps {
   value: ShiftDateRangeValue;
   onApply: (range: ShiftDateRangeValue) => void;
+  controlLabel?: string;
+  dialogTitle?: string;
   description?: string;
   maxRangeDays?: number;
   allowFutureDates?: boolean;
@@ -23,6 +25,8 @@ function dateRangeLabel(range: ShiftDateRangeValue): string {
 export default function ShiftDateRangeControl({
   value,
   onApply,
+  controlLabel = "Change shift date range",
+  dialogTitle = "Select shift date range",
   description = "Choose the dates to show",
   maxRangeDays,
   allowFutureDates = false,
@@ -35,7 +39,7 @@ export default function ShiftDateRangeControl({
       <button
         type="button"
         aria-haspopup="dialog"
-        aria-label={`Change shift date range, ${dateRangeLabel(value)}`}
+        aria-label={`${controlLabel}, ${dateRangeLabel(value)}`}
         onClick={() => {
           setDraft(value);
           setOpen(true);
@@ -51,7 +55,7 @@ export default function ShiftDateRangeControl({
         values={draft}
         onChange={setDraft}
         onApply={onApply}
-        title="Select shift date range"
+        title={dialogTitle}
         description={description}
         enforceMaxDateRange={false}
         maxRangeDays={maxRangeDays}
