@@ -32,7 +32,7 @@ export const NETWORK_BILLING_KEEP_UNUSED_DATA_FOR = 60 as const;
 
 type QueryValue = string | number | boolean | undefined;
 type QueryParams = Record<string, QueryValue>;
-type NetworkBillingError = {
+export type NetworkBillingError = {
   status: number | "FETCH_ERROR" | "PARSING_ERROR";
   data: unknown;
   error?: string;
@@ -89,6 +89,14 @@ export type OverviewNetworkBillingArgs = QueryContext & Pick<DatePageContext, "s
 export type NetworkBillingOptionsArgs = QueryContext & {
   kind: "client" | "staff";
   q: string;
+};
+
+export type NetworkBillingPreparationResult = {
+  examined: number;
+  updated: number;
+  missing: number;
+  invalid: number;
+  ready: boolean;
 };
 
 class NetworkBillingContractError extends Error {
@@ -820,6 +828,18 @@ function validateOverview(value: unknown): NetworkBillingOverview {
   };
 }
 
+function validatePreparation(value: unknown): NetworkBillingPreparationResult {
+  const data = successfulData(value, false);
+  onlyKeys(data, ["examined", "updated", "missing", "invalid", "ready"], "response.data");
+  return {
+    examined: nonNegativeInteger(data, "examined", "response.data"),
+    updated: nonNegativeInteger(data, "updated", "response.data"),
+    missing: nonNegativeInteger(data, "missing", "response.data"),
+    invalid: nonNegativeInteger(data, "invalid", "response.data"),
+    ready: requiredBoolean(data, "ready", "response.data"),
+  };
+}
+
 function validateOptions(value: unknown): NetworkBillingOption[] {
   const envelope = record(value, "response");
   onlyKeys(envelope, ["success", "data"], "response");
@@ -926,6 +946,30 @@ function query<T, TArgs>(
   };
 }
 
+function mutation<T, TArgs>(
+  path: string,
+  validate: (value: unknown, args: TArgs) => T,
+) {
+  return async (args: TArgs, api: { signal: AbortSignal }): Promise<{ data: T } | { error: NetworkBillingError }> => {
+    try {
+      const response = await axiosClient.post<unknown>(path, undefined, { signal: api.signal });
+      return { data: validate(response.data, args) };
+    } catch (error) {
+      if (error instanceof NetworkBillingContractError) {
+        return { error: { status: "PARSING_ERROR", data: null, error: error.message } };
+      }
+      const response = typeof error === "object" && error !== null && "response" in error
+        ? (error as { response?: { status?: number; data?: unknown } }).response
+        : undefined;
+      return {
+        error: response?.status
+          ? { status: response.status, data: response.data ?? null }
+          : { status: "FETCH_ERROR", data: null, error: error instanceof Error ? error.message : "Request failed." },
+      };
+    }
+  };
+}
+
 const tags = (domain: "Claims" | "Payroll" | "Expenses" | "Timesheets" | "Overview" | "Options") => [
   { type: domain, id: "NETWORK" },
   { type: "NETWORK" as const, id: "NETWORK" },
@@ -941,6 +985,17 @@ export const networkBillingApi = createApi({
       queryFn: query("/superAdminOperations/billing/overview/bootstrap", overviewParams, validateOverview),
       serializeQueryArgs: ({ queryArgs }) => cacheArgs(queryArgs, overviewParams(queryArgs)),
       providesTags: tags("Overview"),
+    }),
+    prepareNetworkBilling: build.mutation<NetworkBillingPreparationResult, QueryContext>({
+      queryFn: mutation("/superAdminOperations/billing/prepare-network", validatePreparation),
+      invalidatesTags: [
+        { type: "NETWORK", id: "NETWORK" },
+        { type: "Overview", id: "NETWORK" },
+        { type: "Claims", id: "NETWORK" },
+        { type: "Payroll", id: "NETWORK" },
+        { type: "Expenses", id: "NETWORK" },
+        { type: "Timesheets", id: "NETWORK" },
+      ],
     }),
     getClaimsBootstrap: build.query<NetworkBillingPageResponse<NetworkBillingClaimRow, NetworkBillingClaimsSummary>, ClaimsNetworkBillingArgs>({
       queryFn: query("/superAdminOperations/billing/claims/bootstrap", claimsParams, validateClaimsBootstrap),

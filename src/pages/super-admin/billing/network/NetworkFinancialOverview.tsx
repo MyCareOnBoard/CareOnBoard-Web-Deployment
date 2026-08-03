@@ -1,7 +1,20 @@
+import { useState } from "react";
 import { format } from "date-fns";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   NETWORK_BILLING_QUERY_OPTIONS,
+  type NetworkBillingError,
   networkBillingApi,
 } from "@/lib/api/network-billing";
 import { formatCurrency } from "@/pages/agency/billing-and-approvals/billingUtils";
@@ -167,8 +180,36 @@ function PartialFailure({
   );
 }
 
+function networkBillingErrorCode(error: unknown): string | undefined {
+  const response = error as NetworkBillingError | undefined;
+  if (!response || typeof response.data !== "object" || response.data === null) return undefined;
+  const code = (response.data as { code?: unknown }).code;
+  return typeof code === "string" ? code : undefined;
+}
+
+function preparationErrorMessage(error: unknown): string {
+  const response = error as NetworkBillingError | undefined;
+  if (networkBillingErrorCode(error) !== "NETWORK_BILLING_PREPARATION_INCOMPLETE" || !response) {
+    return "We couldn't prepare network billing. Please try again.";
+  }
+  const result = (response.data as { data?: unknown }).data;
+  if (typeof result !== "object" || result === null) {
+    return "Preparation completed, but some billing records still need attention.";
+  }
+  const { missing, invalid } = result as { missing?: unknown; invalid?: unknown };
+  const missingCount = typeof missing === "number" ? missing : 0;
+  const invalidCount = typeof invalid === "number" ? invalid : 0;
+  const issueCount = missingCount + invalidCount;
+  return issueCount > 0
+    ? `Preparation completed, but ${issueCount} billing record${issueCount === 1 ? "" : "s"} still need${issueCount === 1 ? "s" : ""} attention.`
+    : "Preparation completed, but some billing records still need attention.";
+}
+
 export default function NetworkFinancialOverview() {
   const workspace = useBillingWorkspaceContext();
+  const [preparationOpen, setPreparationOpen] = useState(false);
+  const [preparationError, setPreparationError] = useState<string | null>(null);
+  const [prepareNetworkBilling, preparation] = networkBillingApi.usePrepareNetworkBillingMutation();
   const query = networkBillingApi.useGetOverviewBootstrapQuery({
     actorUid: workspace.actorUid,
     environment: workspace.environment,
@@ -179,8 +220,27 @@ export default function NetworkFinancialOverview() {
     tab: "overview",
   }, NETWORK_BILLING_QUERY_OPTIONS);
   const data = query.data;
-  const initialLoading = query.isLoading && !data;
+  const initialLoading = !data && (query.isLoading || query.isFetching);
   const partialErrors = data?.partialErrors;
+  const canPrepare = networkBillingErrorCode(query.error) === "NETWORK_BILLING_INDEX_NOT_READY";
+
+  async function prepareNetwork() {
+    setPreparationError(null);
+    try {
+      const result = await prepareNetworkBilling({
+        actorUid: workspace.actorUid,
+        environment: workspace.environment,
+        scope: workspace.scope,
+      }).unwrap();
+      if (!result.ready) {
+        setPreparationError("Preparation completed, but some billing records still need attention. Please retry after resolving them.");
+        return;
+      }
+      setPreparationOpen(false);
+    } catch (error) {
+      setPreparationError(preparationErrorMessage(error));
+    }
+  }
 
   if (query.isError && !data) {
     return (
@@ -192,9 +252,39 @@ export default function NetworkFinancialOverview() {
           <p className="font-semibold">Couldn't load network financial overview.</p>
           <p className="mt-1">Your authorized billing data is still unavailable. Try again to refresh it.</p>
         </div>
-        <Button type="button" variant="outline" className="mt-4 min-h-11" onClick={query.refetch}>
-          Retry network financial overview
-        </Button>
+        <div className="mt-4 flex flex-wrap justify-center gap-3">
+          <Button type="button" variant="outline" className="min-h-11" onClick={query.refetch}>
+            Retry network financial overview
+          </Button>
+          {canPrepare && (
+            <AlertDialog open={preparationOpen} onOpenChange={setPreparationOpen}>
+              <AlertDialogTrigger asChild>
+                <Button type="button" className="min-h-11">Prepare network billing</Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Prepare network billing?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This one-time action populates the fields required to load aggregate billing data for all authorized agencies.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                {preparationError && <p role="alert" className="text-sm text-destructive">{preparationError}</p>}
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={preparation.isLoading}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    disabled={preparation.isLoading}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      void prepareNetwork();
+                    }}
+                  >
+                    {preparation.isLoading ? "Preparing network billing…" : "Prepare billing now"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
       </section>
     );
   }

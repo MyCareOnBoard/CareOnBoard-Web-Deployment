@@ -7,12 +7,16 @@ import type { NetworkBillingOverview } from "../types";
 const api = vi.hoisted(() => ({
   overview: vi.fn(),
   refetch: vi.fn(),
+  prepare: vi.fn(),
 }));
 const agencyOverview = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/api/network-billing", () => ({
   NETWORK_BILLING_QUERY_OPTIONS: { refetchOnMountOrArgChange: 30 },
-  networkBillingApi: { useGetOverviewBootstrapQuery: api.overview },
+  networkBillingApi: {
+    useGetOverviewBootstrapQuery: api.overview,
+    usePrepareNetworkBillingMutation: () => [api.prepare, { isLoading: false }],
+  },
 }));
 vi.mock("@/pages/agency/billing/financial-overview", () => ({
   default: () => {
@@ -150,6 +154,29 @@ describe("NetworkFinancialOverview", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Couldn't load network financial overview");
     await user.click(screen.getByRole("button", { name: "Retry network financial overview" }));
     expect(api.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the overview skeleton visible instead of fabricated zero totals while a data-less retry is fetching", () => {
+    api.overview.mockReturnValue(queryResult({
+      data: undefined,
+      isLoading: false,
+      isFetching: true,
+    }));
+    renderWithWorkspace(<NetworkFinancialOverview />);
+
+    expect(screen.getByRole("region", { name: "Network financial overview" })).toHaveAttribute("aria-busy", "true");
+    expect(screen.queryAllByText("$0.00")).toHaveLength(0);
+  });
+
+  it("offers preparation only when the overview reports the network index readiness error", () => {
+    api.overview.mockReturnValue(queryResult({
+      data: undefined,
+      isError: true,
+      error: { status: 503, data: { code: "NETWORK_BILLING_INDEX_NOT_READY" } },
+    }));
+    renderWithWorkspace(<NetworkFinancialOverview />);
+
+    expect(screen.getByRole("button", { name: "Prepare network billing" })).toBeVisible();
   });
 
   it("keeps successful rows and metrics visible while the overview refreshes", () => {
