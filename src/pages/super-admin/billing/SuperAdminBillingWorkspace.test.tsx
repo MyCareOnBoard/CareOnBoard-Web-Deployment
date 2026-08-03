@@ -1,7 +1,16 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { MemoryRouter, Outlet, Route, Routes as ReactRoutes, useLocation, useNavigate } from "react-router";
+import {
+  createMemoryRouter,
+  MemoryRouter,
+  Outlet,
+  Route,
+  RouterProvider,
+  Routes as ReactRoutes,
+  useLocation,
+  useNavigate,
+} from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   OperationalAgencyProvider,
@@ -28,6 +37,11 @@ const auth = vi.hoisted(() => ({
 const reduxState = vi.hoisted(() => ({
   modeByAgency: { "actor-agency": "hha" } as Record<string, "ddd" | "hha">,
 }));
+const networkBilling = vi.hoisted(() => ({
+  overview: vi.fn(),
+  refetch: vi.fn(),
+}));
+const unfinishedClaimsPage = vi.hoisted(() => vi.fn());
 
 vi.mock("react-router", async () => vi.importActual<typeof import("react-router")>("react-router"));
 vi.mock("@/lib/api/claims", () => ({
@@ -66,7 +80,21 @@ vi.mock("@/lib/operational-agency/dataAdapters", () => ({
   createAgencyOperationalDataAdapter: vi.fn(() => ({})),
   createSuperAdminOperationalDataAdapter: vi.fn(() => ({})),
 }));
-vi.mock("@/pages/agency/billing/claims", () => ({ default: () => null }));
+vi.mock("@/lib/api/network-billing", () => ({
+  NETWORK_BILLING_QUERY_OPTIONS: { refetchOnMountOrArgChange: 30 },
+  networkBillingApi: { useGetOverviewBootstrapQuery: networkBilling.overview },
+}));
+vi.mock("@/layouts/SuperAdminLayout", async () => {
+  const React = await import("react");
+  const { Outlet: RouteOutlet } = await import("react-router");
+  return { default: () => React.createElement(RouteOutlet) };
+});
+vi.mock("@/pages/agency/billing/claims", () => ({
+  default: () => {
+    unfinishedClaimsPage();
+    return null;
+  },
+}));
 vi.mock("@/pages/agency/billing/payroll", () => ({ default: () => null }));
 vi.mock("@/pages/agency/billing/expenses", () => ({ default: () => null }));
 
@@ -75,6 +103,7 @@ import { SuperAdminBillingIndex } from "./index";
 import { useBillingWorkspaceContext } from "./BillingWorkspaceContext";
 import { FinancialOverview } from "@/pages/agency/billing/pages";
 import FinancialOverviewPage from "@/pages/agency/billing/financial-overview";
+import { router } from "@/routes";
 
 const atlas = {
   id: "atlas",
@@ -356,9 +385,16 @@ function renderWorkspace(entry: string, nested = <BillingWorkspaceProbe />) {
         <Route path="/super-admin/billing" element={<SuperAdminBillingWorkspace />}>
           <Route index element={<SuperAdminBillingIndex />} />
           <Route path="financial-overview" element={nested} />
+          <Route path="claims" element={nested} />
         </Route>
       </ReactRoutes>
     </MemoryRouter>,
+  );
+}
+
+function renderActualBillingRoute(entry: string) {
+  return render(
+    <RouterProvider router={createMemoryRouter(router.routes, { initialEntries: [entry] })} />,
   );
 }
 
@@ -375,6 +411,27 @@ describe("SuperAdminBillingWorkspace", () => {
     operationsApi.getOperationalAgencyContext.mockImplementation(
       (_feature: string, agencyId: string) => Promise.resolve(agencyId === "beacon" ? beacon : atlas),
     );
+    networkBilling.overview.mockReturnValue({
+      data: {
+        scope: { kind: "global", agencyCount: 2 },
+        periods: {
+          current: { start: "2026-07-01", end: "2026-07-31" },
+          previous: { start: "2026-06-01", end: "2026-06-30" },
+        },
+        current: {
+          claims: { count: 2, amount: 240 },
+          payroll: { count: 1, amount: 80 },
+          expenses: { count: 1, amount: 20 },
+        },
+        previous: { claims: null, payroll: null, expenses: null },
+        recentActivity: [],
+        meta: { totalsExact: true, branchCount: 2 },
+      },
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      refetch: networkBilling.refetch,
+    });
   });
 
   it("fails closed before loading agencies or mounting content without Billing Management", () => {
@@ -387,9 +444,51 @@ describe("SuperAdminBillingWorkspace", () => {
     expect(operationsApi.listOperationalAgencies).not.toHaveBeenCalled();
   });
 
+  it("mounts the completed network overview through the actual super-admin route without an agency provider", async () => {
+    renderActualBillingRoute(
+      "/super-admin/billing/financial-overview?clientType=ddd&startDate=2026-07-01&endDate=2026-07-31",
+    );
+
+    expect(await screen.findByRole("region", { name: "Network financial overview" })).toBeVisible();
+    const overviewArgs = networkBilling.overview.mock.calls.map(([args]) => args);
+    expect(overviewArgs).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        scope: { kind: "network" },
+        startDate: "2026-07-01",
+        endDate: "2026-07-31",
+        mode: "ddd",
+        tab: "overview",
+      }),
+    ]));
+    expect(new Set(overviewArgs.map((args) => JSON.stringify(args))).size).toBe(1);
+    expect(screen.queryByLabelText("Network billing workspace")).not.toBeInTheDocument();
+    expect(operationsApi.getOperationalAgencyContext).not.toHaveBeenCalled();
+  });
+
+  it("keeps the completed network overview mounted for a trailing-slash direct link", async () => {
+    renderActualBillingRoute(
+      "/super-admin/billing/financial-overview/?clientType=ddd&startDate=2026-07-01&endDate=2026-07-31",
+    );
+
+    expect(await screen.findByRole("region", { name: "Network financial overview" })).toBeVisible();
+    expect(screen.queryByLabelText("Network billing workspace")).not.toBeInTheDocument();
+  });
+
+  it("keeps unfinished network children on the provider-free bridge", async () => {
+    renderActualBillingRoute(
+      "/super-admin/billing/claims?clientType=ddd&startDate=2026-07-01&endDate=2026-07-31",
+    );
+
+    const bridge = await screen.findByLabelText("Network billing workspace");
+    expect(bridge).toHaveAttribute("data-scope", "network");
+    expect(networkBilling.overview).not.toHaveBeenCalled();
+    expect(unfinishedClaimsPage).not.toHaveBeenCalled();
+    expect(operationsApi.getOperationalAgencyContext).not.toHaveBeenCalled();
+  });
+
   it("defaults to a context-aware provider-free network bridge without mounting an agency child", async () => {
     renderWorkspace(
-      "/super-admin/billing/financial-overview?status=open&clientType=ddd&startDate=2026-07-01&endDate=2026-07-31",
+      "/super-admin/billing/claims?status=open&clientType=ddd&startDate=2026-07-01&endDate=2026-07-31",
       <BillingDomainProbe />,
     );
 

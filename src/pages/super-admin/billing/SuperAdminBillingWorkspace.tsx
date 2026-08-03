@@ -7,6 +7,7 @@ import { createSuperAdminOperationalDataAdapter } from "@/lib/operational-agency
 import { OperationalAgencyProvider } from "@/lib/operational-agency/OperationalAgencyProvider";
 import { createSuperAdminDirectoryRoutes } from "@/lib/operational-agency/routes";
 import type { OperationalAgencySummary } from "@/lib/operational-agency/types";
+import { Routes } from "@/routes/constants";
 import { useAuth } from "@/utils/auth";
 import BillingManagementHeader from "./BillingManagementHeader";
 import {
@@ -78,6 +79,17 @@ function NetworkBillingBridge() {
       </p>
     </section>
   );
+}
+
+function NetworkBillingOutlet() {
+  const location = useLocation();
+  const workspace = useBillingWorkspaceContext();
+  const generation = billingWorkspaceGeneration(workspace);
+  const pathname = location.pathname.replace(/\/+$/, "") || "/";
+
+  return pathname === Routes.superAdmin.billing.financialOverview
+    ? <Outlet key={generation} />
+    : <NetworkBillingBridge />;
 }
 
 function AgencyBillingOutlet({
@@ -168,7 +180,7 @@ function WorkspaceFrame({
             </Button>
           </div>
         ) : context.scope.kind === "network" ? (
-          <div className="min-w-0"><NetworkBillingBridge /></div>
+          <div className="min-w-0"><NetworkBillingOutlet /></div>
         ) : resolvedAgency ? (
           <div className="min-w-0">
             <AgencyBillingOutlet accessList={accessList} agency={resolvedAgency} workspace={context} />
