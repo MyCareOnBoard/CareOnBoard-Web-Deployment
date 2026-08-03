@@ -125,6 +125,44 @@ describe("network payroll and timesheet table parity", () => {
     expect(onCancel).toHaveBeenCalledWith(expect.objectContaining({ agencyId: "atlas" }));
   });
 
+  it("keeps network saved-payroll mobile cards outside the desktop-only wrapper", () => {
+    render(
+      <SavedPayrollTable
+        invoices={[invoice("atlas", "Atlas Care")]}
+        showAgency
+        onViewInvoice={vi.fn()}
+      />,
+    );
+
+    const mobileCard = screen.getAllByText("PAY-ATLAS")
+      .map((element) => element.closest("article"))
+      .find((element): element is HTMLElement => element !== null);
+
+    expect(mobileCard).toBeTruthy();
+    expect(mobileCard?.parentElement).toHaveClass("lg:hidden");
+    expect(mobileCard?.closest(".hidden.lg\\:block")).toBeNull();
+  });
+
+  it("labels the agency in network timesheet mobile cards", () => {
+    render(
+      <StaffTimesheetsTable
+        timesheets={[timesheet("atlas", "Atlas Care")]}
+        showAgency
+        onView={vi.fn()}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+      />,
+    );
+
+    const mobileCard = screen.getAllByText("Avery Staff")
+      .map((element) => element.closest("article"))
+      .find((element): element is HTMLElement => element !== null);
+
+    expect(mobileCard).toBeTruthy();
+    expect(within(mobileCard!).getByText("Agency")).toBeInTheDocument();
+    expect(within(mobileCard!).getByText("Atlas Care")).toBeInTheDocument();
+  });
+
   it("retains visible rows during refresh and exposes the shared cursor controls", async () => {
     const user = userEvent.setup();
     const onLoadMore = vi.fn();

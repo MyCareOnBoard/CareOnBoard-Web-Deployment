@@ -211,6 +211,7 @@ export default function SavedPayrollTable({
           )}
         </div>
       </div>
+      </div>
       {showAgency ? (
         <div className="space-y-2 lg:hidden">
           {loading ? Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
@@ -227,7 +228,6 @@ export default function SavedPayrollTable({
         loadMoreLabel="Load more payroll invoices"
         terminalLabel="All payroll invoices loaded"
       />
-      </div>
     </div>
   );
 }
