@@ -173,4 +173,104 @@ describe("network claims table parity", () => {
     await user.click(within(menu).getByText("View invoice"));
     expect(onViewInvoice).toHaveBeenCalledWith(expect.objectContaining({ agencyId: "atlas" }));
   });
+
+  it("keeps the saved network Agency column aligned before the claim or invoice number", () => {
+    render(
+      <SavedClaimsTable
+        claims={[savedClaim("atlas", "Atlas Care")]}
+        invoices={[invoice("atlas", "Atlas Care")]}
+        totalCount={1}
+        showAgency
+        statusFilter="all"
+        onStatusFilterChange={vi.fn()}
+        onClientSearchChange={vi.fn()}
+        onViewReport={vi.fn()}
+        onUpdateStatus={vi.fn()}
+        onCancelClaim={vi.fn()}
+        onViewInvoice={vi.fn()}
+        onCancelInvoice={vi.fn()}
+      />,
+    );
+
+    const desktopRows = screen.getAllByText("Atlas Care").map((cell) => cell.parentElement);
+    const claimRow = desktopRows.find((row) => row?.textContent?.includes("CLM-ATLAS"));
+    const invoiceRow = desktopRows.find((row) => row?.textContent?.includes("INV-ATLAS"));
+
+    expect(claimRow?.children[0]).toHaveTextContent("Atlas Care");
+    expect(claimRow?.children[1]).toHaveTextContent("CLM-ATLAS");
+    expect(invoiceRow?.children[0]).toHaveTextContent("Atlas Care");
+    expect(invoiceRow?.children[1]).toHaveTextContent("INV-ATLAS");
+  });
+
+  it("keeps ready-to-bill rows visible during refetch and exposes an accessible cursor control", async () => {
+    const user = userEvent.setup();
+    const onLoadMore = vi.fn();
+    const { rerender } = render(
+      <RecentClaimsTable
+        claims={[recentClaim("atlas", "Atlas Care")]}
+        isRefetching
+        nextCursor="ready-cursor-2"
+        onLoadMore={onLoadMore}
+        showAgency
+      />,
+    );
+
+    expect(screen.getAllByText("Atlas Care").length).toBeGreaterThan(0);
+    const button = screen.getByRole("button", { name: "Load more ready-to-bill items" });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute("aria-busy", "true");
+
+    rerender(
+      <RecentClaimsTable
+        claims={[recentClaim("atlas", "Atlas Care")]}
+        nextCursor="ready-cursor-2"
+        onLoadMore={onLoadMore}
+        showAgency
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Load more ready-to-bill items" }));
+    expect(onLoadMore).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <RecentClaimsTable
+        claims={[recentClaim("atlas", "Atlas Care")]}
+        nextCursor={null}
+        showAgency
+      />,
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("All ready-to-bill items loaded");
+  });
+
+  it("keeps saved claim and invoice rows visible during refetch and exposes the shared cursor control", async () => {
+    const user = userEvent.setup();
+    const onLoadMore = vi.fn();
+    const props = {
+      claims: [savedClaim("atlas", "Atlas Care")],
+      invoices: [invoice("atlas", "Atlas Care")],
+      totalCount: 1,
+      showAgency: true,
+      statusFilter: "all" as const,
+      onStatusFilterChange: vi.fn(),
+      onClientSearchChange: vi.fn(),
+      onViewReport: vi.fn(),
+      onUpdateStatus: vi.fn(),
+      onCancelClaim: vi.fn(),
+      onViewInvoice: vi.fn(),
+      onCancelInvoice: vi.fn(),
+    };
+    const { rerender } = render(
+      <SavedClaimsTable {...props} isRefetching nextCursor="saved-cursor-2" onLoadMore={onLoadMore} />,
+    );
+
+    expect(screen.getAllByText("CLM-ATLAS").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("INV-ATLAS").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Load more claims and invoices" })).toBeDisabled();
+
+    rerender(<SavedClaimsTable {...props} nextCursor="saved-cursor-2" onLoadMore={onLoadMore} />);
+    await user.click(screen.getByRole("button", { name: "Load more claims and invoices" }));
+    expect(onLoadMore).toHaveBeenCalledTimes(1);
+
+    rerender(<SavedClaimsTable {...props} nextCursor={null} />);
+    expect(screen.getByRole("status")).toHaveTextContent("All claims and invoices loaded");
+  });
 });

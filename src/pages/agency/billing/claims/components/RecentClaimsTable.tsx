@@ -5,6 +5,7 @@ import {
   type RecentClaimClientGroup,
 } from "../utils/groupRecentClaimsByClient";
 import ClaimsClientSearch from "./ClaimsClientSearch";
+import ClaimsTablePagination from "./ClaimsTablePagination";
 import RecentClaimRow from "./RecentClaimRow";
 import RecentClaimsClientGroupHeader from "./RecentClaimsClientGroupHeader";
 import {
@@ -27,6 +28,9 @@ type RecentClaimsTableProps = {
   generateDisabled?: boolean;
   /** Enables the super-admin network table identity column and agency-separated grouping. */
   showAgency?: boolean;
+  isRefetching?: boolean;
+  nextCursor?: string | null;
+  onLoadMore?: () => void;
 };
 
 function RecentClaimSkeletonRow({
@@ -71,6 +75,9 @@ export default function RecentClaimsTable({
   onGenerateClaim,
   generateDisabled = false,
   showAgency = false,
+  isRefetching = false,
+  nextCursor,
+  onLoadMore,
 }: RecentClaimsTableProps) {
   const [filterQuery, setFilterQuery] = useState("");
   const [selectedClientName, setSelectedClientName] = useState<string | undefined>();
@@ -122,12 +129,13 @@ export default function RecentClaimsTable({
   );
 
   const emptyMessage = useMemo(() => {
-    if (loading) return "";
+    if (loading && claims.length === 0) return "";
     if (claims.length === 0) {
       return "No approved shifts or transportation mileage found.";
     }
     return "No items match your filters.";
   }, [claims.length, loading]);
+  const isInitialLoading = loading && claims.length === 0;
 
   return (
     <section>
@@ -155,7 +163,7 @@ export default function RecentClaimsTable({
         </div>
       </div>
 
-      {truncated && !loading ? (
+      {truncated && !isInitialLoading ? (
         <p className="mb-3 text-[13px] text-[#808081]">
           Showing the first 100 shifts and rides. Use client search or Generate claim to narrow
           results.
@@ -177,7 +185,7 @@ export default function RecentClaimsTable({
               <span>Coverage</span>
             </div>
 
-            {loading ? (
+            {isInitialLoading ? (
               Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
                 <RecentClaimSkeletonRow
                   key={`skeleton-desktop-${index}`}
@@ -215,7 +223,7 @@ export default function RecentClaimsTable({
       </div>
 
       <div className="space-y-2 lg:hidden">
-        {loading ? (
+        {isInitialLoading ? (
           Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
             <RecentClaimMobileSkeletonCard key={`skeleton-mobile-${index}`} />
           ))
@@ -245,6 +253,15 @@ export default function RecentClaimsTable({
           </div>
         )}
       </div>
+      {!isInitialLoading ? (
+        <ClaimsTablePagination
+          isRefetching={isRefetching}
+          nextCursor={nextCursor}
+          onLoadMore={onLoadMore}
+          loadMoreLabel="Load more ready-to-bill items"
+          terminalLabel="All ready-to-bill items loaded"
+        />
+      ) : null}
     </section>
   );
 }

@@ -167,6 +167,9 @@ function SavedClaimRow({
 
   return (
     <div className={showClient ? SAVED_CLAIMS_TABLE_ROW_CLASS : showAgency ? NETWORK_GROUPED_SAVED_CLAIMS_TABLE_ROW_CLASS : GROUPED_SAVED_CLAIMS_TABLE_ROW_CLASS}>
+      {!showClient && showAgency ? (
+        <span className="text-[13px] text-[#10141a]">{claim.agencyName ?? "â€”"}</span>
+      ) : null}
       <span className="text-[13px] font-medium text-[#10141a]">{claim.claimNumber}</span>
       {showClient ? (
         <ClientNameLink
@@ -174,9 +177,6 @@ function SavedClaimRow({
           clientId={claim.clientId}
           className="text-[13px] text-[#10141a]"
         />
-      ) : null}
-      {!showClient && showAgency ? (
-        <span className="text-[13px] text-[#10141a]">{claim.agencyName ?? "â€”"}</span>
       ) : null}
       <span className="text-[13px] text-[#10141a]">{claim.serviceCode}</span>
       <span className="text-[13px] text-[#10141a]">{claim.serviceDate ?? "—"}</span>

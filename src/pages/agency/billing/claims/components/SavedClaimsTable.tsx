@@ -2,6 +2,7 @@ import { Fragment, useMemo } from "react";
 import type { BillingClaimListItem, BillingClaimStatus } from "@/lib/api/claims";
 import type { OutOfPocketInvoiceListItem } from "@/lib/api/out-of-pocket";
 import ClaimsClientSearch from "./ClaimsClientSearch";
+import ClaimsTablePagination from "./ClaimsTablePagination";
 import SavedClaimRow from "./SavedClaimRow";
 import SavedInvoiceRow from "./SavedInvoiceRow";
 import SavedClaimsClientGroupHeader from "./SavedClaimsClientGroupHeader";
@@ -36,6 +37,9 @@ type SavedClaimsTableProps = {
   onCancelInvoice?: (invoice: OutOfPocketInvoiceListItem) => void;
   /** Enables the super-admin network table identity column and agency-separated grouping. */
   showAgency?: boolean;
+  isRefetching?: boolean;
+  nextCursor?: string | null;
+  onLoadMore?: () => void;
 };
 
 function SavedClaimSkeletonRow({
@@ -89,6 +93,9 @@ export default function SavedClaimsTable({
   onViewInvoice,
   onCancelInvoice,
   showAgency = false,
+  isRefetching = false,
+  nextCursor,
+  onLoadMore,
 }: SavedClaimsTableProps) {
   const groupedClaims = useMemo(
     () => groupSavedClaimsByClient(claims, { showAgency }),
@@ -99,7 +106,8 @@ export default function SavedClaimsTable({
     [invoices, showAgency],
   );
 
-  const emptyMessage = loading
+  const isInitialLoading = loading && claims.length === 0 && invoices.length === 0;
+  const emptyMessage = isInitialLoading
     ? ""
     : totalCount === 0 && invoices.length === 0
       ? "No generated claims or invoices found for this date range."
@@ -146,7 +154,7 @@ export default function SavedClaimsTable({
               <span className="text-right">Action</span>
             </div>
 
-            {loading ? (
+            {isInitialLoading ? (
               Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
                 <SavedClaimSkeletonRow
                   key={`saved-skeleton-desktop-${index}`}
@@ -213,7 +221,7 @@ export default function SavedClaimsTable({
       </div>
 
       <div className="space-y-2 lg:hidden">
-        {loading ? (
+        {isInitialLoading ? (
           Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
             <SavedClaimMobileSkeletonCard key={`saved-skeleton-mobile-${index}`} />
           ))
@@ -272,6 +280,15 @@ export default function SavedClaimsTable({
           </div>
         )}
       </div>
+      {!isInitialLoading ? (
+        <ClaimsTablePagination
+          isRefetching={isRefetching}
+          nextCursor={nextCursor}
+          onLoadMore={onLoadMore}
+          loadMoreLabel="Load more claims and invoices"
+          terminalLabel="All claims and invoices loaded"
+        />
+      ) : null}
     </section>
   );
 }
