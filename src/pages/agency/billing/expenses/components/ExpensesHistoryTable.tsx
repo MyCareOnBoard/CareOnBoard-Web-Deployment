@@ -31,6 +31,7 @@ type SharedExpensesHistoryTableProps<T extends AgencyExpenseListItem> = {
   noun?: string;
   isRefetching?: boolean;
   nextCursor?: string | null;
+  incomplete?: boolean;
 };
 
 type ExpensesHistoryTableProps =
@@ -68,6 +69,7 @@ export default function ExpensesHistoryTable(props: ExpensesHistoryTableProps) {
     noun = "DSP",
     isRefetching = false,
     nextCursor,
+    incomplete = false,
   } = props;
   const showAgency = props.showAgency === true;
 
@@ -212,17 +214,17 @@ export default function ExpensesHistoryTable(props: ExpensesHistoryTableProps) {
         )}
       </div>
 
-      {(nextCursor || hasMore) && onLoadMore ? (
+      {(nextCursor || hasMore || incomplete) && onLoadMore ? (
         <div className="mt-4 flex justify-center">
           <button
             type="button"
             onClick={onLoadMore}
             disabled={isBusy}
             aria-busy={isBusy}
-            aria-label="Load more expenses"
+            aria-label={incomplete ? "Retry reviewed expenses" : "Load more expenses"}
             className="min-h-[44px] w-full rounded-full border border-[#00b4b8] px-5 py-2 text-[13px] font-semibold text-[#00b4b8] hover:bg-[#eef4f5] disabled:opacity-50 sm:w-auto"
           >
-            {isBusy ? "Loading…" : "Load more expenses"}
+            {isBusy ? "Loading…" : incomplete ? "Retry reviewed expenses" : "Load more expenses"}
           </button>
         </div>
       ) : null}

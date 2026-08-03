@@ -20,15 +20,14 @@ import type { NetworkBillingExpenseRow } from "../types";
 const RejectExpenseModal = lazy(() => import("@/pages/agency/billing/expenses/components/RejectExpenseModal"));
 
 type HistoryStatus = Extract<ExpenseStatus, "approved" | "rejected"> | "all";
-type PageStatus = Extract<ExpenseStatus, "pending" | "approved" | "rejected">;
+type PageStatus = "pending" | "history";
 type BusyAction = "approve" | "reject" | "delete" | null;
 
 type PageState = Record<PageStatus, { cursor: string | null; hasMore: boolean; total: number | null }>;
 
 const EMPTY_PAGE_STATE: PageState = {
   pending: { cursor: null, hasMore: false, total: null },
-  approved: { cursor: null, hasMore: false, total: null },
-  rejected: { cursor: null, hasMore: false, total: null },
+  history: { cursor: null, hasMore: false, total: null },
 };
 
 const NETWORK_HISTORY_STATUS_OPTIONS: Array<{ value: HistoryStatus; label: string }> = [
@@ -70,10 +69,6 @@ function toPageState(page: { nextCursor: string | null; hasMore: boolean; total:
   return { cursor: page.nextCursor, hasMore: page.hasMore, total: page.total };
 }
 
-function sumTotal(...totals: Array<number | null>) {
-  return totals.every((total) => total !== null) ? totals.reduce((sum, total) => sum + (total ?? 0), 0) : null;
-}
-
 export default function NetworkExpenses() {
   const workspace = useBillingWorkspaceContext();
   const dispatch = useDispatch();
@@ -84,6 +79,7 @@ export default function NetworkExpenses() {
   const [rows, setRows] = useState<NetworkBillingExpenseRow[]>([]);
   const [pageState, setPageState] = useState<PageState>(EMPTY_PAGE_STATE);
   const seenCursors = useRef(new Set<string>());
+  const loadEpoch = useRef(0);
   const [approveTarget, setApproveTarget] = useState<NetworkAgencyExpense | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<NetworkAgencyExpense | null>(null);
   const [declineTarget, setDeclineTarget] = useState<NetworkAgencyExpense | null>(null);
@@ -99,17 +95,16 @@ export default function NetworkExpenses() {
   };
   const mode = workspace.mode === "ddd" || workspace.mode === "hha" ? workspace.mode : undefined;
   const pendingArgs: ExpensesNetworkBillingArgs = { ...base, tab: "pending", status: "pending", ...(mode ? { mode } : {}) };
-  const approvedArgs: ExpensesNetworkBillingArgs = { ...base, tab: "history", status: "approved", ...(mode ? { mode } : {}) };
-  const rejectedArgs: ExpensesNetworkBillingArgs = { ...base, tab: "history", status: "rejected", ...(mode ? { mode } : {}) };
+  const historyArgs: ExpensesNetworkBillingArgs = { ...base, tab: "history", ...(mode ? { mode } : {}) };
   const pendingBootstrap = networkBillingApi.useGetExpensesBootstrapQuery(pendingArgs, { ...NETWORK_BILLING_QUERY_OPTIONS, skip: tab !== "pending" });
-  const approvedBootstrap = networkBillingApi.useGetExpensesBootstrapQuery(approvedArgs, { ...NETWORK_BILLING_QUERY_OPTIONS, skip: tab !== "all" });
-  const rejectedBootstrap = networkBillingApi.useGetExpensesBootstrapQuery(rejectedArgs, { ...NETWORK_BILLING_QUERY_OPTIONS, skip: tab !== "all" });
+  const historyBootstrap = networkBillingApi.useGetExpensesBootstrapQuery(historyArgs, { ...NETWORK_BILLING_QUERY_OPTIONS, skip: tab !== "all" });
   const [loadPage, page] = networkBillingApi.useLazyGetExpensesPageQuery();
   const [approveExpense, approveState] = useApproveExpenseMutation();
   const [rejectExpense, rejectState] = useRejectExpenseMutation();
   const [deleteExpense, deleteState] = useDeleteExpenseMutation();
 
   useEffect(() => {
+    loadEpoch.current += 1;
     setCategory("all");
     setRows([]);
     setPageState(EMPTY_PAGE_STATE);
@@ -138,18 +133,14 @@ export default function NetworkExpenses() {
       return;
     }
 
-    const historyPages = [approvedBootstrap.data?.page, rejectedBootstrap.data?.page].filter(
-      (historyPage): historyPage is NonNullable<typeof historyPage> => historyPage !== undefined,
-    );
-    if (historyPages.length === 0) return;
-    setRows(dedupe(historyPages.flatMap((historyPage) => historyPage.rows)));
+    if (!historyBootstrap.data) return;
+    setRows(dedupe(historyBootstrap.data.page.rows));
     setPageState({
       ...EMPTY_PAGE_STATE,
-      ...(approvedBootstrap.data ? { approved: toPageState(approvedBootstrap.data.page) } : {}),
-      ...(rejectedBootstrap.data ? { rejected: toPageState(rejectedBootstrap.data.page) } : {}),
+      history: toPageState(historyBootstrap.data.page),
     });
     seenCursors.current.clear();
-  }, [approvedBootstrap.data, pendingBootstrap.data, rejectedBootstrap.data, tab]);
+  }, [historyBootstrap.data, pendingBootstrap.data, tab]);
 
   const expenses = useMemo(() => rows.map(toAgencyExpense), [rows]);
   const categories = useMemo(() => availableCategories(rows), [rows]);
@@ -157,28 +148,28 @@ export default function NetworkExpenses() {
     () => category === "all" ? expenses : expenses.filter((expense) => expense.category === category),
     [category, expenses],
   );
-  const summary = (tab === "pending" ? pendingBootstrap.data?.summary : approvedBootstrap.data?.summary ?? rejectedBootstrap.data?.summary) as ExpensesDashboardSummary | undefined;
+  const summary = (tab === "pending" ? pendingBootstrap.data?.summary : historyBootstrap.data?.summary) as ExpensesDashboardSummary | undefined;
   const bootstrapLoading = tab === "pending"
     ? pendingBootstrap.isLoading
-    : approvedBootstrap.isLoading || rejectedBootstrap.isLoading;
+    : historyBootstrap.isLoading;
   const bootstrapFetching = tab === "pending"
     ? pendingBootstrap.isFetching
-    : approvedBootstrap.isFetching || rejectedBootstrap.isFetching;
+    : historyBootstrap.isFetching;
   const activeBootstrapError = tab === "pending"
     ? pendingBootstrap.isError
-    : approvedBootstrap.isError || rejectedBootstrap.isError;
+    : historyBootstrap.isError;
   const hasBootstrapData = tab === "pending"
     ? Boolean(pendingBootstrap.data)
-    : Boolean(approvedBootstrap.data || rejectedBootstrap.data);
+    : Boolean(historyBootstrap.data);
   const staleBootstrap = tab === "pending"
     ? pendingBootstrap.isError && Boolean(pendingBootstrap.data)
-    : (approvedBootstrap.isError && Boolean(approvedBootstrap.data)) || (rejectedBootstrap.isError && Boolean(rejectedBootstrap.data));
-  const historyStatuses: PageStatus[] = status === "all" ? ["approved", "rejected"] : [status];
-  const historyHasMore = historyStatuses.some((historyStatus) => pageState[historyStatus].hasMore && Boolean(pageState[historyStatus].cursor));
-  const historyNextCursor = historyStatuses.map((historyStatus) => pageState[historyStatus].cursor).find(Boolean) ?? null;
+    : historyBootstrap.isError && Boolean(historyBootstrap.data);
+  const historyPartialData = tab === "all" ? historyBootstrap.data?.page.partialData ?? null : null;
+  const historyHasMore = pageState.history.hasMore && Boolean(pageState.history.cursor);
+  const historyNextCursor = pageState.history.cursor;
   const totalCount = tab === "pending"
     ? pageState.pending.total ?? visibleExpenses.length
-    : sumTotal(pageState.approved.total, pageState.rejected.total) ?? visibleExpenses.length;
+    : pageState.history.total ?? visibleExpenses.length;
   const actionsDisabled = Boolean(busy || approveState.isLoading || rejectState.isLoading || deleteState.isLoading);
 
   function invalidate(agencyId: string) {
@@ -192,46 +183,37 @@ export default function NetworkExpenses() {
 
   async function loadMore() {
     if (page.isFetching) return;
-    const statuses = tab === "pending" ? ["pending"] as const : historyStatuses;
-    const requests = statuses.flatMap((pageStatus) => {
-      const current = pageState[pageStatus];
-      const cursorKey = `${pageStatus}:${current.cursor ?? ""}`;
-      if (!current.hasMore || !current.cursor || seenCursors.current.has(cursorKey)) return [];
-      seenCursors.current.add(cursorKey);
-      const pageArgs = pageStatus === "pending" ? pendingArgs : pageStatus === "approved" ? approvedArgs : rejectedArgs;
-      return [{ pageStatus, cursor: current.cursor, cursorKey, pageArgs }];
-    });
-    if (requests.length === 0) return;
-
-    const results = await Promise.allSettled(requests.map(async (request) => ({
-      request,
-      response: await loadPage({ ...request.pageArgs, cursor: request.cursor }).unwrap(),
-    })));
-    const loaded = results.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
-    const failures = results.flatMap((result, index) => result.status === "rejected" ? [requests[index]] : []);
-
-    if (loaded.length > 0) {
-      setRows((current) => dedupe([...current, ...loaded.flatMap(({ response }) => response.page.rows)]));
-      setPageState((current) => {
-        const next = { ...current };
-        loaded.forEach(({ request, response }) => {
-          next[request.pageStatus] = toPageState({
-            ...response.page,
-            nextCursor: response.page.nextCursor === request.cursor ? null : response.page.nextCursor,
-            hasMore: response.page.nextCursor === request.cursor ? false : response.page.hasMore,
-          });
-        });
-        return next;
-      });
+    const pageStatus: PageStatus = tab === "pending" ? "pending" : "history";
+    const current = pageState[pageStatus];
+    const cursorKey = `${pageStatus}:${current.cursor ?? ""}`;
+    if (!current.hasMore || !current.cursor || seenCursors.current.has(cursorKey)) return;
+    seenCursors.current.add(cursorKey);
+    const epoch = loadEpoch.current;
+    const pageArgs = pageStatus === "pending" ? pendingArgs : historyArgs;
+    try {
+      const response = await loadPage({ ...pageArgs, cursor: current.cursor }).unwrap();
+      if (epoch !== loadEpoch.current) return;
+      setRows((currentRows) => dedupe([...currentRows, ...response.page.rows]));
+      setPageState((currentState) => ({
+        ...currentState,
+        [pageStatus]: toPageState({
+          ...response.page,
+          nextCursor: response.page.nextCursor === current.cursor ? null : response.page.nextCursor,
+          hasMore: response.page.nextCursor === current.cursor ? false : response.page.hasMore,
+        }),
+      }));
+      setLoadMoreError(null);
+    } catch {
+      if (epoch !== loadEpoch.current) return;
+      seenCursors.current.delete(cursorKey);
+      setLoadMoreError("Couldn't load more expenses. Your current rows are still available.");
     }
-    failures.forEach((request) => seenCursors.current.delete(request.cursorKey));
-    setLoadMoreError(failures.length > 0 ? "Couldn't load more expenses. Your current rows are still available." : null);
   }
 
   function retryBootstrap() {
     const retries = tab === "pending"
       ? [pendingBootstrap.refetch]
-      : [approvedBootstrap.refetch, rejectedBootstrap.refetch];
+      : [historyBootstrap.refetch];
     void Promise.all(retries.map((retry) => retry()));
   }
 
@@ -279,13 +261,14 @@ export default function NetworkExpenses() {
   return <section aria-label="Network expenses" aria-busy={bootstrapLoading || page.isFetching} className="min-w-0 space-y-6 pb-8">
     <span className="sr-only">Expense submissions for all authorized agencies</span>
     {staleBootstrap ? <div role="alert" className="flex flex-col gap-3 rounded-xl border border-[#f1d08b] bg-[#fff9eb] px-4 py-3 text-sm text-[#744b00] sm:flex-row sm:items-center sm:justify-between"><span>Some network expense data may be out of date. Your last loaded rows are still shown.</span><Button type="button" variant="outline" className="min-h-11 border-[#dca83b] text-[#744b00]" onClick={retryBootstrap}>Retry network expenses</Button></div> : null}
+    {historyPartialData ? <div role="alert" className="flex flex-col gap-3 rounded-xl border border-[#f1d08b] bg-[#fff9eb] px-4 py-3 text-sm text-[#744b00] sm:flex-row sm:items-center sm:justify-between"><span>Some reviewed expense data could not load. Successful records are still shown and the history is incomplete.</span><Button type="button" variant="outline" className="min-h-11 border-[#dca83b] text-[#744b00]" onClick={retryBootstrap}>Retry reviewed expenses</Button></div> : null}
     <ExpensesOverviewCards stats={mapDashboardToOverviewStats(summary)} loading={bootstrapLoading && !hasBootstrapData} />
     <ExpensesByStatusChart chart={mapDashboardToStatusChart(summary)} loading={bootstrapLoading && !hasBootstrapData} onStatusSegmentClick={(label) => { const next = STATUS_LABEL_TO_FILTER[label]; if (next === "pending") { setTab("pending"); setStatus("all"); } else if (next === "approved" || next === "rejected") { setTab("all"); setStatus(next); } }} />
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <ExpensesWorkspaceTabs activeTab={tab} onTabChange={setTab} />
       <label className="flex min-h-11 flex-col gap-1 text-[13px] text-[#687173]"><span>Category in loaded rows</span><select aria-label="Expense category" value={category} onChange={(event) => setCategory(event.target.value)} className="min-h-11 rounded-md border border-[#e5e5e6] bg-white px-3 text-sm text-[#10141a]"><option value="all">All categories</option>{categories.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
     </div>
-    {tab === "pending" ? <PendingExpensesTable expenses={visibleExpenses.filter((expense) => expense.status === "pending")} loading={bootstrapLoading && !hasBootstrapData} onApprove={setApproveTarget} onDecline={setDeclineTarget} onDelete={setDeleteTarget} actionsDisabled={actionsDisabled} showAgency noun="Staff" /> : <ExpensesHistoryTable expenses={visibleExpenses.filter((expense) => status === "all" || expense.status === status)} totalCount={totalCount} hasMore={historyHasMore} page={1} loading={bootstrapLoading && !hasBootstrapData} isRefetching={bootstrapFetching || page.isFetching} statusFilter={status} statusFilterOptions={NETWORK_HISTORY_STATUS_OPTIONS} onStatusFilterChange={(next) => { if (next === "all" || next === "approved" || next === "rejected") setStatus(next); }} onLoadMore={() => void loadMore()} nextCursor={historyNextCursor} showAgency noun="Staff" />}
+    {tab === "pending" ? <PendingExpensesTable expenses={visibleExpenses.filter((expense) => expense.status === "pending")} loading={bootstrapLoading && !hasBootstrapData} onApprove={setApproveTarget} onDecline={setDeclineTarget} onDelete={setDeleteTarget} actionsDisabled={actionsDisabled} showAgency noun="Staff" /> : <ExpensesHistoryTable expenses={visibleExpenses.filter((expense) => status === "all" || expense.status === status)} totalCount={totalCount} hasMore={historyHasMore} incomplete={Boolean(historyPartialData)} page={1} loading={bootstrapLoading && !hasBootstrapData} isRefetching={bootstrapFetching || page.isFetching} statusFilter={status} statusFilterOptions={NETWORK_HISTORY_STATUS_OPTIONS} onStatusFilterChange={(next) => { if (next === "all" || next === "approved" || next === "rejected") setStatus(next); }} onLoadMore={historyPartialData ? retryBootstrap : () => void loadMore()} nextCursor={historyNextCursor} showAgency noun="Staff" />}
     {loadMoreError ? <p role="alert" className="text-sm text-[#b42318]">{loadMoreError}</p> : null}
     <DeleteConfirmationModal isOpen={Boolean(approveTarget)} onClose={() => !busy && setApproveTarget(null)} onConfirm={() => void approve()} isDeleting={busy?.action === "approve"} title={approveTarget ? `Approve expense for ${approveTarget.employeeName}?` : "Approve expense?"} message={approveTarget ? `${formatCurrency(approveTarget.amount)} will be included in the next payroll for ${approveTarget.agencyName}.` : ""} confirmText="Approve expense" cancelText="Cancel" confirmButtonClassName="flex-1 bg-[#0EAF52] hover:bg-[#0c9644] text-white" />
     <DeleteConfirmationModal isOpen={Boolean(deleteTarget)} onClose={() => !busy && setDeleteTarget(null)} onConfirm={() => void remove()} isDeleting={busy?.action === "delete"} title={deleteTarget ? `Delete expense for ${deleteTarget.employeeName}?` : "Delete expense?"} message={deleteTarget ? `This permanently removes ${formatCurrency(deleteTarget.amount)} from ${deleteTarget.agencyName}.` : ""} confirmText="Delete expense" cancelText="Cancel" />

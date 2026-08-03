@@ -40,7 +40,7 @@ vi.mock("@/pages/agency/billing/expenses/components/ExpensesOverviewCards", () =
 vi.mock("@/pages/agency/billing/expenses/components/ExpensesByStatusChart", () => ({ default: ({ onStatusSegmentClick }: { onStatusSegmentClick: (label: string) => void }) => <div><button onClick={() => onStatusSegmentClick("Approved")}>Approved chart segment</button><button onClick={() => onStatusSegmentClick("Awaiting review")}>Awaiting review chart segment</button></div> }));
 vi.mock("@/pages/agency/billing/expenses/components/ExpensesWorkspaceTabs", () => ({ default: ({ activeTab, onTabChange }: { activeTab: string; onTabChange: (tab: "pending" | "all") => void }) => <div><output>active:{activeTab}</output><button onClick={() => onTabChange("all")}>History</button><button onClick={() => onTabChange("pending")}>Awaiting review</button></div> }));
 vi.mock("@/pages/agency/billing/expenses/components/PendingExpensesTable", () => ({ default: ({ expenses, onApprove, onDecline, onDelete, showAgency }: { expenses: Array<{ employeeName: string; agencyName: string }>; onApprove: (row: unknown) => void; onDecline: (row: unknown) => void; onDelete: (row: unknown) => void; showAgency: boolean }) => <section aria-label="Pending expenses"><output>{showAgency ? expenses.map((row) => `${row.employeeName} at ${row.agencyName}`).join(",") : "missing-agency"}</output>{expenses[0] ? <><button onClick={() => onApprove(expenses[0])}>Approve row</button><button onClick={() => onDecline(expenses[0])}>Decline row</button><button onClick={() => onDelete(expenses[0])}>Delete row</button></> : null}</section> }));
-vi.mock("@/pages/agency/billing/expenses/components/ExpensesHistoryTable", () => ({ default: ({ expenses, statusFilter, onStatusFilterChange, onLoadMore, nextCursor, hasMore, isRefetching, showAgency, statusFilterOptions }: { expenses: Array<{ employeeName: string; agencyName: string }>; statusFilter: string; onStatusFilterChange: (status: "all" | "approved" | "rejected" | "pending") => void; onLoadMore: () => void; nextCursor: string | null; hasMore: boolean; isRefetching: boolean; showAgency: boolean; statusFilterOptions?: Array<{ value: string; label: string }> }) => <section aria-label="Expense history"><output>{showAgency ? expenses.map((row) => `${row.employeeName} at ${row.agencyName}`).join(",") : "missing-agency"}</output><output>status:{statusFilter}</output><output>cursor:{nextCursor ?? "none"}</output><output>has-more:{String(hasMore)}</output><output>refresh:{String(isRefetching)}</output><select aria-label="History status" value={statusFilter} onChange={(event) => onStatusFilterChange(event.target.value as "all" | "approved" | "rejected" | "pending")}>{(statusFilterOptions ?? []).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>{hasMore ? <button onClick={onLoadMore}>Load more</button> : <output>End of history</output>}</section> }));
+vi.mock("@/pages/agency/billing/expenses/components/ExpensesHistoryTable", () => ({ default: ({ expenses, statusFilter, onStatusFilterChange, onLoadMore, nextCursor, hasMore, incomplete, isRefetching, showAgency, statusFilterOptions }: { expenses: Array<{ employeeName: string; agencyName: string }>; statusFilter: string; onStatusFilterChange: (status: "all" | "approved" | "rejected" | "pending") => void; onLoadMore: () => void; nextCursor: string | null; hasMore: boolean; incomplete?: boolean; isRefetching: boolean; showAgency: boolean; statusFilterOptions?: Array<{ value: string; label: string }> }) => <section aria-label="Expense history"><output>{showAgency ? expenses.map((row) => `${row.employeeName} at ${row.agencyName}`).join(",") : "missing-agency"}</output><output>status:{statusFilter}</output><output>cursor:{nextCursor ?? "none"}</output><output>has-more:{String(hasMore)}</output><output>refresh:{String(isRefetching)}</output><select aria-label="History status" value={statusFilter} onChange={(event) => onStatusFilterChange(event.target.value as "all" | "approved" | "rejected" | "pending")}>{(statusFilterOptions ?? []).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>{hasMore || incomplete ? <button onClick={onLoadMore}>{incomplete ? "Retry reviewed expenses" : "Load more"}</button> : <output>End of history</output>}</section> }));
 
 import NetworkExpenses from "./NetworkExpenses";
 import SuperAdminBillingExpenses from "../SuperAdminBillingExpenses";
@@ -62,14 +62,13 @@ describe("NetworkExpenses", () => {
     expect(screen.getByText("Agency expenses")).toBeVisible();
   });
 
-  it("loads valid approved and declined history together, then carries both cursors to a terminal state", async () => {
+  it("boots reviewed history through one combined request and carries its cursor to a terminal state", async () => {
     const responses = {
       pending: { data: { page: { rows: [row], total: 1, nextCursor: null, hasMore: false }, summary }, isLoading: false, isFetching: false },
-      approved: { data: { page: { rows: [{ ...row, id: "expense-approved", employeeName: "Approved Avery", status: "approved" as const }], total: 1, nextCursor: "after-approved", hasMore: true }, summary }, isLoading: false, isFetching: false },
-      rejected: { data: { page: { rows: [{ ...row, id: "expense-rejected", employeeName: "Declined Avery", status: "rejected" as const }], total: 1, nextCursor: "after-rejected", hasMore: true }, summary }, isLoading: false, isFetching: false },
+      history: { data: { page: { rows: [{ ...row, id: "expense-approved", employeeName: "Approved Avery", status: "approved" as const }, { ...row, id: "expense-rejected", employeeName: "Declined Avery", status: "rejected" as const }], total: 2, nextCursor: "after-history", hasMore: true }, summary }, isLoading: false, isFetching: false },
     };
-    api.bootstrap.mockImplementation((args: { tab: string; status: string }) => args.tab === "pending" ? responses.pending : args.status === "approved" ? responses.approved : responses.rejected);
-    api.page.mockImplementation((args: { status: string }) => ({ unwrap: vi.fn().mockResolvedValue({ page: { rows: [{ ...row, id: `expense-${args.status}-2`, status: args.status }], total: 2, nextCursor: null, hasMore: false } }) }));
+    api.bootstrap.mockImplementation((args: { tab: string }) => args.tab === "pending" ? responses.pending : responses.history);
+    api.page.mockImplementation((args: { tab: string; status?: string }) => ({ unwrap: vi.fn().mockResolvedValue({ page: { rows: [{ ...row, id: "expense-history-2", status: "approved" }], total: 3, nextCursor: null, hasMore: false } }) }));
     renderPage();
     expect(screen.getByRole("region", { name: "Network expenses" })).toBeVisible();
     expect(screen.getByText("Avery Nurse at Atlas Care")).toBeVisible();
@@ -78,13 +77,65 @@ describe("NetworkExpenses", () => {
     expect(await screen.findByRole("region", { name: "Expense history" })).toBeVisible();
     expect(screen.getByText("Approved Avery at Atlas Care,Declined Avery at Atlas Care")).toBeVisible();
     expect(screen.getByText("status:all")).toBeVisible();
-    expect(api.bootstrap).toHaveBeenCalledWith(expect.objectContaining({ tab: "history", status: "approved" }), expect.anything());
-    expect(api.bootstrap).toHaveBeenCalledWith(expect.objectContaining({ tab: "history", status: "rejected" }), expect.anything());
+    const historyBootstraps = api.bootstrap.mock.calls.filter(([args]) => args.tab === "history");
+    expect(historyBootstraps.every(([args]) => !Object.hasOwn(args, "status"))).toBe(true);
+    expect(new Set(historyBootstraps.map(([args]) => JSON.stringify(args))).size).toBe(1);
     fireEvent.click(screen.getByRole("button", { name: "Load more" }));
-    await waitFor(() => expect(api.page).toHaveBeenCalledWith(expect.objectContaining({ tab: "history", status: "approved", cursor: "after-approved" })));
-    expect(api.page).toHaveBeenCalledWith(expect.objectContaining({ tab: "history", status: "rejected", cursor: "after-rejected" }));
+    await waitFor(() => expect(api.page).toHaveBeenCalledWith(expect.objectContaining({ tab: "history", cursor: "after-history" })));
+    expect(api.page.mock.calls.find(([args]) => args.tab === "history")?.[0]).not.toHaveProperty("status");
     await waitFor(() => expect(screen.getByText("End of history")).toBeVisible());
     expect(screen.getByText("has-more:false")).toBeVisible();
+  });
+
+  it("keeps successful reviewed records visible and exposes a local retry for a combined history partial failure", async () => {
+    const retry = vi.fn();
+    const pendingResponse = { data: { page: { rows: [row], total: 1, nextCursor: null, hasMore: false }, summary }, isLoading: false, isFetching: false };
+    const historyResponse = {
+      data: {
+        page: {
+          rows: [{ ...row, id: "expense-approved", employeeName: "Approved Avery", status: "approved" as const }],
+          total: null,
+          nextCursor: null,
+          hasMore: false,
+          partialData: { reason: "A reviewed expense branch is temporarily unavailable.", exactTotalsAvailable: false },
+        },
+        summary,
+      },
+      isLoading: false,
+      isFetching: false,
+      refetch: retry,
+    };
+    api.bootstrap.mockImplementation((args: { tab: string }) => args.tab === "pending" ? pendingResponse : historyResponse);
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "History" }));
+    expect(await screen.findByText("Approved Avery at Atlas Care")).toBeVisible();
+    expect(screen.getByRole("alert")).toHaveTextContent("Some reviewed expense data could not load");
+    expect(screen.getAllByRole("button", { name: "Retry reviewed expenses" })).toHaveLength(2);
+    fireEvent.click(screen.getAllByRole("button", { name: "Retry reviewed expenses" })[0]);
+    expect(retry).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("End of history")).toBeNull();
+  });
+
+  it("does not append an old load-more response after the workspace date range changes", async () => {
+    let resolvePage: (value: { page: { rows: typeof row[]; total: number; nextCursor: null; hasMore: false } }) => void = () => {};
+    const pendingPage = new Promise<{ page: { rows: typeof row[]; total: number; nextCursor: null; hasMore: false } }>((resolve) => {
+      resolvePage = resolve;
+    });
+    const oldHistory = { data: { page: { rows: [{ ...row, id: "old-history", employeeName: "Old range" }], total: 2, nextCursor: "old-cursor", hasMore: true }, summary }, isLoading: false, isFetching: false };
+    const newHistory = { data: { page: { rows: [{ ...row, id: "new-history", employeeName: "New range" }], total: 1, nextCursor: null, hasMore: false }, summary }, isLoading: false, isFetching: false };
+    const pendingResponse = { data: { page: { rows: [row], total: 1, nextCursor: null, hasMore: false }, summary }, isLoading: false, isFetching: false };
+    api.bootstrap.mockImplementation((args: { tab: string; startDate: string }) => args.tab === "pending" ? pendingResponse : args.startDate === "2026-08-01" ? newHistory : oldHistory);
+    api.page.mockReturnValue({ unwrap: () => pendingPage });
+    const { rerender } = renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "History" }));
+    await screen.findByText("Old range at Atlas Care");
+    fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+    rerender(<BillingWorkspaceProvider value={{ ...workspace, startDate: "2026-08-01", endDate: "2026-08-31" }}><NetworkExpenses /></BillingWorkspaceProvider>);
+    expect(await screen.findByText("New range at Atlas Care")).toBeVisible();
+    resolvePage({ page: { rows: [{ ...row, id: "old-continuation", employeeName: "Old continuation" }], total: 2, nextCursor: null, hasMore: false } });
+    await waitFor(() => expect(screen.queryByText("Old continuation at Atlas Care")).toBeNull());
   });
 
   it("maps history filters and chart segments to valid network datasets", async () => {
@@ -100,7 +151,7 @@ describe("NetworkExpenses", () => {
     await screen.findByText("status:all");
     fireEvent.change(screen.getByRole("combobox", { name: "History status" }), { target: { value: "rejected" } });
     expect(screen.getByText("status:rejected")).toBeVisible();
-    expect(api.bootstrap).toHaveBeenCalledWith(expect.objectContaining({ tab: "history", status: "rejected" }), expect.anything());
+    expect(api.bootstrap.mock.calls.filter(([args]) => args.tab === "history").every(([args]) => !Object.hasOwn(args, "status"))).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Awaiting review chart segment" }));
     await waitFor(() => expect(screen.getByText("active:pending")).toBeVisible());
     expect(api.bootstrap).toHaveBeenCalledWith(expect.objectContaining({ tab: "pending", status: "pending" }), expect.anything());
