@@ -154,7 +154,7 @@ const SuperAdminBillingIndexPage = lazy(() =>
     import("@/pages/super-admin/billing").then((module) => ({ default: module.SuperAdminBillingIndex }))
 );
 const SuperAdminBillingFinancialOverviewPage = lazy(() =>
-    import("@/pages/agency/billing/financial-overview")
+    import("@/pages/super-admin/billing/SuperAdminBillingFinancialOverview")
 );
 const SuperAdminBillingClaimsPage = lazy(() => import("@/pages/agency/billing/claims"));
 const SuperAdminBillingPayrollPage = lazy(() => import("@/pages/agency/billing/payroll"));
