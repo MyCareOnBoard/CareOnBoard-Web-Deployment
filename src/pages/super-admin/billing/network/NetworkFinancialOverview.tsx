@@ -196,12 +196,20 @@ function preparationErrorMessage(error: unknown): string {
   if (typeof result !== "object" || result === null) {
     return "Preparation completed, but some billing records still need attention.";
   }
-  const { missing, invalid } = result as { missing?: unknown; invalid?: unknown };
+  const { missing, invalid, ownership } = result as { missing?: unknown; invalid?: unknown; ownership?: unknown };
   const missingCount = typeof missing === "number" ? missing : 0;
   const invalidCount = typeof invalid === "number" ? invalid : 0;
-  const issueCount = missingCount + invalidCount;
+  const unresolved = typeof ownership === "object" && ownership !== null
+    && typeof (ownership as { unresolved?: unknown }).unresolved === "number"
+    ? (ownership as { unresolved: number }).unresolved
+    : missingCount + invalidCount;
+  const repaired = typeof ownership === "object" && ownership !== null
+    && typeof (ownership as { repaired?: unknown }).repaired === "number"
+    ? (ownership as { repaired: number }).repaired
+    : 0;
+  const issueCount = unresolved || missingCount + invalidCount;
   return issueCount > 0
-    ? `Preparation completed, but ${issueCount} billing record${issueCount === 1 ? "" : "s"} still need${issueCount === 1 ? "s" : ""} attention.`
+    ? `Automatically repaired ${repaired} record${repaired === 1 ? "" : "s"}; ${issueCount} still need${issueCount === 1 ? "s" : ""} manual ownership review.`
     : "Preparation completed, but some billing records still need attention.";
 }
 

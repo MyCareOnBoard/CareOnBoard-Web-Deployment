@@ -97,6 +97,11 @@ export type NetworkBillingPreparationResult = {
   missing: number;
   invalid: number;
   ready: boolean;
+  ownership: {
+    repaired: number;
+    unresolved: number;
+    byCollection: Record<string, { repaired: number; unresolved: number }>;
+  };
 };
 
 class NetworkBillingContractError extends Error {
@@ -830,13 +835,28 @@ function validateOverview(value: unknown): NetworkBillingOverview {
 
 function validatePreparation(value: unknown): NetworkBillingPreparationResult {
   const data = successfulData(value, false);
-  onlyKeys(data, ["examined", "updated", "missing", "invalid", "ready"], "response.data");
+  onlyKeys(data, ["examined", "updated", "missing", "invalid", "ready", "ownership"], "response.data");
+  const ownership = record(data.ownership, "response.data.ownership");
+  onlyKeys(ownership, ["repaired", "unresolved", "byCollection"], "response.data.ownership");
+  const byCollection = record(ownership.byCollection, "response.data.ownership.byCollection");
   return {
     examined: nonNegativeInteger(data, "examined", "response.data"),
     updated: nonNegativeInteger(data, "updated", "response.data"),
     missing: nonNegativeInteger(data, "missing", "response.data"),
     invalid: nonNegativeInteger(data, "invalid", "response.data"),
     ready: requiredBoolean(data, "ready", "response.data"),
+    ownership: {
+      repaired: nonNegativeInteger(ownership, "repaired", "response.data.ownership"),
+      unresolved: nonNegativeInteger(ownership, "unresolved", "response.data.ownership"),
+      byCollection: Object.fromEntries(Object.entries(byCollection).map(([collection, value]) => {
+        const summary = record(value, `response.data.ownership.byCollection.${collection}`);
+        onlyKeys(summary, ["repaired", "unresolved"], `response.data.ownership.byCollection.${collection}`);
+        return [collection, {
+          repaired: nonNegativeInteger(summary, "repaired", `response.data.ownership.byCollection.${collection}`),
+          unresolved: nonNegativeInteger(summary, "unresolved", `response.data.ownership.byCollection.${collection}`),
+        }];
+      })),
+    },
   };
 }
 
