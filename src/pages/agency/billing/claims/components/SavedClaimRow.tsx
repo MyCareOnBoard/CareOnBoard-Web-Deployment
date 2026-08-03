@@ -11,16 +11,23 @@ import type { BillingClaimListItem } from "@/lib/api/claims";
 import { cn } from "@/lib/utils";
 import BillingStatusBadge from "../../components/BillingStatusBadge";
 import ClientNameLink from "./ClientNameLink";
-import { GROUPED_SAVED_CLAIMS_TABLE_ROW_CLASS, SAVED_CLAIMS_TABLE_ROW_CLASS } from "./tableColumns";
+import {
+  GROUPED_SAVED_CLAIMS_TABLE_ROW_CLASS,
+  NETWORK_GROUPED_SAVED_CLAIMS_TABLE_ROW_CLASS,
+  SAVED_CLAIMS_TABLE_ROW_CLASS,
+} from "./tableColumns";
+
+type AgencyIdentity = { agencyId?: string; agencyName?: string };
 
 type SavedClaimRowProps = {
-  claim: BillingClaimListItem;
+  claim: BillingClaimListItem & AgencyIdentity;
   variant: "desktop" | "mobile";
   showClient?: boolean;
   onViewReport: (claim: BillingClaimListItem) => void;
   onUpdateStatus: (claim: BillingClaimListItem) => void;
   onCancelClaim: (claim: BillingClaimListItem) => void;
   actionsDisabled?: boolean;
+  showAgency?: boolean;
 };
 
 function formatCreatedDate(value: string) {
@@ -99,6 +106,7 @@ function SavedClaimRow({
   onUpdateStatus,
   onCancelClaim,
   actionsDisabled = false,
+  showAgency = false,
 }: SavedClaimRowProps) {
   const clientDisplayName = claim.clientName ?? "Unknown client";
 
@@ -116,6 +124,12 @@ function SavedClaimRow({
               />
             ) : null}
           </div>
+          {showAgency && claim.agencyName ? (
+            <div className="mt-2">
+              <p className="text-[12px] text-[#808081]">Agency</p>
+              <p className="mt-1 text-[13px] font-medium text-[#10141a]">{claim.agencyName}</p>
+            </div>
+          ) : null}
           <SavedClaimActions
             claim={claim}
             onViewReport={onViewReport}
@@ -152,7 +166,7 @@ function SavedClaimRow({
   }
 
   return (
-    <div className={showClient ? SAVED_CLAIMS_TABLE_ROW_CLASS : GROUPED_SAVED_CLAIMS_TABLE_ROW_CLASS}>
+    <div className={showClient ? SAVED_CLAIMS_TABLE_ROW_CLASS : showAgency ? NETWORK_GROUPED_SAVED_CLAIMS_TABLE_ROW_CLASS : GROUPED_SAVED_CLAIMS_TABLE_ROW_CLASS}>
       <span className="text-[13px] font-medium text-[#10141a]">{claim.claimNumber}</span>
       {showClient ? (
         <ClientNameLink
@@ -160,6 +174,9 @@ function SavedClaimRow({
           clientId={claim.clientId}
           className="text-[13px] text-[#10141a]"
         />
+      ) : null}
+      {!showClient && showAgency ? (
+        <span className="text-[13px] text-[#10141a]">{claim.agencyName ?? "â€”"}</span>
       ) : null}
       <span className="text-[13px] text-[#10141a]">{claim.serviceCode}</span>
       <span className="text-[13px] text-[#10141a]">{claim.serviceDate ?? "—"}</span>

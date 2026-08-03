@@ -18,6 +18,7 @@ type RecentClaimsClientGroupHeaderProps = {
   variant: "mobile" | "desktop";
   onGenerateClaim: (group: RecentClaimClientGroup) => void;
   generateDisabled?: boolean;
+  showAgency?: boolean;
 };
 
 export default function RecentClaimsClientGroupHeader({
@@ -25,6 +26,7 @@ export default function RecentClaimsClientGroupHeader({
   variant,
   onGenerateClaim,
   generateDisabled = false,
+  showAgency = false,
 }: RecentClaimsClientGroupHeaderProps) {
   const itemLabel = group.claims.length === 1 ? "1 item" : `${group.claims.length} items`;
   const isMobile = variant === "mobile";
@@ -78,6 +80,9 @@ export default function RecentClaimsClientGroupHeader({
             />
           </div>
           <p className="mt-1 text-[13px] text-[#808081]">{itemLabel}</p>
+          {showAgency && group.agencyName ? (
+            <p className="mt-1 text-[13px] text-[#808081]">Agency: {group.agencyName}</p>
+          ) : null}
         </div>
         {actionsMenu}
       </div>

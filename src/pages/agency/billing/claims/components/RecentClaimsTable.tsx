@@ -10,6 +10,8 @@ import RecentClaimsClientGroupHeader from "./RecentClaimsClientGroupHeader";
 import {
   GROUPED_TABLE_HEADER_CLASS,
   GROUPED_TABLE_ROW_CLASS,
+  NETWORK_GROUPED_TABLE_HEADER_CLASS,
+  NETWORK_GROUPED_TABLE_ROW_CLASS,
   TABLE_MIN_WIDTH,
   TABLE_ROW_CLASS,
 } from "./tableColumns";
@@ -23,15 +25,23 @@ type RecentClaimsTableProps = {
   truncated?: boolean;
   onGenerateClaim?: (group: RecentClaimClientGroup) => void;
   generateDisabled?: boolean;
+  /** Enables the super-admin network table identity column and agency-separated grouping. */
+  showAgency?: boolean;
 };
 
-function RecentClaimSkeletonRow({ grouped = false }: { grouped?: boolean }) {
+function RecentClaimSkeletonRow({
+  grouped = false,
+  showAgency = false,
+}: {
+  grouped?: boolean;
+  showAgency?: boolean;
+}) {
   return (
     <div
-      className={`${grouped ? GROUPED_TABLE_ROW_CLASS : TABLE_ROW_CLASS} animate-pulse`}
+      className={`${grouped ? showAgency ? NETWORK_GROUPED_TABLE_ROW_CLASS : GROUPED_TABLE_ROW_CLASS : TABLE_ROW_CLASS} animate-pulse`}
       aria-hidden="true"
     >
-      {Array.from({ length: grouped ? 8 : 9 }).map((_, index) => (
+      {Array.from({ length: grouped ? showAgency ? 9 : 8 : 9 }).map((_, index) => (
         <span key={index} className="h-4 rounded bg-[#eef4f5]" />
       ))}
     </div>
@@ -60,6 +70,7 @@ export default function RecentClaimsTable({
   truncated = false,
   onGenerateClaim,
   generateDisabled = false,
+  showAgency = false,
 }: RecentClaimsTableProps) {
   const [filterQuery, setFilterQuery] = useState("");
   const [selectedClientName, setSelectedClientName] = useState<string | undefined>();
@@ -93,8 +104,8 @@ export default function RecentClaimsTable({
   }, [sortedClaims, filterQuery, selectedClientName, typeFilter]);
 
   const groupedClaims = useMemo(
-    () => groupRecentClaimsByClient(filteredClaims),
-    [filteredClaims],
+    () => groupRecentClaimsByClient(filteredClaims, { showAgency }),
+    [filteredClaims, showAgency],
   );
 
   const handleFilterChange = (query: string, clientName?: string) => {
@@ -154,7 +165,8 @@ export default function RecentClaimsTable({
       <div className="hidden overflow-hidden rounded-[16px] border border-[#e5e5e6] bg-white lg:block">
         <div className="overflow-x-auto">
           <div className={TABLE_MIN_WIDTH}>
-            <div className={GROUPED_TABLE_HEADER_CLASS}>
+            <div className={showAgency ? NETWORK_GROUPED_TABLE_HEADER_CLASS : GROUPED_TABLE_HEADER_CLASS}>
+              {showAgency ? <span>Agency</span> : null}
               <span>{labels.noun}</span>
               <span>Service code</span>
               <span>PA Number</span>
@@ -167,7 +179,11 @@ export default function RecentClaimsTable({
 
             {loading ? (
               Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
-                <RecentClaimSkeletonRow key={`skeleton-desktop-${index}`} grouped />
+                <RecentClaimSkeletonRow
+                  key={`skeleton-desktop-${index}`}
+                  grouped
+                  showAgency={showAgency}
+                />
               ))
             ) : groupedClaims.length > 0 ? (
               groupedClaims.map((group) => (
@@ -184,6 +200,7 @@ export default function RecentClaimsTable({
                       variant="desktop"
                       showClient={false}
                       claim={claim}
+                      showAgency={showAgency}
                     />
                   ))}
                 </Fragment>
@@ -210,6 +227,7 @@ export default function RecentClaimsTable({
                 variant="mobile"
                 onGenerateClaim={handleGenerateClaim}
                 generateDisabled={generateDisabled}
+                showAgency={showAgency}
               />
               {group.claims.map((claim) => (
                 <RecentClaimRow

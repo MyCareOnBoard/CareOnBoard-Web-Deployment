@@ -9,6 +9,7 @@ type SavedClaimsClientGroupHeaderProps = {
   /** "claim" or "invoice" — pluralized for the count label. */
   itemNoun?: string;
   outOfPocket?: boolean;
+  agencyName?: string;
 };
 
 export default function SavedClaimsClientGroupHeader({
@@ -18,6 +19,7 @@ export default function SavedClaimsClientGroupHeader({
   variant,
   itemNoun = "claim",
   outOfPocket = false,
+  agencyName,
 }: SavedClaimsClientGroupHeaderProps) {
   const label = count === 1 ? `1 ${itemNoun}` : `${count} ${itemNoun}s`;
 
@@ -33,6 +35,7 @@ export default function SavedClaimsClientGroupHeader({
           {outOfPocket ? <OutOfPocketBadge /> : <PayerInsuranceBadge />}
         </div>
         <p className="mt-1 text-[13px] text-[#808081]">{label}</p>
+        {agencyName ? <p className="mt-1 text-[13px] text-[#808081]">Agency: {agencyName}</p> : null}
       </div>
     );
   }

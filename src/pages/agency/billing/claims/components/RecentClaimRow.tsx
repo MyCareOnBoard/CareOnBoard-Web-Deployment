@@ -4,7 +4,11 @@ import { ArrowRight } from "lucide-react";
 import type { RecentClaim } from "../data/mockClaimsDashboardData";
 import ClientNameLink from "./ClientNameLink";
 import CoverageBadge from "./CoverageBadge";
-import { GROUPED_TABLE_ROW_CLASS, TABLE_ROW_CLASS } from "./tableColumns";
+import {
+  GROUPED_TABLE_ROW_CLASS,
+  NETWORK_GROUPED_TABLE_ROW_CLASS,
+  TABLE_ROW_CLASS,
+} from "./tableColumns";
 import { useStaffLabels } from "@/hooks/useStaffLabels";
 import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
 
@@ -49,6 +53,7 @@ type RecentClaimRowProps = {
   claim: RecentClaim;
   variant: RowVariant;
   showClient?: boolean;
+  showAgency?: boolean;
 };
 
 function DurationRange({ start, end }: { start: string; end: string }) {
@@ -61,7 +66,7 @@ function DurationRange({ start, end }: { start: string; end: string }) {
   );
 }
 
-function RecentClaimRow({ claim, variant, showClient = true }: RecentClaimRowProps) {
+function RecentClaimRow({ claim, variant, showClient = true, showAgency = false }: RecentClaimRowProps) {
   const { labels } = useStaffLabels();
   if (variant === "mobile") {
     return (
@@ -72,6 +77,13 @@ function RecentClaimRow({ claim, variant, showClient = true }: RecentClaimRowPro
             clientId={claim.clientId}
             className="text-[15px] font-semibold text-[#10141a]"
           />
+        ) : null}
+
+        {showAgency && claim.agencyName ? (
+          <div className={showClient ? "mt-3" : "mb-3"}>
+            <p className="text-[12px] text-[#808081]">Agency</p>
+            <p className="mt-1 text-[13px] font-medium text-[#10141a]">{claim.agencyName}</p>
+          </div>
         ) : null}
 
         <div className={showClient ? "mt-4 space-y-3" : "space-y-3"}>
@@ -120,13 +132,16 @@ function RecentClaimRow({ claim, variant, showClient = true }: RecentClaimRowPro
   }
 
   return (
-    <div className={showClient ? TABLE_ROW_CLASS : GROUPED_TABLE_ROW_CLASS}>
+    <div className={showClient ? TABLE_ROW_CLASS : showAgency ? NETWORK_GROUPED_TABLE_ROW_CLASS : GROUPED_TABLE_ROW_CLASS}>
       {showClient ? (
         <ClientNameLink
           name={claim.client}
           clientId={claim.clientId}
           className="text-[14px] font-medium text-[#10141a]"
         />
+      ) : null}
+      {!showClient && showAgency ? (
+        <span className="text-[13px] text-[#10141a]">{claim.agencyName ?? "â€”"}</span>
       ) : null}
       <StaffLink staffId={claim.staffId} staffName={claim.staffName} />
       <span className="text-[13px] text-[#10141a]">{claim.serviceCode}</span>

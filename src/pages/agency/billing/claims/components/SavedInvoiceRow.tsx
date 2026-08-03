@@ -9,14 +9,20 @@ import { DotGridIcon, menuItemClassName } from "@/components/ui/dot-grid-menu";
 import { formatCurrency } from "@/pages/agency/billing-and-approvals/billingUtils";
 import { cn } from "@/lib/utils";
 import type { OutOfPocketInvoiceListItem } from "@/lib/api/out-of-pocket";
-import { GROUPED_SAVED_CLAIMS_TABLE_ROW_CLASS } from "./tableColumns";
+import {
+  GROUPED_SAVED_CLAIMS_TABLE_ROW_CLASS,
+  NETWORK_GROUPED_SAVED_CLAIMS_TABLE_ROW_CLASS,
+} from "./tableColumns";
+
+type AgencyIdentity = { agencyId?: string; agencyName?: string };
 
 type Props = {
-  invoice: OutOfPocketInvoiceListItem;
+  invoice: OutOfPocketInvoiceListItem & AgencyIdentity;
   variant: "desktop" | "mobile";
   onViewInvoice: (invoice: OutOfPocketInvoiceListItem) => void;
   onCancelInvoice: (invoice: OutOfPocketInvoiceListItem) => void;
   actionsDisabled?: boolean;
+  showAgency?: boolean;
 };
 
 function formatDate(value: string) {
@@ -67,7 +73,14 @@ function InvoiceActions({ invoice, onViewInvoice, onCancelInvoice, actionsDisabl
   );
 }
 
-function SavedInvoiceRow({ invoice, variant, onViewInvoice, onCancelInvoice, actionsDisabled = false }: Props) {
+function SavedInvoiceRow({
+  invoice,
+  variant,
+  onViewInvoice,
+  onCancelInvoice,
+  actionsDisabled = false,
+  showAgency = false,
+}: Props) {
   if (variant === "mobile") {
     return (
       <div className="rounded-[16px] border border-[#e5e5e6] bg-white px-4 py-4">
@@ -98,6 +111,12 @@ function SavedInvoiceRow({ invoice, variant, onViewInvoice, onCancelInvoice, act
             <p className="mt-1 font-medium text-[#10141a]">{formatDate(invoice.createdAt)}</p>
           </div>
         </div>
+        {showAgency && invoice.agencyName ? (
+          <div className="mt-3">
+            <p className="text-[12px] text-[#808081]">Agency</p>
+            <p className="mt-1 text-[13px] font-medium text-[#10141a]">{invoice.agencyName}</p>
+          </div>
+        ) : null}
         <div className="mt-4">
           <EmailStatusBadge status={invoice.emailStatus} />
         </div>
@@ -106,7 +125,8 @@ function SavedInvoiceRow({ invoice, variant, onViewInvoice, onCancelInvoice, act
   }
 
   return (
-    <div className={GROUPED_SAVED_CLAIMS_TABLE_ROW_CLASS}>
+    <div className={showAgency ? NETWORK_GROUPED_SAVED_CLAIMS_TABLE_ROW_CLASS : GROUPED_SAVED_CLAIMS_TABLE_ROW_CLASS}>
+      {showAgency ? <span className="text-[13px] text-[#10141a]">{invoice.agencyName ?? "â€”"}</span> : null}
       <span className="text-[13px] font-medium text-[#10141a]">{invoice.invoiceNumber}</span>
       <span className="text-[13px] text-[#10141a]">{invoice.serviceCode}</span>
       <span className="text-[13px] text-[#10141a]">{invoice.serviceDate ?? "—"}</span>

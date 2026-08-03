@@ -7,6 +7,8 @@ import SavedInvoiceRow from "./SavedInvoiceRow";
 import SavedClaimsClientGroupHeader from "./SavedClaimsClientGroupHeader";
 import {
   GROUPED_SAVED_CLAIMS_TABLE_HEADER_CLASS,
+  NETWORK_GROUPED_SAVED_CLAIMS_TABLE_ROW_CLASS,
+  NETWORK_GROUPED_SAVED_CLAIMS_TABLE_HEADER_CLASS,
   SAVED_CLAIMS_TABLE_MIN_WIDTH,
 } from "./tableColumns";
 import { groupSavedClaimsByClient } from "../utils/groupSavedClaimsByClient";
@@ -15,8 +17,10 @@ import { STATUS_FILTER_OPTIONS } from "../utils/savedClaimUtils";
 
 const SKELETON_ROW_COUNT = 8;
 
+type AgencyIdentity = { agencyId?: string; agencyName?: string };
+
 type SavedClaimsTableProps = {
-  claims: BillingClaimListItem[];
+  claims: Array<BillingClaimListItem & AgencyIdentity>;
   totalCount: number;
   loading?: boolean;
   statusFilter: BillingClaimStatus | "all";
@@ -27,18 +31,28 @@ type SavedClaimsTableProps = {
   onCancelClaim: (claim: BillingClaimListItem) => void;
   actionsDisabled?: boolean;
   /** Out-of-pocket invoices mixed into this tab, badged and grouped by client. */
-  invoices?: OutOfPocketInvoiceListItem[];
+  invoices?: Array<OutOfPocketInvoiceListItem & AgencyIdentity>;
   onViewInvoice?: (invoice: OutOfPocketInvoiceListItem) => void;
   onCancelInvoice?: (invoice: OutOfPocketInvoiceListItem) => void;
+  /** Enables the super-admin network table identity column and agency-separated grouping. */
+  showAgency?: boolean;
 };
 
-function SavedClaimSkeletonRow({ grouped = false }: { grouped?: boolean }) {
+function SavedClaimSkeletonRow({
+  grouped = false,
+  showAgency = false,
+}: {
+  grouped?: boolean;
+  showAgency?: boolean;
+}) {
   return (
     <div
-      className={`${GROUPED_SAVED_CLAIMS_TABLE_HEADER_CLASS.replace("font-semibold", "")} animate-pulse`}
+      className={`${(showAgency
+        ? NETWORK_GROUPED_SAVED_CLAIMS_TABLE_ROW_CLASS
+        : GROUPED_SAVED_CLAIMS_TABLE_HEADER_CLASS.replace("font-semibold", ""))} animate-pulse`}
       aria-hidden="true"
     >
-      {Array.from({ length: grouped ? 7 : 8 }).map((_, index) => (
+      {Array.from({ length: grouped ? showAgency ? 8 : 7 : 8 }).map((_, index) => (
         <span key={index} className="h-4 rounded bg-[#eef4f5]" />
       ))}
     </div>
@@ -74,9 +88,16 @@ export default function SavedClaimsTable({
   invoices = [],
   onViewInvoice,
   onCancelInvoice,
+  showAgency = false,
 }: SavedClaimsTableProps) {
-  const groupedClaims = useMemo(() => groupSavedClaimsByClient(claims), [claims]);
-  const groupedInvoices = useMemo(() => groupInvoicesByClient(invoices), [invoices]);
+  const groupedClaims = useMemo(
+    () => groupSavedClaimsByClient(claims, { showAgency }),
+    [claims, showAgency],
+  );
+  const groupedInvoices = useMemo(
+    () => groupInvoicesByClient(invoices, { showAgency }),
+    [invoices, showAgency],
+  );
 
   const emptyMessage = loading
     ? ""
@@ -114,7 +135,8 @@ export default function SavedClaimsTable({
       <div className="hidden overflow-hidden rounded-[16px] border border-[#e5e5e6] bg-white lg:block">
         <div className="overflow-x-auto">
           <div className={SAVED_CLAIMS_TABLE_MIN_WIDTH}>
-            <div className={GROUPED_SAVED_CLAIMS_TABLE_HEADER_CLASS}>
+            <div className={showAgency ? NETWORK_GROUPED_SAVED_CLAIMS_TABLE_HEADER_CLASS : GROUPED_SAVED_CLAIMS_TABLE_HEADER_CLASS}>
+              {showAgency ? <span>Agency</span> : null}
               <span>Claim #</span>
               <span>Service code</span>
               <span>Service date</span>
@@ -126,7 +148,11 @@ export default function SavedClaimsTable({
 
             {loading ? (
               Array.from({ length: SKELETON_ROW_COUNT }).map((_, index) => (
-                <SavedClaimSkeletonRow key={`saved-skeleton-desktop-${index}`} grouped />
+                <SavedClaimSkeletonRow
+                  key={`saved-skeleton-desktop-${index}`}
+                  grouped
+                  showAgency={showAgency}
+                />
               ))
             ) : groupedClaims.length > 0 || groupedInvoices.length > 0 ? (
               <>
@@ -148,6 +174,7 @@ export default function SavedClaimsTable({
                         onUpdateStatus={onUpdateStatus}
                         onCancelClaim={onCancelClaim}
                         actionsDisabled={actionsDisabled}
+                        showAgency={showAgency}
                       />
                     ))}
                   </Fragment>
@@ -170,6 +197,7 @@ export default function SavedClaimsTable({
                         onViewInvoice={onViewInvoice ?? (() => {})}
                         onCancelInvoice={onCancelInvoice ?? (() => {})}
                         actionsDisabled={actionsDisabled}
+                        showAgency={showAgency}
                       />
                     ))}
                   </Fragment>
@@ -198,6 +226,7 @@ export default function SavedClaimsTable({
                   clientId={group.clientId}
                   count={group.claims.length}
                   variant="mobile"
+                  agencyName={showAgency ? group.agencyName : undefined}
                 />
                 {group.claims.map((claim) => (
                   <SavedClaimRow
@@ -222,6 +251,7 @@ export default function SavedClaimsTable({
                   variant="mobile"
                   itemNoun="invoice"
                   outOfPocket
+                  agencyName={showAgency ? group.agencyName : undefined}
                 />
                 {group.invoices.map((invoice) => (
                   <SavedInvoiceRow
