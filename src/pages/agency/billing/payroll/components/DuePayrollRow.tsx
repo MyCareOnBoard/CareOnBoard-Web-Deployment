@@ -260,8 +260,12 @@ function DuePayrollRow({
       <span className="text-[13px] tabular-nums text-[#10141a]">
         {(entry.expenseTotal ?? 0) > 0 ? formatCurrency(entry.expenseTotal ?? 0) : "—"}
       </span>
-      <span className="text-[13px] font-medium tabular-nums text-[#10141a]" title={breakdown ?? undefined}>
-        {formatCurrency(entry.grossAmount ?? 0)}
+      <span
+        aria-label={entry.grossAmount === undefined ? "Gross pay unavailable" : "Gross pay"}
+        className="text-[13px] font-medium tabular-nums text-[#10141a]"
+        title={breakdown ?? undefined}
+      >
+        {entry.grossAmount === undefined ? "—" : formatCurrency(entry.grossAmount)}
       </span>
       <div className="flex justify-end">
         <PayrollActionsMenu
