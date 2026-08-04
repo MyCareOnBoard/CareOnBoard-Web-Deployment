@@ -77,7 +77,14 @@ function ShiftListRowsSkeleton() {
   );
 }
 
-export default function ShiftsListPage() {
+export interface ShiftsListPageProps {
+  clientId?: string;
+  dateRange?: { startDate: string; endDate: string };
+  readOnly?: boolean;
+  embedded?: boolean;
+}
+
+export default function ShiftsListPage({ clientId, dateRange, readOnly = false, embedded = false }: ShiftsListPageProps) {
   const { toast } = useToast();
   const { agencyId, agency, mode, data, actor, routes } = useOperationalAgency();
   const location = useLocation();
@@ -123,7 +130,11 @@ export default function ShiftsListPage() {
         setLoading(true);
         const loadedShifts = await loadAllShiftPages(
           (params) => listShifts(params, { signal }),
-          scopedShiftListParams(agencyId, shiftRequestSearch, mode ?? undefined),
+          {
+            ...scopedShiftListParams(agencyId, shiftRequestSearch, mode ?? undefined),
+            ...(clientId ? { clientId } : {}),
+            ...(dateRange ? { startDate: dateRange.startDate, endDate: dateRange.endDate, limit: 200 } : {}),
+          },
         );
         if (signal?.aborted) return;
         // Filter out shifts with type="manual" and submissionStatus="draft"
@@ -142,7 +153,7 @@ export default function ShiftsListPage() {
       } finally {
         if (!signal?.aborted) setLoading(false);
       }
-  }, [agencyId, mode, shiftRequestSearch, toast]);
+  }, [agencyId, clientId, dateRange?.endDate, dateRange?.startDate, mode, shiftRequestSearch, toast]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -394,13 +405,13 @@ export default function ShiftsListPage() {
 
   return (
     <>
-      <div className="min-h-[calc(100vh-200px)]">
+      <div className={embedded ? "" : "min-h-[calc(100vh-200px)]"}>
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        {!embedded ? <div className="flex items-center justify-between mb-8">
           <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
             Shift Management
           </h1>
-          <Button
+          {!readOnly ? <Button
             disabled={!agencyId}
             title={!agencyId ? "Select an agency to add a schedule" : undefined}
             onClick={() => {
@@ -413,7 +424,8 @@ export default function ShiftsListPage() {
             <Plus className="w-5 h-5" />
             Add Schedule
           </Button>
-        </div>
+          : null}
+        </div> : null}
 
         {/* Main Content Card */}
         <div className="relative overflow-hidden rounded-[30px] border border-[rgba(255,255,255,0.3)] backdrop-blur bg-[rgba(255,255,255,0.3)]">
@@ -642,7 +654,7 @@ export default function ShiftsListPage() {
                               <FileText className="text-[#808081]" aria-hidden />
                               Details
                             </DropdownMenuItem>
-                            <DropdownMenuItem
+                            {!readOnly ? <DropdownMenuItem
                               className={menuItemClassName}
                               disabled={!agencyId}
                               title={!agencyId ? "Select an agency to edit this shift" : undefined}
@@ -650,20 +662,20 @@ export default function ShiftsListPage() {
                             >
                               <Pencil className="text-[#808081]" aria-hidden />
                               Edit
-                            </DropdownMenuItem>
-                            {apiShift.type === ShiftType.MANUAL && apiShift.submissionStatus === SubmissionStatus.SUBMITTED ? (
+                            </DropdownMenuItem> : null}
+                            {!readOnly && apiShift.type === ShiftType.MANUAL && apiShift.submissionStatus === SubmissionStatus.SUBMITTED ? (
                               <DropdownMenuItem className={menuItemClassName} onClick={() => handleApprove(apiShift)}>
                                 <CheckCircle className="text-[#0eaf52]" aria-hidden />
                                 Approve
                               </DropdownMenuItem>
                             ) : null}
-                            <DropdownMenuItem
+                            {!readOnly ? <DropdownMenuItem
                               className={`${menuItemClassName} text-[#d53411] hover:bg-[#fff2ef] focus:bg-[#fff2ef] focus:text-[#d53411]`}
                               onClick={() => handleCancel(apiShift)}
                             >
                               <X className="text-[#d53411]" aria-hidden />
                               Cancel
-                            </DropdownMenuItem>
+                            </DropdownMenuItem> : null}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
@@ -701,7 +713,7 @@ export default function ShiftsListPage() {
       </div>
 
       {/* Add Schedule Modal */}
-      <AddScheduleModal
+      {!readOnly ? <AddScheduleModal
         isOpen={showAddScheduleModal}
         agencyId={agencyId}
         agencyName={agency.name}
@@ -716,10 +728,10 @@ export default function ShiftsListPage() {
         onShiftsUpdated={(updatedShifts) => setShifts(updatedShifts)}
         mode={modalMode}
         editData={editFormData || undefined}
-      />
+      /> : null}
 
       {/* Cancel Shift Confirmation Dialog */}
-      <ConfirmDialog
+      {!readOnly ? <ConfirmDialog
         open={showCancelModal && !!shiftToCancel}
         onOpenChange={(open: boolean) => {
           if (isCancelling) return;
@@ -742,10 +754,10 @@ export default function ShiftsListPage() {
           isLoading={isCancelling}
           loadingText="Cancelling..."
         />
-      </ConfirmDialog>
+      </ConfirmDialog> : null}
 
       {/* Shift Cancelled Success Dialog */}
-      <ConfirmDialog
+      {!readOnly ? <ConfirmDialog
         open={showCancelledModal && !!cancelledShiftInfo}
         onOpenChange={(open: boolean) => {
           setShowCancelledModal(open);
@@ -764,10 +776,10 @@ export default function ShiftsListPage() {
           onConfirm={() => setShowCancelledModal(false)}
           onCancel={() => setShowCancelledModal(false)}
         />
-      </ConfirmDialog>
+      </ConfirmDialog> : null}
 
       {/* Approve Shift Confirmation Dialog */}
-      <ConfirmDialog
+      {!readOnly ? <ConfirmDialog
         open={showApproveModal && !!shiftToApprove}
         onOpenChange={(open: boolean) => {
           if (isApproving) return;
@@ -790,7 +802,7 @@ export default function ShiftsListPage() {
           isLoading={isApproving}
           loadingText="Approving..."
         />
-      </ConfirmDialog>
+      </ConfirmDialog> : null}
     </>
   );
 }

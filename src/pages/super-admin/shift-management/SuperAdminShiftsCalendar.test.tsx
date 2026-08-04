@@ -52,6 +52,23 @@ describe("SuperAdminShiftsCalendar", () => {
     }, { signal: expect.any(AbortSignal) }));
   });
 
+  it("locks calendar requests to the supplied client", async () => {
+    render(
+      <SuperAdminShiftsCalendar
+        agencies={[agency]}
+        clientId="client-1"
+        dateRange={{ startDate: "2026-07-20", endDate: "2026-08-18" }}
+        mode="ddd"
+        onSelectionChange={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(listShifts).toHaveBeenCalledWith(expect.objectContaining({
+      agencyId: "atlas",
+      clientId: "client-1",
+    }), { signal: expect.any(AbortSignal) }));
+  });
+
   it("shows one month at a time and navigates within the selected range", async () => {
     render(<SuperAdminShiftsCalendar agencies={[]} dateRange={{ startDate: "2026-07-20", endDate: "2026-08-18" }} mode="ddd" onSelectionChange={vi.fn()} />);
     expect(await screen.findByRole("grid", { name: "Shifts for July 2026" })).toBeVisible();

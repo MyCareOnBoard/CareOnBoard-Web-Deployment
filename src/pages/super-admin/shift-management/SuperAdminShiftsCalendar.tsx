@@ -20,6 +20,8 @@ const PAGE_LIMIT = 200;
 
 export interface SuperAdminShiftsCalendarProps {
   agencies: OperationalAgencySummary[];
+  clientId?: string;
+  lockAgency?: boolean;
   dateRange: ShiftDateRange;
   mode: "ddd" | "hha";
   category?: ShiftCategory | null;
@@ -117,6 +119,8 @@ function ShiftSummary({ shift, showBadge }: { shift: NormalizedCalendarShift; sh
 
 export default function SuperAdminShiftsCalendar({
   agencies,
+  clientId,
+  lockAgency = false,
   dateRange,
   mode,
   category = null,
@@ -155,6 +159,7 @@ export default function SuperAdminShiftsCalendar({
       do {
         const response = await listShifts({
           ...(selectedAgency ? { agencyId: selectedAgency.id } : {}),
+          ...(clientId ? { clientId } : {}),
           startDate: dateRange.startDate,
           endDate: dateRange.endDate,
           client: true,
@@ -186,7 +191,7 @@ export default function SuperAdminShiftsCalendar({
     });
 
     return () => controller.abort();
-  }, [dateRange.endDate, dateRange.startDate, mode, retryVersion, selectedAgency]);
+  }, [clientId, dateRange.endDate, dateRange.startDate, mode, retryVersion, selectedAgency]);
 
   const filteredShifts = useMemo(
     () => shifts.filter((shift) => matchesShiftCategory(shift, category)),
@@ -198,7 +203,7 @@ export default function SuperAdminShiftsCalendar({
 
   return (
     <section className="space-y-3" aria-label="Shift calendar">
-      {selectedAgency ? (
+      {selectedAgency && !lockAgency ? (
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-full border border-[#cad7d7] bg-white pl-3 pr-1 text-xs font-semibold text-[#284041]">
             <span className="truncate">{selectedAgency.name}</span>

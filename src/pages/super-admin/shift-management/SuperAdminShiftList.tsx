@@ -15,6 +15,7 @@ import ActivityLogsPage from "@/pages/agency/scheduling/activity-logs";
 interface SuperAdminShiftScopeProps {
   children: ReactNode;
   agency?: OperationalAgencySummary;
+  agencyId?: string;
 }
 
 const ALL_AGENCIES: OperationalAgencySummary = {
@@ -33,7 +34,7 @@ function isAbort(error: unknown): boolean {
     || candidate.name === "AbortError";
 }
 
-export function SuperAdminShiftScope({ children, agency: suppliedAgency }: SuperAdminShiftScopeProps) {
+export function SuperAdminShiftScope({ children, agency: suppliedAgency, agencyId: suppliedAgencyId }: SuperAdminShiftScopeProps) {
   const location = useLocation();
   const { user } = useAuth();
   const accessList = user?.profile?.accessList ?? [];
@@ -42,7 +43,7 @@ export function SuperAdminShiftScope({ children, agency: suppliedAgency }: Super
     .getAll("agencyId")
     .map((id) => id.trim())
     .filter(Boolean);
-  const agencyId = suppliedAgency?.id || (requestedIds.length === 1 ? requestedIds[0] : "");
+  const agencyId = suppliedAgency?.id || suppliedAgencyId || (requestedIds.length === 1 ? requestedIds[0] : "");
   const [resolvedAgency, setResolvedAgency] = useState<OperationalAgencySummary | null>(
     suppliedAgency ?? (agencyId ? null : ALL_AGENCIES),
   );

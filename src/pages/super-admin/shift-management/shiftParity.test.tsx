@@ -707,6 +707,34 @@ describe("shared operational shift pages", () => {
     expect(currentRoute).toHaveTextContent("returnTo=");
   });
 
+  it("supports a locked read-only client scope in the shared shift list", async () => {
+    auth.user = { uid: "super-user", userType: "super_admin", profile: { accessList: ["Shift Management"] } };
+    api.listShifts.mockResolvedValue({ success: true, shifts: [shift("shift-1", "agency-b", "Jamie")] });
+    render(
+      <MemoryRouter initialEntries={["/super-admin/shifts/list?agencyId=agency-b"]}>
+        <OperationalAgencyProvider
+          actor="super_admin"
+          agencyId="agency-b"
+          agency={agency("agency-b", "Beacon Supports")}
+          mode="ddd"
+          capabilities={{ canManageShifts: true, canManageBilling: false, shiftMaintenance: false }}
+          data={data}
+        >
+          <ShiftsListPage clientId="client-1" readOnly />
+        </OperationalAgencyProvider>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(api.listShifts).toHaveBeenCalledWith(
+      expect.objectContaining({ agencyId: "agency-b", clientId: "client-1" }),
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    ));
+    expect(screen.queryByRole("button", { name: /add schedule/i })).not.toBeInTheDocument();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Shift actions for Jamie Client" }));
+    expect(screen.getAllByRole("menuitem").map((item) => item.textContent?.trim())).toEqual(["Details"]);
+  });
+
   it("uses layout-matched skeleton rows while the dedicated shift list is loading", async () => {
     auth.user = { uid: "super-user", userType: "super_admin", profile: { accessList: ["Shift Management"] } };
     api.listShifts.mockReturnValueOnce(new Promise(() => {}));

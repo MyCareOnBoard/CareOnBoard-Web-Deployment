@@ -5,7 +5,7 @@ import { Routes } from "@/routes/constants";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ActivityTab } from "@/pages/shared/client-details/tabs/ActivityTab";
+import SuperAdminClientActivityShifts from "@/pages/super-admin/clients-directory/client-details/SuperAdminClientActivityShifts";
 import { ProfileTab } from "@/pages/shared/client-details/tabs/ProfileTab";
 import { ServicesTab } from "@/pages/super-admin/clients-directory/client-details/tabs/ServicesTab";
 import { DocumentsTab } from "@/pages/super-admin/clients-directory/client-details/tabs/DocumentsTab";
@@ -35,7 +35,6 @@ export default function ClientDetailsPage() {
     setActiveTab(tab);
     setSearchParams({ tab });
   };
-  const [currentPage, setCurrentPage] = useState(1);
   const [client, setClient] = useState<Client | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +42,6 @@ export default function ClientDetailsPage() {
   const [documentToEdit, setDocumentToEdit] = useState<ClientDocument | undefined>(undefined);
   const [activate485Open, setActivate485Open] = useState(false);
   const [isActivating, setIsActivating] = useState(false);
-  const itemsPerPage = 6;
 
   // Format client name from firstName, lastName, middleName
   const formatClientName = useMemo(() => {
@@ -334,14 +332,9 @@ export default function ClientDetailsPage() {
 
       {/* Tab Content */}
       {activeTab === "activity" && (
-        <ActivityTab
-          clientName={clientDisplay.name}
+        <SuperAdminClientActivityShifts
           clientId={clientId || ""}
           agencyId={client?.agencyId || ""}
-          currentPage={currentPage}
-          setCurrentPage={setCurrentPage}
-          itemsPerPage={itemsPerPage}
-          shiftDetailsRoute={Routes.agency.shiftDetails}
         />
       )}
       {activeTab === "profile" && (
