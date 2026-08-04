@@ -6,16 +6,25 @@ import type { NetworkBillingPayrollRow } from "../types";
 
 const api = vi.hoisted(() => ({ bootstrap: vi.fn(), options: vi.fn(), search: vi.fn(), page: vi.fn(), invalidate: vi.fn() }));
 const payroll = vi.hoisted(() => ({ createPayrollInvoice: vi.fn(), getPayrollInvoiceById: vi.fn(), markPayrollInvoicePaid: vi.fn(), cancelPayrollInvoice: vi.fn() }));
+const timestampParser = vi.hoisted(() => ({ parseIsoTimestamp: (value: string) => value === "2026-02-30T00:00:00.000Z" ? null : new Date(value) }));
 vi.mock("@/lib/firebase", () => ({ app: {}, auth: {}, db: {} }));
+vi.mock("@/lib/axios", () => ({ default: { get: vi.fn(), post: vi.fn() } }));
 vi.mock("@/utils/auth/store/authSlice", () => ({ default: (state = {}) => state }));
 vi.mock("@/utils/auth/services/authService", () => ({}));
-vi.mock("react-redux", () => ({ useDispatch: () => vi.fn() }));
+vi.mock("react-redux", () => ({
+  useDispatch: Object.assign(() => vi.fn(), { withTypes: () => () => vi.fn() }),
+  useSelector: Object.assign(() => undefined, { withTypes: () => () => undefined }),
+}));
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: vi.fn() }) }));
 vi.mock("@/components/ui/button", () => ({ Button: (p: ButtonHTMLAttributes<HTMLButtonElement>) => <button {...p} /> }));
 vi.mock("@/components/ui/dialog", () => ({ Dialog: ({ open, children }: { open: boolean; children: ReactNode }) => open ? <div role="dialog">{children}</div> : null, DialogContent: ({ children }: { children: ReactNode }) => <div>{children}</div>, DialogDescription: ({ children }: { children: ReactNode }) => <p>{children}</p>, DialogFooter: ({ children }: { children: ReactNode }) => <div>{children}</div>, DialogHeader: ({ children }: { children: ReactNode }) => <div>{children}</div>, DialogTitle: ({ children }: { children: ReactNode }) => <h2>{children}</h2> }));
 vi.mock("@/components/modals/DeleteConfirmationModal", () => ({ DeleteConfirmationModal: ({ isOpen, title, onConfirm }: { isOpen: boolean; title: string; onConfirm: () => void }) => isOpen ? <div role="dialog" aria-label={title}><button onClick={onConfirm}>Confirm {title}</button></div> : null }));
 vi.mock("@/lib/api/payroll", () => ({ ...payroll }));
-vi.mock("@/lib/api/network-billing", () => ({ NETWORK_BILLING_QUERY_OPTIONS: {}, networkBillingApi: { useGetPayrollBootstrapQuery: api.bootstrap, useLazyGetPayrollPageQuery: () => [api.page, { isFetching: false }], useLazySearchBillingOptionsQuery: () => [api.search, api.options()], util: { invalidateTags: api.invalidate } } }));
+vi.mock("@/lib/api/network-billing", () => ({
+  NETWORK_BILLING_QUERY_OPTIONS: {},
+  parseIsoTimestamp: timestampParser.parseIsoTimestamp,
+  networkBillingApi: { useGetPayrollBootstrapQuery: api.bootstrap, useLazyGetPayrollPageQuery: () => [api.page, { isFetching: false }], useLazySearchBillingOptionsQuery: () => [api.search, api.options()], util: { invalidateTags: api.invalidate } },
+}));
 vi.mock("@/pages/agency/billing/payroll/components/PayrollOverviewCards", () => ({ default: ({ stats }: { stats: Array<{ label: string; value: string }> }) => <div aria-label="Payroll overview">{stats.map((stat) => <span key={stat.label}>{stat.label}: {stat.value}</span>)}</div> }));
 vi.mock("@/pages/agency/billing/payroll/components/PayrollSummaryChart", () => ({ default: () => <div aria-label="Payroll summary chart" /> }));
 vi.mock("@/pages/agency/billing/payroll/components/TopOvertimeAlerts", () => ({ default: () => <div aria-label="Top overtime alerts" /> }));
@@ -78,6 +87,19 @@ describe("NetworkPayroll", () => {
     render(<UrlBackedNetworkPayroll />);
 
     expect(screen.getByLabelText("Network payroll aggregate status")).toHaveTextContent("The oldest successful calculation is from Unknown calculation time.");
+  });
+
+  it.each([
+    ["UTC timestamp without fractional seconds", "2026-08-03T00:00:00Z"],
+    ["timestamp with a UTC offset", "2026-08-03T00:00:00+05:30"],
+  ])("formats a valid %s in the aggregate status", (_name, oldestComputedAt) => {
+    api.options.mockReturnValue({ data: [] });
+    api.bootstrap.mockReturnValue({ data: { page: { rows, nextCursor: null, total: 1, hasMore: false }, summary: dueSummary({ freshness: { oldestComputedAt, newestComputedAt: "2026-08-03T00:00:00.000Z" } }) }, isLoading: false, isFetching: false, refetch: vi.fn() });
+    api.search.mockReturnValue({ unwrap: vi.fn().mockResolvedValue([]), abort: vi.fn() });
+
+    render(<UrlBackedNetworkPayroll />);
+
+    expect(screen.getByLabelText("Network payroll aggregate status")).not.toHaveTextContent("Unknown calculation time");
   });
 
   it("uses the authorized staff name projected by the payroll page without issuing label lookups", () => {

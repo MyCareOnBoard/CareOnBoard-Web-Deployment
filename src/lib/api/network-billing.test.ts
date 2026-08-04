@@ -20,6 +20,7 @@ import {
   NETWORK_BILLING_KEEP_UNUSED_DATA_FOR,
   NETWORK_BILLING_QUERY_OPTIONS,
   networkBillingApi,
+  parseIsoTimestamp,
   type ClaimsNetworkBillingArgs,
   type ExpensesNetworkBillingArgs,
   type NetworkBillingOptionsArgs,
@@ -339,6 +340,17 @@ describe("network billing API", () => {
     vi.useRealTimers();
   });
 
+  it.each([
+    ["UTC timestamp without fractional seconds", "2026-08-03T00:00:00Z"],
+    ["timestamp with a UTC offset", "2026-08-03T00:00:00+05:30"],
+  ])("accepts a valid %s", (_name, value) => {
+    expect(parseIsoTimestamp(value)).toBeInstanceOf(Date);
+  });
+
+  it("rejects an impossible ISO calendar date", () => {
+    expect(parseIsoTimestamp("2026-02-30T00:00:00.000Z")).toBeNull();
+  });
+
   it("uses the network claims path and preserves server-supported query params", async () => {
     const store = createStore();
 
@@ -388,6 +400,7 @@ describe("network billing API", () => {
     ["negative metric", (summary: typeof duePayrollSummary) => ({ ...summary, overview: { ...summary.overview, pendingHours: { hours: -1 } } })],
     ["non-finite metric", (summary: typeof duePayrollSummary) => ({ ...summary, overview: { ...summary.overview, overtimeHours: { hours: Number.POSITIVE_INFINITY } } })],
     ["invalid freshness date", (summary: typeof duePayrollSummary) => ({ ...summary, freshness: { ...summary.freshness, oldestComputedAt: "not-a-date" } })],
+    ["impossible freshness date", (summary: typeof duePayrollSummary) => ({ ...summary, freshness: { ...summary.freshness, oldestComputedAt: "2026-02-30T00:00:00.000Z" } })],
     ["wrong calculation version", (summary: typeof duePayrollSummary) => ({ ...summary, meta: { ...summary.meta, calculationVersion: 2 } })],
     ["coverage mismatch", (summary: typeof duePayrollSummary) => ({ ...summary, coverage: { ...summary.coverage, failedAgencyCount: 1 } })],
     ["null amount with usable rollup", (summary: typeof duePayrollSummary) => ({ ...summary, overview: { ...summary.overview, totalDue: { ...summary.overview.totalDue, amount: null } } })],

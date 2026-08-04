@@ -183,9 +183,35 @@ function nonNegativeNumber(source: Record<string, unknown>, key: string, context
   return value;
 }
 
+const ISO_TIMESTAMP = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+
+function daysInMonth(year: number, month: number): number {
+  if (month === 2) return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0) ? 29 : 28;
+  return [4, 6, 9, 11].includes(month) ? 30 : 31;
+}
+
+export function parseIsoTimestamp(value: string): Date | null {
+  const match = ISO_TIMESTAMP.exec(value);
+  if (!match) return null;
+  const [, yearText, monthText, dayText, hourText, minuteText, secondText, offset] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  const second = Number(secondText);
+  if (month < 1 || month > 12 || day < 1 || day > daysInMonth(year, month) || hour > 23 || minute > 59 || second > 59) return null;
+  if (offset !== "Z") {
+    const [offsetHour, offsetMinute] = offset.slice(1).split(":").map(Number);
+    if (offsetHour > 23 || offsetMinute > 59) return null;
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 function requiredIsoDate(source: Record<string, unknown>, key: string, context: string): string {
   const value = requiredString(source, key, context);
-  if (!/^\d{4}-\d{2}-\d{2}T/.test(value) || Number.isNaN(Date.parse(value))) {
+  if (!parseIsoTimestamp(value)) {
     fail(`${context}.${key} must be an ISO date-time.`);
   }
   return value;

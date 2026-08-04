@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
 import { useToast } from "@/hooks/use-toast";
 import { cancelPayrollInvoice, createPayrollInvoice, getPayrollInvoiceById, markPayrollInvoicePaid, type DuePayrollEntry, type PayrollInvoiceListItem } from "@/lib/api/payroll";
-import { NETWORK_BILLING_QUERY_OPTIONS, networkBillingApi, type PayrollNetworkBillingArgs } from "@/lib/api/network-billing";
+import { NETWORK_BILLING_QUERY_OPTIONS, networkBillingApi, parseIsoTimestamp, type PayrollNetworkBillingArgs } from "@/lib/api/network-billing";
 import PayrollOverviewCards from "@/pages/agency/billing/payroll/components/PayrollOverviewCards";
 import PayrollWorkspaceTabs, { type PayrollWorkspaceTab } from "@/pages/agency/billing/payroll/components/PayrollWorkspaceTabs";
 import DuePayrollTable from "@/pages/agency/billing/payroll/components/DuePayrollTable";
@@ -68,12 +68,6 @@ function dedupe(rows: readonly NetworkBillingPayrollRow[]) {
 
 function currency(value: number | null): string {
   return value === null ? "Unavailable" : new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
-}
-
-function parseIsoTimestamp(value: string): Date | null {
-  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) || date.toISOString() !== value ? null : date;
 }
 
 function formatFreshness(value: string | null): string {
