@@ -21,6 +21,7 @@ interface DisplayClient {
   accountCreated: string;
   avatarUrl?: string;
   agency?: Agency;
+  type?: Client["type"];
 }
 
 function ClientDirectorySkeleton() {
@@ -48,6 +49,18 @@ function statusClass(status: DisplayClient["status"]) {
   if (status === "Pending") return "border-[#efce8b] bg-[#fff9ed] text-[#9a6511]";
   if (status === "Archived") return "border-[#d5d9da] bg-[#f5f6f6] text-[#687173]";
   return "border-[#e4b5af] bg-[#fff5f3] text-[#9a4038]";
+}
+
+function clientTypeLabel(type?: Client["type"]) {
+  if (type === "hha") return "HHA";
+  if (type === "ddd") return "DDD";
+  return "Unknown";
+}
+
+function clientTypeClass(type?: Client["type"]) {
+  if (type === "hha") return "border-[#99d8d5] bg-[#eefafa] text-[#087f82]";
+  if (type === "ddd") return "border-[#aec8ec] bg-[#f0f6ff] text-[#2865a2]";
+  return "border-[#d5d9da] bg-[#f5f6f6] text-[#687173]";
 }
 
 export default function ClientsDirectory() {
@@ -118,6 +131,7 @@ export default function ClientsDirectory() {
       accountCreated: formatDate(client.createdAt),
       avatarUrl: client.profileImage,
       agency: client.agency,
+      type: client.type,
     };
   }), [clients, formatClientName, formatDate]);
 
@@ -212,7 +226,7 @@ export default function ClientsDirectory() {
                 <thead className="bg-[#f5f8f8]"><tr>{["Client", "Status", "Assigned staff", "Agency", "Created", ""].map((label) => <th key={label || "actions"} className={`px-5 py-3 text-left text-[11px] font-bold uppercase tracking-[0.08em] text-[#687173] ${!label ? "text-right" : ""}`}>{label}</th>)}</tr></thead>
                 <tbody className="divide-y divide-[#edf1f1]">
                   {paginatedClients.map((client) => <tr key={client.id} className="transition-colors hover:bg-[#f7fbfb]">
-                    <td className="px-5 py-4"><div className="flex items-center gap-3"><Avatar className="h-10 w-10 shrink-0 rounded-full"><AvatarImage src={client.avatarUrl} alt="" /><AvatarFallback className="bg-[#087f82] text-xs font-semibold text-white">{client.name.split(" ").filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("")}</AvatarFallback></Avatar><div className="min-w-0"><p className="truncate text-[13px] font-semibold text-[#20282a]">{client.name}</p><p className="mt-0.5 text-[11px] text-[#687173]">Client record</p></div></div></td>
+                    <td className="px-5 py-4"><div className="flex items-center gap-3"><Avatar className="h-10 w-10 shrink-0 rounded-full"><AvatarImage src={client.avatarUrl} alt="" /><AvatarFallback className="bg-[#087f82] text-xs font-semibold text-white">{client.name.split(" ").filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("")}</AvatarFallback></Avatar><div className="min-w-0"><p className="truncate text-[13px] font-semibold text-[#20282a]">{client.name}</p><Badge variant="outline" className={`mt-1 border px-2 py-0.5 text-[10px] font-semibold leading-none ${clientTypeClass(client.type)}`}>{clientTypeLabel(client.type)}</Badge></div></div></td>
                     <td className="px-5 py-4"><Badge variant="outline" className={`border px-2.5 py-1 text-[11px] font-semibold ${statusClass(client.status)}`}>{client.statusLabel}</Badge></td>
                     <td className="px-5 py-4 text-[13px] font-medium text-[#273033]">{client.assignedStaff}</td>
                     <td className="max-w-[190px] px-5 py-4 text-[13px] text-[#4d5a5c]"><span className="block truncate">{client.agency?.name || "Not assigned"}</span></td>

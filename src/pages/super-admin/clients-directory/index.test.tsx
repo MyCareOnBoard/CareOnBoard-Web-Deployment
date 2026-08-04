@@ -58,4 +58,31 @@ describe("super-admin clients directory", () => {
     );
     expect(useGetClientStatsQuery).toHaveBeenLastCalledWith({ agencyId: "atlas" }, { skip: false });
   });
+
+  it("shows each client's program type instead of the generic record label", () => {
+    useListClientsQuery.mockReturnValue({
+      data: {
+        success: true,
+        total: 3,
+        count: 3,
+        clients: [
+          { id: "client-hha", firstName: "Harper", lastName: "Home", status: "active", type: "hha" },
+          { id: "client-ddd", firstName: "Dana", lastName: "Development", status: "active", type: "ddd" },
+          { id: "client-legacy", firstName: "Legacy", lastName: "Record", status: "active" },
+        ],
+      },
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    useGetClientStatsQuery.mockReturnValue({ data: { stats: { total: 3, active: 3, inactive: 0 } } });
+
+    render(<ClientsDirectory />);
+
+    expect(screen.getByText("HHA")).toBeVisible();
+    expect(screen.getByText("DDD")).toBeVisible();
+    expect(screen.getByText("Unknown")).toBeVisible();
+    expect(screen.queryByText("Client record")).not.toBeInTheDocument();
+  });
 });
