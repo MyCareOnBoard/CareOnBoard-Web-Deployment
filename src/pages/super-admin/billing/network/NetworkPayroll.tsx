@@ -14,6 +14,7 @@ import MarkPayrollInvoicePaidDialog, { type MarkPayrollInvoicePaidTarget } from 
 import { buildPayrollInvoiceDocument } from "@/pages/agency/billing/payroll/utils/buildPayrollInvoiceDocument";
 import { useBillingWorkspaceContext } from "../BillingWorkspaceContext";
 import type { NetworkBillingOption, NetworkBillingPayrollDueRow, NetworkBillingPayrollRow, NetworkBillingPayrollSavedRow } from "../types";
+import { networkPayrollWeek } from "./networkPayrollWeek";
 
 const PayrollInvoiceModal = lazy(() => import("@/pages/agency/billing/payroll/components/PayrollInvoiceModal"));
 
@@ -65,11 +66,24 @@ function dedupe(rows: readonly NetworkBillingPayrollRow[]) {
   return [...new Map(rows.map((row) => [`${row.agencyId}:${row.id}`, row])).values()];
 }
 
+function currency(value: number | null): string {
+  return value === null ? "Unavailable" : new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
+}
+
+function formatFreshness(value: string | null): string {
+  if (!value) return "No successful calculation yet";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Unknown calculation time" : new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
 export default function NetworkPayroll() {
   const workspace = useBillingWorkspaceContext();
   const dispatch = useDispatch();
   const { toast } = useToast();
-  const [tab, setTab] = useState<PayrollWorkspaceTab>("staff");
+  const tab: PayrollWorkspaceTab = workspace.payrollTab === "saved" ? "generated" : "staff";
   const [staff, setStaff] = useState<NetworkBillingOption | null>(null);
   const [staffSearch, setStaffSearch] = useState("");
   const [rows, setRows] = useState<NetworkBillingPayrollRow[]>([]);
@@ -83,7 +97,10 @@ export default function NetworkPayroll() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
 
-  const base = { actorUid: workspace.actorUid, environment: workspace.environment, scope: workspace.scope, startDate: workspace.startDate, endDate: workspace.endDate };
+  const payrollPeriod = workspace.payrollTab === "due"
+    ? networkPayrollWeek(workspace.payrollWeekStart)
+    : { startDate: workspace.startDate, endDate: workspace.endDate };
+  const base = { actorUid: workspace.actorUid, environment: workspace.environment, scope: workspace.scope, ...payrollPeriod };
   const mode = workspace.mode === "ddd" || workspace.mode === "hha" ? workspace.mode : undefined;
   const args: PayrollNetworkBillingArgs = tab === "staff"
     ? staff ? { ...base, tab: "due", ...(mode ? { mode } : {}), employeeId: staff.id, employeeAgencyId: staff.agencyId } : { ...base, tab: "due", ...(mode ? { mode } : {}) }
@@ -102,7 +119,7 @@ export default function NetworkPayroll() {
     setCancelTarget(null);
     setLoadMoreError(null);
     seenCursors.current.clear();
-  }, [tab, workspace.startDate, workspace.endDate, workspace.mode, workspace.scope]);
+  }, [tab, payrollPeriod.startDate, payrollPeriod.endDate, workspace.mode, workspace.scope]);
 
   useEffect(() => {
     // A staff selection is a new dataset just like a tab or period change; never let a
@@ -132,16 +149,35 @@ export default function NetworkPayroll() {
     seenCursors.current.clear();
   }, [bootstrap.data]);
 
-  const due = useMemo(() => rows.filter((row): row is NetworkBillingPayrollDueRow => "sourceType" in row).map((row) => dueRow(row, workspace.startDate, workspace.endDate)), [rows, workspace.startDate, workspace.endDate]);
-  const invoices = useMemo(() => rows.filter((row): row is NetworkBillingPayrollSavedRow => "kind" in row).map((row) => savedRow(row, workspace.startDate, workspace.endDate)), [rows, workspace.startDate, workspace.endDate]);
+  const due = useMemo(() => rows.filter((row): row is NetworkBillingPayrollDueRow => "sourceType" in row).map((row) => dueRow(row, payrollPeriod.startDate, payrollPeriod.endDate)), [rows, payrollPeriod.startDate, payrollPeriod.endDate]);
+  const invoices = useMemo(() => rows.filter((row): row is NetworkBillingPayrollSavedRow => "kind" in row).map((row) => savedRow(row, payrollPeriod.startDate, payrollPeriod.endDate)), [rows, payrollPeriod.startDate, payrollPeriod.endDate]);
   const invalidate = (agencyId: string) => dispatch(networkBillingApi.util.invalidateTags([{ type: "Payroll", id: "NETWORK" }, { type: "Timesheets", id: "NETWORK" }, { type: "NETWORK", id: agencyId }]));
   const dueSummary = bootstrap.data && "totalDue" in bootstrap.data.summary.overview ? bootstrap.data.summary.overview.totalDue : undefined;
   const savedSummary = bootstrap.data && "savedInvoices" in bootstrap.data.summary.overview ? bootstrap.data.summary.overview.savedInvoices : undefined;
-  const summary = useMemo(() => dueSummary
-    ? [{ id: "total-due", label: dueSummary.exact ? "Total payroll due" : "Due payroll (partial)", value: dueSummary.amount === null ? "Unavailable" : `$${dueSummary.amount.toLocaleString()}`, count: dueSummary.count }]
+  const summary = useMemo(() => dueSummary && bootstrap.data && "coverage" in bootstrap.data.summary
+    ? [
+      { id: "total-due", label: "Total payroll due", value: currency(dueSummary.amount), count: dueSummary.count },
+      { id: "staff-count", label: "Staff count", value: String(bootstrap.data.summary.overview.staffCount.count), count: bootstrap.data.summary.overview.staffCount.count },
+      { id: "pending-hours", label: "Pending hours", value: String(bootstrap.data.summary.overview.pendingHours.hours), count: bootstrap.data.summary.overview.pendingHours.hours },
+      { id: "overtime-hours", label: "Overtime", value: String(bootstrap.data.summary.overview.overtimeHours.hours), count: bootstrap.data.summary.overview.overtimeHours.hours },
+      { id: "missing-timesheets", label: "Missing timesheets", value: String(bootstrap.data.summary.overview.missingTimesheets.count), count: bootstrap.data.summary.overview.missingTimesheets.count },
+    ]
     : savedSummary
       ? [{ id: "saved-payroll", label: savedSummary.exact ? "Saved payroll invoices" : "Saved payroll (partial)", value: String(savedSummary.count), count: savedSummary.count }]
-      : [], [dueSummary, savedSummary]);
+    : [], [dueSummary, savedSummary]);
+
+  const aggregateStatus = useMemo(() => {
+    if (!dueSummary || !bootstrap.data || !("coverage" in bootstrap.data.summary)) return null;
+    const { coverage, freshness, meta } = bootstrap.data.summary;
+    const exact = meta.totalsExact && dueSummary.exact
+      && coverage.expectedAgencyCount === coverage.readyAgencyCount;
+    if (dueSummary.amount === null) return { title: "No payroll rollup", message: "No payroll rollup is available yet. Check again after agencies calculate this payroll week.", action: "Check again" };
+    if (exact) return { title: "Payroll rollup is exact", message: `All ${coverage.readyAgencyCount} agencies are included. Updated ${formatFreshness(meta.evaluatedAt)}.` };
+    if (coverage.failedAgencyCount > 0) return { title: "Payroll rollup is incomplete", message: `Latest status is unavailable for ${coverage.failedAgencyCount} agencies. Check again to load the current aggregate.`, action: "Check again" };
+    if (coverage.pendingAgencyCount > 0 && coverage.staleAgencyCount > 0) return { title: "Payroll rollup is partial", message: `${coverage.readyAgencyCount} of ${coverage.expectedAgencyCount} agencies are ready; the remaining statuses are pending or based on older results.`, action: "Reload status" };
+    if (coverage.staleAgencyCount > 0) return { title: "Payroll rollup is stale", message: `${coverage.staleAgencyCount} agencies use the last successful calculation from ${formatFreshness(freshness.oldestComputedAt)}.`, action: "Reload status" };
+    return { title: "Awaiting updated status", message: `${coverage.pendingAgencyCount} agency statuses are pending. The displayed total is not exact.`, action: "Reload status" };
+  }, [bootstrap.data, dueSummary]);
 
   async function loadMore() {
     const requestedCursor = cursor;
@@ -171,7 +207,7 @@ export default function NetworkPayroll() {
         totalHours: created.totalHours, mode: null, invoiceNumber: created.invoiceNumber,
         status: created.status, employeeName: created.employeeName, periodStart: created.periodStart,
         periodEnd: created.periodEnd, shiftCount: created.shiftIds.length, createdAt: createTarget.dateRangeStart,
-      }, workspace.startDate, workspace.endDate);
+      }, payrollPeriod.startDate, payrollPeriod.endDate);
       setViewing({ invoice, loading: false, detail: created });
     } catch (error) { toast({ title: "Couldn't create payroll invoice", description: error instanceof Error ? error.message : "Try again.", variant: "destructive" }); }
     finally { setBusyId(null); }
@@ -202,11 +238,15 @@ export default function NetworkPayroll() {
 
   return <section aria-label="Network payroll" aria-busy={bootstrap.isLoading || page.isFetching} className="min-w-0 space-y-6 pb-8">
     <PayrollOverviewCards stats={summary} loading={bootstrap.isLoading && !bootstrap.data} />
-    <div aria-label="Network payroll aggregate status" className="rounded-[8px] border border-[#e5e5e6] bg-white p-6 shadow-sm">
+    <div role="region" aria-label="Network payroll aggregate status" className="rounded-[8px] border border-[#e5e5e6] bg-white p-6 shadow-sm">
       <h3 className="text-[18px] font-semibold text-[#10141a]">Network aggregate detail</h3>
-      <p className="mt-2 text-sm text-[#687173]">{tab === "staff" ? "Due-payroll amounts, overtime, and hours are not exact across the network. Review the listed records or select an agency for complete operational totals." : "Saved-invoice status distribution is not available as a network aggregate. The table below remains the authoritative list."}</p>
+      {aggregateStatus ? <>
+        <p className="mt-2 text-sm font-medium text-[#10141a]">{aggregateStatus.title}</p>
+        <p className="mt-1 text-sm text-[#687173]">{aggregateStatus.message}</p>
+        {aggregateStatus.action ? <Button type="button" variant="outline" className="mt-4 min-h-11" onClick={() => void bootstrap.refetch?.()}>{aggregateStatus.action}</Button> : null}
+      </> : <p className="mt-2 text-sm text-[#687173]">{tab === "staff" ? "Due-payroll amounts, overtime, and hours are not available as a network rollup yet. Review the listed records or select an agency for complete operational totals." : "Saved-invoice status distribution is not available as a network aggregate. The table below remains the authoritative list."}</p>}
     </div>
-    <PayrollWorkspaceTabs activeTab={tab} onTabChange={setTab} />
+    <PayrollWorkspaceTabs activeTab={tab} onTabChange={(nextTab) => workspace.onPayrollTabChange?.(nextTab === "staff" ? "due" : "saved")} />
     <div className="flex flex-col gap-2 sm:flex-row sm:justify-end"><label className="sr-only" htmlFor="network-payroll-staff">Find a staff member</label><input id="network-payroll-staff" value={staffSearch} onChange={(event) => setStaffSearch(event.target.value)} placeholder="Search staff across agencies" className="min-h-11 w-full rounded-md border border-[#e5e5e6] bg-white px-3 text-sm sm:max-w-xs" />{staff ? <Button type="button" variant="outline" className="min-h-11" onClick={() => { setStaff(null); setStaffSearch(""); }}>Clear staff</Button> : null}</div>
     {options.data?.length ? <div role="listbox" aria-label="Authorized staff" className="rounded-xl border border-[#e5e5e6] bg-white p-2">{options.data.map((option) => <button key={`${option.agencyId}:${option.id}`} type="button" role="option" className="block min-h-11 w-full rounded-lg px-3 text-left text-sm hover:bg-[#eef4f5]" onClick={() => { setCreateTarget(null); setViewing(null); setMarkPaidTarget(null); setCancelTarget(null); setStaff(option); setStaffSearch(option.name); }}>{option.name} <span className="text-[#687173]">· {option.agencyName}</span></button>)}</div> : null}
     {tab === "staff" ? <DuePayrollTable entries={due} dueTotal={dueSummary?.count ?? due.length} loading={bootstrap.isLoading} isRefetching={page.isFetching} showAgency nextCursor={cursor} onLoadMore={() => void loadMore()} onCreateInvoiceClick={(entry) => setCreateTarget(entry as AgencyDue)} actionsDisabled={Boolean(busyId)} /> : <SavedPayrollTable invoices={invoices} loading={bootstrap.isLoading} isRefetching={page.isFetching} showAgency nextCursor={cursor} onLoadMore={() => void loadMore()} onViewInvoice={(invoice) => void viewInvoice(invoice as AgencyInvoice)} onMarkPaid={(invoice) => setMarkPaidTarget({ id: invoice.id, invoiceNumber: invoice.invoiceNumber, employeeName: invoice.employeeName, agencyId: (invoice as AgencyInvoice).agencyId })} onCancel={(invoice) => setCancelTarget(invoice as AgencyInvoice)} actionsDisabled={Boolean(busyId)} />}

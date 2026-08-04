@@ -177,6 +177,25 @@ function nullableNumber(source: Record<string, unknown>, key: string, context: s
   return requiredNumber(source, key, context);
 }
 
+function nonNegativeNumber(source: Record<string, unknown>, key: string, context: string): number {
+  const value = requiredNumber(source, key, context);
+  if (value < 0) fail(`${context}.${key} must be a non-negative number.`);
+  return value;
+}
+
+function requiredIsoDate(source: Record<string, unknown>, key: string, context: string): string {
+  const value = requiredString(source, key, context);
+  if (!/^\d{4}-\d{2}-\d{2}T/.test(value) || Number.isNaN(Date.parse(value))) {
+    fail(`${context}.${key} must be an ISO date-time.`);
+  }
+  return value;
+}
+
+function nullableIsoDate(source: Record<string, unknown>, key: string, context: string): string | null {
+  if (source[key] === null) return null;
+  return requiredIsoDate(source, key, context);
+}
+
 function optionalNullableNumber(
   source: Record<string, unknown>,
   key: string,
@@ -636,32 +655,78 @@ function validateClaimsSummary(value: unknown): NetworkBillingClaimsSummary {
   };
 }
 
+function validateDuePayrollSummary(value: unknown): NetworkBillingPayrollSummary {
+  const source = record(value, "response.data.summary");
+  onlyKeys(source, ["overview", "coverage", "freshness", "meta"], "response.data.summary");
+  const overview = record(source.overview, "response.data.summary.overview");
+  const coverage = record(source.coverage, "response.data.summary.coverage");
+  const freshness = record(source.freshness, "response.data.summary.freshness");
+  const meta = record(source.meta, "response.data.summary.meta");
+  onlyKeys(overview, ["totalDue", "staffCount", "pendingHours", "overtimeHours", "missingTimesheets"], "response.data.summary.overview");
+  onlyKeys(coverage, ["expectedAgencyCount", "readyAgencyCount", "pendingAgencyCount", "staleAgencyCount", "failedAgencyCount"], "response.data.summary.coverage");
+  onlyKeys(freshness, ["oldestComputedAt", "newestComputedAt"], "response.data.summary.freshness");
+  onlyKeys(meta, ["evaluatedAt", "calculationVersion", "totalsExact"], "response.data.summary.meta");
+  const totalDue = record(overview.totalDue, "response.data.summary.overview.totalDue");
+  const staffCount = record(overview.staffCount, "response.data.summary.overview.staffCount");
+  const pendingHours = record(overview.pendingHours, "response.data.summary.overview.pendingHours");
+  const overtimeHours = record(overview.overtimeHours, "response.data.summary.overview.overtimeHours");
+  const missingTimesheets = record(overview.missingTimesheets, "response.data.summary.overview.missingTimesheets");
+  onlyKeys(totalDue, ["amount", "count", "exact"], "response.data.summary.overview.totalDue");
+  onlyKeys(staffCount, ["count"], "response.data.summary.overview.staffCount");
+  onlyKeys(pendingHours, ["hours"], "response.data.summary.overview.pendingHours");
+  onlyKeys(overtimeHours, ["hours"], "response.data.summary.overview.overtimeHours");
+  onlyKeys(missingTimesheets, ["count"], "response.data.summary.overview.missingTimesheets");
+  const parsedCoverage = {
+    expectedAgencyCount: nonNegativeInteger(coverage, "expectedAgencyCount", "response.data.summary.coverage"),
+    readyAgencyCount: nonNegativeInteger(coverage, "readyAgencyCount", "response.data.summary.coverage"),
+    pendingAgencyCount: nonNegativeInteger(coverage, "pendingAgencyCount", "response.data.summary.coverage"),
+    staleAgencyCount: nonNegativeInteger(coverage, "staleAgencyCount", "response.data.summary.coverage"),
+    failedAgencyCount: nonNegativeInteger(coverage, "failedAgencyCount", "response.data.summary.coverage"),
+  };
+  if (parsedCoverage.readyAgencyCount + parsedCoverage.pendingAgencyCount + parsedCoverage.staleAgencyCount + parsedCoverage.failedAgencyCount !== parsedCoverage.expectedAgencyCount) {
+    fail("response.data.summary.coverage must add up to expectedAgencyCount.");
+  }
+  const amount = nullableNumber(totalDue, "amount", "response.data.summary.overview.totalDue");
+  if (amount !== null && amount < 0) fail("response.data.summary.overview.totalDue.amount must be a non-negative number or null.");
+  if (amount === null && parsedCoverage.readyAgencyCount + parsedCoverage.staleAgencyCount > 0) {
+    fail("response.data.summary.overview.totalDue.amount may be null only without a usable rollup.");
+  }
+  const oldestComputedAt = nullableIsoDate(freshness, "oldestComputedAt", "response.data.summary.freshness");
+  const newestComputedAt = nullableIsoDate(freshness, "newestComputedAt", "response.data.summary.freshness");
+  if (oldestComputedAt && newestComputedAt && Date.parse(oldestComputedAt) > Date.parse(newestComputedAt)) {
+    fail("response.data.summary.freshness oldestComputedAt must not follow newestComputedAt.");
+  }
+  if (requiredNumber(meta, "calculationVersion", "response.data.summary.meta") !== 1) {
+    fail("response.data.summary.meta.calculationVersion must be 1.");
+  }
+  return {
+    overview: {
+      totalDue: { amount, count: nonNegativeInteger(totalDue, "count", "response.data.summary.overview.totalDue"), exact: requiredBoolean(totalDue, "exact", "response.data.summary.overview.totalDue") },
+      staffCount: { count: nonNegativeInteger(staffCount, "count", "response.data.summary.overview.staffCount") },
+      pendingHours: { hours: nonNegativeNumber(pendingHours, "hours", "response.data.summary.overview.pendingHours") },
+      overtimeHours: { hours: nonNegativeNumber(overtimeHours, "hours", "response.data.summary.overview.overtimeHours") },
+      missingTimesheets: { count: nonNegativeInteger(missingTimesheets, "count", "response.data.summary.overview.missingTimesheets") },
+    },
+    coverage: parsedCoverage,
+    freshness: { oldestComputedAt, newestComputedAt },
+    meta: { evaluatedAt: requiredIsoDate(meta, "evaluatedAt", "response.data.summary.meta"), calculationVersion: 1, totalsExact: requiredBoolean(meta, "totalsExact", "response.data.summary.meta") },
+  };
+}
+
 function validatePayrollSummary(value: unknown, tab: PayrollNetworkBillingArgs["tab"]): NetworkBillingPayrollSummary {
+  if (tab === "due") return validateDuePayrollSummary(value);
   const source = record(value, "response.data.summary");
   onlyKeys(source, ["overview", "meta"], "response.data.summary");
   const overview = record(source.overview, "response.data.summary.overview");
   const meta = record(source.meta, "response.data.summary.meta");
   onlyKeys(meta, ["evaluatedAt", "totalsExact"], "response.data.summary.meta");
-  const validatedOverview: NetworkBillingPayrollSummary["overview"] = tab === "due"
-    ? (() => {
-      onlyKeys(overview, ["totalDue"], "response.data.summary.overview");
-      const totalDue = record(overview.totalDue, "response.data.summary.overview.totalDue");
-      onlyKeys(totalDue, ["amount", "count", "exact"], "response.data.summary.overview.totalDue");
-      return { totalDue: {
-        amount: nullableNumber(totalDue, "amount", "response.data.summary.overview.totalDue"),
-        count: nonNegativeInteger(totalDue, "count", "response.data.summary.overview.totalDue"),
-        exact: requiredBoolean(totalDue, "exact", "response.data.summary.overview.totalDue"),
-      } };
-    })()
-    : (() => {
-      onlyKeys(overview, ["savedInvoices"], "response.data.summary.overview");
-      const saved = record(overview.savedInvoices, "response.data.summary.overview.savedInvoices");
-      onlyKeys(saved, ["count", "exact"], "response.data.summary.overview.savedInvoices");
-      return { savedInvoices: {
-        count: nonNegativeInteger(saved, "count", "response.data.summary.overview.savedInvoices"),
-        exact: requiredBoolean(saved, "exact", "response.data.summary.overview.savedInvoices"),
-      } };
-    })();
+  onlyKeys(overview, ["savedInvoices"], "response.data.summary.overview");
+  const saved = record(overview.savedInvoices, "response.data.summary.overview.savedInvoices");
+  onlyKeys(saved, ["count", "exact"], "response.data.summary.overview.savedInvoices");
+  const validatedOverview = { savedInvoices: {
+    count: nonNegativeInteger(saved, "count", "response.data.summary.overview.savedInvoices"),
+    exact: requiredBoolean(saved, "exact", "response.data.summary.overview.savedInvoices"),
+  } };
   return {
     overview: validatedOverview,
     meta: {

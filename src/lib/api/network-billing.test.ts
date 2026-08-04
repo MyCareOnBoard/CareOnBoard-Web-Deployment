@@ -98,6 +98,27 @@ const payrollSummary = {
   overview: { savedInvoices: { count: 1, exact: true } },
   meta: { evaluatedAt: "2026-08-02T00:00:00.000Z", totalsExact: true },
 };
+const duePayrollSummary = {
+  overview: {
+    totalDue: { amount: 350, count: 3, exact: false },
+    staffCount: { count: 3 },
+    pendingHours: { hours: 16 },
+    overtimeHours: { hours: 2 },
+    missingTimesheets: { count: 1 },
+  },
+  coverage: {
+    expectedAgencyCount: 2,
+    readyAgencyCount: 1,
+    pendingAgencyCount: 0,
+    staleAgencyCount: 1,
+    failedAgencyCount: 0,
+  },
+  freshness: {
+    oldestComputedAt: "2026-08-02T00:00:00.000Z",
+    newestComputedAt: "2026-08-03T00:00:00.000Z",
+  },
+  meta: { evaluatedAt: "2026-08-03T00:00:00.000Z", calculationVersion: 1, totalsExact: false },
+};
 const expenseRow = {
   id: "expense-1",
   agencyId: "agency-a",
@@ -158,6 +179,7 @@ const queryContext = {
 };
 const claimsSavedArgs: ClaimsNetworkBillingArgs = { ...queryContext, startDate: "2026-07-01", endDate: "2026-07-31", tab: "saved", sort: "createdAt:desc", limit: 25 };
 const payrollSavedArgs: PayrollNetworkBillingArgs = { ...queryContext, startDate: "2026-07-01", endDate: "2026-07-31", tab: "saved", status: "pending", limit: 25 };
+const payrollDueArgs: PayrollNetworkBillingArgs = { ...queryContext, startDate: "2026-07-28", endDate: "2026-08-03", tab: "due", limit: 25 };
 const expensesPendingArgs: ExpensesNetworkBillingArgs = { ...queryContext, startDate: "2026-07-01", endDate: "2026-07-31", tab: "pending", status: "pending", limit: 25 };
 const timesheetsArgs: TimesheetsNetworkBillingArgs = { ...queryContext, startDate: "2026-07-01", endDate: "2026-07-31", tab: "list", status: "pending", limit: 25 };
 const overviewArgs: OverviewNetworkBillingArgs = { ...queryContext, startDate: "2026-07-01", endDate: "2026-07-31", tab: "overview" };
@@ -342,6 +364,48 @@ describe("network billing API", () => {
       cursor: "cursorA",
     });
     expect(NETWORK_BILLING_QUERY_OPTIONS).toEqual({ refetchOnMountOrArgChange: 30 });
+  });
+
+  it("accepts the frozen due-payroll rollup contract", async () => {
+    const store = createStore();
+    respond({
+      success: true,
+      data: {
+        scope: { kind: "global", agencyCount: 2 },
+        page: emptyPage,
+        summary: duePayrollSummary,
+      },
+      meta: timingMeta,
+    });
+
+    await expect(store.dispatch(networkBillingApi.endpoints.getPayrollBootstrap.initiate(payrollDueArgs)).unwrap()).resolves.toMatchObject({
+      summary: duePayrollSummary,
+    });
+  });
+
+  it.each([
+    ["extra due-summary field", (summary: typeof duePayrollSummary) => ({ ...summary, private: true })],
+    ["negative metric", (summary: typeof duePayrollSummary) => ({ ...summary, overview: { ...summary.overview, pendingHours: { hours: -1 } } })],
+    ["non-finite metric", (summary: typeof duePayrollSummary) => ({ ...summary, overview: { ...summary.overview, overtimeHours: { hours: Number.POSITIVE_INFINITY } } })],
+    ["invalid freshness date", (summary: typeof duePayrollSummary) => ({ ...summary, freshness: { ...summary.freshness, oldestComputedAt: "not-a-date" } })],
+    ["wrong calculation version", (summary: typeof duePayrollSummary) => ({ ...summary, meta: { ...summary.meta, calculationVersion: 2 } })],
+    ["coverage mismatch", (summary: typeof duePayrollSummary) => ({ ...summary, coverage: { ...summary.coverage, failedAgencyCount: 1 } })],
+    ["null amount with usable rollup", (summary: typeof duePayrollSummary) => ({ ...summary, overview: { ...summary.overview, totalDue: { ...summary.overview.totalDue, amount: null } } })],
+  ])("rejects a due-payroll rollup with %s", async (_name, mutate) => {
+    const store = createStore();
+    respond({
+      success: true,
+      data: {
+        scope: { kind: "global", agencyCount: 2 },
+        page: emptyPage,
+        summary: mutate(duePayrollSummary),
+      },
+      meta: timingMeta,
+    });
+
+    await expect(store.dispatch(networkBillingApi.endpoints.getPayrollBootstrap.initiate(payrollDueArgs)).unwrap()).rejects.toMatchObject({
+      status: "PARSING_ERROR",
+    });
   });
 
   it("preserves bounded unresolved ownership diagnostics from network preparation", async () => {

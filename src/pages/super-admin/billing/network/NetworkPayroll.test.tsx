@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { BillingWorkspaceProvider, type BillingWorkspaceContextValue } from "../BillingWorkspaceContext";
 import type { NetworkBillingPayrollRow } from "../types";
@@ -16,7 +16,7 @@ vi.mock("@/components/ui/dialog", () => ({ Dialog: ({ open, children }: { open: 
 vi.mock("@/components/modals/DeleteConfirmationModal", () => ({ DeleteConfirmationModal: ({ isOpen, title, onConfirm }: { isOpen: boolean; title: string; onConfirm: () => void }) => isOpen ? <div role="dialog" aria-label={title}><button onClick={onConfirm}>Confirm {title}</button></div> : null }));
 vi.mock("@/lib/api/payroll", () => ({ ...payroll }));
 vi.mock("@/lib/api/network-billing", () => ({ NETWORK_BILLING_QUERY_OPTIONS: {}, networkBillingApi: { useGetPayrollBootstrapQuery: api.bootstrap, useLazyGetPayrollPageQuery: () => [api.page, { isFetching: false }], useLazySearchBillingOptionsQuery: () => [api.search, api.options()], util: { invalidateTags: api.invalidate } } }));
-vi.mock("@/pages/agency/billing/payroll/components/PayrollOverviewCards", () => ({ default: ({ stats }: { stats: Array<{ label: string }> }) => <div aria-label="Payroll overview">{stats.map((stat) => <span key={stat.label}>{stat.label}</span>)}</div> }));
+vi.mock("@/pages/agency/billing/payroll/components/PayrollOverviewCards", () => ({ default: ({ stats }: { stats: Array<{ label: string; value: string }> }) => <div aria-label="Payroll overview">{stats.map((stat) => <span key={stat.label}>{stat.label}: {stat.value}</span>)}</div> }));
 vi.mock("@/pages/agency/billing/payroll/components/PayrollSummaryChart", () => ({ default: () => <div aria-label="Payroll summary chart" /> }));
 vi.mock("@/pages/agency/billing/payroll/components/TopOvertimeAlerts", () => ({ default: () => <div aria-label="Top overtime alerts" /> }));
 vi.mock("@/pages/agency/billing/payroll/components/PayrollWorkspaceTabs", () => ({ default: ({ onTabChange }: { onTabChange: (value: "staff" | "generated") => void }) => <><button onClick={() => onTabChange("staff")}>Due</button><button onClick={() => onTabChange("generated")}>Saved</button></> }));
@@ -29,7 +29,47 @@ import NetworkPayroll from "./NetworkPayroll";
 const rows: NetworkBillingPayrollRow[] = [{ id: "due-1", agencyId: "atlas", agencyName: "Atlas Care", staffKey: "atlas:staff-1", staffName: "Avery Nurse", employeeId: "staff-1", sourceType: "shift", sourceId: "shift-1", totalsExact: true, grossAmount: 100, totalHours: 42, mode: "ddd" }];
 const workspace: BillingWorkspaceContextValue = { scope: { kind: "network" }, startDate: "2026-07-01", endDate: "2026-07-31", mode: "ddd", actorUid: "super-1", environment: "staging", onDateRangeChange: vi.fn() };
 
+function UrlBackedNetworkPayroll() {
+  const [payrollTab, setPayrollTab] = useState<"due" | "saved">("due");
+  return <><output aria-label="Workspace payroll tab">{payrollTab}</output><BillingWorkspaceProvider value={{ ...workspace, payrollTab, onPayrollTabChange: setPayrollTab }}><NetworkPayroll /></BillingWorkspaceProvider></>;
+}
+
+function dueSummary(overrides: Record<string, unknown> = {}) {
+  return {
+    overview: {
+      totalDue: { amount: 350, count: 3, exact: false },
+      staffCount: { count: 3 },
+      pendingHours: { hours: 16 },
+      overtimeHours: { hours: 2 },
+      missingTimesheets: { count: 1 },
+    },
+    coverage: { expectedAgencyCount: 2, readyAgencyCount: 1, pendingAgencyCount: 0, staleAgencyCount: 1, failedAgencyCount: 0 },
+    freshness: { oldestComputedAt: "2026-08-02T00:00:00.000Z", newestComputedAt: "2026-08-03T00:00:00.000Z" },
+    meta: { evaluatedAt: "2026-08-03T00:00:00.000Z", calculationVersion: 1, totalsExact: false },
+    ...overrides,
+  };
+}
+
 describe("NetworkPayroll", () => {
+  it.each([
+    ["exact", dueSummary({ overview: { totalDue: { amount: 350, count: 3, exact: true }, staffCount: { count: 3 }, pendingHours: { hours: 16 }, overtimeHours: { hours: 2 }, missingTimesheets: { count: 1 } }, coverage: { expectedAgencyCount: 2, readyAgencyCount: 2, pendingAgencyCount: 0, staleAgencyCount: 0, failedAgencyCount: 0 }, meta: { evaluatedAt: "2026-08-03T00:00:00.000Z", calculationVersion: 1, totalsExact: true } }), "Payroll rollup is exact"],
+    ["pending", dueSummary({ coverage: { expectedAgencyCount: 2, readyAgencyCount: 1, pendingAgencyCount: 1, staleAgencyCount: 0, failedAgencyCount: 0 } }), "Awaiting updated status"],
+    ["partial", dueSummary({ coverage: { expectedAgencyCount: 3, readyAgencyCount: 1, pendingAgencyCount: 1, staleAgencyCount: 1, failedAgencyCount: 0 } }), "1 of 3 agencies"],
+    ["stale", dueSummary({ coverage: { expectedAgencyCount: 2, readyAgencyCount: 1, pendingAgencyCount: 0, staleAgencyCount: 1, failedAgencyCount: 0 } }), "last successful calculation"],
+    ["failed", dueSummary({ coverage: { expectedAgencyCount: 2, readyAgencyCount: 1, pendingAgencyCount: 0, staleAgencyCount: 0, failedAgencyCount: 1 } }), "Check again"],
+    ["unavailable", dueSummary({ overview: { totalDue: { amount: null, count: 0, exact: false }, staffCount: { count: 3 }, pendingHours: { hours: 16 }, overtimeHours: { hours: 2 }, missingTimesheets: { count: 1 } }, coverage: { expectedAgencyCount: 2, readyAgencyCount: 0, pendingAgencyCount: 2, staleAgencyCount: 0, failedAgencyCount: 0 }, freshness: { oldestComputedAt: null, newestComputedAt: null } }), "No payroll rollup"],
+  ])("renders the %s aggregate state from the rollup", (_state, summary, expected) => {
+    api.options.mockReturnValue({ data: [] });
+    api.bootstrap.mockReturnValue({ data: { page: { rows, loadedCount: 99, nextCursor: null, total: 1, hasMore: false }, summary }, isLoading: false, isFetching: false, refetch: vi.fn() });
+    api.search.mockReturnValue({ unwrap: vi.fn().mockResolvedValue([]), abort: vi.fn() });
+
+    render(<UrlBackedNetworkPayroll />);
+
+    expect(screen.getByLabelText("Network payroll aggregate status")).toHaveTextContent(expected);
+    expect(screen.getByLabelText("Payroll overview")).toHaveTextContent("Staff count: 3");
+    expect(screen.queryByText("Staff count: 99")).toBeNull();
+  });
+
   it("uses the authorized staff name projected by the payroll page without issuing label lookups", () => {
     const labeledRows = [{ ...rows[0], staffKey: "atlas:staff-1", staffName: "Avery Nurse" }] as unknown as NetworkBillingPayrollRow[];
     api.options.mockReturnValue({ data: [] });
@@ -41,19 +81,23 @@ describe("NetworkPayroll", () => {
     expect(api.search).not.toHaveBeenCalled();
   });
 
-  it("renders provider-free due and saved demand tabs without fabricating aggregate payroll charts", () => {
+  it("updates the provider-backed workspace tab and bootstrap range when Saved is selected", async () => {
     api.options.mockReturnValue({ data: [{ id: "staff-1", name: "Avery Nurse", agencyId: "atlas", agencyName: "Atlas Care", kind: "staff" }] });
     api.bootstrap.mockReturnValue({ data: { page: { rows, nextCursor: null, total: 1, hasMore: false }, summary: { overview: { totalDue: { amount: 100, count: 1, exact: true } }, meta: { evaluatedAt: "2026-08-03", totalsExact: true } } }, isLoading: false, isFetching: false });
     api.search.mockReturnValue({ unwrap: vi.fn().mockResolvedValue([]), abort: vi.fn() });
-    render(<BillingWorkspaceProvider value={workspace}><NetworkPayroll /></BillingWorkspaceProvider>);
+    render(<UrlBackedNetworkPayroll />);
     expect(screen.getByRole("region", { name: "Network payroll" })).toBeVisible();
     expect(screen.getByLabelText("Network payroll aggregate status")).toBeVisible();
     expect(screen.queryByLabelText("Payroll summary chart")).toBeNull();
     expect(screen.queryByLabelText("Top overtime alerts")).toBeNull();
-    expect(screen.getByText("Avery Nurse")).toBeVisible();
+    expect(screen.getByRole("option", { name: /Avery Nurse/ })).toBeVisible();
     expect(screen.queryByText("atlas:staff-1")).toBeNull();
+    expect(api.bootstrap).toHaveBeenLastCalledWith(expect.objectContaining({ tab: "due", startDate: "2026-07-27", endDate: "2026-08-02", scope: { kind: "network" } }), expect.anything());
     fireEvent.click(screen.getByRole("button", { name: "Saved" }));
-    expect(api.bootstrap).toHaveBeenLastCalledWith(expect.objectContaining({ tab: "saved", scope: { kind: "network" } }), expect.anything());
+    await waitFor(() => {
+      expect(screen.getByLabelText("Workspace payroll tab")).toHaveTextContent("saved");
+      expect(api.bootstrap).toHaveBeenLastCalledWith(expect.objectContaining({ tab: "saved", startDate: "2026-07-01", endDate: "2026-07-31", scope: { kind: "network" } }), expect.anything());
+    });
   });
 
   it("debounces and aborts authorized staff search without mounting an agency provider", () => {
