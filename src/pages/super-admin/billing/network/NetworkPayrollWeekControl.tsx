@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   currentNetworkPayrollWeekStart,
   networkPayrollWeek,
@@ -20,13 +21,34 @@ function weekLabel(weekStart: string): string {
   return `${formatter.format(new Date(`${startDate}T00:00:00Z`))} – ${formatter.format(new Date(`${endDate}T00:00:00Z`))}`;
 }
 
+function millisecondsUntilNextUtcMonday(now = new Date()): number {
+  const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const daysUntilMonday = (8 - now.getUTCDay()) % 7 || 7;
+  next.setUTCDate(next.getUTCDate() + daysUntilMonday);
+  return Math.max(0, next.getTime() - now.getTime());
+}
+
 export default function NetworkPayrollWeekControl({
   value,
   onChange,
 }: NetworkPayrollWeekControlProps) {
   const previousWeek = shiftNetworkPayrollWeek(value, -1);
   const nextWeek = shiftNetworkPayrollWeek(value, 1);
-  const currentWeek = currentNetworkPayrollWeekStart();
+  const [currentWeek, setCurrentWeek] = useState(currentNetworkPayrollWeekStart);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const refreshAtNextBoundary = () => {
+      timer = setTimeout(() => {
+        setCurrentWeek(currentNetworkPayrollWeekStart());
+        refreshAtNextBoundary();
+      }, millisecondsUntilNextUtcMonday());
+    };
+    refreshAtNextBoundary();
+    return () => {
+      if (timer !== undefined) clearTimeout(timer);
+    };
+  }, []);
 
   return (
     <div className="flex min-h-11 min-w-0 items-center gap-1.5 rounded-xl border border-[#cfd7d7] bg-white p-1 text-[#20282a]">
