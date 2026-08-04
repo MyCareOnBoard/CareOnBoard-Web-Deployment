@@ -1,15 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Loader2, Plus, Search, ArrowRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Plus, Search, Building2, Users } from "lucide-react";
 import { useNavigate } from "react-router";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Routes } from "@/routes/constants";
-import { useAuth } from "@/utils/auth";
 import { useListClientsQuery, useGetClientStatsQuery, type Client, type Agency } from "@/lib/api/clients";
+import { useListAllAgenciesQuery } from "@/pages/super-admin/agencies/api";
 import { countUniqueAssignedDspsForClient } from "@/lib/countUniqueAssignedDsps";
 
 interface DisplayClient {
@@ -17,395 +17,215 @@ interface DisplayClient {
   name: string;
   status: "Active" | "Inactive" | "Pending" | "Archived";
   statusLabel: string;
-  roleLabel: string;
-  roleValue: string | number;
+  assignedStaff: number;
   accountCreated: string;
   avatarUrl?: string;
   agency?: Agency;
 }
 
+function ClientDirectorySkeleton() {
+  return (
+    <div aria-label="Loading clients directory" aria-busy="true" className="divide-y divide-[#edf1f1]">
+      {Array.from({ length: 7 }).map((_, index) => (
+        <div key={index} data-testid="client-directory-skeleton-row" className="grid min-w-[860px] grid-cols-[minmax(14rem,1.8fr)_8rem_8rem_minmax(10rem,1fr)_9rem_7rem] items-center gap-4 px-5 py-4">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+            <div className="space-y-2"><Skeleton className="h-4 w-36 rounded" /><Skeleton className="h-3 w-24 rounded" /></div>
+          </div>
+          <Skeleton className="h-6 w-16 rounded-full" />
+          <Skeleton className="h-4 w-8 rounded" />
+          <Skeleton className="h-4 w-28 rounded" />
+          <Skeleton className="h-4 w-20 rounded" />
+          <Skeleton className="h-9 w-20 rounded-lg" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function statusClass(status: DisplayClient["status"]) {
+  if (status === "Active") return "border-[#9edab7] bg-[#f1fbf4] text-[#237a46]";
+  if (status === "Pending") return "border-[#efce8b] bg-[#fff9ed] text-[#9a6511]";
+  if (status === "Archived") return "border-[#d5d9da] bg-[#f5f6f6] text-[#687173]";
+  return "border-[#e4b5af] bg-[#fff5f3] text-[#9a4038]";
+}
+
 export default function ClientsDirectory() {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  const [selectedAgencyId, setSelectedAgencyId] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
   const itemsPerPage = 7;
-  const searchAnchorRef = useRef<HTMLDivElement>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const shouldShowSearchDropdown = searchQuery.trim().length >= 2;
 
-  const { data: clientsData, isLoading: isLoadingClients, isFetching: isSearching } = useListClientsQuery(
-    {
-      search: debouncedSearchQuery.trim() || undefined,
-      limit: 100,
-      agency: true,
-    }
-  );
-
+  const { data: agenciesData, isLoading: isLoadingAgencies } = useListAllAgenciesQuery({
+    status: "active",
+    limit: 100,
+    features: "id,name,status",
+  });
+  const { data: clientsData, isLoading: isLoadingClients, isFetching, isError, refetch } = useListClientsQuery({
+    agencyId: selectedAgencyId || undefined,
+    search: debouncedSearchQuery.trim() || undefined,
+    limit: 100,
+    agency: true,
+  });
   const { data: statsData } = useGetClientStatsQuery(
-    undefined,
-    { skip: !!debouncedSearchQuery.trim() }
+    selectedAgencyId ? { agencyId: selectedAgencyId } : undefined,
+    { skip: !!debouncedSearchQuery.trim() },
   );
 
   const clients = clientsData?.clients || [];
-  const totalClients = statsData?.stats?.total || 0;
   const isLoading = isLoadingClients && clients.length === 0;
-  const error = null;
+  const totalClients = statsData?.stats?.total ?? clientsData?.total ?? 0;
+  const activeClients = statsData?.stats?.active ?? clients.filter((client) => client.status === "active").length;
+  const agencies = useMemo(() => (agenciesData?.agencies ?? [])
+    .filter((agency) => agency.id && agency.name)
+    .sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id)), [agenciesData]);
 
   const formatClientName = useCallback((client: Client): string => {
-    const parts = [
-      client.firstName,
-      client.middleName,
-      client.lastName,
-    ].filter(Boolean);
-    return parts.join(" ") || "Unnamed Client";
+    const parts = [client.firstName, client.middleName, client.lastName].filter(Boolean);
+    return parts.join(" ") || "Unnamed client";
   }, []);
 
   const formatDate = useCallback((dateValue?: string | { _seconds?: number; _nanoseconds?: number } | Date): string => {
-    if (!dateValue) return "N/A";
-    
+    if (!dateValue) return "Not available";
     try {
-      let date: Date;
-      
-      if (typeof dateValue === 'object' && '_seconds' in dateValue && dateValue._seconds) {
-        date = new Date(dateValue._seconds * 1000);
-      }
-      else if (dateValue instanceof Date) {
-        date = dateValue;
-      }
-      else if (typeof dateValue === 'string') {
-        date = new Date(dateValue);
-      }
-      else {
-        return "N/A";
-      }
-      
-      if (isNaN(date.getTime())) {
-        return "N/A";
-      }
-      
-      return format(date, "d MMMM yyyy");
+      const date = typeof dateValue === "object" && "_seconds" in dateValue && dateValue._seconds
+        ? new Date(dateValue._seconds * 1000)
+        : dateValue instanceof Date ? dateValue : typeof dateValue === "string" ? new Date(dateValue) : null;
+      return date && !Number.isNaN(date.getTime()) ? format(date, "MMM d, yyyy") : "Not available";
     } catch {
-      return "N/A";
+      return "Not available";
     }
   }, []);
 
   useEffect(() => {
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
-
-    debounceTimeoutRef.current = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
-    }, 500);
-
-    return () => {
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-      }
-    };
+    if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
+    debounceTimeoutRef.current = setTimeout(() => setDebouncedSearchQuery(searchQuery), 350);
+    return () => { if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current); };
   }, [searchQuery]);
 
-  const displayClients: DisplayClient[] = useMemo(() => {
-    return clients.map((client) => {
-      const status = client.status || "active";
-      const statusCapitalized = status.charAt(0).toUpperCase() + status.slice(1) as DisplayClient["status"];
-      const statusLabel = status === "pending" ? "Pending Setup" : statusCapitalized;
+  const displayClients = useMemo<DisplayClient[]>(() => clients.map((client) => {
+    const status = (client.status || "active");
+    const normalizedStatus = `${status.charAt(0).toUpperCase()}${status.slice(1)}` as DisplayClient["status"];
+    return {
+      id: client.id,
+      name: formatClientName(client),
+      status: normalizedStatus,
+      statusLabel: status === "pending" ? "Pending setup" : normalizedStatus,
+      assignedStaff: countUniqueAssignedDspsForClient(client),
+      accountCreated: formatDate(client.createdAt),
+      avatarUrl: client.profileImage,
+      agency: client.agency,
+    };
+  }), [clients, formatClientName, formatDate]);
 
-      const dspCount = countUniqueAssignedDspsForClient(client);
-
-      return {
-        id: client.id,
-        name: formatClientName(client),
-        status: statusCapitalized,
-        statusLabel,
-        roleLabel: "DSP",
-        roleValue: dspCount,
-        accountCreated: formatDate(client.createdAt),
-        avatarUrl: client.profileImage,
-        agency: client.agency,
-      };
-    });
-  }, [clients, formatClientName, formatDate]);
-
-  const filteredClients = useMemo(() => {
-    return displayClients;
-  }, [displayClients]);
-
-  const searchSuggestions = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (q.length < 2) return [];
-    
-    return displayClients
-      .filter((c) => {
-        const nameLower = c.name.toLowerCase();
-        return nameLower.includes(q);
-      })
-      .slice(0, 5);
-  }, [displayClients, searchQuery]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredClients.length / itemsPerPage));
+  const totalPages = Math.max(1, Math.ceil(displayClients.length / itemsPerPage));
   const paginatedClients = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
-    return filteredClients.slice(start, start + itemsPerPage);
-  }, [filteredClients, currentPage]);
+    return displayClients.slice(start, start + itemsPerPage);
+  }, [currentPage, displayClients]);
 
-  const handleSelectSuggestion = useCallback((name: string) => {
-    setSearchQuery(name);
+  useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages); }, [currentPage, totalPages]);
+
+  const selectedAgencyName = agencies.find((agency) => agency.id === selectedAgencyId)?.name;
+  const handleAgencyChange = (agencyId: string) => {
+    setSelectedAgencyId(agencyId);
     setCurrentPage(1);
-    setIsSearchOpen(false);
-  }, []);
-
-  const handleSearchChange = useCallback((value: string) => {
-    setSearchQuery(value);
-    setCurrentPage(1);
-    setActiveSuggestionIndex(0);
-    setIsSearchOpen(value.trim().length >= 2);
-  }, []);
-
-  const handleSearchFocus = useCallback(() => {
-    setActiveSuggestionIndex(0);
-    setIsSearchOpen(shouldShowSearchDropdown);
-  }, [shouldShowSearchDropdown]);
+  };
 
   return (
-    <div className="min-h-[calc(100vh-200px)]">
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
-            Clients Directory
-          </h1>
-        </div>
-        <Button
-          size="lg"
-          className="h-[52px] px-[16px] py-[12px]"
-          onClick={() => navigate(Routes.superAdmin.addClient)}
-        >
-          <Plus className="w-5 h-5 text-white" />
-          Add Client
-        </Button>
-      </div>
-
-      <div className="relative overflow-hidden rounded-[30px] border border-[rgba(255,255,255,0.3)]">
-        <div className="absolute inset-0 backdrop-blur-[50px] bg-[rgba(255,255,255,0.4)]" />
-        <div className="relative px-[20px] py-[16px]">
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col gap-[4px]">
-              <p className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
-          Clients
-              </p>
-              <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-                Count of clients registered with the agency
-        </p>
-      </div>
-
-            <div className="flex flex-col items-start px-[24px]">
-              <p className="text-[40px] font-semibold leading-[normal] text-[#10141a]">
-                {isLoading ? "..." : totalClients}
-              </p>
-              <div className="flex items-center gap-[6px]">
-                <span className="inline-block h-[12px] w-[12px] rounded-full bg-[#2B82FF]" />
-                <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-                  Total
-                </p>
-              </div>
+    <div className="min-h-[calc(100vh-200px)] space-y-5 pb-6">
+      <header className="rounded-2xl border border-[#dce3e3] bg-[#f9fbfb] px-4 py-4 sm:px-5" aria-labelledby="clients-directory-title">
+        <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(12rem,1fr)_minmax(0,31rem)] lg:items-end">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#5f7778]">Operations</p>
+            <h1 id="clients-directory-title" className="mt-1 text-[24px] font-semibold leading-tight text-[#10141a] sm:text-[28px]">Clients directory</h1>
+            <p className="mt-2 max-w-xl text-[13px] text-[#687173]">Review client records across the agencies you are authorized to manage.</p>
+          </div>
+          <div className="min-w-0">
+            <label htmlFor="client-directory-agency" className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-[#687173]">Agency scope</label>
+            <div className="relative">
+              <Building2 aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#087f82]" />
+              <select
+                id="client-directory-agency"
+                aria-label="Agency scope"
+                value={selectedAgencyId}
+                onChange={(event) => handleAgencyChange(event.target.value)}
+                disabled={isLoadingAgencies}
+                className="min-h-11 w-full appearance-none rounded-xl border border-[#cfd7d7] bg-[#fbfcfc] py-2 pl-10 pr-10 text-[13px] font-medium text-[#273033] transition-colors hover:border-[#8ebabb] focus:outline-none focus:ring-2 focus:ring-[#008f92] focus:ring-offset-2 disabled:cursor-wait disabled:opacity-60"
+              >
+                <option value="">All authorized agencies</option>
+                {agencies.map((agency) => <option key={agency.id} value={agency.id}>{agency.name}</option>)}
+              </select>
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="mt-4 relative overflow-hidden rounded-[30px] border border-[rgba(255,255,255,0.3)] backdrop-blur bg-[rgba(255,255,255,0.3)]">
-        <div className="p-5">
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col gap-[4px]">
-              <p className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
-                Client Directory
-              </p>
-              <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-                List of clients registered on the app
-              </p>
-            </div>
-            <div
-              ref={searchAnchorRef}
-              className="relative flex items-center gap-2 bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] rounded-full px-3 py-2 h-[36px] w-[320px]"
-            >
-              <Search className="w-4 h-4 text-[#808081] shrink-0" />
-              <Input
-                value={searchQuery}
-                onFocus={handleSearchFocus}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                onKeyDown={(e) => {
-                  if (!isSearchOpen || !shouldShowSearchDropdown) {
-                    if (
-                      (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter") &&
-                      shouldShowSearchDropdown
-                    ) {
-                      setIsSearchOpen(true);
-                    }
-                    return;
-                  }
-                  if (e.key === "Escape") {
-                    e.preventDefault();
-                    setIsSearchOpen(false);
-                    return;
-                  }
-                  if (e.key === "ArrowDown") {
-                    e.preventDefault();
-                    setActiveSuggestionIndex((i) =>
-                      Math.min(i + 1, Math.max(0, searchSuggestions.length - 1))
-                    );
-                    return;
-                  }
-                  if (e.key === "ArrowUp") {
-                    e.preventDefault();
-                    setActiveSuggestionIndex((i) => Math.max(0, i - 1));
-                    return;
-                  }
-                  if (e.key === "Enter") {
-                    const selected = searchSuggestions[activeSuggestionIndex];
-                    if (selected) {
-                      e.preventDefault();
-                      handleSelectSuggestion(selected.name);
-                    }
-                  }
-                }}
-                placeholder="Search"
-                className="h-[20px] border-0 bg-transparent px-0 py-0 text-[12px] font-medium leading-[1.4] text-[#10141a] placeholder:text-[#808081] shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
-                role="combobox"
-                aria-expanded={isSearchOpen}
-                aria-controls="client-search-dropdown"
-                aria-autocomplete="list"
-              />
-              {isSearching && (
-                <Loader2 className="w-4 h-4 text-[#808081] animate-spin shrink-0" />
-              )}
-            </div>
+      <section aria-label="Client summary" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="rounded-2xl border border-[#d9e4e4] bg-white p-5 shadow-[0_8px_28px_rgba(33,69,70,0.05)]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#687173]">Registered clients</p>
+          {isLoading ? <Skeleton className="mt-3 h-9 w-16 rounded" /> : <p className="mt-2 text-[32px] font-semibold leading-none text-[#10141a]">{totalClients}</p>}
+          <p className="mt-2 text-[12px] text-[#687173]">{selectedAgencyName ? `Within ${selectedAgencyName}` : "Across all authorized agencies"}</p>
+        </div>
+        <div className="rounded-2xl border border-[#d9e4e4] bg-white p-5 shadow-[0_8px_28px_rgba(33,69,70,0.05)]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#687173]">Active clients</p>
+          {isLoading ? <Skeleton className="mt-3 h-9 w-16 rounded" /> : <p className="mt-2 text-[32px] font-semibold leading-none text-[#10141a]">{activeClients}</p>}
+          <p className="mt-2 text-[12px] text-[#687173]">Ready for active service delivery</p>
+        </div>
+        <div className="hidden rounded-2xl border border-[#b9dfe0] bg-[#eefafa] p-5 lg:block">
+          <Users aria-hidden="true" className="h-5 w-5 text-[#087f82]" />
+          <p className="mt-3 text-[14px] font-semibold text-[#234f50]">Network-ready directory</p>
+          <p className="mt-1 text-[12px] leading-5 text-[#4a696a]">Search records, verify assigned agencies, and open the client profile from one clear workspace.</p>
+        </div>
+      </section>
+
+      <section className="overflow-hidden rounded-2xl border border-[#dfe6e6] bg-[#fdfefe] shadow-[0_16px_45px_rgba(33,69,70,0.08)]" aria-labelledby="client-directory-list-title">
+        <div className="flex flex-col gap-4 border-b border-[#e6ecec] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div>
+            <h2 id="client-directory-list-title" className="text-[18px] font-semibold text-[#10141a]">Client records</h2>
+            <p className="mt-1 text-[12px] text-[#687173]">{isLoading ? "Loading client records" : `${displayClients.length} record${displayClients.length === 1 ? "" : "s"} shown`}</p>
           </div>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <div className="relative min-w-0 sm:w-[300px]">
+              <Search aria-hidden="true" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#748082]" />
+              <Input aria-label="Search clients" value={searchQuery} onChange={(event) => { setSearchQuery(event.target.value); setCurrentPage(1); }} placeholder="Search name" className="h-11 rounded-full border-[#d2dada] bg-[#f6f9f9] pl-10 pr-10 text-[13px] focus-visible:ring-[#008f92]/30" />
+              {isFetching && <Loader2 aria-label="Searching clients" className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-[#748082]" />}
+            </div>
+            <Button type="button" className="min-h-11 shrink-0 px-4" onClick={() => navigate(Routes.superAdmin.addClient)}><Plus className="h-4 w-4" />Add client</Button>
+          </div>
+        </div>
 
-          {/* Rows */}
-          <div className="mt-6 space-y-3">
-            {isLoading ? (
-              <div className="py-12 text-center">
-                <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-[#00b4b8] border-r-transparent"></div>
-                <p className="mt-4 text-sm text-[#808081]">Loading clients...</p>
-              </div>
-            ) : error ? (
-              <div className="py-12 text-center">
-                <p className="text-[14px] font-medium text-red-600">
-                  {error}
-                </p>
-              </div>
-            ) : paginatedClients.length === 0 ? (
-              <div className="py-12 text-center">
-                <p className="text-[14px] font-medium text-[#808081]">
-                  No clients found.
-                </p>
-              </div>
+        {isError ? (
+          <div role="alert" className="p-10 text-center">
+            <p className="text-[13px] font-semibold text-[#9b3e33]">Could not load client records.</p>
+            <Button type="button" variant="outline" className="mt-4" onClick={() => void refetch()}>Try again</Button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            {isLoading ? <ClientDirectorySkeleton /> : paginatedClients.length === 0 ? (
+              <div className="p-12 text-center"><p className="text-[14px] font-semibold text-[#273033]">No clients found</p><p className="mt-1 text-[12px] text-[#687173]">Try another search or agency scope.</p></div>
             ) : (
-              paginatedClients.map((client) => (
-                <div
-                  key={client.id}
-                  className="flex flex-wrap items-center gap-4 backdrop-blur-[20px] rounded-[20px] p-2"
-                >
-                  <div className="flex flex-wrap flex-1 gap-7 items-center justify-between min-w-0">
-                    <div className="flex items-center gap-4">
-                      <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
-                        {client.avatarUrl && (
-                          <AvatarImage
-                            src={client.avatarUrl}
-                            alt={client.name}
-                            className="w-full h-full object-cover aspect-auto rounded-[8px]"
-                          />
-                        )}
-                        <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
-                          {client.name
-                            .split(" ")
-                            .filter(Boolean)
-                            .slice(0, 2)
-                            .map((w) => w[0]?.toUpperCase())
-                            .join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                      
-                      <div className="min-w-[220px]">
-                        <p className="text-[16px] font-semibold leading-[1.6] text-black truncate">
-                          {client.name}
-                        </p>
-                      </div>
-                    </div>
-
-                    <Badge
-                      variant={client.status === "Active" ? "confirmed" : "pending"}
-                      className={
-                        client.status === "Active"
-                          ? "bg-[rgba(14,175,82,0.05)] border-[0.5px] border-[#0eaf52] text-[#0eaf52] px-[10px] py-[10px]"
-                          : client.status === "Pending"
-                            ? "bg-amber-50 border-[0.5px] border-amber-500 text-amber-700 px-[10px] py-[10px]"
-                            : "px-[10px] py-[10px]"
-                      }
-                    >
-                      {client.statusLabel}
-                    </Badge>
-
-                    <div className="w-[75px] text-[14px] font-medium leading-[1.4]">
-                      <p className="mb-0 text-[#808081]">{client.roleLabel}</p>
-                      <p className="text-[#10141a]">{client.roleValue}</p>
-                    </div>
-
-                    <div className="w-[160px] text-[14px] font-medium leading-[1.4]">
-                      <p className="mb-0 text-[#808081] text-nowrap">Account Created</p>
-                      <p className="text-[#10141a] text-nowrap">{client.accountCreated}</p>
-                    </div>
-
-                    <div className="w-[160px] text-[14px] font-medium leading-[1.4]">
-                      <p className="mb-0 text-[#808081] text-nowrap">Assigned Agency</p>
-                      <p className="text-[#10141a] text-nowrap">{client.agency?.name}</p>
-                    </div>
-                    <Button
-                      className="h-9 w-[140px] px-4 py-2 text-[14px] font-semibold"
-                      onClick={() =>
-                        navigate(
-                          Routes.superAdmin.clientDetails.replace(":clientId", client.id)
-                        )
-                      }
-                    >
-                      Client Details
-                    </Button>
-                  </div>
-
-                </div>
-              ))
+              <table className="w-full min-w-[860px]">
+                <thead className="bg-[#f5f8f8]"><tr>{["Client", "Status", "Assigned staff", "Agency", "Created", ""].map((label) => <th key={label || "actions"} className={`px-5 py-3 text-left text-[11px] font-bold uppercase tracking-[0.08em] text-[#687173] ${!label ? "text-right" : ""}`}>{label}</th>)}</tr></thead>
+                <tbody className="divide-y divide-[#edf1f1]">
+                  {paginatedClients.map((client) => <tr key={client.id} className="transition-colors hover:bg-[#f7fbfb]">
+                    <td className="px-5 py-4"><div className="flex items-center gap-3"><Avatar className="h-10 w-10 shrink-0 rounded-full"><AvatarImage src={client.avatarUrl} alt="" /><AvatarFallback className="bg-[#087f82] text-xs font-semibold text-white">{client.name.split(" ").filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("")}</AvatarFallback></Avatar><div className="min-w-0"><p className="truncate text-[13px] font-semibold text-[#20282a]">{client.name}</p><p className="mt-0.5 text-[11px] text-[#687173]">Client record</p></div></div></td>
+                    <td className="px-5 py-4"><Badge variant="outline" className={`border px-2.5 py-1 text-[11px] font-semibold ${statusClass(client.status)}`}>{client.statusLabel}</Badge></td>
+                    <td className="px-5 py-4 text-[13px] font-medium text-[#273033]">{client.assignedStaff}</td>
+                    <td className="max-w-[190px] px-5 py-4 text-[13px] text-[#4d5a5c]"><span className="block truncate">{client.agency?.name || "Not assigned"}</span></td>
+                    <td className="px-5 py-4 text-[12px] text-[#4d5a5c]">{client.accountCreated}</td>
+                    <td className="px-5 py-4 text-right"><Button type="button" variant="outline" className="h-9 border-[#9bbfc0] px-3 text-[12px] text-[#075b5d] hover:bg-[#eaf7f7]" onClick={() => navigate(Routes.superAdmin.clientDetails.replace(":clientId", client.id))}>View details</Button></td>
+                  </tr>)}
+                </tbody>
+              </table>
             )}
           </div>
-
-          {/* Pagination */}
-          <div className="mt-6 flex items-center justify-center gap-2">
-            <span className="text-[16px] font-medium leading-[1.6] text-[#10141a]">
-              {Math.min(currentPage, totalPages)}
-              <span className="text-[14px] text-[#808081]">/{totalPages}</span>
-            </span>
-            <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage <= 1}
-              className="backdrop-blur-[2.909px] bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] rounded-full p-1.5 disabled:opacity-50 hover:bg-white/70 transition-colors cursor-pointer"
-              aria-label="Previous page"
-            >
-              <ChevronLeft className="w-5 h-5 text-[#10141a]" />
-            </button>
-            <button
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage >= totalPages}
-              className="backdrop-blur-[2.909px] bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] rounded-full p-1.5 disabled:opacity-50 hover:bg-white/70 transition-colors cursor-pointer"
-              aria-label="Next page"
-            >
-              <ChevronRight className="w-5 h-5 text-[#10141a]" />
-            </button>
-          </div>
-        </div>
-      </div>
+        )}
+        {!isLoading && !isError && paginatedClients.length > 0 && <div className="flex items-center justify-between border-t border-[#e6ecec] px-5 py-3"><p className="text-[12px] text-[#687173]">Page {currentPage} of {totalPages}</p><div className="flex gap-2"><Button type="button" variant="outline" size="icon" aria-label="Previous page" disabled={currentPage <= 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}><ChevronLeft className="h-4 w-4" /></Button><Button type="button" variant="outline" size="icon" aria-label="Next page" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}><ChevronRight className="h-4 w-4" /></Button></div></div>}
+      </section>
     </div>
   );
 }
