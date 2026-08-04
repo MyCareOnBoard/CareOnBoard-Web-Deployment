@@ -8,7 +8,7 @@ const { axiosAdapter, testAxiosClient } = vi.hoisted(() => {
     axiosAdapter: adapter,
     testAxiosClient: {
       get: (url: string, config: AxiosRequestConfig) => adapter({ ...config, url }),
-      post: (url: string, _body: unknown, config: AxiosRequestConfig) => adapter({ ...config, url, method: "post" }),
+      post: (url: string, body: unknown, config: AxiosRequestConfig) => adapter({ ...config, url, method: "post", data: body }),
     },
   };
 });
@@ -453,6 +453,42 @@ describe("network billing API", () => {
       environment: "staging",
       scope: { kind: "network" },
     })).unwrap()).resolves.toMatchObject({ ownership: { unresolvedRecords: [diagnostic] } });
+  });
+
+  it("sends the fixed backfill request body and validates its rollout status", async () => {
+    const store = createStore();
+    respond({
+      success: true,
+      data: {
+        version: 1,
+        enabled: false,
+        status: "pending",
+        days: 90,
+        weekCount: 13,
+        activeAgencyCount: 2,
+        expectedRollupCount: 78,
+        verifiedRollupCount: 0,
+        missingRollupCount: 0,
+        invalidRollupCount: 0,
+        failedRollupCount: 0,
+        enqueuedAt: "2026-08-04T00:00:00.000Z",
+        completedAt: null,
+      },
+    });
+
+    await expect(store.dispatch(networkBillingApi.endpoints.startNetworkPayrollRollupBackfill.initiate({
+      actorUid: "super-admin-a",
+      environment: "staging",
+      scope: { kind: "network" },
+      days: 90,
+      confirmProduction: false,
+    })).unwrap()).resolves.toMatchObject({ status: "pending", expectedRollupCount: 78 });
+
+    expect(axiosAdapter).toHaveBeenCalledWith(expect.objectContaining({
+      method: "post",
+      url: "/superAdminOperations/billing/payroll/rollups/backfill",
+      data: { days: 90, confirmProduction: false },
+    }));
   });
 
   it("uses endpoint-specific outbound parameter allowlists for all nine reads", async () => {

@@ -224,6 +224,7 @@ export default function NetworkFinancialOverview() {
   const [preparationOpen, setPreparationOpen] = useState(false);
   const [preparationError, setPreparationError] = useState<string | null>(null);
   const [prepareNetworkBilling, preparation] = networkBillingApi.usePrepareNetworkBillingMutation();
+  const [startNetworkPayrollRollupBackfill, payrollBackfill] = networkBillingApi.useStartNetworkPayrollRollupBackfillMutation();
   const query = networkBillingApi.useGetOverviewBootstrapQuery({
     actorUid: workspace.actorUid,
     environment: workspace.environment,
@@ -251,6 +252,18 @@ export default function NetworkFinancialOverview() {
       }
       if (!result.ready) {
         setPreparationError("Preparation completed, but some billing records still need attention. Please retry after resolving them.");
+        return;
+      }
+      try {
+        await startNetworkPayrollRollupBackfill({
+          actorUid: workspace.actorUid,
+          environment: workspace.environment,
+          scope: workspace.scope,
+          days: 90,
+          confirmProduction: workspace.environment !== "staging",
+        }).unwrap();
+      } catch {
+        setPreparationError("Preparation succeeded, but scheduling the 90-day payroll rollup backfill failed. Please try again.");
         return;
       }
       setPreparationOpen(false);
@@ -282,20 +295,20 @@ export default function NetworkFinancialOverview() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Prepare network billing?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This one-time action populates the fields required to load aggregate billing data for all authorized agencies.
+                    This one-time action populates the fields required to load aggregate billing data for all authorized agencies, then schedules the 90-day payroll rollup backfill.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 {preparationError && <p role="alert" className="text-sm text-destructive">{preparationError}</p>}
                 <AlertDialogFooter>
-                  <AlertDialogCancel disabled={preparation.isLoading}>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel disabled={preparation.isLoading || payrollBackfill.isLoading}>Cancel</AlertDialogCancel>
                   <AlertDialogAction
-                    disabled={preparation.isLoading}
+                    disabled={preparation.isLoading || payrollBackfill.isLoading}
                     onClick={(event) => {
                       event.preventDefault();
                       void prepareNetwork();
                     }}
                   >
-                    {preparation.isLoading ? "Preparing network billing…" : "Prepare billing now"}
+                    {preparation.isLoading || payrollBackfill.isLoading ? "Preparing data and scheduling payroll…" : "Prepare billing now"}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

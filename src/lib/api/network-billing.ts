@@ -117,6 +117,27 @@ export type NetworkBillingPreparationResult = {
   };
 };
 
+export type NetworkPayrollRollupBackfillArgs = QueryContext & {
+  days: 90;
+  confirmProduction: boolean;
+};
+
+export type NetworkPayrollRolloutStatus = {
+  version: 1;
+  enabled: boolean;
+  status: string;
+  days: 90;
+  weekCount: number;
+  activeAgencyCount: number;
+  expectedRollupCount: number;
+  verifiedRollupCount: number;
+  missingRollupCount: number;
+  invalidRollupCount: number;
+  failedRollupCount: number;
+  enqueuedAt: string | null;
+  completedAt: string | null;
+};
+
 class NetworkBillingContractError extends Error {
   constructor(message: string) {
     super(message);
@@ -1003,6 +1024,33 @@ function validatePreparation(value: unknown): NetworkBillingPreparationResult {
   };
 }
 
+function validateNetworkPayrollRolloutStatus(value: unknown): NetworkPayrollRolloutStatus {
+  const data = successfulData(value, false);
+  const context = "response.data";
+  onlyKeys(data, [
+    "version", "enabled", "status", "days", "weekCount", "activeAgencyCount",
+    "expectedRollupCount", "verifiedRollupCount", "missingRollupCount", "invalidRollupCount",
+    "failedRollupCount", "enqueuedAt", "completedAt",
+  ], context);
+  if (nonNegativeInteger(data, "version", context) !== 1) fail(`${context}.version must be 1.`);
+  if (nonNegativeInteger(data, "days", context) !== 90) fail(`${context}.days must be 90.`);
+  return {
+    version: 1,
+    enabled: requiredBoolean(data, "enabled", context),
+    status: requiredString(data, "status", context),
+    days: 90,
+    weekCount: nonNegativeInteger(data, "weekCount", context),
+    activeAgencyCount: nonNegativeInteger(data, "activeAgencyCount", context),
+    expectedRollupCount: nonNegativeInteger(data, "expectedRollupCount", context),
+    verifiedRollupCount: nonNegativeInteger(data, "verifiedRollupCount", context),
+    missingRollupCount: nonNegativeInteger(data, "missingRollupCount", context),
+    invalidRollupCount: nonNegativeInteger(data, "invalidRollupCount", context),
+    failedRollupCount: nonNegativeInteger(data, "failedRollupCount", context),
+    enqueuedAt: nullableIsoDate(data, "enqueuedAt", context),
+    completedAt: nullableIsoDate(data, "completedAt", context),
+  };
+}
+
 function validateOptions(value: unknown): NetworkBillingOption[] {
   const envelope = record(value, "response");
   onlyKeys(envelope, ["success", "data"], "response");
@@ -1112,10 +1160,11 @@ function query<T, TArgs>(
 function mutation<T, TArgs>(
   path: string,
   validate: (value: unknown, args: TArgs) => T,
+  requestBody?: (args: TArgs) => unknown,
 ) {
   return async (args: TArgs, api: { signal: AbortSignal }): Promise<{ data: T } | { error: NetworkBillingError }> => {
     try {
-      const response = await axiosClient.post<unknown>(path, undefined, { signal: api.signal });
+      const response = await axiosClient.post<unknown>(path, requestBody?.(args), { signal: api.signal });
       return { data: validate(response.data, args) };
     } catch (error) {
       if (error instanceof NetworkBillingContractError) {
@@ -1158,6 +1207,17 @@ export const networkBillingApi = createApi({
         { type: "Payroll", id: "NETWORK" },
         { type: "Expenses", id: "NETWORK" },
         { type: "Timesheets", id: "NETWORK" },
+      ],
+    }),
+    startNetworkPayrollRollupBackfill: build.mutation<NetworkPayrollRolloutStatus, NetworkPayrollRollupBackfillArgs>({
+      queryFn: mutation(
+        "/superAdminOperations/billing/payroll/rollups/backfill",
+        validateNetworkPayrollRolloutStatus,
+        ({ days, confirmProduction }) => ({ days, confirmProduction }),
+      ),
+      invalidatesTags: [
+        { type: "NETWORK", id: "NETWORK" },
+        { type: "Payroll", id: "NETWORK" },
       ],
     }),
     getClaimsBootstrap: build.query<NetworkBillingPageResponse<NetworkBillingClaimRow, NetworkBillingClaimsSummary>, ClaimsNetworkBillingArgs>({
