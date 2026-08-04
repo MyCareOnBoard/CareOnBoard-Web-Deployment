@@ -55,7 +55,7 @@ describe("NetworkPayroll", () => {
     ["exact", dueSummary({ overview: { totalDue: { amount: 350, count: 3, exact: true }, staffCount: { count: 3 }, pendingHours: { hours: 16 }, overtimeHours: { hours: 2 }, missingTimesheets: { count: 1 } }, coverage: { expectedAgencyCount: 2, readyAgencyCount: 2, pendingAgencyCount: 0, staleAgencyCount: 0, failedAgencyCount: 0 }, meta: { evaluatedAt: "2026-08-03T00:00:00.000Z", calculationVersion: 1, totalsExact: true } }), "Payroll rollup is exact"],
     ["pending", dueSummary({ coverage: { expectedAgencyCount: 2, readyAgencyCount: 1, pendingAgencyCount: 1, staleAgencyCount: 0, failedAgencyCount: 0 } }), "Awaiting updated status"],
     ["partial", dueSummary({ coverage: { expectedAgencyCount: 3, readyAgencyCount: 1, pendingAgencyCount: 1, staleAgencyCount: 1, failedAgencyCount: 0 } }), "1 of 3 agencies"],
-    ["stale", dueSummary({ coverage: { expectedAgencyCount: 2, readyAgencyCount: 1, pendingAgencyCount: 0, staleAgencyCount: 1, failedAgencyCount: 0 } }), "last successful calculation"],
+    ["stale", dueSummary({ coverage: { expectedAgencyCount: 2, readyAgencyCount: 1, pendingAgencyCount: 0, staleAgencyCount: 1, failedAgencyCount: 0 } }), "The oldest successful calculation is from"],
     ["failed", dueSummary({ coverage: { expectedAgencyCount: 2, readyAgencyCount: 1, pendingAgencyCount: 0, staleAgencyCount: 0, failedAgencyCount: 1 } }), "Check again"],
     ["unavailable", dueSummary({ overview: { totalDue: { amount: null, count: 0, exact: false }, staffCount: { count: 3 }, pendingHours: { hours: 16 }, overtimeHours: { hours: 2 }, missingTimesheets: { count: 1 } }, coverage: { expectedAgencyCount: 2, readyAgencyCount: 0, pendingAgencyCount: 2, staleAgencyCount: 0, failedAgencyCount: 0 }, freshness: { oldestComputedAt: null, newestComputedAt: null } }), "No payroll rollup"],
   ])("renders the %s aggregate state from the rollup", (_state, summary, expected) => {
@@ -68,6 +68,16 @@ describe("NetworkPayroll", () => {
     expect(screen.getByLabelText("Network payroll aggregate status")).toHaveTextContent(expected);
     expect(screen.getByLabelText("Payroll overview")).toHaveTextContent("Staff count: 3");
     expect(screen.queryByText("Staff count: 99")).toBeNull();
+  });
+
+  it("fails closed rather than normalizing an impossible aggregate freshness timestamp", () => {
+    api.options.mockReturnValue({ data: [] });
+    api.bootstrap.mockReturnValue({ data: { page: { rows, nextCursor: null, total: 1, hasMore: false }, summary: dueSummary({ freshness: { oldestComputedAt: "2026-02-30T00:00:00.000Z", newestComputedAt: "2026-08-03T00:00:00.000Z" } }) }, isLoading: false, isFetching: false, refetch: vi.fn() });
+    api.search.mockReturnValue({ unwrap: vi.fn().mockResolvedValue([]), abort: vi.fn() });
+
+    render(<UrlBackedNetworkPayroll />);
+
+    expect(screen.getByLabelText("Network payroll aggregate status")).toHaveTextContent("The oldest successful calculation is from Unknown calculation time.");
   });
 
   it("uses the authorized staff name projected by the payroll page without issuing label lookups", () => {

@@ -70,10 +70,16 @@ function currency(value: number | null): string {
   return value === null ? "Unavailable" : new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
 }
 
+function parseIsoTimestamp(value: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) || date.toISOString() !== value ? null : date;
+}
+
 function formatFreshness(value: string | null): string {
   if (!value) return "No successful calculation yet";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "Unknown calculation time" : new Intl.DateTimeFormat("en-US", {
+  const date = parseIsoTimestamp(value);
+  return !date ? "Unknown calculation time" : new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
@@ -175,7 +181,7 @@ export default function NetworkPayroll() {
     if (exact) return { title: "Payroll rollup is exact", message: `All ${coverage.readyAgencyCount} agencies are included. Updated ${formatFreshness(meta.evaluatedAt)}.` };
     if (coverage.failedAgencyCount > 0) return { title: "Payroll rollup is incomplete", message: `Latest status is unavailable for ${coverage.failedAgencyCount} agencies. Check again to load the current aggregate.`, action: "Check again" };
     if (coverage.pendingAgencyCount > 0 && coverage.staleAgencyCount > 0) return { title: "Payroll rollup is partial", message: `${coverage.readyAgencyCount} of ${coverage.expectedAgencyCount} agencies are ready; the remaining statuses are pending or based on older results.`, action: "Reload status" };
-    if (coverage.staleAgencyCount > 0) return { title: "Payroll rollup is stale", message: `${coverage.staleAgencyCount} agencies use the last successful calculation from ${formatFreshness(freshness.oldestComputedAt)}.`, action: "Reload status" };
+    if (coverage.staleAgencyCount > 0) return { title: "Payroll rollup is stale", message: `The oldest successful calculation is from ${formatFreshness(freshness.oldestComputedAt)}. The displayed total may not reflect current agency results.`, action: "Reload status" };
     return { title: "Awaiting updated status", message: `${coverage.pendingAgencyCount} agency statuses are pending. The displayed total is not exact.`, action: "Reload status" };
   }, [bootstrap.data, dueSummary]);
 
