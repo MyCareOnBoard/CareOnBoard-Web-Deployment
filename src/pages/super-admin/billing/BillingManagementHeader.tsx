@@ -9,6 +9,8 @@ import type {
   BillingWorkspaceState,
 } from "./billingWorkspaceState";
 import type { BillingWorkspaceScope } from "./types";
+import NetworkPayrollWeekControl from "./network/NetworkPayrollWeekControl";
+import { normalizeNetworkPayrollWeekStart } from "./network/networkPayrollWeek";
 
 export interface BillingManagementHeaderProps {
   workspace: BillingWorkspaceState;
@@ -16,6 +18,7 @@ export interface BillingManagementHeaderProps {
   onScopeChange: (scope: BillingWorkspaceScope) => void;
   onDateRangeChange: (range: BillingWorkspaceDateRange) => void;
   onModeChange: (mode: BillingProgramMode | null) => void;
+  onPayrollWeekChange: (weekStart: string) => void;
   initialAgencies?: OperationalAgencySummary[];
   onAgenciesDiscovered?: (agencies: OperationalAgencySummary[]) => void;
 }
@@ -39,12 +42,19 @@ export default function BillingManagementHeader({
   onScopeChange,
   onDateRangeChange,
   onModeChange,
+  onPayrollWeekChange,
   initialAgencies,
   onAgenciesDiscovered,
 }: BillingManagementHeaderProps) {
   const location = useLocation();
   const workspaceSearch = search ?? location.search;
   const selectedAgencyIds = workspace.scope.kind === "agency" ? [workspace.scope.agencyId] : [];
+  const pathname = location.pathname.replace(/\/+$/, "");
+  const payrollWeekStart = workspace.payrollWeekStart
+    ?? normalizeNetworkPayrollWeekStart("", workspace.endDate);
+  const showPayrollWeek = pathname === Routes.superAdmin.billing.payrollManagement
+    && workspace.scope.kind === "network"
+    && workspace.payrollTab === "due";
 
   return (
     <>
@@ -86,16 +96,23 @@ export default function BillingManagementHeader({
 
             <div className="min-w-0">
               <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-[#687173]">
-                Date range
+                {showPayrollWeek ? "Payroll week" : "Date range"}
               </span>
-              <ShiftDateRangeControl
-                value={{ startDate: workspace.startDate, endDate: workspace.endDate }}
-                onApply={onDateRangeChange}
-                controlLabel="Change billing date range"
-                dialogTitle="Select billing date range"
-                description="Choose the dates to show in billing management"
-                maxRangeDays={366}
-              />
+              {showPayrollWeek ? (
+                <NetworkPayrollWeekControl
+                  value={payrollWeekStart}
+                  onChange={onPayrollWeekChange}
+                />
+              ) : (
+                <ShiftDateRangeControl
+                  value={{ startDate: workspace.startDate, endDate: workspace.endDate }}
+                  onApply={onDateRangeChange}
+                  controlLabel="Change billing date range"
+                  dialogTitle="Select billing date range"
+                  description="Choose the dates to show in billing management"
+                  maxRangeDays={366}
+                />
+              )}
             </div>
 
             <label className="min-w-0 sm:col-span-2 lg:col-span-1">

@@ -352,7 +352,11 @@ function BillingWorkspaceProbe() {
       <output aria-label="Billing workspace environment">{workspace.environment}</output>
       <output aria-label="Billing workspace dates">{`${workspace.startDate}:${workspace.endDate}`}</output>
       <output aria-label="Billing workspace mode">{workspace.mode ?? "all"}</output>
+      <output aria-label="Billing payroll week">{workspace.payrollWeekStart}</output>
+      <output aria-label="Billing payroll tab">{workspace.payrollTab}</output>
       <output aria-label="Billing location">{`${location.pathname}${location.search}`}</output>
+      <button type="button" onClick={() => workspace.onPayrollWeekChange?.("2026-08-03")}>Change payroll week</button>
+      <button type="button" onClick={() => workspace.onPayrollTabChange?.("saved")}>Show saved payroll</button>
     </div>
   );
 }
@@ -420,6 +424,7 @@ function renderWorkspace(entry: string, nested = <BillingWorkspaceProbe />) {
           <Route path="financial-overview" element={nested} />
           <Route path="claims" element={nested} />
           <Route path="expenses" element={nested} />
+          <Route path="payroll-management" element={nested} />
         </Route>
       </ReactRoutes>
     </MemoryRouter>,
@@ -541,6 +546,28 @@ describe("SuperAdminBillingWorkspace", () => {
       expect.objectContaining({ skip: false }),
     );
     expect(operationsApi.getOperationalAgencyContext).not.toHaveBeenCalled();
+  });
+
+  it("canonicalizes network payroll week state and keeps it independent from the billing date range", async () => {
+    const user = userEvent.setup();
+    renderWorkspace(
+      "/super-admin/billing/payroll-management?scope=network&startDate=2026-07-01&endDate=2026-08-02&payrollWeekStart=2026-07-29&payrollTab=invalid",
+    );
+
+    expect(await screen.findByLabelText("Billing payroll week")).toHaveTextContent("2026-07-27");
+    expect(screen.getByLabelText("Billing payroll tab")).toHaveTextContent("due");
+    expect(screen.getByLabelText("Billing workspace dates")).toHaveTextContent("2026-07-01:2026-08-02");
+
+    await user.click(screen.getByRole("button", { name: "Change payroll week" }));
+    await user.click(screen.getByRole("button", { name: "Show saved payroll" }));
+    await waitFor(() => {
+      expect(screen.getByLabelText("Billing payroll week")).toHaveTextContent("2026-08-03");
+      expect(screen.getByLabelText("Billing payroll tab")).toHaveTextContent("saved");
+    });
+    expect(screen.getByLabelText("Billing workspace dates")).toHaveTextContent("2026-07-01:2026-08-02");
+    expect(screen.getByLabelText("Billing location")).toHaveTextContent(
+      "payrollWeekStart=2026-08-03&payrollTab=saved",
+    );
   });
 
   it("revalidates a direct-link agency before mounting nested billing content", async () => {

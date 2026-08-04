@@ -185,12 +185,33 @@ export type NetworkBillingClaimsSummary = {
   meta: { atRiskDays: number; evaluatedAt: string };
 };
 
-export type NetworkBillingPayrollSummary = {
-  overview:
-    | { totalDue: { amount: number | null; count: number; exact: boolean } }
-    | { savedInvoices: { count: number; exact: boolean } };
+export type NetworkBillingPayrollDueSummary = {
+  overview: {
+    totalDue: { amount: number | null; count: number; exact: boolean };
+    staffCount: { count: number };
+    pendingHours: { hours: number };
+    overtimeHours: { hours: number };
+    missingTimesheets: { count: number };
+  };
+  coverage: {
+    expectedAgencyCount: number;
+    readyAgencyCount: number;
+    pendingAgencyCount: number;
+    staleAgencyCount: number;
+    failedAgencyCount: number;
+  };
+  freshness: { oldestComputedAt: string | null; newestComputedAt: string | null };
+  meta: { evaluatedAt: string; calculationVersion: 1; totalsExact: boolean };
+};
+
+export type NetworkBillingPayrollSavedSummary = {
+  overview: { savedInvoices: { count: number; exact: boolean } };
   meta: { evaluatedAt: string; totalsExact: boolean };
 };
+
+export type NetworkBillingPayrollSummary =
+  | NetworkBillingPayrollDueSummary
+  | NetworkBillingPayrollSavedSummary;
 
 export type NetworkBillingExpensesSummary = {
   overview: Record<"submitted" | "awaitingReview" | "approved" | "declined", NetworkBillingAmount>;

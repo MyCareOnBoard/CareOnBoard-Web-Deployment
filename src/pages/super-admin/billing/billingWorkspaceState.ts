@@ -1,12 +1,16 @@
 import type { BillingWorkspaceScope } from "./types";
+import { normalizeNetworkPayrollWeekStart } from "./network/networkPayrollWeek";
 
 export type BillingProgramMode = "ddd" | "hha";
+export type BillingPayrollTab = "due" | "saved";
 
 export interface BillingWorkspaceState {
   scope: BillingWorkspaceScope;
   startDate: string;
   endDate: string;
   mode: BillingProgramMode | null;
+  payrollWeekStart: string;
+  payrollTab: BillingPayrollTab;
 }
 
 export interface BillingWorkspaceDateRange {
@@ -14,7 +18,10 @@ export interface BillingWorkspaceDateRange {
   endDate: string;
 }
 
-export function billingWorkspaceGeneration(state: BillingWorkspaceState): string {
+export function billingWorkspaceGeneration(state: Pick<
+  BillingWorkspaceState,
+  "scope" | "startDate" | "endDate" | "mode"
+>): string {
   return JSON.stringify([
     state.scope.kind,
     state.scope.kind === "agency" ? state.scope.agencyId : null,
@@ -88,10 +95,13 @@ export function parseBillingWorkspace(search: string, now = new Date()): Billing
   const agencyId = requestedAgencyIds[0]?.trim();
   const range = parseDateRange(params, now);
   const requestedMode = params.get("clientType");
+  const requestedPayrollTab = params.get("payrollTab");
   return {
     scope: agencyId ? { kind: "agency", agencyId } : { kind: "network" },
     ...range,
     mode: requestedMode === "ddd" || requestedMode === "hha" ? requestedMode : null,
+    payrollWeekStart: normalizeNetworkPayrollWeekStart(params.get("payrollWeekStart") ?? "", range.endDate),
+    payrollTab: requestedPayrollTab === "saved" ? "saved" : "due",
   };
 }
 
@@ -103,11 +113,15 @@ export function canonicalizeBillingWorkspaceSearch(search: string, now = new Dat
   params.delete("startDate");
   params.delete("endDate");
   params.delete("clientType");
+  params.delete("payrollWeekStart");
+  params.delete("payrollTab");
   if (state.scope.kind === "network") params.set("scope", "network");
   else params.set("agencyId", state.scope.agencyId);
   params.set("startDate", state.startDate);
   params.set("endDate", state.endDate);
   if (state.mode) params.set("clientType", state.mode);
+  params.set("payrollWeekStart", state.payrollWeekStart);
+  params.set("payrollTab", state.payrollTab);
   return stringify(params);
 }
 
@@ -148,6 +162,24 @@ export function updateBillingWorkspaceMode(
   const params = paramsFor(search);
   if (mode) params.set("clientType", mode);
   else params.delete("clientType");
+  clearTransientState(params);
+  return stringify(params);
+}
+
+export function updateBillingWorkspacePayrollWeek(search: string, weekStart: string): string {
+  const workspace = parseBillingWorkspace(search);
+  const params = paramsFor(search);
+  params.set(
+    "payrollWeekStart",
+    normalizeNetworkPayrollWeekStart(weekStart, workspace.endDate),
+  );
+  clearTransientState(params);
+  return stringify(params);
+}
+
+export function updateBillingWorkspacePayrollTab(search: string, tab: BillingPayrollTab): string {
+  const params = paramsFor(search);
+  params.set("payrollTab", tab);
   clearTransientState(params);
   return stringify(params);
 }

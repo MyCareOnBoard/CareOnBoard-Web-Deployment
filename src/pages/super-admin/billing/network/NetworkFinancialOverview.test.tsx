@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
@@ -7,12 +7,18 @@ import type { NetworkBillingOverview } from "../types";
 const api = vi.hoisted(() => ({
   overview: vi.fn(),
   refetch: vi.fn(),
+  prepare: vi.fn(),
+  backfill: vi.fn(),
 }));
 const agencyOverview = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/api/network-billing", () => ({
   NETWORK_BILLING_QUERY_OPTIONS: { refetchOnMountOrArgChange: 30 },
-  networkBillingApi: { useGetOverviewBootstrapQuery: api.overview },
+  networkBillingApi: {
+    useGetOverviewBootstrapQuery: api.overview,
+    usePrepareNetworkBillingMutation: () => [api.prepare, { isLoading: false }],
+    useStartNetworkPayrollRollupBackfillMutation: () => [api.backfill, { isLoading: false }],
+  },
 }));
 vi.mock("@/pages/agency/billing/financial-overview", () => ({
   default: () => {
@@ -150,6 +156,115 @@ describe("NetworkFinancialOverview", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Couldn't load network financial overview");
     await user.click(screen.getByRole("button", { name: "Retry network financial overview" }));
     expect(api.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the overview skeleton visible instead of fabricated zero totals while a data-less retry is fetching", () => {
+    api.overview.mockReturnValue(queryResult({
+      data: undefined,
+      isLoading: false,
+      isFetching: true,
+    }));
+    renderWithWorkspace(<NetworkFinancialOverview />);
+
+    expect(screen.getByRole("region", { name: "Network financial overview" })).toHaveAttribute("aria-busy", "true");
+    expect(screen.queryAllByText("$0.00")).toHaveLength(0);
+  });
+
+  it("offers preparation only when the overview reports the network index readiness error", () => {
+    api.overview.mockReturnValue(queryResult({
+      data: undefined,
+      isError: true,
+      error: { status: 503, data: { code: "NETWORK_BILLING_INDEX_NOT_READY" } },
+    }));
+    renderWithWorkspace(<NetworkFinancialOverview />);
+
+    expect(screen.getByRole("button", { name: "Prepare network billing" })).toBeVisible();
+  });
+
+  it("schedules the ninety-day payroll rollup backfill after preparation is ready", async () => {
+    const user = userEvent.setup();
+    api.overview.mockReturnValue(queryResult({
+      data: undefined,
+      isError: true,
+      error: { status: 503, data: { code: "NETWORK_BILLING_INDEX_NOT_READY" } },
+    }));
+    api.prepare.mockReturnValue({
+      unwrap: () => Promise.resolve({ ready: true, ownership: { deletedRecords: [] } }),
+    });
+    api.backfill.mockReturnValue({ unwrap: () => Promise.resolve({ status: "pending" }) });
+    renderWithWorkspace(<NetworkFinancialOverview />);
+
+    await user.click(screen.getByRole("button", { name: "Prepare network billing" }));
+    await user.click(screen.getByRole("button", { name: "Prepare billing now" }));
+
+    await waitFor(() => expect(api.backfill).toHaveBeenCalledWith({
+      actorUid: "super-1",
+      environment: "staging",
+      scope: { kind: "network" },
+      days: 90,
+      confirmProduction: false,
+    }));
+  });
+
+  it("does not schedule payroll rollups when preparation is incomplete", async () => {
+    const user = userEvent.setup();
+    api.overview.mockReturnValue(queryResult({
+      data: undefined,
+      isError: true,
+      error: { status: 503, data: { code: "NETWORK_BILLING_INDEX_NOT_READY" } },
+    }));
+    api.prepare.mockReturnValue({
+      unwrap: () => Promise.resolve({ ready: false, ownership: { deletedRecords: [] } }),
+    });
+    renderWithWorkspace(<NetworkFinancialOverview />);
+
+    await user.click(screen.getByRole("button", { name: "Prepare network billing" }));
+    await user.click(screen.getByRole("button", { name: "Prepare billing now" }));
+
+    expect(api.backfill).not.toHaveBeenCalled();
+    expect(await screen.findByRole("alert")).toHaveTextContent("some billing records still need attention");
+  });
+
+  it("keeps the confirmation dialog open when payroll rollup scheduling fails", async () => {
+    const user = userEvent.setup();
+    api.overview.mockReturnValue(queryResult({
+      data: undefined,
+      isError: true,
+      error: { status: 503, data: { code: "NETWORK_BILLING_INDEX_NOT_READY" } },
+    }));
+    api.prepare.mockReturnValue({
+      unwrap: () => Promise.resolve({ ready: true, ownership: { deletedRecords: [] } }),
+    });
+    api.backfill.mockReturnValue({ unwrap: () => Promise.reject(new Error("queue unavailable")) });
+    renderWithWorkspace(<NetworkFinancialOverview />);
+
+    await user.click(screen.getByRole("button", { name: "Prepare network billing" }));
+    await user.click(screen.getByRole("button", { name: "Prepare billing now" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("scheduling the 90-day payroll rollup backfill failed");
+    expect(screen.getByRole("alertdialog")).toBeVisible();
+  });
+
+  it("uses the confirmation to satisfy the production backfill guard", async () => {
+    const user = userEvent.setup();
+    api.overview.mockReturnValue(queryResult({
+      data: undefined,
+      isError: true,
+      error: { status: 503, data: { code: "NETWORK_BILLING_INDEX_NOT_READY" } },
+    }));
+    api.prepare.mockReturnValue({
+      unwrap: () => Promise.resolve({ ready: true, ownership: { deletedRecords: [] } }),
+    });
+    api.backfill.mockReturnValue({ unwrap: () => Promise.resolve({ status: "pending" }) });
+    renderWithWorkspace(<NetworkFinancialOverview />, workspace({ environment: "production" }));
+
+    await user.click(screen.getByRole("button", { name: "Prepare network billing" }));
+    await user.click(screen.getByRole("button", { name: "Prepare billing now" }));
+
+    await waitFor(() => expect(api.backfill).toHaveBeenCalledWith(expect.objectContaining({
+      days: 90,
+      confirmProduction: true,
+    })));
   });
 
   it("keeps successful rows and metrics visible while the overview refreshes", () => {

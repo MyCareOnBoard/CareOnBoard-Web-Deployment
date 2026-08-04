@@ -32,7 +32,7 @@ export const NETWORK_BILLING_KEEP_UNUSED_DATA_FOR = 60 as const;
 
 type QueryValue = string | number | boolean | undefined;
 type QueryParams = Record<string, QueryValue>;
-type NetworkBillingError = {
+export type NetworkBillingError = {
   status: number | "FETCH_ERROR" | "PARSING_ERROR";
   data: unknown;
   error?: string;
@@ -89,6 +89,53 @@ export type OverviewNetworkBillingArgs = QueryContext & Pick<DatePageContext, "s
 export type NetworkBillingOptionsArgs = QueryContext & {
   kind: "client" | "staff";
   q: string;
+};
+
+export type NetworkBillingPreparationResult = {
+  examined: number;
+  updated: number;
+  missing: number;
+  invalid: number;
+  ready: boolean;
+  ownership: {
+    repaired: number;
+    unresolved: number;
+    byCollection: Record<string, { repaired: number; unresolved: number }>;
+    unresolvedRecords: Array<{
+      collection: string;
+      documentId: string;
+      reason: "NO_AUTHORITATIVE_AGENCY" | "CONFLICTING_AUTHORITATIVE_AGENCIES";
+      relationships: { clientIds: string[]; staffIds: string[] };
+      candidateAgencyIds: string[];
+    }>;
+    deletedRecords: Array<{
+      collection: "employees";
+      documentId: string;
+      userUid: string | null;
+      userDocumentDeleted: boolean;
+    }>;
+  };
+};
+
+export type NetworkPayrollRollupBackfillArgs = QueryContext & {
+  days: 90;
+  confirmProduction: boolean;
+};
+
+export type NetworkPayrollRolloutStatus = {
+  version: 1;
+  enabled: boolean;
+  status: string;
+  days: 90;
+  weekCount: number;
+  activeAgencyCount: number;
+  expectedRollupCount: number;
+  verifiedRollupCount: number;
+  missingRollupCount: number;
+  invalidRollupCount: number;
+  failedRollupCount: number;
+  enqueuedAt: string | null;
+  completedAt: string | null;
 };
 
 class NetworkBillingContractError extends Error {
@@ -149,6 +196,51 @@ function nullableNumber(source: Record<string, unknown>, key: string, context: s
   const value = source[key];
   if (value === null) return null;
   return requiredNumber(source, key, context);
+}
+
+function nonNegativeNumber(source: Record<string, unknown>, key: string, context: string): number {
+  const value = requiredNumber(source, key, context);
+  if (value < 0) fail(`${context}.${key} must be a non-negative number.`);
+  return value;
+}
+
+const ISO_TIMESTAMP = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+
+function daysInMonth(year: number, month: number): number {
+  if (month === 2) return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0) ? 29 : 28;
+  return [4, 6, 9, 11].includes(month) ? 30 : 31;
+}
+
+export function parseIsoTimestamp(value: string): Date | null {
+  const match = ISO_TIMESTAMP.exec(value);
+  if (!match) return null;
+  const [, yearText, monthText, dayText, hourText, minuteText, secondText, offset] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  const second = Number(secondText);
+  if (month < 1 || month > 12 || day < 1 || day > daysInMonth(year, month) || hour > 23 || minute > 59 || second > 59) return null;
+  if (offset !== "Z") {
+    const [offsetHour, offsetMinute] = offset.slice(1).split(":").map(Number);
+    if (offsetHour > 23 || offsetMinute > 59) return null;
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function requiredIsoDate(source: Record<string, unknown>, key: string, context: string): string {
+  const value = requiredString(source, key, context);
+  if (!parseIsoTimestamp(value)) {
+    fail(`${context}.${key} must be an ISO date-time.`);
+  }
+  return value;
+}
+
+function nullableIsoDate(source: Record<string, unknown>, key: string, context: string): string | null {
+  if (source[key] === null) return null;
+  return requiredIsoDate(source, key, context);
 }
 
 function optionalNullableNumber(
@@ -610,32 +702,78 @@ function validateClaimsSummary(value: unknown): NetworkBillingClaimsSummary {
   };
 }
 
+function validateDuePayrollSummary(value: unknown): NetworkBillingPayrollSummary {
+  const source = record(value, "response.data.summary");
+  onlyKeys(source, ["overview", "coverage", "freshness", "meta"], "response.data.summary");
+  const overview = record(source.overview, "response.data.summary.overview");
+  const coverage = record(source.coverage, "response.data.summary.coverage");
+  const freshness = record(source.freshness, "response.data.summary.freshness");
+  const meta = record(source.meta, "response.data.summary.meta");
+  onlyKeys(overview, ["totalDue", "staffCount", "pendingHours", "overtimeHours", "missingTimesheets"], "response.data.summary.overview");
+  onlyKeys(coverage, ["expectedAgencyCount", "readyAgencyCount", "pendingAgencyCount", "staleAgencyCount", "failedAgencyCount"], "response.data.summary.coverage");
+  onlyKeys(freshness, ["oldestComputedAt", "newestComputedAt"], "response.data.summary.freshness");
+  onlyKeys(meta, ["evaluatedAt", "calculationVersion", "totalsExact"], "response.data.summary.meta");
+  const totalDue = record(overview.totalDue, "response.data.summary.overview.totalDue");
+  const staffCount = record(overview.staffCount, "response.data.summary.overview.staffCount");
+  const pendingHours = record(overview.pendingHours, "response.data.summary.overview.pendingHours");
+  const overtimeHours = record(overview.overtimeHours, "response.data.summary.overview.overtimeHours");
+  const missingTimesheets = record(overview.missingTimesheets, "response.data.summary.overview.missingTimesheets");
+  onlyKeys(totalDue, ["amount", "count", "exact"], "response.data.summary.overview.totalDue");
+  onlyKeys(staffCount, ["count"], "response.data.summary.overview.staffCount");
+  onlyKeys(pendingHours, ["hours"], "response.data.summary.overview.pendingHours");
+  onlyKeys(overtimeHours, ["hours"], "response.data.summary.overview.overtimeHours");
+  onlyKeys(missingTimesheets, ["count"], "response.data.summary.overview.missingTimesheets");
+  const parsedCoverage = {
+    expectedAgencyCount: nonNegativeInteger(coverage, "expectedAgencyCount", "response.data.summary.coverage"),
+    readyAgencyCount: nonNegativeInteger(coverage, "readyAgencyCount", "response.data.summary.coverage"),
+    pendingAgencyCount: nonNegativeInteger(coverage, "pendingAgencyCount", "response.data.summary.coverage"),
+    staleAgencyCount: nonNegativeInteger(coverage, "staleAgencyCount", "response.data.summary.coverage"),
+    failedAgencyCount: nonNegativeInteger(coverage, "failedAgencyCount", "response.data.summary.coverage"),
+  };
+  if (parsedCoverage.readyAgencyCount + parsedCoverage.pendingAgencyCount + parsedCoverage.staleAgencyCount + parsedCoverage.failedAgencyCount !== parsedCoverage.expectedAgencyCount) {
+    fail("response.data.summary.coverage must add up to expectedAgencyCount.");
+  }
+  const amount = nullableNumber(totalDue, "amount", "response.data.summary.overview.totalDue");
+  if (amount !== null && amount < 0) fail("response.data.summary.overview.totalDue.amount must be a non-negative number or null.");
+  if (amount === null && parsedCoverage.readyAgencyCount + parsedCoverage.staleAgencyCount > 0) {
+    fail("response.data.summary.overview.totalDue.amount may be null only without a usable rollup.");
+  }
+  const oldestComputedAt = nullableIsoDate(freshness, "oldestComputedAt", "response.data.summary.freshness");
+  const newestComputedAt = nullableIsoDate(freshness, "newestComputedAt", "response.data.summary.freshness");
+  if (oldestComputedAt && newestComputedAt && Date.parse(oldestComputedAt) > Date.parse(newestComputedAt)) {
+    fail("response.data.summary.freshness oldestComputedAt must not follow newestComputedAt.");
+  }
+  if (requiredNumber(meta, "calculationVersion", "response.data.summary.meta") !== 1) {
+    fail("response.data.summary.meta.calculationVersion must be 1.");
+  }
+  return {
+    overview: {
+      totalDue: { amount, count: nonNegativeInteger(totalDue, "count", "response.data.summary.overview.totalDue"), exact: requiredBoolean(totalDue, "exact", "response.data.summary.overview.totalDue") },
+      staffCount: { count: nonNegativeInteger(staffCount, "count", "response.data.summary.overview.staffCount") },
+      pendingHours: { hours: nonNegativeNumber(pendingHours, "hours", "response.data.summary.overview.pendingHours") },
+      overtimeHours: { hours: nonNegativeNumber(overtimeHours, "hours", "response.data.summary.overview.overtimeHours") },
+      missingTimesheets: { count: nonNegativeInteger(missingTimesheets, "count", "response.data.summary.overview.missingTimesheets") },
+    },
+    coverage: parsedCoverage,
+    freshness: { oldestComputedAt, newestComputedAt },
+    meta: { evaluatedAt: requiredIsoDate(meta, "evaluatedAt", "response.data.summary.meta"), calculationVersion: 1, totalsExact: requiredBoolean(meta, "totalsExact", "response.data.summary.meta") },
+  };
+}
+
 function validatePayrollSummary(value: unknown, tab: PayrollNetworkBillingArgs["tab"]): NetworkBillingPayrollSummary {
+  if (tab === "due") return validateDuePayrollSummary(value);
   const source = record(value, "response.data.summary");
   onlyKeys(source, ["overview", "meta"], "response.data.summary");
   const overview = record(source.overview, "response.data.summary.overview");
   const meta = record(source.meta, "response.data.summary.meta");
   onlyKeys(meta, ["evaluatedAt", "totalsExact"], "response.data.summary.meta");
-  const validatedOverview: NetworkBillingPayrollSummary["overview"] = tab === "due"
-    ? (() => {
-      onlyKeys(overview, ["totalDue"], "response.data.summary.overview");
-      const totalDue = record(overview.totalDue, "response.data.summary.overview.totalDue");
-      onlyKeys(totalDue, ["amount", "count", "exact"], "response.data.summary.overview.totalDue");
-      return { totalDue: {
-        amount: nullableNumber(totalDue, "amount", "response.data.summary.overview.totalDue"),
-        count: nonNegativeInteger(totalDue, "count", "response.data.summary.overview.totalDue"),
-        exact: requiredBoolean(totalDue, "exact", "response.data.summary.overview.totalDue"),
-      } };
-    })()
-    : (() => {
-      onlyKeys(overview, ["savedInvoices"], "response.data.summary.overview");
-      const saved = record(overview.savedInvoices, "response.data.summary.overview.savedInvoices");
-      onlyKeys(saved, ["count", "exact"], "response.data.summary.overview.savedInvoices");
-      return { savedInvoices: {
-        count: nonNegativeInteger(saved, "count", "response.data.summary.overview.savedInvoices"),
-        exact: requiredBoolean(saved, "exact", "response.data.summary.overview.savedInvoices"),
-      } };
-    })();
+  onlyKeys(overview, ["savedInvoices"], "response.data.summary.overview");
+  const saved = record(overview.savedInvoices, "response.data.summary.overview.savedInvoices");
+  onlyKeys(saved, ["count", "exact"], "response.data.summary.overview.savedInvoices");
+  const validatedOverview = { savedInvoices: {
+    count: nonNegativeInteger(saved, "count", "response.data.summary.overview.savedInvoices"),
+    exact: requiredBoolean(saved, "exact", "response.data.summary.overview.savedInvoices"),
+  } };
   return {
     overview: validatedOverview,
     meta: {
@@ -820,6 +958,99 @@ function validateOverview(value: unknown): NetworkBillingOverview {
   };
 }
 
+function validatePreparation(value: unknown): NetworkBillingPreparationResult {
+  const data = successfulData(value, false);
+  onlyKeys(data, ["examined", "updated", "missing", "invalid", "ready", "ownership"], "response.data");
+  const ownership = record(data.ownership, "response.data.ownership");
+  onlyKeys(ownership, ["repaired", "unresolved", "byCollection", "unresolvedRecords", "deletedRecords"], "response.data.ownership");
+  const byCollection = record(ownership.byCollection, "response.data.ownership.byCollection");
+  if (!Array.isArray(ownership.unresolvedRecords) || ownership.unresolvedRecords.length > 100) {
+    fail("response.data.ownership.unresolvedRecords must be an array of at most 100 records.");
+  }
+  if (!Array.isArray(ownership.deletedRecords) || ownership.deletedRecords.length > 100) {
+    fail("response.data.ownership.deletedRecords must be an array of at most 100 records.");
+  }
+  return {
+    examined: nonNegativeInteger(data, "examined", "response.data"),
+    updated: nonNegativeInteger(data, "updated", "response.data"),
+    missing: nonNegativeInteger(data, "missing", "response.data"),
+    invalid: nonNegativeInteger(data, "invalid", "response.data"),
+    ready: requiredBoolean(data, "ready", "response.data"),
+    ownership: {
+      repaired: nonNegativeInteger(ownership, "repaired", "response.data.ownership"),
+      unresolved: nonNegativeInteger(ownership, "unresolved", "response.data.ownership"),
+      byCollection: Object.fromEntries(Object.entries(byCollection).map(([collection, value]) => {
+        const summary = record(value, `response.data.ownership.byCollection.${collection}`);
+        onlyKeys(summary, ["repaired", "unresolved"], `response.data.ownership.byCollection.${collection}`);
+        return [collection, {
+          repaired: nonNegativeInteger(summary, "repaired", `response.data.ownership.byCollection.${collection}`),
+          unresolved: nonNegativeInteger(summary, "unresolved", `response.data.ownership.byCollection.${collection}`),
+        }];
+      })),
+      unresolvedRecords: ownership.unresolvedRecords.map((value, index) => {
+        const context = `response.data.ownership.unresolvedRecords[${index}]`;
+        const diagnostic = record(value, context);
+        onlyKeys(diagnostic, ["collection", "documentId", "reason", "relationships", "candidateAgencyIds"], context);
+        const relationships = record(diagnostic.relationships, `${context}.relationships`);
+        onlyKeys(relationships, ["clientIds", "staffIds"], `${context}.relationships`);
+        const stringArray = (input: unknown, name: string) => {
+          if (!Array.isArray(input) || input.some((item) => typeof item !== "string")) fail(`${name} must be a string array.`);
+          return input as string[];
+        };
+        return {
+          collection: requiredString(diagnostic, "collection", context),
+          documentId: requiredString(diagnostic, "documentId", context),
+          reason: requiredEnum(diagnostic, "reason", ["NO_AUTHORITATIVE_AGENCY", "CONFLICTING_AUTHORITATIVE_AGENCIES"] as const, context),
+          relationships: {
+            clientIds: stringArray(relationships.clientIds, `${context}.relationships.clientIds`),
+            staffIds: stringArray(relationships.staffIds, `${context}.relationships.staffIds`),
+          },
+          candidateAgencyIds: stringArray(diagnostic.candidateAgencyIds, `${context}.candidateAgencyIds`),
+        };
+      }),
+      deletedRecords: ownership.deletedRecords.map((value, index) => {
+        const context = `response.data.ownership.deletedRecords[${index}]`;
+        const diagnostic = record(value, context);
+        onlyKeys(diagnostic, ["collection", "documentId", "userUid", "userDocumentDeleted"], context);
+        if (diagnostic.collection !== "employees") fail(`${context}.collection must be employees.`);
+        return {
+          collection: "employees" as const,
+          documentId: requiredString(diagnostic, "documentId", context),
+          userUid: nullableString(diagnostic, "userUid", context),
+          userDocumentDeleted: requiredBoolean(diagnostic, "userDocumentDeleted", context),
+        };
+      }),
+    },
+  };
+}
+
+function validateNetworkPayrollRolloutStatus(value: unknown): NetworkPayrollRolloutStatus {
+  const data = successfulData(value, false);
+  const context = "response.data";
+  onlyKeys(data, [
+    "version", "enabled", "status", "days", "weekCount", "activeAgencyCount",
+    "expectedRollupCount", "verifiedRollupCount", "missingRollupCount", "invalidRollupCount",
+    "failedRollupCount", "enqueuedAt", "completedAt",
+  ], context);
+  if (nonNegativeInteger(data, "version", context) !== 1) fail(`${context}.version must be 1.`);
+  if (nonNegativeInteger(data, "days", context) !== 90) fail(`${context}.days must be 90.`);
+  return {
+    version: 1,
+    enabled: requiredBoolean(data, "enabled", context),
+    status: requiredString(data, "status", context),
+    days: 90,
+    weekCount: nonNegativeInteger(data, "weekCount", context),
+    activeAgencyCount: nonNegativeInteger(data, "activeAgencyCount", context),
+    expectedRollupCount: nonNegativeInteger(data, "expectedRollupCount", context),
+    verifiedRollupCount: nonNegativeInteger(data, "verifiedRollupCount", context),
+    missingRollupCount: nonNegativeInteger(data, "missingRollupCount", context),
+    invalidRollupCount: nonNegativeInteger(data, "invalidRollupCount", context),
+    failedRollupCount: nonNegativeInteger(data, "failedRollupCount", context),
+    enqueuedAt: nullableIsoDate(data, "enqueuedAt", context),
+    completedAt: nullableIsoDate(data, "completedAt", context),
+  };
+}
+
 function validateOptions(value: unknown): NetworkBillingOption[] {
   const envelope = record(value, "response");
   onlyKeys(envelope, ["success", "data"], "response");
@@ -926,6 +1157,31 @@ function query<T, TArgs>(
   };
 }
 
+function mutation<T, TArgs>(
+  path: string,
+  validate: (value: unknown, args: TArgs) => T,
+  requestBody?: (args: TArgs) => unknown,
+) {
+  return async (args: TArgs, api: { signal: AbortSignal }): Promise<{ data: T } | { error: NetworkBillingError }> => {
+    try {
+      const response = await axiosClient.post<unknown>(path, requestBody?.(args), { signal: api.signal });
+      return { data: validate(response.data, args) };
+    } catch (error) {
+      if (error instanceof NetworkBillingContractError) {
+        return { error: { status: "PARSING_ERROR", data: null, error: error.message } };
+      }
+      const response = typeof error === "object" && error !== null && "response" in error
+        ? (error as { response?: { status?: number; data?: unknown } }).response
+        : undefined;
+      return {
+        error: response?.status
+          ? { status: response.status, data: response.data ?? null }
+          : { status: "FETCH_ERROR", data: null, error: error instanceof Error ? error.message : "Request failed." },
+      };
+    }
+  };
+}
+
 const tags = (domain: "Claims" | "Payroll" | "Expenses" | "Timesheets" | "Overview" | "Options") => [
   { type: domain, id: "NETWORK" },
   { type: "NETWORK" as const, id: "NETWORK" },
@@ -941,6 +1197,28 @@ export const networkBillingApi = createApi({
       queryFn: query("/superAdminOperations/billing/overview/bootstrap", overviewParams, validateOverview),
       serializeQueryArgs: ({ queryArgs }) => cacheArgs(queryArgs, overviewParams(queryArgs)),
       providesTags: tags("Overview"),
+    }),
+    prepareNetworkBilling: build.mutation<NetworkBillingPreparationResult, QueryContext>({
+      queryFn: mutation("/superAdminOperations/billing/prepare-network", validatePreparation),
+      invalidatesTags: [
+        { type: "NETWORK", id: "NETWORK" },
+        { type: "Overview", id: "NETWORK" },
+        { type: "Claims", id: "NETWORK" },
+        { type: "Payroll", id: "NETWORK" },
+        { type: "Expenses", id: "NETWORK" },
+        { type: "Timesheets", id: "NETWORK" },
+      ],
+    }),
+    startNetworkPayrollRollupBackfill: build.mutation<NetworkPayrollRolloutStatus, NetworkPayrollRollupBackfillArgs>({
+      queryFn: mutation(
+        "/superAdminOperations/billing/payroll/rollups/backfill",
+        validateNetworkPayrollRolloutStatus,
+        ({ days, confirmProduction }) => ({ days, confirmProduction }),
+      ),
+      invalidatesTags: [
+        { type: "NETWORK", id: "NETWORK" },
+        { type: "Payroll", id: "NETWORK" },
+      ],
     }),
     getClaimsBootstrap: build.query<NetworkBillingPageResponse<NetworkBillingClaimRow, NetworkBillingClaimsSummary>, ClaimsNetworkBillingArgs>({
       queryFn: query("/superAdminOperations/billing/claims/bootstrap", claimsParams, validateClaimsBootstrap),
