@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { Building2, ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react";
+import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import {
   type StaffDirectoryAccountType,
   type StaffDirectoryStaffMember,
   type StaffDirectoryStatus,
+  useBackfillStaffDirectoryMutation,
   useListStaffDirectoryQuery,
 } from "@/lib/api/staff-directory";
 
@@ -95,6 +97,7 @@ export default function StaffDirectory() {
     cursor,
     limit: PAGE_SIZE,
   });
+  const [backfillStaffDirectory, { isLoading: isBackfilling }] = useBackfillStaffDirectoryMutation();
 
   const agencies = useMemo(() => (data?.agencies ?? [])
     .filter((agency) => agency.id && agency.name)
@@ -139,15 +142,41 @@ export default function StaffDirectory() {
     setPreviousCursors((history) => history.slice(0, -1));
   };
 
+  const handleBackfillDirectory = async () => {
+    if (isBackfilling || !window.confirm("Backfill directory records from existing employee and agency-user accounts? This rebuilds the staff directory.")) return;
+
+    try {
+      const response = await backfillStaffDirectory().unwrap();
+      await refetch();
+      toast.success("Directory backfilled", {
+        description: `${response.result.written} written, ${response.result.deleted} deleted.`,
+      });
+    } catch {
+      toast.error("Could not backfill the directory", {
+        description: "Please try again.",
+      });
+    }
+  };
+
   return (
     <div className="min-h-[calc(100vh-200px)] space-y-5 pb-6">
       <header className="rounded-2xl border border-[#dce3e3] bg-[#f9fbfb] px-4 py-4 sm:px-5" aria-labelledby="staff-directory-title">
-        <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(12rem,1fr)_minmax(0,31rem)] lg:items-end">
+        <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(12rem,1fr)_auto_minmax(0,31rem)] lg:items-end">
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#5f7778]">Operations</p>
             <h1 id="staff-directory-title" className="mt-1 text-[24px] font-semibold leading-tight text-[#10141a] sm:text-[28px]">Staff directory</h1>
             <p className="mt-2 max-w-xl text-[13px] text-[#687173]">Review staff accounts across the agencies you are authorized to manage.</p>
           </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-11 border-[#8ebabb] text-[#087f82] hover:bg-[#eefafa] hover:text-[#087f82] disabled:cursor-wait"
+            disabled={isBackfilling}
+            onClick={() => void handleBackfillDirectory()}
+          >
+            {isBackfilling && <Loader2 aria-hidden="true" className="mr-2 h-4 w-4 animate-spin" />}
+            {isBackfilling ? "Backfilling directory" : "Backfill directory"}
+          </Button>
           <div className="min-w-0">
             <label htmlFor="staff-directory-agency" className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-[#687173]">Agency scope</label>
             <div className="relative">

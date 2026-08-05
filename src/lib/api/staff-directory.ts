@@ -54,6 +54,20 @@ export interface ListStaffDirectoryResponse {
   updatedAt: string | null;
 }
 
+export interface StaffDirectoryBackfillResult {
+  examined: number;
+  written: number;
+  deleted: number;
+  skipped: number;
+  dryRun: boolean;
+  databaseId: string;
+}
+
+export interface StaffDirectoryBackfillResponse {
+  success: true;
+  result: StaffDirectoryBackfillResult;
+}
+
 export const staffDirectoryApi = createApi({
   reducerPath: "staffDirectoryApi",
   baseQuery: customBaseQuery,
@@ -67,7 +81,14 @@ export const staffDirectoryApi = createApi({
         requiresAuth: true,
       }),
     }),
+    backfillStaffDirectory: builder.mutation<StaffDirectoryBackfillResponse, void>({
+      query: () => ({
+        url: "/superAdminStaffDirectory/staff-directory/backfill",
+        method: "POST",
+        requiresAuth: true,
+      }),
+    }),
   }),
 });
 
-export const { useListStaffDirectoryQuery } = staffDirectoryApi;
+export const { useBackfillStaffDirectoryMutation, useListStaffDirectoryQuery } = staffDirectoryApi;
