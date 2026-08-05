@@ -66,8 +66,9 @@ function statusClass(status: StaffDirectoryStatus): string {
 
 function staffRoleLabel(member: StaffDirectoryStaffMember): string {
   if (member.accountType !== "employee") return member.role || "Not assigned";
-  if (member.role?.trim().toLowerCase() === "ddd") return "DSP";
-  if (member.role?.trim().toLowerCase() === "hha") return "Caregiver";
+  const role = member.role?.trim().toLowerCase();
+  if (role === "ddd" || role === "dsp") return "DSP";
+  if (role === "hha" || role === "caregiver") return "Caregiver";
   return member.role || "Not assigned";
 }
 
