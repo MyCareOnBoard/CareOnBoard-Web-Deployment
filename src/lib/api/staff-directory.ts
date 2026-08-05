@@ -32,6 +32,12 @@ export interface StaffDirectoryStats {
   internalUsers: number;
 }
 
+export interface StaffDirectoryAgencyOption {
+  id: string;
+  name: string;
+  status: string | null;
+}
+
 export interface ListStaffDirectoryParams {
   agencyId?: string;
   search?: string;
@@ -41,6 +47,7 @@ export interface ListStaffDirectoryParams {
 
 export interface ListStaffDirectoryResponse {
   success: boolean;
+  agencies: StaffDirectoryAgencyOption[];
   staff: StaffDirectoryStaffMember[];
   pagination: StaffDirectoryPagination;
   stats: StaffDirectoryStats;

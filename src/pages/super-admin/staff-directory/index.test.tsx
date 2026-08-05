@@ -2,10 +2,8 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const useListStaffDirectoryQuery = vi.hoisted(() => vi.fn());
-const useListAllAgenciesQuery = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/api/staff-directory", () => ({ useListStaffDirectoryQuery }));
-vi.mock("@/pages/super-admin/agencies/api", () => ({ useListAllAgenciesQuery }));
 
 import StaffDirectory from "./index";
 
@@ -13,13 +11,13 @@ describe("super-admin staff directory", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
-    useListAllAgenciesQuery.mockReturnValue({
-      data: { agencies: [{ id: "atlas", name: "Atlas Care", status: "active" }] },
-      isLoading: false,
-    });
     useListStaffDirectoryQuery.mockReturnValue({
       data: {
         success: true,
+        agencies: [
+          { id: "atlas", name: "Atlas Care", status: "active" },
+          { id: "legacy", name: "Legacy Care", status: "inactive" },
+        ],
         staff: [{
           id: "staff-1",
           accountType: "employee",
@@ -58,6 +56,7 @@ describe("super-admin staff directory", () => {
     expect(screen.getByText("2")).toBeVisible();
     expect(screen.queryByRole("button", { name: /add staff|view details|edit|delete/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: /actions?/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Legacy Care" })).toHaveValue("legacy");
 
     const search = screen.getByRole("textbox", { name: "Search staff" });
     fireEvent.change(search, { target: { value: "JoRdAn" } });
@@ -68,5 +67,8 @@ describe("super-admin staff directory", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(350); });
     expect(screen.getByText("Use one 2–32 character name or email token with letters and numbers only.")).toBeVisible();
     expect(useListStaffDirectoryQuery).toHaveBeenLastCalledWith(expect.objectContaining({ search: "jordan" }));
+    expect(screen.queryByRole("row", { name: /Jordan Lee/i })).not.toBeInTheDocument();
+    expect(screen.queryByText("17")).not.toBeInTheDocument();
+    expect(screen.queryByText("Page 1")).not.toBeInTheDocument();
   });
 });

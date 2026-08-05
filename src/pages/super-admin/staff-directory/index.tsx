@@ -12,7 +12,6 @@ import {
   type StaffDirectoryStatus,
   useListStaffDirectoryQuery,
 } from "@/lib/api/staff-directory";
-import { useListAllAgenciesQuery } from "@/pages/super-admin/agencies/api";
 
 const PAGE_SIZE = 20;
 const SEARCH_TOKEN_PATTERN = /^[a-z0-9]{2,32}$/;
@@ -90,11 +89,6 @@ export default function StaffDirectory() {
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const hasInvalidSearch = normalizedSearchQuery.length > 0 && !SEARCH_TOKEN_PATTERN.test(normalizedSearchQuery);
 
-  const { data: agenciesData, isLoading: isLoadingAgencies } = useListAllAgenciesQuery({
-    status: "active",
-    limit: 100,
-    features: "id,name,status",
-  });
   const { data, isLoading: isLoadingStaff, isFetching, isError, refetch } = useListStaffDirectoryQuery({
     agencyId: selectedAgencyId || undefined,
     search: debouncedSearchQuery.trim() || undefined,
@@ -102,12 +96,15 @@ export default function StaffDirectory() {
     limit: PAGE_SIZE,
   });
 
-  const agencies = useMemo(() => (agenciesData?.agencies ?? [])
+  const agencies = useMemo(() => (data?.agencies ?? [])
     .filter((agency) => agency.id && agency.name)
-    .sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id)), [agenciesData]);
-  const staff = data?.staff ?? [];
-  const stats = data?.stats;
-  const isLoading = isLoadingStaff && !data;
+    .sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id)), [data?.agencies]);
+  const visibleData = hasInvalidSearch ? undefined : data;
+  const staff = visibleData?.staff ?? [];
+  const stats = visibleData?.stats;
+  const isLoading = !hasInvalidSearch && isLoadingStaff && !data;
+  const isLoadingAgencies = isLoadingStaff && !data;
+  const showError = !hasInvalidSearch && isError;
   const selectedAgencyName = agencies.find((agency) => agency.id === selectedAgencyId)?.name;
   const currentPage = previousCursors.length + 1;
 
@@ -203,13 +200,13 @@ export default function StaffDirectory() {
                 placeholder="Search one name or email token"
                 className={`h-11 rounded-full bg-[#f6f9f9] pl-10 pr-10 text-[13px] focus-visible:ring-[#008f92]/30 ${hasInvalidSearch ? "border-[#d99b94]" : "border-[#d2dada]"}`}
               />
-              {isFetching && !isLoading && <Loader2 aria-label="Searching staff" className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-[#748082]" />}
+              {!hasInvalidSearch && isFetching && !isLoading && <Loader2 aria-label="Searching staff" className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-[#748082]" />}
             </div>
             <p id="staff-directory-search-guidance" aria-live="polite" className={`mt-1.5 px-2 text-[11px] leading-4 ${hasInvalidSearch ? "font-medium text-[#9b3e33]" : "text-[#687173]"}`}>{SEARCH_GUIDANCE}</p>
           </div>
         </div>
 
-        {isError ? (
+        {showError ? (
           <div role="alert" className="p-10 text-center">
             <p className="text-[13px] font-semibold text-[#9b3e33]">Could not load staff records.</p>
             <Button type="button" variant="outline" className="mt-4" onClick={() => void refetch()}>Try again</Button>
@@ -217,7 +214,7 @@ export default function StaffDirectory() {
         ) : (
           <div className="overflow-x-auto">
             {isLoading ? <StaffDirectorySkeleton /> : staff.length === 0 ? (
-              <div className="p-12 text-center"><p className="text-[14px] font-semibold text-[#273033]">No staff found</p><p className="mt-1 text-[12px] text-[#687173]">Try another search or agency scope.</p></div>
+              <div className="p-12 text-center"><p className="text-[14px] font-semibold text-[#273033]">{hasInvalidSearch ? "Enter a valid search token" : "No staff found"}</p><p className="mt-1 text-[12px] text-[#687173]">{hasInvalidSearch ? "Correct the highlighted search to continue." : "Try another search or agency scope."}</p></div>
             ) : (
               <table className="w-full min-w-[920px]">
                 <thead className="bg-[#f5f8f8]"><tr>{["Staff member", "Account type", "Role", "Status", "Agency", "Created"].map((label) => <th key={label} className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-[0.08em] text-[#687173]">{label}</th>)}</tr></thead>
@@ -238,7 +235,7 @@ export default function StaffDirectory() {
           </div>
         )}
 
-        {!isLoading && !isError && staff.length > 0 && (
+        {!isLoading && !showError && staff.length > 0 && (
           <div className="flex items-center justify-between border-t border-[#e6ecec] px-5 py-3">
             <p className="text-[12px] text-[#687173]">Page {currentPage}</p>
             <div className="flex gap-2">
