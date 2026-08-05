@@ -64,6 +64,13 @@ function statusClass(status: StaffDirectoryStatus): string {
   return "border-[#e4b5af] bg-[#fff5f3] text-[#9a4038]";
 }
 
+function staffRoleLabel(member: StaffDirectoryStaffMember): string {
+  if (member.accountType !== "employee") return member.role || "Not assigned";
+  if (member.role?.trim().toLowerCase() === "ddd") return "DSP";
+  if (member.role?.trim().toLowerCase() === "hha") return "Caregiver";
+  return member.role || "Not assigned";
+}
+
 function createdDate(value: string | null): string {
   if (!value) return "Not available";
   const date = new Date(value);
@@ -223,7 +230,7 @@ export default function StaffDirectory() {
                     <tr key={member.id} className="transition-colors hover:bg-[#f7fbfb]">
                       <td className="px-5 py-4"><div className="flex items-center gap-3"><Avatar className="h-10 w-10 shrink-0 rounded-full"><AvatarImage src={member.avatarUrl ?? undefined} alt="" /><AvatarFallback className="bg-[#087f82] text-xs font-semibold text-white">{initialsFor(member)}</AvatarFallback></Avatar><div className="min-w-0"><p className="truncate text-[13px] font-semibold text-[#20282a]">{member.name}</p><p className="mt-1 truncate text-[11px] text-[#687173]">{member.email || "No email on file"}</p></div></div></td>
                       <td className="px-5 py-4"><Badge variant="outline" className={`border px-2.5 py-1 text-[11px] font-semibold ${accountTypeClass(member.accountType)}`}>{accountTypeLabel(member.accountType)}</Badge></td>
-                      <td className="max-w-[190px] px-5 py-4 text-[13px] text-[#4d5a5c]"><span className="block truncate">{member.role || "Not assigned"}</span></td>
+                      <td className="max-w-[190px] px-5 py-4 text-[13px] text-[#4d5a5c]"><span className="block truncate">{staffRoleLabel(member)}</span></td>
                       <td className="px-5 py-4"><Badge variant="outline" className={`border px-2.5 py-1 text-[11px] font-semibold ${statusClass(member.status)}`}>{statusLabel(member.status)}</Badge></td>
                       <td className="max-w-[190px] px-5 py-4 text-[13px] text-[#4d5a5c]"><span className="block truncate">{member.agency.name}</span></td>
                       <td className="px-5 py-4 text-[12px] text-[#4d5a5c]">{createdDate(member.createdAt)}</td>
