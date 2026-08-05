@@ -1,5 +1,5 @@
-import { render, screen, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const useListStaffDirectoryQuery = vi.hoisted(() => vi.fn());
 const useListAllAgenciesQuery = vi.hoisted(() => vi.fn());
@@ -11,6 +11,7 @@ import StaffDirectory from "./index";
 
 describe("super-admin staff directory", () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     vi.clearAllMocks();
     useListAllAgenciesQuery.mockReturnValue({
       data: { agencies: [{ id: "atlas", name: "Atlas Care", status: "active" }] },
@@ -43,7 +44,9 @@ describe("super-admin staff directory", () => {
     });
   });
 
-  it("renders staff identity, directory aggregates, and no mutation controls", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("renders the read-only directory and protects its search contract", async () => {
     render(<StaffDirectory />);
 
     const row = screen.getByRole("row", { name: /Jordan Lee/i });
@@ -55,5 +58,15 @@ describe("super-admin staff directory", () => {
     expect(screen.getByText("2")).toBeVisible();
     expect(screen.queryByRole("button", { name: /add staff|view details|edit|delete/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: /actions?/i })).not.toBeInTheDocument();
+
+    const search = screen.getByRole("textbox", { name: "Search staff" });
+    fireEvent.change(search, { target: { value: "JoRdAn" } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(350); });
+    expect(useListStaffDirectoryQuery).toHaveBeenLastCalledWith(expect.objectContaining({ search: "jordan" }));
+
+    fireEvent.change(search, { target: { value: "Jordan Lee@" } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(350); });
+    expect(screen.getByText("Use one 2–32 character name or email token with letters and numbers only.")).toBeVisible();
+    expect(useListStaffDirectoryQuery).toHaveBeenLastCalledWith(expect.objectContaining({ search: "jordan" }));
   });
 });

@@ -15,6 +15,8 @@ import {
 import { useListAllAgenciesQuery } from "@/pages/super-admin/agencies/api";
 
 const PAGE_SIZE = 20;
+const SEARCH_TOKEN_PATTERN = /^[a-z0-9]{2,32}$/;
+const SEARCH_GUIDANCE = "Use one 2–32 character name or email token with letters and numbers only.";
 
 function StaffDirectorySkeleton() {
   return (
@@ -85,6 +87,8 @@ export default function StaffDirectory() {
   const [cursor, setCursor] = useState<string | undefined>();
   const [previousCursors, setPreviousCursors] = useState<Array<string | undefined>>([]);
   const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const hasInvalidSearch = normalizedSearchQuery.length > 0 && !SEARCH_TOKEN_PATTERN.test(normalizedSearchQuery);
 
   const { data: agenciesData, isLoading: isLoadingAgencies } = useListAllAgenciesQuery({
     status: "active",
@@ -109,11 +113,16 @@ export default function StaffDirectory() {
 
   useEffect(() => {
     if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
-    debounceTimeoutRef.current = setTimeout(() => setDebouncedSearchQuery(searchQuery), 350);
+    if (hasInvalidSearch) return;
+    debounceTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearchQuery(normalizedSearchQuery);
+      setCursor(undefined);
+      setPreviousCursors([]);
+    }, 350);
     return () => {
       if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
     };
-  }, [searchQuery]);
+  }, [hasInvalidSearch, normalizedSearchQuery]);
 
   const resetPagination = () => {
     setCursor(undefined);
@@ -182,16 +191,21 @@ export default function StaffDirectory() {
             <h2 id="staff-directory-list-title" className="text-[18px] font-semibold text-[#10141a]">Staff records</h2>
             <p className="mt-1 text-[12px] text-[#687173]" aria-live="polite">{isLoading ? "Loading staff records" : `${staff.length} record${staff.length === 1 ? "" : "s"} shown`}</p>
           </div>
-          <div className="relative min-w-0 sm:w-[300px]">
-            <Search aria-hidden="true" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#748082]" />
-            <Input
-              aria-label="Search staff"
-              value={searchQuery}
-              onChange={(event) => { setSearchQuery(event.target.value); resetPagination(); }}
-              placeholder="Search name, email, or role"
-              className="h-11 rounded-full border-[#d2dada] bg-[#f6f9f9] pl-10 pr-10 text-[13px] focus-visible:ring-[#008f92]/30"
-            />
-            {isFetching && !isLoading && <Loader2 aria-label="Searching staff" className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-[#748082]" />}
+          <div className="min-w-0 sm:w-[340px]">
+            <div className="relative">
+              <Search aria-hidden="true" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#748082]" />
+              <Input
+                aria-label="Search staff"
+                aria-describedby="staff-directory-search-guidance"
+                aria-invalid={hasInvalidSearch || undefined}
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search one name or email token"
+                className={`h-11 rounded-full bg-[#f6f9f9] pl-10 pr-10 text-[13px] focus-visible:ring-[#008f92]/30 ${hasInvalidSearch ? "border-[#d99b94]" : "border-[#d2dada]"}`}
+              />
+              {isFetching && !isLoading && <Loader2 aria-label="Searching staff" className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-[#748082]" />}
+            </div>
+            <p id="staff-directory-search-guidance" aria-live="polite" className={`mt-1.5 px-2 text-[11px] leading-4 ${hasInvalidSearch ? "font-medium text-[#9b3e33]" : "text-[#687173]"}`}>{SEARCH_GUIDANCE}</p>
           </div>
         </div>
 
