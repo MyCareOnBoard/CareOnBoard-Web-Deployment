@@ -121,6 +121,7 @@ const SuperAdminDashboard = lazy(() => import("@/pages/super-admin/dashboard"));
 const ComplianceMonitor = lazy(() => import("@/pages/super-admin/compliance-monitor"));
 const UserAccessControlPage = lazy(() => import("@/pages/super-admin/user-access-control"));
 const ClientsDirectory = lazy(() => import("@/pages/super-admin/clients-directory"));
+const StaffDirectory = lazy(() => import("@/pages/super-admin/staff-directory"));
 const AdminClientDetails = lazy(() => import("@/pages/super-admin/clients-directory/client-details"));
 const SuperAdminAddClientPage = lazy(() => import("@/pages/shared/client-management/wrappers/SuperAdminAddClientPage"));
 const SuperAdminEditClientPage = lazy(() => import("@/pages/shared/client-management/wrappers/SuperAdminEditClientPage"));
@@ -754,6 +755,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.superAdmin.agencyView,
                 Component: AgencyView,
+            },
+            {
+                path: Routes.superAdmin.staffDirectory,
+                Component: StaffDirectory,
             },
             {
                 path: Routes.superAdmin.complianceMonitor,

@@ -21,6 +21,7 @@ import {
   ChartGantt,
   Settings,
   UserLock,
+  Contact,
   Briefcase,
   CalendarRange,
 } from "lucide-react";
@@ -29,6 +30,7 @@ const allNavItems: NavItem[] = [
   {label: "Dashboard", path: Routes.superAdmin.dashboard, icon: Home}, // Always accessible
   {label: "Agency directory", path: Routes.superAdmin.agencies, icon: Building2, accessKey: "Agency Directory"},
   {label: "Clients Directory", path: Routes.superAdmin.clientDirectory, icon: UserLock, accessKey: "Clients Directory"},
+  {label: "Staff Directory", path: Routes.superAdmin.staffDirectory, icon: Contact, accessKey: "Staff Directory"},
   {label: "Shift Management", path: Routes.superAdmin.shifts.index, icon: CalendarRange, accessKey: "Shift Management"},
   {label: "User Access Control", path: Routes.superAdmin.userAccessControl, icon: Users, accessKey: "User Access Control"},
   {label: "Compliance Monitor", path: Routes.superAdmin.complianceMonitor, icon: Shield, accessKey: "Compliance Monitor"},

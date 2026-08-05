@@ -37,6 +37,7 @@ import { aiAutomationApi } from "@/pages/agency/ai-automation/api";
 import { agencyStaffTasksApi } from "@/pages/agency/staff-tasks/api";
 import { remindersApi } from "@/pages/agency/reminders/api";
 import { networkBillingApi } from "@/lib/api/network-billing";
+import { staffDirectoryApi } from "@/lib/api/staff-directory";
 
 const appReducer = combineReducers({
     auth: authReducer,
@@ -66,6 +67,7 @@ const appReducer = combineReducers({
     [agencyStaffTasksApi.reducerPath]: agencyStaffTasksApi.reducer,
     [remindersApi.reducerPath]: remindersApi.reducer,
     [networkBillingApi.reducerPath]: networkBillingApi.reducer,
+    [staffDirectoryApi.reducerPath]: staffDirectoryApi.reducer,
 });
 
 const isLogoutFulfilled = (action: unknown): boolean => (
@@ -132,7 +134,8 @@ export const store = configureStore({
             .concat(aiAutomationApi.middleware)
             .concat(agencyStaffTasksApi.middleware)
             .concat(remindersApi.middleware)
-            .concat(networkBillingApi.middleware),
+            .concat(networkBillingApi.middleware)
+            .concat(staffDirectoryApi.middleware),
     devTools: process.env.VITE_ENVIRONMENT !== 'production',
 });
 
