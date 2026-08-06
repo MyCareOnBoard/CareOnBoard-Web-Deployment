@@ -208,7 +208,7 @@ export default function ClientsDirectory() {
               <Input aria-label="Search clients" value={searchQuery} onChange={(event) => { setSearchQuery(event.target.value); setCurrentPage(1); }} placeholder="Search name" className="h-11 rounded-full border-[#d2dada] bg-[#f6f9f9] pl-10 pr-10 text-[13px] focus-visible:ring-[#008f92]/30" />
               {isFetching && <Loader2 aria-label="Searching clients" className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-[#748082]" />}
             </div>
-            <Button type="button" className="min-h-11 shrink-0 px-4" onClick={() => navigate(Routes.superAdmin.addClient)}><Plus className="h-4 w-4" />Add client</Button>
+            {/* <Button type="button" className="min-h-11 shrink-0 px-4" onClick={() => navigate(Routes.superAdmin.addClient)}><Plus className="h-4 w-4" />Add client</Button> */}
           </div>
         </div>
 

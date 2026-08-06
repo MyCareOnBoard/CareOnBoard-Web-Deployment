@@ -50,6 +50,7 @@ interface ServicesTabProps {
   client: Client;
   clientId: string;
   onServicesUpdated?: () => void;
+  readOnly?: boolean;
 }
 
 // Editable model mirroring Stage 2 service fields
@@ -1360,7 +1361,7 @@ function ServiceRow({
   );
 }
 
-export function ServicesTab({ client, clientId, onServicesUpdated }: ServicesTabProps) {
+export function ServicesTab({ client, clientId, onServicesUpdated, readOnly = false }: ServicesTabProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const isSuperAdminContext = location.pathname.includes("/super-admin/");
@@ -1517,6 +1518,7 @@ export function ServicesTab({ client, clientId, onServicesUpdated }: ServicesTab
               Approved HHA services, payer details, and assigned caregivers.
             </p>
           </div>
+          {!readOnly && (
           <Button
             type="button"
             variant="outline"
@@ -1525,6 +1527,7 @@ export function ServicesTab({ client, clientId, onServicesUpdated }: ServicesTab
           >
             Edit service authorizations
           </Button>
+          )}
         </div>
 
         {authorizations.length === 0 ? (

@@ -93,7 +93,11 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   );
 }
 
-export default function AgencyShiftDetailsPage() {
+export interface AgencyShiftDetailsPageProps {
+  readOnly?: boolean;
+}
+
+export default function AgencyShiftDetailsPage({ readOnly = false }: AgencyShiftDetailsPageProps) {
   const { shiftId } = useParams<{ shiftId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -381,7 +385,7 @@ export default function AgencyShiftDetailsPage() {
               </p>
             </div>
           </div>
-          {capabilities.canManageShifts || capabilities.shiftMaintenance ? (
+          {(!readOnly && (capabilities.canManageShifts || capabilities.shiftMaintenance)) ? (
             <div className="flex flex-wrap gap-2 sm:shrink-0">
               {capabilities.canManageShifts ? (
               <>
@@ -405,7 +409,7 @@ export default function AgencyShiftDetailsPage() {
                 Edit clock times
               </Button>
               ) : null}
-              {capabilities.canManageShifts ? (
+              {!readOnly && capabilities.canManageShifts ? (
               <Button
                 type="button"
                 className="rounded-full bg-[#d93c24] px-4 font-semibold text-white hover:bg-[#c52d16]"
@@ -461,7 +465,7 @@ export default function AgencyShiftDetailsPage() {
         <div className="rounded-[20px] border border-white bg-[#FFFFFF4D] p-6 shadow-sm">
           <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-[18px] font-semibold text-[#10141a]">What needs attention</h2>
-            {derivedAnomaly && capabilities.shiftMaintenance ? (
+            {derivedAnomaly && !readOnly && capabilities.shiftMaintenance ? (
               <Button
                 type="button"
                 variant="outline"
@@ -484,7 +488,7 @@ export default function AgencyShiftDetailsPage() {
                 </span>
               ))}
             </div>
-          ) : capabilities.shiftMaintenance ? (
+          ) : !readOnly && capabilities.shiftMaintenance ? (
             <p className="text-[14px] text-[#808081]">
               Nothing stands out from this shift&apos;s schedule and clock times. Use{" "}
               <span className="font-semibold text-[#10141a]">Edit clock times</span> above to adjust clocks or

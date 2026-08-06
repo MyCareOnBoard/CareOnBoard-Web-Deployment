@@ -149,7 +149,7 @@ export function SuperAdminShiftScope({ children, agency: suppliedAgency, agencyI
 }
 
 export default function SuperAdminShiftList({ agency }: { agency?: OperationalAgencySummary }) {
-  return <SuperAdminShiftScope agency={agency}><ShiftsListPage /></SuperAdminShiftScope>;
+  return <SuperAdminShiftScope agency={agency}><ShiftsListPage readOnly={true} /></SuperAdminShiftScope>;
 }
 
 export function SuperAdminShiftApprovals() {

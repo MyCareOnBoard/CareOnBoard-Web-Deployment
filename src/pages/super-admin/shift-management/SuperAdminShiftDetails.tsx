@@ -4,7 +4,7 @@ import { SuperAdminShiftScope } from "./SuperAdminShiftList";
 export default function SuperAdminShiftDetails() {
   return (
     <SuperAdminShiftScope>
-      <AgencyShiftDetailsPage />
+      <AgencyShiftDetailsPage readOnly={true} />
     </SuperAdminShiftScope>
   );
 }

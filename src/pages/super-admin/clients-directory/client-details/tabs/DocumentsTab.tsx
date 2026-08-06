@@ -11,9 +11,11 @@ import {
 export function DocumentsTab({
   client,
   onOpenUploadModal,
+  readOnly = false,
 }: {
   client: Client;
   onOpenUploadModal?: (document?: ClientDocument) => void;
+  readOnly?: boolean;
 }) {
   const grace = form485GraceInfo(client);
   const formatDeadline = (d?: Date) =>
@@ -72,6 +74,7 @@ export function DocumentsTab({
             Here are your uploaded documents
           </p>
         </div>
+        {!readOnly && (
         <Button
           className="h-11 rounded-[60px] bg-[#00b4b8] text-white hover:bg-[#00a0a4] px-6 shrink-0"
           onClick={() => {
@@ -83,6 +86,7 @@ export function DocumentsTab({
           <Plus className="w-5 h-5 mr-2" />
           Add Document
         </Button>
+        )}
       </div>
 
       {isForm485Required(client) && (

@@ -146,6 +146,7 @@ export type ProfileTabProps = {
   onClientUpdated?: () => void;
   /** Where to navigate after successful delete. Defaults to agency clients list. */
   afterDeleteRoute?: string;
+  readOnly?: boolean;
 };
 
 export function ProfileTab({
@@ -154,6 +155,7 @@ export function ProfileTab({
   clientId,
   onClientUpdated,
   afterDeleteRoute = Routes.agency.clients,
+  readOnly = false,
 }: ProfileTabProps) {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -279,7 +281,8 @@ export function ProfileTab({
 
   return (
     <>
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 py-4">
+        {!readOnly && (
         <ProfileTabToolbar
           isInactive={isInactive}
           isActivating={isActivating}
@@ -289,6 +292,7 @@ export function ProfileTab({
           onOpenDeactivate={openDeactivateModal}
           onOpenDelete={openDeleteModal}
         />
+        )}
 
         <ProfileTabSections sections={sections} />
       </div>

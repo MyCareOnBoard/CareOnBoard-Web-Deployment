@@ -224,13 +224,13 @@ export default function ClientDetailsPage() {
             Client Management
           </h1>
         </div>
-        <Button
+        {/* <Button
           className="h-[44px] w-[180px] rounded-[60px] px-[11px] py-[12px] gap-2 bg-[#00b4b8] hover:bg-[#00a0a4] text-white flex items-center justify-center font-medium transition-colors"
           onClick={() => navigate(Routes.superAdmin.editClient.replace(":clientId", clientId || ""))}
         >
           <Edit className="w-5 h-5 text-white" />
           Edit Client
-        </Button>
+        </Button> */}
       </div>
 
       {/* Header Block */}
@@ -344,6 +344,7 @@ export default function ClientDetailsPage() {
           clientId={clientId || ""}
           onClientUpdated={fetchClient}
           afterDeleteRoute={Routes.superAdmin.clientDirectory}
+          readOnly={true}
         />
       )}
       {activeTab === "services" && (
@@ -351,11 +352,13 @@ export default function ClientDetailsPage() {
           client={client}
           clientId={clientId || ""}
           onServicesUpdated={fetchClient}
+          readOnly={true}
         />
       )}
       {activeTab === "documents" && (
         <DocumentsTab
           client={client}
+          readOnly={true}
           onOpenUploadModal={(document) => {
             setDocumentToEdit(document);
             setIsUploadModalOpen(true);

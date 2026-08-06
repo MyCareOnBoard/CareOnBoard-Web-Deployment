@@ -38,28 +38,29 @@ function ScopedClientShiftViews({ clientId }: { clientId: string }) {
 
   return (
     <section className="mt-4 space-y-4" aria-label="Client shifts">
-      <div role="group" aria-label="Client shift view" className="flex w-fit rounded-lg bg-[#e9eeee] p-1">
-        <button
-          type="button"
-          aria-label="Calendar view"
-          aria-pressed={view === "calendar"}
-          onClick={() => setView("calendar")}
-          className={`flex min-h-11 items-center gap-2 rounded-lg px-4 text-xs font-semibold transition-colors ${view === "calendar" ? "bg-white text-[#075b5d] shadow-[0_1px_2px_rgba(26,54,55,0.12)]" : "text-[#5e696b] hover:bg-white/60"}`}
-        >
-          <CalendarDays aria-hidden="true" className="h-4 w-4" />Calendar
-        </button>
-        <button
-          type="button"
-          aria-label="List view"
-          aria-pressed={view === "list"}
-          onClick={() => setView("list")}
-          className={`flex min-h-11 items-center gap-2 rounded-lg px-4 text-xs font-semibold transition-colors ${view === "list" ? "bg-white text-[#075b5d] shadow-[0_1px_2px_rgba(26,54,55,0.12)]" : "text-[#5e696b] hover:bg-white/60"}`}
-        >
-          <List aria-hidden="true" className="h-4 w-4" />List
-        </button>
-      </div>
 
-      <div className="flex flex-wrap items-end gap-3 rounded-xl border border-[#dce4e4] bg-white px-4 py-3">
+      <div className="flex justify-between flex-wrap items-end gap-3 rounded-xl border border-[#dce4e4] bg-white px-4 py-3">
+        <div role="group" aria-label="Client shift view" className="flex w-fit rounded-lg bg-[#e9eeee] p-1">
+          <button
+            type="button"
+            aria-label="Calendar view"
+            aria-pressed={view === "calendar"}
+            onClick={() => setView("calendar")}
+            className={`flex min-h-11 items-center gap-2 rounded-lg px-4 text-xs font-semibold transition-colors ${view === "calendar" ? "bg-white text-[#075b5d] shadow-[0_1px_2px_rgba(26,54,55,0.12)]" : "text-[#5e696b] hover:bg-white/60"}`}
+          >
+            <CalendarDays aria-hidden="true" className="h-4 w-4" />Calendar
+          </button>
+          <button
+            type="button"
+            aria-label="List view"
+            aria-pressed={view === "list"}
+            onClick={() => setView("list")}
+            className={`flex min-h-11 items-center gap-2 rounded-lg px-4 text-xs font-semibold transition-colors ${view === "list" ? "bg-white text-[#075b5d] shadow-[0_1px_2px_rgba(26,54,55,0.12)]" : "text-[#5e696b] hover:bg-white/60"}`}
+          >
+            <List aria-hidden="true" className="h-4 w-4" />List
+          </button>
+        </div>
+        <div className="flex flex-wrap items-end gap-3">
         <label className="grid gap-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#687173]">
           From
           <input
@@ -84,6 +85,7 @@ function ScopedClientShiftViews({ clientId }: { clientId: string }) {
             className="min-h-10 rounded-lg border border-[#cfd7d7] bg-[#fbfcfc] px-3 text-sm font-medium text-[#273033]"
           />
         </label>
+        </div>
       </div>
 
       {view === "calendar" ? <SuperAdminShiftsCalendar
@@ -94,7 +96,7 @@ function ScopedClientShiftViews({ clientId }: { clientId: string }) {
         mode={selectedMode}
         onSelectionChange={() => undefined}
         onOpenShift={openShiftDetails}
-      /> : <ShiftsListPage clientId={clientId} dateRange={dateRange} readOnly embedded />}
+      /> : <ShiftsListPage clientId={clientId} dateRange={dateRange} readOnly={true} embedded />}
     </section>
   );
 }

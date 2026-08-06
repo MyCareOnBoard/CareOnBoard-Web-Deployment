@@ -136,16 +136,16 @@ export default function ShiftManagementWorkspace() {
   };
 
   const changeSelection = (ids: string[]) => {
-    if (isMaintenanceRoute) {
-      const params = new URLSearchParams(location.search);
-      const agencyId = ids.map((id) => id.trim()).find(Boolean);
-      if (agencyId) params.set("agencyId", agencyId);
-      else params.delete("agencyId");
-      params.set("startDate", activeDateRange.startDate);
-      params.set("endDate", activeDateRange.endDate);
-      navigate({ pathname: location.pathname, search: `?${params.toString()}` });
-      return;
-    }
+    // if (isMaintenanceRoute) {
+    //   const params = new URLSearchParams(location.search);
+    //   const agencyId = ids.map((id) => id.trim()).find(Boolean);
+    //   if (agencyId) params.set("agencyId", agencyId);
+    //   else params.delete("agencyId");
+    //   params.set("startDate", activeDateRange.startDate);
+    //   params.set("endDate", activeDateRange.endDate);
+    //   navigate({ pathname: location.pathname, search: `?${params.toString()}` });
+    //   return;
+    // }
     const transition = updateShiftWorkspaceSelection(location.search, workspace, ids);
     navigateTo(transition.state, transition.search);
   };
@@ -247,9 +247,9 @@ export default function ShiftManagementWorkspace() {
         agencyId={activeAgencyId ?? ""}
         dateRange={activeDateRange}
         mode={mode}
-        maintenanceHref={!isMaintenanceRoute && canAccessShiftMaintenance
-          ? `${Routes.superAdmin.shifts.maintenance}?${maintenanceSearch.toString()}`
-          : undefined}
+        // maintenanceHref={!isMaintenanceRoute && canAccessShiftMaintenance
+        //   ? `${Routes.superAdmin.shifts.maintenance}?${maintenanceSearch.toString()}`
+        //   : undefined}
         activeCategory={activeShiftCategory}
         onCategoryChange={changeShiftCategory}
       /> : null}
@@ -263,9 +263,9 @@ export default function ShiftManagementWorkspace() {
             canManageShifts
               ? { label: "Shifts", pathname: workspace.view === "calendar" ? Routes.superAdmin.shifts.index : Routes.superAdmin.shifts.list, active: isShiftsRoute }
               : null,
-            canAccessShiftMaintenance
-              ? { label: "Maintenance", pathname: Routes.superAdmin.shifts.maintenance, active: isMaintenanceRoute }
-              : null,
+            // canAccessShiftMaintenance
+            //   ? { label: "Maintenance", pathname: Routes.superAdmin.shifts.maintenance, active: isMaintenanceRoute }
+            //   : null,
           ].filter((item): item is { label: string; pathname: string; active: boolean } => item !== null).map(({ label, pathname, active }) => (
             <button
               key={label}
@@ -308,7 +308,7 @@ export default function ShiftManagementWorkspace() {
         ) : null}
       </nav>
 
-      {!isMaintenanceRoute && selectedAgencies.length === 1 ? (
+      {/* {!isMaintenanceRoute && selectedAgencies.length === 1 ? (
         <div
           role="status"
           aria-label="Selected operational agency"
@@ -316,7 +316,7 @@ export default function ShiftManagementWorkspace() {
         >
           Operating in <strong>{selectedAgencies[0].name}</strong>
         </div>
-      ) : null}
+      ) : null} */}
 
       {isCalendarRoute && workspace.view === "calendar" ? (
         <SuperAdminShiftsCalendar
