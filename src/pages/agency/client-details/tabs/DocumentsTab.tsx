@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { FileText, Plus } from "lucide-react";
 import { Client, ClientDocument } from "@/lib/api/clients";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import {
   hasSignedForm485,
   form485GraceInfo,
 } from "@/pages/shared/client-management/utils/form485GenerationEligibility";
+import { DocumentPreviewModal } from "@/components/documents/DocumentPreviewModal";
 
 export function DocumentsTab({
   client,
@@ -18,6 +19,7 @@ export function DocumentsTab({
   onOpenUploadModal?: (document?: ClientDocument) => void;
   onActivateClient?: () => void;
 }) {
+  const [preview, setPreview] = useState<ClientDocument | null>(null);
   const grace = form485GraceInfo(client);
   const canReactivate =
     Boolean(onActivateClient) &&
@@ -69,149 +71,168 @@ export function DocumentsTab({
   }, [client.documents]);
 
   return (
-    <div className="mt-4 backdrop-blur bg-[rgba(255,255,255,0.3)] border border-[rgba(255,255,255,0.3)] rounded-[30px] p-[20px] flex flex-col gap-[24px] overflow-hidden">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-[4px]">
-          <p className="text-[24px] font-medium leading-[normal] text-[#10141a]">
-            Documents
-          </p>
-          <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-            Here are your uploaded documents
-          </p>
-        </div>
-        <Button
-          className="h-11 rounded-[60px] bg-[#00b4b8] text-white hover:bg-[#00a0a4] px-6 shrink-0"
-          onClick={() => {
-            if (onOpenUploadModal) {
-              onOpenUploadModal();
-            }
-          }}
-        >
-          <Plus className="w-5 h-5 mr-2" />
-          Add Document
-        </Button>
-      </div>
-
-      {isForm485Required(client) && (
-        <div className="rounded-[12px] border border-[#fdb022] bg-[#fffaeb] px-4 py-3">
-          <p className="text-[13px] font-medium text-[#b54708]">
-            Form 485 required to activate this client. Upload the signed Form 485
-            (CMS-485 Plan of Care) — you&apos;ll be prompted to activate once it&apos;s added.
-          </p>
-        </div>
-      )}
-
-      {grace.state === "unsigned-grace" && (
-        <div className="flex items-center justify-between gap-3 rounded-[12px] border border-[#fdb022] bg-[#fffaeb] px-4 py-3">
-          <p className="text-[13px] font-medium text-[#b54708]">
-            Active on an <strong>unsigned</strong> Form 485.{" "}
-            {grace.deadline
-              ? `Upload the signed copy by ${formatDeadline(grace.deadline)}${
-                  typeof grace.daysLeft === "number"
-                    ? ` (${grace.daysLeft} day${grace.daysLeft === 1 ? "" : "s"} left)`
-                    : ""
-                } to keep the client active.`
-              : "Upload the signed copy to keep the client active."}
-          </p>
-        </div>
-      )}
-
-      {grace.state === "expired" && (
-        <div className="flex items-center justify-between gap-3 rounded-[12px] border border-[#f97066] bg-[#fef3f2] px-4 py-3">
-          <p className="text-[13px] font-medium text-[#b42318]">
-            Form 485 grace period expired — this client was deactivated. Upload a
-            signed Form 485 to reactivate.
-          </p>
-        </div>
-      )}
-
-      {canReactivate && (
-        <div className="flex items-center justify-between gap-3 rounded-[12px] border border-[#12b76a] bg-[#ecfdf3] px-4 py-3">
-          <p className="text-[13px] font-medium text-[#027a48]">
-            A signed Form 485 is on file. This client can be activated.
-          </p>
-          <Button
-            className="h-9 shrink-0 rounded-[60px] bg-[#12b76a] px-5 text-white hover:bg-[#039855]"
-            onClick={() => onActivateClient?.()}
-          >
-            Activate client
-          </Button>
-        </div>
-      )}
-
-      <div className="flex flex-col gap-3">
-        {documents.length === 0 ? (
-          <div className="py-12 text-center">
-            <p className="text-[14px] font-medium text-[#808081]">
-              No documents uploaded yet.
+    <>
+      <div className="mt-4 backdrop-blur bg-[rgba(255,255,255,0.3)] border border-[rgba(255,255,255,0.3)] rounded-[30px] p-[20px] flex flex-col gap-[24px] overflow-hidden">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col gap-[4px]">
+            <p className="text-[24px] font-medium leading-[normal] text-[#10141a]">
+              Documents
+            </p>
+            <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+              Here are your uploaded documents
             </p>
           </div>
-        ) : (
-          documents.map((doc) => (
-            <div
-              key={doc.id}
-              className="backdrop-blur-[20px] rounded-[20px] flex items-center gap-[16px]"
-            >
-              <div className="w-[52.5px] h-[60px] rounded-[8px] bg-white flex items-center justify-center shrink-0">
-                <FileText className="w-6 h-6 text-[#00b4b8]" />
-              </div>
+          <Button
+            className="h-11 rounded-[60px] bg-[#00b4b8] text-white hover:bg-[#00a0a4] px-6 shrink-0"
+            onClick={() => {
+              if (onOpenUploadModal) {
+                onOpenUploadModal();
+              }
+            }}
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Add Document
+          </Button>
+        </div>
 
-              <div className="flex flex-1 items-center justify-between min-w-0">
-                <div className="flex flex-col gap-1 min-w-0">
-                  <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a] truncate">
-                    {doc.title}
-                  </p>
-                  {doc.fileName && (
-                    doc.url ? (
-                      <a
-                        href={doc.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[12px] font-medium leading-[1.4] text-[#808081] truncate hover:text-[#00b4b8] hover:underline transition-colors"
-                      >
-                        {doc.fileName}
-                      </a>
-                    ) : (
-                      <p className="text-[12px] font-medium leading-[1.4] text-[#808081] truncate">
-                        {doc.fileName}
-                      </p>
-                    )
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  {doc.isForm485 && doc.url ? (
-                    <Badge variant={doc.signed ? "success" : "pending"}>
-                      {doc.signed ? "Signed" : "Unsigned"}
-                    </Badge>
-                  ) : null}
-                  <Badge
-                    variant={
-                      doc.status === "Expired"
-                        ? "expired"
-                        : doc.status === "Available"
-                        ? "success"
-                        : "pending"
-                    }
-                    className={doc.status === "Expired" ? "cursor-pointer" : ""}
-                    onClick={() => {
-                      if (doc.status === "Expired") {
-                        if (onOpenUploadModal) {
-                          onOpenUploadModal(doc.document);
-                        }
-                      }
-                    }}
-                    title={doc.status === "Expired" ? "Update Document" : ""}
-                  >
-                    {doc.status}
-                  </Badge>
-                </div>
-              </div>
-            </div>
-          ))
+        {isForm485Required(client) && (
+          <div className="rounded-[12px] border border-[#fdb022] bg-[#fffaeb] px-4 py-3">
+            <p className="text-[13px] font-medium text-[#b54708]">
+              Form 485 required to activate this client. Upload the signed Form 485
+              (CMS-485 Plan of Care) — you&apos;ll be prompted to activate once it&apos;s added.
+            </p>
+          </div>
         )}
+
+        {grace.state === "unsigned-grace" && (
+          <div className="flex items-center justify-between gap-3 rounded-[12px] border border-[#fdb022] bg-[#fffaeb] px-4 py-3">
+            <p className="text-[13px] font-medium text-[#b54708]">
+              Active on an <strong>unsigned</strong> Form 485.{" "}
+              {grace.deadline
+                ? `Upload the signed copy by ${formatDeadline(grace.deadline)}${
+                    typeof grace.daysLeft === "number"
+                      ? ` (${grace.daysLeft} day${grace.daysLeft === 1 ? "" : "s"} left)`
+                      : ""
+                  } to keep the client active.`
+                : "Upload the signed copy to keep the client active."}
+            </p>
+          </div>
+        )}
+
+        {grace.state === "expired" && (
+          <div className="flex items-center justify-between gap-3 rounded-[12px] border border-[#f97066] bg-[#fef3f2] px-4 py-3">
+            <p className="text-[13px] font-medium text-[#b42318]">
+              Form 485 grace period expired — this client was deactivated. Upload a
+              signed Form 485 to reactivate.
+            </p>
+          </div>
+        )}
+
+        {canReactivate && (
+          <div className="flex items-center justify-between gap-3 rounded-[12px] border border-[#12b76a] bg-[#ecfdf3] px-4 py-3">
+            <p className="text-[13px] font-medium text-[#027a48]">
+              A signed Form 485 is on file. This client can be activated.
+            </p>
+            <Button
+              className="h-9 shrink-0 rounded-[60px] bg-[#12b76a] px-5 text-white hover:bg-[#039855]"
+              onClick={() => onActivateClient?.()}
+            >
+              Activate client
+            </Button>
+          </div>
+        )}
+
+        <div className="flex flex-col gap-3">
+          {documents.length === 0 ? (
+            <div className="py-12 text-center">
+              <p className="text-[14px] font-medium text-[#808081]">
+                No documents uploaded yet.
+              </p>
+            </div>
+          ) : (
+            documents.map((doc) => (
+              <div
+                key={doc.id}
+                className="backdrop-blur-[20px] rounded-[20px] flex items-center gap-[16px]"
+              >
+                <div className="w-[52.5px] h-[60px] rounded-[8px] bg-white flex items-center justify-center shrink-0">
+                  <FileText className="w-6 h-6 text-[#00b4b8]" />
+                </div>
+
+                <div className="flex flex-1 items-center justify-between min-w-0">
+                  <div className="flex flex-col gap-1 min-w-0">
+                    <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a] truncate">
+                      {doc.title}
+                    </p>
+                    {doc.fileName && (
+                      doc.url ? (
+                        <a
+                          href={doc.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[12px] font-medium leading-[1.4] text-[#808081] truncate hover:text-[#00b4b8] hover:underline transition-colors"
+                        >
+                          {doc.fileName}
+                        </a>
+                      ) : (
+                        <p className="text-[12px] font-medium leading-[1.4] text-[#808081] truncate">
+                          {doc.fileName}
+                        </p>
+                      )
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {doc.isForm485 && doc.url ? (
+                      <Badge variant={doc.signed ? "success" : "pending"}>
+                        {doc.signed ? "Signed" : "Unsigned"}
+                      </Badge>
+                    ) : null}
+                    <Badge
+                      variant={
+                        doc.status === "Expired"
+                          ? "expired"
+                          : doc.status === "Available"
+                          ? "success"
+                          : "pending"
+                      }
+                      className={doc.status === "Expired" ? "cursor-pointer" : ""}
+                      onClick={() => {
+                        if (doc.status === "Expired") {
+                          if (onOpenUploadModal) {
+                            onOpenUploadModal(doc.document);
+                          }
+                        }
+                      }}
+                      title={doc.status === "Expired" ? "Update Document" : ""}
+                    >
+                      {doc.status}
+                    </Badge>
+                    {doc.url ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPreview(doc.document as ClientDocument)}
+                      >
+                        View
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
-    </div>
+      <DocumentPreviewModal
+        open={preview !== null}
+        onOpenChange={(open) => { if (!open) setPreview(null); }}
+        title={preview?.title ?? "Document preview"}
+        url={preview?.url}
+        fileName={preview?.fileName}
+      />
+    </>
   );
 }
 
