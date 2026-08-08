@@ -3,6 +3,7 @@ import { Loader2, Phone, Edit, ArrowLeft } from "lucide-react";
 import { useParams, useSearchParams, useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import SuperAdminClientActivityShifts from "@/pages/super-admin/clients-directory/client-details/SuperAdminClientActivityShifts";
@@ -181,20 +182,7 @@ export default function ClientDetailsPage() {
     [clientId, formatClientName, calculateAge, client?.profileImage]
   );
 
-  if (isLoading) {
-    return (
-      <div className="min-h-[calc(100vh-200px)] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 animate-spin text-[#00b4b8]" />
-          <p className="text-[14px] font-medium text-[#808081]">
-            Loading client details...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !client) {
+  if (error || (!isLoading && !client)) {
     return (
       <div className="min-h-[calc(100vh-200px)] flex items-center justify-center">
         <div className="text-center">
@@ -235,47 +223,65 @@ export default function ClientDetailsPage() {
 
       {/* Header Block */}
       <div className="flex items-start justify-between gap-6">
-        <div className="flex items-start gap-6">
-          <Avatar className="w-[127px] h-[145px] rounded-[12px]">
-            {clientDisplay.avatarUrl && (
-              <AvatarImage
-                src={clientDisplay.avatarUrl}
-                alt={clientDisplay.name}
-                className="w-full h-full object-cover aspect-auto rounded-[12px]"
-              />
-            )}
-            <AvatarFallback className="w-full h-full rounded-[12px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-xl font-semibold">
-              {clientDisplay.name
-                .split(" ")
-                .filter(Boolean)
-                .slice(0, 2)
-                .map((w) => w[0]?.toUpperCase())
-                .join("")}
-            </AvatarFallback>
-          </Avatar>
-
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1">
-              <p className="text-[24px] font-semibold leading-[normal] text-[#10141a]">
-                {clientDisplay.name}
-              </p>
-              <div className="flex flex-col gap-1 text-[12px] font-medium text-[#808081]">
-                <span>Age: <span className="font-normal ps-2">{clientDisplay.ageLabel}</span></span>
-                <span>Medical ID: <span className="font-normal ps-2">{client.medicaidId}</span></span>
+        {isLoading || !client ? (
+          <div
+            aria-label="Loading client header"
+            aria-busy="true"
+            className="flex items-start gap-6"
+          >
+            <Skeleton className="h-[145px] w-[127px] rounded-[12px]" />
+            <div className="flex flex-col gap-4 pt-1">
+              <div className="flex flex-col gap-2">
+                <Skeleton className="h-7 w-56 rounded" />
+                <Skeleton className="h-3 w-36 rounded" />
+                <Skeleton className="h-3 w-44 rounded" />
               </div>
+              <Skeleton className="h-[44px] w-[180px] rounded-[60px]" />
             </div>
-
-            {client.phone && (
-              <a
-                href={`tel:${client.phone.replace(/\D/g, "")}`}
-                className="h-[44px] w-[180px] rounded-[60px] px-[11px] py-[12px] gap-2 bg-[#00b4b8] hover:bg-[#00a0a4] text-white flex items-center justify-center font-medium transition-colors"
-              >
-                <Phone className="w-5 h-5 text-white" />
-                Call
-              </a>
-            )}
           </div>
-        </div>
+        ) : (
+          <div className="flex items-start gap-6">
+            <Avatar className="w-[127px] h-[145px] rounded-[12px]">
+              {clientDisplay.avatarUrl && (
+                <AvatarImage
+                  src={clientDisplay.avatarUrl}
+                  alt={clientDisplay.name}
+                  className="w-full h-full object-cover aspect-auto rounded-[12px]"
+                />
+              )}
+              <AvatarFallback className="w-full h-full rounded-[12px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-xl font-semibold">
+                {clientDisplay.name
+                  .split(" ")
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .map((w) => w[0]?.toUpperCase())
+                  .join("")}
+              </AvatarFallback>
+            </Avatar>
+
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <p className="text-[24px] font-semibold leading-[normal] text-[#10141a]">
+                  {clientDisplay.name}
+                </p>
+                <div className="flex flex-col gap-1 text-[12px] font-medium text-[#808081]">
+                  <span>Age: <span className="font-normal ps-2">{clientDisplay.ageLabel}</span></span>
+                  <span>Medical ID: <span className="font-normal ps-2">{client.medicaidId}</span></span>
+                </div>
+              </div>
+
+              {client.phone && (
+                <a
+                  href={`tel:${client.phone.replace(/\D/g, "")}`}
+                  className="h-[44px] w-[180px] rounded-[60px] px-[11px] py-[12px] gap-2 bg-[#00b4b8] hover:bg-[#00a0a4] text-white flex items-center justify-center font-medium transition-colors"
+                >
+                  <Phone className="w-5 h-5 text-white" />
+                  Call
+                </a>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex items-center gap-2">
@@ -331,13 +337,13 @@ export default function ClientDetailsPage() {
       </div>
 
       {/* Tab Content */}
-      {activeTab === "activity" && (
+      {!isLoading && client && activeTab === "activity" && (
         <SuperAdminClientActivityShifts
           clientId={clientId || ""}
           agencyId={client?.agencyId || ""}
         />
       )}
-      {activeTab === "profile" && (
+      {!isLoading && client && activeTab === "profile" && (
         <ProfileTab
           client={client}
           formatDate={formatDate}
@@ -347,7 +353,7 @@ export default function ClientDetailsPage() {
           readOnly={true}
         />
       )}
-      {activeTab === "services" && (
+      {!isLoading && client && activeTab === "services" && (
         <ServicesTab
           client={client}
           clientId={clientId || ""}
@@ -355,7 +361,7 @@ export default function ClientDetailsPage() {
           readOnly={true}
         />
       )}
-      {activeTab === "documents" && (
+      {!isLoading && client && activeTab === "documents" && (
         <DocumentsTab
           client={client}
           readOnly={true}
