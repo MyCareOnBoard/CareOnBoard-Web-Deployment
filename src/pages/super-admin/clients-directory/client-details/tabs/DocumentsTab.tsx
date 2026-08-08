@@ -1,5 +1,6 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { FileText, Plus } from "lucide-react";
+import { DocumentPreviewModal } from "@/components/documents/DocumentPreviewModal";
 import { Client, ClientDocument } from "@/lib/api/clients";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,11 @@ export function DocumentsTab({
   onOpenUploadModal?: (document?: ClientDocument) => void;
   readOnly?: boolean;
 }) {
+  const [preview, setPreview] = useState<{
+    title: string;
+    fileName?: string;
+    url: string;
+  } | null>(null);
   const grace = form485GraceInfo(client);
   const formatDeadline = (d?: Date) =>
     d ? d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
@@ -144,22 +150,11 @@ export function DocumentsTab({
                   <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a] truncate">
                     {doc.title}
                   </p>
-                  {doc.fileName && (
-                    doc.url ? (
-                      <a
-                        href={doc.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[12px] font-medium leading-[1.4] text-[#808081] truncate hover:text-[#00b4b8] hover:underline transition-colors"
-                      >
-                        {doc.fileName}
-                      </a>
-                    ) : (
-                      <p className="text-[12px] font-medium leading-[1.4] text-[#808081] truncate">
-                        {doc.fileName}
-                      </p>
-                    )
-                  )}
+                  {doc.fileName ? (
+                    <p className="text-[12px] font-medium leading-[1.4] text-[#808081] truncate">
+                      {doc.fileName}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
@@ -188,12 +183,33 @@ export function DocumentsTab({
                   >
                     {doc.status}
                   </Badge>
+                  {doc.url ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPreview({
+                        title: doc.title,
+                        fileName: doc.fileName,
+                        url: doc.url!,
+                      })}
+                    >
+                      View
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             </div>
           ))
         )}
       </div>
+      <DocumentPreviewModal
+        open={preview !== null}
+        onOpenChange={(open) => { if (!open) setPreview(null); }}
+        title={preview?.title ?? "Document preview"}
+        url={preview?.url}
+        fileName={preview?.fileName}
+      />
     </div>
   );
 }

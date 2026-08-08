@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
-import { listShifts, Shift, deleteShift, updateShift, ShiftType, SubmissionStatus, formatShiftLocation } from "@/lib/api/shifts";
+import { listShifts, Shift, deleteShift, updateShift, ShiftType, SubmissionStatus, formatShiftLocation, type ShiftPageLoader } from "@/lib/api/shifts";
 import { useToast } from "@/hooks/use-toast";
 import AddScheduleModal, { ScheduleFormData } from "../components/AddScheduleModal";
 import { shiftToScheduleFormData } from "../shift-to-schedule-form";
@@ -79,12 +79,14 @@ function ShiftListRowsSkeleton() {
 
 export interface ShiftsListPageProps {
   clientId?: string;
+  employeeId?: string;
   dateRange?: { startDate: string; endDate: string };
   readOnly?: boolean;
   embedded?: boolean;
+  loadPage?: ShiftPageLoader;
 }
 
-export default function ShiftsListPage({ clientId, dateRange, readOnly = false, embedded = false }: ShiftsListPageProps) {
+export default function ShiftsListPage({ clientId, employeeId, dateRange, readOnly = false, embedded = false, loadPage }: ShiftsListPageProps) {
   const { toast } = useToast();
   const { agencyId, agency, mode, data, actor, routes } = useOperationalAgency();
   const location = useLocation();
@@ -129,10 +131,11 @@ export default function ShiftsListPage({ clientId, dateRange, readOnly = false, 
       try {
         setLoading(true);
         const loadedShifts = await loadAllShiftPages(
-          (params) => listShifts(params, { signal }),
+          (params) => (loadPage ?? listShifts)(params, { signal }),
           {
             ...scopedShiftListParams(agencyId, shiftRequestSearch, mode ?? undefined),
             ...(clientId ? { clientId } : {}),
+            ...(employeeId ? { employeeId } : {}),
             ...(dateRange ? { startDate: dateRange.startDate, endDate: dateRange.endDate, limit: 200 } : {}),
           },
         );
@@ -153,7 +156,7 @@ export default function ShiftsListPage({ clientId, dateRange, readOnly = false, 
       } finally {
         if (!signal?.aborted) setLoading(false);
       }
-  }, [agencyId, clientId, dateRange?.endDate, dateRange?.startDate, mode, shiftRequestSearch, toast]);
+  }, [agencyId, clientId, dateRange?.endDate, dateRange?.startDate, employeeId, loadPage, mode, shiftRequestSearch, toast]);
 
   useEffect(() => {
     const controller = new AbortController();

@@ -29,7 +29,7 @@ vi.mock("@/lib/operational-agency/OperationalAgencyProvider", () => ({
   }),
 }));
 
-import SuperAdminClientActivityShifts from "./SuperAdminClientActivityShifts";
+import SuperAdminClientActivityShifts, { SuperAdminStaffActivityShifts } from "./SuperAdminClientActivityShifts";
 
 describe("SuperAdminClientActivityShifts", () => {
   it("locks both Shift Management views to the client and agency", async () => {
@@ -50,6 +50,28 @@ describe("SuperAdminClientActivityShifts", () => {
       dateRange: expect.objectContaining({ startDate: expect.any(String), endDate: expect.any(String) }),
       readOnly: true,
       embedded: true,
+    }));
+  });
+
+  it("uses the same workspace and date range for an employee", async () => {
+    const loadPage = vi.fn(async () => ({ success: true, count: 0, shifts: [], nextCursor: null }));
+    render(<SuperAdminStaffActivityShifts employeeId="employee-1" agencyId="agency-1" loadPage={loadPage} />);
+
+    expect(screen.getByRole("group", { name: "Staff shift view" })).toBeVisible();
+    expect(calendarProps).toHaveBeenLastCalledWith(expect.objectContaining({
+      employeeId: "employee-1",
+      lockAgency: true,
+      loadPage,
+    }));
+
+    await userEvent.click(screen.getByRole("button", { name: "List view" }));
+
+    expect(listProps).toHaveBeenLastCalledWith(expect.objectContaining({
+      employeeId: "employee-1",
+      dateRange: expect.objectContaining({ startDate: expect.any(String), endDate: expect.any(String) }),
+      readOnly: true,
+      embedded: true,
+      loadPage,
     }));
   });
 });

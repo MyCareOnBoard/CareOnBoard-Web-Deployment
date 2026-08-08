@@ -4,7 +4,7 @@ import { AlertTriangle, Building2, ChevronLeft, ChevronRight, X } from "lucide-r
 import ShiftMonthGrid from "@/components/shifts/ShiftMonthGrid";
 import ShiftCalendarSkeleton from "@/components/shifts/ShiftCalendarSkeleton";
 import { Button } from "@/components/ui/button";
-import { listShifts, type Shift } from "@/lib/api/shifts";
+import { listShifts, type Shift, type ShiftPageLoader } from "@/lib/api/shifts";
 import type { OperationalAgencySummary } from "@/lib/operational-agency/types";
 import { ANOMALY_CHIP_CLASS } from "@/lib/shift-visual-tokens";
 import { cn } from "@/lib/utils";
@@ -21,12 +21,14 @@ const PAGE_LIMIT = 200;
 export interface SuperAdminShiftsCalendarProps {
   agencies: OperationalAgencySummary[];
   clientId?: string;
+  employeeId?: string;
   lockAgency?: boolean;
   dateRange: ShiftDateRange;
   mode: "ddd" | "hha";
   category?: ShiftCategory | null;
   onSelectionChange: (selectedIds: string[]) => void;
   onOpenShift?: (shift: NormalizedCalendarShift) => void;
+  loadPage?: ShiftPageLoader;
 }
 
 function populatedName(value: unknown): string | null {
@@ -120,12 +122,14 @@ function ShiftSummary({ shift, showBadge }: { shift: NormalizedCalendarShift; sh
 export default function SuperAdminShiftsCalendar({
   agencies,
   clientId,
+  employeeId,
   lockAgency = false,
   dateRange,
   mode,
   category = null,
   onSelectionChange,
   onOpenShift,
+  loadPage,
 }: SuperAdminShiftsCalendarProps) {
   const selectedAgency = agencies[0];
   const [shifts, setShifts] = useState<NormalizedCalendarShift[]>([]);
@@ -157,9 +161,10 @@ export default function SuperAdminShiftsCalendar({
       const seenCursors = new Set<string>();
       let startAfter: string | undefined;
       do {
-        const response = await listShifts({
+        const response = await (loadPage ?? listShifts)({
           ...(selectedAgency ? { agencyId: selectedAgency.id } : {}),
           ...(clientId ? { clientId } : {}),
+          ...(employeeId ? { employeeId } : {}),
           startDate: dateRange.startDate,
           endDate: dateRange.endDate,
           client: true,
@@ -191,7 +196,7 @@ export default function SuperAdminShiftsCalendar({
     });
 
     return () => controller.abort();
-  }, [clientId, dateRange.endDate, dateRange.startDate, mode, retryVersion, selectedAgency]);
+  }, [clientId, dateRange.endDate, dateRange.startDate, employeeId, loadPage, mode, retryVersion, selectedAgency]);
 
   const filteredShifts = useMemo(
     () => shifts.filter((shift) => matchesShiftCategory(shift, category)),

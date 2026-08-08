@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, generatePath } from "react-router";
 import { format } from "date-fns";
-import { Building2, ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react";
+import { ArrowDownUp, Building2, Check, ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Routes } from "@/routes/constants";
 import {
   type StaffDirectoryAccountType,
   type StaffDirectoryStaffMember,
@@ -15,7 +18,8 @@ import {
 
 const PAGE_SIZE = 20;
 const SEARCH_TOKEN_PATTERN = /^[a-z0-9]{2,32}$/;
-const SEARCH_GUIDANCE = "Use one 2–32 character name or email token with letters and numbers only.";
+const EMAIL_FRAGMENT_PATTERN = /^(?=.{2,254}$)(?=.*[a-z0-9])[a-z0-9.!#$%&'*+/=?^_`{|}~@-]+$/;
+const UPDATED_SEARCH_GUIDANCE = "Search by one name, email term, email fragment, or complete email address.";
 
 function StaffDirectorySkeleton() {
   return (
@@ -91,15 +95,22 @@ export default function StaffDirectory() {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [selectedAgencyId, setSelectedAgencyId] = useState("");
+  const [selectedAccountType, setSelectedAccountType] = useState<StaffDirectoryAccountType | "">("");
+  const [createdSort, setCreatedSort] = useState<"asc" | "desc">("desc");
+  const [sortOpen, setSortOpen] = useState(false);
   const [cursor, setCursor] = useState<string | undefined>();
   const [previousCursors, setPreviousCursors] = useState<Array<string | undefined>>([]);
   const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
-  const hasInvalidSearch = normalizedSearchQuery.length > 0 && !SEARCH_TOKEN_PATTERN.test(normalizedSearchQuery);
+  const hasInvalidSearch = normalizedSearchQuery.length > 0 &&
+    !SEARCH_TOKEN_PATTERN.test(normalizedSearchQuery) &&
+    !EMAIL_FRAGMENT_PATTERN.test(normalizedSearchQuery);
 
   const { data, isLoading: isLoadingStaff, isFetching, isError, refetch } = useListStaffDirectoryQuery({
     agencyId: selectedAgencyId || undefined,
     search: debouncedSearchQuery.trim() || undefined,
+    accountType: selectedAccountType || undefined,
+    sort: createdSort,
     cursor,
     limit: PAGE_SIZE,
   });
@@ -191,26 +202,39 @@ export default function StaffDirectory() {
       </section>
 
       <section className="overflow-hidden rounded-2xl border border-[#dfe6e6] bg-[#fdfefe] shadow-[0_16px_45px_rgba(33,69,70,0.08)]" aria-labelledby="staff-directory-list-title">
-        <div className="flex flex-col gap-4 border-b border-[#e6ecec] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className="border-b border-[#e6ecec] px-5 py-5 sm:px-6">
           <div>
             <h2 id="staff-directory-list-title" className="text-[18px] font-semibold text-[#10141a]">Staff records</h2>
             <p className="mt-1 text-[12px] text-[#687173]" aria-live="polite">{isLoading ? "Loading staff records" : `${staff.length} record${staff.length === 1 ? "" : "s"} shown`}</p>
           </div>
-          <div className="min-w-0 sm:w-[340px]">
-            <div className="relative">
+          <div className="mt-4 flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start">
+            <div className="min-w-0 lg:flex-[1.4]">
+              <label htmlFor="staff-directory-search" className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-[#687173]">Search</label>
+              <div className="relative">
               <Search aria-hidden="true" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#748082]" />
               <Input
+                id="staff-directory-search"
                 aria-label="Search staff"
                 aria-describedby="staff-directory-search-guidance"
                 aria-invalid={hasInvalidSearch || undefined}
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Search one name or email token"
+                placeholder="Name term or full email"
                 className={`h-11 rounded-full bg-[#f6f9f9] pl-10 pr-10 text-[13px] focus-visible:ring-[#008f92]/30 ${hasInvalidSearch ? "border-[#d99b94]" : "border-[#d2dada]"}`}
               />
               {!hasInvalidSearch && isFetching && !isLoading && <Loader2 aria-label="Searching staff" className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-[#748082]" />}
+              </div>
+              <p id="staff-directory-search-guidance" aria-live="polite" className={`mt-1.5 px-2 text-[11px] leading-4 ${hasInvalidSearch ? "font-medium text-[#9b3e33]" : "text-[#687173]"}`}>{UPDATED_SEARCH_GUIDANCE}</p>
             </div>
-            <p id="staff-directory-search-guidance" aria-live="polite" className={`mt-1.5 px-2 text-[11px] leading-4 ${hasInvalidSearch ? "font-medium text-[#9b3e33]" : "text-[#687173]"}`}>{SEARCH_GUIDANCE}</p>
+            <div className="min-w-0 lg:w-64"><label htmlFor="staff-directory-account-type" className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-[#687173]">Account type</label><select id="staff-directory-account-type" value={selectedAccountType} onChange={(event) => { setSelectedAccountType(event.target.value as StaffDirectoryAccountType | ""); resetPagination(); }} className="h-11 w-full rounded-xl border border-[#d2dada] bg-[#f6f9f9] px-3 text-[13px] text-[#273033] focus:outline-none focus:ring-2 focus:ring-[#008f92]/30"><option value="">All account types</option><option value="employee">Employee</option><option value="internal_user">Agency Staff</option><option value="agency_admin">Agency Administrator</option></select></div>
+            <div className="self-start lg:pt-[22px]">
+              <Popover open={sortOpen} onOpenChange={setSortOpen}>
+                <PopoverTrigger asChild><Button type="button" variant="outline" size="icon" aria-label={`Sort by created date: ${createdSort === "desc" ? "Newest first" : "Oldest first"}`} className="h-11 w-11 shrink-0 rounded-xl border-[#d2dada] bg-[#f6f9f9] text-[#4d5a5c] hover:bg-[#edf5f5]"><ArrowDownUp className="h-4 w-4" /></Button></PopoverTrigger>
+                <PopoverContent align="end" className="w-48 rounded-xl border-[#dce4e4] p-1.5 shadow-lg">
+                  {([{"value":"desc","label":"Newest first"},{"value":"asc","label":"Oldest first"}] as const).map((option) => <button key={option.value} type="button" aria-pressed={createdSort === option.value} onClick={() => { setCreatedSort(option.value); resetPagination(); setSortOpen(false); }} className="flex min-h-10 w-full items-center justify-between rounded-lg px-3 text-left text-[13px] text-[#273033] hover:bg-[#eef7f7] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#008f92]/30"><span>{option.label}</span><Check className={`h-4 w-4 text-[#008f92] ${createdSort === option.value ? "opacity-100" : "opacity-0"}`} /></button>)}
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
         </div>
 
@@ -222,10 +246,10 @@ export default function StaffDirectory() {
         ) : (
           <div className="overflow-x-auto">
             {isLoading ? <StaffDirectorySkeleton /> : staff.length === 0 ? (
-              <div className="p-12 text-center"><p className="text-[14px] font-semibold text-[#273033]">{hasInvalidSearch ? "Enter a valid search token" : "No staff found"}</p><p className="mt-1 text-[12px] text-[#687173]">{hasInvalidSearch ? "Correct the highlighted search to continue." : "Try another search or agency scope."}</p></div>
+              <div className="p-12 text-center"><p className="text-[14px] font-semibold text-[#273033]">{hasInvalidSearch ? "Correct the highlighted search" : "No staff found"}</p><p className="mt-1 text-[12px] text-[#687173]">{hasInvalidSearch ? "Update the search to continue." : "Try another search or filter."}</p></div>
             ) : (
-              <table className="w-full min-w-[920px]">
-                <thead className="bg-[#f5f8f8]"><tr>{["Staff member", "Account type", "Role", "Status", "Agency", "Created"].map((label) => <th key={label} className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-[0.08em] text-[#687173]">{label}</th>)}</tr></thead>
+              <table className="w-full min-w-[1050px]">
+                <thead className="bg-[#f5f8f8]"><tr>{["Staff member", "Account type", "Role", "Status", "Agency", "Created", "Actions"].map((label) => <th key={label} className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-[0.08em] text-[#687173]">{label}</th>)}</tr></thead>
                 <tbody className="divide-y divide-[#edf1f1]">
                   {staff.map((member) => (
                     <tr key={member.id} className="transition-colors hover:bg-[#f7fbfb]">
@@ -235,6 +259,7 @@ export default function StaffDirectory() {
                       <td className="px-5 py-4"><Badge variant="outline" className={`border px-2.5 py-1 text-[11px] font-semibold ${statusClass(member.status)}`}>{statusLabel(member.status)}</Badge></td>
                       <td className="max-w-[190px] px-5 py-4 text-[13px] text-[#4d5a5c]"><span className="block truncate">{member.agency.name}</span></td>
                       <td className="px-5 py-4 text-[12px] text-[#4d5a5c]">{createdDate(member.createdAt)}</td>
+                      <td className="px-5 py-4"><Link to={generatePath(Routes.superAdmin.staffDetails, { staffId: member.id })} className="inline-flex h-9 cursor-pointer items-center justify-center whitespace-nowrap rounded-[60px] border border-[#00b4b8] px-4 text-[12px] font-medium text-[#008f92] transition-colors hover:bg-[#e8f7f7] focus:outline-none focus:ring-2 focus:ring-[#008f92]/30">View details</Link></td>
                     </tr>
                   ))}
                 </tbody>

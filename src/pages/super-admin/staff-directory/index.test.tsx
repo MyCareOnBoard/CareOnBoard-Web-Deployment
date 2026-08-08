@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router";
 
 const useListStaffDirectoryQuery = vi.hoisted(() => vi.fn());
 
@@ -45,7 +46,7 @@ describe("super-admin staff directory", () => {
   afterEach(() => vi.useRealTimers());
 
   it("renders the read-only directory and protects its search contract", async () => {
-    render(<StaffDirectory />);
+    render(<MemoryRouter><StaffDirectory /></MemoryRouter>);
 
     const row = screen.getByRole("row", { name: /Jordan Lee/i });
     expect(within(row).getByText("Employee")).toBeVisible();
@@ -54,8 +55,10 @@ describe("super-admin staff directory", () => {
     expect(screen.getByText("17")).toBeVisible();
     expect(screen.getByText("13")).toBeVisible();
     expect(screen.getByText("2")).toBeVisible();
-    expect(screen.queryByRole("button", { name: /add staff|view details|edit|delete/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("columnheader", { name: /actions?/i })).not.toBeInTheDocument();
+    expect(within(row).getByRole("link", { name: /view details/i })).toHaveAttribute("href", "/super-admin/staff-1");
+    expect(within(row).getByRole("link", { name: /view details/i })).toHaveClass("whitespace-nowrap");
+    expect(within(row).queryByRole("link", { name: /Jordan Lee/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /actions?/i })).toBeVisible();
     expect(screen.getByRole("option", { name: "Legacy Care" })).toHaveValue("legacy");
 
     const search = screen.getByRole("textbox", { name: "Search staff" });
@@ -63,10 +66,27 @@ describe("super-admin staff directory", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(350); });
     expect(useListStaffDirectoryQuery).toHaveBeenLastCalledWith(expect.objectContaining({ search: "jordan" }));
 
+    fireEvent.change(search, { target: { value: "test_agency@test.com" } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(350); });
+    expect(useListStaffDirectoryQuery).toHaveBeenLastCalledWith(expect.objectContaining({ search: "test_agency@test.com" }));
+
+    fireEvent.change(search, { target: { value: "test_ca" } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(350); });
+    expect(search).not.toHaveAttribute("aria-invalid");
+    expect(useListStaffDirectoryQuery).toHaveBeenLastCalledWith(expect.objectContaining({ search: "test_ca" }));
+
+    fireEvent.change(screen.getByLabelText("Account type"), { target: { value: "internal_user" } });
+    expect(useListStaffDirectoryQuery).toHaveBeenLastCalledWith(expect.objectContaining({ accountType: "internal_user" }));
+
+    expect(screen.queryByLabelText("Role")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Sort by created date: Newest first" }));
+    fireEvent.click(screen.getByRole("button", { name: "Oldest first" }));
+    expect(useListStaffDirectoryQuery).toHaveBeenLastCalledWith(expect.objectContaining({ sort: "asc" }));
+
     fireEvent.change(search, { target: { value: "Jordan Lee@" } });
     await act(async () => { await vi.advanceTimersByTimeAsync(350); });
-    expect(screen.getByText("Use one 2–32 character name or email token with letters and numbers only.")).toBeVisible();
-    expect(useListStaffDirectoryQuery).toHaveBeenLastCalledWith(expect.objectContaining({ search: "jordan" }));
+    expect(screen.getByText("Search by one name, email term, email fragment, or complete email address.")).toBeVisible();
     expect(screen.queryByRole("row", { name: /Jordan Lee/i })).not.toBeInTheDocument();
     expect(screen.queryByText("17")).not.toBeInTheDocument();
     expect(screen.queryByText("Page 1")).not.toBeInTheDocument();

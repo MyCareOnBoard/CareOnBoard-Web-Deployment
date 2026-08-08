@@ -387,6 +387,11 @@ export interface ListShiftsResponse {
     nextCursor?: string | null;
 }
 
+export type ShiftPageLoader = (
+    params: ListShiftsParams,
+    options?: ShiftRequestOptions,
+) => Promise<ListShiftsResponse>;
+
 /**
  * Shift statistics bucket for a single day
  */

@@ -7,13 +7,17 @@ import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgency
 import SuperAdminShiftsCalendar from "@/pages/super-admin/shift-management/SuperAdminShiftsCalendar";
 import { SuperAdminShiftScope } from "@/pages/super-admin/shift-management/SuperAdminShiftList";
 import type { NormalizedCalendarShift } from "@/pages/super-admin/shift-management/calendarModel";
+import type { ShiftPageLoader } from "@/lib/api/shifts";
 
-interface SuperAdminClientActivityShiftsProps {
-  clientId: string;
+interface SuperAdminSubjectActivityShiftsProps {
+  clientId?: string;
+  employeeId?: string;
   agencyId: string;
+  subjectLabel: "Client" | "Staff";
+  loadPage?: ShiftPageLoader;
 }
 
-function ScopedClientShiftViews({ clientId }: { clientId: string }) {
+function ScopedSubjectShiftViews({ clientId, employeeId, subjectLabel, loadPage }: Omit<SuperAdminSubjectActivityShiftsProps, "agencyId">) {
   const navigate = useNavigate();
   const location = useLocation();
   const { agency, agencyId, mode, routes } = useOperationalAgency();
@@ -37,10 +41,10 @@ function ScopedClientShiftViews({ clientId }: { clientId: string }) {
   };
 
   return (
-    <section className="mt-4 space-y-4" aria-label="Client shifts">
+    <section className="mt-4 space-y-4" aria-label={`${subjectLabel} shifts`}>
 
       <div className="flex justify-between flex-wrap items-end gap-3 rounded-xl border border-[#dce4e4] bg-white px-4 py-3">
-        <div role="group" aria-label="Client shift view" className="flex w-fit rounded-lg bg-[#e9eeee] p-1">
+        <div role="group" aria-label={`${subjectLabel} shift view`} className="flex w-fit rounded-lg bg-[#e9eeee] p-1">
           <button
             type="button"
             aria-label="Calendar view"
@@ -91,24 +95,34 @@ function ScopedClientShiftViews({ clientId }: { clientId: string }) {
       {view === "calendar" ? <SuperAdminShiftsCalendar
         agencies={[agency]}
         clientId={clientId}
+        employeeId={employeeId}
         lockAgency
         dateRange={dateRange}
         mode={selectedMode}
         onSelectionChange={() => undefined}
         onOpenShift={openShiftDetails}
-      /> : <ShiftsListPage clientId={clientId} dateRange={dateRange} readOnly={true} embedded />}
+        loadPage={loadPage}
+      /> : <ShiftsListPage clientId={clientId} employeeId={employeeId} dateRange={dateRange} readOnly={true} embedded loadPage={loadPage} />}
     </section>
   );
 }
 
-export default function SuperAdminClientActivityShifts({ clientId, agencyId }: SuperAdminClientActivityShiftsProps) {
-  if (!clientId || !agencyId) {
-    return <p role="status" className="mt-4 rounded-xl border border-[#dce4e4] bg-white px-4 py-6 text-sm text-[#5e6d6e]">Shift activity is unavailable until this client is assigned to an agency.</p>;
+function SuperAdminSubjectActivityShifts({ clientId, employeeId, agencyId, subjectLabel, loadPage }: SuperAdminSubjectActivityShiftsProps) {
+  if ((!clientId && !employeeId) || !agencyId) {
+    return <p role="status" className="mt-4 rounded-xl border border-[#dce4e4] bg-white px-4 py-6 text-sm text-[#5e6d6e]">Shift activity is unavailable until this {subjectLabel.toLowerCase()} member is assigned to an agency.</p>;
   }
 
   return (
     <SuperAdminShiftScope agencyId={agencyId}>
-      <ScopedClientShiftViews clientId={clientId} />
+      <ScopedSubjectShiftViews clientId={clientId} employeeId={employeeId} subjectLabel={subjectLabel} loadPage={loadPage} />
     </SuperAdminShiftScope>
   );
+}
+
+export function SuperAdminStaffActivityShifts({ employeeId, agencyId, loadPage }: { employeeId: string; agencyId: string; loadPage: ShiftPageLoader }) {
+  return <SuperAdminSubjectActivityShifts employeeId={employeeId} agencyId={agencyId} subjectLabel="Staff" loadPage={loadPage} />;
+}
+
+export default function SuperAdminClientActivityShifts({ clientId, agencyId }: { clientId: string; agencyId: string }) {
+  return <SuperAdminSubjectActivityShifts clientId={clientId} agencyId={agencyId} subjectLabel="Client" />;
 }

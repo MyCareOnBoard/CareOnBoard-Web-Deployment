@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { FileText, Plus } from "lucide-react";
-import { EmployeeDocument } from "@/lib/api/employee-documents";
+import { DocumentPreviewModal } from "@/components/documents/DocumentPreviewModal";
+import { Button } from "@/components/ui/button";
+import type { EmployeeDocument } from "@/lib/api/employee-documents";
 
 interface DocumentsSectionProps {
   documents: EmployeeDocument[];
@@ -16,6 +19,8 @@ export function DocumentsSection({
   getDocumentStatusColor,
   getDocumentActionButton,
 }: DocumentsSectionProps) {
+  const [preview, setPreview] = useState<EmployeeDocument | null>(null);
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -58,11 +63,28 @@ export function DocumentsSection({
                   {doc.status === 'expiring-soon' ? 'Expiring Soon' : doc.status === 'unavailable' ? 'Unavailable' : doc.status}
                 </span>
                 {getDocumentActionButton(doc.status, doc)}
+                {doc.fileUrl ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPreview(doc)}
+                  >
+                    View
+                  </Button>
+                ) : null}
               </div>
             </div>
           ))
         )}
       </div>
+      <DocumentPreviewModal
+        open={preview !== null}
+        onOpenChange={(open) => { if (!open) setPreview(null); }}
+        title={preview?.documentName ?? "Document preview"}
+        url={preview?.fileUrl}
+        fileName={preview?.fileName}
+      />
     </div>
   );
 }
