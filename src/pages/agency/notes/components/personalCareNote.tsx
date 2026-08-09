@@ -11,19 +11,21 @@ interface AgencyPersonalCareNoteProps {
   submissionId: string | null;
   isLoading: boolean;
   submittedNote?: SubmittedNoteDetails;
+  readOnly?: boolean;
 }
 
 export default function AgencyPersonalCareNote({
   submissionId,
   isLoading,
   submittedNote,
+  readOnly = false,
 }: AgencyPersonalCareNoteProps) {
   const [checkedActivities, setCheckedActivities] = useState<string[]>([]);
   const [noteId, setNoteId] = useState<string>("");
   const [startDate, setStartDate] = useState<string>("");
   const [mutateNote] = useUpdateSubmittedNoteMutation();
 
-  const isEditable = submittedNote?.status === "submitted";
+  const isEditable = !readOnly && submittedNote?.status === "submitted";
 
   const infoItems = useMemo<HhaNoteInfoItem[]>(
     () => [

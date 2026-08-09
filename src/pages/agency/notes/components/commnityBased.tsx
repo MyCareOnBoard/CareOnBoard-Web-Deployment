@@ -40,12 +40,14 @@ const initialActivities = [
 
 
 export default function AgencyCommunityBasedNote(
-  {submissionId, isLoading, submittedNote}: {
+  {submissionId, isLoading, submittedNote, readOnly = false}: {
     submissionId: string | null;
     isLoading: boolean;
     submittedNote?: SubmittedNoteDetails;
+    readOnly?: boolean;
   }
 ) {
+  const isEditable = !readOnly && submittedNote?.status === "submitted";
   const [openDatePopoverId, setOpenDatePopoverId] = useState<string | null>(null);
 
   const [mutateNote] = useUpdateSubmittedNoteMutation();
@@ -312,7 +314,7 @@ export default function AgencyCommunityBasedNote(
                 key={strategy.id}
                 checked={submittedNote?.metadata?.strategies?.includes(strategy.id) || strategy.checked}
                 onChange={() => toggleStrategy(strategy.id)}
-                disabled={submittedNote?.status !== "submitted"}
+                disabled={!isEditable}
                 label={strategy.label}
                 labelClassName="text-[14px] font-normal leading-[1.4] text-[#808081] font-['Urbanist',sans-serif]"
               />
@@ -361,7 +363,7 @@ export default function AgencyCommunityBasedNote(
 
             {/* Table Body */}
             <div className="border border-[#b2b2b3] rounded-bl-[2px] rounded-br-[2px] border-t-0">
-              <div className={submittedNote?.status === "submitted" ? "bg-[#eef4f5]" : "bg-white"}>
+              <div className={isEditable ? "bg-[#eef4f5]" : "bg-white"}>
                 {activities?.map((activity, index) => (
                   <div
                     key={index}
@@ -371,7 +373,7 @@ export default function AgencyCommunityBasedNote(
                   >
                     {/* Date */}
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
-                      {submittedNote?.status === "submitted" ? (
+                      {isEditable ? (
                         <Popover
                           open={openDatePopoverId === String(index)}
                           onOpenChange={(open) => setOpenDatePopoverId(open ? String(index) : null)}
@@ -424,7 +426,7 @@ export default function AgencyCommunityBasedNote(
                     </div>
                     {/* Start Time */}
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
-                      {submittedNote?.status === "submitted" ? (
+                      {isEditable ? (
                         <TimePicker
                           value={activity.startTime}
                           onChange={(value) => updateActivity(activity.id, index, 'startTime', value)}
@@ -437,7 +439,7 @@ export default function AgencyCommunityBasedNote(
                     </div>
                     {/* End Time */}
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
-                      {submittedNote?.status === "submitted" ? (
+                      {isEditable ? (
                         <TimePicker
                           value={activity.endTime}
                           onChange={(value) => updateActivity(activity.id, index, 'endTime', value)}
@@ -450,7 +452,7 @@ export default function AgencyCommunityBasedNote(
                     </div>
                     {/* Activity */}
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
-                      {submittedNote?.status === "submitted" ? (
+                      {isEditable ? (
                         <ContentEditableCell
                           value={activity.activity}
                           onChange={(value) => updateActivity(activity.id, index, 'activity', value)}
@@ -465,7 +467,7 @@ export default function AgencyCommunityBasedNote(
                     </div>
                     {/* Description */}
                     <div className="px-4 py-3 flex items-center justify-center">
-                      {submittedNote?.status === "submitted" ? (
+                      {isEditable ? (
                         <ContentEditableCell
                           value={activity.description}
                           onChange={(value) => updateActivity(activity.id, index, 'description', value)}
@@ -504,7 +506,7 @@ export default function AgencyCommunityBasedNote(
         </div>
 
         {/* Floating Action Button - Only show when editable */}
-        {submittedNote?.status === "submitted" && <VoiceInputButton minimal={false} />}
+        {isEditable && <VoiceInputButton minimal={false} />}
       </div>
     </VoiceRecordingProvider>
   )

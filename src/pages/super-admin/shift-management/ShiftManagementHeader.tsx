@@ -14,6 +14,9 @@ export interface ShiftManagementHeaderProps {
   initialAgencies?: OperationalAgencySummary[];
   onAgenciesDiscovered?: (agencies: OperationalAgencySummary[]) => void;
   requiresAgencyChoice?: boolean;
+  dateRangeDescription?: string;
+  dateRangeControlLabel?: string;
+  dateRangeDialogTitle?: string;
 }
 
 export default function ShiftManagementHeader({
@@ -27,6 +30,9 @@ export default function ShiftManagementHeader({
   initialAgencies,
   onAgenciesDiscovered,
   requiresAgencyChoice = false,
+  dateRangeDescription,
+  dateRangeControlLabel,
+  dateRangeDialogTitle,
 }: ShiftManagementHeaderProps) {
   return (
     <header className="rounded-2xl border border-[#dce3e3] bg-[#f9fbfb] px-4 py-4 sm:px-5" aria-labelledby="shift-management-title">
@@ -63,9 +69,11 @@ export default function ShiftManagementHeader({
             <ShiftDateRangeControl
               value={dateRange}
               onApply={onDateRangeChange}
-              description={enforceManagementDateRangeRules
+              description={dateRangeDescription ?? (enforceManagementDateRangeRules
                 ? "Choose the dates to show in shift management"
-                : "Choose the dates to scan for shift maintenance issues"}
+                : "Choose the dates to scan for shift maintenance issues")}
+              controlLabel={dateRangeControlLabel}
+              dialogTitle={dateRangeDialogTitle}
               maxRangeDays={enforceManagementDateRangeRules ? 366 : undefined}
               allowFutureDates={enforceManagementDateRangeRules}
             />

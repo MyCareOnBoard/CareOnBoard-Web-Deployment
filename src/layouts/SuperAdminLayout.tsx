@@ -35,6 +35,7 @@ const allNavItems: NavItem[] = [
   {label: "User Access Control", path: Routes.superAdmin.userAccessControl, icon: Users, accessKey: "User Access Control"},
   {label: "Compliance Monitor", path: Routes.superAdmin.complianceMonitor, icon: Shield, accessKey: "Compliance Monitor"},
   {label: "Billing Management", path: Routes.superAdmin.billing.index, icon: DollarSign, accessKey: "Billing Management"},
+  {label: "Notes", path: Routes.superAdmin.notes, icon: FileText, accessKey: "Notes"},
   {label: "Global Notes Quality", path: Routes.superAdmin.globalNotesQuality, icon: FileText, accessKey: "Global Notes Quality"},
   {label: "Agency Billing Monitor", path: Routes.superAdmin.agencyBillingMonitor, icon: DollarSign, accessKey: "Agency Billing Monitor"},
   {label: "Corporate Support", path: Routes.superAdmin.corporateSupport, icon: HelpCircle, accessKey: "Corporate Support"},

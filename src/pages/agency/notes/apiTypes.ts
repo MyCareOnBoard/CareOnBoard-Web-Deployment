@@ -6,20 +6,19 @@ export interface SubmittedNoteDetail {
   status: string;
 }
 
-export interface SubmittedNote {
+export interface SubmittedNoteSummary {
   id: string;
+  agencyId: string;
+  agencyName: string;
   employeeId: string;
   employeeName: string;
   activityLogId: string;
   activityType: string;
   activityDescription: string;
   submittedAt: string | null;
-  submittedBy: string;
   approvedAt?: string | null;
-  approvedBy?: string | null;
   noteCount: number;
-  notes: SubmittedNoteDetail[];
-  status: "submitted" | "approved" | "rejected";
+  status: "submitted" | "approved";
 }
 
 export interface PaginationInfo {
@@ -30,12 +29,12 @@ export interface PaginationInfo {
 }
 
 export interface SubmittedNotesResponse {
-  data: SubmittedNote[];
+  data: SubmittedNoteSummary[];
   pagination: PaginationInfo;
 }
 
 export interface SubmittedNotesQueryParams {
-  agencyId: string;
+  agencyId?: string;
   page?: number;
   limit?: number;
   activityType?: string;
@@ -43,6 +42,8 @@ export interface SubmittedNotesQueryParams {
   search?: string;
   timeInterval?: 'today' | 'this-month' | 'this-year' | 'all';
   status?: 'submitted' | 'approved';
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface SubmittedNoteDetails {

@@ -146,6 +146,7 @@ export const Routes = {
         staffDetails: "/super-admin/:staffId",
         userAccessControl: "/super-admin/user-access-control",
         complianceMonitor: "/super-admin/compliance-monitor",
+        notes: "/super-admin/notes",
         globalNotesQuality: "/super-admin/global-notes-quality",
         agencyBillingMonitor: "/super-admin/agency-billing-monitor",
         corporateSupport: "/super-admin/corporate-support",

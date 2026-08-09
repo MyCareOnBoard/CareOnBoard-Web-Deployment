@@ -142,6 +142,7 @@ const SuperAdminSystemSettingsPage = lazy(() => import("@/pages/super-admin/syst
 const ServicesManagementPage = lazy(() => import("@/pages/super-admin/services"));
 const AgencyTrainings = lazy(() => import("@/pages/agency/trainings"));
 const GlobalNotesQualityPage = lazy(() => import("@/pages/super-admin/global-notes-quality"));
+const SuperAdminNotesPage = lazy(() => import("@/pages/super-admin/notes"));
 const SuperAdminShiftMaintenancePage = lazy(() => import("@/pages/super-admin/shift-maintenance"));
 const SuperAdminShiftManagementPage = lazy(() => import("@/pages/super-admin/shift-management"));
 const SuperAdminShiftWorkspaceIndexPage = lazy(() =>
@@ -772,6 +773,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.superAdmin.userAccessControl,
                 Component: UserAccessControlPage,
+            },
+            {
+                path: Routes.superAdmin.notes,
+                Component: SuperAdminNotesPage,
             },
             {
                 path: Routes.superAdmin.globalNotesQuality,

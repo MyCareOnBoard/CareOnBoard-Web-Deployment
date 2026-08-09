@@ -73,6 +73,19 @@ describe("SuperAdminLayout", () => {
     expect(screen.queryByText("Billing Management")).not.toBeInTheDocument();
   });
 
+  it("shows Notes only for its exact permission", () => {
+    state.user = { ...state.user, profile: { role: "Notes reviewer", accessList: ["Notes"] } };
+    const view = render(<MemoryRouter><SuperAdminLayout /></MemoryRouter>);
+    expect(screen.getByText("Notes")).toHaveAttribute("data-path", "/super-admin/notes");
+    expect(screen.queryByText("Global Notes Quality")).not.toBeInTheDocument();
+
+    state.user = { ...state.user, profile: { role: "Quality reviewer", accessList: ["Global Notes Quality"] } };
+    view.unmount();
+    render(<MemoryRouter><SuperAdminLayout /></MemoryRouter>);
+    expect(screen.getByText("Global Notes Quality")).toBeVisible();
+    expect(screen.queryByText("Notes")).not.toBeInTheDocument();
+  });
+
   it("shows the agency billing workspaces under Billing Management", () => {
     routing.search = "?agencyId=agency-123";
     state.user = { ...state.user, profile: { role: "Billing operator", accessList: ["Billing Management"] } };

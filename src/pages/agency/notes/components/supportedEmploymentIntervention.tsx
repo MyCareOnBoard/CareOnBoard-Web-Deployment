@@ -74,10 +74,11 @@ interface AgencySupportedEmploymentInterventionProps {
   submissionId: string | null;
   isLoading: boolean;
   submittedNote?: SubmittedNoteDetails;
+  readOnly?: boolean;
 }
 
 export default function AgencySupportedEmploymentIntervention(
-  {submissionId, isLoading, submittedNote}: AgencySupportedEmploymentInterventionProps
+  {submissionId, isLoading, submittedNote, readOnly = false}: AgencySupportedEmploymentInterventionProps
 ) {
   const pageTitle = "Supported Employment Services – Intervention Plan and Service Log";
 
@@ -394,7 +395,7 @@ export default function AgencySupportedEmploymentIntervention(
     );
   }
 
-  const isEditable = submittedNote?.status === "submitted";
+  const isEditable = !readOnly && submittedNote?.status === "submitted";
 
   return (
     <VoiceRecordingProvider pageTitle={pageTitle}>

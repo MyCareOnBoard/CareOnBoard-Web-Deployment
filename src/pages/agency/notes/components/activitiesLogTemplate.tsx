@@ -36,11 +36,13 @@ interface AgencyActivitiesLogTemplateProps {
   submissionId: string | null;
   isLoading: boolean;
   submittedNote?: SubmittedNoteDetails;
+  readOnly?: boolean;
 }
 
 export default function AgencyActivitiesLogTemplate(
-  {title, submissionId, isLoading, submittedNote}: AgencyActivitiesLogTemplateProps
+  {title, submissionId, isLoading, submittedNote, readOnly = false}: AgencyActivitiesLogTemplateProps
 ) {
+  const isEditable = !readOnly && submittedNote?.status === "submitted";
   const [openDatePopoverId, setOpenDatePopoverId] = useState<string | null>(null);
 
   const [mutateNote] = useUpdateSubmittedNoteMutation();
@@ -271,7 +273,7 @@ export default function AgencyActivitiesLogTemplate(
 
             {/* Table Body */}
             <div className="border border-[#b2b2b3] rounded-bl-[2px] rounded-br-[2px] border-t-0">
-              <div className={submittedNote?.status === "submitted" ? "bg-[#eef4f5]" : "bg-white"}>
+              <div className={isEditable ? "bg-[#eef4f5]" : "bg-white"}>
                 {activities?.map((activity, index) => (
                   <div
                     key={index}
@@ -281,7 +283,7 @@ export default function AgencyActivitiesLogTemplate(
                   >
                     {/* Date */}
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
-                      {submittedNote?.status === "submitted" ? (
+                      {isEditable ? (
                         <Popover
                           open={openDatePopoverId === String(index)}
                           onOpenChange={(open) => setOpenDatePopoverId(open ? String(index) : null)}
@@ -334,7 +336,7 @@ export default function AgencyActivitiesLogTemplate(
                     </div>
                     {/* Units */}
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
-                      {submittedNote?.status === "submitted" ? (
+                      {isEditable ? (
                         <ContentEditableCell
                           value={activity.units}
                           onChange={(value) => updateActivity(activity.id, index, 'units', value)}
@@ -349,7 +351,7 @@ export default function AgencyActivitiesLogTemplate(
                     </div>
                     {/* Strategies */}
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
-                      {submittedNote?.status === "submitted" ? (
+                      {isEditable ? (
                         <ContentEditableCell
                           value={activity.strategies}
                           onChange={(value) => updateActivity(activity.id, index, 'strategies', value)}
@@ -364,7 +366,7 @@ export default function AgencyActivitiesLogTemplate(
                     </div>
                     {/* Activities */}
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
-                      {submittedNote?.status === "submitted" ? (
+                      {isEditable ? (
                         <ContentEditableCell
                           value={activity.activities}
                           onChange={(value) => updateActivity(activity.id, index, 'activities', value)}
@@ -379,7 +381,7 @@ export default function AgencyActivitiesLogTemplate(
                     </div>
                     {/* Location */}
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
-                      {submittedNote?.status === "submitted" ? (
+                      {isEditable ? (
                         <ContentEditableCell
                           value={activity.location}
                           onChange={(value) => updateActivity(activity.id, index, 'location', value)}
@@ -394,7 +396,7 @@ export default function AgencyActivitiesLogTemplate(
                     </div>
                     {/* Notes */}
                     <div className="px-4 py-3 flex items-center justify-center">
-                      {submittedNote?.status === "submitted" ? (
+                      {isEditable ? (
                         <ContentEditableCell
                           value={activity.notes}
                           onChange={(value) => updateActivity(activity.id, index, 'notes', value)}
@@ -437,7 +439,7 @@ export default function AgencyActivitiesLogTemplate(
         </div>
 
         {/* Floating Action Button - Only show when editable */}
-        {submittedNote?.status === "submitted" && <VoiceInputButton minimal={false} />}
+        {isEditable && <VoiceInputButton minimal={false} />}
       </div>
     </VoiceRecordingProvider>
   )

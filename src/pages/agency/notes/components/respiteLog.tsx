@@ -18,10 +18,11 @@ interface AgencyRespiteLogProps {
   submissionId: string | null;
   isLoading: boolean;
   submittedNote?: SubmittedNoteDetails;
+  readOnly?: boolean;
 }
 
 export default function AgencyRespiteLog(
-  {submissionId, isLoading, submittedNote}: AgencyRespiteLogProps
+  {submissionId, isLoading, submittedNote, readOnly = false}: AgencyRespiteLogProps
 ) {
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [isDateOpen, setIsDateOpen] = useState(false);
@@ -36,11 +37,12 @@ export default function AgencyRespiteLog(
   const [noteId, setNoteId] = useState<string>("");
 
   const [mutateNote] = useUpdateSubmittedNoteMutation();
+  const isEditable = !readOnly && submittedNote?.status === "submitted";
 
   const currentDate = new Date().toLocaleDateString("en-US", {month: "long", day: "numeric", year: "numeric"});
 
   const toggleMeal = (meal: MealType) => {
-    if (submittedNote?.status !== "submitted") return;
+    if (!isEditable) return;
     
     setSelectedMeals((prev) =>
       prev.includes(meal) ? prev.filter((m) => m !== meal) : [...prev, meal]
@@ -81,7 +83,7 @@ export default function AgencyRespiteLog(
 
   // Auto-save when fields change (only for submitted status)
   useEffect(() => {
-    if (submittedNote?.status === "submitted" && noteId && date) {
+    if (isEditable && noteId && date) {
       const timer = setTimeout(() => {
         handleSave();
       }, 1000);
@@ -116,8 +118,6 @@ export default function AgencyRespiteLog(
       </div>
     );
   }
-
-  const isEditable = submittedNote?.status === "submitted";
 
   return (
     <VoiceRecordingProvider pageTitle="Respite Log">
@@ -160,7 +160,8 @@ export default function AgencyRespiteLog(
               <Input
                 type="text"
                 value={toileting}
-                onChange={(e) => setToileting(e.target.value)}
+                onChange={(e) => isEditable && setToileting(e.target.value)}
+                disabled={!isEditable}
                 className="h-11 bg-white border border-[#cccccd] rounded-xl px-4"
               />
             </div>

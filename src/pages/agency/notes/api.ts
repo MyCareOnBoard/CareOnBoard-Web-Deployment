@@ -11,7 +11,7 @@ export const agencyNotesApi = createApi({
       query: (params) => {
         const queryParams = new URLSearchParams();
         
-        queryParams.append('agencyId', params.agencyId);
+        if (params.agencyId) queryParams.set('agencyId', params.agencyId);
         if (params.page) queryParams.append('page', params.page.toString());
         if (params.limit) queryParams.append('limit', params.limit.toString());
         if (params.activityType) queryParams.append('activityType', params.activityType);
@@ -19,6 +19,8 @@ export const agencyNotesApi = createApi({
         if (params.search) queryParams.append('search', params.search);
         if (params.timeInterval) queryParams.append('timeInterval', params.timeInterval);
         if (params.status) queryParams.append('status', params.status);
+        if (params.startDate) queryParams.set('startDate', params.startDate);
+        if (params.endDate) queryParams.set('endDate', params.endDate);
         
         return {
           url: `/employees/submitted-notes?${queryParams.toString()}`,
