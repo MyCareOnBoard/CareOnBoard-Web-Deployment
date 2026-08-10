@@ -162,6 +162,16 @@ export default function DashboardHeader(
     return makeCommonRoute(Routes.common.settings);
   }
 
+  const getCareConnectDashboardUrl = () => {
+    const careConnectSegments: Partial<Record<UserType, string>> = {
+      [UserType.EMPLOYEE]: "user",
+      [UserType.AGENCY]: "agency",
+      [UserType.AGENCY_STAFF]: "agency",
+    }
+    const segment = careConnectSegments[userType as UserType];
+    return segment ? `https://care-connect-three-eosin.vercel.app/${segment}/dashboard` : null;
+  }
+
   return (
     <header className="fixed left-0 right-0 top-0 z-50 h-[98px] bg-[#eef4f5]">
       <div className="mx-auto flex h-full max-w-[1440px] items-center justify-between px-8">
@@ -172,10 +182,10 @@ export default function DashboardHeader(
             onClick={toggleDrawer}
             className="grid h-[42px] w-[42px] place-items-center rounded-[50px] text-[#808081] cursor-pointer hover:bg-white/50 transition-colors md:hidden"
           >
-            <Menu className="h-6 w-6" />
+            <Menu className="w-6 h-6" />
           </button>
           <LogoNameIcon className="hidden w-[226px] md:block" />
-          <LogoMarkIcon className="h-9 w-auto md:hidden" />
+          <LogoMarkIcon className="w-auto h-9 md:hidden" />
         </div>
 
         {centerContent && (
@@ -184,6 +194,16 @@ export default function DashboardHeader(
 
         {actions ?? (
           <div className="flex items-center gap-[10px]">
+            {getCareConnectDashboardUrl() && (
+              <a
+                href={getCareConnectDashboardUrl()!}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="whitespace-nowrap bg-[#00b4b8] text-white px-2 py-1 text-[10px] rounded-full border border-[rgba(255,255,255,0.3)] font-medium backdrop-blur-[22px] transition-all duration-200 hover:bg-[#00b4b8]/90 hover:border-[rgba(255,255,255,0.5)] sm:px-3 sm:py-1.5 sm:text-[11px] lg:px-4 lg:py-2 lg:text-xs"
+              >
+                CareConnect Login
+              </a>
+            )}
             <HeaderActionButton
               icon={CogIcon}
               ariaLabel="Settings"
@@ -227,7 +247,7 @@ export default function DashboardHeader(
                 </div>
 
                 {/* Notification List */}
-                <div className="overflow-y-auto custom-scrollbar flex-1">
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
                   {loading ? (
                     /* Loading State */
                     <div className="px-4 py-12 text-center">
