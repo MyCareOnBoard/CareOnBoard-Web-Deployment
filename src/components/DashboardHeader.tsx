@@ -201,7 +201,7 @@ export default function DashboardHeader(
                 rel="noopener noreferrer"
                 className="whitespace-nowrap bg-[#00b4b8] text-white px-2 py-1 text-[10px] rounded-full border border-[rgba(255,255,255,0.3)] font-medium backdrop-blur-[22px] transition-all duration-200 hover:bg-[#00b4b8]/90 hover:border-[rgba(255,255,255,0.5)] sm:px-3 sm:py-1.5 sm:text-[11px] lg:px-4 lg:py-2 lg:text-xs"
               >
-                CareConnect Login
+                CareOnboardConnect Login
               </a>
             )}
             <HeaderActionButton
