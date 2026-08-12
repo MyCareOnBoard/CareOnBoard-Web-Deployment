@@ -65,19 +65,15 @@ function filterNavItemsByAccess(items: AgencyNavItem[], userType: UserType | und
         return items;
     }
 
-    if (!accessList) {
-        return items.filter((item) => !item.accessKey);
-    }
-
     return items.flatMap((item) => {
         if (item.label === "Billing" && item.children) {
             const children = item.children.filter((child) =>
-                !child.accessKey || canAccessBillingChild(userType, accessList, child.accessKey as AgencyBillingScope),
+                !child.accessKey || canAccessBillingChild(userType, accessList ?? [], child.accessKey as AgencyBillingScope),
             );
             return children.length ? [{ ...item, path: children[0].path, children }] : [];
         }
         if (!item.accessKey) return [item];
-        return hasAgencyStaffAccess(accessList, item.accessKey) ? [item] : [];
+        return hasAgencyStaffAccess(accessList ?? [], item.accessKey) ? [item] : [];
     });
 }
 

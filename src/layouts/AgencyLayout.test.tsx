@@ -71,6 +71,14 @@ describe("AgencyDashboardLayout billing authorization", () => {
     expect(screen.queryByText("Billing")).not.toBeInTheDocument();
   });
 
+  it("fails closed when staff scopes are missing", () => {
+    routing.pathname = "/agency/dashboard";
+    state.user.profile = {};
+    render(<MemoryRouter><AgencyDashboardLayout /></MemoryRouter>);
+    expect(screen.queryByText("Billing")).not.toBeInTheDocument();
+    expect(screen.queryByText("Financial overview")).not.toBeInTheDocument();
+  });
+
   it("does not mount a denied nonbilling child", () => {
     routing.pathname = "/agency/analytics";
     const mounted = vi.fn();
