@@ -6,7 +6,7 @@ if (!baselinePath) {
 }
 
 const baseline = JSON.parse(await readFile(baselinePath, "utf8"));
-const emittedScripts = Object.values(baseline.assetMap ?? {});
+const emittedScripts = Object.values(baseline.emittedAssetMap ?? baseline.assetMap ?? {});
 if (!emittedScripts.length || emittedScripts.some((asset) => !Number.isFinite(asset.gzipBytes))) {
   throw new Error("Baseline must contain encoded gzip byte sizes for every emitted script.");
 }

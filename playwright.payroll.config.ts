@@ -1,17 +1,23 @@
 import { defineConfig } from "@playwright/test";
 
+const baseURL = process.env.PAYROLL_BASE_URL ?? "http://127.0.0.1:4173";
+const node = `"${process.execPath}"`;
+
 export default defineConfig({
   testDir: "tests/performance",
-  timeout: 90_000,
+  timeout: 180_000,
+  outputDir: ".artifacts/payroll-performance/test-results",
   use: {
-    baseURL: "http://127.0.0.1:4173",
+    baseURL,
     browserName: "chromium",
-    trace: "retain-on-failure",
+    // The shared baseline probe owns the trace so the focused spec and the
+    // standalone capture produce the same artifact.
+    trace: "off",
   },
-  webServer: {
-    command: "pnpm vite --host 127.0.0.1 --port 4173",
-    url: "http://127.0.0.1:4173",
+  webServer: process.env.PAYROLL_BASE_URL ? undefined : {
+    command: `${node} scripts/capture-payroll-performance-baseline.mjs --serve-only dist 4173`,
+    url: baseURL,
     reuseExistingServer: false,
-    timeout: 60_000,
+    timeout: 30_000,
   },
 });
