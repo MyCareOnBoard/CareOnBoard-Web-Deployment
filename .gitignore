@@ -60,3 +60,4 @@ package-lock.json
 docs/superpowers/
 .pnpm-store/
 .worktrees/
+.artifacts/payroll-performance/

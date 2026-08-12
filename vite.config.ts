@@ -31,6 +31,7 @@ export default defineConfig(({ mode }) => {
       globals: true,
       environment: 'jsdom',
       setupFiles: './src/setupTests.ts',
+      exclude: ["tests/performance/**"],
       coverage: {
         reporter: ['text', 'json', 'html'],
         exclude: [
