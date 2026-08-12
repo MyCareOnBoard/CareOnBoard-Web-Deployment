@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { resolve } from "node:path";
 import {
+  assertSyntheticFirebaseBuildConfig,
   captureLegacyPayrollProbe,
   createAssetMap,
 } from "./fixtures/legacyPayrollBaseline";
@@ -8,6 +9,7 @@ import {
 const outputDirectory = resolve(process.env.PAYROLL_OUTPUT_DIRECTORY ?? ".artifacts/payroll-performance/baseline");
 
 test("captures the authorized production payroll route under the fixed mobile profile", async ({ browser, baseURL }) => {
+  await assertSyntheticFirebaseBuildConfig(resolve("dist"));
   const probe = await captureLegacyPayrollProbe({
     browser,
     baseURL: baseURL!,

@@ -13,6 +13,10 @@ export async function createAssetMap(...args: Parameters<Awaited<ReturnType<type
   return (await loadBaselineTools()).createAssetMap(...args);
 }
 
+export async function assertSyntheticFirebaseBuildConfig(...args: Parameters<Awaited<ReturnType<typeof loadBaselineTools>>["assertSyntheticFirebaseBuildConfig"]>) {
+  return (await loadBaselineTools()).assertSyntheticFirebaseBuildConfig(...args);
+}
+
 export async function captureLegacyPayrollProbe(...args: Parameters<Awaited<ReturnType<typeof loadBaselineTools>>["captureLegacyPayrollProbe"]>) {
   return (await loadBaselineTools()).captureLegacyPayrollProbe(...args);
 }

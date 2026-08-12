@@ -21,6 +21,11 @@ const COMPRESSIBLE_TYPES = new Map([
 export const LEGACY_PAYROLL_ROUTE = "/agency/billing/payroll-management?agencyId=payroll-baseline-agency";
 export const BASELINE_AGENCY_ID = "payroll-baseline-agency";
 export const BASELINE_USER_ID = "payroll-baseline-owner";
+export const SYNTHETIC_FIREBASE_API_KEY = "AIzaSyPayrollBaselineFixture00000000001";
+export const LOOPBACK_FIXTURE_API_BASE_URL = "http://127.0.0.1:5001/care-on-board/us-central1";
+export const FIXTURE_MARKER = "pbfx-7d09a11e90b84f36";
+const FIXTURE_MARKER_HEADER = "X-Payroll-Baseline-Fixture";
+const FIXTURE_MARKER_FIELD = "_payrollBaselineFixture";
 
 const FIXTURE_RESPONSE_HEADERS = {
   "Access-Control-Allow-Headers": "authorization,content-type,x-environment",
@@ -31,8 +36,8 @@ const FIXTURE_RESPONSE_HEADERS = {
   "Timing-Allow-Origin": "*",
 };
 
-export function buildAuthorizedFixtureState(firebaseApiKey, expirationTime = Date.now() + 86_400_000) {
-  if (!firebaseApiKey) throw new Error("A Firebase API key is required to seed the authorized fixture.");
+export function buildAuthorizedFixtureState(expirationTime = Date.now() + 86_400_000) {
+  const firebaseApiKey = SYNTHETIC_FIREBASE_API_KEY;
   const user = {
     uid: BASELINE_USER_ID,
     email: "owner@payroll-baseline.invalid",
@@ -331,18 +336,126 @@ function isFixtureApiUrl(requestUrl) {
   const url = new URL(requestUrl);
   return url.hostname === "identitytoolkit.googleapis.com" ||
     (url.hostname === "www.googleapis.com" && url.pathname.startsWith("/identitytoolkit/")) ||
+    url.hostname === "securetoken.googleapis.com" ||
+    url.hostname === "firebaseinstallations.googleapis.com" ||
     ((url.hostname === "127.0.0.1" || url.hostname === "localhost") && url.port === "5001");
 }
 
-export async function installLegacyPayrollFixture(target, { firebaseApiKey, unhandledRequests = [] }) {
-  const state = buildAuthorizedFixtureState(firebaseApiKey);
+function isBlockedFirstPartyUrl(requestUrl) {
+  const url = new URL(requestUrl);
+  return url.hostname === "firestore.googleapis.com" ||
+    (url.hostname === "care-on-board.firebaseapp.com" && url.pathname.startsWith("/__/auth/"));
+}
+
+function fixturePayload(body) {
+  return body === null ? null : { ...body, [FIXTURE_MARKER_FIELD]: FIXTURE_MARKER };
+}
+
+function fixtureHeaders(headers = {}) {
+  return { ...headers, [FIXTURE_MARKER_HEADER]: FIXTURE_MARKER };
+}
+
+function createFixtureRuntime(target, unhandledRequests) {
+  const ledger = [];
+  const pageIds = new WeakMap();
+  const pendingResponses = new Set();
+  let nextPageId = 1;
+  let nextSequence = 1;
+  const targetIdForPage = (page) => {
+    if (!page) return "non-page-target";
+    if (!pageIds.has(page)) pageIds.set(page, `fixture-page-${nextPageId++}`);
+    return pageIds.get(page);
+  };
+  const provenance = (request) => {
+    let frame;
+    let page;
+    try {
+      frame = request.frame();
+      page = frame.page();
+    } catch {
+      frame = null;
+      page = null;
+    }
+    return {
+      targetId: targetIdForPage(page),
+      pageUrl: page?.url() ?? null,
+      frameUrl: frame?.url() ?? null,
+      isMainFrame: Boolean(page && frame === page.mainFrame()),
+      resourceType: request.resourceType(),
+    };
+  };
+  const record = (action, request, details = {}) => {
+    const entry = {
+      sequence: nextSequence++,
+      marker: FIXTURE_MARKER,
+      action,
+      method: request.method(),
+      url: request.url(),
+      ...provenance(request),
+      ...details,
+      servedAt: new Date().toISOString(),
+    };
+    ledger.push(entry);
+    return entry;
+  };
+  const runtime = {
+    marker: FIXTURE_MARKER,
+    ledger,
+    unhandledRequests,
+    active: false,
+    targetIdForPage,
+    record,
+    async flush() {
+      await Promise.all([...pendingResponses]);
+    },
+    checkpoint(probeTargetId) {
+      const fulfilledCount = ledger.filter((entry) => entry.action === "fulfilled").length;
+      const receivedCount = ledger.filter((entry) => entry.action === "received").length;
+      return {
+        sequence: ledger.at(-1)?.sequence ?? 0,
+        fulfilledCount,
+        receivedCount,
+        probeTargetId,
+      };
+    },
+  };
+  const responseHandler = (response) => {
+    const request = response.request();
+    const requestUrl = request.url();
+    if (!isFixtureApiUrl(requestUrl)) return;
+    const task = (async () => {
+      const headerMarker = await response.headerValue(FIXTURE_MARKER_HEADER);
+      let bodyMarker = null;
+      const responseHasBody = request.method() !== "OPTIONS" && response.status() !== 204;
+      if (responseHasBody) {
+        const body = await response.json().catch(() => null);
+        bodyMarker = body?.[FIXTURE_MARKER_FIELD] ?? null;
+      }
+      const marked = headerMarker === FIXTURE_MARKER && (!responseHasBody || bodyMarker === FIXTURE_MARKER);
+      runtime.record(marked ? "received" : "unmarked-response", request, {
+        status: response.status(),
+        headerMarker,
+        bodyMarker,
+      });
+      if (!marked) unhandledRequests.push(`UNMARKED ${request.method()} ${requestUrl}`);
+    })().finally(() => pendingResponses.delete(task));
+    pendingResponses.add(task);
+  };
+  runtime.responseHandler = responseHandler;
+  runtime.target = target;
+  return runtime;
+}
+
+export async function installLegacyPayrollFixture(target, { unhandledRequests = [] } = {}) {
+  const state = buildAuthorizedFixtureState();
+  const runtime = createFixtureRuntime(target, unhandledRequests);
   await target.addInitScript(installBrowserBaselineState, { localStorageEntries: state.localStorage });
-  await target.route("**/*", async (route) => {
+  const routeHandler = async (route) => {
     const request = route.request();
     const requestUrl = request.url();
-    const url = new URL(requestUrl);
-    if (url.hostname === "firestore.googleapis.com") {
+    if (isBlockedFirstPartyUrl(requestUrl)) {
       await route.abort("blockedbyclient");
+      runtime.record("blocked", request, { status: null });
       return;
     }
     if (!isFixtureApiUrl(requestUrl)) {
@@ -351,29 +464,38 @@ export async function installLegacyPayrollFixture(target, { firebaseApiKey, unha
     }
     try {
       const response = getLegacyFixtureResponse(request.method(), requestUrl);
+      const body = fixturePayload(response.body);
       await route.fulfill({
         status: response.status,
-        headers: response.headers,
-        body: response.body === null ? "" : JSON.stringify(response.body),
+        headers: fixtureHeaders(response.headers),
+        body: body === null ? "" : JSON.stringify(body),
       });
+      runtime.record("fulfilled", request, { status: response.status });
     } catch (error) {
       unhandledRequests.push(`${request.method()} ${requestUrl}`);
+      const body = fixturePayload({ success: false, error: error instanceof Error ? error.message : String(error) });
       await route.fulfill({
         status: 500,
-        headers: FIXTURE_RESPONSE_HEADERS,
-        body: JSON.stringify({ success: false, error: error instanceof Error ? error.message : String(error) }),
+        headers: fixtureHeaders(FIXTURE_RESPONSE_HEADERS),
+        body: JSON.stringify(body),
       });
+      runtime.record("fulfilled-error", request, { status: 500 });
     }
-  });
-  return { unhandledRequests };
-}
-
-async function readFirebaseApiKey() {
-  if (process.env.VITE_FIREBASE_API_KEY) return process.env.VITE_FIREBASE_API_KEY;
-  const envText = await readFile(resolve(".env.local"), "utf8");
-  const match = envText.match(/^VITE_FIREBASE_API_KEY=(.+)$/m);
-  if (!match?.[1]?.trim()) throw new Error("VITE_FIREBASE_API_KEY is required for the credential-free browser fixture.");
-  return match[1].trim();
+  };
+  runtime.routeHandler = routeHandler;
+  target.on("response", runtime.responseHandler);
+  await target.route("**/*", routeHandler);
+  runtime.active = true;
+  runtime.dispose = async () => {
+    if (!runtime.active) return;
+    runtime.active = false;
+    target.off("response", runtime.responseHandler);
+    await cleanupCaptureResources([
+      () => target.unroute("**/*", runtime.routeHandler),
+      () => runtime.flush(),
+    ]);
+  };
+  return runtime;
 }
 
 function selectPerformanceResources(entries, baseURL) {
@@ -436,14 +558,12 @@ export async function captureLegacyPayrollProbe({
   });
   const ownsContext = !suppliedContext;
   const unhandledRequests = [];
-  await installLegacyPayrollFixture(context, {
-    firebaseApiKey: await readFirebaseApiKey(),
-    unhandledRequests,
-  });
+  const fixtureRuntime = await installLegacyPayrollFixture(context, { unhandledRequests });
   await mkdir(outputDirectory, { recursive: true });
   const tracePath = join(outputDirectory, "playwright-trace.zip");
   await context.tracing.start({ screenshots: true, snapshots: true });
   const page = await context.newPage();
+  const probeTargetId = fixtureRuntime.targetIdForPage(page);
   const session = await context.newCDPSession(page);
   await session.send("Network.setCacheDisabled", { cacheDisabled: true });
   await session.send("Emulation.setDeviceMetricsOverride", {
@@ -562,10 +682,28 @@ export async function captureLegacyPayrollProbe({
     unhandledFirstPartyRequests: unhandledRequests,
     pageErrors,
   };
-  await writeFile(join(outputDirectory, "browser-probe.json"), `${JSON.stringify(probe, null, 2)}\n`);
   await context.tracing.stop({ path: tracePath });
   await page.close();
-  if (ownsContext) await context.close();
+  await fixtureRuntime.flush();
+  if (unhandledRequests.length) {
+    throw new Error(`Fixture missed or received unmarked first-party requests:\n${unhandledRequests.join("\n")}`);
+  }
+  const checkpoint = fixtureRuntime.checkpoint(probeTargetId);
+  probe.fixtureEvidence = {
+    marker: fixtureRuntime.marker,
+    syntheticPublicConfig: {
+      firebaseApiKey: SYNTHETIC_FIREBASE_API_KEY,
+      note: "Fixed synthetic public-format identifier; not a real Firebase project credential.",
+    },
+    checkpoint,
+    ledger: fixtureRuntime.ledger.slice(),
+  };
+  await writeFile(join(outputDirectory, "browser-probe.json"), `${JSON.stringify(probe, null, 2)}\n`);
+  Object.defineProperty(probe, "fixtureRuntime", { value: fixtureRuntime, enumerable: false });
+  if (ownsContext) {
+    await fixtureRuntime.dispose();
+    await context.close();
+  }
   return probe;
 }
 
@@ -594,6 +732,38 @@ export async function createAssetMap(distDirectory) {
     }];
   }));
   return Object.fromEntries(entries.sort(([left], [right]) => left.localeCompare(right)));
+}
+
+export async function assertSyntheticFirebaseBuildConfig(distDirectory) {
+  const scripts = (await filesIn(distDirectory)).filter((filePath) => extname(filePath) === ".js");
+  const syntheticKey = Buffer.from(SYNTHETIC_FIREBASE_API_KEY);
+  const loopbackApiBase = Buffer.from(LOOPBACK_FIXTURE_API_BASE_URL);
+  const firebaseKeyScripts = [];
+  const apiBaseScripts = [];
+  const publicFormatKeys = new Set();
+  for (const filePath of scripts) {
+    const body = await readFile(filePath);
+    const assetPath = `/${toPosixPath(relative(distDirectory, filePath))}`;
+    if (body.includes(syntheticKey)) firebaseKeyScripts.push(assetPath);
+    if (body.includes(loopbackApiBase)) apiBaseScripts.push(assetPath);
+    for (const match of body.toString("utf8").matchAll(/AIza[0-9A-Za-z_-]{35}/g)) {
+      publicFormatKeys.add(match[0]);
+    }
+  }
+  if (firebaseKeyScripts.length === 0) {
+    throw new Error("Production dist must embed the fixed synthetic Firebase API key before payroll baseline capture.");
+  }
+  if (apiBaseScripts.length === 0) {
+    throw new Error("Production dist must embed the loopback fixture API base URL before payroll baseline capture.");
+  }
+  if ([...publicFormatKeys].some((key) => key !== SYNTHETIC_FIREBASE_API_KEY)) {
+    throw new Error("Production dist contains an unexpected public-format API key; rebuild with synthetic public config.");
+  }
+  return {
+    firebaseKeyScripts: firebaseKeyScripts.sort(),
+    apiBaseScripts: apiBaseScripts.sort(),
+    publicFormatKeyCount: publicFormatKeys.size,
+  };
 }
 
 export function buildTransferredScriptMap(assetMap, resources) {
@@ -830,7 +1000,7 @@ export function validateSharedBrowserProfile(payrollConfig, expectedChromePath) 
   if (!fixedProfile) throw new Error("Lighthouse must use the fixed payroll capture profile.");
 }
 
-export function validateLighthousePayrollResult(lhr, expectedUrl) {
+export function validateLighthousePayrollResult(lhr, expectedUrl, fixtureEvidence) {
   if (new URL(lhr.finalDisplayedUrl).href !== new URL(expectedUrl).href) {
     throw new Error(`Lighthouse did not audit the authorized payroll route: ${lhr.finalDisplayedUrl}`);
   }
@@ -841,10 +1011,41 @@ export function validateLighthousePayrollResult(lhr, expectedUrl) {
   if (!payrollDashboard) {
     throw new Error("Lighthouse did not record a successful authorized payroll dashboard API request.");
   }
-  return { routeRendered: true, payrollDashboardStatus: payrollDashboard.statusCode };
+  if (fixtureEvidence.unhandledRequests.length) {
+    throw new Error(`Lighthouse made unmatched first-party requests:\n${fixtureEvidence.unhandledRequests.join("\n")}`);
+  }
+  const markedDashboard = fixtureEvidence.ledger.find((entry) => (
+    entry.sequence > fixtureEvidence.checkpointSequence &&
+    entry.action === "received" &&
+    entry.status === 200 &&
+    entry.marker === fixtureEvidence.marker &&
+    entry.headerMarker === fixtureEvidence.marker &&
+    entry.bodyMarker === fixtureEvidence.marker &&
+    entry.url === payrollDashboard.url
+  ));
+  if (!markedDashboard) {
+    throw new Error("Lighthouse did not receive a marked synthetic payroll dashboard response after the probe checkpoint.");
+  }
+  if (markedDashboard.targetId === fixtureEvidence.probeTargetId) {
+    throw new Error("Lighthouse payroll fixture evidence must come from Lighthouse's own page target.");
+  }
+  if (
+    markedDashboard.pageUrl !== expectedUrl ||
+    markedDashboard.frameUrl !== expectedUrl ||
+    markedDashboard.isMainFrame !== true
+  ) {
+    throw new Error("Lighthouse fixture evidence must originate from its authorized payroll page and main frame.");
+  }
+  return {
+    routeRendered: true,
+    payrollDashboardStatus: payrollDashboard.statusCode,
+    syntheticFixtureMarker: markedDashboard.marker,
+    fixtureTargetId: markedDashboard.targetId,
+    fixtureSequence: markedDashboard.sequence,
+  };
 }
 
-async function runLighthouse({ url, port, outputDirectory, expectedChromePath }) {
+async function runLighthouse({ url, port, outputDirectory, expectedChromePath, fixtureRuntime, fixtureCheckpoint }) {
   const configModule = await import("../lighthouse.payroll.config.cjs");
   const payrollConfig = configModule.default;
   validateSharedBrowserProfile(payrollConfig, expectedChromePath);
@@ -860,7 +1061,27 @@ async function runLighthouse({ url, port, outputDirectory, expectedChromePath })
     settings: payrollConfig.settings,
   });
   if (!result) throw new Error("Lighthouse returned no result.");
-  const authorizedRoute = validateLighthousePayrollResult(result.lhr, url);
+  await fixtureRuntime.flush();
+  const authorizedRoute = validateLighthousePayrollResult(result.lhr, url, {
+    marker: fixtureRuntime.marker,
+    ledger: fixtureRuntime.ledger,
+    checkpointSequence: fixtureCheckpoint.sequence,
+    probeTargetId: fixtureCheckpoint.probeTargetId,
+    unhandledRequests: fixtureRuntime.unhandledRequests,
+  });
+  const finalFulfilledCount = fixtureRuntime.ledger.filter((entry) => entry.action === "fulfilled").length;
+  const finalReceivedCount = fixtureRuntime.ledger.filter((entry) => entry.action === "received").length;
+  const fixtureServedCounters = {
+    checkpoint: {
+      fulfilled: fixtureCheckpoint.fulfilledCount,
+      received: fixtureCheckpoint.receivedCount,
+    },
+    final: { fulfilled: finalFulfilledCount, received: finalReceivedCount },
+    postProbe: {
+      fulfilled: finalFulfilledCount - fixtureCheckpoint.fulfilledCount,
+      received: finalReceivedCount - fixtureCheckpoint.receivedCount,
+    },
+  };
   const report = Array.isArray(result.report) ? result.report[0] : result.report;
   await writeFile(join(outputDirectory, "lighthouse.json"), typeof report === "string" ? report : JSON.stringify(result.lhr));
   await writeFile(join(outputDirectory, "lighthouse-trace.json"), `${JSON.stringify(result.artifacts.Trace)}\n`);
@@ -870,6 +1091,8 @@ async function runLighthouse({ url, port, outputDirectory, expectedChromePath })
     finalDisplayedUrl: result.lhr.finalDisplayedUrl,
     fetchTime: result.lhr.fetchTime,
     authorizedRoute,
+    fixtureServedCounters,
+    postProbeFixtureLedger: fixtureRuntime.ledger.filter((entry) => entry.sequence > fixtureCheckpoint.sequence),
     performanceScore: result.lhr.categories.performance.score,
     metrics: {
       firstContentfulPaint: result.lhr.audits["first-contentful-paint"]?.numericValue ?? null,
@@ -906,18 +1129,41 @@ export function serializeBaselineWithCoherentInventory(baseline, inventory) {
   throw new Error("Unable to stabilize the baseline.json artifact byte count.");
 }
 
+export async function cleanupCaptureResources(cleanups, primaryError) {
+  const cleanupErrors = [];
+  for (const cleanup of cleanups) {
+    try {
+      await cleanup();
+    } catch (error) {
+      cleanupErrors.push(error);
+    }
+  }
+  if (cleanupErrors.length && primaryError && (typeof primaryError === "object" || typeof primaryError === "function")) {
+    Object.defineProperty(primaryError, "cleanupErrors", { value: cleanupErrors, enumerable: false });
+  }
+  if (!primaryError && cleanupErrors.length) {
+    throw new AggregateError(cleanupErrors, "Payroll baseline capture cleanup failed.");
+  }
+  return cleanupErrors;
+}
+
 export async function capturePayrollPerformanceBaseline(distDirectory, outputDirectory) {
   const absoluteDist = resolve(distDirectory);
   const absoluteOutput = resolve(outputDirectory);
   await stat(join(absoluteDist, "index.html"));
   await mkdir(absoluteOutput, { recursive: true });
+  const syntheticBuildConfig = await assertSyntheticFirebaseBuildConfig(absoluteDist);
   const assetMap = await createAssetMap(absoluteDist);
-  const server = await createGzipStaticServer(absoluteDist);
   const { chromium } = await import("@playwright/test");
   const tooling = await resolveToolingMetadata(chromium);
-  const chrome = await launchPinnedChromium(tooling.chromium.executablePath);
+  let server;
+  let chrome;
   let browser;
+  let fixtureRuntime;
+  let captureError;
   try {
+    server = await createGzipStaticServer(absoluteDist);
+    chrome = await launchPinnedChromium(tooling.chromium.executablePath);
     browser = await chromium.connectOverCDP(`http://127.0.0.1:${chrome.port}`);
     const context = browser.contexts()[0];
     if (!context) throw new Error("Pinned Chromium did not expose its default browser context.");
@@ -928,11 +1174,18 @@ export async function capturePayrollPerformanceBaseline(distDirectory, outputDir
       outputDirectory: absoluteOutput,
       assetMap,
     });
+    fixtureRuntime = probe.fixtureRuntime;
+    const fixtureCheckpoint = probe.fixtureEvidence.checkpoint;
+    if (!fixtureRuntime.active) {
+      throw new Error("The shared context fixture routing must remain active until Lighthouse completes.");
+    }
     const lighthouse = await runLighthouse({
       url: new URL(LEGACY_PAYROLL_ROUTE, server.url).href,
       port: chrome.port,
       outputDirectory: absoluteOutput,
       expectedChromePath: tooling.chromium.executablePath,
+      fixtureRuntime,
+      fixtureCheckpoint,
     });
     if (probe.unhandledFirstPartyRequests.length) {
       throw new Error(`Fixture missed Lighthouse first-party requests:\n${probe.unhandledFirstPartyRequests.join("\n")}`);
@@ -948,6 +1201,14 @@ export async function capturePayrollPerformanceBaseline(distDirectory, outputDir
         routeRendered: probe.routeRendered,
         status: probe.status,
         unhandledFirstPartyRequests: probe.unhandledFirstPartyRequests,
+      },
+      syntheticFixtureEvidence: {
+        marker: fixtureRuntime.marker,
+        publicConfig: probe.fixtureEvidence.syntheticPublicConfig,
+        buildConfig: syntheticBuildConfig,
+        probeCheckpoint: fixtureCheckpoint,
+        routingActiveThroughLighthouse: fixtureRuntime.active,
+        finalLedger: fixtureRuntime.ledger.slice(),
       },
       emittedAssetMap: assetMap,
       transferredGzipMap: probe.transferredScriptMap,
@@ -969,10 +1230,16 @@ export async function capturePayrollPerformanceBaseline(distDirectory, outputDir
     const serialized = serializeBaselineWithCoherentInventory(baseline, inventory);
     await writeFile(join(absoluteOutput, "baseline.json"), serialized.text);
     return serialized.baseline;
+  } catch (error) {
+    captureError = error;
+    throw error;
   } finally {
-    await browser?.close().catch(() => {});
-    await chrome.close();
-    await server.close();
+    await cleanupCaptureResources([
+      () => fixtureRuntime?.dispose(),
+      () => browser?.close(),
+      () => chrome?.close(),
+      () => server?.close(),
+    ], captureError);
   }
 }
 

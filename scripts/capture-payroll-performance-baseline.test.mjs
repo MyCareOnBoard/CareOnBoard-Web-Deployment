@@ -9,10 +9,12 @@ import { promisify } from "node:util";
 import { gunzipSync, gzipSync } from "node:zlib";
 
 import {
+  assertSyntheticFirebaseBuildConfig,
   buildAuthorizedFixtureState,
   buildTransferredScriptMap,
   createAssetMap,
   createGzipStaticServer,
+  cleanupCaptureResources,
   evaluateDomStability,
   getLegacyFixtureResponse,
   resolvePlaywrightBrowsersPath,
@@ -54,6 +56,34 @@ test("createAssetMap maps emitted JavaScript assets to their immutable build pat
   assert.deepEqual(Object.keys(assets).sort(), ["/assets/index-a1b2c3.js", "/assets/vendor-d4e5f6.js"]);
   assert.equal(assets["/assets/index-a1b2c3.js"].gzipBytes > 0, true);
   assert.equal(assets["/assets/vendor-d4e5f6.js"].bytes, 22);
+});
+
+test("assertSyntheticFirebaseBuildConfig rejects a build made with a different Firebase key", async (t) => {
+  // Production break caught: synthetic persisted auth is keyed by the Firebase
+  // API key embedded in the build, so a mismatched build can silently fall back
+  // to Redux state without proving Firebase Auth hydration is credential-free.
+  const buildDir = await mkdtemp(join(tmpdir(), "payroll-baseline-config-"));
+  t.after(() => rm(buildDir, { recursive: true, force: true }));
+  await mkdir(join(buildDir, "assets"), { recursive: true });
+  await writeFile(join(buildDir, "index.html"), "<!doctype html>");
+  await writeFile(join(buildDir, "assets", "index.js"), "const apiKey='different-public-key';");
+
+  await assert.rejects(() => assertSyntheticFirebaseBuildConfig(buildDir), /synthetic Firebase API key/i);
+  await writeFile(
+    join(buildDir, "assets", "index.js"),
+    "const apiKey='AIzaSyPayrollBaselineFixture00000000001';",
+  );
+  await assert.rejects(() => assertSyntheticFirebaseBuildConfig(buildDir), /loopback fixture API base URL/i);
+  await writeFile(
+    join(buildDir, "assets", "index.js"),
+    "const apiKey='AIzaSyPayrollBaselineFixture00000000001';const otherKey='AIzaSyPayrollBaselineFixture00000000002';const apiBase='http://127.0.0.1:5001/care-on-board/us-central1';",
+  );
+  await assert.rejects(() => assertSyntheticFirebaseBuildConfig(buildDir), /unexpected public-format API key/i);
+  await writeFile(
+    join(buildDir, "assets", "index.js"),
+    "const apiKey='AIzaSyPayrollBaselineFixture00000000001';const apiBase='http://127.0.0.1:5001/care-on-board/us-central1';",
+  );
+  await assert.doesNotReject(() => assertSyntheticFirebaseBuildConfig(buildDir));
 });
 
 test("gzip static server returns level-six gzip responses with transfer headers", async (t) => {
@@ -131,18 +161,21 @@ test("evaluateDomStability applies the two-percent tolerance to the cycle-five n
   ]).stable, false);
 });
 
-test("buildAuthorizedFixtureState seeds matching Redux and Firebase agency-owner identities", () => {
+test("buildAuthorizedFixtureState uses the fixed synthetic public Firebase key", () => {
   // Production break caught: Redux-only fixture state still redirects because
-  // ProtectedRoute independently requires Firebase Auth and enrolled MFA.
-  const state = buildAuthorizedFixtureState("public-firebase-key", 2_000_000_000_000);
+  // ProtectedRoute independently requires Firebase Auth and enrolled MFA. A
+  // real project key must never be read into or retained by baseline evidence.
+  const state = buildAuthorizedFixtureState(2_000_000_000_000);
   const persistedRoot = JSON.parse(state.localStorage["persist:root"]);
   const persistedAuth = JSON.parse(persistedRoot.auth);
-  const firebaseUser = JSON.parse(state.localStorage["firebase:authUser:public-firebase-key:[DEFAULT]"]);
+  const firebaseStorageKey = "firebase:authUser:AIzaSyPayrollBaselineFixture00000000001:[DEFAULT]";
+  const firebaseUser = JSON.parse(state.localStorage[firebaseStorageKey]);
 
   assert.equal(persistedAuth.user.uid, "payroll-baseline-owner");
   assert.equal(persistedAuth.user.userType, "agency");
   assert.equal(persistedAuth.user.agencyId, "payroll-baseline-agency");
   assert.equal(firebaseUser.uid, persistedAuth.user.uid);
+  assert.equal(firebaseUser.apiKey, "AIzaSyPayrollBaselineFixture00000000001");
   assert.equal(firebaseUser.stsTokenManager.expirationTime, 2_000_000_000_000);
 });
 
@@ -234,31 +267,74 @@ test("resolvePlaywrightBrowsersPath follows the package graph instead of assumin
   assert.match(browsersPath.replaceAll("\\", "/"), /playwright-core\/browsers\.json$/);
 });
 
-test("validateLighthousePayrollResult requires authorized payroll API evidence on its own target", () => {
+test("validateLighthousePayrollResult requires a marked post-probe response on Lighthouse's target", () => {
   // Production break caught: matching only the final pathname can accept an app
-  // shell that redirects to login after Lighthouse finishes navigation.
+  // shell backed by an unmarked live API 200 instead of the synthetic fixture.
   const url = "http://127.0.0.1:4173/agency/billing/payroll-management?agencyId=payroll-baseline-agency";
+  const dashboardUrl = "http://127.0.0.1:5001/care-on-board/us-central1/billing/payroll/dashboard?agencyId=payroll-baseline-agency";
+  const marker = "pbfx-7d09a11e90b84f36";
   const lhr = {
     finalDisplayedUrl: url,
     audits: {
       "network-requests": {
         details: {
           items: [{
-            url: "http://127.0.0.1:5001/care-on-board/us-central1/billing/payroll/dashboard?agencyId=payroll-baseline-agency",
+            url: dashboardUrl,
             statusCode: 200,
           }],
         },
       },
     },
   };
+  const fixtureEvidence = {
+    marker,
+    checkpointSequence: 7,
+    probeTargetId: "fixture-page-1",
+    unhandledRequests: [],
+    ledger: [{
+      sequence: 8,
+      marker,
+      headerMarker: marker,
+      bodyMarker: marker,
+      action: "received",
+      method: "GET",
+      url: dashboardUrl,
+      status: 200,
+      targetId: "fixture-page-2",
+      pageUrl: url,
+      frameUrl: url,
+      isMainFrame: true,
+      servedAt: "2026-08-12T16:00:00.000Z",
+    }],
+  };
 
-  assert.deepEqual(validateLighthousePayrollResult(lhr, url), {
+  assert.deepEqual(validateLighthousePayrollResult(lhr, url, fixtureEvidence), {
     routeRendered: true,
     payrollDashboardStatus: 200,
+    syntheticFixtureMarker: marker,
+    fixtureTargetId: "fixture-page-2",
+    fixtureSequence: 8,
   });
   assert.throws(
-    () => validateLighthousePayrollResult({ ...lhr, audits: {} }, url),
-    /authorized payroll dashboard API/i,
+    () => validateLighthousePayrollResult(lhr, url, {
+      ...fixtureEvidence,
+      ledger: [{ ...fixtureEvidence.ledger[0], marker: "unmarked-live-response" }],
+    }),
+    /marked synthetic.*dashboard/i,
+  );
+  assert.throws(
+    () => validateLighthousePayrollResult(lhr, url, {
+      ...fixtureEvidence,
+      ledger: [{ ...fixtureEvidence.ledger[0], targetId: fixtureEvidence.probeTargetId }],
+    }),
+    /Lighthouse.*target/i,
+  );
+  assert.throws(
+    () => validateLighthousePayrollResult(lhr, url, {
+      ...fixtureEvidence,
+      ledger: [{ ...fixtureEvidence.ledger[0], pageUrl: "about:blank" }],
+    }),
+    /Lighthouse.*payroll page/i,
   );
 });
 
@@ -273,4 +349,25 @@ test("serializeBaselineWithCoherentInventory records the final baseline byte siz
 
   assert.equal(baselineEntry.bytes, Buffer.byteLength(text));
   assert.deepEqual(JSON.parse(text), baseline);
+});
+
+test("cleanupCaptureResources exhausts cleanup while preserving the primary error", async () => {
+  // Production break caught: a cleanup failure must neither skip later cleanup
+  // nor replace the capture failure that explains why evidence was unavailable.
+  const calls = [];
+  const primaryError = new Error("capture failed");
+  const cleanupErrors = await cleanupCaptureResources([
+    async () => { calls.push("routing"); throw new Error("unroute failed"); },
+    async () => { calls.push("browser"); },
+    async () => { calls.push("chromium"); },
+    async () => { calls.push("server"); },
+  ], primaryError);
+
+  assert.deepEqual(calls, ["routing", "browser", "chromium", "server"]);
+  assert.equal(cleanupErrors.length, 1);
+  assert.equal(primaryError.cleanupErrors, cleanupErrors);
+  await assert.rejects(
+    () => cleanupCaptureResources([async () => { throw new Error("close failed"); }]),
+    AggregateError,
+  );
 });
