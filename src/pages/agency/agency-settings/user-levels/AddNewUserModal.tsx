@@ -23,6 +23,9 @@ import {
   isBillingPairComplete,
   roundRate,
   staffHrFieldsValid,
+  AGENCY_ACCESS_OPTIONS,
+  normalizeAgencyAccessListForUi,
+  toggleAgencyAccess,
 } from "./staffForm";
 
 interface AddNewUserModalProps {
@@ -43,30 +46,6 @@ interface AddNewUserModalProps {
   };
   onSave?: (data: StaffFormValues) => Promise<void>;
 }
-
-function normalizeAgencyAccessListForUi(list: string[]): string[] {
-  return list.map((item) => (item === "Scheduling" ? "Shift Management" : item));
-}
-
-// Agency-specific access options
-const ACCESS_OPTIONS = [
-  "DSP Management",
-  "Client Management",
-  "Shift Management",
-  "Notes",
-  "Billing & Management",
-  "AI Automation",
-  "Support",
-  "Analytics",
-  "Goals & Documents",
-  "Applicant Directory",
-  "Reports",
-  "Community Inclusion",
-  "Trainings",
-  "User Levels",
-  "Mileage",
-  "Incident",
-];
 
 const CREATE_DEFAULTS = ["Mileage"];
 
@@ -95,7 +74,7 @@ export default function AddNewUserModal({
   const [email, setEmail] = useState(initialData?.email || "");
   const [password, setPassword] = useState(initialData?.password || "");
   const [accessList, setAccessList] = useState<string[]>(
-    initialData?.accessList || (mode === "create" ? CREATE_DEFAULTS : [])
+    initialData ? normalizeAgencyAccessListForUi(initialData.accessList) : (mode === "create" ? CREATE_DEFAULTS : [])
   );
   const [isAccessOpen, setIsAccessOpen] = useState(false);
   const [agencyModes, setAgencyModes] = useState<("ddd" | "hha")[]>(
@@ -131,13 +110,7 @@ export default function AddNewUserModal({
     setPassword(newPassword);
   };
 
-  const toggleAccess = (access: string) => {
-    setAccessList((prev) =>
-      prev.includes(access)
-        ? prev.filter((item) => item !== access)
-        : [...prev, access]
-    );
-  };
+  const toggleAccess = (access: string) => setAccessList((prev) => toggleAgencyAccess(prev, access));
 
   const toggleMode = (m: "ddd" | "hha") => {
     setAgencyModes((prev) =>
@@ -633,7 +606,7 @@ export default function AddNewUserModal({
                     className="flex flex-col mt-[8px] overflow-y-auto"
                     onWheel={(e) => e.stopPropagation()}
                   >
-                    {ACCESS_OPTIONS.map((option) => {
+                    {AGENCY_ACCESS_OPTIONS.map((option) => {
                       const isSelected = accessList.includes(option);
                       return (
                         <button

@@ -5,7 +5,27 @@ import {
   roundRate,
   isBillingPairComplete,
   staffHrFieldsValid,
+  AGENCY_ACCESS_OPTIONS,
+  normalizeAgencyAccessListForUi,
+  toggleAgencyAccess,
 } from "./staffForm";
+
+describe("agency billing access form invariants", () => {
+  it("uses canonical billing options and removes legacy values", () => {
+    expect(AGENCY_ACCESS_OPTIONS).toContain("Payroll Management");
+    expect(AGENCY_ACCESS_OPTIONS).not.toContain("Billing & Management");
+    expect(normalizeAgencyAccessListForUi(["Billing & Management", "Scheduling", "Mileage"])).toEqual(["Shift Management", "Mileage"]);
+  });
+
+  it("normalizes, deduplicates, and maintains elevated view implications", () => {
+    expect(normalizeAgencyAccessListForUi(["Payroll Management", "Payroll Management"])).toEqual(["Payroll Management", "Payroll View"]);
+    expect(toggleAgencyAccess([], "Claims Management")).toEqual(["Claims Management", "Claims View"]);
+    expect(toggleAgencyAccess(["Claims Management", "Claims View"], "Claims Management")).toEqual(["Claims View"]);
+    expect(toggleAgencyAccess(["Claims Management", "Claims View"], "Claims View")).toEqual([]);
+    expect(toggleAgencyAccess([], "Payroll View")).toEqual(["Payroll View"]);
+    expect(toggleAgencyAccess(["Mileage", "Incident"], "Payroll View")).toEqual(["Mileage", "Incident", "Payroll View"]);
+  });
+});
 
 describe("isCustomRole", () => {
   it("is false for a default role", () => {

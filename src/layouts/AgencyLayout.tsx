@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useEffect, useMemo } from "react";
-import { Outlet, useNavigate, useLocation, Link } from "react-router";
+import { Navigate, Outlet, useNavigate, useLocation, Link } from "react-router";
 import { useDispatch } from "react-redux";
 import { useAuth } from "@/utils/auth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -10,11 +10,13 @@ import DashboardSidebar, { NavItem } from "@/components/DashboardSidebar";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
 import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
 import { UserType } from "@/utils/auth/types/user.types";
-import { resolveActiveNavItem } from "@/lib/nav-utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Sparkles } from "lucide-react";
 import { staffLabels } from "@/lib/roleLabel";
 import { cn } from "@/lib/utils";
+import { canAccessBillingChild, type AgencyBillingScope } from "@/lib/agency/agency-billing-permissions";
+import { getAgencyBillingRouteAccess } from "@/lib/agency/agency-billing-route-access";
+import { resolveActiveNavItem } from "@/lib/nav-utils";
 import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 import { setAgencyMode, type AgencyMode } from "@/store/redux/agencyModeSlice";
 import HomeIcon from "@/assets/icons/home.svg?react";
@@ -67,9 +69,15 @@ function filterNavItemsByAccess(items: AgencyNavItem[], userType: UserType | und
         return items.filter((item) => !item.accessKey);
     }
 
-    return items.filter((item) => {
-        if (!item.accessKey) return true;
-        return hasAgencyStaffAccess(accessList, item.accessKey);
+    return items.flatMap((item) => {
+        if (item.label === "Billing" && item.children) {
+            const children = item.children.filter((child) =>
+                !child.accessKey || canAccessBillingChild(userType, accessList, child.accessKey as AgencyBillingScope),
+            );
+            return children.length ? [{ ...item, path: children[0].path, children }] : [];
+        }
+        if (!item.accessKey) return [item];
+        return hasAgencyStaffAccess(accessList, item.accessKey) ? [item] : [];
     });
 }
 
@@ -101,13 +109,12 @@ const allNavItems: AgencyNavItem[] = [
         label: "Billing",
         path: Routes.agency.billing.index,
         icon: BillingIcon,
-        accessKey: "Billing & Management",
         children: [
-            { label: "Financial overview", path: Routes.agency.billing.financialOverview },
-            { label: "Payroll management", path: Routes.agency.billing.payrollManagement },
-            { label: "Claims dashboard", path: Routes.agency.billing.claims },
-            { label: "DSP expenses", path: Routes.agency.billing.expenses },
-            { label: "Submitted timesheets", path: Routes.agency.billing.staffTimesheets },
+            { label: "Financial overview", path: Routes.agency.billing.financialOverview, accessKey: "Billing Overview" },
+            { label: "Payroll management", path: Routes.agency.billing.payrollManagement, accessKey: "Payroll View" },
+            { label: "Claims dashboard", path: Routes.agency.billing.claims, accessKey: "Claims View" },
+            { label: "DSP expenses", path: Routes.agency.billing.expenses, accessKey: "Expenses View" },
+            { label: "Submitted timesheets", path: Routes.agency.billing.staffTimesheets, accessKey: "Timesheets View" },
         ],
     },
     // { label: "Reports", path: Routes.agency.reports.index, icon: ReportIcon, accessKey: "Reports" },
@@ -283,21 +290,6 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
         });
     }, [user?.userType, user?.profile?.accessList, effectiveMode, dspManagementLabel]);
 
-    // Protect routes - redirect if user tries to access unauthorized page.
-    useEffect(() => {
-        if (!user) return;
-        if (user.userType === UserType.AGENCY) return;
-
-        const currentNavItem = resolveActiveNavItem(location.pathname, allNavItems);
-        if (!currentNavItem || !currentNavItem.accessKey) return;
-
-        const userAccessList = user.profile?.accessList || [];
-        const hasAccess = hasAgencyStaffAccess(userAccessList, currentNavItem.accessKey);
-        if (!hasAccess) {
-            navigate(Routes.agency.dashboard, { replace: true });
-        }
-    }, [user, location.pathname, navigate]);
-
     useEffect(() => {
         if (!user || (user?.userType !== UserType.AGENCY && user?.userType !== UserType.AGENCY_STAFF)) {
             navigate(Routes.auth.login, { replace: true });
@@ -309,8 +301,23 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
             <AgencyModeToggle mode={effectiveMode} onSelect={handleModeToggle} />
         ) : null;
 
+    const billingRoute = getAgencyBillingRouteAccess(location.pathname);
+    const mayAccessBillingRoute = !billingRoute || canAccessBillingChild(
+        user?.userType,
+        user?.profile?.accessList ?? [],
+        billingRoute.required,
+    );
+    const currentNavItem = resolveActiveNavItem(location.pathname, allNavItems);
+    const mayAccessNonBillingRoute = billingRoute ? true : (
+        user?.userType === UserType.AGENCY ||
+        !currentNavItem?.accessKey ||
+        hasAgencyStaffAccess(user?.profile?.accessList ?? [], currentNavItem.accessKey)
+    );
+    const canRenderCurrentRoute = mayAccessBillingRoute && mayAccessNonBillingRoute;
+
     return (
         <ProtectedRoute>
+            {!canRenderCurrentRoute ? <Navigate to={Routes.agency.dashboard} replace /> :
             <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
                 <DashboardHeader
                     userName={user?.fullName}
@@ -367,7 +374,7 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
                         </TooltipProvider>
                     </>
                 )}
-            </div>
+            </div>}
         </ProtectedRoute>
     );
 }

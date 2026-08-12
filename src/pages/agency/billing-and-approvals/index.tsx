@@ -107,7 +107,7 @@ export default function BillingAndApprovalsPage() {
       {/* Header */}
       <div className="mb-6 flex justify-between items-center">
         <h1 className="text-[40px] font-bold leading-[1.4] text-[#10141a]">
-          Billing & Management
+          Claims
         </h1>
         <div className="flex gap-3">
           <Button

@@ -80,7 +80,9 @@ const BillingClaimsDashboardPage = lazy(() =>
 const BillingExpensesDashboardPage = lazy(() =>
     import("@/pages/agency/billing/pages").then((module) => ({ default: module.ExpensesDashboard }))
 );
-const BillingIndexRedirect = lazy(() => import("@/pages/agency/billing/BillingIndexRedirect"));
+const AgencyBillingIndexRedirect = lazy(() =>
+    import("@/pages/agency/billing/BillingIndexRedirect").then((module) => ({ default: module.AgencyBillingIndexRedirect }))
+);
 const ClientClaimsPage = lazy(() => import("@/pages/agency/billing-and-approvals/client-claims"));
 const AgencySchedulingRoute = lazy(() =>
     import("@/pages/agency/scheduling/AgencyShiftOperationsRoutes").then((module) => ({ default: module.AgencySchedulingRoute }))
@@ -358,7 +360,7 @@ export const router = createBrowserRouter([
             },
             {
                 path: Routes.agency.billing.index,
-                Component: BillingIndexRedirect,
+                Component: AgencyBillingIndexRedirect,
             },
             {
                 path: Routes.agency.billing.financialOverview,

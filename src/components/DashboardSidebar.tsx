@@ -10,6 +10,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 export type NavSubItem = {
   label: string;
   path: string;
+  accessKey?: string;
 };
 
 export type NavItem = {

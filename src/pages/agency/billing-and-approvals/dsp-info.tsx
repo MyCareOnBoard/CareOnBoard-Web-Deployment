@@ -323,7 +323,7 @@ export default function DSPClaimsPage() {
             <ArrowLeft className="w-5 h-5 text-[#10141a]"/>
           </button>
           <h1 className="text-[24px] font-semibold text-[#10141a]">
-            Billing & Management
+            {`${labels.noun} Claims`}
           </h1>
           <div className="ml-auto">
             <button

@@ -155,7 +155,7 @@ export default function ClientClaimsPage() {
             <ArrowLeft className="w-5 h-5 text-[#10141a]"/>
           </button>
           <h1 className="text-[24px] font-semibold text-[#10141a]">
-            Billing & Management
+            Client Claims
           </h1>
         </div>
 

@@ -1,4 +1,47 @@
 import type { EmploymentType, StaffBillingType } from "@/lib/api/agency-staff";
+import {
+  AGENCY_BILLING_SCOPE_IMPLICATIONS,
+  AGENCY_BILLING_SCOPES,
+  type AgencyBillingScope,
+} from "@/lib/agency/agency-billing-permissions";
+
+export const AGENCY_ACCESS_OPTIONS = [
+  "DSP Management", "Client Management", "Shift Management", "Notes",
+  ...AGENCY_BILLING_SCOPES,
+  "AI Automation", "Support", "Analytics", "Goals & Documents", "Applicant Directory",
+  "Reports", "Community Inclusion", "Trainings", "User Levels", "Mileage", "Incident",
+] as const;
+
+const BILLING_SCOPE_SET = new Set<string>(AGENCY_BILLING_SCOPES);
+
+export function normalizeAgencyAccessListForUi(list: readonly string[]): string[] {
+  const normalized = new Set<string>();
+  for (const access of list) {
+    if (access === "Scheduling") normalized.add("Shift Management");
+    else if (access !== "Billing & Management") normalized.add(access);
+  }
+  for (const [elevated, view] of Object.entries(AGENCY_BILLING_SCOPE_IMPLICATIONS)) {
+    if (normalized.has(elevated)) normalized.add(view);
+  }
+  return [...normalized];
+}
+
+export function toggleAgencyAccess(accessList: readonly string[], access: string): string[] {
+  const next = new Set(normalizeAgencyAccessListForUi(accessList));
+  if (!next.has(access)) {
+    next.add(access);
+    const implied = AGENCY_BILLING_SCOPE_IMPLICATIONS[access as AgencyBillingScope];
+    if (implied) next.add(implied);
+  } else {
+    next.delete(access);
+    if (BILLING_SCOPE_SET.has(access)) {
+      for (const [elevated, view] of Object.entries(AGENCY_BILLING_SCOPE_IMPLICATIONS)) {
+        if (view === access) next.delete(elevated);
+      }
+    }
+  }
+  return normalizeAgencyAccessListForUi([...next]);
+}
 
 /** Default job-title options; "Other (custom)" lets an admin type a free-text role. */
 export const STAFF_ROLE_OPTIONS: string[] = [
