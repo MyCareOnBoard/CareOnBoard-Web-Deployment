@@ -7,7 +7,14 @@ const routing = vi.hoisted(() => ({ pathname: "/agency/billing/payroll-managemen
 const state = vi.hoisted(() => ({ user: { uid: "staff", fullName: "Sam", userType: "agency_staff", profile: { accessList: [] }, agency: { supportedClientTypes: ["ddd"] } } as any }));
 vi.mock("react-router", async () => {
   const actual = await vi.importActual<typeof import("react-router")>("react-router");
-  return { ...actual, useLocation: () => ({ pathname: routing.pathname, search: routing.search, hash: "", state: null, key: "test" }), useNavigate: () => routing.navigate };
+  return {
+    ...actual,
+    Navigate: ({ to, replace }: { to: string; replace?: boolean }) => (
+      <span data-testid="route-redirect" data-to={to} data-replace={String(!!replace)} />
+    ),
+    useLocation: () => ({ pathname: routing.pathname, search: routing.search, hash: "", state: null, key: "test" }),
+    useNavigate: () => routing.navigate,
+  };
 });
 vi.mock("react-redux", () => ({ useDispatch: () => vi.fn() }));
 vi.mock("@/utils/auth", () => ({ useAuth: () => ({ user: state.user, logout: vi.fn() }) }));
@@ -17,6 +24,17 @@ vi.mock("@/components/DashboardSidebar", () => ({ default: ({ navItems }: any) =
 vi.mock("@/components/AnnouncementBanner", () => ({ default: () => <div /> }));
 vi.mock("@/hooks/useSidebarCollapsed", () => ({ useSidebarCollapsed: () => [false] }));
 vi.mock("@/hooks/useEffectiveAgencyMode", () => ({ useEffectiveAgencyMode: () => "ddd" }));
+
+const DIRECT_BILLING_ROUTE_CASES = [
+  { path: "/agency/billing/financial-overview", view: "Billing Overview", implied: undefined, unrelated: "Payroll View" },
+  { path: "/agency/billing/payroll-management", view: "Payroll View", implied: "Payroll Management", unrelated: "Claims View" },
+  { path: "/agency/billing/claims", view: "Claims View", implied: "Claims Management", unrelated: "Expenses View" },
+  { path: "/agency/billing/expenses", view: "Expenses View", implied: "Expenses Management", unrelated: "Timesheets View" },
+  { path: "/agency/billing/staff-timesheets", view: "Timesheets View", implied: "Timesheets Approval", unrelated: "Billing Overview" },
+  { path: "/agency/billing-and-approvals", view: "Claims View", implied: "Claims Management", unrelated: "Payroll View" },
+  { path: "/agency/billing-and-approvals/client/client-123", view: "Claims View", implied: "Claims Management", unrelated: "Payroll View" },
+  { path: "/agency/billing-and-approvals/dsp/dsp-123", view: "Claims View", implied: "Claims Management", unrelated: "Payroll View" },
+] as const;
 
 describe("AgencyDashboardLayout billing authorization", () => {
   beforeEach(() => {
@@ -87,4 +105,47 @@ describe("AgencyDashboardLayout billing authorization", () => {
     expect(screen.queryByText("Denied analytics")).not.toBeInTheDocument();
     expect(mounted).not.toHaveBeenCalled();
   });
+
+  it.each(DIRECT_BILLING_ROUTE_CASES)(
+    "authorizes $path only for owner, $view, or its matching elevated scope",
+    ({ path, view: requiredView, implied, unrelated }) => {
+      routing.pathname = path;
+
+      const renderChild = () => {
+        const mounted = vi.fn();
+        function Child() { mounted(); return <div>Protected billing child</div>; }
+        const result = render(<MemoryRouter><AgencyDashboardLayout><Child /></AgencyDashboardLayout></MemoryRouter>);
+        return { ...result, mounted };
+      };
+
+      state.user = { ...state.user, userType: "agency", profile: { accessList: [] } };
+      let result = renderChild();
+      expect(result.mounted).toHaveBeenCalledOnce();
+      expect(screen.queryByTestId("route-redirect")).not.toBeInTheDocument();
+      result.unmount();
+
+      state.user = { ...state.user, userType: "agency_staff", profile: { accessList: [requiredView] } };
+      result = renderChild();
+      expect(result.mounted).toHaveBeenCalledOnce();
+      expect(screen.queryByTestId("route-redirect")).not.toBeInTheDocument();
+      result.unmount();
+
+      if (implied) {
+        state.user = { ...state.user, profile: { accessList: [implied] } };
+        result = renderChild();
+        expect(result.mounted).toHaveBeenCalledOnce();
+        expect(screen.queryByTestId("route-redirect")).not.toBeInTheDocument();
+        result.unmount();
+      }
+
+      for (const accessList of [[unrelated], []]) {
+        state.user = { ...state.user, profile: { accessList } };
+        result = renderChild();
+        expect(result.mounted).not.toHaveBeenCalled();
+        expect(screen.getByTestId("route-redirect")).toHaveAttribute("data-to", "/agency/dashboard");
+        expect(screen.getByTestId("route-redirect")).toHaveAttribute("data-replace", "true");
+        result.unmount();
+      }
+    },
+  );
 });
