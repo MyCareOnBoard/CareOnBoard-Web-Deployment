@@ -7,6 +7,10 @@ const deleteFn = vi.hoisted(() =>
   vi.fn(() => ({ unwrap: () => Promise.resolve() }))
 );
 
+vi.mock("@/hooks/useEffectiveAgencyMode", () => ({
+  useEffectiveAgencyMode: () => null,
+}));
+
 vi.mock("../api", () => ({
   useListConversationsQuery: () => ({
     data: {
