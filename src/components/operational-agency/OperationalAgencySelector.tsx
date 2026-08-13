@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Building2, Check, ChevronDown, Search, X } from "lucide-react";
+import { Building2, Check, ChevronDown, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   Popover,

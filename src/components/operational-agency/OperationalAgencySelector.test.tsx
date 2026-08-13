@@ -52,7 +52,7 @@ describe("OperationalAgencySelector", () => {
     const user = userEvent.setup();
     render(<SelectorHarness selectionMode="single" />);
 
-    await user.click(screen.getByRole("button", { name: "Select an agency, none selected" }));
+    await user.click(screen.getByRole("button", { name: "Select an agency, choose one agency" }));
     await user.click(await screen.findByRole("option", { name: "Atlas Care" }));
     expect(screen.getByLabelText("Selected agency IDs")).toHaveTextContent("atlas");
 
@@ -89,11 +89,11 @@ describe("OperationalAgencySelector", () => {
     const hydratedTrigger = await screen.findByRole("button", {
       name: "Select agencies, Zenith Supports selected",
     });
-    expect(within(screen.getByLabelText("Selected agencies")).getByText("Zenith Supports")).toBeVisible();
+    expect(hydratedTrigger).toHaveTextContent("Zenith Supports");
     fireEvent.click(hydratedTrigger);
     fireEvent.change(screen.getByRole("searchbox", { name: "Search agencies" }), { target: { value: "Birch" } });
 
-    expect(within(screen.getByLabelText("Selected agencies")).getByText("Zenith Supports")).toBeVisible();
+    expect(hydratedTrigger).toHaveTextContent("Zenith Supports");
     expect(screen.getByLabelText("Selected agency IDs")).toHaveTextContent("zenith");
   });
 
@@ -256,6 +256,14 @@ describe("OperationalAgencySelector", () => {
 
     render(<SelectorHarness initialIds={manyAgencies.map((agency) => agency.id)} />);
 
-    expect(await screen.findByRole("button", { name: "Remove Agency 51" })).toBeVisible();
+    expect(await screen.findByRole("button", { name: "Select agencies, 51 agencies selected" })).toBeVisible();
+    await waitFor(() => {
+      const hydrationCalls = listOperationalAgencies.mock.calls
+        .map(([, input]) => input as { ids?: string[] } | undefined)
+        .filter((input) => input?.ids?.length);
+      expect(hydrationCalls).toHaveLength(2);
+      expect(hydrationCalls.map((input) => input?.ids?.length)).toEqual([50, 1]);
+    });
+    expect(screen.getByLabelText("Selected agency IDs")).toHaveTextContent("agency-0,agency-1");
   });
 });

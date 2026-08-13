@@ -4,8 +4,6 @@
  * Reusable loading spinner component with different sizes and variants
  */
 
-import { Oval } from 'react-loader-spinner'
-
 interface LoaderProps {
   size?: 'sm' | 'md' | 'lg' | 'xl'
   color?: string
@@ -32,14 +30,16 @@ export function Loader({
 
   const loader = (
     <div className="flex flex-col items-center justify-center gap-3">
-      <Oval
-        height={loaderSize}
-        width={loaderSize}
-        color={color}
-        secondaryColor={secondaryColor}
-        strokeWidth={4}
-        strokeWidthSecondary={4}
-        ariaLabel="loading"
+      <span
+        aria-label="loading"
+        className="animate-spin rounded-full border-4 border-solid"
+        role="status"
+        style={{
+          borderColor: secondaryColor,
+          borderTopColor: color,
+          height: loaderSize,
+          width: loaderSize,
+        }}
       />
       {text && (
         <p className="text-sm text-gray-600 animate-pulse">{text}</p>
