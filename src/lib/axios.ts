@@ -1,5 +1,5 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
-import { getIdToken } from '@/utils/auth';
+import { getIdToken } from '@/utils/auth/services/authService';
 import { auth } from '@/lib/firebase';
 import { Routes } from "@/routes/constants";
 import { handleMfaApiError } from '@/utils/auth/helpers/handleMfaApiError';

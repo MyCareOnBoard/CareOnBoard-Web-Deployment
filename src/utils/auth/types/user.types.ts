@@ -158,6 +158,7 @@ export interface User {
   applicantType?: string
   // Agency reference
   agencyId?: string
+  canOpenAgencyPayrollSetup?: boolean
   // Some endpoints embed agency details rather than only agencyId
   agency?: UserAgency
   // Profile sub-object containing all profile-related data

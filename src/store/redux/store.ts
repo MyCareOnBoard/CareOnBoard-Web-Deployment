@@ -11,6 +11,7 @@ import {
 } from "redux-persist";
 import storage from "redux-persist/lib/storage";
 import authReducer, { logoutUser } from "@/utils/auth/store/authSlice";
+import { setUser } from "@/utils/auth/store/authSlice";
 import agencyModeReducer from "@/store/redux/agencyModeSlice";
 import { applicationApi } from "@/pages/applicant/application/api";
 import { documentsApi } from "@/pages/applicant/documents/api";
@@ -38,6 +39,9 @@ import { agencyStaffTasksApi } from "@/pages/agency/staff-tasks/api";
 import { remindersApi } from "@/pages/agency/reminders/api";
 import { networkBillingApi } from "@/lib/api/network-billing";
 import { staffDirectoryApi } from "@/lib/api/staff-directory";
+import { checkPayrollApi } from "@/features/payroll/api/checkPayrollApi";
+import { clearPayrollOnboardSessions } from "@/features/payroll/onboard/payrollOnboardSession";
+import { payrollScopeChanged } from "@/features/payroll/api/payrollCacheLifecycle";
 
 const appReducer = combineReducers({
     auth: authReducer,
@@ -68,6 +72,7 @@ const appReducer = combineReducers({
     [remindersApi.reducerPath]: remindersApi.reducer,
     [networkBillingApi.reducerPath]: networkBillingApi.reducer,
     [staffDirectoryApi.reducerPath]: staffDirectoryApi.reducer,
+    [checkPayrollApi.reducerPath]: checkPayrollApi.reducer,
 });
 
 const isLogoutFulfilled = (action: unknown): boolean => (
@@ -78,9 +83,23 @@ const isLogoutFulfilled = (action: unknown): boolean => (
 );
 
 // Dispatch before logout reaches route consumers so a remounted account never sees prior billing data.
-export const networkBillingLogoutResetMiddleware: Middleware = ({ dispatch }) => (next) => (action) => {
-    if (isLogoutFulfilled(action)) {
+export const networkBillingLogoutResetMiddleware: Middleware = ({ dispatch, getState }) => (next) => (action) => {
+    if (isLogoutFulfilled(action) || (action as { type?: unknown }).type === payrollScopeChanged.type) {
+        clearPayrollOnboardSessions();
         dispatch(networkBillingApi.util.resetApiState());
+        dispatch(checkPayrollApi.util.resetApiState());
+    }
+    if ((action as { type?: unknown }).type === setUser.type) {
+        const previous = (getState() as RootState).auth?.user;
+        const nextUser = (action as { payload?: { uid?: string; agencyId?: string; canOpenAgencyPayrollSetup?: boolean } | null }).payload;
+        if (
+            previous?.uid !== nextUser?.uid ||
+            previous?.agencyId !== nextUser?.agencyId ||
+            previous?.canOpenAgencyPayrollSetup !== nextUser?.canOpenAgencyPayrollSetup
+        ) {
+            const key = (value: typeof previous) => value ? `${value.uid ?? ""}:${value.agencyId ?? ""}:${value.canOpenAgencyPayrollSetup === true}` : null;
+            dispatch(payrollScopeChanged({ previousKey: key(previous), nextKey: key(nextUser as typeof previous) }));
+        }
     }
     return next(action);
 };
@@ -135,7 +154,8 @@ export const store = configureStore({
             .concat(agencyStaffTasksApi.middleware)
             .concat(remindersApi.middleware)
             .concat(networkBillingApi.middleware)
-            .concat(staffDirectoryApi.middleware),
+            .concat(staffDirectoryApi.middleware)
+            .concat(checkPayrollApi.middleware),
     devTools: process.env.VITE_ENVIRONMENT !== 'production',
 });
 

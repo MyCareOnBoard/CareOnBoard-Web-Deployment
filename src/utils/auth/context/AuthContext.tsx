@@ -23,6 +23,8 @@ import { clearAuthCache } from "@/lib/axios";
 import { getUser } from "@/lib/api/users";
 import { clearMfaResolverSession } from "@/utils/auth/services/mfaSessionStore";
 import type { User } from "../types/user.types"
+import { checkPayrollApi } from "@/features/payroll/api/checkPayrollApi"
+import { clearPayrollOnboardSessions } from "@/features/payroll/onboard/payrollOnboardSession"
 
 interface AuthContextType {
   user: User | null
@@ -62,6 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [isInitialized, setIsInitialized] = useState(false)
   const refreshGenerationRef = useRef(0)
+  const firebaseUidRef = useRef<string | null>(auth.currentUser?.uid ?? null)
 
   useEffect(() => {
     const initAuth = async () => {
@@ -108,10 +111,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []) // Only run once on mount
 
   useEffect(() => {
-    return auth.onAuthStateChanged(() => {
+    return auth.onAuthStateChanged((nextFirebaseUser) => {
+      if (firebaseUidRef.current !== nextFirebaseUser?.uid) {
+        clearPayrollOnboardSessions()
+        dispatch(checkPayrollApi.util.resetApiState())
+        firebaseUidRef.current = nextFirebaseUser?.uid ?? null
+      }
       refreshGenerationRef.current += 1
     })
-  }, [])
+  }, [dispatch])
   // Sync local state when Redux state changes (after login/signup)
   useEffect(() => {
     if (isInitialized) {
@@ -233,6 +241,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       refreshGenerationRef.current !== refreshGeneration
     ) {
       return null
+    }
+
+    if (user?.uid && user.uid !== nextUser.uid) {
+      clearPayrollOnboardSessions()
+      dispatch(checkPayrollApi.util.resetApiState())
     }
 
     setUserState(nextUser)

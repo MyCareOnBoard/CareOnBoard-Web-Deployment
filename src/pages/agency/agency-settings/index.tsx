@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense, useMemo, useCallback } from "react";
-import { useLocation } from "react-router";
+import { useLocation, useSearchParams } from "react-router";
 import AccountTab from "./components/AccountTab";
 import SettingsTabNav, { SettingsTabId, SettingsTabItem } from "./components/SettingsTabNav";
 import SettingsTabSkeleton from "./components/SettingsTabSkeleton";
@@ -10,6 +10,7 @@ import { UserType } from "@/utils/auth/types";
 const AgencyInfoTab = lazy(() => import("./components/AgencyInfoTab"));
 const NotificationsTab = lazy(() => import("./components/NotificationTab"));
 const UserLevelsTab = lazy(() => import("./components/UserLevelsTab"));
+const AgencyPayrollSetupTab = lazy(() => import("./components/AgencyPayrollSetupTab"));
 
 
 
@@ -18,10 +19,12 @@ export default function AgencySettingsPage() {
   const { user } = useAuth();
 
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [activeTab, setActiveTab] = useState<SettingsTabId>("account");
 
   const [visitedTabs, setVisitedTabs] = useState<Set<SettingsTabId>>(() => new Set(["account"]));
+  const canOpenPayrollSetup = user?.canOpenAgencyPayrollSetup === true;
 
 
 
@@ -36,6 +39,19 @@ export default function AgencySettingsPage() {
     }
 
   }, [location.state]);
+
+  useEffect(() => {
+    const requested = searchParams.get("tab");
+    const removePayrollQuery = () => {
+      const next = new URLSearchParams(searchParams);
+      next.delete("tab");
+      setSearchParams(Object.fromEntries(next.entries()), { replace: true });
+    };
+    if (requested === "payrollSetup" && (!canOpenPayrollSetup || !user?.uid || !user.agencyId)) { setActiveTab("account"); setVisitedTabs((prev) => { const next = new Set(prev); next.delete("payrollSetup"); return next; }); removePayrollQuery(); return; }
+    if (requested && requested !== "payrollSetup") { setActiveTab("account"); removePayrollQuery(); return; }
+    if ((!canOpenPayrollSetup || !user?.uid || !user.agencyId) && activeTab === "payrollSetup") { setActiveTab("account"); setVisitedTabs((prev) => { const next = new Set(prev); next.delete("payrollSetup"); return next; }); removePayrollQuery(); return; }
+    if (requested === "payrollSetup" && canOpenPayrollSetup) { setActiveTab("payrollSetup"); setVisitedTabs((prev) => new Set(prev).add("payrollSetup")); }
+  }, [searchParams, canOpenPayrollSetup, activeTab, setSearchParams, user?.uid, user?.agencyId]);
 
 
 
@@ -66,10 +82,11 @@ export default function AgencySettingsPage() {
       items.push({ id: "userLevels", label: "Staff Management" });
 
     }
+    if (canOpenPayrollSetup) items.push({ id: "payrollSetup", label: "Payroll Setup" });
 
     return items;
 
-  }, [showTeamTab]);
+  }, [showTeamTab, canOpenPayrollSetup]);
 
 
 
@@ -78,8 +95,9 @@ export default function AgencySettingsPage() {
     setActiveTab(tabId);
 
     setVisitedTabs((prev) => new Set(prev).add(tabId));
+    if (tabId === "payrollSetup") setSearchParams({ tab: "payrollSetup" }); else setSearchParams({});
 
-  }, []);
+  }, [setSearchParams]);
 
 
 
@@ -159,6 +177,14 @@ export default function AgencySettingsPage() {
 
           </TabPanel>
 
+        )}
+
+        {canOpenPayrollSetup && visitedTabs.has("payrollSetup") && user?.uid && user.agencyId && (
+          <TabPanel tabId="payrollSetup" activeTab={activeTab}>
+            <Suspense fallback={<SettingsTabSkeleton variant="form" cardCount={2} />}>
+              <AgencyPayrollSetupTab scope={{ audience: "agency", actorUid: user.uid, agencyId: user.agencyId }} />
+            </Suspense>
+          </TabPanel>
         )}
 
       </div>

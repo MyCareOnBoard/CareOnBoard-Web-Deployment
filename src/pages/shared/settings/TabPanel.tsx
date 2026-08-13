@@ -19,6 +19,9 @@ export function TabPanel<T extends string>({
   return (
     <div
       className={cn(!isActive && "hidden", className)}
+      id={`settings-panel-${tabId}`}
+      role="tabpanel"
+      aria-labelledby={`settings-tab-${tabId}`}
       aria-hidden={!isActive}
       hidden={!isActive}
     >

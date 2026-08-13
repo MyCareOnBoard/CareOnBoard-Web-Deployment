@@ -81,6 +81,7 @@ export async function getUser(): Promise<User> {
       createdAt: backendUser.createdAt,
       updatedAt: backendUser.updatedAt,
       agencyId: backendUser.agencyId,
+      canOpenAgencyPayrollSetup: backendUser.canOpenAgencyPayrollSetup === true,
 
       // Profile data goes ONLY in profile sub-object
       profile: {},
