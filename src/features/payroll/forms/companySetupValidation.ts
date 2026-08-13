@@ -46,3 +46,36 @@ export function validateCompanySetup(values: CheckPayrollProfileFormValues): Rec
   if (signerParticipates && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.proposedSignerEmail ?? "")) errors.proposedSignerEmail = "Enter a valid proposed signer email.";
   return errors;
 }
+
+const present = (value?: string) => Boolean(value?.trim());
+
+/** Mirrors the backend's completeProfile gate; this indicates local readiness only. */
+export function isCompanySetupComplete(values: CheckPayrollProfileFormValues): boolean {
+  const hasEin = present(values.ein) || values.einPresent === true;
+  return Object.keys(validateCompanySetup(values)).length === 0
+    && present(values.legalName)
+    && hasEin
+    && CHECK_ENTITY_TYPES.includes(values.entityType as typeof CHECK_ENTITY_TYPES[number])
+    && CHECK_INDUSTRIES.includes(values.industry as typeof CHECK_INDUSTRIES[number])
+    && address(values.legalAddress)
+    && present(values.officeName)
+    && address(values.officeAddress)
+    && values.actualWorkLocationAttested === true
+    && present(values.website)
+    && present(values.phone)
+    && present(values.payrollContactName)
+    && present(values.payrollContactEmail)
+    && present(values.payrollContactPhone)
+    && CHECK_PAY_FREQUENCIES.includes(values.payFrequency as typeof CHECK_PAY_FREQUENCIES[number])
+    && isoDate(values.firstPayday)
+    && isoDate(values.firstPeriodEnd)
+    && isoDate(values.payrollStartDate)
+    && (values.payFrequency !== "semimonthly" || isoDate(values.secondPayday))
+    && present(values.proposedSignerFirstName)
+    && present(values.proposedSignerLastName)
+    && present(values.proposedSignerTitle)
+    && present(values.proposedSignerEmail)
+    && values.expectedW2Workers !== undefined
+    && Number.isInteger(Number(values.expectedW2Workers))
+    && Number(values.expectedW2Workers) >= 0;
+}

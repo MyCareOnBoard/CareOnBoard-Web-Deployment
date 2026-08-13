@@ -1,5 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { validateCompanySetup } from "./companySetupValidation";
+import { isCompanySetupComplete, validateCompanySetup } from "./companySetupValidation";
+
+const completeSetup = {
+  legalName: "Able Care LLC",
+  einPresent: true,
+  entityType: "llc",
+  industry: "health_care",
+  legalAddress: { line1: "1 Legal Street", line2: "", city: "Austin", state: "TX", postalCode: "78701", country: "US" as const },
+  officeName: "Main office",
+  officeAddress: { line1: "2 Work Street", line2: "", city: "Austin", state: "TX", postalCode: "78702", country: "US" as const },
+  actualWorkLocationAttested: true,
+  website: "https://able.example",
+  phone: "+15125550123",
+  payrollContactName: "Pay Roll",
+  payrollContactEmail: "payroll@able.example",
+  payrollContactPhone: "+15125550124",
+  payFrequency: "weekly",
+  firstPayday: "2026-09-04",
+  secondPayday: "",
+  firstPeriodEnd: "2026-09-03",
+  payrollStartDate: "2026-08-28",
+  proposedSignerFirstName: "Ada",
+  proposedSignerLastName: "Owner",
+  proposedSignerTitle: "Owner",
+  proposedSignerEmail: "ada@able.example",
+  expectedW2Workers: "3",
+};
 
 describe("validateCompanySetup", () => {
   it("rejects malformed partial values without requiring an incomplete draft", () => {
@@ -11,5 +37,31 @@ describe("validateCompanySetup", () => {
   });
   it("allows empty address objects in a blank needs-information draft", () => {
     expect(validateCompanySetup({ legalAddress: { line1: "", line2: "", city: "", state: "", postalCode: "", country: "US" }, officeAddress: { line1: "", line2: "", city: "", state: "", postalCode: "", country: "US" } })).toEqual({});
+  });
+});
+
+describe("isCompanySetupComplete", () => {
+  it("requires EIN and proposed signer even when every other group is complete", () => {
+    expect(isCompanySetupComplete({ ...completeSetup, einPresent: false })).toBe(false);
+    expect(isCompanySetupComplete({ ...completeSetup, proposedSignerEmail: "" })).toBe(false);
+  });
+
+  it.each([
+    ["legal name", { legalName: "" }],
+    ["entity type", { entityType: "" }],
+    ["industry", { industry: "" }],
+    ["legal address", { legalAddress: undefined }],
+    ["workplace", { officeName: "" }],
+    ["website", { website: "" }],
+    ["phone", { phone: "" }],
+    ["payroll contact", { payrollContactEmail: "" }],
+    ["schedule", { payFrequency: "" }],
+    ["worker count", { expectedW2Workers: undefined }],
+  ])("keeps the profile incomplete without %s", (_label, missing) => {
+    expect(isCompanySetupComplete({ ...completeSetup, ...missing })).toBe(false);
+  });
+
+  it("returns ready only for the complete backend profile", () => {
+    expect(isCompanySetupComplete(completeSetup)).toBe(true);
   });
 });
