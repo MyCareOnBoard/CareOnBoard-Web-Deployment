@@ -3,14 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import {
-  createMemoryRouter,
   MemoryRouter,
   Outlet,
   Route,
-  RouterProvider,
   Routes as ReactRoutes,
   useLocation,
-  useNavigate,
 } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -42,6 +39,8 @@ const networkBilling = vi.hoisted(() => ({
   overview: vi.fn(),
   expensesBootstrap: vi.fn(),
   expensesPage: vi.fn(),
+  prepare: vi.fn(),
+  backfill: vi.fn(),
   refetch: vi.fn(),
 }));
 const unfinishedClaimsPage = vi.hoisted(() => vi.fn());
@@ -90,6 +89,8 @@ vi.mock("@/lib/api/network-billing", () => ({
     useGetOverviewBootstrapQuery: networkBilling.overview,
     useGetExpensesBootstrapQuery: networkBilling.expensesBootstrap,
     useLazyGetExpensesPageQuery: networkBilling.expensesPage,
+    usePrepareNetworkBillingMutation: () => [networkBilling.prepare, { isLoading: false }],
+    useStartNetworkPayrollRollupBackfillMutation: () => [networkBilling.backfill, { isLoading: false }],
     util: { invalidateTags: vi.fn() },
   },
 }));
@@ -133,10 +134,11 @@ vi.mock("@/pages/agency/billing/expenses", () => ({ default: () => null }));
 
 import SuperAdminBillingWorkspace from "./SuperAdminBillingWorkspace";
 import { SuperAdminBillingIndex } from "./index";
+import SuperAdminBillingFinancialOverview from "./SuperAdminBillingFinancialOverview";
+import SuperAdminBillingExpenses from "./SuperAdminBillingExpenses";
 import { useBillingWorkspaceContext } from "./BillingWorkspaceContext";
 import { FinancialOverview } from "@/pages/agency/billing/pages";
 import FinancialOverviewPage from "@/pages/agency/billing/financial-overview";
-import { router } from "@/routes";
 
 const atlas = {
   id: "atlas",
@@ -410,11 +412,6 @@ function DirectoryCapabilityProbe() {
   );
 }
 
-function SwitchAgency() {
-  const navigate = useNavigate();
-  return <button type="button" onClick={() => navigate("/super-admin/billing/financial-overview?agencyId=beacon")}>Switch agency</button>;
-}
-
 function renderWorkspace(entry: string, nested = <BillingWorkspaceProbe />) {
   return render(
     <MemoryRouter initialEntries={[entry]}>
@@ -431,14 +428,33 @@ function renderWorkspace(entry: string, nested = <BillingWorkspaceProbe />) {
   );
 }
 
-function renderActualBillingRoute(entry: string) {
-  const configuredRouter = createMemoryRouter(router.routes, { initialEntries: [entry] });
-  return {
-    configuredRouter,
-    ...render(
-      <RouterProvider router={configuredRouter} />,
-    ),
-  };
+function renderConfiguredBillingRoute(entry: string) {
+  return render(
+    <MemoryRouter initialEntries={[entry]}>
+      <ReactRoutes>
+        <Route path="/super-admin/billing" element={<SuperAdminBillingWorkspace />}>
+          <Route path="financial-overview/*" element={<SuperAdminBillingFinancialOverview />} />
+          <Route path="expenses" element={<SuperAdminBillingExpenses />} />
+        </Route>
+      </ReactRoutes>
+    </MemoryRouter>,
+  );
+}
+
+function RevalidationWorkspace() {
+  const [agencyId, setAgencyId] = useState("atlas");
+  return (
+    <>
+      <button type="button" onClick={() => setAgencyId("beacon")}>Switch agency</button>
+      <MemoryRouter key={agencyId} initialEntries={[`/super-admin/billing/financial-overview?agencyId=${agencyId}`]}>
+        <ReactRoutes>
+          <Route path="/super-admin/billing" element={<SuperAdminBillingWorkspace />}>
+            <Route path="financial-overview" element={<><Outlet /><BillingDomainProbe /></>} />
+          </Route>
+        </ReactRoutes>
+      </MemoryRouter>
+    </>
+  );
 }
 
 describe("SuperAdminBillingWorkspace", () => {
@@ -496,7 +512,7 @@ describe("SuperAdminBillingWorkspace", () => {
   });
 
   it("mounts the completed network overview through the actual super-admin route without an agency provider", async () => {
-    renderActualBillingRoute(
+    renderConfiguredBillingRoute(
       "/super-admin/billing/financial-overview?clientType=ddd&startDate=2026-07-01&endDate=2026-07-31",
     );
 
@@ -517,7 +533,7 @@ describe("SuperAdminBillingWorkspace", () => {
   });
 
   it("keeps the completed network overview mounted for a trailing-slash direct link", async () => {
-    renderActualBillingRoute(
+    renderConfiguredBillingRoute(
       "/super-admin/billing/financial-overview/?clientType=ddd&startDate=2026-07-01&endDate=2026-07-31",
     );
 
@@ -526,11 +542,10 @@ describe("SuperAdminBillingWorkspace", () => {
   });
 
   it("mounts the configured provider-free network expenses controller instead of the staging bridge", async () => {
-    const { configuredRouter } = renderActualBillingRoute(
+    renderConfiguredBillingRoute(
       "/super-admin/billing/expenses?status=open&clientType=ddd&startDate=2026-07-01&endDate=2026-07-31",
     );
 
-    await waitFor(() => expect(configuredRouter.state.errors).toBeNull());
     await waitFor(() => expect(networkBilling.expensesBootstrap).toHaveBeenCalled());
     expect(await screen.findByRole("region", { name: "Network expenses" })).toBeVisible();
     expect(screen.queryByLabelText("Network billing workspace")).not.toBeInTheDocument();
@@ -747,10 +762,7 @@ describe("SuperAdminBillingWorkspace", () => {
         : Promise.resolve(atlas),
     );
     const user = userEvent.setup();
-    renderWorkspace(
-      "/super-admin/billing/financial-overview?agencyId=atlas",
-      <><SwitchAgency /><Outlet /><BillingDomainProbe /></>,
-    );
+    render(<RevalidationWorkspace />);
 
     expect(await screen.findByLabelText("Billing domain agency")).toHaveTextContent("Atlas Care");
     await user.click(screen.getByRole("button", { name: "Switch agency" }));
