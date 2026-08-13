@@ -149,16 +149,16 @@ describe("NetworkPayroll", () => {
 
   it("binds every payroll invoice action to the row agency and invalidates network data", async () => {
     const savedRows = [{ id: "invoice-1", agencyId: "beacon", agencyName: "Beacon Supports", staffKey: "beacon:staff-2", employeeId: "staff-2", employeeName: "Blair Support", kind: "payrollInvoice" as const, grossAmount: 80, totalHours: 4, mode: "ddd" as const, invoiceNumber: "PAY-1", status: "pending" as const }];
+    const dueBootstrap = { data: { page: { rows, nextCursor: null, total: 1, hasMore: false }, summary: { overview: { totalDue: { amount: null, count: 1, exact: false } }, meta: { evaluatedAt: "2026-08-03", totalsExact: false } } }, isLoading: false, isFetching: false };
+    const savedBootstrap = { data: { page: { rows: savedRows, nextCursor: null, total: 1, hasMore: false }, summary: { overview: { savedInvoices: { count: 1, exact: true } }, meta: { evaluatedAt: "2026-08-03", totalsExact: true } } }, isLoading: false, isFetching: false };
     api.options.mockReturnValue({ data: [] });
-    api.bootstrap.mockImplementation((args: { tab: string }) => ({ data: args.tab === "saved"
-      ? { page: { rows: savedRows, nextCursor: null, total: 1, hasMore: false }, summary: { overview: { savedInvoices: { count: 1, exact: true } }, meta: { evaluatedAt: "2026-08-03", totalsExact: true } } }
-      : { page: { rows, nextCursor: null, total: 1, hasMore: false }, summary: { overview: { totalDue: { amount: null, count: 1, exact: false } }, meta: { evaluatedAt: "2026-08-03", totalsExact: false } } }, isLoading: false, isFetching: false }));
+    api.bootstrap.mockImplementation((args: { tab: string }) => args.tab === "saved" ? savedBootstrap : dueBootstrap);
     api.search.mockReturnValue({ unwrap: vi.fn().mockResolvedValue([]), abort: vi.fn() });
     payroll.createPayrollInvoice.mockResolvedValue({ id: "created-1", grossAmount: 100, totalHours: 2, invoiceNumber: "PAY-NEW", status: "pending", employeeName: "Avery Nurse", periodStart: "2026-07-01", periodEnd: "2026-07-31", shiftIds: ["shift-1"] });
     payroll.getPayrollInvoiceById.mockResolvedValue({ id: "invoice-1" });
     payroll.markPayrollInvoicePaid.mockResolvedValue(undefined);
     payroll.cancelPayrollInvoice.mockResolvedValue(undefined);
-    render(<BillingWorkspaceProvider value={workspace}><NetworkPayroll /></BillingWorkspaceProvider>);
+    render(<UrlBackedNetworkPayroll />);
 
     fireEvent.click(screen.getByRole("button", { name: "Create invoice for Avery Nurse" }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm Create payroll invoice?" }));
