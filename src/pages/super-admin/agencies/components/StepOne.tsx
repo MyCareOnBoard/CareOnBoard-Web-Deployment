@@ -4,6 +4,7 @@ import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/c
 import React, {useEffect, useRef} from "react";
 import {cn} from "@/lib/utils";
 import {useGooglePlacesAutocomplete} from "@/hooks/useGooglePlacesAutocomplete";
+import { CompanySetupFields } from "@/features/payroll/forms/companySetupFields";
 
 export default function Step1AgencyIdentity({formData, onChange, fieldsWithErrors}: any) {
     const addressInputRef = useRef<HTMLDivElement>(null);
@@ -121,28 +122,6 @@ export default function Step1AgencyIdentity({formData, onChange, fieldsWithError
                     )}
                 </div>
 
-                {/* Agency EIN */}
-                <div>
-                    <Label htmlFor="ein" className="mb-2 text-[14px] font-medium text-[#10141a]">
-                        Agency EIN (Employer Identification Number)
-                    </Label>
-                    <Input
-                        id="ein"
-                        value={formData.ein}
-                        onChange={(e) => onChange("ein", e.target.value)}
-                        placeholder="Enter EIN"
-                        className={cn(
-                            "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
-                            fieldsWithErrors.includes("ein") && "border-red-500"
-                        )}
-                    />
-                    {fieldsWithErrors.includes("ein") && (
-                        <p className="text-red-500 text-sm mt-1">
-                            EIN is required.
-                        </p>
-                    )}
-                </div>
-
                 {/* NPI Number */}
                 <div>
                     <Label htmlFor="npi" className="mb-2 text-[14px] font-medium text-[#10141a]">
@@ -185,6 +164,7 @@ export default function Step1AgencyIdentity({formData, onChange, fieldsWithError
                     />
                 </div>
             </div>
+            <CompanySetupFields formData={formData} onChange={onChange} fieldsWithErrors={fieldsWithErrors} />
             <div className={"mt-10"}>
                 <div className="mt-2 mb-6">
                     <p className="text-[16px] font-semibold text-[#10141a]">

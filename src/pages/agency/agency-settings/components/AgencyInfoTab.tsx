@@ -66,7 +66,6 @@ const EMPTY_VALUES: AgencyProfileFormValues = {
   legalBusinessName: "",
   dba: "",
   agencyType: "",
-  ein: "",
   npi: "",
   providerId: "",
   medicaidProviderId: "",
@@ -82,8 +81,6 @@ const EMPTY_VALUES: AgencyProfileFormValues = {
   billingFormat: "",
   invoiceName: "",
   invoiceEmail: "",
-  payrollScheduleFrequency: "biweekly",
-  payrollScheduleNextPayoutDate: "",
   ...pickOperationalFormValues({}),
 };
 
@@ -93,7 +90,6 @@ function agencyToFormValues(agency: Agency): AgencyProfileFormValues {
     legalBusinessName: agency.legalBusinessName ?? "",
     dba: agency.dba ?? "",
     agencyType: agency.agencyType ?? "",
-    ein: agency.ein ?? "",
     npi: agency.npi ?? "",
     providerId: agency.providerId ?? "",
     medicaidProviderId: agency.medicaidProviderId ?? "",
@@ -109,8 +105,6 @@ function agencyToFormValues(agency: Agency): AgencyProfileFormValues {
     billingFormat: agency.billingFormat ?? "",
     invoiceName: agency.invoiceName ?? "",
     invoiceEmail: agency.invoiceEmail ?? "",
-    payrollScheduleFrequency: agency.payrollSchedule?.frequency ?? "biweekly",
-    payrollScheduleNextPayoutDate: agency.payrollSchedule?.nextPayoutDate ?? "",
     ...agencyOperationalToForm(agency),
   };
 }
@@ -497,24 +491,6 @@ export default function AgencyInfoTab() {
 
                 {!readOnly && (
                   <>
-                <SettingsFormFieldRow
-                  title="EIN"
-                  description="Your 9-digit Employer Identification Number (format: XX-XXXXXXX)."
-                >
-                  <FormField
-                    control={form.control}
-                    name="ein"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormControl>
-                          <Input placeholder="Enter EIN" {...field} disabled={disabled} className={inputClassName} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </SettingsFormFieldRow>
-
                 <SettingsFormFieldRow
                   title="NPI"
                   description="National Provider Identifier — 10 digits, no dashes."
@@ -941,50 +917,6 @@ export default function AgencyInfoTab() {
                   />
                 </SettingsFormFieldRow>
 
-                <SettingsFormFieldRow
-                  title="Payroll frequency"
-                  description="How often your agency runs payroll. Used for the upcoming payout date on the payroll dashboard."
-                >
-                  <FormField
-                    control={form.control}
-                    name="payrollScheduleFrequency"
-                    render={({ field }) => (
-                      <FormItem>
-                        <Select value={field.value} onValueChange={field.onChange} disabled={disabled}>
-                          <FormControl>
-                            <SelectTrigger className={inputClassName}>
-                              <SelectValue placeholder="Select frequency" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="weekly">Weekly</SelectItem>
-                            <SelectItem value="biweekly">Biweekly</SelectItem>
-                            <SelectItem value="monthly">Monthly</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </SettingsFormFieldRow>
-
-                <SettingsFormFieldRow
-                  title="Next payout date"
-                  description="The next scheduled payroll payout date shown on your dashboard."
-                >
-                  <FormField
-                    control={form.control}
-                    name="payrollScheduleNextPayoutDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormControl>
-                          <Input type="date" {...field} disabled={disabled} className={inputClassName} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </SettingsFormFieldRow>
               </AccordionContent>
             </AccordionItem>
             )}

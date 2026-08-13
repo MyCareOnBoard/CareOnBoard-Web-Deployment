@@ -5,6 +5,7 @@
 
 import axiosClient from '../axios';
 import { User } from '@/utils/auth/types/user.types';
+import type { CheckPayrollProfileInput } from "@/lib/agency/agency-profile-payload";
 
 /**
  * Agency interface
@@ -19,10 +20,10 @@ export interface Agency {
     legalBusinessName?: string;
     dba?: string;
     agencyType?: string;
-    ein?: string;
     npi?: string;
     providerId?: string;
     medicaidProviderId?: string;
+    checkPayrollProfile?: Omit<CheckPayrollProfileInput, "einChange"> & { einStatus?: { present: boolean; last4?: string } };
     // Contact
     phone?: string;
     address?: string;
@@ -46,10 +47,6 @@ export interface Agency {
     invoiceEmail?: string;
     invoiceFax?: string;
     payrollSystemIntegration?: string;
-    payrollSchedule?: {
-        frequency?: "weekly" | "biweekly" | "monthly";
-        nextPayoutDate?: string | null;
-    };
     quickBooks?: string;
     adp?: string;
     paycheck?: string;
@@ -134,10 +131,10 @@ export interface UpdateAgencyProfileRequest {
     legalBusinessName?: string | null;
     dba?: string | null;
     agencyType?: string | null;
-    ein?: string | null;
     npi?: string | null;
     providerId?: string | null;
     medicaidProviderId?: string | null;
+    checkPayrollProfile?: CheckPayrollProfileInput;
     email?: string;
     phone?: string | null;
     address?: string | null;
@@ -159,10 +156,6 @@ export interface UpdateAgencyProfileRequest {
     invoiceEmail?: string | null;
     invoiceFax?: string | null;
     payrollSystemIntegration?: string | null;
-    payrollSchedule?: {
-        frequency?: "weekly" | "biweekly" | "monthly" | null;
-        nextPayoutDate?: string | null;
-    } | null;
     quickBooks?: string | null;
     adp?: string | null;
     paycheck?: string | null;

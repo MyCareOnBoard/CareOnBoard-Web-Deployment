@@ -5,12 +5,57 @@ import {
   type OperationalFormSlice,
 } from "./operational-settings";
 
+export const CHECK_ENTITY_TYPES = ["sole_proprietorship", "partnership", "c_corporation", "s_corporation", "llc"] as const;
+export const CHECK_INDUSTRIES = ["auto_or_machine_sales", "auto_or_machine_repair", "arts_or_entertainment_or_recreation", "cleaning_services", "consulting_services", "educational_services", "family_care_services", "financial_services", "food_or_accommodation_services", "health_care", "information_services", "insurance_services", "manufacturing", "other", "personal_care_services", "real_estate", "restaurant", "scientific_or_technical_services", "security_services", "tobacco_or_alcohol_sales", "transportation"] as const;
+export const CHECK_PAY_FREQUENCIES = ["weekly", "biweekly", "semimonthly", "monthly", "quarterly", "annually"] as const;
+
+export type CheckAddress = { line1: string; line2?: string | null; city: string; state: string; postalCode: string; country: "US" };
+export type CheckPayrollProfileInput = {
+  legalName?: string; einChange?: { mode: "replace"; value: string } | { mode: "preserve" };
+  entityType?: typeof CHECK_ENTITY_TYPES[number]; industry?: typeof CHECK_INDUSTRIES[number]; legalAddress?: CheckAddress;
+  officeWorkplace?: { name: string; address: CheckAddress; actualWorkLocationAttested: true }; website?: string; phone?: string;
+  payrollContact?: { name: string; email: string; phone: string };
+  paySchedule?: { frequency: typeof CHECK_PAY_FREQUENCIES[number]; firstPayday: string; secondPayday: string | null; firstPeriodEnd: string; payrollStartDate: string };
+  proposedSignerContact?: { firstName: string; lastName: string; title: string; email: string };
+  expectedWorkerCounts?: { w2: number; contractor: 0 };
+};
+
+export type CheckPayrollProfileFormValues = {
+  legalName?: string; ein?: string; einPresent?: boolean; entityType?: string; industry?: string; legalAddress?: CheckAddress;
+  officeName?: string; officeAddress?: CheckAddress; actualWorkLocationAttested?: boolean; website?: string; phone?: string;
+  payrollContactName?: string; payrollContactEmail?: string; payrollContactPhone?: string; payFrequency?: string;
+  firstPayday?: string; secondPayday?: string; firstPeriodEnd?: string; payrollStartDate?: string;
+  proposedSignerFirstName?: string; proposedSignerLastName?: string; proposedSignerTitle?: string; proposedSignerEmail?: string; expectedW2Workers?: string | number;
+};
+
+const trim = (value: string | undefined) => value?.trim() ?? "";
+const hasAddress = (value: CheckAddress | undefined) => Boolean(value && trim(value.line1) && trim(value.city) && trim(value.state) && trim(value.postalCode));
+
+/** Maps the one onboarding form slice to the backend's exact, write-only contract. */
+export function buildCheckPayrollProfilePayload(values: CheckPayrollProfileFormValues): CheckPayrollProfileInput {
+  const payload: CheckPayrollProfileInput = {};
+  const ein = trim(values.ein);
+  if (ein) payload.einChange = { mode: "replace", value: ein };
+  else if (values.einPresent) payload.einChange = { mode: "preserve" };
+  if (trim(values.legalName)) payload.legalName = trim(values.legalName);
+  if (CHECK_ENTITY_TYPES.includes(values.entityType as typeof CHECK_ENTITY_TYPES[number])) payload.entityType = values.entityType as typeof CHECK_ENTITY_TYPES[number];
+  if (CHECK_INDUSTRIES.includes(values.industry as typeof CHECK_INDUSTRIES[number])) payload.industry = values.industry as typeof CHECK_INDUSTRIES[number];
+  if (hasAddress(values.legalAddress)) payload.legalAddress = values.legalAddress!;
+  if (trim(values.officeName) && hasAddress(values.officeAddress) && values.actualWorkLocationAttested) payload.officeWorkplace = { name: trim(values.officeName), address: values.officeAddress!, actualWorkLocationAttested: true };
+  if (trim(values.website)) payload.website = trim(values.website);
+  if (trim(values.phone)) payload.phone = trim(values.phone);
+  if (trim(values.payrollContactName) && trim(values.payrollContactEmail) && trim(values.payrollContactPhone)) payload.payrollContact = { name: trim(values.payrollContactName), email: trim(values.payrollContactEmail), phone: trim(values.payrollContactPhone) };
+  if (CHECK_PAY_FREQUENCIES.includes(values.payFrequency as typeof CHECK_PAY_FREQUENCIES[number]) && trim(values.firstPayday) && trim(values.firstPeriodEnd) && trim(values.payrollStartDate)) payload.paySchedule = { frequency: values.payFrequency as typeof CHECK_PAY_FREQUENCIES[number], firstPayday: trim(values.firstPayday), secondPayday: values.payFrequency === "semimonthly" ? trim(values.secondPayday) : null, firstPeriodEnd: trim(values.firstPeriodEnd), payrollStartDate: trim(values.payrollStartDate) };
+  if (trim(values.proposedSignerFirstName) && trim(values.proposedSignerLastName) && trim(values.proposedSignerTitle) && trim(values.proposedSignerEmail)) payload.proposedSignerContact = { firstName: trim(values.proposedSignerFirstName), lastName: trim(values.proposedSignerLastName), title: trim(values.proposedSignerTitle), email: trim(values.proposedSignerEmail) };
+  if (values.expectedW2Workers !== undefined && trim(String(values.expectedW2Workers)) !== "") payload.expectedWorkerCounts = { w2: Number(values.expectedW2Workers), contractor: 0 };
+  return payload;
+}
+
 export type AgencyProfileFormValues = {
   name: string;
   legalBusinessName: string;
   dba: string;
   agencyType: string;
-  ein: string;
   npi: string;
   providerId: string;
   medicaidProviderId: string;
@@ -26,8 +71,6 @@ export type AgencyProfileFormValues = {
   billingFormat: string;
   invoiceName: string;
   invoiceEmail: string;
-  payrollScheduleFrequency: string;
-  payrollScheduleNextPayoutDate: string;
 } & OperationalFormSlice;
 
 type DirtyFields = Partial<Record<keyof AgencyProfileFormValues, boolean | boolean[]>>;
@@ -37,7 +80,6 @@ const IDENTITY_KEYS = [
   "legalBusinessName",
   "dba",
   "agencyType",
-  "ein",
   "npi",
   "providerId",
   "medicaidProviderId",
@@ -60,8 +102,6 @@ const BILLING_KEYS = [
   "billingFormat",
   "invoiceName",
   "invoiceEmail",
-  "payrollScheduleFrequency",
-  "payrollScheduleNextPayoutDate",
 ] as const satisfies readonly (keyof AgencyProfileFormValues)[];
 
 export function isFieldDirty(
@@ -78,13 +118,6 @@ export function hasAnyDirty(
   keys: readonly (keyof AgencyProfileFormValues)[],
 ): boolean {
   return keys.some((key) => isFieldDirty(dirtyFields, key));
-}
-
-function parsePayrollFrequency(value: string): "weekly" | "biweekly" | "monthly" {
-  if (value === "weekly" || value === "biweekly" || value === "monthly") {
-    return value;
-  }
-  return "biweekly";
 }
 
 export function buildAgencyProfileUpdatePayload(
@@ -104,7 +137,6 @@ export function buildAgencyProfileUpdatePayload(
     payload.legalBusinessName = nullable(values.legalBusinessName);
     payload.dba = nullable(values.dba);
     payload.agencyType = nullable(values.agencyType);
-    payload.ein = nullable(values.ein);
     payload.npi = nullable(values.npi);
     payload.providerId = nullable(values.providerId);
     payload.medicaidProviderId = nullable(values.medicaidProviderId);
@@ -129,15 +161,6 @@ export function buildAgencyProfileUpdatePayload(
     payload.billingFormat = nullable(values.billingFormat);
     payload.invoiceName = nullable(values.invoiceName);
     payload.invoiceEmail = nullable(values.invoiceEmail);
-    if (
-      isFieldDirty(dirtyFields, "payrollScheduleFrequency") ||
-      isFieldDirty(dirtyFields, "payrollScheduleNextPayoutDate")
-    ) {
-      payload.payrollSchedule = {
-        frequency: parsePayrollFrequency(values.payrollScheduleFrequency),
-        nextPayoutDate: nullable(values.payrollScheduleNextPayoutDate),
-      };
-    }
   }
 
   if (hasOperationalDirtyFields(dirtyFields)) {

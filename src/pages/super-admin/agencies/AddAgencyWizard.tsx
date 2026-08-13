@@ -30,14 +30,37 @@ import {
     dismissAgencyAccessRefreshWarning,
     showAgencyAccessRefreshWarning,
 } from "./agencyAccessRefreshToast";
+import { buildCheckPayrollProfilePayload, type CheckAddress } from "@/lib/agency/agency-profile-payload";
+import { validateCompanySetup } from "@/features/payroll/forms/companySetupValidation";
 
-interface AgencyFormData {
+export interface AgencyFormData {
     // Step 1: Agency Identity Information
     agencyName: string;
     legalBusinessName: string;
     dba: string;
     agencyType: string;
-    ein: string;
+    payrollEin: string;
+    payrollEinPresent: boolean;
+    payrollLegalName: string;
+    payrollEntityType: string;
+    payrollIndustry: string;
+    payrollLegalAddress: CheckAddress;
+    payrollOfficeName: string;
+    payrollOfficeAddress: CheckAddress;
+    payrollActualWorkLocationAttested: boolean;
+    payrollContactName: string;
+    payrollContactEmail: string;
+    payrollContactPhone: string;
+    payrollFrequency: string;
+    payrollFirstPayday: string;
+    payrollSecondPayday: string;
+    payrollFirstPeriodEnd: string;
+    payrollStartDate: string;
+    proposedSignerFirstName: string;
+    proposedSignerLastName: string;
+    proposedSignerTitle: string;
+    proposedSignerEmail: string;
+    expectedW2Workers: string;
     npi: string;
     providerId: string;
     medicaidProviderId: string;
@@ -138,7 +161,6 @@ const STEPS = [
         requiredFields: [
             "agencyName",
             "agencyType",
-            "ein",
             "primaryAddress",
             "county_or_state",
             "zipCode",
@@ -263,7 +285,18 @@ export default function AddAgencyWizard() {
         legalBusinessName: "",
         dba: "",
         agencyType: "",
-        ein: "",
+        payrollEin: "",
+        payrollEinPresent: false,
+        payrollLegalName: "",
+        payrollEntityType: "",
+        payrollIndustry: "",
+        payrollLegalAddress: { line1: "", line2: "", city: "", state: "", postalCode: "", country: "US" },
+        payrollOfficeName: "",
+        payrollOfficeAddress: { line1: "", line2: "", city: "", state: "", postalCode: "", country: "US" },
+        payrollActualWorkLocationAttested: false,
+        payrollContactName: "", payrollContactEmail: "", payrollContactPhone: "",
+        payrollFrequency: "", payrollFirstPayday: "", payrollSecondPayday: "", payrollFirstPeriodEnd: "", payrollStartDate: "",
+        proposedSignerFirstName: "", proposedSignerLastName: "", proposedSignerTitle: "", proposedSignerEmail: "", expectedW2Workers: "",
         npi: "",
         providerId: "",
         medicaidProviderId: "",
@@ -344,7 +377,28 @@ export default function AddAgencyWizard() {
             legalBusinessName: responseData.agencyData?.legalBusinessName || "",
             dba: responseData.agencyData?.dba || "",
             agencyType: responseData.agencyData?.agencyType || "",
-            ein: responseData.agencyData?.ein || "",
+            payrollEin: "",
+            payrollEinPresent: responseData.agencyData?.checkPayrollProfile?.einStatus?.present === true,
+            payrollLegalName: responseData.agencyData?.checkPayrollProfile?.legalName || "",
+            payrollEntityType: responseData.agencyData?.checkPayrollProfile?.entityType || "",
+            payrollIndustry: responseData.agencyData?.checkPayrollProfile?.industry || "",
+            payrollLegalAddress: responseData.agencyData?.checkPayrollProfile?.legalAddress || { line1: "", line2: "", city: "", state: "", postalCode: "", country: "US" },
+            payrollOfficeName: responseData.agencyData?.checkPayrollProfile?.officeWorkplace?.name || "",
+            payrollOfficeAddress: responseData.agencyData?.checkPayrollProfile?.officeWorkplace?.address || { line1: "", line2: "", city: "", state: "", postalCode: "", country: "US" },
+            payrollActualWorkLocationAttested: responseData.agencyData?.checkPayrollProfile?.officeWorkplace?.actualWorkLocationAttested === true,
+            payrollContactName: responseData.agencyData?.checkPayrollProfile?.payrollContact?.name || "",
+            payrollContactEmail: responseData.agencyData?.checkPayrollProfile?.payrollContact?.email || "",
+            payrollContactPhone: responseData.agencyData?.checkPayrollProfile?.payrollContact?.phone || "",
+            payrollFrequency: responseData.agencyData?.checkPayrollProfile?.paySchedule?.frequency || "",
+            payrollFirstPayday: responseData.agencyData?.checkPayrollProfile?.paySchedule?.firstPayday || "",
+            payrollSecondPayday: responseData.agencyData?.checkPayrollProfile?.paySchedule?.secondPayday || "",
+            payrollFirstPeriodEnd: responseData.agencyData?.checkPayrollProfile?.paySchedule?.firstPeriodEnd || "",
+            payrollStartDate: responseData.agencyData?.checkPayrollProfile?.paySchedule?.payrollStartDate || "",
+            proposedSignerFirstName: responseData.agencyData?.checkPayrollProfile?.proposedSignerContact?.firstName || "",
+            proposedSignerLastName: responseData.agencyData?.checkPayrollProfile?.proposedSignerContact?.lastName || "",
+            proposedSignerTitle: responseData.agencyData?.checkPayrollProfile?.proposedSignerContact?.title || "",
+            proposedSignerEmail: responseData.agencyData?.checkPayrollProfile?.proposedSignerContact?.email || "",
+            expectedW2Workers: responseData.agencyData?.checkPayrollProfile?.expectedWorkerCounts?.w2?.toString() || "",
             npi: responseData.agencyData?.npi || "",
             providerId: responseData.agencyData?.providerId ?? "",
             medicaidProviderId: responseData.agencyData?.medicaidProviderId || "",
@@ -471,6 +525,18 @@ export default function AddAgencyWizard() {
     };
 
     // Single source of truth for the agency payload built from the current form data.
+    const payrollFormValues = () => ({
+        legalName: formData.payrollLegalName, ein: formData.payrollEin, einPresent: formData.payrollEinPresent,
+        entityType: formData.payrollEntityType, industry: formData.payrollIndustry, legalAddress: formData.payrollLegalAddress,
+        officeName: formData.payrollOfficeName, officeAddress: formData.payrollOfficeAddress, actualWorkLocationAttested: formData.payrollActualWorkLocationAttested,
+        website: formData.websiteUrl, phone: formData.mainPhone, payrollContactName: formData.payrollContactName,
+        payrollContactEmail: formData.payrollContactEmail, payrollContactPhone: formData.payrollContactPhone, payFrequency: formData.payrollFrequency,
+        firstPayday: formData.payrollFirstPayday, secondPayday: formData.payrollSecondPayday, firstPeriodEnd: formData.payrollFirstPeriodEnd,
+        payrollStartDate: formData.payrollStartDate, proposedSignerFirstName: formData.proposedSignerFirstName,
+        proposedSignerLastName: formData.proposedSignerLastName, proposedSignerTitle: formData.proposedSignerTitle,
+        proposedSignerEmail: formData.proposedSignerEmail, expectedW2Workers: formData.expectedW2Workers,
+    });
+
     const buildAgencyPayload = (
         logoUrl: string,
         letterheadUrl: string,
@@ -479,7 +545,7 @@ export default function AddAgencyWizard() {
         legalBusinessName: formData.legalBusinessName,
         dba: formData.dba,
         agencyType: formData.agencyType,
-        ein: formData.ein,
+        checkPayrollProfile: buildCheckPayrollProfilePayload(payrollFormValues()),
         npi: formData.npi,
         providerId: formData.providerId,
         medicaidProviderId: formData.medicaidProviderId,
@@ -559,6 +625,13 @@ export default function AddAgencyWizard() {
     // so this is a safe partial update (no full-form validation required).
     const handleSaveEdit = async () => {
         if (!agencyId) return;
+        const payrollErrors = validateCompanySetup(payrollFormValues());
+        if (Object.keys(payrollErrors).length > 0) {
+            setCurrentStep(1);
+            setFieldsWithErrors(Object.keys(payrollErrors));
+            toast({ title: "Check payroll prerequisites", description: Object.values(payrollErrors)[0], variant: "destructive" });
+            return;
+        }
         try {
             const { logoUrl, letterheadUrl } = await uploadBrandingAssets();
             await updateAgency({
@@ -582,6 +655,13 @@ export default function AddAgencyWizard() {
     };
 
     const handleSaveDraft = async (saveName: string) => {
+        const payrollErrors = validateCompanySetup(payrollFormValues());
+        if (Object.keys(payrollErrors).length > 0) {
+            setCurrentStep(1);
+            setFieldsWithErrors(Object.keys(payrollErrors));
+            toast({ title: "Check payroll prerequisites", description: Object.values(payrollErrors)[0], variant: "destructive" });
+            return;
+        }
         try {
             const { logoUrl, letterheadUrl } = await uploadBrandingAssets();
 
@@ -631,6 +711,12 @@ export default function AddAgencyWizard() {
     };
 
     const handleNext = () => {
+        const payrollErrors = validateCompanySetup(payrollFormValues());
+        if (currentStep === 1 && Object.keys(payrollErrors).length > 0) {
+            setFieldsWithErrors(Object.keys(payrollErrors));
+            toast({ title: "Check payroll prerequisites", description: Object.values(payrollErrors)[0], variant: "destructive" });
+            return;
+        }
         const { isValid, missingFields } = validateCurrentStep();
 
         if (!isValid) {
@@ -661,6 +747,13 @@ export default function AddAgencyWizard() {
     };
 
     const handleSubmit = async () => {
+        const payrollErrors = validateCompanySetup(payrollFormValues());
+        if (Object.keys(payrollErrors).length > 0) {
+            setCurrentStep(1);
+            setFieldsWithErrors(Object.keys(payrollErrors));
+            toast({ title: "Check payroll prerequisites", description: Object.values(payrollErrors)[0], variant: "destructive" });
+            return;
+        }
         // Validate all steps before submission
         for (let i = 0; i < STEPS.length; i++) {
             const step = STEPS[i];
@@ -855,6 +948,11 @@ export default function AddAgencyWizard() {
                                 I hereby declared that all the information are correct
                             </label>
                         </div>
+                        <p className="text-sm text-[#808081]" role="status">
+                            {Object.keys(buildCheckPayrollProfilePayload(payrollFormValues())).length === 0
+                                ? "Payroll setup needs information. You can complete it after creating the agency."
+                                : "Payroll prerequisites are saved with the agency; later asynchronous payroll setup does not roll back agency creation."}
+                        </p>
 
                         <div className="flex items-center gap-3">
                             <Button
