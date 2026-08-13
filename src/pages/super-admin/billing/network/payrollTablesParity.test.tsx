@@ -13,6 +13,7 @@ vi.mock("@/lib/operational-agency/OperationalAgencyProvider", () => ({
     capabilities: { canAccessStaffDirectory: false },
     directoryRoutes: undefined,
   }),
+  useOptionalOperationalAgency: () => undefined,
 }));
 
 const dueEntry = (agencyId: string, agencyName: string): AgencyAware<DuePayrollEntry> => ({
