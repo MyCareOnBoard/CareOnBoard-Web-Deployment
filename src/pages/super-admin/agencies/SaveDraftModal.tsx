@@ -1,5 +1,5 @@
 import React, {useState} from "react";
-import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog";
+import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {Label} from "@/components/ui/label";
@@ -32,9 +32,9 @@ export function SaveDraftModal({open, onOpenChange, onSave, isLoading}: SaveDraf
                         </DialogTitle>
                     </DialogHeader>
 
-                    <p className="text-[16px] font-medium text-[#808081] text-center leading-[1.6] px-[47px]">
+                    <DialogDescription className="text-[16px] font-medium text-[#808081] text-center leading-[1.6] px-[47px]">
                         Do you want to save this application for later? Save this with a name
-                    </p>
+                    </DialogDescription>
 
                     <div className="flex flex-col gap-[4px] mx-6 px-[20.5px]">
                         <Label htmlFor="saveName" className="text-[12px] font-normal text-[#10141a]">
