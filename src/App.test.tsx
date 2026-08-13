@@ -1,12 +1,12 @@
-import { render, screen } from "./test-utils";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import App from "./App";
 
 describe("App", () => {
-  it("renders the route fallback at the unconfigured root location", async () => {
+  it("renders the root splash screen through the application router", async () => {
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "Page not found" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Go home" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "CareOnboard" })).toBeVisible();
+    expect(screen.getByAltText("CareOnboard Logo")).toBeVisible();
   });
 });
