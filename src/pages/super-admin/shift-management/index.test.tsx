@@ -129,7 +129,7 @@ describe("super-admin shift management workspace", () => {
     const filterButton = screen.getByRole("button", { name: "Filter shifts, All shifts" });
     expect(filterButton.compareDocumentPosition(screen.getByRole("group", { name: "Shift workspace view" })))
       .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(screen.getByRole("button", { name: "Maintenance" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Maintenance" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Approvals" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Activity logs" })).not.toBeInTheDocument();
   });
@@ -166,14 +166,12 @@ describe("super-admin shift management workspace", () => {
     });
   });
 
-  it("links attention shifts to maintenance with the active scope", async () => {
+  it("does not link attention shifts while the maintenance section is hidden", async () => {
     routing.search = "?agencyId=atlas&startDate=2026-07-20&endDate=2026-08-18&view=calendar";
     render(<ShiftManagementWorkspace />);
 
-    expect(await screen.findByRole("link", { name: /Needs attention/i })).toHaveAttribute(
-      "href",
-      "/super-admin/shifts/maintenance?agencyId=atlas&startDate=2026-07-20&endDate=2026-08-18",
-    );
+    expect(await screen.findByRole("heading", { name: "Needs attention" })).toBeVisible();
+    expect(screen.queryByRole("link", { name: /Needs attention/i })).not.toBeInTheDocument();
   });
 
   it("renders maintenance-only navigation without loading shift-management data", async () => {
@@ -204,7 +202,7 @@ describe("super-admin shift management workspace", () => {
       "shift-maintenance",
       expect.objectContaining({ limit: 50 }),
     ));
-    expect(screen.getByRole("button", { name: "Maintenance" })).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByRole("button", { name: "Maintenance" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Shifts" })).not.toBeInTheDocument();
   });
 
