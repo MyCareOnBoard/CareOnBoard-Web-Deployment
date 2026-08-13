@@ -39,6 +39,26 @@ const config = {
   roleTemplates: [{ key: "custom", label: "Custom role", accessList: [] }],
   canAssignAllAgencies: true,
 } as const;
+const scopedCacheResetTypes = [
+  "superAdminApi/resetApiState",
+  "superAdminDashboardApi/resetApiState",
+  "complianceApi/resetApiState",
+  "billingMonitorApi/resetApiState",
+  "clientsApi/resetApiState",
+  "reportsApi/resetApiState",
+  "agencyStaffApi/resetApiState",
+  "userMessagingApi/resetApiState",
+  "billingExpensesApi/resetApiState",
+  "servicesApi/resetApiState",
+  "networkBillingApi/resetApiState",
+  "staffDirectoryApi/resetApiState",
+];
+function expectScopedCachesReset(times = 1) {
+  const actionTypes = dispatch.mock.calls.map(([action]) => (action as { type: string }).type);
+  for (const type of scopedCacheResetTypes) {
+    expect(actionTypes.filter((actionType) => actionType === type)).toHaveLength(times);
+  }
+}
 const deferred = <T,>() => {
   let resolve!: (value: T) => void;
   let reject!: (reason: unknown) => void;
@@ -542,22 +562,10 @@ describe("UserAccessControlPage", () => {
         agencyIds: ["a1", "a2"],
       }),
     );
-    expect(dispatch).not.toHaveBeenCalled();
+    expectScopedCachesReset();
     pendingRefresh.resolve({ uid: "u1" });
     await waitFor(() => expect(refreshProfile).toHaveBeenCalledOnce());
-    await waitFor(() => expect(dispatch).toHaveBeenCalledTimes(10));
-    expect(dispatch.mock.calls.map(([action]) => action.type)).toEqual([
-      "superAdminApi/resetApiState",
-      "superAdminDashboardApi/resetApiState",
-      "complianceApi/resetApiState",
-      "billingMonitorApi/resetApiState",
-      "clientsApi/resetApiState",
-      "reportsApi/resetApiState",
-      "agencyStaffApi/resetApiState",
-      "userMessagingApi/resetApiState",
-      "billingExpensesApi/resetApiState",
-      "servicesApi/resetApiState",
-    ]);
+    await waitFor(() => expectScopedCachesReset());
   });
 
   it("commits a self-edit even when profile refresh fails and retries only refresh", async () => {
@@ -626,7 +634,7 @@ describe("UserAccessControlPage", () => {
     await user.click(screen.getByRole("button", { name: "Update User" }));
 
     await waitFor(() => expect(refreshProfile).toHaveBeenCalledOnce());
-    expect(dispatch).toHaveBeenCalledTimes(10);
+    expectScopedCachesReset();
     expect(listSuperAdminUsers).toHaveBeenCalledOnce();
     expect(navigate).toHaveBeenCalledWith("/super-admin/dashboard", { replace: true });
     expect(screen.queryByText("Update failed")).not.toBeInTheDocument();
@@ -646,7 +654,7 @@ describe("UserAccessControlPage", () => {
 
     expect(await screen.findByRole("heading", { name: "User updated" })).toBeVisible();
     await waitFor(() => expect(refreshProfile).toHaveBeenCalledOnce());
-    expect(dispatch).toHaveBeenCalledTimes(10);
+    expectScopedCachesReset();
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "access was refreshed, but the administrator list could not be reloaded",
     );
@@ -673,7 +681,7 @@ describe("UserAccessControlPage", () => {
     );
 
     pendingRefresh.resolve({ uid: "u1" });
-    await waitFor(() => expect(dispatch).toHaveBeenCalledTimes(10));
+    await waitFor(() => expectScopedCachesReset());
     expect(screen.queryByRole("heading", { name: "User updated" }))
       .not.toBeInTheDocument();
   });
@@ -703,9 +711,10 @@ describe("UserAccessControlPage", () => {
     expect(await screen.findByText("Refreshing access...")).toBeVisible();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 
+    expectScopedCachesReset(2);
     firstRefresh.resolve(null);
     await waitFor(() => expect(refreshProfile).toHaveBeenCalledTimes(2));
-    expect(dispatch).not.toHaveBeenCalled();
+    expectScopedCachesReset(2);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.getByText("Refreshing access...")).toBeVisible();
 
@@ -716,7 +725,7 @@ describe("UserAccessControlPage", () => {
     await waitFor(() =>
       expect(screen.queryByText("Refreshing access...")).not.toBeInTheDocument(),
     );
-    expect(dispatch).toHaveBeenCalledTimes(10);
+    expectScopedCachesReset(2);
     expect(updateSuperAdminUser).toHaveBeenCalledTimes(2);
   }, 15000);
 });
