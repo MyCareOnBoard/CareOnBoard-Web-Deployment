@@ -5,7 +5,7 @@
 
 import axiosClient from '../axios';
 import { User } from '@/utils/auth/types/user.types';
-import type { CheckPayrollProfileInput } from "@/lib/agency/agency-profile-payload";
+import type { CheckPayrollProfileRead, CheckPayrollProfileWrite } from "@/lib/agency/agency-profile-payload";
 
 /**
  * Agency interface
@@ -23,7 +23,7 @@ export interface Agency {
     npi?: string;
     providerId?: string;
     medicaidProviderId?: string;
-    checkPayrollProfile?: Omit<CheckPayrollProfileInput, "einChange"> & { einStatus?: { present: boolean; last4?: string } };
+    checkPayrollProfile?: CheckPayrollProfileRead;
     // Contact
     phone?: string;
     address?: string;
@@ -134,7 +134,7 @@ export interface UpdateAgencyProfileRequest {
     npi?: string | null;
     providerId?: string | null;
     medicaidProviderId?: string | null;
-    checkPayrollProfile?: CheckPayrollProfileInput;
+    checkPayrollProfile?: CheckPayrollProfileWrite;
     email?: string;
     phone?: string | null;
     address?: string | null;

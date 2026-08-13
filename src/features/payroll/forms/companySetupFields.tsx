@@ -9,9 +9,10 @@ const field = (label: string, id: string, formData: any, onChange: Props["onChan
 const addressField = (prefix: "payrollLegalAddress" | "payrollOfficeAddress", label: string, formData: any, onChange: Props["onChange"]) => <div className="grid grid-cols-1 gap-3 md:col-span-3 md:grid-cols-4"><p className="md:col-span-4 text-sm font-medium">{label}</p>{(["line1", "city", "state", "postalCode"] as const).map((key) => <div key={key}><Label htmlFor={`${prefix}-${key}`}>{friendly(key)}</Label><Input id={`${prefix}-${key}`} value={formData[prefix]?.[key] ?? ""} onChange={(event) => onChange(prefix, { ...formData[prefix], [key]: event.target.value, country: "US" })} /></div>)}</div>;
 
 /** Payroll prerequisites are optional during agency onboarding; the provider setup flow owns later editing. */
-export function CompanySetupFields({ formData, onChange }: Props) {
+export function CompanySetupFields({ formData, onChange, fieldsWithErrors = [] }: Props) {
   return <fieldset className="mt-10 space-y-5 border-t pt-6"><legend className="text-base font-semibold">Payroll prerequisites</legend>
     <p className="text-sm text-muted-foreground">You can save this information later. Incomplete information is marked as needs information and is not queued for payroll setup.</p>
+    {fieldsWithErrors.some((fieldName) => fieldName.startsWith("payroll")) && <p id="payroll-prerequisites-error" role="alert" className="text-sm text-red-600">Review the highlighted payroll prerequisite fields.</p>}
     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
       {field("Legal name", "payrollLegalName", formData, onChange)}
       <div><Label htmlFor="payrollEin">EIN</Label><Input id="payrollEin" value={formData.payrollEin ?? ""} autoComplete="off" inputMode="numeric" onChange={(event) => onChange("payrollEin", event.target.value)} placeholder={formData.payrollEinPresent ? "EIN on file" : "12-3456789"} /><p className="mt-1 text-xs text-muted-foreground">Leave blank to preserve the EIN already on file.</p></div>

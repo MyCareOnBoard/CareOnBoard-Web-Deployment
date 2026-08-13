@@ -2,6 +2,7 @@ import {
   CreateAgencyWithUserPayloadAgency,
   CreateAgencyWithUserPayloadUser
 } from "@/pages/super-admin/agencies/api";
+import type { CheckPayrollProfileRead } from "@/lib/agency/agency-profile-payload";
 
 
 export interface ListDraftAgenciesResponse {
@@ -16,7 +17,7 @@ export interface ListDraftAgenciesResponse {
 
 export interface GetDraftAgencyResponse {
   name?: string;
-  agencyData: CreateAgencyWithUserPayloadAgency;
+  agencyData: Omit<CreateAgencyWithUserPayloadAgency, "checkPayrollProfile"> & { checkPayrollProfile?: CheckPayrollProfileRead };
   user: CreateAgencyWithUserPayloadUser;
   createdAt: string;
   updatedAt: string;

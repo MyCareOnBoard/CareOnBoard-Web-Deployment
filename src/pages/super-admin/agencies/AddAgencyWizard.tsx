@@ -949,9 +949,9 @@ export default function AddAgencyWizard() {
                             </label>
                         </div>
                         <p className="text-sm text-[#808081]" role="status">
-                            {Object.keys(buildCheckPayrollProfilePayload(payrollFormValues())).length === 0
-                                ? "Payroll setup needs information. You can complete it after creating the agency."
-                                : "Payroll prerequisites are saved with the agency; later asynchronous payroll setup does not roll back agency creation."}
+                            {Object.keys(buildCheckPayrollProfilePayload(payrollFormValues())).length < 11
+                                ? "Payroll setup needs information and is saved for later. You can complete it after creating the agency."
+                                : "Payroll prerequisites are ready to continue setup; later asynchronous payroll setup does not roll back agency creation."}
                         </p>
 
                         <div className="flex items-center gap-3">

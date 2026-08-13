@@ -3,6 +3,7 @@ import { OPERATIONAL_FORM_DEFAULTS } from "./operational-settings";
 import {
   buildAgencyProfileUpdatePayload,
   buildCheckPayrollProfilePayload,
+  CHECK_INDUSTRIES,
   type AgencyProfileFormValues,
 } from "./agency-profile-payload";
 
@@ -54,6 +55,20 @@ describe("buildAgencyProfileUpdatePayload", () => {
 });
 
 describe("buildCheckPayrollProfilePayload", () => {
+  it("omits empty nested groups so a blank draft remains a valid partial profile", () => {
+    expect(buildCheckPayrollProfilePayload({
+      legalAddress: { line1: "", line2: "", city: "", state: "", postalCode: "", country: "US" },
+      officeAddress: { line1: "", line2: "", city: "", state: "", postalCode: "", country: "US" },
+    })).toEqual({});
+  });
+
+  it("matches every backend enum and drops unknown values", () => {
+    expect(CHECK_INDUSTRIES).toEqual([
+      "auto_or_machine_sales", "auto_or_machine_repair", "arts_or_entertainment_or_recreation", "cleaning_services", "consulting_services", "educational_services", "family_care_services", "financial_services", "food_and_beverage_retail_or_wholesale", "general_construction_or_general_contracting", "health_care", "hospitality_or_accommodation", "hvac_or_plumbing_or_electrical_contracting", "legal_services", "non_food_retail_or_wholesale", "other", "personal_care_services", "real_estate", "restaurant", "scientific_or_technical_services", "security_services", "tobacco_or_alcohol_sales", "transportation",
+    ]);
+    for (const industry of CHECK_INDUSTRIES) expect(buildCheckPayrollProfilePayload({ industry }).industry).toBe(industry);
+    expect(buildCheckPayrollProfilePayload({ industry: "unknown" })).toEqual({});
+  });
   it("uses the write-only replace operation and never emits a raw or legacy EIN", () => {
     const payload = buildCheckPayrollProfilePayload({
       legalName: "Able Care LLC",
@@ -96,5 +111,10 @@ describe("buildCheckPayrollProfilePayload", () => {
     expect(buildCheckPayrollProfilePayload({ ein: "", einPresent: true })).toEqual({
       einChange: { mode: "preserve" },
     });
+  });
+
+  it("strips response-only fields even when an unsafe caller supplies them", () => {
+    const unsafe = { legalName: "Able", einStatus: { present: true, last4: "6789" }, designatedSignerUserUid: "forged", payrollSchedule: { frequency: "weekly" } } as any;
+    expect(buildCheckPayrollProfilePayload(unsafe)).toEqual({ legalName: "Able" });
   });
 });

@@ -6,11 +6,11 @@ import {
 } from "./operational-settings";
 
 export const CHECK_ENTITY_TYPES = ["sole_proprietorship", "partnership", "c_corporation", "s_corporation", "llc"] as const;
-export const CHECK_INDUSTRIES = ["auto_or_machine_sales", "auto_or_machine_repair", "arts_or_entertainment_or_recreation", "cleaning_services", "consulting_services", "educational_services", "family_care_services", "financial_services", "food_or_accommodation_services", "health_care", "information_services", "insurance_services", "manufacturing", "other", "personal_care_services", "real_estate", "restaurant", "scientific_or_technical_services", "security_services", "tobacco_or_alcohol_sales", "transportation"] as const;
+export const CHECK_INDUSTRIES = ["auto_or_machine_sales", "auto_or_machine_repair", "arts_or_entertainment_or_recreation", "cleaning_services", "consulting_services", "educational_services", "family_care_services", "financial_services", "food_and_beverage_retail_or_wholesale", "general_construction_or_general_contracting", "health_care", "hospitality_or_accommodation", "hvac_or_plumbing_or_electrical_contracting", "legal_services", "non_food_retail_or_wholesale", "other", "personal_care_services", "real_estate", "restaurant", "scientific_or_technical_services", "security_services", "tobacco_or_alcohol_sales", "transportation"] as const;
 export const CHECK_PAY_FREQUENCIES = ["weekly", "biweekly", "semimonthly", "monthly", "quarterly", "annually"] as const;
 
 export type CheckAddress = { line1: string; line2?: string | null; city: string; state: string; postalCode: string; country: "US" };
-export type CheckPayrollProfileInput = {
+export type CheckPayrollProfileWrite = {
   legalName?: string; einChange?: { mode: "replace"; value: string } | { mode: "preserve" };
   entityType?: typeof CHECK_ENTITY_TYPES[number]; industry?: typeof CHECK_INDUSTRIES[number]; legalAddress?: CheckAddress;
   officeWorkplace?: { name: string; address: CheckAddress; actualWorkLocationAttested: true }; website?: string; phone?: string;
@@ -19,6 +19,7 @@ export type CheckPayrollProfileInput = {
   proposedSignerContact?: { firstName: string; lastName: string; title: string; email: string };
   expectedWorkerCounts?: { w2: number; contractor: 0 };
 };
+export type CheckPayrollProfileRead = Omit<CheckPayrollProfileWrite, "einChange"> & { einStatus?: { present: boolean; last4?: string } };
 
 export type CheckPayrollProfileFormValues = {
   legalName?: string; ein?: string; einPresent?: boolean; entityType?: string; industry?: string; legalAddress?: CheckAddress;
@@ -32,8 +33,8 @@ const trim = (value: string | undefined) => value?.trim() ?? "";
 const hasAddress = (value: CheckAddress | undefined) => Boolean(value && trim(value.line1) && trim(value.city) && trim(value.state) && trim(value.postalCode));
 
 /** Maps the one onboarding form slice to the backend's exact, write-only contract. */
-export function buildCheckPayrollProfilePayload(values: CheckPayrollProfileFormValues): CheckPayrollProfileInput {
-  const payload: CheckPayrollProfileInput = {};
+export function buildCheckPayrollProfilePayload(values: CheckPayrollProfileFormValues): CheckPayrollProfileWrite {
+  const payload: CheckPayrollProfileWrite = {};
   const ein = trim(values.ein);
   if (ein) payload.einChange = { mode: "replace", value: ein };
   else if (values.einPresent) payload.einChange = { mode: "preserve" };

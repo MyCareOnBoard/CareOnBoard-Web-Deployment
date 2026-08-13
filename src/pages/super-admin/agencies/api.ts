@@ -1,7 +1,7 @@
 import { createApi } from "@reduxjs/toolkit/query/react";
 import { customBaseQuery } from "@/lib/baseQuery";
 import { Agency } from "@/lib/api/agencies";
-import type { CheckPayrollProfileInput } from "@/lib/agency/agency-profile-payload";
+import type { CheckPayrollProfileWrite, CheckPayrollProfileRead } from "@/lib/agency/agency-profile-payload";
 import { ListAgenciesResponse } from "@/lib/api/agencies";
 import {
   GetDraftAgencyResponse, GetSingleAgencyUsersItem,
@@ -17,7 +17,7 @@ export interface CreateAgencyWithUserPayloadAgency {
   legalBusinessName?: string;
   dba?: string;
   agencyType?: string;
-  checkPayrollProfile?: CheckPayrollProfileInput & { einStatus?: { present: boolean; last4?: string } };
+  checkPayrollProfile?: CheckPayrollProfileWrite;
   npi?: string;
   providerId?: string;
   medicaidProviderId?: string;
