@@ -1,17 +1,33 @@
 import { describe, it, expect, vi, beforeEach, Mock } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import type { ReactElement } from "react";
+import { render as rtlRender, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { configureStore } from "@reduxjs/toolkit";
+import { Provider } from "react-redux";
 import ProfilePreScreeningStep from "../ProfilePreScreeningStep";
 import { uploadResume, submitPreScreening } from "@/lib/api/job-application";
+import authReducer from "@/utils/auth/store/authSlice";
 
 // Mock the API functions
 vi.mock("@/lib/api/job-application", () => ({
   uploadResume: vi.fn(),
   submitPreScreening: vi.fn(),
+  getPreScreening: vi.fn().mockResolvedValue({ success: false }),
+  updatePreScreening: vi.fn(),
 }));
 
 describe("ProfilePreScreeningStep - Integration Tests", () => {
   const mockOnNext = vi.fn();
+  const render = async (ui: ReactElement) => {
+    const store = configureStore({ reducer: { auth: authReducer } });
+    const result = rtlRender(
+      <Provider store={store}>
+        {ui}
+      </Provider>
+    );
+    await screen.findByPlaceholderText("Enter full name");
+    return result;
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -32,7 +48,7 @@ describe("ProfilePreScreeningStep - Integration Tests", () => {
       "Do you have a High School Diploma or GED?",
       "Are you legally eligible to work in the U.S.?",
       "Have you ever been convicted of a disqualifying offense under NJ law?",
-      "Do you have reliable transportation?",
+      "Do you have reliable transportation? (Optional)",
     ];
 
     for (const question of questions) {
@@ -49,7 +65,7 @@ describe("ProfilePreScreeningStep - Integration Tests", () => {
     const fileInput = screen.getByLabelText("Upload your resume") as HTMLInputElement;
     await user.upload(fileInput, file);
 
-    // Declaration is checked by default, but we can verify
+    // Select the required declaration when it is initially unchecked.
     const checkbox = screen.getByRole("checkbox");
     if (!checkbox.hasAttribute("checked")) {
       await user.click(checkbox);
@@ -79,10 +95,10 @@ describe("ProfilePreScreeningStep - Integration Tests", () => {
     (uploadResume as Mock).mockResolvedValue(mockUploadResponse);
     (submitPreScreening as Mock).mockResolvedValue(mockSubmitResponse);
 
-    render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+    await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
     // Initially button should be disabled
-    const submitButton = screen.getByRole("button", { name: /Next/i });
+    const submitButton = screen.getByRole("button", { name: /Save/i });
     expect(submitButton).toBeDisabled();
     expect(submitButton).toHaveClass("bg-[#b2b2b3]"); // Grey when invalid
 
@@ -95,7 +111,7 @@ describe("ProfilePreScreeningStep - Integration Tests", () => {
 
   it("displays file name after file selection", async () => {
     const user = userEvent.setup();
-    render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+    await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
     const file = new File(["resume content"], "my-resume.pdf", { type: "application/pdf" });
     const fileInput = screen.getByLabelText("Upload your resume") as HTMLInputElement;
@@ -112,7 +128,7 @@ describe("ProfilePreScreeningStep - Integration Tests", () => {
     const user = userEvent.setup();
     (uploadResume as Mock).mockRejectedValue(new Error("Network error"));
 
-    render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+    await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
     await fillCompleteForm(user);
 
@@ -135,7 +151,7 @@ describe("ProfilePreScreeningStep - Integration Tests", () => {
     (uploadResume as Mock).mockResolvedValue(mockUploadResponse);
     (submitPreScreening as Mock).mockResolvedValue({ success: true, data: {} });
 
-    render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+    await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
     await fillCompleteForm(user);
 
@@ -168,7 +184,7 @@ describe("ProfilePreScreeningStep - Integration Tests", () => {
     (uploadResume as Mock).mockReturnValue(uploadPromise);
     (submitPreScreening as Mock).mockResolvedValue({ success: true });
 
-    render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+    await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
     await fillCompleteForm(user);
 
@@ -184,9 +200,9 @@ describe("ProfilePreScreeningStep - Integration Tests", () => {
 
   it("validates all required fields are filled", async () => {
     const user = userEvent.setup();
-    render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+    await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
-    const submitButton = screen.getByRole("button", { name: /Next/i });
+    const submitButton = screen.getByRole("button", { name: /Save/i });
 
     // Initially disabled
     expect(submitButton).toBeDisabled();
@@ -205,12 +221,12 @@ describe("ProfilePreScreeningStep - Integration Tests", () => {
 
   it("accepts only valid file types for resume", async () => {
     const user = userEvent.setup();
-    render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+    await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
     const fileInput = screen.getByLabelText("Upload your resume") as HTMLInputElement;
     
     // Check accept attribute
-    expect(fileInput).toHaveAttribute("accept", ".pdf,.doc,.docx");
+    expect(fileInput).toHaveAttribute("accept", ".pdf");
 
     // Valid file types
     const pdfFile = new File(["content"], "resume.pdf", { type: "application/pdf" });
@@ -220,7 +236,7 @@ describe("ProfilePreScreeningStep - Integration Tests", () => {
 
   it("validates email format in real-time", async () => {
     const user = userEvent.setup();
-    render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+    await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
     const emailInput = screen.getByPlaceholderText("Enter your email");
 
@@ -260,7 +276,7 @@ describe("ProfilePreScreeningStep - Integration Tests", () => {
     const user = userEvent.setup();
     (uploadResume as Mock).mockRejectedValue(new Error("Upload failed"));
 
-    render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+    await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
     // Fill form
     const nameInput = screen.getByPlaceholderText("Enter full name") as HTMLInputElement;
@@ -286,7 +302,7 @@ describe("ProfilePreScreeningStep - Integration Tests", () => {
     const user = userEvent.setup();
     (uploadResume as Mock).mockRejectedValue(new Error("Upload failed"));
 
-    render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+    await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
     await fillCompleteForm(user);
 
@@ -296,7 +312,7 @@ describe("ProfilePreScreeningStep - Integration Tests", () => {
 
   it("clears error when new file is selected", async () => {
     const user = userEvent.setup();
-    render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+    await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
     const fileInput = screen.getByLabelText("Upload your resume");
     

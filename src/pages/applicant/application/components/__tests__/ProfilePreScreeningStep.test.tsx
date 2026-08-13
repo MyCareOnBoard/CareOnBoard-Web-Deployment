@@ -1,25 +1,41 @@
 import { describe, it, expect, vi, beforeEach, Mock } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import type { ReactElement } from "react";
+import { render as rtlRender, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { configureStore } from "@reduxjs/toolkit";
+import { Provider } from "react-redux";
 import ProfilePreScreeningStep from "../ProfilePreScreeningStep";
 import { uploadResume, submitPreScreening } from "@/lib/api/job-application";
+import authReducer from "@/utils/auth/store/authSlice";
 
 // Mock the API functions
 vi.mock("@/lib/api/job-application", () => ({
   uploadResume: vi.fn(),
   submitPreScreening: vi.fn(),
+  getPreScreening: vi.fn().mockResolvedValue({ success: false }),
+  updatePreScreening: vi.fn(),
 }));
 
 describe("ProfilePreScreeningStep", () => {
   const mockOnNext = vi.fn();
+  const render = async (ui: ReactElement) => {
+    const store = configureStore({ reducer: { auth: authReducer } });
+    const result = rtlRender(
+      <Provider store={store}>
+        {ui}
+      </Provider>
+    );
+    await screen.findByPlaceholderText("Enter full name");
+    return result;
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   describe("Rendering", () => {
-    it("renders all form fields", () => {
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+    it("renders all form fields", async () => {
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
       expect(screen.getByPlaceholderText("Enter full name")).toBeInTheDocument();
       expect(screen.getByPlaceholderText("Enter your email")).toBeInTheDocument();
@@ -27,16 +43,16 @@ describe("ProfilePreScreeningStep", () => {
       expect(screen.getByPlaceholderText("Enter Address")).toBeInTheDocument();
     });
 
-    it("renders gender radio buttons", () => {
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+    it("renders gender radio buttons", async () => {
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
       expect(screen.getByText("Gender")).toBeInTheDocument();
       expect(screen.getByLabelText("Male")).toBeInTheDocument();
       expect(screen.getByLabelText("Female")).toBeInTheDocument();
     });
 
-    it("renders all pre-screening questions", () => {
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+    it("renders all pre-screening questions", async () => {
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
       expect(screen.getByText("Are you at least 18 years old?")).toBeInTheDocument();
       expect(screen.getByText("Do you have a High School Diploma or GED?")).toBeInTheDocument();
@@ -44,49 +60,49 @@ describe("ProfilePreScreeningStep", () => {
       expect(
         screen.getByText("Have you ever been convicted of a disqualifying offense under NJ law?")
       ).toBeInTheDocument();
-      expect(screen.getByText("Do you have reliable transportation?")).toBeInTheDocument();
+      expect(screen.getByText("Do you have reliable transportation? (Optional)")).toBeInTheDocument();
     });
 
-    it("renders resume upload section", () => {
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+    it("renders resume upload section", async () => {
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
-      expect(screen.getByText("Upload Resume")).toBeInTheDocument();
+      expect(screen.getByText("Upload Resume in PDF format (Optional)")).toBeInTheDocument();
       expect(screen.getByText("Upload your resume")).toBeInTheDocument();
     });
 
-    it("renders declaration checkbox", () => {
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+    it("renders declaration checkbox", async () => {
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
       expect(
         screen.getByText("I hereby declared that all the information are correct")
       ).toBeInTheDocument();
     });
 
-    it("renders Next button", () => {
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+    it("renders Save button", async () => {
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
-      expect(screen.getByRole("button", { name: /Next/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Save/i })).toBeInTheDocument();
     });
   });
 
   describe("Form Validation", () => {
-    it("disables submit button when form is invalid", () => {
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+    it("disables submit button when form is invalid", async () => {
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
-      const submitButton = screen.getByRole("button", { name: /Next/i });
+      const submitButton = screen.getByRole("button", { name: /Save/i });
       expect(submitButton).toBeDisabled();
     });
 
-    it("applies grey styling to button when form is invalid", () => {
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+    it("applies grey styling to button when form is invalid", async () => {
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
-      const submitButton = screen.getByRole("button", { name: /Next/i });
+      const submitButton = screen.getByRole("button", { name: /Save/i });
       expect(submitButton).toHaveClass("bg-[#b2b2b3]");
     });
 
     it("shows validation error when email is invalid", async () => {
       const user = userEvent.setup();
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
       const emailInput = screen.getByPlaceholderText("Enter your email");
       await user.type(emailInput, "invalid-email");
@@ -99,7 +115,7 @@ describe("ProfilePreScreeningStep", () => {
 
     it("shows validation error when required field is cleared", async () => {
       const user = userEvent.setup();
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
       const nameInput = screen.getByPlaceholderText("Enter full name");
       // Type something first, then clear it to trigger validation
@@ -116,7 +132,7 @@ describe("ProfilePreScreeningStep", () => {
   describe("Form Interactions", () => {
     it("allows user to type in text fields", async () => {
       const user = userEvent.setup();
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
       const nameInput = screen.getByPlaceholderText("Enter full name") as HTMLInputElement;
       await user.type(nameInput, "John Doe");
@@ -126,7 +142,7 @@ describe("ProfilePreScreeningStep", () => {
 
     it("allows user to select gender", async () => {
       const user = userEvent.setup();
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
       const maleRadio = screen.getByLabelText("Male") as HTMLInputElement;
       await user.click(maleRadio);
@@ -136,7 +152,7 @@ describe("ProfilePreScreeningStep", () => {
 
     it("allows user to answer boolean questions", async () => {
       const user = userEvent.setup();
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
       // Find all "Yes" radio buttons (there should be 5 for the boolean questions)
       const yesRadios = screen.getAllByLabelText("Yes");
@@ -148,19 +164,18 @@ describe("ProfilePreScreeningStep", () => {
 
     it("allows user to check declaration checkbox", async () => {
       const user = userEvent.setup();
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
       const checkbox = screen.getByRole("checkbox");
-      // Checkbox should be checked by default based on the component
-      expect(checkbox).toBeChecked();
+      expect(checkbox).not.toBeChecked();
 
       await user.click(checkbox);
-      expect(checkbox).not.toBeChecked();
+      expect(checkbox).toBeChecked();
     });
 
     it("updates file input when file is selected", async () => {
       const user = userEvent.setup();
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
       const file = new File(["resume content"], "resume.pdf", { type: "application/pdf" });
       const fileInput = screen.getByLabelText("Upload your resume") as HTMLInputElement;
@@ -188,7 +203,7 @@ describe("ProfilePreScreeningStep", () => {
       (uploadResume as Mock).mockResolvedValue(mockUploadResponse);
       (submitPreScreening as Mock).mockResolvedValue({ success: true });
 
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
       // Fill out the form
       await user.type(screen.getByPlaceholderText("Enter full name"), "John Doe");
@@ -218,7 +233,7 @@ describe("ProfilePreScreeningStep", () => {
       const user = userEvent.setup();
       (uploadResume as Mock).mockRejectedValue(new Error("Upload failed"));
 
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
       // Fill required fields and upload file
       await user.type(screen.getByPlaceholderText("Enter full name"), "John Doe");
@@ -240,7 +255,7 @@ describe("ProfilePreScreeningStep", () => {
       );
       (submitPreScreening as Mock).mockResolvedValue({ success: true });
 
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
       // Note: Testing loading state would require completing entire form
       // This is a simplified test structure
@@ -248,7 +263,7 @@ describe("ProfilePreScreeningStep", () => {
 
     it("clears upload error when new file is selected", async () => {
       const user = userEvent.setup();
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
       const fileInput = screen.getByLabelText("Upload your resume") as HTMLInputElement;
       const file1 = new File(["content1"], "resume1.pdf", { type: "application/pdf" });
@@ -296,7 +311,7 @@ describe("ProfilePreScreeningStep", () => {
         () => new Promise((resolve) => setTimeout(() => resolve({ success: true }), 100))
       );
 
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
       // Button text changes during submission
       // This would be visible during actual form submission
@@ -309,7 +324,7 @@ describe("ProfilePreScreeningStep", () => {
       // Error handling is implemented in the component
     });
 
-    it("transforms form data to API format correctly", () => {
+    it("transforms form data to API format correctly", async () => {
       // This is tested implicitly through the submitPreScreening mock
       // The component transforms:
       // - date to YYYY-MM-DD format
@@ -324,22 +339,22 @@ describe("ProfilePreScreeningStep", () => {
         () => new Promise((resolve) => setTimeout(() => resolve({ data: {}, success: true }), 1000))
       );
 
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
-      const submitButton = screen.getByRole("button", { name: /Next/i });
+      const submitButton = screen.getByRole("button", { name: /Save/i });
       expect(submitButton).toBeDisabled(); // Initially disabled due to validation
     });
 
-    it("disables button during submission", () => {
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+    it("disables button during submission", async () => {
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
-      const submitButton = screen.getByRole("button", { name: /Next/i });
+      const submitButton = screen.getByRole("button", { name: /Save/i });
       expect(submitButton).toBeDisabled(); // Disabled when form is invalid
     });
 
     it("enables button when form is valid", async () => {
       const user = userEvent.setup();
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
       // Fill all required fields
       await user.type(screen.getByPlaceholderText("Enter full name"), "John Doe");
@@ -363,20 +378,20 @@ describe("ProfilePreScreeningStep", () => {
   });
 
   describe("Accessibility", () => {
-    it("has proper labels for all form fields", () => {
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+    it("has proper labels for all form fields", async () => {
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
       expect(screen.getByText("Full Name")).toBeInTheDocument();
       expect(screen.getByText("Email")).toBeInTheDocument();
       expect(screen.getByText("Date of birth")).toBeInTheDocument();
       expect(screen.getByText("Address")).toBeInTheDocument();
       expect(screen.getByText("Gender")).toBeInTheDocument();
-      expect(screen.getByText("Upload Resume")).toBeInTheDocument();
+      expect(screen.getByText("Upload Resume in PDF format (Optional)")).toBeInTheDocument();
     });
 
     it("displays error messages with proper styling", async () => {
       const user = userEvent.setup();
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
       const emailInput = screen.getByPlaceholderText("Enter your email");
       await user.type(emailInput, "invalid");
@@ -389,8 +404,8 @@ describe("ProfilePreScreeningStep", () => {
       });
     });
 
-    it("checkbox has accessible label", () => {
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+    it("checkbox has accessible label", async () => {
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
       const checkbox = screen.getByRole("checkbox");
       expect(checkbox).toBeInTheDocument();
@@ -398,18 +413,18 @@ describe("ProfilePreScreeningStep", () => {
   });
 
   describe("Edge Cases", () => {
-    it("handles missing file upload gracefully", () => {
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+    it("keeps Save disabled until required fields are complete", async () => {
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
-      // Form should require resume file
-      const submitButton = screen.getByRole("button", { name: /Next/i });
+      // An incomplete required profile remains invalid without a resume.
+      const submitButton = screen.getByRole("button", { name: /Save/i });
       expect(submitButton).toBeDisabled();
     });
 
     it("handles API timeout", async () => {
       (uploadResume as Mock).mockRejectedValue(new Error("Timeout"));
 
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
       // Error handling is implemented
     });
@@ -420,17 +435,17 @@ describe("ProfilePreScreeningStep", () => {
         () => new Promise((resolve) => setTimeout(() => resolve({ success: true }), 100))
       );
 
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
-      const submitButton = screen.getByRole("button", { name: /Next/i });
+      const submitButton = screen.getByRole("button", { name: /Save/i });
       expect(submitButton).toBeDisabled(); // Disabled during processing
     });
 
-    it("validates date of birth is required", () => {
-      render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
+    it("validates date of birth is required", async () => {
+      await render(<ProfilePreScreeningStep onSuccess={mockOnNext} />);
 
       // Date is required for form validity
-      const submitButton = screen.getByRole("button", { name: /Next/i });
+      const submitButton = screen.getByRole("button", { name: /Save/i });
       expect(submitButton).toBeDisabled();
     });
   });

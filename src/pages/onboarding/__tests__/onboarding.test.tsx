@@ -58,7 +58,7 @@ describe("OnboardingSlider", () => {
 
     expect(
       screen.getByRole("heading", {
-        name: /as a dsp, your responsibilities will include/i,
+        name: /applicants must/i,
       })
     ).toBeInTheDocument()
   })
