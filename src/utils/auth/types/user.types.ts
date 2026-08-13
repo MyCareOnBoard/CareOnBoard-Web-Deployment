@@ -74,6 +74,7 @@ export interface Profile {
   email?: string
   fullName?: string
   name?: string  // Agency name or user display name
+  status?: "active" | "inactive" | "pending" | "suspended"
   phoneNumber?: string
   address?: string | {
     address: string
@@ -112,12 +113,7 @@ export interface Profile {
 export interface UserAgency {
   id?: string
   name?: string
-  email?: string
-  phone?: string
-  address?: string
-  city?: string
-  state?: string
-  zipCode?: string
+  status?: "active" | "inactive" | "pending" | "suspended"
   supportedClientTypes?: ("ddd" | "hha")[]
 }
 

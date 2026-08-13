@@ -2,7 +2,7 @@ import React, { useMemo, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router";
 import { ArrowLeft, Loader2, Download } from "lucide-react";
 import { useAuth } from "@/utils/auth";
-import { useGetClientClaimsQuery } from "./api";
+import { useGetAgencyDetailQuery, useGetClientClaimsQuery } from "./api";
 import {
   formatCurrency,
   getClientRate,
@@ -16,6 +16,7 @@ export default function ClientClaimsPage() {
   const {clientId} = useParams();
   const navigate = useNavigate();
   const {user} = useAuth();
+  const agencyId = user?.agencyId || "";
   const { labels } = useStaffLabels();
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const printContentRef = useRef<HTMLDivElement>(null);
@@ -30,6 +31,9 @@ export default function ClientClaimsPage() {
       skip: !clientId || !user?.agencyId,
     }
   );
+  const { data: agency } = useGetAgencyDetailQuery(agencyId, {
+    skip: !agencyId,
+  });
 
   const serviceByCode = useMemo(
     () => buildServiceByCodeMap(data?.data?.client?.services),
@@ -110,10 +114,7 @@ export default function ClientClaimsPage() {
     [client?.dateOfBirth]
   );
 
-  const providerAddress = useMemo(() => {
-    const addr = user?.profile?.address;
-    return typeof addr === "object" ? addr?.address : addr;
-  }, [user?.profile?.address]);
+  const providerAddress = agency?.address || "—";
 
   if (isLoading) {
     return (
@@ -220,7 +221,7 @@ export default function ClientClaimsPage() {
               </div>
               <div className="text-right space-y-1">
                 <p className="text-[16px] font-semibold text-[#10141a] mb-2">
-                  {user?.profile?.name}
+                  {agency?.name || user?.profile?.name || "—"}
                 </p>
                 <p className="text-[14px] text-[#10141a]">{providerAddress}</p>
                 <p className="text-[14px] text-[#10141a]">NPI: 23764234232756</p>

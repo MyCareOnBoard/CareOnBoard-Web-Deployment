@@ -1,6 +1,7 @@
 import { createApi } from "@reduxjs/toolkit/query/react";
 import { customBaseQuery } from "@/lib/baseQuery";
 import { Client } from "@/lib/api/clients";
+import type { Agency, AgencyResponse } from "@/lib/api/agencies";
 import { Employee } from "@/lib/api/employees";
 import type { AgencyMode } from "@/store/redux/agencyModeSlice";
 import type { OperationalBillingRequestContext } from "@/lib/operational-agency/types";
@@ -322,6 +323,14 @@ export const billingApi = createApi({
       }),
       providesTags: (_result, _error, { context }) => [billingRecordTag(operationalAgencyId(context))],
     }),
+    getAgencyDetail: builder.query<Agency, string>({
+      query: (agencyId) => ({
+        url: `/agencies/${encodeURIComponent(agencyId)}`,
+        method: "GET",
+        requiresAuth: true,
+      }),
+      transformResponse: (response: AgencyResponse) => response.agency,
+    }),
   }),
 });
 
@@ -330,4 +339,5 @@ export const {
   useGenerateReportMutation,
   useGetClientClaimsQuery,
   useGetDspClaimsQuery,
+  useGetAgencyDetailQuery,
 } = billingApi;

@@ -45,4 +45,45 @@ describe("getUser", () => {
       agencyIds: ["agency-a"],
     });
   });
+
+  it("keeps the agency bootstrap limited to identity and supported client types", async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        success: true,
+        user: {
+          id: "agency-1",
+          uid: "agency-1",
+          email: "owner@atlas.example",
+          fullName: "Atlas Owner",
+          userType: "agency",
+          agencyId: "agency-1",
+          createdAt: "2026-07-26T00:00:00.000Z",
+          updatedAt: "2026-07-26T00:00:00.000Z",
+          profile: {
+            id: "agency-1",
+            name: "Atlas Care",
+            status: "active",
+            supportedClientTypes: ["ddd"],
+            address: "must not be trusted",
+            checkPayrollProfile: { legalName: "must not be trusted" },
+          },
+        },
+      },
+    });
+
+    const mapped = await getUser();
+
+    expect(mapped.agency).toEqual({
+      id: "agency-1",
+      name: "Atlas Care",
+      status: "active",
+      supportedClientTypes: ["ddd"],
+    });
+    expect(mapped.profile).toEqual({
+      id: "agency-1",
+      name: "Atlas Care",
+      status: "active",
+      supportedClientTypes: ["ddd"],
+    });
+  });
 });

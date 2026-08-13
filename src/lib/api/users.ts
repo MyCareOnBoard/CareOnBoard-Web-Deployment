@@ -101,18 +101,9 @@ export async function getUser(): Promise<User> {
       email: profileSource.email || backendUser.email,
       fullName: profileSource.fullName || backendUser.fullName,
       name: profileSource.name || backendUser.displayName,
-      phoneNumber: profileSource.phoneNumber || profileSource.phone,
-      address: profileSource.address,
-      city: profileSource.city,
-      state: profileSource.state,
-      zipCode: profileSource.zipCode,
-      gender: profileSource.gender,
-      dateOfBirth: profileSource.dateOfBirth,
-      profilePicture: profileSource.profilePicture || profileSource.photo || profileSource.photoURL,
-      professionalSummary: profileSource.professionalSummary || profileSource.summary,
-      workAvailability: profileSource.workAvailability,
-      tagId: profileSource.tagId,
-      supportedClientTypes: profileSource?.supportedClientTypes || [],
+      supportedClientTypes: Array.isArray(profileSource.supportedClientTypes)
+        ? [...profileSource.supportedClientTypes]
+        : [],
       agencyScope: superAdminAccess.agencyScope || profileSource.agencyScope,
       agencyIds: Array.isArray(superAdminAccess.agencyIds)
         ? [...superAdminAccess.agencyIds]
@@ -121,16 +112,13 @@ export async function getUser(): Promise<User> {
           : undefined,
     };
 
-    // Add agency details if user is an employee
+    // The profile bootstrap embeds only minimal agency identity. Contact,
+    // address, and payroll details must come from an authorized agency-detail query.
     if ([UserType.EMPLOYEE, UserType.APPLICANT].includes(user.userType)) {
       user.agency = {
         id: backendUser.agencyId,
         name: backendUser.agency?.name,
-        email: backendUser.agency?.email,
-        phone: backendUser.agency?.phone,
-        address: backendUser.agency?.address,
-        city: backendUser.agency?.city,
-        state: backendUser.agency?.state,
+        status: backendUser.agency?.status,
         supportedClientTypes: backendUser.agency?.supportedClientTypes,
       };
     }
@@ -146,8 +134,19 @@ export async function getUser(): Promise<User> {
         ...user.agency,
         id: backendUser.agencyId || agencyDoc?.id,
         name: agencyDoc?.name || user.agency?.name,
+        status: agencyDoc?.status,
         supportedClientTypes: agencyDoc?.supportedClientTypes,
       };
+      if (user.userType === UserType.AGENCY) {
+        user.profile = {
+          id: agencyDoc?.id || backendUser.agencyId,
+          name: agencyDoc?.name,
+          status: agencyDoc?.status,
+          supportedClientTypes: Array.isArray(agencyDoc?.supportedClientTypes)
+            ? [...agencyDoc.supportedClientTypes]
+            : [],
+        };
+      }
     }
 
     if ([UserType.SUPER_ADMIN, UserType.AGENCY_STAFF].includes(user.userType)) {
