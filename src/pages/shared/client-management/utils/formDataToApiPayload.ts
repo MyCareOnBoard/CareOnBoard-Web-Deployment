@@ -11,6 +11,22 @@ import { hasForm485Document } from "./form485GenerationEligibility";
 
 const toIso = (d?: Date) => (d ? d.toISOString() : undefined);
 
+function isRealIsoDate(value: string | undefined): value is string {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
+}
+
+function structuredPrimaryAddress(s1: AddClientFormData["stage1"]) {
+  const value = { line1: s1.line1?.trim(), line2: s1.line2?.trim() || null, city: s1.city?.trim(), state: s1.state?.trim(), postalCode: s1.postalCode?.trim(), country: s1.country?.trim().toUpperCase() };
+  return Object.values(value).some((item) => item) ? value : {};
+}
+
+function hasCompleteStructuredPrimaryAddress(s1: AddClientFormData["stage1"]) {
+  return Boolean(s1.line1?.trim() && s1.city?.trim() && s1.state?.trim() && s1.postalCode?.trim() && /^[A-Z]{2}$/.test(s1.country?.trim() ?? ""));
+}
+
 function isMeaningfulHhaInsuranceRow(row: HhaInsuranceInfo): boolean {
   return Boolean(
     row.company?.trim() ||
@@ -67,6 +83,10 @@ export function formDataToApiPayload(
   const isHhaClient = formData.type === "hha";
 
   const primaryLocation = s1.location;
+  if (s1.payrollServiceLocation) {
+    if (!isRealIsoDate(s1.payrollServiceLocation.effectiveFrom)) throw new Error("Enter a valid effective date for the actual service-location attestation.");
+    if (!hasCompleteStructuredPrimaryAddress(s1)) throw new Error("Select a complete primary address before attesting to the actual service location.");
+  }
   if (!progressive && (!primaryLocation || !primaryLocation.lat || !primaryLocation.lon)) {
     throw new Error("Please select an address from the suggestions so we can capture coordinates.");
   }
@@ -158,6 +178,7 @@ export function formDataToApiPayload(
             location: primaryLocation,
             countyState: s1.countyState || undefined,
             zipCode: s1.zipCode || undefined,
+            ...structuredPrimaryAddress(s1),
           }
         : s1.address || s1.countyState || s1.zipCode
           ? {
@@ -165,8 +186,10 @@ export function formDataToApiPayload(
               location: undefined,
               countyState: s1.countyState || undefined,
               zipCode: s1.zipCode || undefined,
+              ...structuredPrimaryAddress(s1),
             }
           : undefined,
+    ...(s1.payrollServiceLocation === null ? { payrollServiceLocation: null } : s1.payrollServiceLocation ? { payrollServiceLocation: { source: "primaryAddress" as const, attestedActualServiceLocation: true as const, effectiveFrom: s1.payrollServiceLocation.effectiveFrom } } : {}),
     secondaryAddress: s1.secondaryAddress || s1.secondaryLocation || s1.secondaryCountyState || s1.secondaryZipCode
       ? {
           address: s1.secondaryAddress || undefined,

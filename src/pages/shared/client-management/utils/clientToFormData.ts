@@ -22,6 +22,17 @@ const EMERGENCY_CONTACT_RELATIONSHIP_LOOKUP = new Set<string>(
 
 const GUARDIAN_RELATIONSHIP_LOOKUP = new Set<string>(GUARDIAN_RELATIONSHIP_VALUES);
 
+function isRealIsoDate(value: unknown): value is string {
+    if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const [year, month, day] = value.split("-").map(Number);
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
+}
+
+function hasCompleteStructuredAddress(address: Client["primaryAddress"]): boolean {
+    return Boolean(address?.line1?.trim() && address.city?.trim() && address.state?.trim() && address.postalCode?.trim() && /^[A-Z]{2}$/.test(address.country?.trim() ?? ""));
+}
+
 function coerceGuardianRelationship(raw: unknown): GuardianRelationship | undefined {
     if (typeof raw !== "string") return undefined;
     const v = raw.trim();
@@ -45,7 +56,16 @@ function coerceEmergencyRelationship(
 export function clientToFormData(client: Client, includeAgencyId: boolean = false): AddClientFormData {
     const initial = createInitialAddClientFormData();
     const clientType = client.type === "hha" ? "hha" : "ddd";
-
+    const promotedHhaLine2 =
+        clientType === "hha" &&
+        !client.primaryAddress?.line2?.trim() &&
+        Boolean(client.homeInfo?.apartmentNumber?.trim());
+    const payrollServiceLocation = client.payrollServiceLocation === null ? null :
+        client.payrollServiceLocation?.source === "primaryAddress" && client.payrollServiceLocation.attestedActualServiceLocation === true && isRealIsoDate(client.payrollServiceLocation.effectiveFrom) && hasCompleteStructuredAddress(client.primaryAddress)
+            ? promotedHhaLine2
+                ? null
+                : { source: "primaryAddress" as const, attestedActualServiceLocation: true as const, effectiveFrom: client.payrollServiceLocation.effectiveFrom }
+            : undefined;
     const parseDate = (dateValue?: string | { _seconds?: number; _nanoseconds?: number } | Date): Date | undefined => {
         if (!dateValue) return undefined;
 
@@ -173,6 +193,13 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
             location: client.primaryAddress?.location || client.location,
             countyState: client.primaryAddress?.countyState || client.countyState || "",
             zipCode: client.primaryAddress?.zipCode || client.zipCode || "",
+            line1: client.primaryAddress?.line1,
+            line2: client.primaryAddress?.line2?.trim() || (clientType === "hha" ? client.homeInfo?.apartmentNumber : undefined),
+            city: client.primaryAddress?.city,
+            state: client.primaryAddress?.state,
+            postalCode: client.primaryAddress?.postalCode,
+            country: client.primaryAddress?.country,
+            payrollServiceLocation,
             secondaryAddress: client.secondaryAddress?.address || "",
             secondaryLocation: client.secondaryAddress?.location,
             secondaryCountyState: client.secondaryAddress?.countyState || "",

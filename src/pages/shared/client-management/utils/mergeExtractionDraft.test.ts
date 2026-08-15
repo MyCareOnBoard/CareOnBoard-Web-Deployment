@@ -39,6 +39,53 @@ function makeExtraction(partial: Partial<ClientExtractionResponse>): ClientExtra
 }
 
 describe("mergeExtractionDraft", () => {
+  it("fails closed when overwrite imports a changed primary address over an attested address", () => {
+    const initial = createInitialAddClientFormData();
+    Object.assign(initial.stage1, { address: "42 Service Lane", location: { lat: "40.7", lon: "-74" }, line1: "42 Service Lane", city: "Newark", state: "NJ", postalCode: "07102", country: "US", payrollServiceLocation: { source: "primaryAddress" as const, attestedActualServiceLocation: true as const, effectiveFrom: "2026-08-14" } });
+    const { formData } = mergeExtractionDraft(initial, makeExtraction({ draft: { stage1: { address: "99 New Street" } } }), { overwrite: true });
+    expect(formData._pendingImportedPrimaryGeocode).toBe(true);
+    expect(formData.stage1.payrollServiceLocation).toBeNull();
+    expect(formData.stage1.line1).toBeUndefined();
+  });
+
+  it("mirrors an imported HHA unit into line2 and clears an attestation", () => {
+    const initial = createInitialAddClientFormData();
+    initial.type = "hha";
+    Object.assign(initial.stage1, { line1: "42 Service Lane", line2: "Unit 3", city: "Newark", state: "NJ", postalCode: "07102", country: "US", homeInfo: { ...initial.stage1.homeInfo, apartmentNumber: "Unit 3" }, payrollServiceLocation: { source: "primaryAddress" as const, attestedActualServiceLocation: true as const, effectiveFrom: "2026-08-14" } });
+    const { formData } = mergeExtractionDraft(initial, makeExtraction({ draft: { stage1: { homeInfo: { apartmentNumber: "Unit 4" } } } }), { overwrite: true });
+    expect(formData.stage1.line2).toBe("Unit 4");
+    expect(formData.stage1.payrollServiceLocation).toBeNull();
+  });
+
+  it("fails closed for a non-overwrite import that fills blank legacy address and unit fields", () => {
+    const initial = createInitialAddClientFormData();
+    initial.type = "hha";
+    Object.assign(initial.stage1, { line1: "42 Service Lane", line2: "Unit 3", city: "Newark", state: "NJ", postalCode: "07102", country: "US", payrollServiceLocation: { source: "primaryAddress" as const, attestedActualServiceLocation: true as const, effectiveFrom: "2026-08-14" } });
+    const { formData } = mergeExtractionDraft(initial, makeExtraction({ draft: { stage1: { address: "99 New Street", homeInfo: { apartmentNumber: "Unit 4" } } } }));
+    expect(formData._pendingImportedPrimaryGeocode).toBe(true);
+    expect(formData.stage1.line2).toBe("Unit 4");
+    expect(formData.stage1.homeInfo?.apartmentNumber).toBe("Unit 4");
+    expect(formData.stage1.payrollServiceLocation).toBeNull();
+  });
+
+  it("invalidates an attestation when an import keeps the address but changes its zip", () => {
+    const initial = createInitialAddClientFormData();
+    Object.assign(initial.stage1, { address: "42 Service Lane", zipCode: "07102", location: { lat: "40", lon: "-74" }, line1: "42 Service Lane", city: "Newark", state: "NJ", postalCode: "07102", country: "US", payrollServiceLocation: { source: "primaryAddress" as const, attestedActualServiceLocation: true as const, effectiveFrom: "2026-08-14" } });
+    const { formData } = mergeExtractionDraft(initial, makeExtraction({ draft: { stage1: { address: "42 Service Lane", zipCode: "07103" } } }), { overwrite: true });
+    expect(formData._pendingImportedPrimaryGeocode).toBe(true);
+    expect(formData.stage1.payrollServiceLocation).toBeNull();
+    expect(formData.stage1.line1).toBeUndefined();
+  });
+
+  it("clears an old HHA unit when a changed imported address supplies no unit", () => {
+    const initial = createInitialAddClientFormData();
+    initial.type = "hha";
+    Object.assign(initial.stage1, { address: "42 Service Lane", line2: "Unit 3", homeInfo: { ...initial.stage1.homeInfo, apartmentNumber: "Unit 3" }, payrollServiceLocation: { source: "primaryAddress" as const, attestedActualServiceLocation: true as const, effectiveFrom: "2026-08-14" } });
+    const { formData } = mergeExtractionDraft(initial, makeExtraction({ draft: { stage1: { address: "99 New Street" } } }), { overwrite: true });
+    expect(formData.stage1.line2).toBeUndefined();
+    expect(formData.stage1.homeInfo?.apartmentNumber).toBeUndefined();
+    expect(formData.stage1.payrollServiceLocation).toBeNull();
+  });
   it("merges stage1 and attaches isp file", () => {
     const initial = createInitialAddClientFormData();
     const file = new File(["x"], "isp.pdf", { type: "application/pdf" });

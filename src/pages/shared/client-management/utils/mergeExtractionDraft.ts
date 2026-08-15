@@ -887,6 +887,10 @@ export function mergeExtractionDraft(
 
   const s1 = draft.stage1;
   if (s1) {
+    const priorAddress = String(next.stage1.address ?? "").trim();
+    const priorCountyState = String(next.stage1.countyState ?? "").trim();
+    const priorZipCode = String(next.stage1.zipCode ?? "").trim();
+    const priorApartment = String(next.stage1.homeInfo?.apartmentNumber ?? "").trim();
     next.stage1.firstName = mergeString(next.stage1.firstName, s1.firstName, overwrite);
     next.stage1.lastName = mergeString(next.stage1.lastName, s1.lastName, overwrite);
     next.stage1.middleName = mergeString(next.stage1.middleName, s1.middleName, overwrite);
@@ -939,6 +943,11 @@ export function mergeExtractionDraft(
         homeType:
           mergeString(next.stage1.homeInfo?.homeType ?? "", s1.homeInfo.homeType, overwrite) || undefined,
       };
+      const importedApartment = String(next.stage1.homeInfo.apartmentNumber ?? "").trim();
+      if (importedApartment && importedApartment !== priorApartment) {
+        next.stage1.line2 = next.stage1.homeInfo.apartmentNumber ?? undefined;
+        next.stage1.payrollServiceLocation = null;
+      }
     }
     if (s1.referralInfo) {
       const referralDate = parseIsoOrUsDate(s1.referralInfo.date);
@@ -959,6 +968,26 @@ export function mergeExtractionDraft(
     }
 
     next.stage1.address = mergeString(next.stage1.address, s1.address, overwrite);
+    const importedAddressChanged = (String(s1.address ?? "").trim() && String(next.stage1.address ?? "").trim() !== priorAddress) ||
+      (String(s1.countyState ?? "").trim() && String(mergeString(priorCountyState, s1.countyState, overwrite)).trim() !== priorCountyState) ||
+      (String(s1.zipCode ?? "").trim() && String(mergeString(priorZipCode, s1.zipCode, overwrite)).trim() !== priorZipCode);
+    if (importedAddressChanged) {
+      next.stage1.location = undefined;
+      next.stage1.line1 = undefined;
+      next.stage1.line2 = undefined;
+      next.stage1.city = undefined;
+      next.stage1.state = undefined;
+      next.stage1.postalCode = undefined;
+      next.stage1.country = undefined;
+      next.stage1.payrollServiceLocation = null;
+      next._pendingImportedPrimaryGeocode = true;
+      const importedApartment = String(s1.homeInfo?.apartmentNumber ?? "").trim();
+      if (importedApartment) {
+        next.stage1.line2 = next.stage1.homeInfo?.apartmentNumber;
+      } else {
+        next.stage1.homeInfo = { ...(next.stage1.homeInfo ?? {}), apartmentNumber: undefined };
+      }
+    }
     next.stage1.countyState = mergeString(next.stage1.countyState, s1.countyState, overwrite);
     next.stage1.zipCode = mergeString(next.stage1.zipCode, s1.zipCode, overwrite);
     next.stage1.secondaryAddress = mergeString(
@@ -1011,7 +1040,7 @@ export function mergeExtractionDraft(
     if (
       String(s1.address ?? "").trim() &&
       String(next.stage1.address ?? "").trim() &&
-      !next.stage1.location?.lat
+      (!next.stage1.location?.lat || importedAddressChanged)
     ) {
       next._pendingImportedPrimaryGeocode = true;
     }

@@ -6,6 +6,7 @@ import { useAuth } from "@/utils/auth";
 import { UserType } from "@/utils/auth/types/user.types";
 import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -19,7 +20,7 @@ import {
 import { AddClientFormData, type InsuranceDetail } from "@/pages/shared/client-management/types/formData";
 import { Button } from "@/components/ui/button";
 import { Agency } from "@/lib/api/clients";
-import { useGooglePlacesAutocomplete, fetchFirstPlaceDetailsForQuery } from "@/hooks/useGooglePlacesAutocomplete";
+import { useGooglePlacesAutocomplete, fetchFirstPlaceDetailsForQuery, type AddressDetails } from "@/hooks/useGooglePlacesAutocomplete";
 import HhaBlankFormsCard from "@/pages/shared/client-management/components/HhaBlankFormsCard";
 
 const SELECT_TRIGGER_CN =
@@ -59,6 +60,18 @@ export function Stage1ClientIdentityAndContact({
   const isHhaClient = formData.type === "hha";
   const updateStage1 = (patch: Partial<AddClientFormData["stage1"]>) =>
     setFormData((prev) => ({ ...prev, stage1: { ...prev.stage1, ...patch } }));
+  const clearPrimaryPayrollIdentity = (patch: Partial<AddClientFormData["stage1"]>) =>
+    updateStage1({ ...patch, line1: undefined, line2: undefined, city: undefined, state: undefined, postalCode: undefined, country: undefined, payrollServiceLocation: null });
+  const hasStructuredPrimaryAddress = Boolean(stage1.line1?.trim() && stage1.city?.trim() && stage1.state?.trim() && stage1.postalCode?.trim() && /^[A-Z]{2}$/.test(stage1.country?.trim() ?? ""));
+  const normalizedIdentity = (value: string | null | undefined) => value?.trim().replace(/\s+/g, " ").toUpperCase() || null;
+  const canonicalPrimaryDetails = (details: AddressDetails) => ({
+    ...details,
+    line1: details.line1.trim().replace(/\s+/g, " "), line2: details.line2?.trim().replace(/\s+/g, " ") || null,
+    city: details.city.trim().replace(/\s+/g, " "), state: (details.stateCode ?? details.state).trim().toUpperCase(),
+    zipCode: details.zipCode.trim().toUpperCase(), country: (details.countryCode ?? details.country).trim().toUpperCase(),
+  });
+  const samePrimaryIdentity = (details: { line1: string; line2: string | null; city: string; state: string; zipCode: string; country: string }, current = stage1) =>
+    normalizedIdentity(current.line1) === normalizedIdentity(details.line1) && normalizedIdentity(current.line2) === normalizedIdentity(details.line2) && normalizedIdentity(current.city) === normalizedIdentity(details.city) && normalizedIdentity(current.state) === normalizedIdentity(details.state) && normalizedIdentity(current.postalCode) === normalizedIdentity(details.zipCode) && normalizedIdentity(current.country) === normalizedIdentity(details.country);
   const updateHomeInfo = (patch: Partial<NonNullable<AddClientFormData["stage1"]["homeInfo"]>>) =>
     setFormData((prev) => ({
       ...prev,
@@ -112,6 +125,8 @@ export function Stage1ClientIdentityAndContact({
 
   const primaryAddress = useGooglePlacesAutocomplete();
   const secondaryAddress = useGooglePlacesAutocomplete();
+  const [primarySuggestionIndex, setPrimarySuggestionIndex] = useState(-1);
+  const primarySuggestionsExpanded = primaryAddress.showSuggestions && primaryAddress.suggestions.length > 0;
 
   useEffect(() => {
     if (!formData._pendingImportedPrimaryGeocode) return undefined;
@@ -148,10 +163,11 @@ export function Stage1ClientIdentityAndContact({
         }
 
         const countyStateValue =
-          details.county && details.state
-            ? `${details.county} / ${details.state}`
-            : details.county || details.state;
+          details.county && details.stateLong
+            ? `${details.county} / ${details.stateLong}`
+            : details.county || details.stateLong;
 
+        const canonical = canonicalPrimaryDetails(details);
         return {
           ...base,
           stage1: {
@@ -160,6 +176,9 @@ export function Stage1ClientIdentityAndContact({
             location: { lat: String(details.lat), lon: String(details.lng) },
             countyState: countyStateValue,
             zipCode: details.zipCode,
+            line1: canonical.line1, line2: canonical.line2 ?? prev.stage1.line2, city: canonical.city, state: canonical.state, postalCode: canonical.zipCode, country: canonical.country,
+            homeInfo: { ...(prev.stage1.homeInfo ?? {}), apartmentNumber: canonical.line2 ?? prev.stage1.line2 ?? undefined },
+            ...(samePrimaryIdentity(canonical, prev.stage1) ? {} : { payrollServiceLocation: null }),
           },
         };
       });
@@ -196,15 +215,19 @@ export function Stage1ClientIdentityAndContact({
   const handleSelectAddressSuggestion = async (placeId: string) => {
     const details = await primaryAddress.selectSuggestion(placeId);
     if (details) {
+      const canonical = canonicalPrimaryDetails(details);
       const countyStateValue =
-        details.county && details.state
-          ? `${details.county} / ${details.state}`
-          : details.county || details.state;
+        details.county && details.stateLong
+          ? `${details.county} / ${details.stateLong}`
+          : details.county || details.stateLong;
       updateStage1({
         address: details.formattedAddress,
         location: { lat: String(details.lat), lon: String(details.lng) },
         countyState: countyStateValue,
         zipCode: details.zipCode,
+        line1: canonical.line1, line2: canonical.line2, city: canonical.city, state: canonical.state, postalCode: canonical.zipCode, country: canonical.country,
+        homeInfo: { ...(stage1.homeInfo ?? {}), apartmentNumber: canonical.line2 ?? undefined },
+        ...(samePrimaryIdentity(canonical) ? {} : { payrollServiceLocation: null }),
       });
     }
   };
@@ -213,9 +236,9 @@ export function Stage1ClientIdentityAndContact({
     const details = await secondaryAddress.selectSuggestion(placeId);
     if (details) {
       const countyStateValue =
-        details.county && details.state
-          ? `${details.county} / ${details.state}`
-          : details.county || details.state;
+        details.county && details.stateLong
+          ? `${details.county} / ${details.stateLong}`
+          : details.county || details.stateLong;
       updateStage1({
         secondaryAddress: details.formattedAddress,
         secondaryLocation: { lat: String(details.lat), lon: String(details.lng) },
@@ -584,13 +607,15 @@ const maskSSN = (value: string) => {
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 xl:grid-cols-4">
           <div className="flex flex-col gap-1">
-            <label className="text-[12px] font-normal text-[#10141a]">Primary Address</label>
+            <label className="text-[12px] font-normal text-[#10141a]" htmlFor="primary-mailing-address">Primary / mailing address</label>
             <div className="relative" ref={addressInputRef}>
               <Input
+                id="primary-mailing-address"
                 value={stage1.address}
                 onChange={(e) => {
                   const v = e.target.value;
-                  updateStage1({ address: v, location: undefined });
+                  setPrimarySuggestionIndex(-1);
+                  clearPrimaryPayrollIdentity({ address: v, location: undefined });
                   primaryAddress.handleInputChange(v);
                 }}
                 onFocus={() => {
@@ -598,12 +623,24 @@ const maskSSN = (value: string) => {
                     primaryAddress.setShowSuggestions(true);
                   }
                 }}
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded={primarySuggestionsExpanded}
+                aria-controls="primary-address-suggestions"
+                aria-activedescendant={primarySuggestionsExpanded && primarySuggestionIndex >= 0 ? `primary-address-suggestion-${primarySuggestionIndex}` : undefined}
+                onKeyDown={(event) => {
+                  if (!primaryAddress.suggestions.length) return;
+                  if (event.key === "ArrowDown") { event.preventDefault(); if (!primarySuggestionsExpanded) primaryAddress.setShowSuggestions(true); setPrimarySuggestionIndex((index) => Math.min(index + 1, primaryAddress.suggestions.length - 1)); }
+                  if (event.key === "ArrowUp") { event.preventDefault(); setPrimarySuggestionIndex((index) => Math.max(index - 1, 0)); }
+                  if (event.key === "Enter" && primarySuggestionsExpanded && primarySuggestionIndex >= 0) { event.preventDefault(); void handleSelectAddressSuggestion(primaryAddress.suggestions[primarySuggestionIndex].placeId); setPrimarySuggestionIndex(-1); }
+                  if (event.key === "Escape") { event.preventDefault(); primaryAddress.setShowSuggestions(false); setPrimarySuggestionIndex(-1); }
+                }}
                 className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
                 placeholder="Enter primary address"
               />
 
               {primaryAddress.showSuggestions && primaryAddress.suggestions.length > 0 && (
-                <div className="absolute z-50 w-full mt-1 bg-white border border-[#e5e5e6] rounded-md shadow-lg max-h-[200px] overflow-y-auto">
+                <div id="primary-address-suggestions" role="listbox" className="absolute z-50 w-full mt-1 bg-white border border-[#e5e5e6] rounded-md shadow-lg max-h-[200px] overflow-y-auto">
                   {primaryAddress.isSearching && (
                     <div className="px-4 py-3 text-sm text-[#808081] flex items-center gap-2">
                       <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-[#00b4b8] border-r-transparent" />
@@ -611,11 +648,14 @@ const maskSSN = (value: string) => {
                     </div>
                   )}
                   {!primaryAddress.isSearching &&
-                    primaryAddress.suggestions.map((suggestion) => (
+                    primaryAddress.suggestions.map((suggestion, index) => (
                       <div
                         key={suggestion.placeId}
+                        id={`primary-address-suggestion-${index}`}
+                        role="option"
+                        aria-selected={primarySuggestionIndex === index}
                         onClick={() => handleSelectAddressSuggestion(suggestion.placeId)}
-                        className="px-4 py-3 text-sm text-[#10141a] hover:bg-[#f8f9fa] cursor-pointer border-b border-[#e5e5e6] last:border-b-0 transition-colors"
+                        className={`px-4 py-3 text-sm text-[#10141a] hover:bg-[#f8f9fa] cursor-pointer border-b border-[#e5e5e6] last:border-b-0 transition-colors ${primarySuggestionIndex === index ? "bg-[#e6f7f7]" : ""}`}
                       >
                         <span className="line-clamp-2">
                           {suggestion.description}
@@ -631,7 +671,7 @@ const maskSSN = (value: string) => {
             <label className="text-[12px] font-normal text-[#10141a]">Primary County / State</label>
             <Input
               value={stage1.countyState}
-              onChange={(e) => updateStage1({ countyState: e.target.value })}
+              onChange={(e) => clearPrimaryPayrollIdentity({ countyState: e.target.value, location: undefined })}
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder="Enter County / State"
             />
@@ -641,20 +681,62 @@ const maskSSN = (value: string) => {
             <label className="text-[12px] font-normal text-[#10141a]">Primary Zip Code</label>
             <Input
               value={stage1.zipCode}
-              onChange={(e) => updateStage1({ zipCode: e.target.value })}
+              onChange={(e) => clearPrimaryPayrollIdentity({ zipCode: e.target.value, location: undefined })}
               inputMode="numeric"
               className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
               placeholder="Enter Zip Code"
             />
           </div>
 
+          <div className="flex flex-col gap-2 lg:col-span-3 xl:col-span-4">
+            <Checkbox
+              id="actual-service-location"
+              checked={Boolean(stage1.payrollServiceLocation)}
+              disabled={!hasStructuredPrimaryAddress}
+              aria-describedby={!hasStructuredPrimaryAddress ? "actual-service-location-address-help" : undefined}
+              onChange={(event) => updateStage1(event.target.checked
+                ? { payrollServiceLocation: { source: "primaryAddress", attestedActualServiceLocation: true, effectiveFrom: "" } }
+                : { payrollServiceLocation: null })}
+              label="I attest that this primary/mailing address is where services are actually delivered."
+              labelClassName="text-[13px] font-normal"
+            />
+            {!hasStructuredPrimaryAddress && <p id="actual-service-location-address-help" className="text-[12px] text-[#5d5d5f]">Select a suggested primary/mailing address to attest to the actual service location.</p>}
+            <p className="text-[12px] text-[#5d5d5f]">Future address changes apply to future payroll assignments and do not rewrite history.</p>
+            {stage1.payrollServiceLocation && (
+              <div className="flex max-w-[260px] flex-col gap-1">
+                <label className="text-[12px] font-normal text-[#10141a]" htmlFor="actual-service-location-effective-from">Effective date</label>
+                <Input id="actual-service-location-effective-from" type="date" required value={stage1.payrollServiceLocation.effectiveFrom}
+                  onChange={(event) => updateStage1({ payrollServiceLocation: { ...stage1.payrollServiceLocation!, effectiveFrom: event.target.value } })}
+                  aria-invalid={!stage1.payrollServiceLocation.effectiveFrom}
+                  aria-describedby={!stage1.payrollServiceLocation.effectiveFrom ? "actual-service-location-effective-from-error" : undefined}
+                  className="h-[44px] rounded-[12px] border-[#cccccd] bg-white" />
+                {!stage1.payrollServiceLocation.effectiveFrom && <p id="actual-service-location-effective-from-error" className="text-[12px] text-red-600" role="alert">An effective date is required to save this attestation.</p>}
+              </div>
+            )}
+          </div>
+
           {isHhaClient ? (
             <>
               <div className="flex flex-col gap-1">
-                <label className="text-[12px] font-normal text-[#10141a]">Apartment number</label>
+                <label className="text-[12px] font-normal text-[#10141a]" htmlFor="primary-apartment-number">Apartment number</label>
                 <Input
-                  value={stage1.homeInfo?.apartmentNumber ?? ""}
-                  onChange={(e) => updateHomeInfo({ apartmentNumber: e.target.value })}
+                  id="primary-apartment-number"
+                  value={stage1.line2 ?? stage1.homeInfo?.apartmentNumber ?? ""}
+                  onChange={(e) => {
+                    const apartmentNumber = e.target.value;
+                    const sameLine2 = normalizedIdentity(stage1.line2) === normalizedIdentity(apartmentNumber);
+                    setFormData((prev) => ({
+                      ...prev,
+                      stage1: {
+                        ...prev.stage1,
+                        line2: apartmentNumber,
+                        payrollServiceLocation: sameLine2
+                          ? prev.stage1.payrollServiceLocation
+                          : null,
+                        homeInfo: { ...(prev.stage1.homeInfo ?? {}), apartmentNumber },
+                      },
+                    }));
+                  }}
                   className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
                   placeholder="Apartment, unit, or suite"
                 />

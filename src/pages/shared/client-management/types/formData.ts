@@ -100,6 +100,13 @@ export type Stage1ClientIdentityAndContactData = {
     location?: { lat: string; lon: string };
     countyState: string;
     zipCode: string;
+    line1?: string;
+    line2?: string | null;
+    city?: string;
+    state?: string;
+    postalCode?: string;
+    country?: string;
+    payrollServiceLocation?: { source: "primaryAddress"; attestedActualServiceLocation: true; effectiveFrom: string } | null;
     secondaryAddress: string;
     secondaryLocation?: { lat: string; lon: string };
     secondaryCountyState: string;
@@ -787,6 +794,8 @@ export function createInitialAddClientFormData(): AddClientFormData {
             location: undefined,
             countyState: "",
             zipCode: "",
+            line1: undefined, line2: undefined, city: undefined, state: undefined, postalCode: undefined, country: undefined,
+            payrollServiceLocation: undefined,
             secondaryAddress: "",
             secondaryLocation: undefined,
             secondaryCountyState: "",

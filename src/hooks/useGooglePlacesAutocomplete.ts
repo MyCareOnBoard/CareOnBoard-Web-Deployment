@@ -14,11 +14,16 @@ export type AddressSuggestion = {
 export type AddressDetails = {
     formattedAddress: string;
     street: string;
+    line1: string;
+    line2: string | null;
     city: string;
     county: string;
     state: string;
+    stateLong: string;
+    stateCode: string;
     zipCode: string;
     country: string;
+    countryCode: string;
     lat: number;
     lng: number;
 };
@@ -80,13 +85,15 @@ declare global {
 
 function parseAddressComponents(
     components: Array<{ longText: string; shortText: string; types: string[] }>
-): { street: string; city: string; county: string; state: string; zipCode: string; country: string } {
+): { street: string; line1: string; line2: string | null; city: string; county: string; state: string; stateLong: string; stateCode: string; zipCode: string; country: string; countryCode: string } {
     const get = (type: string) =>
         components.find((c) => c.types.includes(type))?.longText ?? "";
+    const short = (type: string) => components.find((c) => c.types.includes(type))?.shortText ?? "";
 
     const streetNumber = get("street_number");
     const route = get("route");
     const street = [streetNumber, route].filter(Boolean).join(" ");
+    const line2 = get("subpremise") || null;
     const city =
         get("locality") ||
         get("sublocality") ||
@@ -94,10 +101,13 @@ function parseAddressComponents(
         get("administrative_area_level_3");
     const county = get("administrative_area_level_2");
     const state = get("administrative_area_level_1");
+    const stateLong = get("administrative_area_level_1");
+    const stateCode = short("administrative_area_level_1");
     const zipCode = get("postal_code");
     const country = get("country");
+    const countryCode = short("country");
 
-    return { street, city, county, state, zipCode, country };
+    return { street, line1: street, line2, city, county, state, stateLong, stateCode, zipCode, country, countryCode };
 }
 
 async function fetchPlaceDetails(
