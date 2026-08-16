@@ -21,6 +21,12 @@ function errorStatus(error: unknown) {
   return (error as { status?: unknown }).status;
 }
 
+function samePayrollScope(left: EmployeePayrollScope, right: EmployeePayrollScope) {
+  return left.actorUid === right.actorUid
+    && left.agencyId === right.agencyId
+    && left.employmentId === right.employmentId;
+}
+
 export default function MyPayrollTab({ scope, active }: { scope: EmployeePayrollScope; active: boolean }) {
   const dispatch = useDispatch();
   const [focused, setFocused] = useState(documentIsFocused);
@@ -28,7 +34,10 @@ export default function MyPayrollTab({ scope, active }: { scope: EmployeePayroll
   const [actionError, setActionError] = useState<string | null>(null);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const actionInFlight = useRef(false);
+  const actionToken = useRef(0);
   const mounted = useRef(true);
+  const currentScope = useRef(scope);
+  currentScope.current = scope;
   const coalescedRefetch = useRef({ employmentId: "", inFlight: false, trailing: false });
   const queryArg = active && scope.employmentId ? scope : skipToken;
   const queryState = employeePayrollApi.endpoints.getEmployeePayrollSetup.useQueryState(queryArg);
@@ -61,17 +70,19 @@ export default function MyPayrollTab({ scope, active }: { scope: EmployeePayroll
     mounted.current = true;
     return () => {
       mounted.current = false;
+      actionToken.current += 1;
       coalescedRefetch.current.trailing = false;
     };
   }, []);
 
   useEffect(() => {
+    actionToken.current += 1;
     actionInFlight.current = false;
     setPendingAction(null);
     setActionError(null);
     setOnboardingOpen(false);
     coalescedRefetch.current = { employmentId: scope.employmentId, inFlight: false, trailing: false };
-  }, [scope.employmentId]);
+  }, [scope.actorUid, scope.agencyId, scope.employmentId]);
 
   const refetchCoalesced = useCallback(() => {
     const state = coalescedRefetch.current;
@@ -94,6 +105,11 @@ export default function MyPayrollTab({ scope, active }: { scope: EmployeePayroll
   const runAction = async (command: EmployeePayrollAction) => {
     const current = queryState.currentData;
     if (!current || actionInFlight.current) return;
+    const actionScope = { ...scope };
+    const token = ++actionToken.current;
+    const isCurrentAction = () => mounted.current
+      && actionToken.current === token
+      && samePayrollScope(currentScope.current, actionScope);
     actionInFlight.current = true;
     setPendingAction(command);
     setActionError(null);
@@ -104,13 +120,22 @@ export default function MyPayrollTab({ scope, active }: { scope: EmployeePayroll
         projectionRevision: current.projectionRevision,
         idempotencyKey: crypto.randomUUID(),
       }).unwrap();
+      if (!isCurrentAction()) return;
     } catch (error) {
+      if (!isCurrentAction()) return;
       if (errorStatus(error) === 409) {
-        await subscription.refetch();
+        try {
+          await subscription.refetch();
+        } catch (refetchError) {
+          if (!isCurrentAction()) return;
+          throw refetchError;
+        }
+        if (!isCurrentAction()) return;
       } else {
         setActionError("Payroll setup could not be updated. Please try again.");
       }
     } finally {
+      if (!isCurrentAction()) return;
       actionInFlight.current = false;
       setPendingAction(null);
     }

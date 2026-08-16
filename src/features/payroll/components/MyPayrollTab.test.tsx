@@ -9,6 +9,7 @@ const testState = vi.hoisted(() => ({
   requests: [] as Array<{ url: string; method: string; headers?: Record<string, string> }> ,
   getResponses: [] as Array<Promise<unknown> | unknown>,
   commandResponse: { data: { operationId: "operation-1", state: "accepted", resourceType: "employee", pollAfterMs: null } } as unknown,
+  commandResponses: [] as Array<Promise<unknown> | unknown>,
   onboardResponse: { data: { url: "https://onboard.example/session", expiresAt: "2099-01-01T00:00:00.000Z" } } as unknown,
   modalProps: null as null | { requestSession: () => Promise<{ link: string; expiresAt?: string }>; onRefetch: () => void },
   modalModuleLoads: 0,
@@ -24,7 +25,8 @@ vi.mock("@/lib/baseQuery", () => ({
       return next instanceof Promise ? await next : next;
     }
     if (args.url.endsWith("/onboard-session")) return testState.onboardResponse;
-    return testState.commandResponse;
+    const next = testState.commandResponses.shift() ?? testState.commandResponse;
+    return next instanceof Promise ? await next : next;
   },
 }));
 
@@ -94,6 +96,7 @@ describe("MyPayrollTab", () => {
     testState.requests = [];
     testState.getResponses = [];
     testState.commandResponse = { data: { operationId: "operation-1", state: "accepted", resourceType: "employee", pollAfterMs: null } };
+    testState.commandResponses = [];
     testState.onboardResponse = { data: { url: "https://onboard.example/session", expiresAt: "2099-01-01T00:00:00.000Z" } };
     testState.modalProps = null;
     testState.modalRenders = 0;
@@ -220,6 +223,45 @@ describe("MyPayrollTab", () => {
     await user.click(await screen.findByRole("button", { name: "Start payroll setup" }));
     await waitFor(() => expect(commandRequests()).toHaveLength(1));
     await waitFor(() => expect(getRequests()).toHaveLength(2));
+  });
+
+  it("does not refetch or escape when a 409 settles after unmount", async () => {
+    let resolveCommand!: (value: unknown) => void;
+    testState.getResponses.push(readyResponse(projection()));
+    testState.commandResponses.push(new Promise((resolve) => { resolveCommand = resolve; }));
+    const user = userEvent.setup();
+    const view = renderPayroll();
+    await user.click(await screen.findByRole("button", { name: "Start payroll setup" }));
+    await waitFor(() => expect(commandRequests()).toHaveLength(1));
+    view.unmount();
+    await act(async () => { resolveCommand({ error: { status: 409, data: "stale" } }); });
+    expect(getRequests()).toHaveLength(1);
+  });
+
+  it("does not let a stale 409 refetch or clear the current scope action", async () => {
+    let resolveOldCommand!: (value: unknown) => void;
+    let resolveCurrentCommand!: (value: unknown) => void;
+    const currentScope = { ...scope, employmentId: "employment-2" };
+    testState.getResponses.push(readyResponse(projection()), readyResponse(projection({ employmentId: currentScope.employmentId })));
+    testState.commandResponses.push(
+      new Promise((resolve) => { resolveOldCommand = resolve; }),
+      new Promise((resolve) => { resolveCurrentCommand = resolve; }),
+    );
+    const user = userEvent.setup();
+    const view = renderPayroll();
+    await user.click(await screen.findByRole("button", { name: "Start payroll setup" }));
+    await waitFor(() => expect(commandRequests()).toHaveLength(1));
+    view.rerender(<Provider store={view.store}><MyPayrollTab scope={currentScope} active /></Provider>);
+    const currentButton = await screen.findByRole("button", { name: "Start payroll setup" });
+    await user.click(currentButton);
+    expect(await screen.findByRole("button", { name: "Starting payroll setup..." })).toBeDisabled();
+    expect(getRequests()).toHaveLength(2);
+    await act(async () => { resolveOldCommand({ error: { status: 409, data: "stale" } }); });
+    expect(getRequests()).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Starting payroll setup..." })).toBeDisabled();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    view.unmount();
+    await act(async () => { resolveCurrentCommand({ data: { operationId: "operation-2", state: "accepted", resourceType: "employee", pollAfterMs: null } }); });
   });
 
   it("defers the Onboard module and session until the user continues, then coalesces event bursts", async () => {
