@@ -8,75 +8,122 @@ vi.mock("@/features/payroll/onboard/payrollOnboardSession", () => ({
   clearPayrollOnboardSessions: vi.fn(),
 }));
 
-const currentUser = { uid: "u1", agencyId: "a1", userType: "agency_staff", payrollEmploymentId: "employment-1", profile: { accessList: ["Payroll Management"] }, canOpenAgencyPayrollSetup: true };
+type PayrollScopeUser = {
+  uid: string;
+  agencyId: string;
+  userType: string;
+  payrollEmploymentId: string;
+  profile: { accessList?: string[] };
+  canOpenAgencyPayrollSetup: boolean;
+};
+
+const currentUser: PayrollScopeUser = {
+  uid: "u1",
+  agencyId: "a1",
+  userType: "agency_staff",
+  payrollEmploymentId: "employment-1",
+  profile: { accessList: ["Payroll Management"] },
+  canOpenAgencyPayrollSetup: true,
+};
+const clearSessionsMock = vi.mocked(clearPayrollOnboardSessions);
+
+function createRecursiveMiddlewareHarness(previous: PayrollScopeUser) {
+  let middleware!: (action: unknown) => unknown;
+  const next = vi.fn();
+  const dispatch = vi.fn((action: unknown) => middleware(action));
+  middleware = networkBillingLogoutResetMiddleware({
+    dispatch,
+    getState: () => ({ auth: { user: previous } }),
+  } as never)(next);
+
+  return {
+    dispatch,
+    next,
+    setUser: (user: PayrollScopeUser) => middleware(setUser(user as never)),
+  };
+}
+
+function expectOneResetBeforeOuterSetUserForwarding(harness: ReturnType<typeof createRecursiveMiddlewareHarness>) {
+  expect(harness.dispatch.mock.calls.filter(([action]) => (action as { type?: string }).type === payrollScopeChanged.type)).toHaveLength(1);
+  expect(clearSessionsMock).toHaveBeenCalledOnce();
+  const outerSetUserForwardIndex = harness.next.mock.calls.findIndex(([action]) => (action as { type?: string }).type === setUser.type);
+  expect(outerSetUserForwardIndex).toBeGreaterThanOrEqual(0);
+  const outerSetUserForwardOrder = harness.next.mock.invocationCallOrder[outerSetUserForwardIndex];
+  expect(clearSessionsMock.mock.invocationCallOrder[0]).toBeLessThan(outerSetUserForwardOrder);
+  const resetDispatchIndexes = harness.dispatch.mock.calls
+    .map(([action], index) => ({ type: (action as { type?: string }).type, index }))
+    .filter(({ type }) => type === "networkBillingApi/resetApiState" || type === "checkPayrollApi/resetApiState")
+    .map(({ index }) => index);
+  expect(resetDispatchIndexes).toHaveLength(2);
+  for (const resetDispatchIndex of resetDispatchIndexes) {
+    expect(harness.dispatch.mock.invocationCallOrder[resetDispatchIndex]).toBeLessThan(outerSetUserForwardOrder);
+  }
+}
 
 describe("payroll scope middleware", () => {
   beforeEach(() => vi.clearAllMocks());
-  it("does not reset equivalent identity and advances a changed scope before the user reducer", () => {
-    const dispatch = vi.fn(); const next = vi.fn();
-    const middleware = networkBillingLogoutResetMiddleware({ dispatch, getState: () => ({ auth: { user: currentUser } }) } as never)(next);
-    middleware(setUser({ ...currentUser } as never));
-    expect(dispatch).not.toHaveBeenCalled(); expect(next).toHaveBeenCalledOnce();
 
-    dispatch.mockClear(); next.mockClear();
-    middleware(setUser({ ...currentUser, payrollEmploymentId: "employment-2" } as never));
-    expect(dispatch.mock.calls[0][0]).toMatchObject({ type: payrollScopeChanged.type, payload: { previousKey: "u1:a1:agency_staff:employment-1:true:true", nextKey: "u1:a1:agency_staff:employment-2:true:true" } });
-    expect(next).toHaveBeenCalledOnce();
+  it("does not reset an equivalent payroll identity", () => {
+    const harness = createRecursiveMiddlewareHarness(currentUser);
+
+    harness.setUser({ ...currentUser, profile: { ...currentUser.profile } });
+
+    expect(harness.dispatch).not.toHaveBeenCalled();
+    expect(clearSessionsMock).not.toHaveBeenCalled();
+    expect(harness.next).toHaveBeenCalledOnce();
   });
 
   it("treats absent and empty Payroll Management access lists as the same authority", () => {
-    const previous = { ...currentUser, profile: {} };
-    let middleware!: (action: unknown) => unknown;
-    const next = vi.fn();
-    const dispatch = vi.fn((action: unknown) => middleware(action));
-    middleware = networkBillingLogoutResetMiddleware({ dispatch, getState: () => ({ auth: { user: previous } }) } as never)(next);
+    const profilePairs: Array<[PayrollScopeUser["profile"], PayrollScopeUser["profile"]]> = [
+      [{}, { accessList: [] }],
+      [{ accessList: [] }, {}],
+    ];
 
-    middleware(setUser({ ...previous, profile: { accessList: [] } } as never));
+    for (const [previousProfile, nextProfile] of profilePairs) {
+      const previous = { ...currentUser, profile: previousProfile };
+      const harness = createRecursiveMiddlewareHarness(previous);
 
-    expect(dispatch).not.toHaveBeenCalled();
-    expect(clearPayrollOnboardSessions).not.toHaveBeenCalled();
-    expect(next).toHaveBeenCalledOnce();
+      harness.setUser({ ...previous, profile: nextProfile });
+
+      expect(harness.dispatch).not.toHaveBeenCalled();
+      expect(clearSessionsMock).not.toHaveBeenCalled();
+      expect(harness.next).toHaveBeenCalledOnce();
+      vi.clearAllMocks();
+    }
   });
 
-  it("treats empty and absent Payroll Management access lists as the same authority", () => {
-    const previous = { ...currentUser, profile: { accessList: [] } };
-    let middleware!: (action: unknown) => unknown;
-    const next = vi.fn();
-    const dispatch = vi.fn((action: unknown) => middleware(action));
-    middleware = networkBillingLogoutResetMiddleware({ dispatch, getState: () => ({ auth: { user: previous } }) } as never)(next);
+  it("resets once for every payroll identity dimension", () => {
+    const identityChanges: Array<[string, Partial<PayrollScopeUser>]> = [
+      ["uid", { uid: "u2" }],
+      ["agencyId", { agencyId: "a2" }],
+      ["userType", { userType: "employee" }],
+      ["payrollEmploymentId", { payrollEmploymentId: "employment-2" }],
+    ];
 
-    middleware(setUser({ ...previous, profile: {} } as never));
+    for (const [_field, change] of identityChanges) {
+      const harness = createRecursiveMiddlewareHarness(currentUser);
 
-    expect(dispatch).not.toHaveBeenCalled();
-    expect(clearPayrollOnboardSessions).not.toHaveBeenCalled();
-    expect(next).toHaveBeenCalledOnce();
+      harness.setUser({ ...currentUser, ...change });
+
+      expectOneResetBeforeOuterSetUserForwarding(harness);
+      vi.clearAllMocks();
+    }
   });
 
-  it("resets once before forwarding a new payroll identity or Payroll Management authority", () => {
-    const previous = { ...currentUser, profile: { accessList: [] } };
-    let middleware!: (action: unknown) => unknown;
-    const next = vi.fn();
-    const dispatch = vi.fn((action: unknown) => middleware(action));
-    middleware = networkBillingLogoutResetMiddleware({ dispatch, getState: () => ({ auth: { user: previous } }) } as never)(next);
+  it("resets once for an exact Payroll Management grant or setup-capability change", () => {
+    const previous = { ...currentUser, profile: { accessList: [] }, canOpenAgencyPayrollSetup: false };
+    const scopeChanges: Array<[string, PayrollScopeUser]> = [
+      ["Payroll Management", { ...previous, profile: { accessList: ["Payroll Management"] } }],
+      ["setup capability", { ...previous, canOpenAgencyPayrollSetup: true }],
+    ];
 
-    middleware(setUser({ ...previous, profile: { accessList: ["Payroll Management"] } } as never));
+    for (const [_field, nextUser] of scopeChanges) {
+      const harness = createRecursiveMiddlewareHarness(previous);
 
-    expect(dispatch.mock.calls.filter(([action]) => (action as { type?: string }).type === payrollScopeChanged.type)).toHaveLength(1);
-    expect(clearPayrollOnboardSessions).toHaveBeenCalledOnce();
-    expect(clearPayrollOnboardSessions.mock.invocationCallOrder[0]).toBeLessThan(next.mock.invocationCallOrder[0]);
-  });
+      harness.setUser(nextUser);
 
-  it("resets once before forwarding a changed payroll setup capability", () => {
-    const previous = { ...currentUser, profile: { accessList: [] } };
-    let middleware!: (action: unknown) => unknown;
-    const next = vi.fn();
-    const dispatch = vi.fn((action: unknown) => middleware(action));
-    middleware = networkBillingLogoutResetMiddleware({ dispatch, getState: () => ({ auth: { user: previous } }) } as never)(next);
-
-    middleware(setUser({ ...previous, canOpenAgencyPayrollSetup: false } as never));
-
-    expect(dispatch.mock.calls.filter(([action]) => (action as { type?: string }).type === payrollScopeChanged.type)).toHaveLength(1);
-    expect(clearPayrollOnboardSessions).toHaveBeenCalledOnce();
-    expect(clearPayrollOnboardSessions.mock.invocationCallOrder[0]).toBeLessThan(next.mock.invocationCallOrder[0]);
+      expectOneResetBeforeOuterSetUserForwarding(harness);
+      vi.clearAllMocks();
+    }
   });
 });
