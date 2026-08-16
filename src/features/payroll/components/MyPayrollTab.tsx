@@ -125,7 +125,7 @@ export default function MyPayrollTab({ scope, active }: { scope: EmployeePayroll
       if (!isCurrentAction()) return;
       if (errorStatus(error) === 409) {
         try {
-          await subscription.refetch();
+          await subscription.refetch().unwrap();
         } catch {
           if (!isCurrentAction()) return;
           setActionError("Payroll setup could not be updated. Please try again.");
