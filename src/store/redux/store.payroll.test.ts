@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { setUser } from "@/utils/auth/store/authSlice";
 import { payrollScopeChanged } from "@/features/payroll/api/payrollCacheLifecycle";
+import { checkPayrollApi } from "@/features/payroll/api/checkPayrollApi";
 import { clearPayrollOnboardSessions } from "@/features/payroll/onboard/payrollOnboardSession";
+import { networkBillingApi } from "@/lib/api/network-billing";
 import { networkBillingLogoutResetMiddleware } from "./store";
 
 vi.mock("@/features/payroll/onboard/payrollOnboardSession", () => ({
@@ -26,6 +28,8 @@ const currentUser: PayrollScopeUser = {
   canOpenAgencyPayrollSetup: true,
 };
 const clearSessionsMock = vi.mocked(clearPayrollOnboardSessions);
+const networkBillingResetType = networkBillingApi.util.resetApiState().type;
+const checkPayrollResetType = checkPayrollApi.util.resetApiState().type;
 
 function createRecursiveMiddlewareHarness(previous: PayrollScopeUser) {
   let middleware!: (action: unknown) => unknown;
@@ -50,11 +54,14 @@ function expectOneResetBeforeOuterSetUserForwarding(harness: ReturnType<typeof c
   expect(outerSetUserForwardIndex).toBeGreaterThanOrEqual(0);
   const outerSetUserForwardOrder = harness.next.mock.invocationCallOrder[outerSetUserForwardIndex];
   expect(clearSessionsMock.mock.invocationCallOrder[0]).toBeLessThan(outerSetUserForwardOrder);
-  const resetDispatchIndexes = harness.dispatch.mock.calls
-    .map(([action], index) => ({ type: (action as { type?: string }).type, index }))
-    .filter(({ type }) => type === "networkBillingApi/resetApiState" || type === "checkPayrollApi/resetApiState")
-    .map(({ index }) => index);
-  expect(resetDispatchIndexes).toHaveLength(2);
+  const resetDispatchIndexes = [networkBillingResetType, checkPayrollResetType].map((resetType) => {
+    const matchingIndexes = harness.dispatch.mock.calls
+      .map(([action], index) => ({ type: (action as { type?: string }).type, index }))
+      .filter(({ type }) => type === resetType)
+      .map(({ index }) => index);
+    expect(matchingIndexes).toHaveLength(1);
+    return matchingIndexes[0];
+  });
   for (const resetDispatchIndex of resetDispatchIndexes) {
     expect(harness.dispatch.mock.invocationCallOrder[resetDispatchIndex]).toBeLessThan(outerSetUserForwardOrder);
   }
