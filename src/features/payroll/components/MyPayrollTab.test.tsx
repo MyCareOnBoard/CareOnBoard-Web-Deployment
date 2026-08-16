@@ -46,6 +46,8 @@ import { checkPayrollApi } from "../api/checkPayrollApi";
 import { employeePayrollApi } from "../api/employeePayrollEndpoints";
 
 const useEmployeePayrollSetupSubscription = employeePayrollApi.endpoints.getEmployeePayrollSetup.useQuerySubscription;
+type EmployeeSubscription = ReturnType<typeof useEmployeePayrollSetupSubscription>;
+type EmployeeRefetchResult = ReturnType<EmployeeSubscription["refetch"]>;
 
 const scope: EmployeePayrollScope = {
   audience: "employee",
@@ -229,7 +231,7 @@ describe("MyPayrollTab", () => {
   });
 
   it("contains a current-scope 409 refetch rejection in the retryable panel state", async () => {
-    const refetch = vi.fn(() => Promise.reject(new Error("refresh unavailable")));
+    const refetch = vi.fn(() => Promise.reject(new Error("refresh unavailable")) as unknown as EmployeeRefetchResult);
     vi.spyOn(employeePayrollApi.endpoints.getEmployeePayrollSetup, "useQuerySubscription").mockImplementation((arg, options) => ({
       ...useEmployeePayrollSetupSubscription(arg, options),
       refetch,
