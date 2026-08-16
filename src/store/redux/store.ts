@@ -97,7 +97,7 @@ export const networkBillingLogoutResetMiddleware: Middleware = ({ dispatch, getS
             previous?.agencyId !== nextUser?.agencyId ||
             previous?.userType !== nextUser?.userType ||
             previous?.payrollEmploymentId !== nextUser?.payrollEmploymentId ||
-            previous?.profile?.accessList?.includes("Payroll Management") !== nextUser?.profile?.accessList?.includes("Payroll Management") ||
+            (previous?.profile?.accessList?.includes("Payroll Management") === true) !== (nextUser?.profile?.accessList?.includes("Payroll Management") === true) ||
             previous?.canOpenAgencyPayrollSetup !== nextUser?.canOpenAgencyPayrollSetup
         ) {
             const key = (value: typeof previous) => value
