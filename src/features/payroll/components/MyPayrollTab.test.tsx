@@ -43,6 +43,9 @@ vi.mock("../onboard/CheckOnboardModal", () => {
 
 import MyPayrollTab from "./MyPayrollTab";
 import { checkPayrollApi } from "../api/checkPayrollApi";
+import { employeePayrollApi } from "../api/employeePayrollEndpoints";
+
+const useEmployeePayrollSetupSubscription = employeePayrollApi.endpoints.getEmployeePayrollSetup.useQuerySubscription;
 
 const scope: EmployeePayrollScope = {
   audience: "employee",
@@ -223,6 +226,24 @@ describe("MyPayrollTab", () => {
     await user.click(await screen.findByRole("button", { name: "Start payroll setup" }));
     await waitFor(() => expect(commandRequests()).toHaveLength(1));
     await waitFor(() => expect(getRequests()).toHaveLength(2));
+  });
+
+  it("contains a current-scope 409 refetch rejection in the retryable panel state", async () => {
+    const refetch = vi.fn(() => Promise.reject(new Error("refresh unavailable")));
+    vi.spyOn(employeePayrollApi.endpoints.getEmployeePayrollSetup, "useQuerySubscription").mockImplementation((arg, options) => ({
+      ...useEmployeePayrollSetupSubscription(arg, options),
+      refetch,
+    }));
+    testState.getResponses.push(readyResponse(projection()));
+    testState.commandResponse = { error: { status: 409, data: "stale" } };
+    const user = userEvent.setup();
+    renderPayroll();
+    await user.click(await screen.findByRole("button", { name: "Start payroll setup" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not be updated/i);
+    expect(screen.getByRole("button", { name: "Start payroll setup" })).toBeEnabled();
+    expect(commandRequests()).toHaveLength(1);
+    expect(refetch).toHaveBeenCalledOnce();
+    expect(getRequests()).toHaveLength(1);
   });
 
   it("does not refetch or escape when a 409 settles after unmount", async () => {
