@@ -156,16 +156,22 @@ describe("MyPayrollTab", () => {
 
   it.each(["queued", "waiting", "awaiting_provider"] as const)("polls %s exactly once every five seconds while focused", async (state) => {
     vi.useFakeTimers();
-    testState.getResponses.push(readyResponse(projection({ setup: { state, blockers: [], onboardingStatus: null, blockingStepCodes: [], remainingStepCodes: [] } })), readyResponse(projection({ setup: { state, blockers: [], onboardingStatus: null, blockingStepCodes: [], remainingStepCodes: [] } })));
+    testState.getResponses.push(
+      readyResponse(projection({ setup: { state, blockers: [], onboardingStatus: null, blockingStepCodes: [], remainingStepCodes: [] } })),
+      readyResponse(projection({ setup: { state, blockers: [], onboardingStatus: null, blockingStepCodes: [], remainingStepCodes: [] } })),
+      readyResponse(projection({ setup: { state, blockers: [], onboardingStatus: null, blockingStepCodes: [], remainingStepCodes: [] } })),
+    );
     const view = renderPayroll();
     await act(async () => { await vi.advanceTimersByTimeAsync(100); });
     expect(screen.getByRole("status", { name: /payroll setup is in progress/i })).toBeVisible();
     expect(getRequests()).toHaveLength(1);
     await act(async () => { await vi.advanceTimersByTimeAsync(5_000); });
     expect(getRequests()).toHaveLength(2);
+    await act(async () => { await vi.advanceTimersByTimeAsync(5_000); });
+    expect(getRequests()).toHaveLength(3);
     view.rerender(<Provider store={view.store}><MyPayrollTab scope={scope} active={false} /></Provider>);
     await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
-    expect(getRequests()).toHaveLength(2);
+    expect(getRequests()).toHaveLength(3);
     view.unmount();
   });
 
