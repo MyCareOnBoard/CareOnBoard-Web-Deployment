@@ -255,4 +255,75 @@ describe("EmployeePrimaryWorkplaceCard", () => {
     expect(screen.getByRole("radio", { name: "Avery Client" })).not.toBeChecked();
     expect(screen.getByRole("checkbox", { name: /ordinary primary work location/i })).not.toBeChecked();
   });
+
+  it("does not refetch or mutate after a deferred 409 settles on an unmounted card", async () => {
+    let settleCommand!: (response: unknown) => void;
+    testState.getResponses.push(response(projection()));
+    testState.commandResponse = new Promise((resolve) => { settleCommand = resolve; });
+    const user = userEvent.setup();
+    const view = renderCard();
+    await user.click(await screen.findByRole("radio", { name: "Avery Client" }));
+    await user.click(screen.getByRole("checkbox", { name: /ordinary primary work location/i }));
+    await user.click(screen.getByRole("button", { name: "Save primary work location" }));
+    await waitFor(() => expect(commandRequests()).toHaveLength(1));
+    view.unmount();
+
+    await act(async () => { settleCommand({ error: { status: 409, data: "stale" } }); });
+    expect(getRequests()).toHaveLength(1);
+  });
+
+  it("does not let a deferred 409 from an old scope clear or refetch the current scope", async () => {
+    let settleCommand!: (response: unknown) => void;
+    const oldScope = { ...scope, actorUid: "manager-old", agencyId: "agency-old", employmentId: "employee-old" };
+    const nextScope = { ...scope, actorUid: "manager-new", agencyId: "agency-new", employmentId: "employee-new" };
+    const store = makeStore();
+    testState.getResponses.push(response(projection({ employeeId: oldScope.employmentId })), response(projection({ employeeId: nextScope.employmentId })));
+    testState.commandResponse = new Promise((resolve) => { settleCommand = resolve; });
+    const user = userEvent.setup();
+    const view = renderCard({ payrollScope: oldScope, store });
+    await user.click(await screen.findByRole("radio", { name: "Avery Client" }));
+    await user.click(screen.getByRole("checkbox", { name: /ordinary primary work location/i }));
+    await user.click(screen.getByRole("button", { name: "Save primary work location" }));
+    await waitFor(() => expect(commandRequests()).toHaveLength(1));
+
+    view.rerender(<Provider store={store}><EmployeePrimaryWorkplaceCard scope={nextScope} /></Provider>);
+    await screen.findByRole("radiogroup", { name: "Choose a primary work location" });
+    expect(screen.getByRole("radio", { name: "Avery Client" })).toBeEnabled();
+    await user.click(screen.getByRole("radio", { name: "Avery Client" }));
+    await user.click(screen.getByRole("checkbox", { name: /ordinary primary work location/i }));
+    expect(screen.getByRole("radio", { name: "Avery Client" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /ordinary primary work location/i })).toBeChecked();
+    expect(getRequests()).toHaveLength(2);
+
+    await act(async () => { settleCommand({ error: { status: 409, data: "stale" } }); });
+    expect(getRequests()).toHaveLength(2);
+    expect(screen.getByRole("radio", { name: "Avery Client" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /ordinary primary work location/i })).toBeChecked();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("contains a current-scope 409 refetch rejection in a retryable error without a retry loop", async () => {
+    let resolveRefetch!: (response: unknown) => void;
+    const unhandled = vi.fn();
+    window.addEventListener("unhandledrejection", unhandled);
+    try {
+      testState.getResponses.push(response(projection()), new Promise((resolve) => { resolveRefetch = resolve; }));
+      testState.commandResponse = { error: { status: 409, data: "stale" } };
+      const user = userEvent.setup();
+      renderCard();
+      await user.click(await screen.findByRole("radio", { name: "Avery Client" }));
+      await user.click(screen.getByRole("checkbox", { name: /ordinary primary work location/i }));
+      await user.click(screen.getByRole("button", { name: "Save primary work location" }));
+      await waitFor(() => expect(getRequests()).toHaveLength(2));
+
+      await act(async () => { resolveRefetch({ error: { status: 500, data: "refresh failed" } }); });
+      expect(await screen.findByRole("alert")).toHaveTextContent(/could not be refreshed.*try again/i);
+      expect(screen.getByRole("radio", { name: "Avery Client" })).toBeEnabled();
+      expect(screen.getByRole("checkbox", { name: /ordinary primary work location/i })).toBeEnabled();
+      expect(getRequests()).toHaveLength(2);
+      expect(unhandled).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener("unhandledrejection", unhandled);
+    }
+  });
 });

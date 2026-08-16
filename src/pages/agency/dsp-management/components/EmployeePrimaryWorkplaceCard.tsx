@@ -9,6 +9,12 @@ function isConflict(error: unknown) {
 }
 
 export default function EmployeePrimaryWorkplaceCard({ scope }: { scope: ManagedEmployeePrimaryWorkplaceScope }) {
+  const scopeIdentity = JSON.stringify([scope.actorUid, scope.agencyId, scope.employmentId]);
+  const scopeTokenRef = useRef({ identity: scopeIdentity, version: 0 });
+  if (scopeTokenRef.current.identity !== scopeIdentity) {
+    scopeTokenRef.current = { identity: scopeIdentity, version: scopeTokenRef.current.version + 1 };
+  }
+  const scopeToken = `${scopeTokenRef.current.version}:${scopeTokenRef.current.identity}`;
   const queryArg = scope.employmentId ? scope : skipToken;
   const queryState = agencyPayrollApi.endpoints.getManagedEmployeePrimaryWorkplace.useQueryState(queryArg);
   const subscription = agencyPayrollApi.endpoints.getManagedEmployeePrimaryWorkplace.useQuerySubscription(queryArg);
@@ -16,8 +22,16 @@ export default function EmployeePrimaryWorkplaceCard({ scope }: { scope: Managed
   const [selectedClientAssignmentId, setSelectedClientAssignmentId] = useState<string | null>(null);
   const [ordinaryPrimaryWorkLocation, setOrdinaryPrimaryWorkLocation] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
-  const actionInFlight = useRef(false);
+  const mounted = useRef(true);
+  const actionToken = useRef<{ scopeToken: string } | null>(null);
   const projection = queryState.currentData;
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     setSelectedClientAssignmentId(null);
@@ -48,11 +62,19 @@ export default function EmployeePrimaryWorkplaceCard({ scope }: { scope: Managed
 
   if (primaryWorkplace.options.length <= 1) return null;
 
-  const submitting = actionInFlight.current;
+  const submitting = actionToken.current?.scopeToken === scopeToken;
   const canSubmit = selectedClientAssignmentId !== null && ordinaryPrimaryWorkLocation && !submitting;
   const savePrimaryWorkplace = async () => {
-    if (!canSubmit || !selectedClientAssignmentId || actionInFlight.current) return;
-    actionInFlight.current = true;
+    if (!canSubmit || !selectedClientAssignmentId || actionToken.current?.scopeToken === scopeToken) return;
+    const currentAction = { scopeToken };
+    actionToken.current = currentAction;
+    const isCurrentAction = () => {
+      const activeScope = scopeTokenRef.current;
+      return mounted.current
+        && actionToken.current === currentAction
+        && activeScope.identity === scopeIdentity
+        && `${activeScope.version}:${activeScope.identity}` === currentAction.scopeToken;
+    };
     setRequestError(null);
     try {
       await runCommand({
@@ -62,15 +84,22 @@ export default function EmployeePrimaryWorkplaceCard({ scope }: { scope: Managed
         idempotencyKey: crypto.randomUUID(),
       }).unwrap();
     } catch (error) {
+      if (!isCurrentAction()) return;
       if (isConflict(error)) {
         setSelectedClientAssignmentId(null);
         setOrdinaryPrimaryWorkLocation(false);
-        await subscription.refetch();
+        try {
+          await subscription.refetch().unwrap();
+        } catch {
+          if (isCurrentAction()) {
+            setRequestError("The primary work location could not be refreshed. Choose a location again and try again.");
+          }
+        }
       } else {
         setRequestError("The primary work location could not be saved. Please try again.");
       }
     } finally {
-      actionInFlight.current = false;
+      if (isCurrentAction()) actionToken.current = null;
     }
   };
 
