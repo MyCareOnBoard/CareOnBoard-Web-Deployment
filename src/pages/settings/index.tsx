@@ -1,7 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/utils/auth";
 import { UserType } from "@/utils/auth/types";
-import type { DspPaymentDetails } from "@/lib/api/paymentDetails";
 import {
   AccountSettingsTab,
   SettingsTabNav,
@@ -13,9 +12,9 @@ import {
 const NotificationPreferencesTab = lazy(
   () => import("@/pages/shared/settings/NotificationPreferencesTab"),
 );
-const PaymentTab = lazy(() => import("./components/PaymentTab"));
+const MyPayrollTab = lazy(() => import("@/features/payroll/components/MyPayrollTab"));
 
-type UserSettingsTabId = "account" | "notification" | "payroll";
+type UserSettingsTabId = "account" | "notification" | "myPayroll";
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -23,8 +22,6 @@ export default function SettingsPage() {
   const [visitedTabs, setVisitedTabs] = useState<Set<UserSettingsTabId>>(
     () => new Set(["account"]),
   );
-  const [payrollCache, setPayrollCache] = useState<DspPaymentDetails | null>(null);
-
   const isEmployee = user?.userType === UserType.EMPLOYEE;
 
   const tabs = useMemo(() => {
@@ -33,7 +30,7 @@ export default function SettingsPage() {
       { id: "notification", label: "Notifications" },
     ];
     if (user && isEmployee) {
-      items.push({ id: "payroll", label: "Payroll" });
+      items.push({ id: "myPayroll", label: "My Payroll" });
     }
     return items;
   }, [user, isEmployee]);
@@ -48,16 +45,12 @@ export default function SettingsPage() {
     setVisitedTabs((prev) => new Set(prev).add(tabId));
   }, []);
 
-  const handlePayrollCacheUpdate = useCallback((details: DspPaymentDetails) => {
-    setPayrollCache(details);
-  }, []);
-
   useEffect(() => {
-    if (!isEmployee && activeTab === "payroll") {
+    if (!isEmployee && activeTab === "myPayroll") {
       setActiveTab("account");
       setVisitedTabs((prev) => {
         const next = new Set(prev);
-        next.delete("payroll");
+        next.delete("myPayroll");
         return next;
       });
     }
@@ -90,10 +83,18 @@ export default function SettingsPage() {
           </TabPanel>
         )}
 
-        {user && isEmployee && visitedTabs.has("payroll") && (
-          <TabPanel tabId="payroll" activeTab={activeTab}>
+        {user && isEmployee && activeTab === "myPayroll" && visitedTabs.has("myPayroll") && (
+          <TabPanel tabId="myPayroll" activeTab={activeTab}>
             <Suspense fallback={<SettingsTabSkeleton variant="form" cardCount={2} />}>
-              <PaymentTab cachedDetails={payrollCache} onCacheUpdate={handlePayrollCacheUpdate} />
+              <MyPayrollTab
+                active={activeTab === "myPayroll"}
+                scope={{
+                  audience: "employee",
+                  actorUid: user.uid,
+                  agencyId: user.agencyId ?? "",
+                  employmentId: user.payrollEmploymentId ?? "",
+                }}
+              />
             </Suspense>
           </TabPanel>
         )}

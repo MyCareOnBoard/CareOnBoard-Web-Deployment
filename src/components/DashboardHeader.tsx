@@ -20,6 +20,7 @@ import { ChevronDown, ChevronUp, User, LogOut, Lock, HelpCircle, Menu } from "lu
 import { cn } from "@/lib/utils";
 import { toggleDrawer } from "@/hooks/useSidebarDrawer";
 import { UserType } from "@/utils/auth/types/user.types";
+import { settingsRouteForUserType } from "./dashboardHeaderRoutes";
 
 
 function HeaderActionButton({ icon: Icon, ariaLabel, onClick }: { icon: ComponentType<{ className?: string }>; ariaLabel: string; onClick?: () => void }) {
@@ -153,13 +154,7 @@ export default function DashboardHeader(
   }
 
   const getSettingsRoute = () => {
-    if (userType === UserType.SUPER_ADMIN) {
-      return Routes.superAdmin.systemSettings;
-    }
-    if (userType === UserType.AGENCY) {
-      return Routes.agency.agencySettings;
-    }
-    return makeCommonRoute(Routes.common.settings);
+    return settingsRouteForUserType(userType as UserType);
   }
 
   const getCareConnectDashboardUrl = () => {

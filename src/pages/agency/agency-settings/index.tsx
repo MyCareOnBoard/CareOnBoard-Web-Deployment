@@ -11,6 +11,7 @@ const AgencyInfoTab = lazy(() => import("./components/AgencyInfoTab"));
 const NotificationsTab = lazy(() => import("./components/NotificationTab"));
 const UserLevelsTab = lazy(() => import("./components/UserLevelsTab"));
 const AgencyPayrollSetupTab = lazy(() => import("./components/AgencyPayrollSetupTab"));
+const MyPayrollTab = lazy(() => import("@/features/payroll/components/MyPayrollTab"));
 
 
 
@@ -25,6 +26,7 @@ export default function AgencySettingsPage() {
 
   const [visitedTabs, setVisitedTabs] = useState<Set<SettingsTabId>>(() => new Set(["account"]));
   const canOpenPayrollSetup = user?.canOpenAgencyPayrollSetup === true;
+  const isAgencyStaff = user?.userType === UserType.AGENCY_STAFF;
 
 
 
@@ -47,11 +49,41 @@ export default function AgencySettingsPage() {
       next.delete("tab");
       setSearchParams(Object.fromEntries(next.entries()), { replace: true });
     };
+    if (requested === "myPayroll" && !isAgencyStaff) { setActiveTab("account"); setVisitedTabs((prev) => { const next = new Set(prev); next.delete("myPayroll"); return next; }); removePayrollQuery(); return; }
     if (requested === "payrollSetup" && (!canOpenPayrollSetup || !user?.uid || !user.agencyId)) { setActiveTab("account"); setVisitedTabs((prev) => { const next = new Set(prev); next.delete("payrollSetup"); return next; }); removePayrollQuery(); return; }
-    if (requested && requested !== "payrollSetup") { setActiveTab("account"); removePayrollQuery(); return; }
-    if ((!canOpenPayrollSetup || !user?.uid || !user.agencyId) && activeTab === "payrollSetup") { setActiveTab("account"); setVisitedTabs((prev) => { const next = new Set(prev); next.delete("payrollSetup"); return next; }); removePayrollQuery(); return; }
+    if (requested && requested !== "myPayroll" && requested !== "payrollSetup") { setActiveTab("account"); removePayrollQuery(); return; }
+    if (requested === "myPayroll" && isAgencyStaff) { setActiveTab("myPayroll"); setVisitedTabs((prev) => new Set(prev).add("myPayroll")); }
     if (requested === "payrollSetup" && canOpenPayrollSetup) { setActiveTab("payrollSetup"); setVisitedTabs((prev) => new Set(prev).add("payrollSetup")); }
-  }, [searchParams, canOpenPayrollSetup, activeTab, setSearchParams, user?.uid, user?.agencyId]);
+  }, [searchParams, canOpenPayrollSetup, isAgencyStaff, setSearchParams, user?.uid, user?.agencyId]);
+
+  useEffect(() => {
+    const requested = searchParams.get("tab");
+    const removeActivePayrollQuery = () => {
+      if (requested !== activeTab) return;
+      const next = new URLSearchParams(searchParams);
+      next.delete("tab");
+      setSearchParams(Object.fromEntries(next.entries()), { replace: true });
+    };
+    if (!isAgencyStaff && activeTab === "myPayroll") {
+      setActiveTab("account");
+      setVisitedTabs((prev) => {
+        const next = new Set(prev);
+        next.delete("myPayroll");
+        return next;
+      });
+      removeActivePayrollQuery();
+      return;
+    }
+    if ((!canOpenPayrollSetup || !user?.uid || !user.agencyId) && activeTab === "payrollSetup") {
+      setActiveTab("account");
+      setVisitedTabs((prev) => {
+        const next = new Set(prev);
+        next.delete("payrollSetup");
+        return next;
+      });
+      removeActivePayrollQuery();
+    }
+  }, [searchParams, canOpenPayrollSetup, isAgencyStaff, activeTab, setSearchParams, user?.uid, user?.agencyId]);
 
 
 
@@ -82,11 +114,12 @@ export default function AgencySettingsPage() {
       items.push({ id: "userLevels", label: "Staff Management" });
 
     }
+    if (isAgencyStaff) items.push({ id: "myPayroll", label: "My Payroll" });
     if (canOpenPayrollSetup) items.push({ id: "payrollSetup", label: "Payroll Setup" });
 
     return items;
 
-  }, [showTeamTab, canOpenPayrollSetup]);
+  }, [showTeamTab, isAgencyStaff, canOpenPayrollSetup]);
 
 
 
@@ -95,7 +128,7 @@ export default function AgencySettingsPage() {
     setActiveTab(tabId);
 
     setVisitedTabs((prev) => new Set(prev).add(tabId));
-    if (tabId === "payrollSetup") setSearchParams({ tab: "payrollSetup" }); else setSearchParams({});
+    if (tabId === "myPayroll" || tabId === "payrollSetup") setSearchParams({ tab: tabId }); else setSearchParams({});
 
   }, [setSearchParams]);
 
@@ -172,6 +205,28 @@ export default function AgencySettingsPage() {
             <Suspense fallback={<SettingsTabSkeleton variant="form" cardCount={2} />}>
 
               <UserLevelsTab />
+
+            </Suspense>
+
+          </TabPanel>
+
+        )}
+
+        {isAgencyStaff && activeTab === "myPayroll" && visitedTabs.has("myPayroll") && (
+
+          <TabPanel tabId="myPayroll" activeTab={activeTab}>
+
+            <Suspense fallback={<SettingsTabSkeleton variant="form" cardCount={2} />}>
+
+              <MyPayrollTab
+                active={activeTab === "myPayroll"}
+                scope={{
+                  audience: "employee",
+                  actorUid: user.uid,
+                  agencyId: user.agencyId ?? "",
+                  employmentId: user.payrollEmploymentId ?? "",
+                }}
+              />
 
             </Suspense>
 
