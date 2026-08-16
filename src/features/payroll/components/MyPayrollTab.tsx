@@ -26,6 +26,7 @@ export default function MyPayrollTab({ scope, active }: { scope: EmployeePayroll
   const [focused, setFocused] = useState(documentIsFocused);
   const [pendingAction, setPendingAction] = useState<EmployeePayrollAction | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
   const actionInFlight = useRef(false);
   const mounted = useRef(true);
   const coalescedRefetch = useRef({ employmentId: "", inFlight: false, trailing: false });
@@ -53,7 +54,6 @@ export default function MyPayrollTab({ scope, active }: { scope: EmployeePayroll
       window.removeEventListener("focus", updateFocus);
       window.removeEventListener("blur", updateFocus);
       document.removeEventListener("visibilitychange", updateFocus);
-      dispatch(employeePayrollApi.internalActions.onFocusLost());
     };
   }, [dispatch]);
 
@@ -69,6 +69,7 @@ export default function MyPayrollTab({ scope, active }: { scope: EmployeePayroll
     actionInFlight.current = false;
     setPendingAction(null);
     setActionError(null);
+    setOnboardingOpen(false);
     coalescedRefetch.current = { employmentId: scope.employmentId, inFlight: false, trailing: false };
   }, [scope.employmentId]);
 
@@ -155,7 +156,8 @@ export default function MyPayrollTab({ scope, active }: { scope: EmployeePayroll
     <div className="mt-4 flex flex-wrap items-center gap-3">
       {setup.state === "not_started" && capabilities.canStartProvisioning && <button type="button" disabled={busy} onClick={() => void runAction("start_provisioning")} className="rounded-md bg-[#006f73] px-4 py-2 text-sm font-medium text-white hover:bg-[#00595c] disabled:opacity-60">{pendingAction === "start_provisioning" ? "Starting payroll setup..." : "Start payroll setup"}</button>}
       {needsAttention && capabilities.canRetryEmployeeSync && <button type="button" disabled={busy} onClick={() => void runAction("retry_employee_sync")} className="text-sm font-semibold text-[#006f73] underline disabled:opacity-60">{pendingAction === "retry_employee_sync" ? "Retrying payroll setup..." : "Retry payroll setup"}</button>}
-      {canContinue && <Suspense fallback={<p role="status" className="text-sm text-[#5d626b]">Loading secure setup...</p>}><CheckOnboardModal requestSession={requestOnboardSession} onRefetch={refetchCoalesced} /></Suspense>}
+      {canContinue && !onboardingOpen && <button type="button" onClick={() => setOnboardingOpen(true)} className="rounded-md bg-[#006f73] px-4 py-2 text-sm font-medium text-white hover:bg-[#00595c]">Continue secure setup</button>}
+      {canContinue && onboardingOpen && <Suspense fallback={<p role="status" className="text-sm text-[#5d626b]">Loading secure setup...</p>}><CheckOnboardModal requestSession={requestOnboardSession} onRefetch={refetchCoalesced} /></Suspense>}
     </div>
   </section>;
 }

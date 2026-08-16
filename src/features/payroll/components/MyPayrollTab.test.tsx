@@ -3,7 +3,6 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ReactNode } from "react";
 import type { EmployeePayrollSetupProjection, EmployeePayrollScope } from "../model/types";
 
 const testState = vi.hoisted(() => ({
@@ -12,6 +11,9 @@ const testState = vi.hoisted(() => ({
   commandResponse: { data: { operationId: "operation-1", state: "accepted", resourceType: "employee", pollAfterMs: null } } as unknown,
   onboardResponse: { data: { url: "https://onboard.example/session", expiresAt: "2099-01-01T00:00:00.000Z" } } as unknown,
   modalProps: null as null | { requestSession: () => Promise<{ link: string; expiresAt?: string }>; onRefetch: () => void },
+  modalModuleLoads: 0,
+  modalRenders: 0,
+  documentFocused: true,
 }));
 
 vi.mock("@/lib/baseQuery", () => ({
@@ -26,12 +28,16 @@ vi.mock("@/lib/baseQuery", () => ({
   },
 }));
 
-vi.mock("../onboard/CheckOnboardModal", () => ({
-  CheckOnboardModal: (props: { requestSession: () => Promise<{ link: string; expiresAt?: string }>; onRefetch: () => void }) => {
-    testState.modalProps = props;
-    return <button type="button" onClick={() => void props.requestSession()}>Continue secure setup</button>;
-  },
-}));
+vi.mock("../onboard/CheckOnboardModal", () => {
+  testState.modalModuleLoads += 1;
+  return {
+    CheckOnboardModal: (props: { requestSession: () => Promise<{ link: string; expiresAt?: string }>; onRefetch: () => void }) => {
+      testState.modalProps = props;
+      testState.modalRenders += 1;
+      return <button type="button" onClick={() => void props.requestSession()}>Continue secure setup</button>;
+    },
+  };
+});
 
 import MyPayrollTab from "./MyPayrollTab";
 import { checkPayrollApi } from "../api/checkPayrollApi";
@@ -90,8 +96,10 @@ describe("MyPayrollTab", () => {
     testState.commandResponse = { data: { operationId: "operation-1", state: "accepted", resourceType: "employee", pollAfterMs: null } };
     testState.onboardResponse = { data: { url: "https://onboard.example/session", expiresAt: "2099-01-01T00:00:00.000Z" } };
     testState.modalProps = null;
+    testState.modalRenders = 0;
+    testState.documentFocused = true;
     vi.stubGlobal("crypto", { randomUUID: vi.fn(() => "payroll-action-uuid") });
-    vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    vi.spyOn(document, "hasFocus").mockImplementation(() => testState.documentFocused);
   });
 
   afterEach(() => {
@@ -146,9 +154,9 @@ describe("MyPayrollTab", () => {
     expect(screen.queryByRole("button", { name: "Start payroll setup" })).not.toBeInTheDocument();
   });
 
-  it("shows progress for queue states and polls exactly once every five seconds while focused", async () => {
+  it.each(["queued", "waiting", "awaiting_provider"] as const)("polls %s exactly once every five seconds while focused", async (state) => {
     vi.useFakeTimers();
-    testState.getResponses.push(readyResponse(projection({ setup: { state: "queued", blockers: [], onboardingStatus: null, blockingStepCodes: [], remainingStepCodes: [] } })), readyResponse(projection({ setup: { state: "queued", blockers: [], onboardingStatus: null, blockingStepCodes: [], remainingStepCodes: [] } })));
+    testState.getResponses.push(readyResponse(projection({ setup: { state, blockers: [], onboardingStatus: null, blockingStepCodes: [], remainingStepCodes: [] } })), readyResponse(projection({ setup: { state, blockers: [], onboardingStatus: null, blockingStepCodes: [], remainingStepCodes: [] } })));
     const view = renderPayroll();
     await act(async () => { await vi.advanceTimersByTimeAsync(100); });
     expect(screen.getByRole("status", { name: /payroll setup is in progress/i })).toBeVisible();
@@ -159,6 +167,31 @@ describe("MyPayrollTab", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
     expect(getRequests()).toHaveLength(2);
     view.unmount();
+  });
+
+  it.each(["inactive tab", "window blur", "hidden document", "unmount"] as const)("stops polling without a trailing request on %s", async (transition) => {
+    vi.useFakeTimers();
+    testState.getResponses.push(readyResponse(projection({ setup: { state: "queued", blockers: [], onboardingStatus: null, blockingStepCodes: [], remainingStepCodes: [] } })), readyResponse(projection({ setup: { state: "queued", blockers: [], onboardingStatus: null, blockingStepCodes: [], remainingStepCodes: [] } })));
+    const view = renderPayroll();
+    await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+    expect(getRequests()).toHaveLength(1);
+
+    if (transition === "inactive tab") {
+      view.rerender(<Provider store={view.store}><MyPayrollTab scope={scope} active={false} /></Provider>);
+    } else if (transition === "window blur") {
+      testState.documentFocused = false;
+      await act(async () => { window.dispatchEvent(new Event("blur")); });
+    } else if (transition === "hidden document") {
+      Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+      await act(async () => { document.dispatchEvent(new Event("visibilitychange")); });
+    } else {
+      view.unmount();
+    }
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+    expect(getRequests()).toHaveLength(1);
+    if (transition === "hidden document") Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+    if (transition !== "unmount") view.unmount();
   });
 
   it("sends one command with one generated key, relies on invalidation refresh, and blocks double click", async () => {
@@ -183,7 +216,7 @@ describe("MyPayrollTab", () => {
     await waitFor(() => expect(getRequests()).toHaveLength(2));
   });
 
-  it("defers onboarding session requests until Continue and coalesces Onboard event bursts", async () => {
+  it("defers the Onboard module and session until the user continues, then coalesces event bursts", async () => {
     let resolveFirst!: (value: unknown) => void;
     let resolveSecond!: (value: unknown) => void;
     testState.getResponses.push(
@@ -194,8 +227,14 @@ describe("MyPayrollTab", () => {
     const user = userEvent.setup();
     renderPayroll();
     expect(await screen.findByRole("button", { name: "Continue secure setup" })).toBeVisible();
+    expect(testState.modalModuleLoads).toBe(0);
+    expect(testState.modalRenders).toBe(0);
     expect(sessionRequests()).toHaveLength(0);
     await user.click(screen.getByRole("button", { name: "Continue secure setup" }));
+    await waitFor(() => expect(testState.modalModuleLoads).toBe(1));
+    expect(testState.modalRenders).toBe(1);
+    expect(sessionRequests()).toHaveLength(0);
+    await user.click(await screen.findByRole("button", { name: "Continue secure setup" }));
     expect(sessionRequests()).toHaveLength(1);
     expect(testState.modalProps).not.toBeNull();
     act(() => {
@@ -218,6 +257,8 @@ describe("MyPayrollTab", () => {
     );
     const view = renderPayroll();
     await screen.findByRole("button", { name: "Continue secure setup" });
+    await userEvent.setup().click(screen.getByRole("button", { name: "Continue secure setup" }));
+    await screen.findByRole("button", { name: "Continue secure setup" });
     act(() => {
       testState.modalProps?.onRefetch();
       testState.modalProps?.onRefetch();
@@ -226,5 +267,45 @@ describe("MyPayrollTab", () => {
     view.unmount();
     await act(async () => { resolveRefetch(readyResponse(projection())); });
     expect(getRequests()).toHaveLength(2);
+  });
+
+  it("keeps global focus state unchanged when a focused tab unmounts", async () => {
+    testState.getResponses.push(readyResponse(projection({ setup: { state: "queued", blockers: [], onboardingStatus: null, blockingStepCodes: [], remainingStepCodes: [] } })));
+    const view = renderPayroll();
+    await screen.findByRole("status", { name: /payroll setup is in progress/i });
+    expect(view.store.getState()[checkPayrollApi.reducerPath].config.focused).toBe(true);
+    view.unmount();
+    expect(view.store.getState()[checkPayrollApi.reducerPath].config.focused).toBe(true);
+  });
+
+  it("renders needs-attention and completed states without unauthorized actions", async () => {
+    testState.getResponses.push(readyResponse(projection({
+      setup: { state: "needs_attention", blockers: ["unknown_code"], onboardingStatus: null, blockingStepCodes: [], remainingStepCodes: [] },
+      capabilities: { canStartProvisioning: false, canRetryEmployeeSync: false, createEmployeeOnboardSession: false },
+    })));
+    const first = renderPayroll();
+    expect(await screen.findByText(/needs attention from your agency/i)).toBeVisible();
+    expect(screen.queryByRole("button", { name: /retry payroll setup/i })).not.toBeInTheDocument();
+    first.unmount();
+
+    testState.getResponses.push(readyResponse(projection({
+      setup: { state: "ready", blockers: [], onboardingStatus: "completed", blockingStepCodes: [], remainingStepCodes: [] },
+      capabilities: { canStartProvisioning: false, canRetryEmployeeSync: false, createEmployeeOnboardSession: false },
+    })));
+    renderPayroll();
+    expect(await screen.findByText(/payroll setup is complete/i)).toBeVisible();
+    expect(screen.queryByRole("button", { name: /start payroll setup|retry payroll setup|continue secure setup/i })).not.toBeInTheDocument();
+  });
+
+  it("withholds Continue when the server denies secure onboarding", async () => {
+    testState.getResponses.push(readyResponse(projection({
+      setup: { state: "ready", blockers: [], onboardingStatus: "blocking", blockingStepCodes: [], remainingStepCodes: [] },
+      capabilities: { canStartProvisioning: false, canRetryEmployeeSync: false, createEmployeeOnboardSession: false },
+    })));
+    renderPayroll();
+    await waitFor(() => expect(getRequests()).toHaveLength(1));
+    expect(screen.queryByRole("button", { name: "Continue secure setup" })).not.toBeInTheDocument();
+    expect(testState.modalRenders).toBe(0);
+    expect(sessionRequests()).toHaveLength(0);
   });
 });
