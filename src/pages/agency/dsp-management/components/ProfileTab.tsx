@@ -1,8 +1,12 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { DSP } from "../types";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog, ConfirmDialogContent } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { canManageEmployeePayroll } from "@/lib/agency/agency-billing-permissions";
+import { useAuth } from "@/utils/auth";
+
+const EmployeePrimaryWorkplaceCard = lazy(() => import("./EmployeePrimaryWorkplaceCard"));
 
 interface ProfileTabProps {
   dsp: DSP;
@@ -12,6 +16,7 @@ interface ProfileTabProps {
 
 export function ProfileTab({ dsp, onDeactivate, onActivate }: ProfileTabProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [showStatusDialog, setShowStatusDialog] = useState(false);
   const [pendingAction, setPendingAction] = useState<"deactivate" | "activate" | null>(null);
   const [isStatusLoading, setIsStatusLoading] = useState(false);
@@ -62,6 +67,8 @@ export function ProfileTab({ dsp, onDeactivate, onActivate }: ProfileTabProps) {
   };
 
   const isDeactivating = pendingAction === "deactivate";
+  const canManagePrimaryWorkplace = canManageEmployeePayroll(user?.userType, user?.profile?.accessList)
+    && Boolean(user?.uid && user.agencyId && dsp.id);
 
   return (<>
     <div className="bg-[#edf1f2] p-6 rounded-lg space-y-6">
@@ -159,6 +166,8 @@ export function ProfileTab({ dsp, onDeactivate, onActivate }: ProfileTabProps) {
           </div>
         </div>
       </div>
+
+      {canManagePrimaryWorkplace && <Suspense fallback={<section aria-label="Loading primary work location" aria-busy="true" role="status" className="h-32 animate-pulse rounded-lg bg-[#edf1f2]" />}><EmployeePrimaryWorkplaceCard scope={{ audience: "agency", actorUid: user!.uid, agencyId: user!.agencyId!, employmentId: dsp.id }} /></Suspense>}
 
     </div>
       <div className="flex items-center gap-4 ">

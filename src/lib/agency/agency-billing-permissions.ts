@@ -35,3 +35,12 @@ export function canAccessBillingChild(
     (scope) => AGENCY_BILLING_SCOPE_IMPLICATIONS[scope] === required && accessList.includes(scope),
   );
 }
+
+export function canManageEmployeePayroll(
+  userType: UserType | undefined,
+  accessList: readonly string[] = [],
+): boolean {
+  return userType === UserType.AGENCY || (
+    userType === UserType.AGENCY_STAFF && accessList.includes("Payroll Management")
+  );
+}

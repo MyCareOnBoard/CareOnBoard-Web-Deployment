@@ -3,6 +3,7 @@ import { UserType } from "@/utils/auth/types/user.types";
 import {
   AGENCY_BILLING_SCOPES,
   canAccessBillingChild,
+  canManageEmployeePayroll,
 } from "./agency-billing-permissions";
 
 describe("agency billing permissions", () => {
@@ -27,5 +28,13 @@ describe("agency billing permissions", () => {
     expect(canAccessBillingChild(UserType.AGENCY_STAFF, ["Expenses Management"], "Expenses View")).toBe(true);
     expect(canAccessBillingChild(UserType.AGENCY_STAFF, ["Timesheets Approval"], "Timesheets View")).toBe(true);
     expect(canAccessBillingChild(UserType.AGENCY_STAFF, ["Payroll Management"], "Claims View")).toBe(false);
+  });
+
+  it("limits managed employee payroll to owners and exact Payroll Management staff", () => {
+    expect(canManageEmployeePayroll(UserType.AGENCY, [])).toBe(true);
+    expect(canManageEmployeePayroll(UserType.AGENCY_STAFF, ["Payroll Management"])).toBe(true);
+    expect(canManageEmployeePayroll(UserType.AGENCY_STAFF, ["Payroll View"])).toBe(false);
+    expect(canManageEmployeePayroll(UserType.AGENCY_STAFF, ["Signer"])).toBe(false);
+    expect(canManageEmployeePayroll(UserType.EMPLOYEE, ["Payroll Management"])).toBe(false);
   });
 });
