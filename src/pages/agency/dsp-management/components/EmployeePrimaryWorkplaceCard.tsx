@@ -20,7 +20,6 @@ export default function EmployeePrimaryWorkplaceCard({ scope }: { scope: Managed
   const projection = queryState.currentData;
 
   useEffect(() => {
-    actionInFlight.current = false;
     setSelectedClientAssignmentId(null);
     setOrdinaryPrimaryWorkLocation(false);
     setRequestError(null);

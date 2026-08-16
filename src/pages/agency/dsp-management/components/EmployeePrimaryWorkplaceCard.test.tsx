@@ -1,5 +1,5 @@
 import { configureStore } from "@reduxjs/toolkit";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -11,6 +11,7 @@ const testState = vi.hoisted(() => ({
   getResponses: [] as Array<Promise<unknown> | unknown>,
   commandResponse: { data: { operationId: "operation-1", state: "accepted", resourceType: "employee", pollAfterMs: null } } as unknown,
   user: null as any,
+  lazyModuleLoads: 0,
 }));
 
 vi.mock("@/lib/baseQuery", () => ({
@@ -28,6 +29,7 @@ vi.mock("@/utils/auth", () => ({
 import EmployeePrimaryWorkplaceCard from "./EmployeePrimaryWorkplaceCard";
 import { ProfileTab } from "./ProfileTab";
 import { checkPayrollApi } from "@/features/payroll/api/checkPayrollApi";
+import { agencyPayrollApi } from "@/features/payroll/api/agencyPayrollEndpoints";
 
 const scope: ManagedEmployeePrimaryWorkplaceScope = {
   audience: "agency",
@@ -123,6 +125,30 @@ describe("EmployeePrimaryWorkplaceCard", () => {
     expect(getRequests()[0].url).not.toContain(dsp.userId);
   });
 
+  it("does not load the lazy card module for unauthorized staff, but loads it once for a payroll manager", async () => {
+    vi.resetModules();
+    testState.lazyModuleLoads = 0;
+    vi.doMock("./EmployeePrimaryWorkplaceCard", () => {
+      testState.lazyModuleLoads += 1;
+      return { default: () => null };
+    });
+    const { ProfileTab: IsolatedProfileTab } = await import("./ProfileTab");
+
+    testState.user = { uid: "manager-1", agencyId: "agency-1", userType: UserType.AGENCY_STAFF, profile: { accessList: ["Payroll View"] } };
+    const unauthorized = render(<Provider store={makeStore()}><IsolatedProfileTab dsp={dsp} onDeactivate={() => undefined} onActivate={() => undefined} /></Provider>);
+    expect(await screen.findByText("Date of Birth")).toBeVisible();
+    expect(testState.lazyModuleLoads).toBe(0);
+    expect(getRequests()).toHaveLength(0);
+    unauthorized.unmount();
+
+    testState.user = { uid: "manager-1", agencyId: "agency-1", userType: UserType.AGENCY_STAFF, profile: { accessList: ["Payroll Management"] } };
+    render(<Provider store={makeStore()}><IsolatedProfileTab dsp={dsp} onDeactivate={() => undefined} onActivate={() => undefined} /></Provider>);
+    await waitFor(() => expect(testState.lazyModuleLoads).toBe(1));
+
+    vi.doUnmock("./EmployeePrimaryWorkplaceCard");
+    vi.resetModules();
+  });
+
   it.each([
     { selectedClientAssignmentId: null, options: [] },
     { selectedClientAssignmentId: null, options: [{ clientAssignmentId: "assignment-1", clientLabel: "Avery Client" }] },
@@ -172,6 +198,45 @@ describe("EmployeePrimaryWorkplaceCard", () => {
     });
     expect(await screen.findByText("Primary work location: Avery Client")).toBeVisible();
     expect(getRequests()).toHaveLength(2);
+  });
+
+  it("keeps a pending command locked across a projection revision and resets the form for the new revision", async () => {
+    let settleCommand!: (response: unknown) => void;
+    const store = makeStore();
+    testState.getResponses.push(
+      response(projection()),
+      response(projection({
+        projectionRevision: 4,
+        primaryWorkplace: {
+          selectedClientAssignmentId: "assignment-1",
+          options: [{ clientAssignmentId: "assignment-1", clientLabel: "Avery Client" }, { clientAssignmentId: "assignment-2", clientLabel: "Blake Client" }],
+        },
+      })),
+    );
+    testState.commandResponse = new Promise((resolve) => { settleCommand = resolve; });
+    const user = userEvent.setup();
+    renderCard({ store });
+    await user.click(await screen.findByRole("radio", { name: "Avery Client" }));
+    await user.click(screen.getByRole("checkbox", { name: /ordinary primary work location/i }));
+    await user.click(screen.getByRole("button", { name: "Save primary work location" }));
+    await waitFor(() => expect(commandRequests()).toHaveLength(1));
+
+    act(() => {
+      store.dispatch(agencyPayrollApi.util.updateQueryData("getManagedEmployeePrimaryWorkplace", scope, (draft) => {
+        draft.projectionRevision = 4;
+      }));
+    });
+    await waitFor(() => expect(screen.getByRole("radio", { name: "Avery Client" })).not.toBeChecked());
+    expect(screen.getByRole("checkbox", { name: /ordinary primary work location/i })).not.toBeChecked();
+    await user.click(screen.getByRole("radio", { name: "Avery Client" }));
+    await user.click(screen.getByRole("checkbox", { name: /ordinary primary work location/i }));
+    const submit = screen.getByRole("button", { name: /save|saving primary work location/i });
+    expect(submit).toBeDisabled();
+    await user.click(submit);
+    expect(commandRequests()).toHaveLength(1);
+
+    await act(async () => { settleCommand({ data: { operationId: "operation-1", state: "accepted", resourceType: "employee", pollAfterMs: null } }); });
+    expect(await screen.findByText("Primary work location: Avery Client")).toBeVisible();
   });
 
   it("clears the form and explicitly refetches the same employee exactly once on a 409", async () => {
