@@ -230,6 +230,9 @@ describe("EmployeePrimaryWorkplaceCard", () => {
     expect(screen.getByRole("checkbox", { name: /ordinary primary work location/i })).not.toBeChecked();
     await user.click(screen.getByRole("radio", { name: "Avery Client" }));
     await user.click(screen.getByRole("checkbox", { name: /ordinary primary work location/i }));
+    expect(screen.getByRole("radio", { name: "Avery Client" })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: "Blake Client" })).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: /ordinary primary work location/i })).toBeDisabled();
     const submit = screen.getByRole("button", { name: /save|saving primary work location/i });
     expect(submit).toBeDisabled();
     await user.click(submit);
