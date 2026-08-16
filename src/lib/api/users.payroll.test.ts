@@ -8,4 +8,11 @@ describe("getUser payroll bootstrap", () => {
     vi.mocked(axiosClient.get).mockResolvedValue({ data: { success: true, user: { uid: "u", email: "x@y.z", fullName: "X", userType: "agency", createdAt: {}, updatedAt: {}, canOpenAgencyPayrollSetup: true } } } as any);
     await expect(getUser()).resolves.toMatchObject({ canOpenAgencyPayrollSetup: true });
   });
+  it("copies only a nonempty server payroll employment identity", async () => {
+    vi.mocked(axiosClient.get).mockResolvedValue({ data: { success: true, user: { uid: "u", email: "x@y.z", fullName: "X", userType: "employee", createdAt: {}, updatedAt: {}, payrollEmploymentId: "employment-1" } } } as any);
+    await expect(getUser()).resolves.toMatchObject({ payrollEmploymentId: "employment-1" });
+
+    vi.mocked(axiosClient.get).mockResolvedValue({ data: { success: true, user: { uid: "u", email: "x@y.z", fullName: "X", userType: "employee", createdAt: {}, updatedAt: {}, payrollEmploymentId: "" } } } as any);
+    await expect(getUser()).resolves.not.toHaveProperty("payrollEmploymentId");
+  });
 });

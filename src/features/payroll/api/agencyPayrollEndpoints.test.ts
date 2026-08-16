@@ -16,4 +16,8 @@ describe("agency payroll wire contracts", () => {
     expect(first.data).toEqual({ command: "designate_signer", expectedProjectionRevision: 7, designatedSignerUserUid: "u", authorityAttested: true });
     expect(JSON.stringify(first)).not.toContain('"agencyId"');
   });
+  it("does not add employee primary-workplace commands to company requests", () => {
+    const request = agencyPayrollCommandRequest({ audience: "agency", actorUid: "u", agencyId: "a", command: "retry_company_sync", projectionRevision: 3 });
+    expect(request.data).toEqual({ command: "retry_company_sync", expectedProjectionRevision: 3 });
+  });
 });

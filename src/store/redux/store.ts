@@ -91,13 +91,18 @@ export const networkBillingLogoutResetMiddleware: Middleware = ({ dispatch, getS
     }
     if ((action as { type?: unknown }).type === setUser.type) {
         const previous = (getState() as RootState).auth?.user;
-        const nextUser = (action as { payload?: { uid?: string; agencyId?: string; canOpenAgencyPayrollSetup?: boolean } | null }).payload;
+        const nextUser = (action as { payload?: { uid?: string; agencyId?: string; userType?: string; payrollEmploymentId?: string; profile?: { accessList?: string[] }; canOpenAgencyPayrollSetup?: boolean } | null }).payload;
         if (
             previous?.uid !== nextUser?.uid ||
             previous?.agencyId !== nextUser?.agencyId ||
+            previous?.userType !== nextUser?.userType ||
+            previous?.payrollEmploymentId !== nextUser?.payrollEmploymentId ||
+            previous?.profile?.accessList?.includes("Payroll Management") !== nextUser?.profile?.accessList?.includes("Payroll Management") ||
             previous?.canOpenAgencyPayrollSetup !== nextUser?.canOpenAgencyPayrollSetup
         ) {
-            const key = (value: typeof previous) => value ? `${value.uid ?? ""}:${value.agencyId ?? ""}:${value.canOpenAgencyPayrollSetup === true}` : null;
+            const key = (value: typeof previous) => value
+                ? `${value.uid ?? ""}:${value.agencyId ?? ""}:${value.userType ?? ""}:${value.payrollEmploymentId ?? ""}:${value.profile?.accessList?.includes("Payroll Management") === true}:${value.canOpenAgencyPayrollSetup === true}`
+                : null;
             dispatch(payrollScopeChanged({ previousKey: key(previous), nextKey: key(nextUser as typeof previous) }));
         }
     }
