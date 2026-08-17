@@ -14,7 +14,6 @@ const requiredCodes = [
   "officeWorkplace.address.line1", "officeWorkplace.address.city", "officeWorkplace.address.state", "officeWorkplace.address.postalCode", "officeWorkplace.address.country",
   "website", "phone",
   "payrollContact.name", "payrollContact.email", "payrollContact.phone",
-  "proposedSignerContact.firstName", "proposedSignerContact.lastName", "proposedSignerContact.title", "proposedSignerContact.email",
   "paySchedule.frequency", "paySchedule.firstPayday", "paySchedule.secondPayday", "paySchedule.firstPeriodEnd", "paySchedule.payrollStartDate",
   "expectedWorkerCounts.w2", "expectedWorkerCounts.contractor",
 ] as const;
@@ -25,7 +24,6 @@ describe("AgencyPayrollBootstrapModal", () => {
     expect(AGENCY_PAYROLL_REQUIRED_FIELD_MAP["payrollContact.name"].target).toBe("payrollContactName");
     expect(AGENCY_PAYROLL_REQUIRED_FIELD_MAP["officeWorkplace.name"].target).toBe("officeName");
     expect(AGENCY_PAYROLL_REQUIRED_FIELD_MAP["paySchedule.frequency"].target).toBe("payFrequency");
-    expect(AGENCY_PAYROLL_REQUIRED_FIELD_MAP["proposedSignerContact.firstName"].target).toBe("proposedSignerFirstName");
     expect(AGENCY_PAYROLL_REQUIRED_FIELD_MAP["expectedWorkerCounts.w2"].target).toBe("expectedW2Workers");
   });
 
@@ -55,7 +53,6 @@ describe("AgencyPayrollBootstrapModal", () => {
       website: "https://able.example", phone: "+15125550123",
       payrollContactName: "Pat Payroll", payrollContactEmail: "payroll@able.example", payrollContactPhone: "+15125550124",
       payFrequency: "weekly", firstPayday: "2026-09-04", secondPayday: "", firstPeriodEnd: "2026-09-03", payrollStartDate: "2026-08-28",
-      proposedSignerFirstName: "Ava", proposedSignerLastName: "Owner", proposedSignerTitle: "Owner", proposedSignerEmail: "ava@able.example",
       expectedW2Workers: 12,
     };
     expect(validateAgencyPayrollBootstrapForm(complete, [...requiredCodes])).toEqual({});
@@ -74,8 +71,9 @@ describe("AgencyPayrollBootstrapModal", () => {
       "Find legal business address", "Primary workplace name", "Find primary workplace address",
       "Company website", "Company phone number", "Payroll contact’s full name", "Payroll contact’s email address", "Payroll contact’s phone number",
       "How often employees are paid",
-      "Proposed signer’s first name", "Proposed signer’s last name", "Proposed signer’s job title", "Proposed signer’s email address", "Estimated number of W-2 employees",
+      "Estimated number of W-2 employees",
     ].forEach((label) => expect(screen.getByLabelText(label)).toBeInTheDocument());
+    expect(screen.queryByLabelText(/proposed signer/i)).not.toBeInTheDocument();
     ["First scheduled payday", "First pay period end date", "Payroll tracking start date"].forEach((label) => expect(screen.getByText(label)).toBeInTheDocument());
     expect(screen.getByRole("checkbox", { name: "I confirm employees physically work at this location." })).toBeInTheDocument();
     expect(screen.getAllByLabelText("Street address")).toHaveLength(2);

@@ -20,10 +20,6 @@ const completeSetup = {
   secondPayday: "",
   firstPeriodEnd: "2026-09-03",
   payrollStartDate: "2026-08-28",
-  proposedSignerFirstName: "Ada",
-  proposedSignerLastName: "Owner",
-  proposedSignerTitle: "Owner",
-  proposedSignerEmail: "ada@able.example",
   expectedW2Workers: "3",
 };
 
@@ -65,9 +61,9 @@ describe("validateCompanySetup", () => {
 });
 
 describe("isCompanySetupComplete", () => {
-  it("requires EIN and proposed signer even when every other group is complete", () => {
+  it("requires EIN but does not require retired proposed signer fields", () => {
     expect(isCompanySetupComplete({ ...completeSetup, einPresent: false })).toBe(false);
-    expect(isCompanySetupComplete({ ...completeSetup, proposedSignerEmail: "" })).toBe(false);
+    expect(isCompanySetupComplete(completeSetup)).toBe(true);
   });
 
   it.each([

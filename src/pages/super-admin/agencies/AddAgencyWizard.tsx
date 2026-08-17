@@ -56,10 +56,6 @@ export interface AgencyFormData {
     payrollSecondPayday: string;
     payrollFirstPeriodEnd: string;
     payrollStartDate: string;
-    proposedSignerFirstName: string;
-    proposedSignerLastName: string;
-    proposedSignerTitle: string;
-    proposedSignerEmail: string;
     expectedW2Workers: string;
     npi: string;
     providerId: string;
@@ -296,7 +292,7 @@ export default function AddAgencyWizard() {
         payrollActualWorkLocationAttested: false,
         payrollContactName: "", payrollContactEmail: "", payrollContactPhone: "",
         payrollFrequency: "", payrollFirstPayday: "", payrollSecondPayday: "", payrollFirstPeriodEnd: "", payrollStartDate: "",
-        proposedSignerFirstName: "", proposedSignerLastName: "", proposedSignerTitle: "", proposedSignerEmail: "", expectedW2Workers: "",
+        expectedW2Workers: "",
         npi: "",
         providerId: "",
         medicaidProviderId: "",
@@ -394,10 +390,6 @@ export default function AddAgencyWizard() {
             payrollSecondPayday: responseData.agencyData?.checkPayrollProfile?.paySchedule?.secondPayday || "",
             payrollFirstPeriodEnd: responseData.agencyData?.checkPayrollProfile?.paySchedule?.firstPeriodEnd || "",
             payrollStartDate: responseData.agencyData?.checkPayrollProfile?.paySchedule?.payrollStartDate || "",
-            proposedSignerFirstName: responseData.agencyData?.checkPayrollProfile?.proposedSignerContact?.firstName || "",
-            proposedSignerLastName: responseData.agencyData?.checkPayrollProfile?.proposedSignerContact?.lastName || "",
-            proposedSignerTitle: responseData.agencyData?.checkPayrollProfile?.proposedSignerContact?.title || "",
-            proposedSignerEmail: responseData.agencyData?.checkPayrollProfile?.proposedSignerContact?.email || "",
             expectedW2Workers: responseData.agencyData?.checkPayrollProfile?.expectedWorkerCounts?.w2?.toString() || "",
             npi: responseData.agencyData?.npi || "",
             providerId: responseData.agencyData?.providerId ?? "",
@@ -532,9 +524,7 @@ export default function AddAgencyWizard() {
         website: formData.websiteUrl, phone: formData.mainPhone, payrollContactName: formData.payrollContactName,
         payrollContactEmail: formData.payrollContactEmail, payrollContactPhone: formData.payrollContactPhone, payFrequency: formData.payrollFrequency,
         firstPayday: formData.payrollFirstPayday, secondPayday: formData.payrollSecondPayday, firstPeriodEnd: formData.payrollFirstPeriodEnd,
-        payrollStartDate: formData.payrollStartDate, proposedSignerFirstName: formData.proposedSignerFirstName,
-        proposedSignerLastName: formData.proposedSignerLastName, proposedSignerTitle: formData.proposedSignerTitle,
-        proposedSignerEmail: formData.proposedSignerEmail, expectedW2Workers: formData.expectedW2Workers,
+        payrollStartDate: formData.payrollStartDate, expectedW2Workers: formData.expectedW2Workers,
     });
 
     const buildAgencyPayload = (

@@ -37,7 +37,14 @@ export interface AgencyPayrollSetupProjection {
   integration: { state: "not_configured" | "configured"; environment: "sandbox" | "production" };
   preflight: { values: CheckPayrollProfileRead; missingFieldCodes: string[] };
   readiness: { status: "needs_information" | "ready_to_sync" | "needs_attention" | "ready"; blockers: string[]; nextAction: string | null };
-  setup: { designatedSignerPresent: boolean; companyLinked: boolean; officeWorkplaceLinked: boolean; payScheduleLinked: boolean; enrollmentProfileLocked: boolean };
+  setup: {
+    designatedSignerPresent: boolean;
+    signerCandidate: { userUid: string; fullName: string; email: string; title: string; designated: boolean } | null;
+    companyLinked: boolean;
+    officeWorkplaceLinked: boolean;
+    payScheduleLinked: boolean;
+    enrollmentProfileLocked: boolean;
+  };
   capabilities: { canView: boolean; canManage: boolean; canCreateIntegration: boolean; canDesignateSigner: boolean; createCompanyOnboardSession: false };
 }
 

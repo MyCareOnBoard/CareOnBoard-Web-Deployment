@@ -39,11 +39,6 @@ export function validateCompanySetup(values: CheckPayrollProfileFormValues): Rec
     if (values.payFrequency === "semimonthly" && (!isoDate(values.secondPayday) || values.secondPayday! <= values.firstPayday! || new Date(`${values.secondPayday!}T00:00:00Z`) > addOneCalendarMonthClamped(values.firstPayday!))) errors.payrollSecondPayday = "The second scheduled payday must be later than the first and within one calendar month.";
     if (values.payFrequency !== "semimonthly" && values.secondPayday) errors.payrollSecondPayday = "Only semimonthly schedules have a second scheduled payday.";
   }
-  const signerParticipates = Boolean(values.proposedSignerFirstName?.trim() || values.proposedSignerLastName?.trim() || values.proposedSignerTitle?.trim() || values.proposedSignerEmail?.trim());
-  if (signerParticipates && !values.proposedSignerFirstName?.trim()) errors.proposedSignerFirstName = "Enter the proposed signer’s first name.";
-  if (signerParticipates && !values.proposedSignerLastName?.trim()) errors.proposedSignerLastName = "Enter the proposed signer’s last name.";
-  if (signerParticipates && !values.proposedSignerTitle?.trim()) errors.proposedSignerTitle = "Enter the proposed signer’s job title.";
-  if (signerParticipates && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.proposedSignerEmail ?? "")) errors.proposedSignerEmail = "Enter a valid proposed signer’s email address.";
   return errors;
 }
 
@@ -71,10 +66,6 @@ export function isCompanySetupComplete(values: CheckPayrollProfileFormValues): b
     && isoDate(values.firstPeriodEnd)
     && isoDate(values.payrollStartDate)
     && (values.payFrequency !== "semimonthly" || isoDate(values.secondPayday))
-    && present(values.proposedSignerFirstName)
-    && present(values.proposedSignerLastName)
-    && present(values.proposedSignerTitle)
-    && present(values.proposedSignerEmail)
     && values.expectedW2Workers !== undefined
     && Number.isInteger(Number(values.expectedW2Workers))
     && Number(values.expectedW2Workers) >= 0;

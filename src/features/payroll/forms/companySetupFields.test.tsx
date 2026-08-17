@@ -12,7 +12,7 @@ describe("CompanySetupFields", () => {
     expect(screen.getByLabelText("Line1", { selector: "#payrollLegalAddress-line1" })).toHaveAttribute("aria-describedby", "payrollLegalAddress-error");
   });
 
-  it("associates select, attestation, signer, count, and date errors with focusable controls", () => {
+  it("associates select, attestation, count, and date errors without retired signer controls", () => {
     render(<CompanySetupFields
       formData={{
         payrollEntityType: "",
@@ -27,7 +27,6 @@ describe("CompanySetupFields", () => {
         "payrollFrequency",
         "payrollActualWorkLocationAttested",
         "payrollStartDate",
-        "proposedSignerEmail",
         "expectedW2Workers",
       ]}
     />);
@@ -39,7 +38,7 @@ describe("CompanySetupFields", () => {
     }
     expect(screen.getByLabelText("This is the actual work location.")).toHaveAttribute("aria-describedby", "payrollActualWorkLocationAttested-error");
     expect(screen.getByLabelText("Local payroll start date")).toHaveAttribute("aria-describedby", "payrollStartDate-error");
-    expect(screen.getByLabelText("Proposed signer email")).toHaveAttribute("aria-describedby", "proposedSignerEmail-error");
+    expect(screen.queryByLabelText(/proposed signer/i)).not.toBeInTheDocument();
     expect(screen.getByLabelText("Expected W-2 workers")).toHaveAttribute("aria-describedby", "expectedW2Workers-error");
   });
 });

@@ -43,17 +43,13 @@ function formValues(values: CheckPayrollProfileRead): CheckPayrollProfileFormVal
     secondPayday: values.paySchedule?.secondPayday ?? "",
     firstPeriodEnd: values.paySchedule?.firstPeriodEnd ?? "",
     payrollStartDate: values.paySchedule?.payrollStartDate ?? "",
-    proposedSignerFirstName: values.proposedSignerContact?.firstName ?? "",
-    proposedSignerLastName: values.proposedSignerContact?.lastName ?? "",
-    proposedSignerTitle: values.proposedSignerContact?.title ?? "",
-    proposedSignerEmail: values.proposedSignerContact?.email ?? "",
     expectedW2Workers: values.expectedWorkerCounts?.w2 ?? "",
   };
 }
 
 export const buildAgencyPayrollBootstrapPayload = (values: CheckPayrollProfileRead) => buildCheckPayrollProfilePayload(formValues(values));
 
-const GROUP_ORDER = ["identity", "ein", "business", "legalAddress", "workplace", "contact", "payrollContact", "schedule", "signer", "workers"] as const;
+const GROUP_ORDER = ["identity", "ein", "business", "legalAddress", "workplace", "contact", "payrollContact", "schedule", "workers"] as const;
 type FieldGroup = typeof GROUP_ORDER[number];
 export const AGENCY_PAYROLL_REQUIRED_FIELD_CODES = [
   "legalName", "ein", "entityType", "industry",
@@ -62,7 +58,6 @@ export const AGENCY_PAYROLL_REQUIRED_FIELD_CODES = [
   "officeWorkplace.address.line1", "officeWorkplace.address.city", "officeWorkplace.address.state", "officeWorkplace.address.postalCode", "officeWorkplace.address.country",
   "website", "phone",
   "payrollContact.name", "payrollContact.email", "payrollContact.phone",
-  "proposedSignerContact.firstName", "proposedSignerContact.lastName", "proposedSignerContact.title", "proposedSignerContact.email",
   "paySchedule.frequency", "paySchedule.firstPayday", "paySchedule.secondPayday", "paySchedule.firstPeriodEnd", "paySchedule.payrollStartDate",
   "expectedWorkerCounts.w2", "expectedWorkerCounts.contractor",
 ] as const;
@@ -92,10 +87,6 @@ export const AGENCY_PAYROLL_REQUIRED_FIELD_MAP: Record<RequiredFieldCode, FieldS
   "payrollContact.name": { group: "payrollContact", target: "payrollContactName", satisfied: (f) => present(f.payrollContactName) },
   "payrollContact.email": { group: "payrollContact", target: "payrollContactEmail", satisfied: (f) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.payrollContactEmail ?? "") },
   "payrollContact.phone": { group: "payrollContact", target: "payrollContactPhone", satisfied: (f) => /^\+?[1-9]\d{7,14}$/.test(f.payrollContactPhone ?? "") },
-  "proposedSignerContact.firstName": { group: "signer", target: "proposedSignerFirstName", satisfied: (f) => present(f.proposedSignerFirstName) },
-  "proposedSignerContact.lastName": { group: "signer", target: "proposedSignerLastName", satisfied: (f) => present(f.proposedSignerLastName) },
-  "proposedSignerContact.title": { group: "signer", target: "proposedSignerTitle", satisfied: (f) => present(f.proposedSignerTitle) },
-  "proposedSignerContact.email": { group: "signer", target: "proposedSignerEmail", satisfied: (f) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.proposedSignerEmail ?? "") },
   "paySchedule.frequency": { group: "schedule", target: "payFrequency", satisfied: (f) => CHECK_PAY_FREQUENCIES.includes(f.payFrequency as typeof CHECK_PAY_FREQUENCIES[number]) },
   "paySchedule.firstPayday": { group: "schedule", target: "firstPayday", satisfied: (f) => present(f.firstPayday) },
   "paySchedule.secondPayday": { group: "schedule", target: "secondPayday", satisfied: (f) => f.payFrequency !== "semimonthly" || present(f.secondPayday) },
@@ -224,7 +215,6 @@ export default function AgencyPayrollBootstrapModal({ open, values, missingField
         {groups.has("contact") && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><Field label="Company website" value={form.website} inputRef={firstGroup === "contact" ? firstFieldRef : undefined} error={fieldErrors.website} onChange={(website) => update("website", website)} /><Field label="Company phone number" value={form.phone} error={fieldErrors.phone} onChange={(phone) => update("phone", phone)} /></div>}
         {groups.has("payrollContact") && <div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><Field label="Payroll contact’s full name" value={form.payrollContactName} inputRef={firstGroup === "payrollContact" ? firstFieldRef : undefined} error={fieldErrors.payrollContactName} onChange={(payrollContactName) => update("payrollContactName", payrollContactName)} /><Field label="Payroll contact’s email address" value={form.payrollContactEmail} type="email" error={fieldErrors.payrollContactEmail} onChange={(payrollContactEmail) => update("payrollContactEmail", payrollContactEmail)} /><Field label="Payroll contact’s phone number" value={form.payrollContactPhone} type="tel" error={fieldErrors.payrollContactPhone} onChange={(payrollContactPhone) => update("payrollContactPhone", payrollContactPhone)} /></div>}
         {groups.has("schedule") && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><EnumField label="How often employees are paid" placeholder="Select pay frequency" value={form.payFrequency} options={CHECK_PAY_FREQUENCIES} inputRef={firstGroup === "schedule" ? firstSelectRef : undefined} error={fieldErrors.payFrequency} onChange={(payFrequency) => setForm((current) => ({ ...current, payFrequency, secondPayday: payFrequency === "semimonthly" ? current.secondPayday : "" }))} /><PayrollDateField label="First scheduled payday" value={form.firstPayday} error={fieldErrors.firstPayday} onChange={(firstPayday) => update("firstPayday", firstPayday)} />{form.payFrequency === "semimonthly" && <PayrollDateField label="Second scheduled payday" value={form.secondPayday} error={fieldErrors.secondPayday} onChange={(secondPayday) => update("secondPayday", secondPayday)} />}<PayrollDateField label="First pay period end date" value={form.firstPeriodEnd} error={fieldErrors.firstPeriodEnd} onChange={(firstPeriodEnd) => update("firstPeriodEnd", firstPeriodEnd)} /><PayrollDateField label="Payroll tracking start date" value={form.payrollStartDate} error={fieldErrors.payrollStartDate} onChange={(payrollStartDate) => update("payrollStartDate", payrollStartDate)} /></div>}
-        {groups.has("signer") && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><Field label="Proposed signer’s first name" value={form.proposedSignerFirstName} inputRef={firstGroup === "signer" ? firstFieldRef : undefined} error={fieldErrors.proposedSignerFirstName} onChange={(proposedSignerFirstName) => update("proposedSignerFirstName", proposedSignerFirstName)} /><Field label="Proposed signer’s last name" value={form.proposedSignerLastName} error={fieldErrors.proposedSignerLastName} onChange={(proposedSignerLastName) => update("proposedSignerLastName", proposedSignerLastName)} /><Field label="Proposed signer’s job title" value={form.proposedSignerTitle} error={fieldErrors.proposedSignerTitle} onChange={(proposedSignerTitle) => update("proposedSignerTitle", proposedSignerTitle)} /><Field label="Proposed signer’s email address" value={form.proposedSignerEmail} type="email" error={fieldErrors.proposedSignerEmail} onChange={(proposedSignerEmail) => update("proposedSignerEmail", proposedSignerEmail)} /></div>}
         {groups.has("workers") && <Field label="Estimated number of W-2 employees" value={form.expectedW2Workers} type="number" inputRef={firstGroup === "workers" ? firstFieldRef : undefined} error={fieldErrors.expectedW2Workers} helperText="Include employees you expect to pay through payroll. Do not include independent contractors." onChange={(expectedW2Workers) => update("expectedW2Workers", expectedW2Workers)} />}
         {(error || submissionError) && <p role="alert" className="text-sm text-[#8b2d2d]">{error ?? submissionError}</p>}</fieldset></div>
         <DialogFooter className="shrink-0 border-t border-[#e2e8e8] bg-[#fbfcfc] px-5 py-4 sm:px-6"><div className="space-y-3">{hasValidationErrors && <p id="payroll-bootstrap-validation-help" className="text-xs text-[#5d626b]">Complete all required fields with valid information to continue.</p>}<div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><button type="button" disabled={isSubmitting} className="min-h-11 rounded-[10px] border border-[#b2b2b3] px-4 text-sm font-semibold text-[#353535] transition-colors hover:bg-[#f2f4f4] disabled:cursor-not-allowed disabled:opacity-60" onClick={() => onOpenChange(false)}>Cancel</button><button type="submit" disabled={isSubmitting || hasValidationErrors} aria-busy={isSubmitting} aria-describedby={hasValidationErrors ? "payroll-bootstrap-validation-help" : undefined} className="inline-flex min-h-11 min-w-full items-center justify-center rounded-[10px] bg-[#006f73] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#005f63] disabled:cursor-not-allowed disabled:opacity-60 sm:min-w-[14rem]">{isSubmitting ? <span role="status" className="inline-flex items-center gap-2"><Loader2 data-testid="agency-payroll-modal-create-spinner" aria-hidden="true" className="h-4 w-4 shrink-0 motion-safe:animate-spin" />Creating payroll setup…</span> : "Create payroll setup"}</button></div></div></DialogFooter>

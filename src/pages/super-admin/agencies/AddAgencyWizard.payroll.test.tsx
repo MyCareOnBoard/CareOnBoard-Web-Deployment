@@ -61,8 +61,7 @@ vi.mock("@/pages/super-admin/agencies/components/StepOne", async () => {
           payrollActualWorkLocationAttested: true, payrollContactName: "Pay Roll", payrollContactEmail: "payroll@able.example",
           payrollContactPhone: "+15125550124", payrollFrequency: "weekly", payrollFirstPayday: "2026-09-04",
           payrollSecondPayday: "", payrollFirstPeriodEnd: "2026-09-03", payrollStartDate: "2026-08-28",
-          proposedSignerFirstName: "Ada", proposedSignerLastName: "Owner", proposedSignerTitle: "Owner",
-          proposedSignerEmail: "ada@able.example", expectedW2Workers: "3",
+          expectedW2Workers: "3",
         };
         Object.entries(values).forEach(([key, value]) => onChange(key, value));
       }}>Fill identity and payroll</button>
@@ -93,7 +92,6 @@ const expectedPayrollWrite = {
   phone: "+15125550123",
   payrollContact: { name: "Pay Roll", email: "payroll@able.example", phone: "+15125550124" },
   paySchedule: { frequency: "weekly", firstPayday: "2026-09-04", secondPayday: null, firstPeriodEnd: "2026-09-03", payrollStartDate: "2026-08-28" },
-  proposedSignerContact: { firstName: "Ada", lastName: "Owner", title: "Owner", email: "ada@able.example" },
   expectedWorkerCounts: { w2: 3, contractor: 0 },
 };
 

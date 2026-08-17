@@ -126,26 +126,33 @@ function AgencyPayrollSetupContent({ scope }: { scope: PayrollScope }) {
   const watchOperation = (operation: PayrollOperation) => { cancelOperation.current?.(); cancelOperation.current = watch(scope, operation.operationId, async () => getOperation({ ...scope, operationId: operation.operationId }).unwrap(), () => { void refetch(); void getOverview(scope); }); };
   const signerAction = async (command: "designate_signer" | "clear_signer" | "retry_company_sync" | "refresh_company_reconciliation", authorityAttested?: true) => {
     if (command === "designate_signer" && authorityAttested !== true) {
-      setCommandError("Confirm your authority before designating yourself as signer.");
-      return;
+      setCommandError("Confirm authority for the verified account before designating a signer.");
+      return false;
     }
-    if (!await freshness.requireCurrentProjection()) return;
+    const signerCandidate = data.setup.signerCandidate;
+    if (command === "designate_signer" && (!signerCandidate || signerCandidate.designated)) {
+      setCommandError("A verified agency owner account is required before a payroll signer can be designated.");
+      return false;
+    }
+    if (!await freshness.requireCurrentProjection()) return false;
     setCommandError(null);
     try {
       const operation = command === "designate_signer"
-        ? await runCommand({ ...scope, command, projectionRevision: data.projectionRevision, designatedSignerUserUid: scope.actorUid, authorityAttested: true }).unwrap()
+        ? await runCommand({ ...scope, command, projectionRevision: data.projectionRevision, designatedSignerUserUid: signerCandidate!.userUid, authorityAttested: true }).unwrap()
         : await runCommand({ ...scope, command, projectionRevision: data.projectionRevision }).unwrap();
       watchOperation(operation);
+      return true;
     } catch (requestError: unknown) {
       if (typeof requestError === "object" && requestError !== null && "status" in requestError && (requestError as { status?: number }).status === 409) {
         await refetch();
         void getOverview(scope);
-        return;
+        return false;
       }
       setCommandError("The payroll command could not be completed. Review the current setup and try again.");
+      return false;
     }
   };
-  return <div className="max-w-3xl divide-y divide-[#e5e7eb] rounded-lg border border-[#e0e5e5] bg-white px-6">{isFetching && <p role="status" className="flex items-center gap-2 py-3 text-sm text-[#5d626b]"><Loader2 data-testid="agency-payroll-refresh-spinner" aria-hidden="true" className="h-4 w-4 shrink-0 motion-safe:animate-spin" />Refreshing payroll setup…</p>}{commandError && <p role="alert" className="py-3 text-sm text-[#8b2d2d]">{commandError}</p>}<CompanySetupChecklist projection={data} /><SignerSetupCard projection={data} onAction={(action, attested) => void signerAction(action, attested)} />{data.capabilities.canManage && <div className="py-5 flex gap-3"><button type="button" onClick={() => void signerAction("retry_company_sync")} className="text-sm font-semibold text-[#006f73] underline">Retry company sync</button><button type="button" onClick={() => void signerAction("refresh_company_reconciliation")} className="text-sm font-semibold text-[#006f73] underline">Refresh reconciliation</button></div>}</div>;
+  return <div className="max-w-3xl divide-y divide-[#e5e7eb] rounded-lg border border-[#e0e5e5] bg-white px-6">{isFetching && <p role="status" className="flex items-center gap-2 py-3 text-sm text-[#5d626b]"><Loader2 data-testid="agency-payroll-refresh-spinner" aria-hidden="true" className="h-4 w-4 shrink-0 motion-safe:animate-spin" />Refreshing payroll setup…</p>}{commandError && <p role="alert" className="py-3 text-sm text-[#8b2d2d]">{commandError}</p>}<CompanySetupChecklist projection={data} /><SignerSetupCard projection={data} onAction={signerAction} />{data.capabilities.canManage && <div className="py-5 flex gap-3"><button type="button" onClick={() => void signerAction("retry_company_sync")} className="text-sm font-semibold text-[#006f73] underline">Retry company sync</button><button type="button" onClick={() => void signerAction("refresh_company_reconciliation")} className="text-sm font-semibold text-[#006f73] underline">Refresh reconciliation</button></div>}</div>;
 }
 
 export default function AgencyPayrollSetupTab({ scope }: { scope: PayrollScope }) {

@@ -69,7 +69,7 @@ describe("buildCheckPayrollProfilePayload", () => {
     for (const industry of CHECK_INDUSTRIES) expect(buildCheckPayrollProfilePayload({ industry }).industry).toBe(industry);
     expect(buildCheckPayrollProfilePayload({ industry: "unknown" })).toEqual({});
   });
-  it("uses the write-only replace operation and never emits a raw or legacy EIN", () => {
+  it("uses the write-only replace operation and never emits a raw or retired signer field", () => {
     const payload = buildCheckPayrollProfilePayload({
       legalName: "Able Care LLC",
       ein: "12-3456789",
@@ -89,10 +89,6 @@ describe("buildCheckPayrollProfilePayload", () => {
       secondPayday: "",
       firstPeriodEnd: "2026-09-03",
       payrollStartDate: "2026-08-28",
-      proposedSignerFirstName: "Ada",
-      proposedSignerLastName: "Owner",
-      proposedSignerTitle: "Owner",
-      proposedSignerEmail: "ada@able.example",
       expectedW2Workers: "1",
       einPresent: false,
     });

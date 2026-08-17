@@ -16,7 +16,6 @@ export type CheckPayrollProfileWrite = {
   officeWorkplace?: { name: string; address: CheckAddress; actualWorkLocationAttested: true }; website?: string; phone?: string;
   payrollContact?: { name: string; email: string; phone: string };
   paySchedule?: { frequency: typeof CHECK_PAY_FREQUENCIES[number]; firstPayday: string; secondPayday: string | null; firstPeriodEnd: string; payrollStartDate: string };
-  proposedSignerContact?: { firstName: string; lastName: string; title: string; email: string };
   expectedWorkerCounts?: { w2: number; contractor: 0 };
 };
 export type CheckPayrollProfileRead = Omit<CheckPayrollProfileWrite, "einChange"> & { einStatus?: { present: boolean; last4?: string } };
@@ -26,7 +25,7 @@ export type CheckPayrollProfileFormValues = {
   officeName?: string; officeAddress?: CheckAddress; actualWorkLocationAttested?: boolean; website?: string; phone?: string;
   payrollContactName?: string; payrollContactEmail?: string; payrollContactPhone?: string; payFrequency?: string;
   firstPayday?: string; secondPayday?: string; firstPeriodEnd?: string; payrollStartDate?: string;
-  proposedSignerFirstName?: string; proposedSignerLastName?: string; proposedSignerTitle?: string; proposedSignerEmail?: string; expectedW2Workers?: string | number;
+  expectedW2Workers?: string | number;
 };
 
 const trim = (value: string | undefined) => value?.trim() ?? "";
@@ -47,7 +46,6 @@ export function buildCheckPayrollProfilePayload(values: CheckPayrollProfileFormV
   if (trim(values.phone)) payload.phone = trim(values.phone);
   if (trim(values.payrollContactName) && trim(values.payrollContactEmail) && trim(values.payrollContactPhone)) payload.payrollContact = { name: trim(values.payrollContactName), email: trim(values.payrollContactEmail), phone: trim(values.payrollContactPhone) };
   if (CHECK_PAY_FREQUENCIES.includes(values.payFrequency as typeof CHECK_PAY_FREQUENCIES[number]) && trim(values.firstPayday) && trim(values.firstPeriodEnd) && trim(values.payrollStartDate)) payload.paySchedule = { frequency: values.payFrequency as typeof CHECK_PAY_FREQUENCIES[number], firstPayday: trim(values.firstPayday), secondPayday: values.payFrequency === "semimonthly" ? trim(values.secondPayday) : null, firstPeriodEnd: trim(values.firstPeriodEnd), payrollStartDate: trim(values.payrollStartDate) };
-  if (trim(values.proposedSignerFirstName) && trim(values.proposedSignerLastName) && trim(values.proposedSignerTitle) && trim(values.proposedSignerEmail)) payload.proposedSignerContact = { firstName: trim(values.proposedSignerFirstName), lastName: trim(values.proposedSignerLastName), title: trim(values.proposedSignerTitle), email: trim(values.proposedSignerEmail) };
   if (values.expectedW2Workers !== undefined && trim(String(values.expectedW2Workers)) !== "") payload.expectedWorkerCounts = { w2: Number(values.expectedW2Workers), contractor: 0 };
   return payload;
 }

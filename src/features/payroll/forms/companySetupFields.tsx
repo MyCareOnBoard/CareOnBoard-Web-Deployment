@@ -40,8 +40,7 @@ export function CompanySetupFields({ formData, onChange, fieldsWithErrors = [] }
       {field("Payroll contact name", "payrollContactName", formData, onChange, "text", error("payrollContactName"))}{field("Payroll contact email", "payrollContactEmail", formData, onChange, "email", error("payrollContactEmail"))}{field("Payroll contact phone", "payrollContactPhone", formData, onChange, "tel", error("payrollContactPhone"))}
       {selectField("Pay frequency", "payrollFrequency", CHECK_PAY_FREQUENCIES)}
       {field("First payday", "payrollFirstPayday", formData, onChange, "date", error("payrollFirstPayday"))}{formData.payrollFrequency === "semimonthly" && field("Second payday", "payrollSecondPayday", formData, onChange, "date", error("payrollSecondPayday"))}{field("First period end", "payrollFirstPeriodEnd", formData, onChange, "date", error("payrollFirstPeriodEnd"))}{field("Local payroll start date", "payrollStartDate", formData, onChange, "date", error("payrollStartDate"))}{field("Expected W-2 workers", "expectedW2Workers", formData, onChange, "number", error("expectedW2Workers"))}
-      {field("Proposed signer first name", "proposedSignerFirstName", formData, onChange, "text", error("proposedSignerFirstName"))}{field("Proposed signer last name", "proposedSignerLastName", formData, onChange, "text", error("proposedSignerLastName"))}{field("Proposed signer title", "proposedSignerTitle", formData, onChange, "text", error("proposedSignerTitle"))}{field("Proposed signer email", "proposedSignerEmail", formData, onChange, "email", error("proposedSignerEmail"))}
     </div>
-    <p className="text-sm text-muted-foreground">Proposed signer details are informational only and do not grant signer authority. Local agency creation is not rolled back if later payroll setup is asynchronous.</p>
+    <p className="text-sm text-muted-foreground">Local agency creation is not rolled back if later payroll setup is asynchronous.</p>
   </fieldset>;
 }

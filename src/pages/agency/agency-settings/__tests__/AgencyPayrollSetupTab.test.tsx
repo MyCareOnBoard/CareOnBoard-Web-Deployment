@@ -20,12 +20,12 @@ vi.mock("@/features/payroll/api/agencyPayrollEndpoints", () => ({
 vi.mock("@/features/payroll/api/payrollCommands", () => ({ useRunAgencyPayrollCommandMutation: () => [runCommand] }));
 vi.mock("@/features/payroll/hooks/useProjectionFreshness", () => ({ useProjectionFreshness: () => ({ requireCurrentProjection: vi.fn().mockResolvedValue(true) }) }));
 
-const projection = (capabilities: AgencyPayrollSetupProjection["capabilities"], designatedSignerPresent = false): AgencyPayrollSetupProjection => ({
+const projection = (capabilities: AgencyPayrollSetupProjection["capabilities"], designatedSignerPresent = false, signerCandidate: { userUid: string; fullName: string; email: string; title: string; designated: boolean } | null = { userUid: "verified-owner", fullName: "Ada Owner", email: "ada@able.example", title: "Owner", designated: designatedSignerPresent }): AgencyPayrollSetupProjection => ({
   projectionRevision: 4,
   integration: { state: "configured", environment: "sandbox" },
   preflight: { values: {}, missingFieldCodes: [] },
   readiness: { status: "ready", blockers: [], nextAction: null },
-  setup: { designatedSignerPresent, companyLinked: true, officeWorkplaceLinked: true, payScheduleLinked: true, enrollmentProfileLocked: true },
+  setup: { designatedSignerPresent, signerCandidate, companyLinked: true, officeWorkplaceLinked: true, payScheduleLinked: true, enrollmentProfileLocked: true },
   capabilities,
 });
 
@@ -36,7 +36,7 @@ const notConfigured = (missingFieldCodes: string[] = ["legalName"]): AgencyPayro
   integration: { state: "not_configured", environment: "sandbox" },
   preflight: { values: {}, missingFieldCodes },
   readiness: { status: "needs_information", blockers: ["integration_missing"], nextAction: "create_integration" },
-  setup: { designatedSignerPresent: false, companyLinked: false, officeWorkplaceLinked: false, payScheduleLinked: false, enrollmentProfileLocked: false },
+  setup: { designatedSignerPresent: false, signerCandidate: null, companyLinked: false, officeWorkplaceLinked: false, payScheduleLinked: false, enrollmentProfileLocked: false },
   capabilities: { canView: true, canManage: true, canCreateIntegration: true, canDesignateSigner: false, createCompanyOnboardSession: false },
 });
 
@@ -57,7 +57,7 @@ describe("AgencyPayrollSetupTab", () => {
         integration: { state: "not_configured", environment: "sandbox" },
         preflight: { values: {}, missingFieldCodes: ["legalName"] },
         readiness: { status: "needs_information", blockers: ["integration_missing"], nextAction: "create_integration" },
-        setup: { designatedSignerPresent: false, companyLinked: false, officeWorkplaceLinked: false, payScheduleLinked: false, enrollmentProfileLocked: false },
+        setup: { designatedSignerPresent: false, signerCandidate: null, companyLinked: false, officeWorkplaceLinked: false, payScheduleLinked: false, enrollmentProfileLocked: false },
         capabilities: { canView: true, canManage: true, canCreateIntegration: true, canDesignateSigner: false, createCompanyOnboardSession: false },
       } as AgencyPayrollSetupProjection,
       refetch,
@@ -74,7 +74,7 @@ describe("AgencyPayrollSetupTab", () => {
       integration: { state: "not_configured" as const, environment: "sandbox" as const },
       preflight: { values: { legalName: "Able Care LLC" }, missingFieldCodes: ["ein"] },
       readiness: { status: "needs_information" as const, blockers: ["integration_missing"], nextAction: "create_integration" },
-      setup: { designatedSignerPresent: false, companyLinked: false, officeWorkplaceLinked: false, payScheduleLinked: false, enrollmentProfileLocked: false },
+      setup: { designatedSignerPresent: false, signerCandidate: null, companyLinked: false, officeWorkplaceLinked: false, payScheduleLinked: false, enrollmentProfileLocked: false },
       capabilities: { canView: true, canManage: true, canCreateIntegration: true, canDesignateSigner: false, createCompanyOnboardSession: false as const },
     } satisfies AgencyPayrollSetupProjection;
     setupQuery = { data: scannedProjection, refetch };
@@ -90,7 +90,7 @@ describe("AgencyPayrollSetupTab", () => {
     expect(loadSetup).toHaveBeenCalledWith(scope, false);
     await act(async () => { resolveScan(scannedProjection); });
     expect(await screen.findByRole("dialog", { name: /complete payroll setup/i })).toBeInTheDocument();
-    expect(screen.getByLabelText("EIN")).toBeInTheDocument();
+    expect(screen.getByLabelText("Employer Identification Number (EIN)")).toBeInTheDocument();
     expect(screen.queryByLabelText(/social security|bank account|withholding/i)).not.toBeInTheDocument();
   });
 
@@ -100,7 +100,7 @@ describe("AgencyPayrollSetupTab", () => {
       integration: { state: "not_configured" as const, environment: "sandbox" as const },
       preflight: { values: { legalName: "Able Care LLC" }, missingFieldCodes: ["ein"] },
       readiness: { status: "needs_information" as const, blockers: ["integration_missing"], nextAction: "create_integration" },
-      setup: { designatedSignerPresent: false, companyLinked: false, officeWorkplaceLinked: false, payScheduleLinked: false, enrollmentProfileLocked: false },
+      setup: { designatedSignerPresent: false, signerCandidate: null, companyLinked: false, officeWorkplaceLinked: false, payScheduleLinked: false, enrollmentProfileLocked: false },
       capabilities: { canView: true, canManage: true, canCreateIntegration: true, canDesignateSigner: false, createCompanyOnboardSession: false as const },
     } satisfies AgencyPayrollSetupProjection;
     setupQuery = { data: scannedProjection, refetch };
@@ -111,7 +111,7 @@ describe("AgencyPayrollSetupTab", () => {
     render(<AgencyPayrollSetupTab scope={scope} />);
     await user.click(screen.getByRole("button", { name: /create payroll setup/i }));
     await screen.findByRole("dialog", { name: /complete payroll setup/i });
-    await user.type(screen.getByLabelText("EIN"), "12-3456789");
+    await user.type(screen.getByLabelText("Employer Identification Number (EIN)"), "12-3456789");
     await user.click(screen.getByRole("button", { name: /^create payroll setup$/i }));
     expect(bootstrapSetup).toHaveBeenCalledWith(expect.objectContaining({
       ...scope,
@@ -178,11 +178,11 @@ describe("AgencyPayrollSetupTab", () => {
     const user = userEvent.setup();
     render(<AgencyPayrollSetupTab scope={scope} />);
     await user.click(screen.getByRole("button", { name: /create payroll setup/i }));
-    await user.type(await screen.findByLabelText("EIN"), "12-3456789");
+    await user.type(await screen.findByLabelText("Employer Identification Number (EIN)"), "12-3456789");
     await user.click(screen.getByRole("button", { name: /^create payroll setup$/i }));
-    const contact = await screen.findByLabelText("Payroll contact name");
+    const contact = await screen.findByLabelText("Payroll contact’s full name");
     expect(contact).toHaveAttribute("aria-invalid", "true");
-    expect(screen.getByLabelText("EIN")).toHaveValue("12-3456789");
+    expect(screen.getByLabelText("Employer Identification Number (EIN)")).toHaveValue("12-3456789");
   });
 
   it("does not let a stale A scan error clear the active B scan", async () => {
@@ -224,11 +224,22 @@ describe("AgencyPayrollSetupTab", () => {
     expect(await screen.findByRole("dialog", { name: /complete payroll setup/i })).toBeInTheDocument();
   });
 
-  it("renders owner-only self-designation plus management actions while withholding Onboard", () => {
+  it("uses the exact verified candidate UID for a designated signer command", async () => {
+    runCommand.mockReturnValue({ unwrap: () => Promise.resolve({ operationId: "operation-1" }) });
+    setupQuery = { data: projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: true, createCompanyOnboardSession: false }), refetch };
+    const user = userEvent.setup();
+    render(<AgencyPayrollSetupTab scope={scope} />);
+    await user.click(screen.getByRole("checkbox", { name: "I confirm this verified account is authorized to act as the agency's payroll signer." }));
+    await user.click(screen.getByRole("button", { name: "Designate this account" }));
+    expect(runCommand).toHaveBeenCalledWith(expect.objectContaining({ command: "designate_signer", designatedSignerUserUid: "verified-owner", authorityAttested: true }));
+    expect(runCommand.mock.calls[0][0].designatedSignerUserUid).not.toBe(scope.actorUid);
+  });
+
+  it("renders verified candidate designation plus management actions while withholding Onboard", () => {
     setupQuery = { data: projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: true, createCompanyOnboardSession: false }), refetch };
     render(<AgencyPayrollSetupTab scope={scope} />);
     expect(screen.getByRole("heading", { name: /payroll company setup/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /designate myself/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Designate this account" })).toBeDisabled();
     expect(screen.getByRole("button", { name: /retry company sync/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /refresh reconciliation/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /onboard|secure setup/i })).not.toBeInTheDocument();
@@ -237,7 +248,7 @@ describe("AgencyPayrollSetupTab", () => {
   it("renders Payroll Management actions without signer authority", () => {
     setupQuery = { data: projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false }), refetch };
     render(<AgencyPayrollSetupTab scope={scope} />);
-    expect(screen.queryByRole("button", { name: /designate myself|clear signer/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /designate this account|clear signer/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /retry company sync/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /refresh reconciliation/i })).toBeInTheDocument();
   });
