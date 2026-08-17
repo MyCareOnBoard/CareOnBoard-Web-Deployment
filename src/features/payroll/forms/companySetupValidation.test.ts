@@ -35,6 +35,30 @@ describe("validateCompanySetup", () => {
     expect(validateCompanySetup({ payFrequency: "semimonthly", firstPayday: "2026-01-31", secondPayday: "2026-01-30", firstPeriodEnd: "2026-01-30", payrollStartDate: "2026-01-01", expectedW2Workers: "-1" })).toMatchObject({ payrollSecondPayday: expect.any(String), expectedW2Workers: expect.any(String) });
     expect(validateCompanySetup({ payFrequency: "semimonthly", firstPayday: "2026-01-15", secondPayday: "2026-02-16", firstPeriodEnd: "2026-01-14", payrollStartDate: "2026-01-01" })).toMatchObject({ payrollSecondPayday: expect.any(String) });
   });
+  it("uses the payroll setup terminology in user-facing validation errors", () => {
+    expect(validateCompanySetup({
+      entityType: "unsupported", ein: "123", legalAddress: { line1: "1 Legal Street", line2: "", city: "", state: "TX", postalCode: "78701", country: "US" },
+      officeName: "", officeAddress: { line1: "2 Work Street", line2: "", city: "", state: "TX", postalCode: "78702", country: "US" }, actualWorkLocationAttested: false,
+      website: "invalid", phone: "123", payrollContactEmail: "invalid", payrollContactPhone: "123",
+      payFrequency: "weekly", firstPayday: "2026-02-30", firstPeriodEnd: "2026-02-30", payrollStartDate: "2026-02-30", expectedW2Workers: "-1",
+    })).toMatchObject({
+      payrollEntityType: "Select a supported business structure.",
+      payrollEin: "Enter a nine-digit federal tax ID.",
+      payrollLegalAddress: "Enter a complete U.S. legal business address.",
+      payrollOfficeName: "Enter the primary workplace name.",
+      payrollOfficeAddress: "Provide a complete primary workplace address.",
+      payrollActualWorkLocationAttested: "Confirm employees physically work at this location.",
+      websiteUrl: "Enter an http or https company website.",
+      mainPhone: "Enter an international company phone number.",
+      payrollContactName: "Enter the payroll contact’s full name.",
+      payrollContactEmail: "Enter a valid payroll contact’s email address.",
+      payrollContactPhone: "Enter an international payroll contact’s phone number.",
+      payrollFirstPayday: "Enter a valid first scheduled payday.",
+      payrollFirstPeriodEnd: "Enter a valid first pay period end date.",
+      payrollStartDate: "Enter a valid payroll tracking start date.",
+      expectedW2Workers: "Enter a whole number of W-2 employees, 0 or more.",
+    });
+  });
   it("allows empty address objects in a blank needs-information draft", () => {
     expect(validateCompanySetup({ legalAddress: { line1: "", line2: "", city: "", state: "", postalCode: "", country: "US" }, officeAddress: { line1: "", line2: "", city: "", state: "", postalCode: "", country: "US" } })).toEqual({});
   });
