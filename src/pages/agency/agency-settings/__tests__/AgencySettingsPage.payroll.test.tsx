@@ -15,9 +15,16 @@ const LocationProbe = () => <output data-testid="location">{useLocation().search
 describe("Agency Settings payroll tab", () => {
   beforeEach(() => { user = { uid: "u", agencyId: "a", payrollEmploymentId: "employment-1", canOpenAgencyPayrollSetup: true, userType: UserType.AGENCY, profile: {} }; });
   it("accepts authorized direct URL navigation with the exact user scope", async () => { render(<MemoryRouter initialEntries={["/settings?tab=payrollSetup"]}><AgencySettingsPage /><LocationProbe /></MemoryRouter>); expect(await screen.findByTestId("payroll-scope")).toHaveTextContent("u:a"); });
-  it("removes the payroll query for an unauthorized bootstrap", async () => { user = { ...user, canOpenAgencyPayrollSetup: false }; render(<MemoryRouter initialEntries={["/settings?tab=payrollSetup"]}><AgencySettingsPage /><LocationProbe /></MemoryRouter>); expect(screen.queryByTestId("payroll-scope")).not.toBeInTheDocument(); expect(await screen.findByTestId("location")).toHaveTextContent(""); });
+  it("keeps Payroll Setup available to the agency owner before the server bootstrap capability exists", async () => {
+    user = { ...user, canOpenAgencyPayrollSetup: false };
+    render(<MemoryRouter initialEntries={["/settings?tab=payrollSetup"]}><AgencySettingsPage /><LocationProbe /></MemoryRouter>);
+    expect(await screen.findByTestId("payroll-scope")).toHaveTextContent("u:a");
+    expect(screen.getByRole("tab", { name: "Payroll Setup" })).toBeInTheDocument();
+  });
+  it("removes the payroll query for a staff member without payroll authority", async () => { user = { ...user, userType: UserType.AGENCY_STAFF, canOpenAgencyPayrollSetup: false, profile: { accessList: [] } }; render(<MemoryRouter initialEntries={["/settings?tab=payrollSetup"]}><AgencySettingsPage /><LocationProbe /></MemoryRouter>); expect(screen.queryByTestId("payroll-scope")).not.toBeInTheDocument(); expect(await screen.findByTestId("location")).toHaveTextContent(""); });
   it("removes an unknown tab query", async () => { user = { uid: "u", agencyId: "a", payrollEmploymentId: "employment-1", canOpenAgencyPayrollSetup: true, userType: UserType.AGENCY, profile: {} }; render(<MemoryRouter initialEntries={["/settings?tab=unknown&from=notice"]}><AgencySettingsPage /><LocationProbe /></MemoryRouter>); expect(screen.queryByTestId("payroll-scope")).not.toBeInTheDocument(); expect(await screen.findByTestId("location")).not.toHaveTextContent("tab=unknown"); });
-  it("falls back to Account and unmounts payroll when the active capability is lost", async () => {
+  it("falls back to Account and unmounts payroll when server setup capability is lost", async () => {
+    user = { ...user, userType: UserType.AGENCY_STAFF, canOpenAgencyPayrollSetup: true, profile: { accessList: [] } };
     const view = render(<MemoryRouter initialEntries={["/settings?tab=payrollSetup"]}><AgencySettingsPage /><LocationProbe /></MemoryRouter>);
     expect(await screen.findByTestId("payroll-scope")).toBeInTheDocument();
     user = { ...user, canOpenAgencyPayrollSetup: false };
@@ -34,16 +41,22 @@ describe("Agency Settings payroll tab", () => {
     expect(screen.queryByRole("tab", { name: "Payroll Setup" })).not.toBeInTheDocument();
   });
 
-  it("shows both payroll tabs for Payroll Management and signer staff", () => {
-    user = { ...user, userType: UserType.AGENCY_STAFF };
+  it("shows both payroll tabs for Payroll Management and server-authorized staff", () => {
+    user = { ...user, userType: UserType.AGENCY_STAFF, canOpenAgencyPayrollSetup: false, profile: { accessList: ["Payroll Management"] } };
     const view = render(<MemoryRouter><AgencySettingsPage /></MemoryRouter>);
     expect(screen.getByRole("tab", { name: "My Payroll" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Payroll Setup" })).toBeInTheDocument();
     view.unmount();
 
-    user = { ...user, profile: { accessList: ["Signer"] } };
+    user = { ...user, canOpenAgencyPayrollSetup: true, profile: { accessList: [] } };
     render(<MemoryRouter><AgencySettingsPage /></MemoryRouter>);
     expect(screen.getByRole("tab", { name: "My Payroll" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Payroll Setup" })).toBeInTheDocument();
+  });
+
+  it("uses the server capability for staff without a guessed access label", () => {
+    user = { ...user, userType: UserType.AGENCY_STAFF, canOpenAgencyPayrollSetup: true, profile: { accessList: [] } };
+    render(<MemoryRouter><AgencySettingsPage /></MemoryRouter>);
     expect(screen.getByRole("tab", { name: "Payroll Setup" })).toBeInTheDocument();
   });
 

@@ -6,6 +6,7 @@ import SettingsTabSkeleton from "./components/SettingsTabSkeleton";
 import { TabPanel } from "@/pages/shared/settings";
 import { useAuth } from "@/utils/auth";
 import { UserType } from "@/utils/auth/types";
+import { canManageEmployeePayroll } from "@/lib/agency/agency-billing-permissions";
 
 const AgencyInfoTab = lazy(() => import("./components/AgencyInfoTab"));
 const NotificationsTab = lazy(() => import("./components/NotificationTab"));
@@ -25,8 +26,10 @@ export default function AgencySettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTabId>("account");
 
   const [visitedTabs, setVisitedTabs] = useState<Set<SettingsTabId>>(() => new Set(["account"]));
-  const canOpenPayrollSetup = user?.canOpenAgencyPayrollSetup === true;
   const isAgencyStaff = user?.userType === UserType.AGENCY_STAFF;
+  const accessList = user?.profile?.accessList ?? [];
+  const canOpenPayrollSetup = canManageEmployeePayroll(user?.userType, accessList)
+    || user?.canOpenAgencyPayrollSetup === true;
 
 
 

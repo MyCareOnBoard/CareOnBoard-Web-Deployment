@@ -1,3 +1,5 @@
+import type { CheckPayrollProfileRead, CheckPayrollProfileWrite } from "@/lib/agency/agency-profile-payload";
+
 export type PayrollAudience = "agency" | "employee" | "superAdmin";
 export type PayrollScope = { audience: PayrollAudience; actorUid: string; agencyId: string };
 export type PayrollAction = "designate_signer" | "clear_signer" | "retry_company_sync" | "refresh_company_reconciliation";
@@ -23,13 +25,20 @@ export type ManagedEmployeePrimaryCommandArgs = Omit<PayrollScope, "audience"> &
   idempotencyKey: string;
 };
 
+export type AgencyPayrollBootstrapArgs = PayrollScope & {
+  expectedProjectionRevision: number;
+  checkPayrollProfile: CheckPayrollProfileWrite;
+};
+
 export interface AgencyPayrollSetupProjection {
   projectionRevision: number;
   generatedAt?: string;
   clientRevalidateAfter?: string;
+  integration: { state: "not_configured" | "configured"; environment: "sandbox" | "production" };
+  preflight: { values: CheckPayrollProfileRead; missingFieldCodes: string[] };
   readiness: { status: "needs_information" | "ready_to_sync" | "needs_attention" | "ready"; blockers: string[]; nextAction: string | null };
   setup: { designatedSignerPresent: boolean; companyLinked: boolean; officeWorkplaceLinked: boolean; payScheduleLinked: boolean; enrollmentProfileLocked: boolean };
-  capabilities: { canView: boolean; canManage: boolean; canDesignateSigner: boolean; createCompanyOnboardSession: false };
+  capabilities: { canView: boolean; canManage: boolean; canCreateIntegration: boolean; canDesignateSigner: boolean; createCompanyOnboardSession: false };
 }
 
 export interface EmployeePayrollSetupProjection {
