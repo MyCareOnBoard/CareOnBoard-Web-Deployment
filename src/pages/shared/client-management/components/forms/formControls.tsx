@@ -203,6 +203,8 @@ export function DatePickerField({
   onChange,
   placeholder = "Select date",
   required,
+  ariaInvalid,
+  ariaDescribedBy,
 }: {
   id?: string;
   label?: string;
@@ -210,6 +212,8 @@ export function DatePickerField({
   onChange: (next: Date | undefined) => void;
   placeholder?: string;
   required?: boolean;
+  ariaInvalid?: boolean;
+  ariaDescribedBy?: string;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -221,7 +225,7 @@ export function DatePickerField({
       ) : null}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <button type="button" id={id} aria-required={required || undefined} className="w-full focus:outline-none">
+          <button type="button" id={id} aria-required={required || undefined} aria-invalid={ariaInvalid || undefined} aria-describedby={ariaDescribedBy} className="w-full focus:outline-none">
             <InputGroup className="h-11 rounded-[10px] border border-[#cccccd] bg-white px-3">
               <InputGroupInput
                 value={value ? format(value, "MMM d, yyyy") : ""}
