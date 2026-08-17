@@ -4,11 +4,13 @@ import { useDispatch } from "react-redux";
 import { employeePayrollApi, useCreateEmployeeOnboardSessionMutation, useRunEmployeePayrollCommandMutation } from "../api/employeePayrollEndpoints";
 import type { EmployeePayrollAction, EmployeePayrollScope } from "../model/types";
 import { employeePayrollBlockerMessage } from "./employeePayrollCopy";
+import { Loader2 } from "lucide-react";
 
 const CheckOnboardModal = lazy(async () => {
   const module = await import("../onboard/CheckOnboardModal");
   return { default: module.CheckOnboardModal };
 });
+const EmployeePayrollPrerequisitesModal = lazy(() => import("./EmployeePayrollPrerequisitesModal"));
 
 const pollingStates = new Set(["queued", "waiting", "awaiting_provider"]);
 
@@ -33,6 +35,8 @@ export default function MyPayrollTab({ scope, active }: { scope: EmployeePayroll
   const [pendingAction, setPendingAction] = useState<EmployeePayrollAction | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [prerequisitesOpen, setPrerequisitesOpen] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const actionInFlight = useRef(false);
   const actionToken = useRef(0);
   const mounted = useRef(true);
@@ -81,6 +85,8 @@ export default function MyPayrollTab({ scope, active }: { scope: EmployeePayroll
     setPendingAction(null);
     setActionError(null);
     setOnboardingOpen(false);
+    setPrerequisitesOpen(false);
+    setScanning(false);
     coalescedRefetch.current = { employmentId: scope.employmentId, inFlight: false, trailing: false };
   }, [scope.actorUid, scope.agencyId, scope.employmentId]);
 
@@ -102,7 +108,9 @@ export default function MyPayrollTab({ scope, active }: { scope: EmployeePayroll
     });
   }, [scope.employmentId, subscription]);
 
-  const runAction = async (command: EmployeePayrollAction) => {
+  const hasPrerequisites = (payroll: NonNullable<typeof queryState.currentData>) => payroll.prerequisites.missingFieldCodes.includes("legalName") || payroll.prerequisites.invalidFieldCodes.includes("email");
+
+  const runAction = async (command: EmployeePayrollAction, profile?: { legalName: string; email: string | null }) => {
     const current = queryState.currentData;
     if (!current || actionInFlight.current) return;
     const actionScope = { ...scope };
@@ -119,19 +127,24 @@ export default function MyPayrollTab({ scope, active }: { scope: EmployeePayroll
         command,
         projectionRevision: current.projectionRevision,
         idempotencyKey: crypto.randomUUID(),
+        ...(profile ? { profile } : {}),
       }).unwrap();
       if (!isCurrentAction()) return;
+      if (command === "start_provisioning" && profile) setPrerequisitesOpen(false);
     } catch (error) {
       if (!isCurrentAction()) return;
       if (errorStatus(error) === 409) {
         try {
-          await subscription.refetch().unwrap();
+          const refreshed = await subscription.refetch().unwrap();
+          if (!isCurrentAction()) return;
+          setPrerequisitesOpen(hasPrerequisites(refreshed));
         } catch {
           if (!isCurrentAction()) return;
           setActionError("Payroll setup could not be updated. Please try again.");
           return;
         }
         if (!isCurrentAction()) return;
+        setActionError("Payroll setup was updated. Please review and try again.");
       } else {
         setActionError("Payroll setup could not be updated. Please try again.");
       }
@@ -139,6 +152,31 @@ export default function MyPayrollTab({ scope, active }: { scope: EmployeePayroll
       if (!isCurrentAction()) return;
       actionInFlight.current = false;
       setPendingAction(null);
+    }
+  };
+
+  const startPayroll = async () => {
+    if (actionInFlight.current || scanning) return;
+    const actionScope = { ...scope };
+    const token = ++actionToken.current;
+    const isCurrent = () => mounted.current && actionToken.current === token && samePayrollScope(currentScope.current, actionScope);
+    actionInFlight.current = true;
+    setScanning(true);
+    setActionError(null);
+    try {
+      const fresh = await subscription.refetch().unwrap();
+      if (!isCurrent()) return;
+      if (fresh.agencyIntegration.state === "missing") return;
+      if (hasPrerequisites(fresh)) { setPrerequisitesOpen(true); return; }
+      actionInFlight.current = false;
+      setScanning(false);
+      await runAction("start_provisioning");
+    } catch {
+      if (isCurrent()) setActionError("Payroll setup could not be updated. Please try again.");
+    } finally {
+      if (!isCurrent()) return;
+      if (!pendingAction) actionInFlight.current = false;
+      setScanning(false);
     }
   };
 
@@ -155,7 +193,7 @@ export default function MyPayrollTab({ scope, active }: { scope: EmployeePayroll
     return <section aria-labelledby="my-payroll-heading" className="border-b border-[#e5e7eb] py-6"><h2 id="my-payroll-heading" className="text-xl font-semibold text-[#10141a]">My Payroll</h2><p role="alert" className="mt-3 text-sm text-[#5d626b]">Payroll setup is not available for this account.</p></section>;
   }
 
-  if (!queryState.currentData && (queryState.isLoading || queryState.isFetching)) {
+  if (!queryState.currentData && (queryState.isUninitialized || queryState.isLoading || queryState.isFetching)) {
     return <section aria-label="Loading payroll setup" aria-busy="true" role="status" className="min-h-[188px] animate-pulse border-b border-[#e5e7eb] py-6"><div className="h-3 w-24 rounded bg-[#dfe7e7]" /><div className="mt-3 h-6 w-48 rounded bg-[#e8eeee]" /><div className="mt-5 h-4 w-full max-w-md rounded bg-[#e8eeee]" /></section>;
   }
 
@@ -166,7 +204,8 @@ export default function MyPayrollTab({ scope, active }: { scope: EmployeePayroll
   const payroll = queryState.currentData;
   if (!payroll) return null;
   const { setup, capabilities } = payroll;
-  const busy = pendingAction !== null;
+  const integrationMissing = payroll.agencyIntegration.state === "missing";
+  const busy = pendingAction !== null || scanning;
   const progress = pollingStates.has(setup.state);
   const needsAttention = setup.state === "blocked" || setup.state === "needs_attention";
   const canContinue = setup.state === "ready" && (setup.onboardingStatus === "blocking" || setup.onboardingStatus === "needs_attention") && capabilities.createEmployeeOnboardSession;
@@ -174,16 +213,18 @@ export default function MyPayrollTab({ scope, active }: { scope: EmployeePayroll
   return <section aria-labelledby="my-payroll-heading" className="border-b border-[#e5e7eb] py-6">
     <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#006f73]">Payroll</p>
     <h2 id="my-payroll-heading" className="mt-1 text-xl font-semibold text-[#10141a]">My Payroll</h2>
-    {setup.state === "not_started" && <p className="mt-3 text-sm text-[#5d626b]">Start payroll setup when you are ready.</p>}
+    {queryState.isFetching && <span role="status" aria-label="Refreshing payroll setup" className="ml-2 inline-flex align-middle"><Loader2 aria-hidden="true" className="h-4 w-4 text-[#006f73] motion-safe:animate-spin" /></span>}
+    {integrationMissing ? <p role="status" className="mt-3 text-sm text-[#5d626b]">Your agency must complete Payroll Setup before you can start your personal payroll setup.</p> : setup.state === "not_started" && <p className="mt-3 text-sm text-[#5d626b]">Start payroll setup when you are ready.</p>}
     {progress && <p role="status" aria-label="Payroll setup is in progress" aria-live="polite" className="mt-3 text-sm text-[#5d626b]">Payroll setup is in progress. This page will update automatically.</p>}
     {needsAttention && <div role="status" aria-live="polite" className="mt-3 space-y-1 text-sm text-[#5d626b]">{setup.blockers.map((blocker) => <p key={blocker}>{employeePayrollBlockerMessage(blocker)}</p>)}</div>}
     {setup.state === "ready" && setup.onboardingStatus === "completed" && <p role="status" className="mt-3 text-sm text-[#176b4d]">Payroll setup is complete.</p>}
     {actionError && <p role="alert" className="mt-3 text-sm text-[#8b2d2d]">{actionError}</p>}
     <div className="mt-4 flex flex-wrap items-center gap-3">
-      {setup.state === "not_started" && capabilities.canStartProvisioning && <button type="button" disabled={busy} onClick={() => void runAction("start_provisioning")} className="rounded-md bg-[#006f73] px-4 py-2 text-sm font-medium text-white hover:bg-[#00595c] disabled:opacity-60">{pendingAction === "start_provisioning" ? "Starting payroll setup..." : "Start payroll setup"}</button>}
-      {needsAttention && capabilities.canRetryEmployeeSync && <button type="button" disabled={busy} onClick={() => void runAction("retry_employee_sync")} className="text-sm font-semibold text-[#006f73] underline disabled:opacity-60">{pendingAction === "retry_employee_sync" ? "Retrying payroll setup..." : "Retry payroll setup"}</button>}
-      {canContinue && !onboardingOpen && <button type="button" onClick={() => setOnboardingOpen(true)} className="rounded-md bg-[#006f73] px-4 py-2 text-sm font-medium text-white hover:bg-[#00595c]">Continue secure setup</button>}
-      {canContinue && onboardingOpen && <Suspense fallback={<p role="status" className="text-sm text-[#5d626b]">Loading secure setup...</p>}><CheckOnboardModal requestSession={requestOnboardSession} onRefetch={refetchCoalesced} /></Suspense>}
+      {!integrationMissing && setup.state === "not_started" && capabilities.canStartProvisioning && <button type="button" disabled={busy} aria-busy={busy} onClick={() => void startPayroll()} className="inline-flex min-h-11 min-w-[13rem] items-center justify-center rounded-md bg-[#006f73] px-4 py-2 text-sm font-medium text-white hover:bg-[#00595c] disabled:opacity-60">{scanning ? <span role="status" className="inline-flex items-center gap-2"><Loader2 aria-hidden="true" className="h-4 w-4 motion-safe:animate-spin" />Scanning payroll details…</span> : pendingAction === "start_provisioning" ? <span role="status" className="inline-flex items-center gap-2"><Loader2 aria-hidden="true" className="h-4 w-4 motion-safe:animate-spin" />Starting payroll setup…</span> : "Start payroll setup"}</button>}
+      {!integrationMissing && needsAttention && capabilities.canRetryEmployeeSync && <button type="button" disabled={busy} onClick={() => void runAction("retry_employee_sync")} className="text-sm font-semibold text-[#006f73] underline disabled:opacity-60">{pendingAction === "retry_employee_sync" ? "Retrying payroll setup..." : "Retry payroll setup"}</button>}
+      {!integrationMissing && canContinue && !onboardingOpen && <button type="button" onClick={() => setOnboardingOpen(true)} className="rounded-md bg-[#006f73] px-4 py-2 text-sm font-medium text-white hover:bg-[#00595c]">Continue secure setup</button>}
+      {!integrationMissing && canContinue && onboardingOpen && <Suspense fallback={<p role="status" className="text-sm text-[#5d626b]">Loading secure setup...</p>}><CheckOnboardModal requestSession={requestOnboardSession} onRefetch={refetchCoalesced} /></Suspense>}
     </div>
+    {!integrationMissing && prerequisitesOpen && <Suspense fallback={<p role="status" aria-busy="true" className="mt-4 text-sm text-[#5d626b]">Loading payroll details…</p>}><EmployeePayrollPrerequisitesModal open values={payroll.prerequisites.values} missingFieldCodes={payroll.prerequisites.missingFieldCodes} invalidFieldCodes={payroll.prerequisites.invalidFieldCodes} isSubmitting={pendingAction === "start_provisioning"} error={actionError} onOpenChange={setPrerequisitesOpen} onSubmit={async (profile) => { await runAction("start_provisioning", profile); }} /></Suspense>}
   </section>;
 }

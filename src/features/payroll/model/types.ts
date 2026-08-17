@@ -44,6 +44,12 @@ export interface AgencyPayrollSetupProjection {
 export interface EmployeePayrollSetupProjection {
   employmentId: string;
   projectionRevision: number;
+  agencyIntegration: { state: "missing" | "configured" };
+  prerequisites: {
+    values: { legalName: string | null; email?: string };
+    missingFieldCodes: string[];
+    invalidFieldCodes: string[];
+  };
   setup: {
     state: "not_started" | "queued" | "waiting" | "blocked" | "awaiting_provider" | "needs_attention" | "ready";
     blockers: string[];

@@ -1,12 +1,17 @@
 import { checkPayrollApi } from "./checkPayrollApi";
 import { employeeSetupMutationTags, payrollTag, payrollScopeKey } from "./cacheTags";
-import type { EmployeePayrollAction, EmployeePayrollScope, EmployeePayrollSetupProjection, PayrollOperation } from "../model/types";
+import type { EmployeePayrollScope, EmployeePayrollSetupProjection, PayrollOperation } from "../model/types";
 
-export type EmployeePayrollCommandArgs = EmployeePayrollScope & {
-  command: EmployeePayrollAction;
+export type EmployeePayrollCommandArgs = EmployeePayrollScope & ({
+  command: "start_provisioning";
   projectionRevision: number;
   idempotencyKey: string;
-};
+  profile?: { legalName: string; email: string | null };
+} | {
+  command: "retry_employee_sync";
+  projectionRevision: number;
+  idempotencyKey: string;
+});
 
 export type EmployeeOnboardSessionArgs = EmployeePayrollScope & {
   projectionRevision: number;
@@ -23,7 +28,11 @@ export const employeePayrollPaths = {
 export const employeePayrollCommandRequest = (args: EmployeePayrollCommandArgs) => ({
   ...employeePayrollPaths.commands(args.employmentId),
   headers: { "Idempotency-Key": args.idempotencyKey },
-  data: { command: args.command, expectedProjectionRevision: args.projectionRevision },
+  data: {
+    command: args.command,
+    expectedProjectionRevision: args.projectionRevision,
+    ...(args.command === "start_provisioning" && args.profile ? { profile: args.profile } : {}),
+  },
 });
 
 export const employeeOnboardSessionRequest = (args: EmployeeOnboardSessionArgs) => ({

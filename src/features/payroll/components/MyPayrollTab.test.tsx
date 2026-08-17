@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EmployeePayrollSetupProjection, EmployeePayrollScope } from "../model/types";
 
 const testState = vi.hoisted(() => ({
-  requests: [] as Array<{ url: string; method: string; headers?: Record<string, string> }> ,
+  requests: [] as Array<{ url: string; method: string; headers?: Record<string, string>; data?: unknown }> ,
   getResponses: [] as Array<Promise<unknown> | unknown>,
   commandResponse: { data: { operationId: "operation-1", state: "accepted", resourceType: "employee", pollAfterMs: null } } as unknown,
   commandResponses: [] as Array<Promise<unknown> | unknown>,
@@ -18,7 +18,7 @@ const testState = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/baseQuery", () => ({
-  customBaseQuery: async (args: { url: string; method: string; headers?: Record<string, string> }) => {
+  customBaseQuery: async (args: { url: string; method: string; headers?: Record<string, string>; data?: unknown }) => {
     testState.requests.push(args);
     if (args.method === "GET") {
       const next = testState.getResponses.shift();
@@ -54,6 +54,8 @@ const scope: EmployeePayrollScope = {
 const projection = (overrides: Partial<EmployeePayrollSetupProjection> = {}): EmployeePayrollSetupProjection => ({
   employmentId: scope.employmentId,
   projectionRevision: 3,
+  agencyIntegration: { state: "configured" },
+  prerequisites: { values: { legalName: "Ada Lovelace", email: "ada@example.test" }, missingFieldCodes: [], invalidFieldCodes: [] },
   setup: {
     state: "not_started",
     blockers: [],
@@ -133,7 +135,56 @@ describe("MyPayrollTab", () => {
   it("uses a fixed accessible skeleton while setup is loading", async () => {
     testState.getResponses.push(new Promise(() => {}));
     renderPayroll();
-    expect(await screen.findByRole("status", { name: /loading payroll setup/i })).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("status", { name: /loading payroll setup/i })).toHaveAttribute("aria-busy", "true");
+    expect(screen.queryByRole("heading", { name: "My Payroll" })).not.toBeInTheDocument();
+  });
+
+  it("withholds personal payroll actions until the agency completes Payroll Setup", async () => {
+    testState.getResponses.push(readyResponse(projection({
+      agencyIntegration: { state: "missing" },
+      setup: { state: "not_started", blockers: [], onboardingStatus: null, blockingStepCodes: [], remainingStepCodes: [] },
+    })));
+    renderPayroll();
+    expect(await screen.findByText("Your agency must complete Payroll Setup before you can start your personal payroll setup.")).toBeVisible();
+    expect(screen.queryByRole("button", { name: /start payroll setup|continue secure setup|create payroll/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/ssn|social security|date of birth|bank account|tax/i)).not.toBeInTheDocument();
+  });
+
+  it("scans first, then collects only missing identity details before starting payroll", async () => {
+    testState.getResponses.push(
+      readyResponse(projection()),
+      readyResponse(projection({ prerequisites: { values: { legalName: "", email: "not-an-email" }, missingFieldCodes: ["legalName"], invalidFieldCodes: ["email"] } })),
+      readyResponse(projection({ setup: { state: "queued", blockers: [], onboardingStatus: null, blockingStepCodes: [], remainingStepCodes: [] } })),
+    );
+    const user = userEvent.setup();
+    renderPayroll();
+    await user.click(await screen.findByRole("button", { name: "Start payroll setup" }));
+    expect(await screen.findByRole("dialog")).toBeVisible();
+    expect(screen.getByLabelText("Legal name")).toHaveFocus();
+    expect(screen.queryByText(/ssn|social security|date of birth|bank|tax|address/i)).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText("Legal name"), "Ada Lovelace");
+    await user.click(screen.getByRole("button", { name: "Remove email" }));
+    await user.click(screen.getByRole("button", { name: "Start payroll setup" }));
+    await waitFor(() => expect(commandRequests()).toHaveLength(1));
+    expect(commandRequests()[0].data).toEqual({ command: "start_provisioning", expectedProjectionRevision: 3, profile: { legalName: "Ada Lovelace", email: null } });
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(await screen.findByRole("status", { name: /payroll setup is in progress/i })).toBeVisible();
+  });
+
+  it("normalizes a null prefilled legal name without allowing submission", async () => {
+    testState.getResponses.push(
+      readyResponse(projection()),
+      readyResponse(projection({ prerequisites: { values: { legalName: null }, missingFieldCodes: ["legalName"], invalidFieldCodes: [] } })),
+    );
+    const user = userEvent.setup();
+    renderPayroll();
+    await user.click(await screen.findByRole("button", { name: "Start payroll setup" }));
+    expect(await screen.findByRole("dialog")).toBeVisible();
+    expect(screen.getByLabelText("Legal name")).toHaveValue("");
+    await user.click(screen.getByRole("button", { name: "Start payroll setup" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Enter your legal name.");
+    expect(screen.getByLabelText("Legal name")).toHaveFocus();
+    expect(commandRequests()).toHaveLength(0);
   });
 
   it("renders a retryable setup error and fetches exactly once for the retry", async () => {
@@ -204,7 +255,7 @@ describe("MyPayrollTab", () => {
   });
 
   it("sends one command with one generated key, relies on invalidation refresh, and blocks double click", async () => {
-    testState.getResponses.push(readyResponse(projection()), readyResponse(projection({ setup: { state: "queued", blockers: [], onboardingStatus: null, blockingStepCodes: [], remainingStepCodes: [] } })));
+    testState.getResponses.push(readyResponse(projection()), readyResponse(projection()), readyResponse(projection({ setup: { state: "queued", blockers: [], onboardingStatus: null, blockingStepCodes: [], remainingStepCodes: [] } })));
     const user = userEvent.setup();
     renderPayroll();
     const button = await screen.findByRole("button", { name: "Start payroll setup" });
@@ -212,21 +263,21 @@ describe("MyPayrollTab", () => {
     await waitFor(() => expect(commandRequests()).toHaveLength(1));
     expect(commandRequests()[0].headers).toEqual({ "Idempotency-Key": "payroll-action-uuid" });
     await screen.findByRole("status", { name: /payroll setup is in progress/i });
-    expect(getRequests()).toHaveLength(2);
+    expect(getRequests()).toHaveLength(3);
   });
 
   it("performs one explicit refetch for a 409 command conflict", async () => {
-    testState.getResponses.push(readyResponse(projection()), readyResponse(projection()));
+    testState.getResponses.push(readyResponse(projection()), readyResponse(projection()), readyResponse(projection()));
     testState.commandResponse = { error: { status: 409, data: "stale" } };
     const user = userEvent.setup();
     renderPayroll();
     await user.click(await screen.findByRole("button", { name: "Start payroll setup" }));
     await waitFor(() => expect(commandRequests()).toHaveLength(1));
-    await waitFor(() => expect(getRequests()).toHaveLength(2));
+    await waitFor(() => expect(getRequests()).toHaveLength(3));
   });
 
   it("contains a current-scope 409 refresh error in the retryable panel state", async () => {
-    testState.getResponses.push(readyResponse(projection()), { error: { status: 500, data: "refresh unavailable" } });
+    testState.getResponses.push(readyResponse(projection()), readyResponse(projection()), { error: { status: 500, data: "refresh unavailable" } });
     testState.commandResponse = { error: { status: 409, data: "stale" } };
     const user = userEvent.setup();
     renderPayroll();
@@ -234,12 +285,12 @@ describe("MyPayrollTab", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/could not be updated/i);
     expect(screen.getByRole("button", { name: "Start payroll setup" })).toBeEnabled();
     expect(commandRequests()).toHaveLength(1);
-    expect(getRequests()).toHaveLength(2);
+    expect(getRequests()).toHaveLength(3);
   });
 
   it("does not refetch or escape when a 409 settles after unmount", async () => {
     let resolveCommand!: (value: unknown) => void;
-    testState.getResponses.push(readyResponse(projection()));
+    testState.getResponses.push(readyResponse(projection()), readyResponse(projection()));
     testState.commandResponses.push(new Promise((resolve) => { resolveCommand = resolve; }));
     const user = userEvent.setup();
     const view = renderPayroll();
@@ -247,14 +298,14 @@ describe("MyPayrollTab", () => {
     await waitFor(() => expect(commandRequests()).toHaveLength(1));
     view.unmount();
     await act(async () => { resolveCommand({ error: { status: 409, data: "stale" } }); });
-    expect(getRequests()).toHaveLength(1);
+    expect(getRequests()).toHaveLength(2);
   });
 
   it("does not let a stale 409 refetch or clear the current scope action", async () => {
     let resolveOldCommand!: (value: unknown) => void;
     let resolveCurrentCommand!: (value: unknown) => void;
     const currentScope = { ...scope, employmentId: "employment-2" };
-    testState.getResponses.push(readyResponse(projection()), readyResponse(projection({ employmentId: currentScope.employmentId })));
+    testState.getResponses.push(readyResponse(projection()), readyResponse(projection()), readyResponse(projection({ employmentId: currentScope.employmentId })), readyResponse(projection({ employmentId: currentScope.employmentId })));
     testState.commandResponses.push(
       new Promise((resolve) => { resolveOldCommand = resolve; }),
       new Promise((resolve) => { resolveCurrentCommand = resolve; }),
@@ -266,11 +317,11 @@ describe("MyPayrollTab", () => {
     view.rerender(<Provider store={view.store}><MyPayrollTab scope={currentScope} active /></Provider>);
     const currentButton = await screen.findByRole("button", { name: "Start payroll setup" });
     await user.click(currentButton);
-    expect(await screen.findByRole("button", { name: "Starting payroll setup..." })).toBeDisabled();
-    expect(getRequests()).toHaveLength(2);
+    expect(await screen.findByRole("button", { name: /Starting payroll setup/ })).toBeDisabled();
+    expect(getRequests()).toHaveLength(4);
     await act(async () => { resolveOldCommand({ error: { status: 409, data: "stale" } }); });
-    expect(getRequests()).toHaveLength(2);
-    expect(screen.getByRole("button", { name: "Starting payroll setup..." })).toBeDisabled();
+    expect(getRequests()).toHaveLength(4);
+    expect(screen.getByRole("button", { name: /Starting payroll setup/ })).toBeDisabled();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     view.unmount();
     await act(async () => { resolveCurrentCommand({ data: { operationId: "operation-2", state: "accepted", resourceType: "employee", pollAfterMs: null } }); });

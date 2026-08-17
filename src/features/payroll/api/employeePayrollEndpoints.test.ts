@@ -70,6 +70,29 @@ describe("employee payroll wire contracts", () => {
     expect(employeePayrollInvalidationTags(undefined, args)).toEqual(employeePayrollMutationTags(args));
     expect(employeePayrollInvalidationTags({ status: 409 }, args)).toEqual([]);
   });
+
+  it("serializes the closed optional personal profile without leaking scope data", () => {
+    const request = employeePayrollCommandRequest({
+      ...employeeScope,
+      command: "start_provisioning",
+      projectionRevision: 7,
+      idempotencyKey: "employee-action-profile",
+      profile: { legalName: "Ada Lovelace", email: null },
+    });
+
+    expect(request).toEqual({
+      url: "/checkPayrollEmployee/payroll/employees/employment-1/commands",
+      method: "POST",
+      requiresAuth: true,
+      headers: { "Idempotency-Key": "employee-action-profile" },
+      data: {
+        command: "start_provisioning",
+        expectedProjectionRevision: 7,
+        profile: { legalName: "Ada Lovelace", email: null },
+      },
+    });
+    expect(JSON.stringify(request)).not.toMatch(/agencyId|actorUid|ssn|dateOfBirth|bank|tax/i);
+  });
 });
 
 describe("manager primary-workplace wire contracts", () => {
