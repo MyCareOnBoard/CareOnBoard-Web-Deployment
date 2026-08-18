@@ -138,6 +138,7 @@ describe("AgencyPayrollSetupTab", () => {
     const user = userEvent.setup();
     const view = render(<AgencyPayrollSetupTab scope={scope} />);
     await user.click(screen.getByRole("button", { name: /create payroll setup/i }));
+    expect(mocks.signerSearchTrigger).not.toHaveBeenCalled();
     expect(await screen.findByRole("status")).toHaveTextContent("Creating payroll setup…");
     expect(screen.getByTestId("agency-payroll-create-spinner")).toBeInTheDocument();
     expect(screen.queryByText("Scanning agency details…")).not.toBeInTheDocument();
@@ -251,7 +252,6 @@ describe("AgencyPayrollSetupTab", () => {
     const user = userEvent.setup();
     render(<AgencyPayrollSetupTab scope={scope} />);
     await user.click(screen.getByRole("button", { name: /create payroll setup/i }));
-    expect(mocks.signerSearchTrigger).not.toHaveBeenCalled();
     expect(await screen.findByRole("radio", { name: /ada owner/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^create payroll setup$/i })).toBeDisabled();
   });
