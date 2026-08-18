@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useGetAgencyPayrollSignerCandidatesQuery, useLazyGetAgencyPayrollSignerCandidatesQuery } from "../api/agencyPayrollEndpoints";
-import { newIdempotencyKey, type IdempotencyKey } from "../api/payrollCommands";
+import { useLazyGetAgencyPayrollSignerCandidatesQuery } from "../api/agencyPayrollEndpoints";
 import type { PayrollScope, PayrollSignerCandidate } from "../model/types";
 
-export type SignerDesignation = { candidate: PayrollSignerCandidate; authorityAttested: true; idempotencyKey: IdempotencyKey };
+export type SignerDesignation = { candidate: PayrollSignerCandidate; authorityAttested: true };
 
 type Props = {
   scope: PayrollScope;
+  ownerCandidate: PayrollSignerCandidate | null;
   disabled?: boolean;
   initialSelection?: SignerDesignation | null;
   /** Changes after a conflict so a fresh signer decision and attestation are required. */
@@ -16,13 +16,11 @@ type Props = {
 
 const sameScope = (args: (PayrollScope & { q?: string }) | undefined, scope: PayrollScope, q: string) => Boolean(args && args.actorUid === scope.actorUid && args.agencyId === scope.agencyId && args.audience === scope.audience && args.q === q);
 
-export function AuthorizedSignerSelector({ scope, disabled = false, initialSelection = null, resetKey = 0, onSelectionChange }: Props) {
-  const ownerQuery = useGetAgencyPayrollSignerCandidatesQuery(scope);
+export function AuthorizedSignerSelector({ scope, ownerCandidate, disabled = false, initialSelection = null, resetKey = 0, onSelectionChange }: Props) {
   const [search, setSearch] = useState("");
   const [triggerSearch, searchQuery] = useLazyGetAgencyPayrollSignerCandidatesQuery();
   const [selected, setSelected] = useState<PayrollSignerCandidate | null>(initialSelection?.candidate ?? null);
   const [attested, setAttested] = useState(initialSelection?.authorityAttested === true);
-  const [idempotencyKey, setIdempotencyKey] = useState<IdempotencyKey | "">(initialSelection?.idempotencyKey ?? "");
   const scopeKey = useMemo(() => `${scope.audience}:${scope.actorUid}:${scope.agencyId}`, [scope.audience, scope.actorUid, scope.agencyId]);
   const initializedFor = useRef({ scopeKey, resetKey });
   const query = search.trim();
@@ -36,12 +34,10 @@ export function AuthorizedSignerSelector({ scope, disabled = false, initialSelec
     setSearch("");
     setSelected(null);
     setAttested(false);
-    setIdempotencyKey("");
   }, [scopeKey, resetKey]);
-  useEffect(() => { if (resetKey > 0) void ownerQuery.refetch?.(); }, [resetKey]);
   useEffect(() => {
-    onSelectionChange(selected && attested && idempotencyKey ? { candidate: selected, authorityAttested: true, idempotencyKey } : null);
-  }, [selected, attested, idempotencyKey, onSelectionChange]);
+    onSelectionChange(selected && attested ? { candidate: selected, authorityAttested: true } : null);
+  }, [selected, attested, onSelectionChange]);
   useEffect(() => {
     if (!canSearch) return;
     let request: ReturnType<typeof triggerSearch> | undefined;
@@ -49,10 +45,9 @@ export function AuthorizedSignerSelector({ scope, disabled = false, initialSelec
     return () => { window.clearTimeout(timer); request?.abort(); };
   }, [scopeKey, canSearch, query, triggerSearch]);
 
-  if (ownerQuery.isLoading) return <p role="status" className="mt-3 text-sm text-[#5d626b]">Loading signer options…</p>;
-  if (ownerQuery.isError || !ownerQuery.data?.ownerCandidate) return <p role="status" className="mt-3 text-sm text-[#5d626b]">Only the active agency owner can choose an authorized payroll signer.</p>;
-  const owner = ownerQuery.data.ownerCandidate;
-  const choose = (candidate: PayrollSignerCandidate) => { setSelected(candidate); setAttested(false); setIdempotencyKey(newIdempotencyKey()); };
+  if (!ownerCandidate) return <p role="status" className="mt-3 text-sm text-[#5d626b]">Only the active agency owner can choose an authorized payroll signer.</p>;
+  const owner = ownerCandidate;
+  const choose = (candidate: PayrollSignerCandidate) => { setSelected(candidate); setAttested(false); };
   const selectedIsOwner = selected?.userUid === owner.userUid;
   const selectedInResults = candidates.some((candidate) => candidate.userUid === selected?.userUid);
   return <fieldset className="mt-5 rounded-md border border-[#dce8e8] bg-[#f7fbfb] p-4" disabled={disabled}>

@@ -15,23 +15,33 @@ export const agencyPayrollBootstrapRequest = (args: AgencyPayrollBootstrapArgs) 
   data: {
     expectedProjectionRevision: args.expectedProjectionRevision,
     checkPayrollProfile: args.checkPayrollProfile,
+    ...(args.signerDesignation ? { signerDesignation: args.signerDesignation } : {}),
   },
 });
 
 export const agencyPayrollBootstrapInvalidationTags = (error: unknown, args: AgencyPayrollBootstrapArgs) => (
-  error ? [] : companyMutationTags(args)
+  error ? [] : companyMutationTags(args).filter((tag) => tag.type !== "AgencySetup")
 );
+export const agencyPayrollSetupTags = (scope: PayrollScope) => [payrollTag("AgencySetup", scope)];
 
 export const agencyPayrollApi = checkPayrollApi.injectEndpoints({
   endpoints: (build) => ({
     getAgencyPayrollSetup: build.query<AgencyPayrollSetupProjection, PayrollScope>({
       query: () => agencyPayrollPaths.setup(),
       serializeQueryArgs: ({ queryArgs }) => payrollScopeKey(queryArgs),
-      providesTags: (_result, _error, scope) => [payrollTag("AgencySetup", scope), payrollTag("AgencyOverview", scope)],
+      providesTags: (_result, _error, scope) => agencyPayrollSetupTags(scope),
     }),
     bootstrapAgencyPayrollSetup: build.mutation<AgencyPayrollSetupProjection, AgencyPayrollBootstrapArgs>({
       query: agencyPayrollBootstrapRequest,
       invalidatesTags: (_result, error, args) => agencyPayrollBootstrapInvalidationTags(error, args),
+      async onQueryStarted(args, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(agencyPayrollApi.util.updateQueryData("getAgencyPayrollSetup", args, () => data));
+        } catch {
+          // Request errors preserve the existing projection and surface through the caller.
+        }
+      },
     }),
     getAgencyPayrollSignerCandidates: build.query<AgencyPayrollSignerCandidates, AgencyPayrollSignerCandidatesArgs>({
       query: ({ q }) => ({ ...agencyPayrollPaths.signerCandidates(), ...(q ? { params: { q } } : {}) }),

@@ -28,6 +28,11 @@ export type ManagedEmployeePrimaryCommandArgs = Omit<PayrollScope, "audience"> &
 export type AgencyPayrollBootstrapArgs = PayrollScope & {
   expectedProjectionRevision: number;
   checkPayrollProfile: CheckPayrollProfileWrite;
+  signerDesignation?: {
+    designatedSignerUserUid: string;
+    designatedSignerIdentityVersion: string;
+    authorityAttested: true;
+  };
 };
 
 export type PayrollSignerCandidate = {
@@ -61,6 +66,7 @@ export interface AgencyPayrollSetupProjection {
     officeWorkplaceLinked: boolean;
     payScheduleLinked: boolean;
     enrollmentProfileLocked: boolean;
+    signatoryLinked: boolean;
   };
   capabilities: { canView: boolean; canManage: boolean; canCreateIntegration: boolean; canDesignateSigner: boolean; createCompanyOnboardSession: false };
 }

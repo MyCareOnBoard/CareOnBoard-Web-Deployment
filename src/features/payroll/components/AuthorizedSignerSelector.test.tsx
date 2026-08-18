@@ -6,18 +6,27 @@ import { AuthorizedSignerSelector } from "./AuthorizedSignerSelector";
 const owner = { userUid: "owner", fullName: "Ada Owner", email: "ada@example.test", title: "Owner", identityVersion: `check_signer_v1_${"a".repeat(64)}`, designated: false };
 const staff = { userUid: "staff", fullName: "Sam Staff", email: "sam@example.test", title: "Director", identityVersion: `check_signer_v1_${"b".repeat(64)}`, designated: false };
 const scope = { audience: "agency" as const, actorUid: "actor", agencyId: "agency" };
-const mocks = vi.hoisted(() => ({ ownerQuery: {} as any, searchQuery: {} as any, trigger: vi.fn() }));
+const mocks = vi.hoisted(() => ({ ownerQuery: {} as any, ownerHook: vi.fn(), searchQuery: {} as any, trigger: vi.fn() }));
 
 vi.mock("../api/agencyPayrollEndpoints", () => ({
-  useGetAgencyPayrollSignerCandidatesQuery: () => mocks.ownerQuery,
+  useGetAgencyPayrollSignerCandidatesQuery: (...args: unknown[]) => { mocks.ownerHook(...args); return mocks.ownerQuery; },
   useLazyGetAgencyPayrollSignerCandidatesQuery: () => [mocks.trigger, mocks.searchQuery],
 }));
 vi.mock("../api/payrollCommands", () => ({ newIdempotencyKey: vi.fn(() => "00000000-0000-4000-8000-000000000001") }));
 
-const renderSelector = (props: Partial<React.ComponentProps<typeof AuthorizedSignerSelector>> = {}) => render(<AuthorizedSignerSelector scope={scope} onSelectionChange={vi.fn()} {...props} />);
+const renderSelector = (props: Partial<React.ComponentProps<typeof AuthorizedSignerSelector>> = {}) => render(<AuthorizedSignerSelector scope={scope} ownerCandidate={owner} onSelectionChange={vi.fn()} {...props} />);
 
 describe("AuthorizedSignerSelector", () => {
   beforeEach(() => { vi.clearAllMocks(); });
+
+  it("reuses the setup candidate and does not request candidates until staff search is entered", () => {
+    mocks.ownerQuery = { data: { ownerCandidate: null }, isLoading: false, isError: false };
+    mocks.searchQuery = { currentData: undefined, originalArgs: undefined, isFetching: false, isError: false };
+    renderSelector({ ownerCandidate: owner } as any);
+    expect(screen.getByRole("radio", { name: /ada owner/i })).toBeInTheDocument();
+    expect(mocks.ownerHook).not.toHaveBeenCalled();
+    expect(mocks.trigger).not.toHaveBeenCalled();
+  });
 
   it("pins an attested staff selection when a later search has no matching results", async () => {
     mocks.ownerQuery = { data: { ownerCandidate: owner }, isLoading: false, isError: false };
@@ -44,27 +53,25 @@ describe("AuthorizedSignerSelector", () => {
   });
 
   it("clears a committed selection after a reset and requires a new attestation", async () => {
-    const refetch = vi.fn();
-    mocks.ownerQuery = { data: { ownerCandidate: owner }, isLoading: false, isError: false, refetch };
+    mocks.ownerQuery = { data: { ownerCandidate: owner }, isLoading: false, isError: false };
     mocks.searchQuery = { data: undefined, originalArgs: undefined, isFetching: false, isError: false };
     const onSelectionChange = vi.fn();
     const user = userEvent.setup();
-    const view = render(<AuthorizedSignerSelector scope={scope} onSelectionChange={onSelectionChange} />);
+    const view = render(<AuthorizedSignerSelector scope={scope} ownerCandidate={owner} onSelectionChange={onSelectionChange} />);
     await user.click(screen.getByRole("radio", { name: /ada owner/i }));
     await user.click(screen.getByRole("checkbox", { name: /selected account is authorized/i }));
     expect(onSelectionChange).toHaveBeenLastCalledWith(expect.objectContaining({ candidate: owner, authorityAttested: true }));
-    view.rerender(<AuthorizedSignerSelector scope={scope} resetKey={1} onSelectionChange={onSelectionChange} />);
+    view.rerender(<AuthorizedSignerSelector scope={scope} ownerCandidate={owner} resetKey={1} onSelectionChange={onSelectionChange} />);
     expect(screen.getByRole("checkbox", { name: /selected account is authorized/i })).toBeDisabled();
     expect(onSelectionChange).toHaveBeenLastCalledWith(null);
-    expect(refetch).toHaveBeenCalledOnce();
   });
 
-  it("refreshes owner candidates when a configured selector first mounts after a conflict reset", () => {
-    const refetch = vi.fn();
-    mocks.ownerQuery = { data: { ownerCandidate: owner }, isLoading: false, isError: false, refetch };
+  it("does not request candidates when a configured selector resets", () => {
+    mocks.ownerQuery = { data: { ownerCandidate: owner }, isLoading: false, isError: false };
     mocks.searchQuery = { currentData: undefined, originalArgs: undefined, isFetching: false, isError: false };
     renderSelector({ resetKey: 1 });
-    expect(refetch).toHaveBeenCalledOnce();
+    expect(mocks.ownerHook).not.toHaveBeenCalled();
+    expect(mocks.trigger).not.toHaveBeenCalled();
   });
 
   it("debounces a staff search and aborts a dispatched request when superseded", () => {
@@ -89,16 +96,13 @@ describe("AuthorizedSignerSelector", () => {
     }
   });
 
-  it("shows loading, owner guidance, empty results, and retry for the current query", async () => {
-    mocks.ownerQuery = { isLoading: true, isError: false };
-    const view = renderSelector();
-    expect(screen.getByRole("status")).toHaveTextContent(/loading signer options/i);
+  it("shows owner guidance, empty results, and retry for the current query", async () => {
     mocks.ownerQuery = { data: { ownerCandidate: null }, isLoading: false, isError: false };
-    view.rerender(<AuthorizedSignerSelector scope={scope} onSelectionChange={vi.fn()} />);
+    const view = renderSelector({ ownerCandidate: null });
     expect(screen.getByRole("status")).toHaveTextContent(/only the active agency owner/i);
     mocks.ownerQuery = { data: { ownerCandidate: owner }, isLoading: false, isError: false };
     mocks.searchQuery = { currentData: { staffCandidates: [] }, originalArgs: { ...scope, q: "sa" }, isFetching: false, isError: true };
-    view.rerender(<AuthorizedSignerSelector scope={scope} onSelectionChange={vi.fn()} />);
+    view.rerender(<AuthorizedSignerSelector scope={scope} ownerCandidate={owner} onSelectionChange={vi.fn()} />);
     const user = userEvent.setup();
     await user.type(screen.getByRole("searchbox"), "sa");
     await user.click(screen.getByRole("button", { name: /try search again/i }));
@@ -115,7 +119,7 @@ describe("AuthorizedSignerSelector", () => {
     await user.clear(screen.getByRole("searchbox"));
     await user.click(screen.getByRole("radio", { name: /ada owner/i }));
     await user.click(screen.getByRole("checkbox", { name: /selected account is authorized/i }));
-    view.rerender(<AuthorizedSignerSelector scope={{ ...scope, agencyId: "agency-b" }} onSelectionChange={vi.fn()} />);
+    view.rerender(<AuthorizedSignerSelector scope={{ ...scope, agencyId: "agency-b" }} ownerCandidate={owner} onSelectionChange={vi.fn()} />);
     expect(screen.getByRole("checkbox", { name: /selected account is authorized/i })).toBeDisabled();
   });
 });

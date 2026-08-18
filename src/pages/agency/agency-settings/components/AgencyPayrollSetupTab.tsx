@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { CompanySetupChecklist } from "@/features/payroll/components/CompanySetupChecklist";
 import { SignerSetupCard } from "@/features/payroll/components/SignerSetupCard";
@@ -33,12 +33,22 @@ function AgencyPayrollSetupContent({ scope }: { scope: PayrollScope }) {
   const [bootstrapProjection, setBootstrapProjection] = useState<typeof data>(undefined);
   const [submissionFieldCodes, setSubmissionFieldCodes] = useState<string[]>([]);
   const [configuredSignerSelection, setConfiguredSignerSelection] = useState<SignerDesignation | null>(null);
+  const [configuredSignerIdempotencyKey, setConfiguredSignerIdempotencyKey] = useState<ReturnType<typeof newIdempotencyKey> | "">("");
+  const configuredSignerIntent = useRef<string | null>(null);
   const [signerSelectorResetKey, setSignerSelectorResetKey] = useState(0);
   const scopeKey = useMemo(() => JSON.stringify([scope.actorUid, scope.agencyId]), [scope.actorUid, scope.agencyId]);
   const activeScopeKey = useRef(scopeKey);
   const requestGeneration = useRef(0);
   const [awaitingConfigured, setAwaitingConfigured] = useState(false);
-  useEffect(() => { activeScopeKey.current = scopeKey; requestGeneration.current += 1; setBootstrapProjection(undefined); setSubmissionFieldCodes([]); setConfiguredSignerSelection(null); setSignerSelectorResetKey(0); setCommandError(null); setIsScanning(false); setIsCreating(false); setAwaitingConfigured(false); }, [scopeKey]);
+  useEffect(() => { activeScopeKey.current = scopeKey; requestGeneration.current += 1; configuredSignerIntent.current = null; setBootstrapProjection(undefined); setSubmissionFieldCodes([]); setConfiguredSignerSelection(null); setConfiguredSignerIdempotencyKey(""); setSignerSelectorResetKey(0); setCommandError(null); setIsScanning(false); setIsCreating(false); setAwaitingConfigured(false); }, [scopeKey]);
+  const onConfiguredSignerSelectionChange = useCallback((selection: SignerDesignation | null) => {
+    const intent = selection ? `${selection.candidate.userUid}:${selection.candidate.identityVersion}` : null;
+    if (intent !== configuredSignerIntent.current) {
+      configuredSignerIntent.current = intent;
+      setConfiguredSignerIdempotencyKey(intent ? newIdempotencyKey() : "");
+    }
+    setConfiguredSignerSelection(selection);
+  }, []);
   useEffect(() => { if (data?.integration.state === "configured") { setIsCreating(false); setAwaitingConfigured(false); } }, [data?.integration.state]);
   useEffect(() => () => cancelOperation.current?.(), [scope.actorUid, scope.agencyId]);
   if (isLoading) {
@@ -59,7 +69,7 @@ function AgencyPayrollSetupContent({ scope }: { scope: PayrollScope }) {
         const fresh = await getSetup(scope, false).unwrap();
         if (!current()) return;
         freshProjection = fresh;
-        if (fresh.integration.state === "not_configured" && fresh.preflight.missingFieldCodes.length) setBootstrapProjection(fresh);
+        if (fresh.integration.state === "not_configured" && (fresh.preflight.missingFieldCodes.length || fresh.capabilities.canDesignateSigner)) setBootstrapProjection(fresh);
         else if (fresh.integration.state === "not_configured") {
           phase = "create";
           setIsScanning(false);
@@ -95,6 +105,8 @@ function AgencyPayrollSetupContent({ scope }: { scope: PayrollScope }) {
       {bootstrapProjection && <AgencyPayrollBootstrapModal
         open
         scope={scope}
+        ownerCandidate={bootstrapProjection.setup.signerCandidate}
+        requireSignerConfirmation={bootstrapProjection.capabilities.canDesignateSigner}
         values={bootstrapProjection.preflight.values}
         missingFieldCodes={bootstrapProjection.preflight.missingFieldCodes}
         isSubmitting={isCreating}
@@ -109,27 +121,9 @@ function AgencyPayrollSetupContent({ scope }: { scope: PayrollScope }) {
           setCommandError(null);
           setSubmissionFieldCodes([]);
           try {
-            const created = await bootstrapAgencyPayrollSetup({ ...scope, expectedProjectionRevision: bootstrapProjection.projectionRevision, checkPayrollProfile }).unwrap();
+            await bootstrapAgencyPayrollSetup({ ...scope, expectedProjectionRevision: bootstrapProjection.projectionRevision, checkPayrollProfile, ...(signerSelection ? { signerDesignation: { designatedSignerUserUid: signerSelection.candidate.userUid, designatedSignerIdentityVersion: signerSelection.candidate.identityVersion, authorityAttested: true as const } } : {}) }).unwrap();
             if (!current()) return;
             setBootstrapProjection(undefined);
-            if (signerSelection) {
-              try {
-                await runCommand({ ...scope, command: "designate_signer", projectionRevision: created.projectionRevision, designatedSignerUserUid: signerSelection.candidate.userUid, designatedSignerIdentityVersion: signerSelection.candidate.identityVersion, authorityAttested: true, idempotencyKey: signerSelection.idempotencyKey }).unwrap();
-              } catch (requestError: unknown) {
-                if (current()) {
-                  if (typeof requestError === "object" && requestError !== null && "status" in requestError && (requestError as { status?: number }).status === 409) {
-                    setConfiguredSignerSelection(null);
-                    setSignerSelectorResetKey((currentKey) => currentKey + 1);
-                    setCommandError("Payroll setup succeeded, but signer details changed. Reselect the signer and confirm authority before trying again.");
-                    await refetch();
-                    void getOverview(scope);
-                  } else {
-                    setConfiguredSignerSelection(signerSelection);
-                    setCommandError("Payroll setup succeeded, but signer designation failed. An owner can retry signer designation from Payroll Setup.");
-                  }
-                }
-              }
-            }
             setAwaitingConfigured(true);
             succeeded = true;
           } catch (requestError: unknown) {
@@ -167,7 +161,9 @@ function AgencyPayrollSetupContent({ scope }: { scope: PayrollScope }) {
       return true;
     } catch (requestError: unknown) {
       if (typeof requestError === "object" && requestError !== null && "status" in requestError && (requestError as { status?: number }).status === 409) {
+        configuredSignerIntent.current = null;
         setConfiguredSignerSelection(null);
+        setConfiguredSignerIdempotencyKey("");
         setSignerSelectorResetKey((current) => current + 1);
         setCommandError("Payroll setup changed. Reselect the signer and confirm authority before trying again.");
         await refetch();
@@ -178,7 +174,7 @@ function AgencyPayrollSetupContent({ scope }: { scope: PayrollScope }) {
       return false;
     }
   };
-  return <div className="max-w-3xl divide-y divide-[#e5e7eb] rounded-lg border border-[#e0e5e5] bg-white px-6">{isFetching && <p role="status" className="flex items-center gap-2 py-3 text-sm text-[#5d626b]"><Loader2 data-testid="agency-payroll-refresh-spinner" aria-hidden="true" className="h-4 w-4 shrink-0 motion-safe:animate-spin" />Refreshing payroll setup…</p>}{commandError && <p role="alert" className="py-3 text-sm text-[#8b2d2d]">{commandError}</p>}<CompanySetupChecklist projection={data} /><SignerSetupCard projection={data} onAction={signerAction} hideDesignation />{data.capabilities.canDesignateSigner && !data.setup.designatedSignerPresent && <section className="py-6"><AuthorizedSignerSelector scope={scope} initialSelection={configuredSignerSelection} resetKey={signerSelectorResetKey} onSelectionChange={setConfiguredSignerSelection} /><button type="button" disabled={!configuredSignerSelection} onClick={() => configuredSignerSelection && void signerAction("designate_signer", true, configuredSignerSelection.candidate, configuredSignerSelection.idempotencyKey)} className="mt-4 text-sm font-semibold text-[#006f73] underline disabled:opacity-50">Designate selected signer</button></section>}{data.capabilities.canManage && <div className="py-5 flex gap-3"><button type="button" onClick={() => void signerAction("retry_company_sync")} className="text-sm font-semibold text-[#006f73] underline">Retry company sync</button><button type="button" onClick={() => void signerAction("refresh_company_reconciliation")} className="text-sm font-semibold text-[#006f73] underline">Refresh reconciliation</button></div>}</div>;
+  return <div className="max-w-3xl divide-y divide-[#e5e7eb] rounded-lg border border-[#e0e5e5] bg-white px-6">{isFetching && <p role="status" className="flex items-center gap-2 py-3 text-sm text-[#5d626b]"><Loader2 data-testid="agency-payroll-refresh-spinner" aria-hidden="true" className="h-4 w-4 shrink-0 motion-safe:animate-spin" />Refreshing payroll setup…</p>}{commandError && <p role="alert" className="py-3 text-sm text-[#8b2d2d]">{commandError}</p>}<CompanySetupChecklist projection={data} /><SignerSetupCard projection={data} onAction={signerAction} hideDesignation />{data.capabilities.canDesignateSigner && !data.setup.designatedSignerPresent && <section className="py-6"><AuthorizedSignerSelector scope={scope} ownerCandidate={data.setup.signerCandidate} initialSelection={configuredSignerSelection} resetKey={signerSelectorResetKey} onSelectionChange={onConfiguredSignerSelectionChange} /><button type="button" disabled={!configuredSignerSelection || !configuredSignerIdempotencyKey} onClick={() => configuredSignerSelection && configuredSignerIdempotencyKey && void signerAction("designate_signer", true, configuredSignerSelection.candidate, configuredSignerIdempotencyKey)} className="mt-4 text-sm font-semibold text-[#006f73] underline disabled:opacity-50">Designate selected signer</button></section>}{data.capabilities.canManage && <div className="py-5 flex gap-3"><button type="button" onClick={() => void signerAction("retry_company_sync")} className="text-sm font-semibold text-[#006f73] underline">Retry company sync</button><button type="button" onClick={() => void signerAction("refresh_company_reconciliation")} className="text-sm font-semibold text-[#006f73] underline">Refresh reconciliation</button></div>}</div>;
 }
 
 export default function AgencyPayrollSetupTab({ scope }: { scope: PayrollScope }) {

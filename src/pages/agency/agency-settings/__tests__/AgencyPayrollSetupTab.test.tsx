@@ -239,12 +239,30 @@ describe("AgencyPayrollSetupTab", () => {
     expect(runCommand.mock.calls[0][0].designatedSignerUserUid).not.toBe(scope.actorUid);
   });
 
-  it("bootstraps once, then designates the attested owner with the returned revision", async () => {
-    const scannedProjection = notConfigured(["ein"]);
+  it("requires owner signer confirmation even when the payroll profile has no missing fields", async () => {
+    const ownerReady = {
+      ...notConfigured([]),
+      setup: { ...notConfigured([]).setup, signerCandidate: signerCandidatesQuery.data.ownerCandidate },
+      capabilities: { ...notConfigured([]).capabilities, canDesignateSigner: true },
+    };
+    setupQuery = { data: ownerReady, refetch };
+    loadSetup.mockReturnValue({ unwrap: () => Promise.resolve(ownerReady) });
+    const user = userEvent.setup();
+    render(<AgencyPayrollSetupTab scope={scope} />);
+    await user.click(screen.getByRole("button", { name: /create payroll setup/i }));
+    expect(await screen.findByRole("radio", { name: /ada owner/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^create payroll setup$/i })).toBeDisabled();
+  });
+
+  it("bootstraps the attested owner in one request without a chained signer command", async () => {
+    const scannedProjection = {
+      ...notConfigured(["ein"]),
+      setup: { ...notConfigured(["ein"]).setup, signerCandidate: signerCandidatesQuery.data.ownerCandidate },
+      capabilities: { ...notConfigured(["ein"]).capabilities, canDesignateSigner: true },
+    };
     setupQuery = { data: scannedProjection, refetch };
     loadSetup.mockReturnValue({ unwrap: () => Promise.resolve(scannedProjection) });
     bootstrapSetup.mockReturnValue({ unwrap: () => Promise.resolve(projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: true, createCompanyOnboardSession: false })) });
-    runCommand.mockReturnValue({ unwrap: () => Promise.resolve({ operationId: "signer-operation" }) });
     const user = userEvent.setup();
     render(<AgencyPayrollSetupTab scope={scope} />);
     await user.click(screen.getByRole("button", { name: /create payroll setup/i }));
@@ -252,61 +270,11 @@ describe("AgencyPayrollSetupTab", () => {
     await user.click(screen.getByRole("radio", { name: /Ada Owner/i }));
     await user.click(screen.getByRole("checkbox", { name: /selected account is authorized/i }));
     await user.click(screen.getByRole("button", { name: /^create payroll setup$/i }));
-    await screen.findByText("Creating payroll setup…");
-    expect(bootstrapSetup).toHaveBeenCalledTimes(1);
-    await act(async () => undefined);
-    expect(runCommand).toHaveBeenCalledWith(expect.objectContaining({ command: "designate_signer", projectionRevision: 4, designatedSignerUserUid: "verified-owner", designatedSignerIdentityVersion: expect.stringMatching(/^check_signer_v1_/), authorityAttested: true, idempotencyKey: "00000000-0000-4000-8000-000000000001" }));
-  });
-
-  it("keeps configured setup after a designation failure and retries without replaying bootstrap", async () => {
-    const scannedProjection = notConfigured(["ein"]);
-    const configured = projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: true, createCompanyOnboardSession: false });
-    setupQuery = { data: scannedProjection, refetch };
-    loadSetup.mockReturnValue({ unwrap: () => Promise.resolve(scannedProjection) });
-    bootstrapSetup.mockReturnValue({ unwrap: () => Promise.resolve(configured) });
-    runCommand
-      .mockReturnValueOnce({ unwrap: () => Promise.reject(new Error("designation failed")) })
-      .mockReturnValueOnce({ unwrap: () => Promise.resolve({ operationId: "retry-signer" }) });
-    const user = userEvent.setup();
-    const view = render(<AgencyPayrollSetupTab scope={scope} />);
-    await user.click(screen.getByRole("button", { name: /create payroll setup/i }));
-    await user.type(await screen.findByLabelText("Employer Identification Number (EIN)"), "12-3456789");
-    await user.click(screen.getByRole("radio", { name: /Ada Owner/i }));
-    await user.click(screen.getByRole("checkbox", { name: /selected account is authorized/i }));
-    await user.click(screen.getByRole("button", { name: /^create payroll setup$/i }));
-    await waitFor(() => expect(runCommand).toHaveBeenCalledTimes(1));
-    setupQuery = { data: configured, refetch };
-    view.rerender(<AgencyPayrollSetupTab scope={scope} />);
-    expect(await screen.findByRole("button", { name: "Designate selected signer" })).toBeEnabled();
-    expect(bootstrapSetup).toHaveBeenCalledTimes(1);
-    await user.click(screen.getByRole("button", { name: "Designate selected signer" }));
-    await waitFor(() => expect(runCommand).toHaveBeenCalledTimes(2));
-    expect(runCommand.mock.calls[1][0].idempotencyKey).toBe(runCommand.mock.calls[0][0].idempotencyKey);
-  });
-
-  it("keeps the setup after a chained designation 409 but requires a new signer intent", async () => {
-    const scannedProjection = notConfigured(["ein"]);
-    const configured = projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: true, createCompanyOnboardSession: false });
-    setupQuery = { data: scannedProjection, refetch };
-    loadSetup.mockReturnValue({ unwrap: () => Promise.resolve(scannedProjection) });
-    bootstrapSetup.mockReturnValue({ unwrap: () => Promise.resolve(configured) });
-    runCommand.mockReturnValue({ unwrap: () => Promise.reject({ status: 409 }) });
-    const user = userEvent.setup();
-    const view = render(<AgencyPayrollSetupTab scope={scope} />);
-    await user.click(screen.getByRole("button", { name: /create payroll setup/i }));
-    await user.type(await screen.findByLabelText("Employer Identification Number (EIN)"), "12-3456789");
-    await user.click(screen.getByRole("radio", { name: /Ada Owner/i }));
-    await user.click(screen.getByRole("checkbox", { name: /selected account is authorized/i }));
-    await user.click(screen.getByRole("button", { name: /^create payroll setup$/i }));
-    await waitFor(() => expect(runCommand).toHaveBeenCalledTimes(1));
-    setupQuery = { data: configured, refetch };
-    view.rerender(<AgencyPayrollSetupTab scope={scope} />);
-    expect(await screen.findByRole("heading", { name: /payroll company setup/i })).toBeInTheDocument();
-    expect(screen.getByRole("alert")).toHaveTextContent(/payroll setup succeeded.*signer.*changed/i);
-    expect(screen.getByRole("checkbox", { name: /selected account is authorized/i })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Designate selected signer" })).toBeDisabled();
-    expect(bootstrapSetup).toHaveBeenCalledTimes(1);
-    expect(refetch).toHaveBeenCalled();
+    await waitFor(() => expect(bootstrapSetup).toHaveBeenCalledWith(expect.objectContaining({
+      expectedProjectionRevision: 0,
+      signerDesignation: { designatedSignerUserUid: "verified-owner", designatedSignerIdentityVersion: expect.stringMatching(/^check_signer_v1_/), authorityAttested: true },
+    })));
+    expect(runCommand).not.toHaveBeenCalled();
   });
 
   it("clears signer intent after a 409 and requires reselection before retry", async () => {

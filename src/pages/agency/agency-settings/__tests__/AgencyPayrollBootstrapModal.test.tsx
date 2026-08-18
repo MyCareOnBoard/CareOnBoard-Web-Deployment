@@ -108,7 +108,7 @@ describe("AgencyPayrollBootstrapModal", () => {
       expect(input).toHaveAttribute("type", "tel");
       expect(input).toHaveAttribute("inputmode", "numeric");
       expect(input).toHaveAttribute("maxlength", "10");
-      expect(input).toHaveAccessibleDescription("Enter a U.S. ten-digit phone number. +1 is added automatically.");
+      expect(input).toHaveAccessibleDescription("Enter a U.S. ten-digit phone number.");
     }
     expect(screen.getAllByText("+1")).toHaveLength(2);
   });

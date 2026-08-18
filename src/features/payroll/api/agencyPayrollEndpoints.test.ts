@@ -15,7 +15,7 @@ describe("agency payroll wire contracts", () => {
     expect(agencyPayrollPaths.signerCandidates).toBeTypeOf("function");
     expect(agencyPayrollPaths.signerCandidates()).toEqual({ url: "/checkPayrollAgency/payroll/agency/signer-candidates", method: "GET", requiresAuth: true });
   });
-  it("sends only the frozen bootstrap body and invalidates the matching agency setup after success", () => {
+  it("sends the verified signer in the one frozen bootstrap body and leaves the setup cache out of invalidation", () => {
     const args = {
       audience: "agency" as const,
       actorUid: "actor-1",
@@ -24,6 +24,11 @@ describe("agency payroll wire contracts", () => {
       checkPayrollProfile: {
         legalName: "Able Care LLC",
         einChange: { mode: "replace" as const, value: "12-3456789" },
+      },
+      signerDesignation: {
+        designatedSignerUserUid: "signer-1",
+        designatedSignerIdentityVersion: `check_signer_v1_${"b".repeat(64)}`,
+        authorityAttested: true as const,
       },
     };
     const request = (agencyEndpoints as Record<string, unknown>).agencyPayrollBootstrapRequest;
@@ -41,16 +46,29 @@ describe("agency payroll wire contracts", () => {
           legalName: "Able Care LLC",
           einChange: { mode: "replace", value: "12-3456789" },
         },
+        signerDesignation: {
+          designatedSignerUserUid: "signer-1",
+          designatedSignerIdentityVersion: `check_signer_v1_${"b".repeat(64)}`,
+          authorityAttested: true,
+        },
       },
     });
     expect(JSON.stringify(request(args))).not.toContain('"agencyId"');
     expect(invalidationTags(undefined, args)).toEqual([
-      { type: "AgencySetup", id: "agency:actor-1:agency-1" },
       { type: "AgencyOverview", id: "agency:actor-1:agency-1" },
       { type: "Attention", id: "agency:actor-1:agency-1" },
       { type: "Compliance", id: "agency:actor-1:agency-1" },
     ]);
     expect(invalidationTags(new Error("no"), args)).toEqual([]);
+  });
+
+  it("keeps the setup cache tagged separately from the overview cache", () => {
+    const setupTags = (agencyEndpoints as Record<string, unknown>).agencyPayrollSetupTags;
+    expect(setupTags).toBeTypeOf("function");
+    if (typeof setupTags !== "function") return;
+    expect(setupTags({ audience: "agency", actorUid: "actor-1", agencyId: "agency-1" })).toEqual([
+      { type: "AgencySetup", id: "agency:actor-1:agency-1" },
+    ]);
   });
   it("sends only the closed designation body with the caller's stable idempotency key", () => {
     const args = { audience: "agency" as const, actorUid: "u", agencyId: "a", command: "designate_signer" as const, projectionRevision: 7, designatedSignerUserUid: "u", designatedSignerIdentityVersion: `check_signer_v1_${"a".repeat(64)}`, authorityAttested: true as const, idempotencyKey: "00000000-0000-4000-8000-000000000001" } satisfies PayrollCommandArgs;

@@ -42,4 +42,12 @@ describe("SignerSetupCard", () => {
     expect(screen.getByText("Taylor Staff")).toBeInTheDocument();
     expect(screen.queryByText("Ada Owner")).not.toBeInTheDocument();
   });
+
+  it("displays the closed provider signatory status separately from signer designation", () => {
+    const configured = projection(false);
+    configured.setup.signatoryLinked = true;
+    render(<SignerSetupCard projection={configured} />);
+    expect(screen.getByText("Signer not designated")).toBeInTheDocument();
+    expect(screen.getByText("Provider signatory link: Linked")).toBeInTheDocument();
+  });
 });
