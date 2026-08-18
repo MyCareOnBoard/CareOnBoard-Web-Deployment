@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthorizedSignerSelector } from "./AuthorizedSignerSelector";
 
 const owner = { userUid: "owner", fullName: "Ada Owner", email: "ada@example.test", title: "Owner", identityVersion: `check_signer_v1_${"a".repeat(64)}`, designated: false };
@@ -17,6 +17,8 @@ vi.mock("../api/payrollCommands", () => ({ newIdempotencyKey: vi.fn(() => "00000
 const renderSelector = (props: Partial<React.ComponentProps<typeof AuthorizedSignerSelector>> = {}) => render(<AuthorizedSignerSelector scope={scope} onSelectionChange={vi.fn()} {...props} />);
 
 describe("AuthorizedSignerSelector", () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
   it("pins an attested staff selection when a later search has no matching results", async () => {
     mocks.ownerQuery = { data: { ownerCandidate: owner }, isLoading: false, isError: false };
     mocks.searchQuery = { currentData: { staffCandidates: [staff] }, originalArgs: { ...scope, q: "sa" }, isFetching: false, isError: false };
@@ -42,7 +44,8 @@ describe("AuthorizedSignerSelector", () => {
   });
 
   it("clears a committed selection after a reset and requires a new attestation", async () => {
-    mocks.ownerQuery = { data: { ownerCandidate: owner }, isLoading: false, isError: false };
+    const refetch = vi.fn();
+    mocks.ownerQuery = { data: { ownerCandidate: owner }, isLoading: false, isError: false, refetch };
     mocks.searchQuery = { data: undefined, originalArgs: undefined, isFetching: false, isError: false };
     const onSelectionChange = vi.fn();
     const user = userEvent.setup();
@@ -53,6 +56,37 @@ describe("AuthorizedSignerSelector", () => {
     view.rerender(<AuthorizedSignerSelector scope={scope} resetKey={1} onSelectionChange={onSelectionChange} />);
     expect(screen.getByRole("checkbox", { name: /selected account is authorized/i })).toBeDisabled();
     expect(onSelectionChange).toHaveBeenLastCalledWith(null);
+    expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it("refreshes owner candidates when a configured selector first mounts after a conflict reset", () => {
+    const refetch = vi.fn();
+    mocks.ownerQuery = { data: { ownerCandidate: owner }, isLoading: false, isError: false, refetch };
+    mocks.searchQuery = { currentData: undefined, originalArgs: undefined, isFetching: false, isError: false };
+    renderSelector({ resetKey: 1 });
+    expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it("debounces a staff search and aborts a dispatched request when superseded", () => {
+    vi.useFakeTimers();
+    try {
+      const abort = vi.fn();
+      mocks.ownerQuery = { data: { ownerCandidate: owner }, isLoading: false, isError: false };
+      mocks.searchQuery = { currentData: undefined, originalArgs: undefined, isFetching: false, isError: false };
+      mocks.trigger.mockReturnValue({ abort });
+      renderSelector();
+      const search = screen.getByRole("searchbox");
+      fireEvent.change(search, { target: { value: "sa" } });
+      expect(mocks.trigger).not.toHaveBeenCalled();
+      act(() => vi.advanceTimersByTime(299));
+      expect(mocks.trigger).not.toHaveBeenCalled();
+      act(() => vi.advanceTimersByTime(1));
+      expect(mocks.trigger).toHaveBeenCalledWith({ ...scope, q: "sa" }, true);
+      fireEvent.change(search, { target: { value: "ad" } });
+      expect(abort).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("shows loading, owner guidance, empty results, and retry for the current query", async () => {
