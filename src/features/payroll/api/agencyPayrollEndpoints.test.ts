@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as agencyEndpoints from "./agencyPayrollEndpoints";
 import { agencyPayrollPaths } from "./agencyPayrollEndpoints";
-import { agencyPayrollCommandRequest } from "./payrollCommands";
+import { agencyPayrollCommandRequest, type PayrollCommandArgs } from "./payrollCommands";
 
 describe("agency payroll wire contracts", () => {
   it("uses closed authenticated paths without scope identity in requests", () => {
@@ -53,7 +53,7 @@ describe("agency payroll wire contracts", () => {
     expect(invalidationTags(new Error("no"), args)).toEqual([]);
   });
   it("sends only the closed designation body with the caller's stable idempotency key", () => {
-    const args = { audience: "agency" as const, actorUid: "u", agencyId: "a", command: "designate_signer" as const, projectionRevision: 7, designatedSignerUserUid: "u", designatedSignerIdentityVersion: `check_signer_v1_${"a".repeat(64)}`, authorityAttested: true as const, idempotencyKey: "00000000-0000-4000-8000-000000000001" };
+    const args = { audience: "agency" as const, actorUid: "u", agencyId: "a", command: "designate_signer" as const, projectionRevision: 7, designatedSignerUserUid: "u", designatedSignerIdentityVersion: `check_signer_v1_${"a".repeat(64)}`, authorityAttested: true as const, idempotencyKey: "00000000-0000-4000-8000-000000000001" } satisfies PayrollCommandArgs;
     const first = agencyPayrollCommandRequest(args); const second = agencyPayrollCommandRequest(args);
     expect(first.headers["Idempotency-Key"]).toBe(args.idempotencyKey);
     expect(second.headers["Idempotency-Key"]).toBe(args.idempotencyKey);
