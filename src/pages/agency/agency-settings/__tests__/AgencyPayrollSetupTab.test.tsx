@@ -284,6 +284,31 @@ describe("AgencyPayrollSetupTab", () => {
     expect(runCommand.mock.calls[1][0].idempotencyKey).toBe(runCommand.mock.calls[0][0].idempotencyKey);
   });
 
+  it("keeps the setup after a chained designation 409 but requires a new signer intent", async () => {
+    const scannedProjection = notConfigured(["ein"]);
+    const configured = projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: true, createCompanyOnboardSession: false });
+    setupQuery = { data: scannedProjection, refetch };
+    loadSetup.mockReturnValue({ unwrap: () => Promise.resolve(scannedProjection) });
+    bootstrapSetup.mockReturnValue({ unwrap: () => Promise.resolve(configured) });
+    runCommand.mockReturnValue({ unwrap: () => Promise.reject({ status: 409 }) });
+    const user = userEvent.setup();
+    const view = render(<AgencyPayrollSetupTab scope={scope} />);
+    await user.click(screen.getByRole("button", { name: /create payroll setup/i }));
+    await user.type(await screen.findByLabelText("Employer Identification Number (EIN)"), "12-3456789");
+    await user.click(screen.getByRole("radio", { name: /Ada Owner/i }));
+    await user.click(screen.getByRole("checkbox", { name: /selected account is authorized/i }));
+    await user.click(screen.getByRole("button", { name: /^create payroll setup$/i }));
+    await waitFor(() => expect(runCommand).toHaveBeenCalledTimes(1));
+    setupQuery = { data: configured, refetch };
+    view.rerender(<AgencyPayrollSetupTab scope={scope} />);
+    expect(await screen.findByRole("heading", { name: /payroll company setup/i })).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(/payroll setup succeeded.*signer.*changed/i);
+    expect(screen.getByRole("checkbox", { name: /selected account is authorized/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Designate selected signer" })).toBeDisabled();
+    expect(bootstrapSetup).toHaveBeenCalledTimes(1);
+    expect(refetch).toHaveBeenCalled();
+  });
+
   it("clears signer intent after a 409 and requires reselection before retry", async () => {
     setupQuery = { data: projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: true, createCompanyOnboardSession: false }), refetch };
     runCommand.mockReturnValue({ unwrap: () => Promise.reject({ status: 409 }) });

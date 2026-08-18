@@ -39,6 +39,8 @@ export default function Step1AgencyIdentity({formData, onChange, fieldsWithError
             onChange("zipCode", details.zipCode);
         }
     };
+    const mainPhone = formData.mainPhone ?? "";
+    const mainPhoneError = fieldsWithErrors.includes("mainPhone") || Boolean(mainPhone && !/^\d{10}$/.test(mainPhone));
 
     return (
         <div>
@@ -278,12 +280,9 @@ export default function Step1AgencyIdentity({formData, onChange, fieldsWithError
                         <Label htmlFor="mainPhone" className="mb-2 text-[14px] font-medium text-[#10141a]">
                             Main Phone Number
                         </Label>
-                        <div className={cn("flex h-[44px] overflow-hidden rounded-[8px] border border-[#e5e5e6] bg-white focus-within:border-[#00b4b8] focus-within:ring-1 focus-within:ring-[#00b4b8]", fieldsWithErrors.includes("mainPhone") && "border-red-500")}><span aria-hidden="true" className="flex items-center border-r border-[#e5e5e6] bg-muted px-3 text-sm font-medium text-muted-foreground">+1</span><Input id="mainPhone" type="tel" inputMode="numeric" autoComplete="tel" maxLength={10} value={formData.mainPhone} onChange={(e) => { if (/^\d{0,10}$/.test(e.target.value)) onChange("mainPhone", e.target.value); }} onPaste={(event) => { const pasted = event.clipboardData.getData("text"); if (!/^\d{0,10}$/.test(pasted) || formData.mainPhone.length + pasted.length > 10) { event.preventDefault(); return; } event.preventDefault(); onChange("mainPhone", `${formData.mainPhone}${pasted}`); }} placeholder="5125550123" className="h-full rounded-none border-0 focus-visible:ring-0" /></div>
-                        {fieldsWithErrors.includes("mainPhone") && (
-                            <p className="text-red-500 text-sm mt-1">
-                                Main phone number is required.
-                            </p>
-                        )}
+                        <div className={cn("flex h-[44px] overflow-hidden rounded-[8px] border border-[#e5e5e6] bg-white focus-within:border-[#00b4b8] focus-within:ring-1 focus-within:ring-[#00b4b8]", mainPhoneError && "border-red-500")}><span aria-hidden="true" className="flex items-center border-r border-[#e5e5e6] bg-muted px-3 text-sm font-medium text-muted-foreground">+1</span><Input id="mainPhone" type="tel" inputMode="numeric" autoComplete="tel" maxLength={10} value={mainPhone} aria-invalid={mainPhoneError} aria-describedby={mainPhoneError ? "mainPhone-error" : "mainPhone-help"} onChange={(e) => { if (/^\d{0,10}$/.test(e.target.value)) onChange("mainPhone", e.target.value); }} onPaste={(event) => { const pasted = event.clipboardData.getData("text"); if (!/^\d{0,10}$/.test(pasted) || mainPhone.length + pasted.length > 10) { event.preventDefault(); return; } event.preventDefault(); onChange("mainPhone", `${mainPhone}${pasted}`); }} placeholder="5125550123" className="h-full rounded-none border-0 focus-visible:ring-0" /></div>
+                        <p id="mainPhone-help" className="mt-1 text-xs text-[#808081]">Enter a U.S. ten-digit phone number. +1 is added automatically.</p>
+                        {mainPhoneError && <p id="mainPhone-error" role="alert" className="text-red-500 text-sm mt-1">Enter a valid US ten-digit company phone number.</p>}
                     </div>
 
                     {/* Support/Office Email */}

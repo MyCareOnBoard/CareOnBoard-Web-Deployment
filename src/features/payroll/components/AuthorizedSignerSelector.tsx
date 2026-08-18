@@ -28,17 +28,17 @@ export function AuthorizedSignerSelector({ scope, disabled = false, initialSelec
   const query = search.trim();
   const canSearch = query.length >= 2;
   const currentSearchResponse = canSearch && sameScope(searchQuery.originalArgs, scope, query);
-  const candidates = currentSearchResponse ? (searchQuery.data?.staffCandidates ?? []) : [];
+  const candidates = currentSearchResponse ? (searchQuery.currentData?.staffCandidates ?? []) : [];
 
   useEffect(() => {
     if (initializedFor.current.scopeKey === scopeKey && initializedFor.current.resetKey === resetKey) return;
     initializedFor.current = { scopeKey, resetKey };
-    void ownerQuery.refetch?.();
     setSearch("");
     setSelected(null);
     setAttested(false);
     setIdempotencyKey("");
   }, [scopeKey, resetKey]);
+  useEffect(() => { if (resetKey > 0) void ownerQuery.refetch?.(); }, [resetKey]);
   useEffect(() => {
     onSelectionChange(selected && attested && idempotencyKey ? { candidate: selected, authorityAttested: true, idempotencyKey } : null);
   }, [selected, attested, idempotencyKey, onSelectionChange]);

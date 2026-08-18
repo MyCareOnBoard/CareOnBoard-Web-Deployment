@@ -19,7 +19,7 @@ const renderSelector = (props: Partial<React.ComponentProps<typeof AuthorizedSig
 describe("AuthorizedSignerSelector", () => {
   it("pins an attested staff selection when a later search has no matching results", async () => {
     mocks.ownerQuery = { data: { ownerCandidate: owner }, isLoading: false, isError: false };
-    mocks.searchQuery = { data: { staffCandidates: [staff] }, originalArgs: { ...scope, q: "sa" }, isFetching: false, isError: false };
+    mocks.searchQuery = { currentData: { staffCandidates: [staff] }, originalArgs: { ...scope, q: "sa" }, isFetching: false, isError: false };
     const user = userEvent.setup();
     renderSelector();
     await user.type(screen.getByRole("searchbox"), "sa");
@@ -31,9 +31,9 @@ describe("AuthorizedSignerSelector", () => {
     expect(screen.getByRole("checkbox", { name: /selected account is authorized/i })).toBeChecked();
   });
 
-  it("does not render stale search data while the current query is waiting", async () => {
+  it("does not render last-query data when RTK reports the new query as current", async () => {
     mocks.ownerQuery = { data: { ownerCandidate: owner }, isLoading: false, isError: false };
-    mocks.searchQuery = { data: { staffCandidates: [staff] }, originalArgs: { ...scope, q: "ad" }, isFetching: false, isError: false };
+    mocks.searchQuery = { data: { staffCandidates: [staff] }, currentData: undefined, originalArgs: { ...scope, q: "sa" }, isFetching: true, isError: false };
     const user = userEvent.setup();
     renderSelector();
     await user.type(screen.getByRole("searchbox"), "sa");
@@ -55,7 +55,7 @@ describe("AuthorizedSignerSelector", () => {
     expect(onSelectionChange).toHaveBeenLastCalledWith(null);
   });
 
-  it("shows loading, owner guidance, empty results, and retry only for the current query scope", async () => {
+  it("shows loading, owner guidance, empty results, and retry for the current query", async () => {
     mocks.ownerQuery = { isLoading: true, isError: false };
     const view = renderSelector();
     expect(screen.getByRole("status")).toHaveTextContent(/loading signer options/i);
@@ -63,11 +63,25 @@ describe("AuthorizedSignerSelector", () => {
     view.rerender(<AuthorizedSignerSelector scope={scope} onSelectionChange={vi.fn()} />);
     expect(screen.getByRole("status")).toHaveTextContent(/only the active agency owner/i);
     mocks.ownerQuery = { data: { ownerCandidate: owner }, isLoading: false, isError: false };
-    mocks.searchQuery = { data: { staffCandidates: [] }, originalArgs: { ...scope, q: "sa" }, isFetching: false, isError: true };
+    mocks.searchQuery = { currentData: { staffCandidates: [] }, originalArgs: { ...scope, q: "sa" }, isFetching: false, isError: true };
     view.rerender(<AuthorizedSignerSelector scope={scope} onSelectionChange={vi.fn()} />);
     const user = userEvent.setup();
     await user.type(screen.getByRole("searchbox"), "sa");
     await user.click(screen.getByRole("button", { name: /try search again/i }));
     expect(mocks.trigger).toHaveBeenCalledWith({ ...scope, q: "sa" }, true);
+  });
+
+  it("renders a current empty result and clears selection on an agency scope change", async () => {
+    mocks.ownerQuery = { data: { ownerCandidate: owner }, isLoading: false, isError: false };
+    mocks.searchQuery = { currentData: { staffCandidates: [] }, originalArgs: { ...scope, q: "sa" }, isFetching: false, isError: false };
+    const user = userEvent.setup();
+    const view = renderSelector();
+    await user.type(screen.getByRole("searchbox"), "sa");
+    expect(screen.getByRole("status")).toHaveTextContent(/no eligible staff signer/i);
+    await user.clear(screen.getByRole("searchbox"));
+    await user.click(screen.getByRole("radio", { name: /ada owner/i }));
+    await user.click(screen.getByRole("checkbox", { name: /selected account is authorized/i }));
+    view.rerender(<AuthorizedSignerSelector scope={{ ...scope, agencyId: "agency-b" }} onSelectionChange={vi.fn()} />);
+    expect(screen.getByRole("checkbox", { name: /selected account is authorized/i })).toBeDisabled();
   });
 });

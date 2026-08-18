@@ -115,8 +115,19 @@ function AgencyPayrollSetupContent({ scope }: { scope: PayrollScope }) {
             if (signerSelection) {
               try {
                 await runCommand({ ...scope, command: "designate_signer", projectionRevision: created.projectionRevision, designatedSignerUserUid: signerSelection.candidate.userUid, designatedSignerIdentityVersion: signerSelection.candidate.identityVersion, authorityAttested: true, idempotencyKey: signerSelection.idempotencyKey }).unwrap();
-              } catch {
-                if (current()) { setConfiguredSignerSelection(signerSelection); setCommandError("Payroll setup succeeded, but signer designation failed. An owner can retry signer designation from Payroll Setup."); }
+              } catch (requestError: unknown) {
+                if (current()) {
+                  if (typeof requestError === "object" && requestError !== null && "status" in requestError && (requestError as { status?: number }).status === 409) {
+                    setConfiguredSignerSelection(null);
+                    setSignerSelectorResetKey((currentKey) => currentKey + 1);
+                    setCommandError("Payroll setup succeeded, but signer details changed. Reselect the signer and confirm authority before trying again.");
+                    await refetch();
+                    void getOverview(scope);
+                  } else {
+                    setConfiguredSignerSelection(signerSelection);
+                    setCommandError("Payroll setup succeeded, but signer designation failed. An owner can retry signer designation from Payroll Setup.");
+                  }
+                }
               }
             }
             setAwaitingConfigured(true);

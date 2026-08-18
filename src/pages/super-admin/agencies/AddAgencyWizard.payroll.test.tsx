@@ -45,10 +45,10 @@ vi.mock("@/pages/super-admin/user-access-control/resetSuperAdminCaches", () => (
 vi.mock("./agencyAccessRefreshToast", () => ({ dismissAgencyAccessRefreshWarning: vi.fn(), showAgencyAccessRefreshWarning: vi.fn() }));
 
 vi.mock("@/pages/super-admin/agencies/components/StepOne", async () => {
-  const { CompanySetupFields } = await vi.importActual<typeof import("@/features/payroll/forms/companySetupFields")>("@/features/payroll/forms/companySetupFields");
+  const { default: StepOne } = await vi.importActual<typeof import("@/pages/super-admin/agencies/components/StepOne")>("@/pages/super-admin/agencies/components/StepOne");
   return {
     default: ({ formData, onChange, fieldsWithErrors }: any) => <div>
-      <CompanySetupFields formData={formData} onChange={onChange} fieldsWithErrors={fieldsWithErrors} />
+      <StepOne formData={formData} onChange={onChange} fieldsWithErrors={fieldsWithErrors} />
       <button type="button" onClick={() => {
         const values = {
           agencyName: "Able Care", agencyType: "provider", primaryAddress: "100 Agency Way",
@@ -160,6 +160,24 @@ describe("AddAgencyWizard payroll endpoint payloads", () => {
     };
     render(<AddAgencyWizard />);
     expect(await screen.findByLabelText("Payroll contact phone")).toHaveValue("5125550124");
+    expect(screen.getByLabelText("Main Phone Number")).toHaveValue("5125550123");
+    expect(screen.getAllByText("+1")).toHaveLength(2);
+  });
+
+  it("keeps a malformed company phone visible and invalid until it is explicitly replaced", async () => {
+    mocks.search = "?agencyId=agency-1";
+    mocks.currentAgency = {
+      agencyData: { name: "Able Care", email: "hello@able.example", phone: "+445125550123", checkPayrollProfile: {} },
+      user: { fullName: "Agency Owner", email: "owner@able.example", phone: "+15125550125", userType: "agency" },
+    };
+    const user = userEvent.setup();
+    render(<AddAgencyWizard />);
+    const phone = await screen.findByLabelText("Main Phone Number");
+    expect(phone).toHaveValue("+445125550123");
+    expect(phone).toHaveAttribute("aria-invalid", "true");
+    expect(phone).toHaveAccessibleDescription("Enter a valid US ten-digit company phone number.");
+    await user.type(phone, "9");
+    expect(phone).toHaveValue("+445125550123");
   });
 
   it("sends the exact canonical full payroll write through the create endpoint", async () => {
