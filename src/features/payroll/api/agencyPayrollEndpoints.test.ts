@@ -1,7 +1,7 @@
 import { configureStore } from "@reduxjs/toolkit";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as agencyEndpoints from "./agencyPayrollEndpoints";
-import { agencyPayrollApi, agencyPayrollPaths } from "./agencyPayrollEndpoints";
+import { agencyCompanyOnboardSessionRequest, agencyPayrollApi, agencyPayrollPaths } from "./agencyPayrollEndpoints";
 import { agencyPayrollCommandRequest, type PayrollCommandArgs } from "./payrollCommands";
 import type { AgencyPayrollSetupProjection } from "../model/types";
 
@@ -29,6 +29,17 @@ describe("agency payroll wire contracts", () => {
     expect(bootstrap()).toEqual({ url: "/checkPayrollAgency/payroll/agency/setup", method: "PUT", requiresAuth: true });
     expect(agencyPayrollPaths.signerCandidates).toBeTypeOf("function");
     expect(agencyPayrollPaths.signerCandidates()).toEqual({ url: "/checkPayrollAgency/payroll/agency/signer-candidates", method: "GET", requiresAuth: true });
+  });
+  it("creates a company Onboard session through the frozen direct-function contract", () => {
+    const request = agencyCompanyOnboardSessionRequest({ audience: "agency", actorUid: "actor-1", agencyId: "agency-1", expectedProjectionRevision: 19 });
+    expect(request).toEqual({
+      url: "/checkPayrollOnboard/payroll/agency/setup/onboard-session",
+      method: "POST",
+      requiresAuth: true,
+      data: { expectedProjectionRevision: 19 },
+    });
+    expect(JSON.stringify(request)).not.toContain('"agencyId"');
+    expect(JSON.stringify(request)).not.toContain('"actorUid"');
   });
   it("sends the verified signer in the one frozen bootstrap body and leaves the setup cache out of invalidation", () => {
     const args = {

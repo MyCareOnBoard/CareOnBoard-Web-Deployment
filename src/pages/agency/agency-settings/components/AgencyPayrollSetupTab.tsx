@@ -1,14 +1,19 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { CompanySetupChecklist } from "@/features/payroll/components/CompanySetupChecklist";
 import { SignerSetupCard } from "@/features/payroll/components/SignerSetupCard";
 import { AuthorizedSignerSelector, type SignerDesignation } from "@/features/payroll/components/AuthorizedSignerSelector";
-import { useBootstrapAgencyPayrollSetupMutation, useGetAgencyPayrollSetupQuery, useLazyGetAgencyPayrollOperationQuery, useLazyGetAgencyPayrollOverviewQuery, useLazyGetAgencyPayrollSetupQuery } from "@/features/payroll/api/agencyPayrollEndpoints";
+import { useBootstrapAgencyPayrollSetupMutation, useCreateCompanyOnboardSessionMutation, useGetAgencyPayrollSetupQuery, useLazyGetAgencyPayrollOperationQuery, useLazyGetAgencyPayrollOverviewQuery, useLazyGetAgencyPayrollSetupQuery } from "@/features/payroll/api/agencyPayrollEndpoints";
 import { useProjectionFreshness } from "@/features/payroll/hooks/useProjectionFreshness";
 import { newIdempotencyKey, useRunAgencyPayrollCommandMutation } from "@/features/payroll/api/payrollCommands";
 import { PayrollOperationProvider, usePayrollOperations } from "@/features/payroll/operations/PayrollOperationProvider";
 import type { PayrollOperation, PayrollScope } from "@/features/payroll/model/types";
 import AgencyPayrollBootstrapModal, { buildAgencyPayrollBootstrapPayload } from "./AgencyPayrollBootstrapModal";
+
+const CheckOnboardModal = lazy(async () => {
+  const module = await import("@/features/payroll/onboard/CheckOnboardModal");
+  return { default: module.CheckOnboardModal };
+});
 
 function setupIncompleteFieldCodes(requestError: unknown): string[] {
   const payload = typeof requestError === "object" && requestError !== null && "data" in requestError ? (requestError as { data?: unknown }).data : undefined;
@@ -21,6 +26,7 @@ function AgencyPayrollSetupContent({ scope }: { scope: PayrollScope }) {
   const { data, isLoading, isFetching, error, refetch } = useGetAgencyPayrollSetupQuery(scope, { skip: !scope.actorUid || !scope.agencyId });
   const [getSetup] = useLazyGetAgencyPayrollSetupQuery();
   const [bootstrapAgencyPayrollSetup] = useBootstrapAgencyPayrollSetupMutation();
+  const [createCompanyOnboardSession] = useCreateCompanyOnboardSessionMutation();
   const [runCommand] = useRunAgencyPayrollCommandMutation();
   const [getOperation] = useLazyGetAgencyPayrollOperationQuery();
   const [getOverview] = useLazyGetAgencyPayrollOverviewQuery();
@@ -174,7 +180,20 @@ function AgencyPayrollSetupContent({ scope }: { scope: PayrollScope }) {
       return false;
     }
   };
-  return <div className="max-w-3xl divide-y divide-[#e5e7eb] rounded-lg border border-[#e0e5e5] bg-white px-6">{isFetching && <p role="status" className="flex items-center gap-2 py-3 text-sm text-[#5d626b]"><Loader2 data-testid="agency-payroll-refresh-spinner" aria-hidden="true" className="h-4 w-4 shrink-0 motion-safe:animate-spin" />Refreshing payroll setup…</p>}{commandError && <p role="alert" className="py-3 text-sm text-[#8b2d2d]">{commandError}</p>}<CompanySetupChecklist projection={data} /><SignerSetupCard projection={data} onAction={signerAction} hideDesignation />{data.capabilities.canDesignateSigner && !data.setup.designatedSignerPresent && <section className="py-6"><AuthorizedSignerSelector scope={scope} ownerCandidate={data.setup.signerCandidate} initialSelection={configuredSignerSelection} resetKey={signerSelectorResetKey} onSelectionChange={onConfiguredSignerSelectionChange} /><button type="button" disabled={!configuredSignerSelection || !configuredSignerIdempotencyKey} onClick={() => configuredSignerSelection && configuredSignerIdempotencyKey && void signerAction("designate_signer", true, configuredSignerSelection.candidate, configuredSignerIdempotencyKey)} className="mt-4 text-sm font-semibold text-[#006f73] underline disabled:opacity-50">Designate selected signer</button></section>}{data.capabilities.canManage && <div className="py-5 flex gap-3"><button type="button" onClick={() => void signerAction("retry_company_sync")} className="text-sm font-semibold text-[#006f73] underline">Retry company sync</button><button type="button" onClick={() => void signerAction("refresh_company_reconciliation")} className="text-sm font-semibold text-[#006f73] underline">Refresh reconciliation</button></div>}</div>;
+  const requestCompanyOnboardSession = async () => {
+    try {
+      const session = await createCompanyOnboardSession({ ...scope, expectedProjectionRevision: data.projectionRevision }).unwrap();
+      return { link: session.url, expiresAt: session.expiresAt };
+    } catch (requestError: unknown) {
+      if (typeof requestError === "object" && requestError !== null && "status" in requestError && (requestError as { status?: number }).status === 409) {
+        await refetch();
+        void getOverview(scope);
+      }
+      throw requestError;
+    }
+  };
+  const refetchCompanySetup = () => { void refetch(); void getOverview(scope); };
+  return <div className="max-w-3xl divide-y divide-[#e5e7eb] rounded-lg border border-[#e0e5e5] bg-white px-6">{isFetching && <p role="status" className="flex items-center gap-2 py-3 text-sm text-[#5d626b]"><Loader2 data-testid="agency-payroll-refresh-spinner" aria-hidden="true" className="h-4 w-4 shrink-0 motion-safe:animate-spin" />Refreshing payroll setup…</p>}{commandError && <p role="alert" className="py-3 text-sm text-[#8b2d2d]">{commandError}</p>}<CompanySetupChecklist projection={data} />{data.capabilities.createCompanyOnboardSession && <section className="py-5"><Suspense fallback={<p role="status" className="text-sm text-[#5d626b]">Loading payroll onboarding…</p>}><CheckOnboardModal actionLabel="Complete payroll onboarding" openingLabel="Opening payroll onboarding..." requestSession={requestCompanyOnboardSession} onRefetch={refetchCompanySetup} /></Suspense></section>}<SignerSetupCard projection={data} onAction={signerAction} hideDesignation />{data.capabilities.canDesignateSigner && !data.setup.designatedSignerPresent && <section className="py-6"><AuthorizedSignerSelector scope={scope} ownerCandidate={data.setup.signerCandidate} initialSelection={configuredSignerSelection} resetKey={signerSelectorResetKey} onSelectionChange={onConfiguredSignerSelectionChange} /><button type="button" disabled={!configuredSignerSelection || !configuredSignerIdempotencyKey} onClick={() => configuredSignerSelection && configuredSignerIdempotencyKey && void signerAction("designate_signer", true, configuredSignerSelection.candidate, configuredSignerIdempotencyKey)} className="mt-4 text-sm font-semibold text-[#006f73] underline disabled:opacity-50">Designate selected signer</button></section>}{data.capabilities.canManage && <div className="py-5 flex gap-3"><button type="button" onClick={() => void signerAction("retry_company_sync")} className="text-sm font-semibold text-[#006f73] underline">Retry company sync</button><button type="button" onClick={() => void signerAction("refresh_company_reconciliation")} className="text-sm font-semibold text-[#006f73] underline">Refresh reconciliation</button></div>}</div>;
 }
 
 export default function AgencyPayrollSetupTab({ scope }: { scope: PayrollScope }) {

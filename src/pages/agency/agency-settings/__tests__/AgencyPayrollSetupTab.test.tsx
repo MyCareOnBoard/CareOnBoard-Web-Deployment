@@ -8,7 +8,8 @@ const refetch = vi.fn();
 const runCommand = vi.fn();
 const loadSetup = vi.fn();
 const bootstrapSetup = vi.fn();
-const mocks = vi.hoisted(() => ({ signerSearchTrigger: vi.fn(), newCommandKey: vi.fn() }));
+const createCompanyOnboardSession = vi.fn();
+const mocks = vi.hoisted(() => ({ signerSearchTrigger: vi.fn(), newCommandKey: vi.fn(), createCheckOnboard: vi.fn(), openCheckOnboard: vi.fn(), closeCheckOnboard: vi.fn() }));
 let setupQuery: { data?: AgencyPayrollSetupProjection; isLoading?: boolean; isFetching?: boolean; error?: unknown; refetch: typeof refetch };
 const signerCandidatesQuery = { data: { ownerCandidate: { userUid: "verified-owner", fullName: "Ada Owner", email: "ada@able.example", title: "Owner", identityVersion: `check_signer_v1_${"a".repeat(64)}`, designated: false }, staffCandidates: [] }, isLoading: false, isError: false };
 
@@ -16,6 +17,7 @@ vi.mock("@/features/payroll/api/agencyPayrollEndpoints", () => ({
   useGetAgencyPayrollSetupQuery: () => setupQuery,
   useLazyGetAgencyPayrollSetupQuery: () => [loadSetup],
   useBootstrapAgencyPayrollSetupMutation: () => [bootstrapSetup],
+  useCreateCompanyOnboardSessionMutation: () => [createCompanyOnboardSession],
   useGetAgencyPayrollSignerCandidatesQuery: () => signerCandidatesQuery,
   useLazyGetAgencyPayrollSignerCandidatesQuery: () => [mocks.signerSearchTrigger, { data: undefined, isFetching: false, isError: false }],
   useLazyGetAgencyPayrollOperationQuery: () => [vi.fn()],
@@ -23,6 +25,7 @@ vi.mock("@/features/payroll/api/agencyPayrollEndpoints", () => ({
 }));
 vi.mock("@/features/payroll/api/payrollCommands", () => ({ useRunAgencyPayrollCommandMutation: () => [runCommand], newIdempotencyKey: mocks.newCommandKey }));
 vi.mock("@/features/payroll/hooks/useProjectionFreshness", () => ({ useProjectionFreshness: () => ({ requireCurrentProjection: vi.fn().mockResolvedValue(true) }) }));
+vi.mock("@/features/payroll/onboard/loadCheckOnboard", () => ({ loadCheckOnboard: () => Promise.resolve({ create: mocks.createCheckOnboard }) }));
 
 const projection = (capabilities: AgencyPayrollSetupProjection["capabilities"], designatedSignerPresent = false, signerCandidate: AgencyPayrollSetupProjection["setup"]["signerCandidate"] = { userUid: "verified-owner", fullName: "Ada Owner", email: "ada@able.example", title: "Owner", identityVersion: `check_signer_v1_${"a".repeat(64)}`, designated: designatedSignerPresent }): AgencyPayrollSetupProjection => ({
   projectionRevision: 4,
@@ -45,7 +48,7 @@ const notConfigured = (missingFieldCodes: string[] = ["legalName"]): AgencyPayro
 });
 
 describe("AgencyPayrollSetupTab", () => {
-  beforeEach(() => { refetch.mockReset(); runCommand.mockReset(); loadSetup.mockReset(); bootstrapSetup.mockReset(); mocks.signerSearchTrigger.mockReset(); mocks.newCommandKey.mockReset(); mocks.newCommandKey.mockReturnValue("00000000-0000-4000-8000-000000000001"); setupQuery = { error: true, refetch }; });
+  beforeEach(() => { refetch.mockReset(); runCommand.mockReset(); loadSetup.mockReset(); bootstrapSetup.mockReset(); createCompanyOnboardSession.mockReset(); mocks.signerSearchTrigger.mockReset(); mocks.newCommandKey.mockReset(); mocks.createCheckOnboard.mockReset(); mocks.openCheckOnboard.mockReset(); mocks.closeCheckOnboard.mockReset(); mocks.createCheckOnboard.mockReturnValue({ open: mocks.openCheckOnboard, close: mocks.closeCheckOnboard }); mocks.newCommandKey.mockReturnValue("00000000-0000-4000-8000-000000000001"); setupQuery = { error: true, refetch }; });
 
   it("offers an accessible retry that refetches setup", async () => {
     const user = userEvent.setup(); render(<AgencyPayrollSetupTab scope={scope} />);
@@ -339,6 +342,40 @@ describe("AgencyPayrollSetupTab", () => {
     expect(screen.getByRole("button", { name: /retry company sync/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /refresh reconciliation/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /onboard|secure setup/i })).not.toBeInTheDocument();
+  });
+
+  it("offers Complete payroll onboarding only to the authorized signer", async () => {
+    setupQuery = { data: projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: true }, true), refetch };
+    render(<AgencyPayrollSetupTab scope={scope} />);
+    expect(await screen.findByRole("button", { name: "Complete payroll onboarding" })).toBeInTheDocument();
+  });
+
+  it("maps the closed company session URL into the shared Check Onboard SDK", async () => {
+    setupQuery = { data: projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: true }, true), refetch };
+    createCompanyOnboardSession.mockReturnValue({ unwrap: () => Promise.resolve({ url: "https://onboard.example/company", expiresAt: new Date(Date.now() + 60_000).toISOString() }) });
+    const user = userEvent.setup();
+    render(<AgencyPayrollSetupTab scope={scope} />);
+    await user.click(await screen.findByRole("button", { name: "Complete payroll onboarding" }));
+    await waitFor(() => expect(mocks.createCheckOnboard).toHaveBeenCalledWith(expect.objectContaining({ link: "https://onboard.example/company" })));
+    expect(mocks.openCheckOnboard).toHaveBeenCalledOnce();
+  });
+
+  it("tells a non-signer manager that the designated signer must complete company onboarding", () => {
+    setupQuery = { data: { ...projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false }, true), readiness: { status: "needs_attention", blockers: ["company_onboard_blocking"], nextAction: "complete_company_onboard" }, setup: { ...projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false }, true).setup, signatoryLinked: true } }, refetch };
+    render(<AgencyPayrollSetupTab scope={scope} />);
+    expect(screen.getByText(/designated payroll signer must complete/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /complete payroll onboarding/i })).not.toBeInTheDocument();
+  });
+
+  it("refreshes after a stale company Onboard response and waits for a new click", async () => {
+    setupQuery = { data: projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: true }, true), refetch };
+    createCompanyOnboardSession.mockReturnValue({ unwrap: () => Promise.reject({ status: 409 }) });
+    const user = userEvent.setup();
+    render(<AgencyPayrollSetupTab scope={scope} />);
+    await user.click(await screen.findByRole("button", { name: "Complete payroll onboarding" }));
+    await waitFor(() => expect(refetch).toHaveBeenCalledOnce());
+    expect(createCompanyOnboardSession).toHaveBeenCalledTimes(1);
+    expect(createCompanyOnboardSession).toHaveBeenCalledWith({ ...scope, expectedProjectionRevision: 4 });
   });
 
   it("renders Payroll Management actions without signer authority", () => {

@@ -68,7 +68,7 @@ export interface AgencyPayrollSetupProjection {
     enrollmentProfileLocked: boolean;
     signatoryLinked: boolean;
   };
-  capabilities: { canView: boolean; canManage: boolean; canCreateIntegration: boolean; canDesignateSigner: boolean; createCompanyOnboardSession: false };
+  capabilities: { canView: boolean; canManage: boolean; canCreateIntegration: boolean; canDesignateSigner: boolean; createCompanyOnboardSession: boolean };
 }
 
 export interface EmployeePayrollSetupProjection {

@@ -1,9 +1,16 @@
 import { checkPayrollApi } from "./checkPayrollApi";
 import { companyMutationTags, payrollTag, payrollScopeKey } from "./cacheTags";
 import type { AgencyPayrollBootstrapArgs, AgencyPayrollSetupProjection, AgencyPayrollSignerCandidates, AgencyPayrollSignerCandidatesArgs, ManagedEmployeePrimaryWorkplaceProjection, ManagedEmployeePrimaryWorkplaceScope, PayrollOperation, PayrollScope } from "../model/types";
+
+export type AgencyCompanyOnboardSessionArgs = PayrollScope & {
+  expectedProjectionRevision: number;
+};
+
+export type AgencyCompanyOnboardSession = { url: string; expiresAt: string };
 export const agencyPayrollPaths = {
   setup: () => ({ url: "/checkPayrollAgency/payroll/agency/setup", method: "GET" as const, requiresAuth: true }),
   bootstrap: () => ({ url: "/checkPayrollAgency/payroll/agency/setup", method: "PUT" as const, requiresAuth: true }),
+  companyOnboardSession: () => ({ url: "/checkPayrollOnboard/payroll/agency/setup/onboard-session", method: "POST" as const, requiresAuth: true }),
   signerCandidates: () => ({ url: "/checkPayrollAgency/payroll/agency/signer-candidates", method: "GET" as const, requiresAuth: true }),
   overview: () => ({ url: "/checkPayrollAgency/payroll/agency/overview", method: "GET" as const, requiresAuth: true }),
   operation: (operationId: string) => ({ url: `/checkPayrollOperations/payroll/operations/${encodeURIComponent(operationId)}`, method: "GET" as const, requiresAuth: true }),
@@ -17,6 +24,11 @@ export const agencyPayrollBootstrapRequest = (args: AgencyPayrollBootstrapArgs) 
     checkPayrollProfile: args.checkPayrollProfile,
     ...(args.signerDesignation ? { signerDesignation: args.signerDesignation } : {}),
   },
+});
+
+export const agencyCompanyOnboardSessionRequest = (args: AgencyCompanyOnboardSessionArgs) => ({
+  ...agencyPayrollPaths.companyOnboardSession(),
+  data: { expectedProjectionRevision: args.expectedProjectionRevision },
 });
 
 export const agencyPayrollBootstrapInvalidationTags = (error: unknown, args: AgencyPayrollBootstrapArgs) => (
@@ -43,6 +55,10 @@ export const agencyPayrollApi = checkPayrollApi.injectEndpoints({
         }
       },
     }),
+    createCompanyOnboardSession: build.mutation<AgencyCompanyOnboardSession, AgencyCompanyOnboardSessionArgs>({
+      query: agencyCompanyOnboardSessionRequest,
+      invalidatesTags: () => [],
+    }),
     getAgencyPayrollSignerCandidates: build.query<AgencyPayrollSignerCandidates, AgencyPayrollSignerCandidatesArgs>({
       query: ({ q }) => ({ ...agencyPayrollPaths.signerCandidates(), ...(q ? { params: { q } } : {}) }),
       serializeQueryArgs: ({ queryArgs }) => `signer-candidates:${payrollScopeKey(queryArgs)}:${queryArgs.q ?? ""}`,
@@ -63,4 +79,4 @@ export const agencyPayrollApi = checkPayrollApi.injectEndpoints({
     }),
   }),
 });
-export const { useGetAgencyPayrollSetupQuery, useLazyGetAgencyPayrollSetupQuery, useBootstrapAgencyPayrollSetupMutation, useGetAgencyPayrollSignerCandidatesQuery, useLazyGetAgencyPayrollSignerCandidatesQuery, useGetAgencyPayrollOverviewQuery, useLazyGetAgencyPayrollOverviewQuery, useLazyGetAgencyPayrollOperationQuery, useGetManagedEmployeePrimaryWorkplaceQuery, useLazyGetManagedEmployeePrimaryWorkplaceQuery } = agencyPayrollApi;
+export const { useGetAgencyPayrollSetupQuery, useLazyGetAgencyPayrollSetupQuery, useBootstrapAgencyPayrollSetupMutation, useCreateCompanyOnboardSessionMutation, useGetAgencyPayrollSignerCandidatesQuery, useLazyGetAgencyPayrollSignerCandidatesQuery, useGetAgencyPayrollOverviewQuery, useLazyGetAgencyPayrollOverviewQuery, useLazyGetAgencyPayrollOperationQuery, useGetManagedEmployeePrimaryWorkplaceQuery, useLazyGetManagedEmployeePrimaryWorkplaceQuery } = agencyPayrollApi;

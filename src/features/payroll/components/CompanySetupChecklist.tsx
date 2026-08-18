@@ -1,4 +1,45 @@
 import type { AgencyPayrollSetupProjection } from "../model/types";
+
+const readinessStatusCopy: Record<string, string> = {
+  needs_information: "More payroll company information is needed.",
+  ready_to_sync: "Payroll company setup is ready to sync.",
+  needs_attention: "Payroll company setup needs attention.",
+  ready: "Payroll company setup is ready.",
+};
+
+const readinessBlockerCopy: Record<string, string> = {
+  missing_required_information: "Complete the required payroll company information before continuing.",
+  designated_signer_required: "Designate an authorized payroll signer before company setup can continue.",
+  implementation_needs_attention: "Payroll company setup needs attention. Review the current setup before continuing.",
+  implementation_in_review: "Payroll company setup is under review. Check back after the review is complete.",
+  unknown_implementation_status: "Payroll company setup needs attention. Review the current setup before continuing.",
+  company_not_in_good_standing: "The payroll company is not in good standing. Contact payroll support for help.",
+  unknown_standing_conditions: "Payroll company standing needs attention. Contact payroll support for help.",
+  standing_compliance_risk: "A compliance review is required before payroll can continue. Contact payroll support for help.",
+  standing_fraud_risk: "A payroll risk review is required before payroll can continue. Contact payroll support for help.",
+  standing_credit_risk: "A credit review is required before payroll can continue. Contact payroll support for help.",
+  standing_failed_debit: "A payroll payment needs attention. Contact payroll support for help.",
+  standing_late_wire: "A payroll payment needs attention. Contact payroll support for help.",
+  unknown_standing_condition: "Payroll company standing needs attention. Contact payroll support for help.",
+  company_onboard_blocking: "Complete payroll onboarding to finish company setup.",
+  company_onboard_needs_attention: "Complete payroll onboarding to finish company setup.",
+  unknown_company_onboard_status: "Payroll company onboarding needs attention. Contact payroll support for help.",
+  ein_verification_final_rejected: "The employer identification number was rejected. Update it before payroll can continue.",
+  ein_verification_pending: "The employer identification number is awaiting verification. Check back shortly.",
+  ein_verification_processing: "The employer identification number is being verified. Check back shortly.",
+  unknown_ein_verification_status: "Employer identification number verification needs attention. Contact payroll support for help.",
+  ein_verification_rejected: "The employer identification number was rejected. Update it before payroll can continue.",
+};
+
+const fallbackReadinessCopy = "Payroll company setup needs attention. Review the current payroll company setup before continuing.";
+
+function readinessMessage(code: string, copy: Record<string, string>) {
+  return copy[code] ?? fallbackReadinessCopy;
+}
+
 export function CompanySetupChecklist({ projection }: { projection: AgencyPayrollSetupProjection }) {
-  return <section aria-labelledby="company-setup-heading" className="border-b border-[#e5e7eb] pb-6"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#006f73]">Company record</p><h2 id="company-setup-heading" className="mt-1 text-xl font-semibold text-[#10141a]">Payroll company setup</h2>{projection.readiness.blockers.length ? <ul className="mt-4 space-y-2 text-sm text-[#5d626b]">{projection.readiness.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul> : <p className="mt-3 text-sm text-[#5d626b]">Current status: {projection.readiness.status.replaceAll("_", " ")}.</p>}</section>;
+  const needsCompanyOnboard = projection.readiness.nextAction === "complete_company_onboard";
+  const needsSignerGuidance = needsCompanyOnboard && projection.setup.designatedSignerPresent && projection.setup.signatoryLinked && !projection.capabilities.createCompanyOnboardSession;
+
+  return <section aria-labelledby="company-setup-heading" className="border-b border-[#e5e7eb] pb-6"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#006f73]">Company record</p><h2 id="company-setup-heading" className="mt-1 text-xl font-semibold text-[#10141a]">Payroll company setup</h2>{projection.readiness.blockers.length ? <ul className="mt-4 space-y-2 text-sm text-[#5d626b]">{projection.readiness.blockers.map((blocker) => <li key={blocker}>{readinessMessage(blocker, readinessBlockerCopy)}</li>)}</ul> : <p className="mt-3 text-sm text-[#5d626b]">{readinessMessage(projection.readiness.status, readinessStatusCopy)}</p>}{needsSignerGuidance && <p className="mt-3 text-sm text-[#5d626b]">The designated payroll signer must complete payroll onboarding before company setup can continue.</p>}</section>;
 }
