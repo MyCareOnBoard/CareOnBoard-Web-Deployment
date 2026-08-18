@@ -32,7 +32,7 @@ describe("CompanySetupChecklist", () => {
     ["company_onboard_blocking", "Complete payroll onboarding to finish company setup."],
     ["company_onboard_needs_attention", "Complete payroll onboarding to finish company setup."],
     ["unknown_company_onboard_status", "Payroll company onboarding needs attention. Contact payroll support for help."],
-    ["ein_verification_final_rejected", "The employer identification number was rejected. Update it before payroll can continue."],
+    ["ein_verification_final_rejected", "The employer identification number was rejected. Contact payroll support for help."],
     ["ein_verification_pending", "The employer identification number is awaiting verification. Check back shortly."],
     ["ein_verification_processing", "The employer identification number is being verified. Check back shortly."],
     ["unknown_ein_verification_status", "Employer identification number verification needs attention. Contact payroll support for help."],
