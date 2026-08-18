@@ -1,9 +1,24 @@
-import { describe, expect, it } from "vitest";
+import { configureStore } from "@reduxjs/toolkit";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as agencyEndpoints from "./agencyPayrollEndpoints";
-import { agencyPayrollPaths } from "./agencyPayrollEndpoints";
+import { agencyPayrollApi, agencyPayrollPaths } from "./agencyPayrollEndpoints";
 import { agencyPayrollCommandRequest, type PayrollCommandArgs } from "./payrollCommands";
+import type { AgencyPayrollSetupProjection } from "../model/types";
+
+const baseQuery = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/baseQuery", () => ({ customBaseQuery: baseQuery }));
+
+const projection = (revision: number): AgencyPayrollSetupProjection => ({
+  projectionRevision: revision,
+  integration: { state: "configured", environment: "sandbox" },
+  preflight: { values: {}, missingFieldCodes: [] },
+  readiness: { status: "ready", blockers: [], nextAction: null },
+  setup: { designatedSignerPresent: false, signerCandidate: null, designatedSigner: null, companyLinked: true, officeWorkplaceLinked: true, payScheduleLinked: true, enrollmentProfileLocked: true, signatoryLinked: false },
+  capabilities: { canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false },
+});
 
 describe("agency payroll wire contracts", () => {
+  beforeEach(() => baseQuery.mockReset());
   it("uses closed authenticated paths without scope identity in requests", () => {
     expect(agencyPayrollPaths.setup()).toEqual({ url: "/checkPayrollAgency/payroll/agency/setup", method: "GET", requiresAuth: true });
     expect(agencyPayrollPaths.overview()).toEqual({ url: "/checkPayrollAgency/payroll/agency/overview", method: "GET", requiresAuth: true });
@@ -69,6 +84,29 @@ describe("agency payroll wire contracts", () => {
     expect(setupTags({ audience: "agency", actorUid: "actor-1", agencyId: "agency-1" })).toEqual([
       { type: "AgencySetup", id: "agency:actor-1:agency-1" },
     ]);
+  });
+  it("replaces only the successful bootstrap scope without immediately refetching setup", async () => {
+    const store = configureStore({
+      reducer: { [agencyPayrollApi.reducerPath]: agencyPayrollApi.reducer },
+      middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(agencyPayrollApi.middleware),
+    });
+    const matchingScope = { audience: "agency" as const, actorUid: "actor-a", agencyId: "agency-a" };
+    const otherScope = { audience: "agency" as const, actorUid: "actor-b", agencyId: "agency-b" };
+    const initial = projection(1);
+    const authoritative = projection(2);
+    await store.dispatch(agencyPayrollApi.util.upsertQueryData("getAgencyPayrollSetup", matchingScope, initial));
+    await store.dispatch(agencyPayrollApi.util.upsertQueryData("getAgencyPayrollSetup", otherScope, projection(7)));
+    baseQuery.mockResolvedValueOnce({ data: authoritative });
+
+    await store.dispatch(agencyPayrollApi.endpoints.bootstrapAgencyPayrollSetup.initiate({
+      ...matchingScope,
+      expectedProjectionRevision: 1,
+      checkPayrollProfile: {},
+    })).unwrap();
+
+    expect(agencyPayrollApi.endpoints.getAgencyPayrollSetup.select(matchingScope)(store.getState()).data).toEqual(authoritative);
+    expect(agencyPayrollApi.endpoints.getAgencyPayrollSetup.select(otherScope)(store.getState()).data).toEqual(projection(7));
+    expect(baseQuery).toHaveBeenCalledTimes(1);
   });
   it("sends only the closed designation body with the caller's stable idempotency key", () => {
     const args = { audience: "agency" as const, actorUid: "u", agencyId: "a", command: "designate_signer" as const, projectionRevision: 7, designatedSignerUserUid: "u", designatedSignerIdentityVersion: `check_signer_v1_${"a".repeat(64)}`, authorityAttested: true as const, idempotencyKey: "00000000-0000-4000-8000-000000000001" } satisfies PayrollCommandArgs;

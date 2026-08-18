@@ -8,6 +8,7 @@ const refetch = vi.fn();
 const runCommand = vi.fn();
 const loadSetup = vi.fn();
 const bootstrapSetup = vi.fn();
+const mocks = vi.hoisted(() => ({ signerSearchTrigger: vi.fn(), newCommandKey: vi.fn() }));
 let setupQuery: { data?: AgencyPayrollSetupProjection; isLoading?: boolean; isFetching?: boolean; error?: unknown; refetch: typeof refetch };
 const signerCandidatesQuery = { data: { ownerCandidate: { userUid: "verified-owner", fullName: "Ada Owner", email: "ada@able.example", title: "Owner", identityVersion: `check_signer_v1_${"a".repeat(64)}`, designated: false }, staffCandidates: [] }, isLoading: false, isError: false };
 
@@ -16,11 +17,11 @@ vi.mock("@/features/payroll/api/agencyPayrollEndpoints", () => ({
   useLazyGetAgencyPayrollSetupQuery: () => [loadSetup],
   useBootstrapAgencyPayrollSetupMutation: () => [bootstrapSetup],
   useGetAgencyPayrollSignerCandidatesQuery: () => signerCandidatesQuery,
-  useLazyGetAgencyPayrollSignerCandidatesQuery: () => [vi.fn(), { data: undefined, isFetching: false, isError: false }],
+  useLazyGetAgencyPayrollSignerCandidatesQuery: () => [mocks.signerSearchTrigger, { data: undefined, isFetching: false, isError: false }],
   useLazyGetAgencyPayrollOperationQuery: () => [vi.fn()],
   useLazyGetAgencyPayrollOverviewQuery: () => [vi.fn()],
 }));
-vi.mock("@/features/payroll/api/payrollCommands", () => ({ useRunAgencyPayrollCommandMutation: () => [runCommand], newIdempotencyKey: () => "00000000-0000-4000-8000-000000000001" }));
+vi.mock("@/features/payroll/api/payrollCommands", () => ({ useRunAgencyPayrollCommandMutation: () => [runCommand], newIdempotencyKey: mocks.newCommandKey }));
 vi.mock("@/features/payroll/hooks/useProjectionFreshness", () => ({ useProjectionFreshness: () => ({ requireCurrentProjection: vi.fn().mockResolvedValue(true) }) }));
 
 const projection = (capabilities: AgencyPayrollSetupProjection["capabilities"], designatedSignerPresent = false, signerCandidate: AgencyPayrollSetupProjection["setup"]["signerCandidate"] = { userUid: "verified-owner", fullName: "Ada Owner", email: "ada@able.example", title: "Owner", identityVersion: `check_signer_v1_${"a".repeat(64)}`, designated: designatedSignerPresent }): AgencyPayrollSetupProjection => ({
@@ -44,7 +45,7 @@ const notConfigured = (missingFieldCodes: string[] = ["legalName"]): AgencyPayro
 });
 
 describe("AgencyPayrollSetupTab", () => {
-  beforeEach(() => { refetch.mockReset(); runCommand.mockReset(); loadSetup.mockReset(); bootstrapSetup.mockReset(); setupQuery = { error: true, refetch }; });
+  beforeEach(() => { refetch.mockReset(); runCommand.mockReset(); loadSetup.mockReset(); bootstrapSetup.mockReset(); mocks.signerSearchTrigger.mockReset(); mocks.newCommandKey.mockReset(); mocks.newCommandKey.mockReturnValue("00000000-0000-4000-8000-000000000001"); setupQuery = { error: true, refetch }; });
 
   it("offers an accessible retry that refetches setup", async () => {
     const user = userEvent.setup(); render(<AgencyPayrollSetupTab scope={scope} />);
@@ -250,6 +251,7 @@ describe("AgencyPayrollSetupTab", () => {
     const user = userEvent.setup();
     render(<AgencyPayrollSetupTab scope={scope} />);
     await user.click(screen.getByRole("button", { name: /create payroll setup/i }));
+    expect(mocks.signerSearchTrigger).not.toHaveBeenCalled();
     expect(await screen.findByRole("radio", { name: /ada owner/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^create payroll setup$/i })).toBeDisabled();
   });
@@ -289,6 +291,27 @@ describe("AgencyPayrollSetupTab", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(/reselect the signer/i);
     expect(screen.getByRole("checkbox", { name: /selected account is authorized/i })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Designate selected signer" })).toBeDisabled();
+  });
+
+  it("keeps the configured signer retry key stable per intent and creates a new key after reselection", async () => {
+    mocks.newCommandKey
+      .mockReturnValueOnce("00000000-0000-4000-8000-000000000001")
+      .mockReturnValueOnce("00000000-0000-4000-8000-000000000002");
+    runCommand.mockReturnValue({ unwrap: () => Promise.resolve({ operationId: "signer-operation" }) });
+    setupQuery = { data: projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: true, createCompanyOnboardSession: false }), refetch };
+    const user = userEvent.setup();
+    render(<AgencyPayrollSetupTab scope={scope} />);
+    await user.click(screen.getByRole("radio", { name: /Ada Owner/i }));
+    await user.click(screen.getByRole("checkbox", { name: /selected account is authorized/i }));
+    await user.click(screen.getByRole("button", { name: "Designate selected signer" }));
+    await user.click(screen.getByRole("button", { name: "Designate selected signer" }));
+    await waitFor(() => expect(runCommand).toHaveBeenCalledTimes(2));
+    expect(runCommand.mock.calls[1][0].idempotencyKey).toBe(runCommand.mock.calls[0][0].idempotencyKey);
+    await user.click(screen.getByRole("checkbox", { name: /selected account is authorized/i }));
+    await user.click(screen.getByRole("checkbox", { name: /selected account is authorized/i }));
+    await user.click(screen.getByRole("button", { name: "Designate selected signer" }));
+    await waitFor(() => expect(runCommand).toHaveBeenCalledTimes(3));
+    expect(runCommand.mock.calls[2][0].idempotencyKey).not.toBe(runCommand.mock.calls[0][0].idempotencyKey);
   });
 
   it("renders verified candidate designation plus management actions while withholding Onboard", () => {
