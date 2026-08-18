@@ -41,4 +41,14 @@ describe("CompanySetupFields", () => {
     expect(screen.queryByLabelText(/proposed signer/i)).not.toBeInTheDocument();
     expect(screen.getByLabelText("Expected W-2 workers")).toHaveAttribute("aria-describedby", "expectedW2Workers-error");
   });
+
+  it("renders fixed +1, ten-digit-only payroll contact input without normalizing a malformed prefill", () => {
+    render(<CompanySetupFields formData={{ payrollContactPhone: "+445125550123" }} onChange={vi.fn()} />);
+    const input = screen.getByLabelText("Payroll contact phone");
+    expect(input).toHaveValue("+445125550123");
+    expect(input).toHaveAttribute("type", "tel");
+    expect(input).toHaveAttribute("inputmode", "numeric");
+    expect(input).toHaveAttribute("maxlength", "10");
+    expect(screen.getByText("+1")).toBeInTheDocument();
+  });
 });

@@ -12,9 +12,8 @@ describe("agency payroll wire contracts", () => {
     expect(bootstrap).toBeTypeOf("function");
     if (typeof bootstrap !== "function") return;
     expect(bootstrap()).toEqual({ url: "/checkPayrollAgency/payroll/agency/setup", method: "PUT", requiresAuth: true });
-    expect((agencyPayrollPaths as Record<string, unknown>).signerCandidates).toBeTypeOf("function");
-    const signerCandidates = (agencyPayrollPaths as Record<string, () => unknown>).signerCandidates;
-    expect(signerCandidates()).toEqual({ url: "/checkPayrollAgency/payroll/agency/signer-candidates", method: "GET", requiresAuth: true });
+    expect(agencyPayrollPaths.signerCandidates).toBeTypeOf("function");
+    expect(agencyPayrollPaths.signerCandidates()).toEqual({ url: "/checkPayrollAgency/payroll/agency/signer-candidates", method: "GET", requiresAuth: true });
   });
   it("sends only the frozen bootstrap body and invalidates the matching agency setup after success", () => {
     const args = {

@@ -52,14 +52,14 @@ vi.mock("@/pages/super-admin/agencies/components/StepOne", async () => {
       <button type="button" onClick={() => {
         const values = {
           agencyName: "Able Care", agencyType: "provider", primaryAddress: "100 Agency Way",
-          county_or_state: "TX", zipCode: "78701", mainPhone: "+15125550123", supportEmail: "hello@able.example",
+          county_or_state: "TX", zipCode: "78701", mainPhone: "5125550123", supportEmail: "hello@able.example",
           websiteUrl: "https://able.example", payrollLegalName: "Able Care LLC", payrollEin: "12-3456789",
           payrollEntityType: "llc", payrollIndustry: "health_care",
           payrollLegalAddress: { line1: "1 Legal Street", line2: "Suite 1", city: "Austin", state: "TX", postalCode: "78701", country: "US" },
           payrollOfficeName: "Main office",
           payrollOfficeAddress: { line1: "2 Work Street", line2: "", city: "Austin", state: "TX", postalCode: "78702", country: "US" },
           payrollActualWorkLocationAttested: true, payrollContactName: "Pay Roll", payrollContactEmail: "payroll@able.example",
-          payrollContactPhone: "+15125550124", payrollFrequency: "weekly", payrollFirstPayday: "2026-09-04",
+          payrollContactPhone: "5125550124", payrollFrequency: "weekly", payrollFirstPayday: "2026-09-04",
           payrollSecondPayday: "", payrollFirstPeriodEnd: "2026-09-03", payrollStartDate: "2026-08-28",
           expectedW2Workers: "3",
         };
@@ -146,6 +146,21 @@ describe("AddAgencyWizard payroll endpoint payloads", () => {
     });
     expect(JSON.stringify(mocks.update.mock.calls[0][0])).not.toMatch(/einStatus|designatedSignerUserUid|payrollSchedule|nextPayoutDate|last4/);
   }, 15_000);
+
+  it("hydrates canonical payroll phones into fixed-prefix ten-digit controls", async () => {
+    mocks.search = "?agencyId=agency-1";
+    mocks.currentAgency = {
+      agencyData: {
+        name: "Able Care",
+        email: "hello@able.example",
+        phone: "+15125550123",
+        checkPayrollProfile: { payrollContact: { name: "Pat Payroll", email: "pat@able.example", phone: "+15125550124" } },
+      },
+      user: { fullName: "Agency Owner", email: "owner@able.example", phone: "+15125550125", userType: "agency" },
+    };
+    render(<AddAgencyWizard />);
+    expect(await screen.findByLabelText("Payroll contact phone")).toHaveValue("5125550124");
+  });
 
   it("sends the exact canonical full payroll write through the create endpoint", async () => {
     const user = userEvent.setup();

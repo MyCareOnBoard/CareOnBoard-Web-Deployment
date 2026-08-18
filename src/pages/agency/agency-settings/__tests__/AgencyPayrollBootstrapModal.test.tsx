@@ -112,4 +112,14 @@ describe("AgencyPayrollBootstrapModal", () => {
     }
     expect(screen.getAllByText("+1")).toHaveLength(2);
   });
+
+  it("does not strip or truncate a noncanonical phone prefill during an edit", async () => {
+    const user = userEvent.setup();
+    render(<AgencyPayrollBootstrapModal open values={{ phone: "+445125550123" }} missingFieldCodes={["phone"]} onOpenChange={vi.fn()} onSubmit={vi.fn()} />);
+    const phone = screen.getByLabelText("Company phone number");
+    expect(phone).toHaveValue("+445125550123");
+    await user.type(phone, "9");
+    expect(phone).toHaveValue("+445125550123");
+    expect(phone).toHaveAccessibleDescription(/enter a valid us ten-digit phone number/i);
+  });
 });

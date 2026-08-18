@@ -2,11 +2,11 @@ import type { AgencyPayrollSetupProjection } from "../model/types";
 import { canUsePayrollAction } from "../model/capabilities";
 import { useEffect, useState } from "react";
 
-export function SignerSetupCard({ projection, onAction }: { projection: AgencyPayrollSetupProjection; onAction?: (action: "designate_signer" | "clear_signer", authorityAttested?: true) => Promise<boolean> }) {
+export function SignerSetupCard({ projection, onAction, hideDesignation = false }: { projection: AgencyPayrollSetupProjection; onAction?: (action: "designate_signer" | "clear_signer", authorityAttested?: true) => Promise<boolean>; hideDesignation?: boolean }) {
   const [attested, setAttested] = useState(false);
   const [pendingAction, setPendingAction] = useState<"designate_signer" | "clear_signer" | null>(null);
   const candidate = projection.setup.designatedSignerPresent ? projection.setup.designatedSigner : projection.setup.signerCandidate;
-  const canDesignate = canUsePayrollAction(projection, "designate_signer");
+  const canDesignate = !hideDesignation && canUsePayrollAction(projection, "designate_signer");
   const canClear = canUsePayrollAction(projection, "clear_signer");
   useEffect(() => {
     setAttested(false);

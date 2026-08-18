@@ -130,7 +130,7 @@ function UsPayrollPhoneField({ label, value, onChange, error, autoComplete }: { 
   const invalidPrefill = Boolean(value && !isUsTenDigitPayrollPhone(value));
   const visibleError = error ?? (invalidPrefill ? "Enter a valid US ten-digit phone number." : undefined);
   const describedBy = [`${id}-help`, visibleError && `${id}-error`].filter(Boolean).join(" ");
-  const acceptDigits = (next: string) => onChange(next.replaceAll(/[^0-9]/g, "").slice(0, 10));
+  const acceptDigits = (next: string) => { if (/^\d{0,10}$/.test(next)) onChange(next); };
   return <div><Label htmlFor={id}>{label}</Label><div className="mt-1 flex min-h-11 overflow-hidden rounded-md border border-input bg-background"><span aria-hidden="true" className="flex items-center border-r border-input bg-muted px-3 text-sm font-medium text-muted-foreground">+1</span><Input id={id} type="tel" inputMode="numeric" autoComplete={autoComplete} maxLength={10} value={value ?? ""} aria-invalid={Boolean(visibleError)} aria-describedby={describedBy} className="h-auto min-h-11 border-0 focus-visible:ring-0" onChange={(event) => acceptDigits(event.target.value)} onPaste={(event) => { const pasted = event.clipboardData.getData("text"); if (!/^\d*$/.test(pasted)) { event.preventDefault(); return; } event.preventDefault(); acceptDigits(`${value ?? ""}${pasted}`); }} /></div><p id={`${id}-help`} className="mt-1 text-xs text-[#5d626b]">Enter a U.S. ten-digit phone number. +1 is added automatically.</p>{visibleError && <p id={`${id}-error`} role="alert" className="mt-1 text-xs text-[#8b2d2d]">{visibleError}</p>}</div>;
 }
 

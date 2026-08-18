@@ -30,7 +30,7 @@ import {
     dismissAgencyAccessRefreshWarning,
     showAgencyAccessRefreshWarning,
 } from "./agencyAccessRefreshToast";
-import { buildCheckPayrollProfilePayload, type CheckAddress } from "@/lib/agency/agency-profile-payload";
+import { buildCheckPayrollProfilePayload, toCanonicalUsPayrollPhone, type CheckAddress } from "@/lib/agency/agency-profile-payload";
 import { isCompanySetupComplete, validateCompanySetup } from "@/features/payroll/forms/companySetupValidation";
 
 export interface AgencyFormData {
@@ -147,6 +147,8 @@ export interface AgencyFormData {
     planStartDate: string;
     planEndDate: string | null;
 }
+
+const hydrateUsNationalPhone = (value: string | undefined) => /^\+1\d{10}$/.test(value ?? "") ? value!.slice(2) : value ?? "";
 
 const STEPS = [
     {
@@ -384,7 +386,7 @@ export default function AddAgencyWizard() {
             payrollActualWorkLocationAttested: responseData.agencyData?.checkPayrollProfile?.officeWorkplace?.actualWorkLocationAttested === true,
             payrollContactName: responseData.agencyData?.checkPayrollProfile?.payrollContact?.name || "",
             payrollContactEmail: responseData.agencyData?.checkPayrollProfile?.payrollContact?.email || "",
-            payrollContactPhone: responseData.agencyData?.checkPayrollProfile?.payrollContact?.phone || "",
+            payrollContactPhone: hydrateUsNationalPhone(responseData.agencyData?.checkPayrollProfile?.payrollContact?.phone),
             payrollFrequency: responseData.agencyData?.checkPayrollProfile?.paySchedule?.frequency || "",
             payrollFirstPayday: responseData.agencyData?.checkPayrollProfile?.paySchedule?.firstPayday || "",
             payrollSecondPayday: responseData.agencyData?.checkPayrollProfile?.paySchedule?.secondPayday || "",
@@ -396,7 +398,7 @@ export default function AddAgencyWizard() {
             medicaidProviderId: responseData.agencyData?.medicaidProviderId || "",
             // Step 2: Contact Information
             supportEmail: responseData.agencyData?.email || "",
-            mainPhone: responseData.agencyData?.phone || "",
+            mainPhone: hydrateUsNationalPhone(responseData.agencyData?.phone),
             primaryAddress: responseData.agencyData?.address || "",
             county_or_state: responseData.agencyData?.state || "",
             zipCode: responseData.agencyData?.zipCode || "",
@@ -540,7 +542,7 @@ export default function AddAgencyWizard() {
         providerId: formData.providerId,
         medicaidProviderId: formData.medicaidProviderId,
         email: formData.supportEmail,
-        phone: formData.mainPhone,
+        phone: toCanonicalUsPayrollPhone(formData.mainPhone) ?? "",
         address: formData.primaryAddress,
         state: formData.county_or_state,
         zipCode: formData.zipCode,
