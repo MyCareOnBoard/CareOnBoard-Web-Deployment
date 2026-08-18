@@ -30,6 +30,8 @@ export type CheckPayrollProfileFormValues = {
 
 const trim = (value: string | undefined) => value?.trim() ?? "";
 const hasAddress = (value: CheckAddress | undefined) => Boolean(value && trim(value.line1) && trim(value.city) && trim(value.state) && trim(value.postalCode));
+export const isUsTenDigitPayrollPhone = (value: string | undefined): value is string => /^\d{10}$/.test(value ?? "");
+export const toCanonicalUsPayrollPhone = (value: string | undefined): string | undefined => isUsTenDigitPayrollPhone(value) ? `+1${value}` : undefined;
 
 /** Maps the one onboarding form slice to the backend's exact, write-only contract. */
 export function buildCheckPayrollProfilePayload(values: CheckPayrollProfileFormValues): CheckPayrollProfileWrite {
@@ -43,8 +45,10 @@ export function buildCheckPayrollProfilePayload(values: CheckPayrollProfileFormV
   if (hasAddress(values.legalAddress)) payload.legalAddress = values.legalAddress!;
   if (trim(values.officeName) && hasAddress(values.officeAddress) && values.actualWorkLocationAttested) payload.officeWorkplace = { name: trim(values.officeName), address: values.officeAddress!, actualWorkLocationAttested: true };
   if (trim(values.website)) payload.website = trim(values.website);
-  if (trim(values.phone)) payload.phone = trim(values.phone);
-  if (trim(values.payrollContactName) && trim(values.payrollContactEmail) && trim(values.payrollContactPhone)) payload.payrollContact = { name: trim(values.payrollContactName), email: trim(values.payrollContactEmail), phone: trim(values.payrollContactPhone) };
+  const phone = toCanonicalUsPayrollPhone(values.phone);
+  const payrollContactPhone = toCanonicalUsPayrollPhone(values.payrollContactPhone);
+  if (phone) payload.phone = phone;
+  if (trim(values.payrollContactName) && trim(values.payrollContactEmail) && payrollContactPhone) payload.payrollContact = { name: trim(values.payrollContactName), email: trim(values.payrollContactEmail), phone: payrollContactPhone };
   if (CHECK_PAY_FREQUENCIES.includes(values.payFrequency as typeof CHECK_PAY_FREQUENCIES[number]) && trim(values.firstPayday) && trim(values.firstPeriodEnd) && trim(values.payrollStartDate)) payload.paySchedule = { frequency: values.payFrequency as typeof CHECK_PAY_FREQUENCIES[number], firstPayday: trim(values.firstPayday), secondPayday: values.payFrequency === "semimonthly" ? trim(values.secondPayday) : null, firstPeriodEnd: trim(values.firstPeriodEnd), payrollStartDate: trim(values.payrollStartDate) };
   if (values.expectedW2Workers !== undefined && trim(String(values.expectedW2Workers)) !== "") payload.expectedWorkerCounts = { w2: Number(values.expectedW2Workers), contractor: 0 };
   return payload;

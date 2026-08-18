@@ -9,15 +9,18 @@ const runCommand = vi.fn();
 const loadSetup = vi.fn();
 const bootstrapSetup = vi.fn();
 let setupQuery: { data?: AgencyPayrollSetupProjection; isLoading?: boolean; isFetching?: boolean; error?: unknown; refetch: typeof refetch };
+const signerCandidatesQuery = { data: { ownerCandidate: { userUid: "verified-owner", fullName: "Ada Owner", email: "ada@able.example", title: "Owner", identityVersion: `check_signer_v1_${"a".repeat(64)}`, designated: false }, staffCandidates: [] }, isLoading: false, isError: false };
 
 vi.mock("@/features/payroll/api/agencyPayrollEndpoints", () => ({
   useGetAgencyPayrollSetupQuery: () => setupQuery,
   useLazyGetAgencyPayrollSetupQuery: () => [loadSetup],
   useBootstrapAgencyPayrollSetupMutation: () => [bootstrapSetup],
+  useGetAgencyPayrollSignerCandidatesQuery: () => signerCandidatesQuery,
+  useLazyGetAgencyPayrollSignerCandidatesQuery: () => [vi.fn(), { data: undefined, isFetching: false, isError: false }],
   useLazyGetAgencyPayrollOperationQuery: () => [vi.fn()],
   useLazyGetAgencyPayrollOverviewQuery: () => [vi.fn()],
 }));
-vi.mock("@/features/payroll/api/payrollCommands", () => ({ useRunAgencyPayrollCommandMutation: () => [runCommand] }));
+vi.mock("@/features/payroll/api/payrollCommands", () => ({ useRunAgencyPayrollCommandMutation: () => [runCommand], newIdempotencyKey: () => "00000000-0000-4000-8000-000000000001" }));
 vi.mock("@/features/payroll/hooks/useProjectionFreshness", () => ({ useProjectionFreshness: () => ({ requireCurrentProjection: vi.fn().mockResolvedValue(true) }) }));
 
 const projection = (capabilities: AgencyPayrollSetupProjection["capabilities"], designatedSignerPresent = false, signerCandidate: { userUid: string; fullName: string; email: string; title: string; designated: boolean } | null = { userUid: "verified-owner", fullName: "Ada Owner", email: "ada@able.example", title: "Owner", designated: designatedSignerPresent }): AgencyPayrollSetupProjection => ({
@@ -233,6 +236,25 @@ describe("AgencyPayrollSetupTab", () => {
     await user.click(screen.getByRole("button", { name: "Designate this account" }));
     expect(runCommand).toHaveBeenCalledWith(expect.objectContaining({ command: "designate_signer", designatedSignerUserUid: "verified-owner", authorityAttested: true }));
     expect(runCommand.mock.calls[0][0].designatedSignerUserUid).not.toBe(scope.actorUid);
+  });
+
+  it("bootstraps once, then designates the attested owner with the returned revision", async () => {
+    const scannedProjection = notConfigured(["ein"]);
+    setupQuery = { data: scannedProjection, refetch };
+    loadSetup.mockReturnValue({ unwrap: () => Promise.resolve(scannedProjection) });
+    bootstrapSetup.mockReturnValue({ unwrap: () => Promise.resolve(projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: true, createCompanyOnboardSession: false })) });
+    runCommand.mockReturnValue({ unwrap: () => Promise.resolve({ operationId: "signer-operation" }) });
+    const user = userEvent.setup();
+    render(<AgencyPayrollSetupTab scope={scope} />);
+    await user.click(screen.getByRole("button", { name: /create payroll setup/i }));
+    await user.type(await screen.findByLabelText("Employer Identification Number (EIN)"), "12-3456789");
+    await user.click(screen.getByRole("radio", { name: /Ada Owner/i }));
+    await user.click(screen.getByRole("checkbox", { name: /selected account is authorized/i }));
+    await user.click(screen.getByRole("button", { name: /^create payroll setup$/i }));
+    await screen.findByText("Creating payroll setup…");
+    expect(bootstrapSetup).toHaveBeenCalledTimes(1);
+    await act(async () => undefined);
+    expect(runCommand).toHaveBeenCalledWith(expect.objectContaining({ command: "designate_signer", projectionRevision: 4, designatedSignerUserUid: "verified-owner", designatedSignerIdentityVersion: expect.stringMatching(/^check_signer_v1_/), authorityAttested: true, idempotencyKey: "00000000-0000-4000-8000-000000000001" }));
   });
 
   it("renders verified candidate designation plus management actions while withholding Onboard", () => {

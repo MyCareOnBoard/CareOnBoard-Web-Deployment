@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 export function SignerSetupCard({ projection, onAction }: { projection: AgencyPayrollSetupProjection; onAction?: (action: "designate_signer" | "clear_signer", authorityAttested?: true) => Promise<boolean> }) {
   const [attested, setAttested] = useState(false);
   const [pendingAction, setPendingAction] = useState<"designate_signer" | "clear_signer" | null>(null);
-  const candidate = projection.setup.signerCandidate;
+  const candidate = projection.setup.designatedSignerPresent ? projection.setup.designatedSigner : projection.setup.signerCandidate;
   const canDesignate = canUsePayrollAction(projection, "designate_signer");
   const canClear = canUsePayrollAction(projection, "clear_signer");
   useEffect(() => {

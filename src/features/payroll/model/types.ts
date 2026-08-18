@@ -30,6 +30,22 @@ export type AgencyPayrollBootstrapArgs = PayrollScope & {
   checkPayrollProfile: CheckPayrollProfileWrite;
 };
 
+export type PayrollSignerCandidate = {
+  userUid: string;
+  fullName: string;
+  email: string;
+  title: string;
+  identityVersion: string;
+  designated: boolean;
+};
+
+export type AgencyPayrollSignerCandidatesArgs = PayrollScope & { q?: string };
+
+export type AgencyPayrollSignerCandidates = {
+  ownerCandidate: PayrollSignerCandidate | null;
+  staffCandidates: PayrollSignerCandidate[];
+};
+
 export interface AgencyPayrollSetupProjection {
   projectionRevision: number;
   generatedAt?: string;
@@ -39,7 +55,8 @@ export interface AgencyPayrollSetupProjection {
   readiness: { status: "needs_information" | "ready_to_sync" | "needs_attention" | "ready"; blockers: string[]; nextAction: string | null };
   setup: {
     designatedSignerPresent: boolean;
-    signerCandidate: { userUid: string; fullName: string; email: string; title: string; designated: boolean } | null;
+    signerCandidate: PayrollSignerCandidate | null;
+    designatedSigner: PayrollSignerCandidate | null;
     companyLinked: boolean;
     officeWorkplaceLinked: boolean;
     payScheduleLinked: boolean;

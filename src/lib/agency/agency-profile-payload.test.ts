@@ -113,4 +113,16 @@ describe("buildCheckPayrollProfilePayload", () => {
     const unsafe = { legalName: "Able", einStatus: { present: true, last4: "6789" }, designatedSignerUserUid: "forged", payrollSchedule: { frequency: "weekly" } } as any;
     expect(buildCheckPayrollProfilePayload(unsafe)).toEqual({ legalName: "Able" });
   });
+
+  it("emits canonical +1 US phones from the ten-digit payroll controls only", () => {
+    expect(buildCheckPayrollProfilePayload({
+      phone: "5125550123",
+      payrollContactName: "Pat Payroll",
+      payrollContactEmail: "payroll@able.example",
+      payrollContactPhone: "5125550124",
+    })).toEqual({
+      phone: "+15125550123",
+      payrollContact: { name: "Pat Payroll", email: "payroll@able.example", phone: "+15125550124" },
+    });
+  });
 });

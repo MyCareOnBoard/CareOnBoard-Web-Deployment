@@ -3,12 +3,12 @@ import type { ManagedEmployeePrimaryCommandArgs, PayrollOperation, PayrollScope 
 import { companyMutationTags, employeeSetupMutationTags } from "./cacheTags";
 
 export const newIdempotencyKey = () => crypto.randomUUID();
-export type PayrollCommandArgs = PayrollScope & ({ command: "designate_signer"; projectionRevision: number; designatedSignerUserUid: string; authorityAttested: true } | { command: "clear_signer" | "retry_company_sync" | "refresh_company_reconciliation"; projectionRevision: number });
+export type PayrollCommandArgs = PayrollScope & ({ command: "designate_signer"; projectionRevision: number; designatedSignerUserUid: string; designatedSignerIdentityVersion: string; authorityAttested: true; idempotencyKey: string } | { command: "clear_signer" | "retry_company_sync" | "refresh_company_reconciliation"; projectionRevision: number; idempotencyKey: string });
 export const agencyPayrollCommandRequest = (args: PayrollCommandArgs) => {
   const data = args.command === "designate_signer"
-    ? { command: args.command, expectedProjectionRevision: args.projectionRevision, designatedSignerUserUid: args.designatedSignerUserUid, authorityAttested: true }
+    ? { command: args.command, expectedProjectionRevision: args.projectionRevision, designatedSignerUserUid: args.designatedSignerUserUid, designatedSignerIdentityVersion: args.designatedSignerIdentityVersion, authorityAttested: true }
     : { command: args.command, expectedProjectionRevision: args.projectionRevision };
-  return { url: "/checkPayrollAgency/payroll/agency/commands", method: "POST" as const, requiresAuth: true, headers: { "Idempotency-Key": newIdempotencyKey() }, data };
+  return { url: "/checkPayrollAgency/payroll/agency/commands", method: "POST" as const, requiresAuth: true, headers: { "Idempotency-Key": args.idempotencyKey }, data };
 };
 
 export const managerPrimaryWorkplaceCommandRequest = (args: ManagedEmployeePrimaryCommandArgs) => ({

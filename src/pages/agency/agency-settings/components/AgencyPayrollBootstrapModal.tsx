@@ -4,11 +4,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { buildCheckPayrollProfilePayload, CHECK_ENTITY_TYPES, CHECK_INDUSTRIES, CHECK_PAY_FREQUENCIES, type CheckAddress, type CheckPayrollProfileFormValues, type CheckPayrollProfileRead, type CheckPayrollProfileWrite } from "@/lib/agency/agency-profile-payload";
+import { buildCheckPayrollProfilePayload, CHECK_ENTITY_TYPES, CHECK_INDUSTRIES, CHECK_PAY_FREQUENCIES, isUsTenDigitPayrollPhone, type CheckAddress, type CheckPayrollProfileFormValues, type CheckPayrollProfileRead, type CheckPayrollProfileWrite } from "@/lib/agency/agency-profile-payload";
 import { validateCompanySetup } from "@/features/payroll/forms/companySetupValidation";
 import { useToast } from "@/hooks/use-toast";
 import { AddressAutocompleteField } from "@/pages/shared/client-management/components/forms/AddressAutocompleteField";
 import { DatePickerField } from "@/pages/shared/client-management/components/forms/formControls";
+import { AuthorizedSignerSelector, type SignerDesignation } from "@/features/payroll/components/AuthorizedSignerSelector";
+import type { PayrollScope } from "@/features/payroll/model/types";
 
 type Props = {
   open: boolean;
@@ -17,11 +19,13 @@ type Props = {
   isSubmitting?: boolean;
   submissionError?: string | null;
   submissionFieldCodes?: string[];
+  scope?: PayrollScope;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (profile: CheckPayrollProfileWrite) => Promise<void>;
+  onSubmit: (profile: CheckPayrollProfileWrite, signerSelection: SignerDesignation | null) => Promise<void>;
 };
 
 const emptyAddress = (): CheckAddress => ({ line1: "", line2: "", city: "", state: "", postalCode: "", country: "US" });
+const hydrateUsPayrollPhone = (value: string | undefined) => /^\+1\d{10}$/.test(value ?? "") ? value!.slice(2) : value ?? "";
 
 function formValues(values: CheckPayrollProfileRead): CheckPayrollProfileFormValues {
   return {
@@ -34,10 +38,10 @@ function formValues(values: CheckPayrollProfileRead): CheckPayrollProfileFormVal
     officeAddress: values.officeWorkplace?.address ?? emptyAddress(),
     actualWorkLocationAttested: values.officeWorkplace?.actualWorkLocationAttested === true,
     website: values.website ?? "",
-    phone: values.phone ?? "",
+    phone: hydrateUsPayrollPhone(values.phone),
     payrollContactName: values.payrollContact?.name ?? "",
     payrollContactEmail: values.payrollContact?.email ?? "",
-    payrollContactPhone: values.payrollContact?.phone ?? "",
+    payrollContactPhone: hydrateUsPayrollPhone(values.payrollContact?.phone),
     payFrequency: values.paySchedule?.frequency ?? "",
     firstPayday: values.paySchedule?.firstPayday ?? "",
     secondPayday: values.paySchedule?.secondPayday ?? "",
@@ -83,10 +87,10 @@ export const AGENCY_PAYROLL_REQUIRED_FIELD_MAP: Record<RequiredFieldCode, FieldS
   "officeWorkplace.address.postalCode": { group: "workplace", target: "officeAddress", satisfied: (f) => /^\d{5}(?:-\d{4})?$/.test(f.officeAddress?.postalCode ?? "") },
   "officeWorkplace.address.country": { group: "workplace", target: "officeAddress", fixed: true, satisfied: () => true },
   website: { group: "contact", target: "website", satisfied: (f) => /^https?:\/\/\S+$/i.test(f.website ?? "") },
-  phone: { group: "contact", target: "phone", satisfied: (f) => /^\+?[1-9]\d{7,14}$/.test(f.phone ?? "") },
+  phone: { group: "contact", target: "phone", satisfied: (f) => isUsTenDigitPayrollPhone(f.phone) },
   "payrollContact.name": { group: "payrollContact", target: "payrollContactName", satisfied: (f) => present(f.payrollContactName) },
   "payrollContact.email": { group: "payrollContact", target: "payrollContactEmail", satisfied: (f) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.payrollContactEmail ?? "") },
-  "payrollContact.phone": { group: "payrollContact", target: "payrollContactPhone", satisfied: (f) => /^\+?[1-9]\d{7,14}$/.test(f.payrollContactPhone ?? "") },
+  "payrollContact.phone": { group: "payrollContact", target: "payrollContactPhone", satisfied: (f) => isUsTenDigitPayrollPhone(f.payrollContactPhone) },
   "paySchedule.frequency": { group: "schedule", target: "payFrequency", satisfied: (f) => CHECK_PAY_FREQUENCIES.includes(f.payFrequency as typeof CHECK_PAY_FREQUENCIES[number]) },
   "paySchedule.firstPayday": { group: "schedule", target: "firstPayday", satisfied: (f) => present(f.firstPayday) },
   "paySchedule.secondPayday": { group: "schedule", target: "secondPayday", satisfied: (f) => f.payFrequency !== "semimonthly" || present(f.secondPayday) },
@@ -121,6 +125,15 @@ function Field({ label, value, onChange, type = "text", inputRef, readOnly = fal
   return <div><Label htmlFor={id}>{label}</Label><Input ref={inputRef} id={id} type={type} value={value ?? ""} readOnly={readOnly} autoComplete={ein ? "off" : undefined} inputMode={ein ? "numeric" : undefined} placeholder={placeholder} aria-invalid={Boolean(error)} aria-describedby={describedBy} className="mt-1 min-h-11" onChange={(event) => onChange(event.target.value)} />{helperText && <p id={`${id}-help`} className="mt-1 text-xs text-[#5d626b]">{helperText}</p>}{error && <p id={`${id}-error`} role="alert" className="mt-1 text-xs text-[#8b2d2d]">{error}</p>}</div>;
 }
 
+function UsPayrollPhoneField({ label, value, onChange, error, autoComplete }: { label: string; value: string | undefined; onChange: (value: string) => void; error?: string; autoComplete: "tel" | "tel-national" }) {
+  const id = `payroll-bootstrap-${label.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-")}`;
+  const invalidPrefill = Boolean(value && !isUsTenDigitPayrollPhone(value));
+  const visibleError = error ?? (invalidPrefill ? "Enter a valid US ten-digit phone number." : undefined);
+  const describedBy = [`${id}-help`, visibleError && `${id}-error`].filter(Boolean).join(" ");
+  const acceptDigits = (next: string) => onChange(next.replaceAll(/[^0-9]/g, "").slice(0, 10));
+  return <div><Label htmlFor={id}>{label}</Label><div className="mt-1 flex min-h-11 overflow-hidden rounded-md border border-input bg-background"><span aria-hidden="true" className="flex items-center border-r border-input bg-muted px-3 text-sm font-medium text-muted-foreground">+1</span><Input id={id} type="tel" inputMode="numeric" autoComplete={autoComplete} maxLength={10} value={value ?? ""} aria-invalid={Boolean(visibleError)} aria-describedby={describedBy} className="h-auto min-h-11 border-0 focus-visible:ring-0" onChange={(event) => acceptDigits(event.target.value)} onPaste={(event) => { const pasted = event.clipboardData.getData("text"); if (!/^\d*$/.test(pasted)) { event.preventDefault(); return; } event.preventDefault(); acceptDigits(`${value ?? ""}${pasted}`); }} /></div><p id={`${id}-help`} className="mt-1 text-xs text-[#5d626b]">Enter a U.S. ten-digit phone number. +1 is added automatically.</p>{visibleError && <p id={`${id}-error`} role="alert" className="mt-1 text-xs text-[#8b2d2d]">{visibleError}</p>}</div>;
+}
+
 function EnumField({ label, value, options, onChange, inputRef, error, id: explicitId, placeholder }: { label: string; value: string | undefined; options: readonly string[]; onChange: (value: string) => void; inputRef?: React.RefObject<HTMLButtonElement | null>; error?: string; id?: string; placeholder?: string }) {
   const id = explicitId ?? `payroll-bootstrap-${label.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-")}`;
   return <div><Label htmlFor={id}>{label}</Label><Select value={value} onValueChange={onChange}><SelectTrigger ref={inputRef} id={id} aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined} className="mt-1 min-h-11"><SelectValue placeholder={placeholder ?? `Select ${label.toLowerCase()}`} /></SelectTrigger><SelectContent>{options.map((option) => <SelectItem key={option} value={option}>{option.replaceAll("_", " ")}</SelectItem>)}</SelectContent></Select>{error && <p id={`${id}-error`} role="alert" className="mt-1 text-xs text-[#8b2d2d]">{error}</p>}</div>;
@@ -152,10 +165,11 @@ function AddressFields({ label, value, onChange, searchValue, onSearchChange, au
   return <fieldset className="rounded-2xl border border-[#dce8e8] bg-[#f7fbfb] p-4"><legend className="px-1 text-sm font-semibold text-[#10141a]">{label}</legend><div className="mt-1 grid grid-cols-1 gap-3 sm:grid-cols-2"><div className="sm:col-span-2"><AddressAutocompleteField label={autocompleteLabel} id={autocompleteId} value={searchValue} onChange={onSearchChange} placeholder={autocompletePlaceholder} onSelectDetails={(details) => { if (details.countryCode?.toUpperCase() !== "US") { onSearchChange(addressSearchValue(value)); toast({ title: "Choose a U.S. address", description: "Payroll setup supports U.S. addresses.", variant: "destructive" }); return; } onChange({ line1: details.line1, line2: details.line2 ?? "", city: details.city, state: (details.stateCode || details.state).toUpperCase(), postalCode: details.zipCode, country: "US" }); }} />{error && <p role="alert" className="mt-1 text-xs text-[#8b2d2d]">{error}</p>}</div><Field label="Street address" id={`${idPrefix}-street-address`} value={value.line1} inputRef={firstRef} error={error} onChange={(line1) => onChange({ ...value, line1 })} /><Field label="City" id={`${idPrefix}-city`} value={value.city} error={error} onChange={(city) => onChange({ ...value, city })} /><Field label="State abbreviation" id={`${idPrefix}-state`} value={value.state} error={error} onChange={(state) => onChange({ ...value, state: state.toUpperCase() })} /><Field label="ZIP code" id={`${idPrefix}-zip-code`} value={value.postalCode} error={error} onChange={(postalCode) => onChange({ ...value, postalCode })} /></div></fieldset>;
 }
 
-export default function AgencyPayrollBootstrapModal({ open, values, missingFieldCodes, isSubmitting = false, submissionError = null, submissionFieldCodes = [], onOpenChange, onSubmit }: Props) {
+export default function AgencyPayrollBootstrapModal({ open, values, missingFieldCodes, isSubmitting = false, submissionError = null, submissionFieldCodes = [], scope, onOpenChange, onSubmit }: Props) {
   const [form, setForm] = useState<CheckPayrollProfileFormValues>(() => formValues(values));
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [signerSelection, setSignerSelection] = useState<SignerDesignation | null>(null);
   const [legalAddressSearch, setLegalAddressSearch] = useState("");
   const [officeAddressSearch, setOfficeAddressSearch] = useState("");
   const firstFieldRef = useRef<HTMLInputElement>(null);
@@ -172,6 +186,7 @@ export default function AgencyPayrollBootstrapModal({ open, values, missingField
       setForm(formValues(values));
       setError(null);
       setFieldErrors({});
+      setSignerSelection(null);
       setLegalAddressSearch(addressSearchValue(values.legalAddress ?? emptyAddress()));
       setOfficeAddressSearch(addressSearchValue(values.officeWorkplace?.address ?? emptyAddress()));
       requestAnimationFrame(() => (firstFieldRef.current ?? firstSelectRef.current)?.focus());
@@ -194,7 +209,7 @@ export default function AgencyPayrollBootstrapModal({ open, values, missingField
     setError(null);
     setFieldErrors({});
     try {
-      await onSubmit(buildCheckPayrollProfilePayload(form));
+      await onSubmit(buildCheckPayrollProfilePayload(form), signerSelection);
     } catch {
       // The parent owns the request error message; retain the user's form values for retry.
     }
@@ -212,10 +227,11 @@ export default function AgencyPayrollBootstrapModal({ open, values, missingField
         {groups.has("business") && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><EnumField label="Business structure" value={form.entityType} options={CHECK_ENTITY_TYPES} inputRef={firstGroup === "business" ? firstSelectRef : undefined} error={fieldErrors.entityType} onChange={(entityType) => update("entityType", entityType)} /><EnumField label="Industry" value={form.industry} options={CHECK_INDUSTRIES} error={fieldErrors.industry} onChange={(industry) => update("industry", industry)} /></div>}
         {groups.has("legalAddress") && <AddressFields label="Legal business address" value={form.legalAddress ?? emptyAddress()} searchValue={legalAddressSearch} onSearchChange={setLegalAddressSearch} autocompleteId="payroll-bootstrap-legal-business-address-search" autocompleteLabel="Find legal business address" autocompletePlaceholder="Find legal business address" idPrefix="payroll-bootstrap-legal-business-address" firstRef={firstGroup === "legalAddress" ? firstFieldRef : undefined} error={fieldErrors.legalAddress} onChange={(legalAddress) => update("legalAddress", legalAddress)} />}
         {groups.has("workplace") && <><Field label="Primary workplace name" value={form.officeName} inputRef={firstGroup === "workplace" ? firstFieldRef : undefined} error={fieldErrors.officeName} onChange={(officeName) => update("officeName", officeName)} /><AddressFields label="Primary workplace address" value={form.officeAddress ?? emptyAddress()} searchValue={officeAddressSearch} onSearchChange={setOfficeAddressSearch} autocompleteId="payroll-bootstrap-primary-workplace-address-search" autocompleteLabel="Find primary workplace address" autocompletePlaceholder="Find primary workplace address" idPrefix="payroll-bootstrap-primary-workplace-address" error={fieldErrors.officeAddress} onChange={(officeAddress) => update("officeAddress", officeAddress)} /><div><label className="flex min-h-11 items-center gap-2 text-sm text-[#10141a]"><input type="checkbox" aria-invalid={Boolean(fieldErrors.actualWorkLocationAttested)} aria-describedby={fieldErrors.actualWorkLocationAttested ? "payroll-bootstrap-workplace-attestation-error" : undefined} checked={form.actualWorkLocationAttested === true} onChange={(event) => update("actualWorkLocationAttested", event.target.checked)} /> I confirm employees physically work at this location.</label>{fieldErrors.actualWorkLocationAttested && <p id="payroll-bootstrap-workplace-attestation-error" role="alert" className="mt-1 text-xs text-[#8b2d2d]">{fieldErrors.actualWorkLocationAttested}</p>}</div></>}
-        {groups.has("contact") && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><Field label="Company website" value={form.website} inputRef={firstGroup === "contact" ? firstFieldRef : undefined} error={fieldErrors.website} onChange={(website) => update("website", website)} /><Field label="Company phone number" value={form.phone} error={fieldErrors.phone} onChange={(phone) => update("phone", phone)} /></div>}
-        {groups.has("payrollContact") && <div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><Field label="Payroll contact’s full name" value={form.payrollContactName} inputRef={firstGroup === "payrollContact" ? firstFieldRef : undefined} error={fieldErrors.payrollContactName} onChange={(payrollContactName) => update("payrollContactName", payrollContactName)} /><Field label="Payroll contact’s email address" value={form.payrollContactEmail} type="email" error={fieldErrors.payrollContactEmail} onChange={(payrollContactEmail) => update("payrollContactEmail", payrollContactEmail)} /><Field label="Payroll contact’s phone number" value={form.payrollContactPhone} type="tel" error={fieldErrors.payrollContactPhone} onChange={(payrollContactPhone) => update("payrollContactPhone", payrollContactPhone)} /></div>}
+        {groups.has("contact") && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><Field label="Company website" value={form.website} inputRef={firstGroup === "contact" ? firstFieldRef : undefined} error={fieldErrors.website} onChange={(website) => update("website", website)} /><UsPayrollPhoneField label="Company phone number" value={form.phone} error={fieldErrors.phone} autoComplete="tel" onChange={(phone) => update("phone", phone)} /></div>}
+        {groups.has("payrollContact") && <div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><Field label="Payroll contact’s full name" value={form.payrollContactName} inputRef={firstGroup === "payrollContact" ? firstFieldRef : undefined} error={fieldErrors.payrollContactName} onChange={(payrollContactName) => update("payrollContactName", payrollContactName)} /><Field label="Payroll contact’s email address" value={form.payrollContactEmail} type="email" error={fieldErrors.payrollContactEmail} onChange={(payrollContactEmail) => update("payrollContactEmail", payrollContactEmail)} /><UsPayrollPhoneField label="Payroll contact’s phone number" value={form.payrollContactPhone} error={fieldErrors.payrollContactPhone} autoComplete="tel-national" onChange={(payrollContactPhone) => update("payrollContactPhone", payrollContactPhone)} /></div>}
         {groups.has("schedule") && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><EnumField label="How often employees are paid" placeholder="Select pay frequency" value={form.payFrequency} options={CHECK_PAY_FREQUENCIES} inputRef={firstGroup === "schedule" ? firstSelectRef : undefined} error={fieldErrors.payFrequency} onChange={(payFrequency) => setForm((current) => ({ ...current, payFrequency, secondPayday: payFrequency === "semimonthly" ? current.secondPayday : "" }))} /><PayrollDateField label="First scheduled payday" value={form.firstPayday} error={fieldErrors.firstPayday} onChange={(firstPayday) => update("firstPayday", firstPayday)} />{form.payFrequency === "semimonthly" && <PayrollDateField label="Second scheduled payday" value={form.secondPayday} error={fieldErrors.secondPayday} onChange={(secondPayday) => update("secondPayday", secondPayday)} />}<PayrollDateField label="First pay period end date" value={form.firstPeriodEnd} error={fieldErrors.firstPeriodEnd} onChange={(firstPeriodEnd) => update("firstPeriodEnd", firstPeriodEnd)} /><PayrollDateField label="Payroll tracking start date" value={form.payrollStartDate} error={fieldErrors.payrollStartDate} onChange={(payrollStartDate) => update("payrollStartDate", payrollStartDate)} /></div>}
         {groups.has("workers") && <Field label="Estimated number of W-2 employees" value={form.expectedW2Workers} type="number" inputRef={firstGroup === "workers" ? firstFieldRef : undefined} error={fieldErrors.expectedW2Workers} helperText="Include employees you expect to pay through payroll. Do not include independent contractors." onChange={(expectedW2Workers) => update("expectedW2Workers", expectedW2Workers)} />}
+        {scope && <AuthorizedSignerSelector scope={scope} disabled={isSubmitting} onSelectionChange={setSignerSelection} />}
         {(error || submissionError) && <p role="alert" className="text-sm text-[#8b2d2d]">{error ?? submissionError}</p>}</fieldset></div>
         <DialogFooter className="shrink-0 border-t border-[#e2e8e8] bg-[#fbfcfc] px-5 py-4 sm:px-6"><div className="space-y-3">{hasValidationErrors && <p id="payroll-bootstrap-validation-help" className="text-xs text-[#5d626b]">Complete all required fields with valid information to continue.</p>}<div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><button type="button" disabled={isSubmitting} className="min-h-11 rounded-[10px] border border-[#b2b2b3] px-4 text-sm font-semibold text-[#353535] transition-colors hover:bg-[#f2f4f4] disabled:cursor-not-allowed disabled:opacity-60" onClick={() => onOpenChange(false)}>Cancel</button><button type="submit" disabled={isSubmitting || hasValidationErrors} aria-busy={isSubmitting} aria-describedby={hasValidationErrors ? "payroll-bootstrap-validation-help" : undefined} className="inline-flex min-h-11 min-w-full items-center justify-center rounded-[10px] bg-[#006f73] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#005f63] disabled:cursor-not-allowed disabled:opacity-60 sm:min-w-[14rem]">{isSubmitting ? <span role="status" className="inline-flex items-center gap-2"><Loader2 data-testid="agency-payroll-modal-create-spinner" aria-hidden="true" className="h-4 w-4 shrink-0 motion-safe:animate-spin" />Creating payroll setup…</span> : "Create payroll setup"}</button></div></div></DialogFooter>
       </form>

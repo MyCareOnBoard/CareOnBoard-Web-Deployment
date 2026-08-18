@@ -1,4 +1,4 @@
-import { CHECK_ENTITY_TYPES, CHECK_INDUSTRIES, CHECK_PAY_FREQUENCIES, type CheckPayrollProfileFormValues } from "@/lib/agency/agency-profile-payload";
+import { CHECK_ENTITY_TYPES, CHECK_INDUSTRIES, CHECK_PAY_FREQUENCIES, isUsTenDigitPayrollPhone, type CheckPayrollProfileFormValues } from "@/lib/agency/agency-profile-payload";
 
 const isoDate = (value?: string) => Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(new Date(`${value}T00:00:00Z`).getTime()) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value);
 const address = (value: CheckPayrollProfileFormValues["legalAddress"]) => Boolean(value?.line1.trim() && value.city.trim() && /^[A-Z]{2}$/.test(value.state) && /^\d{5}(?:-\d{4})?$/.test(value.postalCode) && value.country === "US");
@@ -17,11 +17,11 @@ export function validateCompanySetup(values: CheckPayrollProfileFormValues): Rec
   if (values.industry && !CHECK_INDUSTRIES.includes(values.industry as typeof CHECK_INDUSTRIES[number])) errors.payrollIndustry = "Select a supported industry.";
   if (values.ein && !/^\d{2}-?\d{7}$/.test(values.ein)) errors.payrollEin = "Enter a nine-digit federal tax ID.";
   if (values.website && !/^https?:\/\/\S+$/i.test(values.website)) errors.websiteUrl = "Enter an http or https company website.";
-  if (values.phone && !/^\+?[1-9]\d{7,14}$/.test(values.phone)) errors.mainPhone = "Enter an international company phone number.";
+  if (values.phone && !isUsTenDigitPayrollPhone(values.phone)) errors.mainPhone = "Enter a valid US ten-digit company phone number.";
   const payrollContactParticipates = Boolean(values.payrollContactName?.trim() || values.payrollContactEmail?.trim() || values.payrollContactPhone?.trim());
   if (payrollContactParticipates && !values.payrollContactName?.trim()) errors.payrollContactName = "Enter the payroll contact’s full name.";
   if (payrollContactParticipates && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.payrollContactEmail ?? "")) errors.payrollContactEmail = "Enter a valid payroll contact’s email address.";
-  if (payrollContactParticipates && !/^\+?[1-9]\d{7,14}$/.test(values.payrollContactPhone ?? "")) errors.payrollContactPhone = "Enter an international payroll contact’s phone number.";
+  if (payrollContactParticipates && !isUsTenDigitPayrollPhone(values.payrollContactPhone)) errors.payrollContactPhone = "Enter a valid US ten-digit payroll contact phone number.";
   if (hasAddressContent(values.legalAddress) && !address(values.legalAddress)) errors.payrollLegalAddress = "Enter a complete U.S. legal business address.";
   if (hasAddressContent(values.officeAddress) || values.officeName?.trim() || values.actualWorkLocationAttested) {
     if (!values.officeName?.trim()) errors.payrollOfficeName = "Enter the primary workplace name.";

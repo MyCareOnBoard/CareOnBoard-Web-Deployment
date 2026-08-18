@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import * as agencyEndpoints from "./agencyPayrollEndpoints";
 import { agencyPayrollPaths } from "./agencyPayrollEndpoints";
 import { agencyPayrollCommandRequest } from "./payrollCommands";
@@ -12,6 +12,9 @@ describe("agency payroll wire contracts", () => {
     expect(bootstrap).toBeTypeOf("function");
     if (typeof bootstrap !== "function") return;
     expect(bootstrap()).toEqual({ url: "/checkPayrollAgency/payroll/agency/setup", method: "PUT", requiresAuth: true });
+    expect((agencyPayrollPaths as Record<string, unknown>).signerCandidates).toBeTypeOf("function");
+    const signerCandidates = (agencyPayrollPaths as Record<string, () => unknown>).signerCandidates;
+    expect(signerCandidates()).toEqual({ url: "/checkPayrollAgency/payroll/agency/signer-candidates", method: "GET", requiresAuth: true });
   });
   it("sends only the frozen bootstrap body and invalidates the matching agency setup after success", () => {
     const args = {
@@ -50,16 +53,16 @@ describe("agency payroll wire contracts", () => {
     ]);
     expect(invalidationTags(new Error("no"), args)).toEqual([]);
   });
-  it("sends only the closed command body and a fresh idempotency key", () => {
-    vi.spyOn(crypto, "randomUUID").mockReturnValueOnce("00000000-0000-4000-8000-000000000001").mockReturnValueOnce("00000000-0000-4000-8000-000000000002");
-    const args = { audience: "agency" as const, actorUid: "u", agencyId: "a", command: "designate_signer" as const, projectionRevision: 7, designatedSignerUserUid: "u", authorityAttested: true as const };
+  it("sends only the closed designation body with the caller's stable idempotency key", () => {
+    const args = { audience: "agency" as const, actorUid: "u", agencyId: "a", command: "designate_signer" as const, projectionRevision: 7, designatedSignerUserUid: "u", designatedSignerIdentityVersion: `check_signer_v1_${"a".repeat(64)}`, authorityAttested: true as const, idempotencyKey: "00000000-0000-4000-8000-000000000001" };
     const first = agencyPayrollCommandRequest(args); const second = agencyPayrollCommandRequest(args);
-    expect(first.headers["Idempotency-Key"]).not.toBe(second.headers["Idempotency-Key"]);
-    expect(first.data).toEqual({ command: "designate_signer", expectedProjectionRevision: 7, designatedSignerUserUid: "u", authorityAttested: true });
+    expect(first.headers["Idempotency-Key"]).toBe(args.idempotencyKey);
+    expect(second.headers["Idempotency-Key"]).toBe(args.idempotencyKey);
+    expect(first.data).toEqual({ command: "designate_signer", expectedProjectionRevision: 7, designatedSignerUserUid: "u", designatedSignerIdentityVersion: args.designatedSignerIdentityVersion, authorityAttested: true });
     expect(JSON.stringify(first)).not.toContain('"agencyId"');
   });
   it("does not add employee primary-workplace commands to company requests", () => {
-    const request = agencyPayrollCommandRequest({ audience: "agency", actorUid: "u", agencyId: "a", command: "retry_company_sync", projectionRevision: 3 });
+    const request = agencyPayrollCommandRequest({ audience: "agency", actorUid: "u", agencyId: "a", command: "retry_company_sync", projectionRevision: 3, idempotencyKey: "00000000-0000-4000-8000-000000000001" });
     expect(request.data).toEqual({ command: "retry_company_sync", expectedProjectionRevision: 3 });
   });
 });

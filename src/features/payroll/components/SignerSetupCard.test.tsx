@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SignerSetupCard } from "./SignerSetupCard";
-const projection = (designatedSignerPresent: boolean, canDesignateSigner = true, signerCandidate: { userUid: string; fullName: string; email: string; title: string; designated: boolean } | null = { userUid: "verified-owner", fullName: "Ada Owner", email: "ada@able.example", title: "Owner", designated: designatedSignerPresent }): import("../model/types").AgencyPayrollSetupProjection => ({ projectionRevision: 1, integration: { state: "configured", environment: "sandbox" }, preflight: { values: {}, missingFieldCodes: [] }, readiness: { status: "ready", blockers: [], nextAction: null }, setup: { designatedSignerPresent, signerCandidate, companyLinked: true, officeWorkplaceLinked: true, payScheduleLinked: true, enrollmentProfileLocked: false }, capabilities: { canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner, createCompanyOnboardSession: false } });
+const projection = (designatedSignerPresent: boolean, canDesignateSigner = true, signerCandidate: { userUid: string; fullName: string; email: string; title: string; identityVersion: string; designated: boolean } | null = { userUid: "verified-owner", fullName: "Ada Owner", email: "ada@able.example", title: "Owner", identityVersion: `check_signer_v1_${"a".repeat(64)}`, designated: designatedSignerPresent }): import("../model/types").AgencyPayrollSetupProjection => ({ projectionRevision: 1, integration: { state: "configured", environment: "sandbox" }, preflight: { values: {}, missingFieldCodes: [] }, readiness: { status: "ready", blockers: [], nextAction: null }, setup: { designatedSignerPresent, signerCandidate, designatedSigner: designatedSignerPresent ? signerCandidate : null, companyLinked: true, officeWorkplaceLinked: true, payScheduleLinked: true, enrollmentProfileLocked: false }, capabilities: { canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner, createCompanyOnboardSession: false } });
 describe("SignerSetupCard", () => {
   it("renders clear only for a server-designated signer", () => { render(<SignerSetupCard projection={projection(true)} onAction={vi.fn()} />); expect(screen.getByRole("button", { name: /clear signer/i })).toBeInTheDocument(); });
   it("withholds designation controls and shows safe guidance without a verified candidate", () => { render(<SignerSetupCard projection={projection(false, false, null)} />); expect(screen.queryByRole("button", { name: /designate this account/i })).not.toBeInTheDocument(); expect(screen.getByText(/verified agency owner account/i)).toBeInTheDocument(); });
@@ -26,12 +26,20 @@ describe("SignerSetupCard", () => {
   });
   it("shows an already designated verified candidate without a duplicate designation action", () => { render(<SignerSetupCard projection={projection(true)} />); expect(screen.getByText("Ada Owner")).toBeInTheDocument(); expect(screen.queryByRole("button", { name: "Designate this account" })).not.toBeInTheDocument(); });
   it("distinguishes an existing signer from an undesignated verified owner candidate", () => {
-    render(<SignerSetupCard projection={projection(true, true, { userUid: "verified-owner", fullName: "Ada Owner", email: "ada@able.example", title: "Owner", designated: false })} onAction={vi.fn()} />);
+    render(<SignerSetupCard projection={projection(true, true, { userUid: "verified-owner", fullName: "Ada Owner", email: "ada@able.example", title: "Owner", identityVersion: `check_signer_v1_${"a".repeat(64)}`, designated: false })} onAction={vi.fn()} />);
 
     expect(screen.getByRole("heading", { name: "Existing signer designated" })).toBeInTheDocument();
     expect(screen.getByText("Verified owner candidate")).toBeInTheDocument();
     expect(screen.getByText("Another existing signer must be cleared before this account can be designated.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Clear signer" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Designate this account" })).not.toBeInTheDocument();
+  });
+
+  it("displays the actual designated staff signer rather than the current owner candidate", () => {
+    const configured = projection(true, true, { userUid: "verified-owner", fullName: "Ada Owner", email: "ada@able.example", title: "Owner", identityVersion: `check_signer_v1_${"a".repeat(64)}`, designated: false });
+    configured.setup.designatedSigner = { userUid: "staff-1", fullName: "Taylor Staff", email: "taylor@able.example", title: "Payroll Director", identityVersion: `check_signer_v1_${"a".repeat(64)}`, designated: true };
+    render(<SignerSetupCard projection={configured} onAction={vi.fn()} />);
+    expect(screen.getByText("Taylor Staff")).toBeInTheDocument();
+    expect(screen.queryByText("Ada Owner")).not.toBeInTheDocument();
   });
 });

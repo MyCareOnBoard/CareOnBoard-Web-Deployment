@@ -11,10 +11,10 @@ const completeSetup = {
   officeAddress: { line1: "2 Work Street", line2: "", city: "Austin", state: "TX", postalCode: "78702", country: "US" as const },
   actualWorkLocationAttested: true,
   website: "https://able.example",
-  phone: "+15125550123",
+  phone: "5125550123",
   payrollContactName: "Pay Roll",
   payrollContactEmail: "payroll@able.example",
-  payrollContactPhone: "+15125550124",
+  payrollContactPhone: "5125550124",
   payFrequency: "weekly",
   firstPayday: "2026-09-04",
   secondPayday: "",
@@ -45,14 +45,21 @@ describe("validateCompanySetup", () => {
       payrollOfficeAddress: "Provide a complete primary workplace address.",
       payrollActualWorkLocationAttested: "Confirm employees physically work at this location.",
       websiteUrl: "Enter an http or https company website.",
-      mainPhone: "Enter an international company phone number.",
+      mainPhone: "Enter a valid US ten-digit company phone number.",
       payrollContactName: "Enter the payroll contact’s full name.",
       payrollContactEmail: "Enter a valid payroll contact’s email address.",
-      payrollContactPhone: "Enter an international payroll contact’s phone number.",
+      payrollContactPhone: "Enter a valid US ten-digit payroll contact phone number.",
       payrollFirstPayday: "Enter a valid first scheduled payday.",
       payrollFirstPeriodEnd: "Enter a valid first pay period end date.",
       payrollStartDate: "Enter a valid payroll tracking start date.",
       expectedW2Workers: "Enter a whole number of W-2 employees, 0 or more.",
+    });
+  });
+
+  it.each(["512555012", "51255501234", "+15125550123", "512-555-0123", "5125550123 ext 1", "５１２５５５０１２３"])("rejects malformed US company phones: %s", (phone) => {
+    expect(validateCompanySetup({ phone, payrollContactName: "Pat Payroll", payrollContactEmail: "pat@able.example", payrollContactPhone: phone })).toMatchObject({
+      mainPhone: "Enter a valid US ten-digit company phone number.",
+      payrollContactPhone: "Enter a valid US ten-digit payroll contact phone number.",
     });
   });
   it("allows empty address objects in a blank needs-information draft", () => {
