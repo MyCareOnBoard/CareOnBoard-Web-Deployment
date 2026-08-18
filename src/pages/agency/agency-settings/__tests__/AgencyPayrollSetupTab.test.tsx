@@ -256,6 +256,23 @@ describe("AgencyPayrollSetupTab", () => {
     expect(screen.getByRole("button", { name: /^create payroll setup$/i })).toBeDisabled();
   });
 
+  it("holds owner bootstrap for identity repair when the verified signer candidate is unavailable", async () => {
+    const ownerWithoutCandidate = {
+      ...notConfigured([]),
+      capabilities: { ...notConfigured([]).capabilities, canDesignateSigner: true },
+    };
+    setupQuery = { data: ownerWithoutCandidate, refetch };
+    loadSetup.mockReturnValue({ unwrap: () => Promise.resolve(ownerWithoutCandidate) });
+    const user = userEvent.setup();
+    render(<AgencyPayrollSetupTab scope={scope} />);
+    await user.click(screen.getByRole("button", { name: /create payroll setup/i }));
+    expect(await screen.findByRole("dialog", { name: /complete payroll setup/i })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(/only the active agency owner can choose an authorized payroll signer/i);
+    expect(screen.getByRole("button", { name: /^create payroll setup$/i })).toBeDisabled();
+    expect(bootstrapSetup).not.toHaveBeenCalled();
+    expect(runCommand).not.toHaveBeenCalled();
+  });
+
   it("bootstraps the attested owner in one request without a chained signer command", async () => {
     const scannedProjection = {
       ...notConfigured(["ein"]),
