@@ -318,7 +318,7 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
                 <DashboardHeader
                     userName={user?.fullName}
                     userImage={(user as any)?.profileImage || user?.photoURL}
-                    userRole={(user as any)?.role || "Agency Staff"}
+                    userRole={user?.userType === UserType.AGENCY ? "Agency Administrator" : (user as any)?.role || "Agency Staff"}
                     userType={user?.userType || UserType.APPLICANT}
                     onLogout={handleLogout}
                     centerContent={modeToggle}

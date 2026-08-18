@@ -19,7 +19,9 @@ vi.mock("react-router", async () => {
 vi.mock("react-redux", () => ({ useDispatch: () => vi.fn() }));
 vi.mock("@/utils/auth", () => ({ useAuth: () => ({ user: state.user, logout: vi.fn() }) }));
 vi.mock("@/components/ProtectedRoute", () => ({ ProtectedRoute: ({ children }: any) => children }));
-vi.mock("@/components/DashboardHeader", () => ({ default: () => <div /> }));
+vi.mock("@/components/DashboardHeader", () => ({
+  default: ({ userRole }: { userRole: string }) => <div data-testid="dashboard-header-role">{userRole}</div>,
+}));
 vi.mock("@/components/DashboardSidebar", () => ({ default: ({ navItems }: any) => <nav>{navItems.map((item: any) => <div key={item.label}><span data-path={item.path}>{item.label}</span>{item.children?.map((child: any) => <span key={child.path} data-child-path={child.path}>{child.label}</span>)}</div>)}</nav> }));
 vi.mock("@/components/AnnouncementBanner", () => ({ default: () => <div /> }));
 vi.mock("@/hooks/useSidebarCollapsed", () => ({ useSidebarCollapsed: () => [false] }));
@@ -87,6 +89,13 @@ describe("AgencyDashboardLayout billing authorization", () => {
     state.user = { ...state.user, userType: "agency_staff", profile: { accessList: ["Billing & Management"] } };
     view.rerender(<MemoryRouter><AgencyDashboardLayout /></MemoryRouter>);
     expect(screen.queryByText("Billing")).not.toBeInTheDocument();
+  });
+
+  it("labels an agency owner as Agency Administrator instead of using a stored staff role", () => {
+    routing.pathname = "/agency/dashboard";
+    state.user = { ...state.user, userType: "agency", role: "Agency Staff", profile: { accessList: [] } };
+    render(<MemoryRouter><AgencyDashboardLayout /></MemoryRouter>);
+    expect(screen.getByTestId("dashboard-header-role")).toHaveTextContent("Agency Administrator");
   });
 
   it("fails closed when staff scopes are missing", () => {
