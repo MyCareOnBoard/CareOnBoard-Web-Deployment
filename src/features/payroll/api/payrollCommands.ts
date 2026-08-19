@@ -4,7 +4,7 @@ import { companyMutationTags, employeeSetupMutationTags } from "./cacheTags";
 
 export type IdempotencyKey = `${string}-${string}-${string}-${string}-${string}`;
 export const newIdempotencyKey = (): IdempotencyKey => crypto.randomUUID() as IdempotencyKey;
-export type PayrollCommandArgs = PayrollScope & ({ command: "designate_signer"; projectionRevision: number; designatedSignerUserUid: string; designatedSignerIdentityVersion: string; authorityAttested: true; idempotencyKey: IdempotencyKey } | { command: "clear_signer" | "retry_company_sync" | "refresh_company_reconciliation"; projectionRevision: number; idempotencyKey: IdempotencyKey });
+export type PayrollCommandArgs = PayrollScope & ({ command: "designate_signer"; projectionRevision: number; designatedSignerUserUid: string; designatedSignerIdentityVersion: string; authorityAttested: true; idempotencyKey: IdempotencyKey } | { command: "clear_signer" | "submit_company_implementation" | "retry_company_sync" | "refresh_company_reconciliation"; projectionRevision: number; idempotencyKey: IdempotencyKey });
 export const agencyPayrollCommandRequest = (args: PayrollCommandArgs) => {
   const data = args.command === "designate_signer"
     ? { command: args.command, expectedProjectionRevision: args.projectionRevision, designatedSignerUserUid: args.designatedSignerUserUid, designatedSignerIdentityVersion: args.designatedSignerIdentityVersion, authorityAttested: true }

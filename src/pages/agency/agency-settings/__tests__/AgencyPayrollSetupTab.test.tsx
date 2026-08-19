@@ -9,6 +9,8 @@ const runCommand = vi.fn();
 const loadSetup = vi.fn();
 const bootstrapSetup = vi.fn();
 const createCompanyOnboardSession = vi.fn();
+const getOperation = vi.fn();
+const getOverview = vi.fn();
 const mocks = vi.hoisted(() => ({ signerSearchTrigger: vi.fn(), newCommandKey: vi.fn(), createCheckOnboard: vi.fn(), openCheckOnboard: vi.fn(), closeCheckOnboard: vi.fn() }));
 let setupQuery: { data?: AgencyPayrollSetupProjection; isLoading?: boolean; isFetching?: boolean; error?: unknown; refetch: typeof refetch };
 const signerCandidatesQuery = { data: { ownerCandidate: { userUid: "verified-owner", fullName: "Ada Owner", email: "ada@able.example", title: "Owner", identityVersion: `check_signer_v1_${"a".repeat(64)}`, designated: false }, staffCandidates: [] }, isLoading: false, isError: false };
@@ -20,20 +22,21 @@ vi.mock("@/features/payroll/api/agencyPayrollEndpoints", () => ({
   useCreateCompanyOnboardSessionMutation: () => [createCompanyOnboardSession],
   useGetAgencyPayrollSignerCandidatesQuery: () => signerCandidatesQuery,
   useLazyGetAgencyPayrollSignerCandidatesQuery: () => [mocks.signerSearchTrigger, { data: undefined, isFetching: false, isError: false }],
-  useLazyGetAgencyPayrollOperationQuery: () => [vi.fn()],
-  useLazyGetAgencyPayrollOverviewQuery: () => [vi.fn()],
+  useLazyGetAgencyPayrollOperationQuery: () => [getOperation],
+  useLazyGetAgencyPayrollOverviewQuery: () => [getOverview],
 }));
 vi.mock("@/features/payroll/api/payrollCommands", () => ({ useRunAgencyPayrollCommandMutation: () => [runCommand], newIdempotencyKey: mocks.newCommandKey }));
 vi.mock("@/features/payroll/hooks/useProjectionFreshness", () => ({ useProjectionFreshness: () => ({ requireCurrentProjection: vi.fn().mockResolvedValue(true) }) }));
 vi.mock("@/features/payroll/onboard/loadCheckOnboard", () => ({ loadCheckOnboard: () => Promise.resolve({ create: mocks.createCheckOnboard }) }));
 
-const projection = (capabilities: AgencyPayrollSetupProjection["capabilities"], designatedSignerPresent = false, signerCandidate: AgencyPayrollSetupProjection["setup"]["signerCandidate"] = { userUid: "verified-owner", fullName: "Ada Owner", email: "ada@able.example", title: "Owner", identityVersion: `check_signer_v1_${"a".repeat(64)}`, designated: designatedSignerPresent }): AgencyPayrollSetupProjection => ({
+type TestCapabilities = Omit<AgencyPayrollSetupProjection["capabilities"], "canSubmitCompanyImplementation" | "canRetryCompanySync" | "canRefreshCompanyReconciliation"> & Partial<Pick<AgencyPayrollSetupProjection["capabilities"], "canSubmitCompanyImplementation" | "canRetryCompanySync" | "canRefreshCompanyReconciliation">>;
+const projection = (capabilities: TestCapabilities, designatedSignerPresent = false, signerCandidate: AgencyPayrollSetupProjection["setup"]["signerCandidate"] = { userUid: "verified-owner", fullName: "Ada Owner", email: "ada@able.example", title: "Owner", identityVersion: `check_signer_v1_${"a".repeat(64)}`, designated: designatedSignerPresent }): AgencyPayrollSetupProjection => ({
   projectionRevision: 4,
   integration: { state: "configured", environment: "sandbox" },
   preflight: { values: {}, missingFieldCodes: [] },
   readiness: { status: "ready", blockers: [], nextAction: null },
   setup: { designatedSignerPresent, signerCandidate, designatedSigner: designatedSignerPresent ? signerCandidate : null, companyLinked: true, officeWorkplaceLinked: true, payScheduleLinked: true, enrollmentProfileLocked: true, signatoryLinked: false },
-  capabilities,
+  capabilities: { canSubmitCompanyImplementation: false, canRetryCompanySync: capabilities.canManage, canRefreshCompanyReconciliation: capabilities.canManage, ...capabilities },
 });
 
 const scope = { audience: "agency" as const, actorUid: "u", agencyId: "a" };
@@ -44,11 +47,11 @@ const notConfigured = (missingFieldCodes: string[] = ["legalName"]): AgencyPayro
   preflight: { values: {}, missingFieldCodes },
   readiness: { status: "needs_information", blockers: ["integration_missing"], nextAction: "create_integration" },
   setup: { designatedSignerPresent: false, signerCandidate: null, designatedSigner: null, companyLinked: false, officeWorkplaceLinked: false, payScheduleLinked: false, enrollmentProfileLocked: false, signatoryLinked: false },
-  capabilities: { canView: true, canManage: true, canCreateIntegration: true, canDesignateSigner: false, createCompanyOnboardSession: false },
+  capabilities: { canView: true, canManage: true, canCreateIntegration: true, canDesignateSigner: false, createCompanyOnboardSession: false, canSubmitCompanyImplementation: false, canRetryCompanySync: false, canRefreshCompanyReconciliation: false },
 });
 
 describe("AgencyPayrollSetupTab", () => {
-  beforeEach(() => { refetch.mockReset(); runCommand.mockReset(); loadSetup.mockReset(); bootstrapSetup.mockReset(); createCompanyOnboardSession.mockReset(); mocks.signerSearchTrigger.mockReset(); mocks.newCommandKey.mockReset(); mocks.createCheckOnboard.mockReset(); mocks.openCheckOnboard.mockReset(); mocks.closeCheckOnboard.mockReset(); mocks.createCheckOnboard.mockReturnValue({ open: mocks.openCheckOnboard, close: mocks.closeCheckOnboard }); mocks.newCommandKey.mockReturnValue("00000000-0000-4000-8000-000000000001"); setupQuery = { error: true, refetch }; });
+  beforeEach(() => { refetch.mockReset(); runCommand.mockReset(); loadSetup.mockReset(); bootstrapSetup.mockReset(); createCompanyOnboardSession.mockReset(); getOperation.mockReset(); getOverview.mockReset(); mocks.signerSearchTrigger.mockReset(); mocks.newCommandKey.mockReset(); mocks.createCheckOnboard.mockReset(); mocks.openCheckOnboard.mockReset(); mocks.closeCheckOnboard.mockReset(); mocks.createCheckOnboard.mockReturnValue({ open: mocks.openCheckOnboard, close: mocks.closeCheckOnboard }); mocks.newCommandKey.mockReturnValue("00000000-0000-4000-8000-000000000001"); setupQuery = { error: true, refetch }; });
 
   it("offers an accessible retry that refetches setup", async () => {
     const user = userEvent.setup(); render(<AgencyPayrollSetupTab scope={scope} />);
@@ -65,7 +68,7 @@ describe("AgencyPayrollSetupTab", () => {
         preflight: { values: {}, missingFieldCodes: ["legalName"] },
         readiness: { status: "needs_information", blockers: ["integration_missing"], nextAction: "create_integration" },
         setup: { designatedSignerPresent: false, signerCandidate: null, designatedSigner: null, companyLinked: false, officeWorkplaceLinked: false, payScheduleLinked: false, enrollmentProfileLocked: false, signatoryLinked: false },
-        capabilities: { canView: true, canManage: true, canCreateIntegration: true, canDesignateSigner: false, createCompanyOnboardSession: false },
+        capabilities: { canView: true, canManage: true, canCreateIntegration: true, canDesignateSigner: false, createCompanyOnboardSession: false, canSubmitCompanyImplementation: false, canRetryCompanySync: false, canRefreshCompanyReconciliation: false },
       } as AgencyPayrollSetupProjection,
       refetch,
     };
@@ -82,7 +85,7 @@ describe("AgencyPayrollSetupTab", () => {
       preflight: { values: { legalName: "Able Care LLC" }, missingFieldCodes: ["ein"] },
       readiness: { status: "needs_information" as const, blockers: ["integration_missing"], nextAction: "create_integration" },
       setup: { designatedSignerPresent: false, signerCandidate: null, designatedSigner: null, companyLinked: false, officeWorkplaceLinked: false, payScheduleLinked: false, enrollmentProfileLocked: false, signatoryLinked: false },
-      capabilities: { canView: true, canManage: true, canCreateIntegration: true, canDesignateSigner: false, createCompanyOnboardSession: false as const },
+      capabilities: { canView: true, canManage: true, canCreateIntegration: true, canDesignateSigner: false, createCompanyOnboardSession: false as const, canSubmitCompanyImplementation: false, canRetryCompanySync: false, canRefreshCompanyReconciliation: false },
     } satisfies AgencyPayrollSetupProjection;
     setupQuery = { data: scannedProjection, refetch };
     loadSetup.mockReturnValue({ unwrap: () => new Promise<AgencyPayrollSetupProjection>((resolve) => { resolveScan = resolve; }) });
@@ -108,7 +111,7 @@ describe("AgencyPayrollSetupTab", () => {
       preflight: { values: { legalName: "Able Care LLC" }, missingFieldCodes: ["ein"] },
       readiness: { status: "needs_information" as const, blockers: ["integration_missing"], nextAction: "create_integration" },
       setup: { designatedSignerPresent: false, signerCandidate: null, designatedSigner: null, companyLinked: false, officeWorkplaceLinked: false, payScheduleLinked: false, enrollmentProfileLocked: false, signatoryLinked: false },
-      capabilities: { canView: true, canManage: true, canCreateIntegration: true, canDesignateSigner: false, createCompanyOnboardSession: false as const },
+      capabilities: { canView: true, canManage: true, canCreateIntegration: true, canDesignateSigner: false, createCompanyOnboardSession: false as const, canSubmitCompanyImplementation: false, canRetryCompanySync: false, canRefreshCompanyReconciliation: false },
     } satisfies AgencyPayrollSetupProjection;
     setupQuery = { data: scannedProjection, refetch };
     loadSetup.mockReturnValue({ unwrap: () => Promise.resolve(scannedProjection) });
@@ -399,5 +402,73 @@ describe("AgencyPayrollSetupTab", () => {
     render(<AgencyPayrollSetupTab scope={scope} />);
     expect(screen.getByText(/signer designated/i)).toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("offers review submission from its explicit capability without unrelated company controls", () => {
+    setupQuery = {
+      data: {
+        ...projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false }),
+        readiness: { status: "needs_attention", blockers: ["implementation_needs_attention"], nextAction: "submit_company_implementation" },
+        capabilities: { canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false, canSubmitCompanyImplementation: true, canRetryCompanySync: false, canRefreshCompanyReconciliation: false },
+      } as AgencyPayrollSetupProjection,
+      refetch,
+    };
+    render(<AgencyPayrollSetupTab scope={scope} />);
+    expect(screen.getByRole("button", { name: "Submit for Check review" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /complete payroll onboarding/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /retry company sync/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /refresh reconciliation/i })).not.toBeInTheDocument();
+  });
+
+  it("locks a review submission, polls its operation, and refreshes both projections on settlement", async () => {
+    let resolveSubmit: (operation: { operationId: string; state: "accepted"; resourceType: "company"; pollAfterMs: number | null }) => void = () => undefined;
+    let resolveRefresh: () => void = () => undefined;
+    setupQuery = {
+      data: {
+        ...projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false }),
+        readiness: { status: "needs_attention", blockers: ["implementation_needs_attention"], nextAction: "submit_company_implementation" },
+        capabilities: { canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false, canSubmitCompanyImplementation: true, canRetryCompanySync: false, canRefreshCompanyReconciliation: false },
+      } as AgencyPayrollSetupProjection,
+      refetch,
+    };
+    runCommand.mockReturnValue({ unwrap: () => new Promise((resolve) => { resolveSubmit = resolve; }) });
+    getOperation.mockReturnValue({ unwrap: () => Promise.resolve({ operationId: "review-op", state: "succeeded", resourceType: "company", pollAfterMs: null }) });
+    refetch.mockReturnValue(new Promise<void>((resolve) => { resolveRefresh = resolve; }));
+    const user = userEvent.setup();
+    render(<AgencyPayrollSetupTab scope={scope} />);
+    const submit = screen.getByRole("button", { name: "Submit for Check review" });
+    await user.click(submit);
+    await user.click(submit);
+    expect(runCommand).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: /submitting for review/i })).toBeDisabled();
+    expect(screen.getAllByTestId(/agency-payroll-.*-spinner/)).toHaveLength(1);
+    await act(async () => { resolveSubmit({ operationId: "review-op", state: "accepted", resourceType: "company", pollAfterMs: 1 }); });
+    await waitFor(() => expect(getOperation).toHaveBeenCalledWith({ ...scope, operationId: "review-op" }));
+    await waitFor(() => expect(refetch).toHaveBeenCalledOnce());
+    expect(getOverview).toHaveBeenCalledWith(scope);
+    expect(screen.getByRole("button", { name: /submitting for review/i })).toBeDisabled();
+    await act(async () => { resolveRefresh(); });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Submit for Check review" })).toBeEnabled());
+  });
+
+  it("refreshes stale review submission state without clearing signer details or giving signer guidance", async () => {
+    const signer = { userUid: "verified-owner", fullName: "Ada Owner", email: "ada@able.example", title: "Owner", identityVersion: `check_signer_v1_${"a".repeat(64)}`, designated: true };
+    setupQuery = {
+      data: {
+        ...projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false }, true, signer),
+        readiness: { status: "needs_attention", blockers: ["implementation_needs_attention"], nextAction: "submit_company_implementation" },
+        capabilities: { canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false, canSubmitCompanyImplementation: true, canRetryCompanySync: false, canRefreshCompanyReconciliation: false },
+      } as AgencyPayrollSetupProjection,
+      refetch,
+    };
+    runCommand.mockReturnValue({ unwrap: () => Promise.reject({ status: 409 }) });
+    const user = userEvent.setup();
+    render(<AgencyPayrollSetupTab scope={scope} />);
+    await user.click(screen.getByRole("button", { name: "Submit for Check review" }));
+    await waitFor(() => expect(refetch).toHaveBeenCalledOnce());
+    expect(screen.getByRole("alert")).toHaveTextContent(/review the updated payroll setup status/i);
+    expect(screen.getByRole("alert")).not.toHaveTextContent(/reselect the signer/i);
+    expect(screen.getByText(/signer designated/i)).toBeInTheDocument();
+    expect(getOverview).toHaveBeenCalledWith(scope);
   });
 });

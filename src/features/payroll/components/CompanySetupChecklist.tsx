@@ -4,7 +4,7 @@ const readinessStatusCopy: Record<string, string> = {
   needs_information: "More payroll company information is needed.",
   ready_to_sync: "Payroll company setup is ready to sync.",
   needs_attention: "Payroll company setup needs attention.",
-  ready: "Payroll company setup is ready.",
+  ready: "Payroll setup complete",
 };
 
 const readinessBlockerCopy: Record<string, string> = {
@@ -40,6 +40,8 @@ function readinessMessage(code: string, copy: Record<string, string>) {
 export function CompanySetupChecklist({ projection }: { projection: AgencyPayrollSetupProjection }) {
   const needsCompanyOnboard = projection.readiness.nextAction === "complete_company_onboard";
   const needsSignerGuidance = needsCompanyOnboard && projection.setup.designatedSignerPresent && projection.setup.signatoryLinked && !projection.capabilities.createCompanyOnboardSession;
+  const isInImplementationReview = projection.readiness.nextAction === "await_implementation_review";
+  const isCompleted = projection.readiness.status === "ready";
 
-  return <section aria-labelledby="company-setup-heading" className="border-b border-[#e5e7eb] pb-6"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#006f73]">Company record</p><h2 id="company-setup-heading" className="mt-1 text-xl font-semibold text-[#10141a]">Payroll company setup</h2>{projection.readiness.blockers.length ? <ul className="mt-4 space-y-2 text-sm text-[#5d626b]">{projection.readiness.blockers.map((blocker) => <li key={blocker}>{readinessMessage(blocker, readinessBlockerCopy)}</li>)}</ul> : <p className="mt-3 text-sm text-[#5d626b]">{readinessMessage(projection.readiness.status, readinessStatusCopy)}</p>}{needsSignerGuidance && <p className="mt-3 text-sm text-[#5d626b]">The designated payroll signer must complete payroll onboarding before company setup can continue.</p>}</section>;
+  return <section aria-labelledby="company-setup-heading" className="border-b border-[#e5e7eb] pb-6"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#006f73]">Company record</p><h2 id="company-setup-heading" className="mt-1 text-xl font-semibold text-[#10141a]">Payroll company setup</h2>{isInImplementationReview ? <div className="mt-3 space-y-1 text-sm text-[#5d626b]"><p className="font-semibold text-[#10141a]">Submitted for review</p><p>Check review usually completes within two business days. We’ll update this setup when the review is complete.</p></div> : isCompleted ? <div className="mt-3 space-y-1 text-sm text-[#5d626b]"><p className="font-semibold text-[#10141a]">{readinessMessage(projection.readiness.status, readinessStatusCopy)}</p><p>Your company is ready to run payroll.</p></div> : projection.readiness.blockers.length ? <ul className="mt-4 space-y-2 text-sm text-[#5d626b]">{projection.readiness.blockers.map((blocker) => <li key={blocker}>{readinessMessage(blocker, readinessBlockerCopy)}</li>)}</ul> : <p className="mt-3 text-sm text-[#5d626b]">{readinessMessage(projection.readiness.status, readinessStatusCopy)}</p>}{needsSignerGuidance && <p className="mt-3 text-sm text-[#5d626b]">The designated payroll signer must complete payroll onboarding before company setup can continue.</p>}</section>;
 }

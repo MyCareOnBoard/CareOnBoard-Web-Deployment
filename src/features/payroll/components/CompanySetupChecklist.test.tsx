@@ -10,7 +10,7 @@ function projection(readiness: AgencyPayrollSetupProjection["readiness"]): Agenc
     preflight: { values: {}, missingFieldCodes: [] },
     readiness,
     setup: { designatedSignerPresent: true, signerCandidate: null, designatedSigner: null, companyLinked: true, officeWorkplaceLinked: true, payScheduleLinked: true, enrollmentProfileLocked: true, signatoryLinked: true },
-    capabilities: { canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false },
+    capabilities: { canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false, canSubmitCompanyImplementation: false, canRetryCompanySync: false, canRefreshCompanyReconciliation: false },
   };
 }
 
@@ -64,5 +64,20 @@ describe("CompanySetupChecklist", () => {
     render(<CompanySetupChecklist projection={projection({ status: "future_status" as "ready", blockers: [], nextAction: "future_action" })} />);
     expect(screen.getByText(/review the current payroll company setup/i)).toBeInTheDocument();
     expect(screen.queryByText(/future_status|future_action/)).not.toBeInTheDocument();
+  });
+
+  it("explains that an in-review company was submitted without offering a resubmission", () => {
+    render(<CompanySetupChecklist projection={projection({ status: "needs_attention", blockers: ["implementation_in_review"], nextAction: "await_implementation_review" })} />);
+
+    expect(screen.getByText("Submitted for review")).toBeInTheDocument();
+    expect(screen.getByText(/two business days/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /submit for check review/i })).not.toBeInTheDocument();
+  });
+
+  it("explains that a completed company is ready to run payroll", () => {
+    render(<CompanySetupChecklist projection={projection({ status: "ready", blockers: [], nextAction: null })} />);
+
+    expect(screen.getByText("Payroll setup complete")).toBeInTheDocument();
+    expect(screen.getByText(/ready to run payroll/i)).toBeInTheDocument();
   });
 });

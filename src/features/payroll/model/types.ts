@@ -2,7 +2,7 @@ import type { CheckPayrollProfileRead, CheckPayrollProfileWrite } from "@/lib/ag
 
 export type PayrollAudience = "agency" | "employee" | "superAdmin";
 export type PayrollScope = { audience: PayrollAudience; actorUid: string; agencyId: string };
-export type PayrollAction = "designate_signer" | "clear_signer" | "retry_company_sync" | "refresh_company_reconciliation";
+export type PayrollAction = "designate_signer" | "clear_signer" | "submit_company_implementation" | "retry_company_sync" | "refresh_company_reconciliation";
 export type EmployeePayrollAction = "start_provisioning" | "retry_employee_sync";
 export type ManagedEmployeePrimaryAction = "set_employee_primary_workplace";
 export type PayrollOperationState = "accepted" | "queued" | "running" | "retrying" | "awaiting_provider" | "succeeded" | "failed" | "dead";
@@ -68,7 +68,16 @@ export interface AgencyPayrollSetupProjection {
     enrollmentProfileLocked: boolean;
     signatoryLinked: boolean;
   };
-  capabilities: { canView: boolean; canManage: boolean; canCreateIntegration: boolean; canDesignateSigner: boolean; createCompanyOnboardSession: boolean };
+  capabilities: {
+    canView: boolean;
+    canManage: boolean;
+    canCreateIntegration: boolean;
+    canDesignateSigner: boolean;
+    createCompanyOnboardSession: boolean;
+    canSubmitCompanyImplementation: boolean;
+    canRetryCompanySync: boolean;
+    canRefreshCompanyReconciliation: boolean;
+  };
 }
 
 export interface EmployeePayrollSetupProjection {

@@ -14,7 +14,7 @@ const projection = (revision: number): AgencyPayrollSetupProjection => ({
   preflight: { values: {}, missingFieldCodes: [] },
   readiness: { status: "ready", blockers: [], nextAction: null },
   setup: { designatedSignerPresent: false, signerCandidate: null, designatedSigner: null, companyLinked: true, officeWorkplaceLinked: true, payScheduleLinked: true, enrollmentProfileLocked: true, signatoryLinked: false },
-  capabilities: { canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false },
+  capabilities: { canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false, canSubmitCompanyImplementation: false, canRetryCompanySync: false, canRefreshCompanyReconciliation: false },
 });
 
 describe("agency payroll wire contracts", () => {
@@ -130,5 +130,20 @@ describe("agency payroll wire contracts", () => {
   it("does not add employee primary-workplace commands to company requests", () => {
     const request = agencyPayrollCommandRequest({ audience: "agency", actorUid: "u", agencyId: "a", command: "retry_company_sync", projectionRevision: 3, idempotencyKey: "00000000-0000-4000-8000-000000000001" });
     expect(request.data).toEqual({ command: "retry_company_sync", expectedProjectionRevision: 3 });
+  });
+
+  it("sends review submission through the closed company command body", () => {
+    const request = agencyPayrollCommandRequest({
+      audience: "agency",
+      actorUid: "u",
+      agencyId: "a",
+      command: "submit_company_implementation",
+      projectionRevision: 8,
+      idempotencyKey: "00000000-0000-4000-8000-000000000001",
+    });
+
+    expect(request.headers).toEqual({ "Idempotency-Key": "00000000-0000-4000-8000-000000000001" });
+    expect(request.data).toEqual({ command: "submit_company_implementation", expectedProjectionRevision: 8 });
+    expect(JSON.stringify(request.data)).not.toContain("agencyId");
   });
 });
