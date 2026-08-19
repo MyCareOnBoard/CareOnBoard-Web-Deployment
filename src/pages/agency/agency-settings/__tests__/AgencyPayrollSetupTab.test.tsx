@@ -335,6 +335,35 @@ describe("AgencyPayrollSetupTab", () => {
     }
   });
 
+  it("ignores a retired non-designate 409 without updating or refreshing the old scope", async () => {
+    let rejectCommand: (reason: unknown) => void = () => undefined;
+    setupQuery = { data: projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false }), refetch };
+    runCommand.mockReturnValue({ unwrap: () => new Promise((_resolve, reject) => { rejectCommand = reject; }) });
+    const user = userEvent.setup();
+    const view = render(<AgencyPayrollSetupTab scope={{ ...scope, agencyId: "A" }} />);
+    await user.click(screen.getByRole("button", { name: "Retry company sync" }));
+    await waitFor(() => expect(runCommand).toHaveBeenCalledOnce());
+    view.rerender(<AgencyPayrollSetupTab scope={{ ...scope, agencyId: "B" }} />);
+    await act(async () => { rejectCommand({ status: 409 }); });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(refetch).not.toHaveBeenCalled();
+    expect(getOverview).not.toHaveBeenCalled();
+    expect(getOperation).not.toHaveBeenCalled();
+  });
+
+  it("does not install an old-scope signer watcher after a late successful command", async () => {
+    let resolveCommand: (operation: { operationId: string; state: "accepted"; resourceType: "company"; pollAfterMs: number | null }) => void = () => undefined;
+    setupQuery = { data: projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false }), refetch };
+    runCommand.mockReturnValue({ unwrap: () => new Promise((resolve) => { resolveCommand = resolve; }) });
+    const user = userEvent.setup();
+    const view = render(<AgencyPayrollSetupTab scope={{ ...scope, agencyId: "A" }} />);
+    await user.click(screen.getByRole("button", { name: "Refresh reconciliation" }));
+    await waitFor(() => expect(runCommand).toHaveBeenCalledOnce());
+    view.rerender(<AgencyPayrollSetupTab scope={{ ...scope, agencyId: "B" }} />);
+    await act(async () => { resolveCommand({ operationId: "late-signer-op", state: "accepted", resourceType: "company", pollAfterMs: 1 }); });
+    expect(getOperation).not.toHaveBeenCalled();
+  });
+
   it("keeps the configured signer retry key stable per intent and creates a new key after reselection", async () => {
     mocks.newCommandKey
       .mockReturnValueOnce("00000000-0000-4000-8000-000000000001")

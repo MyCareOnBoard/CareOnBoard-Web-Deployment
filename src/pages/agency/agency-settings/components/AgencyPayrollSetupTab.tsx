@@ -45,11 +45,12 @@ function AgencyPayrollSetupContent({ scope }: { scope: PayrollScope }) {
   const scopeKey = useMemo(() => JSON.stringify([scope.actorUid, scope.agencyId]), [scope.actorUid, scope.agencyId]);
   const activeScopeKey = useRef(scopeKey);
   const requestGeneration = useRef(0);
+  const signerActionGeneration = useRef(0);
   const mounted = useRef(false);
   const [awaitingConfigured, setAwaitingConfigured] = useState(false);
   const [activeCompanyCommand, setActiveCompanyCommand] = useState<"submit_company_implementation" | null>(null);
   const activeCompanyCommandRef = useRef<"submit_company_implementation" | null>(null);
-  useEffect(() => { mounted.current = true; activeScopeKey.current = scopeKey; requestGeneration.current += 1; configuredSignerIntent.current = null; activeCompanyCommandRef.current = null; setBootstrapProjection(undefined); setSubmissionFieldCodes([]); setConfiguredSignerSelection(null); setConfiguredSignerIdempotencyKey(""); setSignerSelectorResetKey(0); setCommandError(null); setIsScanning(false); setIsCreating(false); setAwaitingConfigured(false); setActiveCompanyCommand(null); return () => { mounted.current = false; requestGeneration.current += 1; activeScopeKey.current = ""; cancelOperation.current?.(); cancelOperation.current = null; }; }, [scopeKey]);
+  useEffect(() => { mounted.current = true; activeScopeKey.current = scopeKey; requestGeneration.current += 1; configuredSignerIntent.current = null; activeCompanyCommandRef.current = null; setBootstrapProjection(undefined); setSubmissionFieldCodes([]); setConfiguredSignerSelection(null); setConfiguredSignerIdempotencyKey(""); setSignerSelectorResetKey(0); setCommandError(null); setIsScanning(false); setIsCreating(false); setAwaitingConfigured(false); setActiveCompanyCommand(null); return () => { mounted.current = false; requestGeneration.current += 1; signerActionGeneration.current += 1; activeScopeKey.current = ""; cancelOperation.current?.(); cancelOperation.current = null; }; }, [scopeKey]);
   const onConfiguredSignerSelectionChange = useCallback((selection: SignerDesignation | null) => {
     const intent = selection ? `${selection.candidate.userUid}:${selection.candidate.identityVersion}` : null;
     if (intent !== configuredSignerIntent.current) {
@@ -169,16 +170,21 @@ function AgencyPayrollSetupContent({ scope }: { scope: PayrollScope }) {
       setCommandError("A verified agency owner account is required before a payroll signer can be designated.");
       return false;
     }
+    const generation = ++signerActionGeneration.current;
+    const current = () => mounted.current && activeScopeKey.current === scopeKey && signerActionGeneration.current === generation;
     if (!await freshness.requireCurrentProjection()) return false;
+    if (!current()) return false;
     setCommandError(null);
     const idempotencyKey = suppliedIdempotencyKey ?? newIdempotencyKey();
     try {
       const operation = command === "designate_signer"
         ? await runCommand({ ...scope, command, projectionRevision: data.projectionRevision, designatedSignerUserUid: signerCandidate!.userUid, designatedSignerIdentityVersion: signerCandidate!.identityVersion, authorityAttested: true, idempotencyKey }).unwrap()
         : await runCommand({ ...scope, command, projectionRevision: data.projectionRevision, idempotencyKey }).unwrap();
+      if (!current()) return false;
       watchOperation(operation);
       return true;
     } catch (requestError: unknown) {
+      if (!current()) return false;
       if (typeof requestError === "object" && requestError !== null && "status" in requestError && (requestError as { status?: number }).status === 409) {
         if (command === "designate_signer") {
           configuredSignerIntent.current = null;
@@ -190,7 +196,7 @@ function AgencyPayrollSetupContent({ scope }: { scope: PayrollScope }) {
           setCommandError("Payroll setup changed. Review the current setup and try again.");
         }
         await refetch();
-        void getOverview(scope);
+        if (current()) void getOverview(scope);
         return false;
       }
       setCommandError("The payroll command could not be completed. Review the current setup and try again.");
