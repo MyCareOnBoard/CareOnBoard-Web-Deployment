@@ -335,6 +335,42 @@ describe("AgencyPayrollSetupTab", () => {
     }
   });
 
+  it("keeps one signer-management command active through its terminal refresh", async () => {
+    let resolveCommand: (operation: { operationId: string; state: "accepted"; resourceType: "company"; pollAfterMs: number | null }) => void = () => undefined;
+    let resolveSetupRefresh: () => void = () => undefined;
+    let resolveOverviewRefresh: () => void = () => undefined;
+    const designatedSigner = { userUid: "verified-owner", fullName: "Ada Owner", email: "ada@able.example", title: "Owner", identityVersion: `check_signer_v1_${"a".repeat(64)}`, designated: true };
+    setupQuery = {
+      data: projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: true, createCompanyOnboardSession: false }, true, designatedSigner),
+      refetch,
+    };
+    runCommand.mockReturnValue({ unwrap: () => new Promise((resolve) => { resolveCommand = resolve; }) });
+    getOperation.mockReturnValue({ unwrap: () => Promise.resolve({ operationId: "retry-operation", state: "succeeded", resourceType: "company", pollAfterMs: null }) });
+    refetch.mockReturnValue(new Promise<void>((resolve) => { resolveSetupRefresh = resolve; }));
+    getOverview.mockReturnValue(new Promise<void>((resolve) => { resolveOverviewRefresh = resolve; }));
+    const user = userEvent.setup();
+    render(<AgencyPayrollSetupTab scope={scope} />);
+
+    await user.click(screen.getByRole("button", { name: "Retry company sync" }));
+    await waitFor(() => expect(runCommand).toHaveBeenCalledOnce());
+    expect(screen.getByRole("button", { name: "Retry company sync" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Refresh reconciliation" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Clear signer" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Refresh reconciliation" }));
+    expect(runCommand).toHaveBeenCalledOnce();
+
+    await act(async () => { resolveCommand({ operationId: "retry-operation", state: "accepted", resourceType: "company", pollAfterMs: 1 }); });
+    await waitFor(() => expect(getOperation).toHaveBeenCalledWith({ ...scope, operationId: "retry-operation" }));
+    await waitFor(() => expect(refetch).toHaveBeenCalledOnce());
+    expect(getOverview).toHaveBeenCalledWith(scope);
+    await act(async () => { resolveSetupRefresh(); });
+    expect(screen.getByRole("button", { name: "Refresh reconciliation" })).toBeDisabled();
+    await act(async () => { resolveOverviewRefresh(); });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Retry company sync" })).toBeEnabled());
+    expect(screen.getByRole("button", { name: "Refresh reconciliation" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Clear signer" })).toBeEnabled();
+  });
+
   it("ignores a retired non-designate 409 without updating or refreshing the old scope", async () => {
     let rejectCommand: (reason: unknown) => void = () => undefined;
     setupQuery = { data: projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false }), refetch };
@@ -369,15 +405,18 @@ describe("AgencyPayrollSetupTab", () => {
       .mockReturnValueOnce("00000000-0000-4000-8000-000000000001")
       .mockReturnValueOnce("00000000-0000-4000-8000-000000000002");
     runCommand.mockReturnValue({ unwrap: () => Promise.resolve({ operationId: "signer-operation" }) });
+    getOperation.mockReturnValue({ unwrap: () => Promise.resolve({ operationId: "signer-operation", state: "succeeded", resourceType: "company", pollAfterMs: null }) });
     setupQuery = { data: projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: true, createCompanyOnboardSession: false }), refetch };
     const user = userEvent.setup();
     render(<AgencyPayrollSetupTab scope={scope} />);
     await user.click(screen.getByRole("radio", { name: /Ada Owner/i }));
     await user.click(screen.getByRole("checkbox", { name: /selected account is authorized/i }));
     await user.click(screen.getByRole("button", { name: "Designate selected signer" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Designate selected signer" })).toBeEnabled());
     await user.click(screen.getByRole("button", { name: "Designate selected signer" }));
     await waitFor(() => expect(runCommand).toHaveBeenCalledTimes(2));
     expect(runCommand.mock.calls[1][0].idempotencyKey).toBe(runCommand.mock.calls[0][0].idempotencyKey);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Designate selected signer" })).toBeEnabled());
     await user.click(screen.getByRole("checkbox", { name: /selected account is authorized/i }));
     await user.click(screen.getByRole("checkbox", { name: /selected account is authorized/i }));
     await user.click(screen.getByRole("button", { name: "Designate selected signer" }));
