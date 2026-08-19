@@ -335,6 +335,74 @@ describe("AgencyPayrollSetupTab", () => {
     }
   });
 
+  it("serializes a pending retry before company review submission and announces the active command", async () => {
+    let resolveCommand: (operation: { operationId: string; state: "accepted"; resourceType: "company"; pollAfterMs: number | null }) => void = () => undefined;
+    let resolveSetupRefresh: () => void = () => undefined;
+    let resolveOverviewRefresh: () => void = () => undefined;
+    setupQuery = {
+      data: {
+        ...projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false }),
+        readiness: { status: "needs_attention", blockers: ["implementation_needs_attention"], nextAction: "submit_company_implementation" },
+        capabilities: { canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false, canSubmitCompanyImplementation: true, canRetryCompanySync: true, canRefreshCompanyReconciliation: true },
+      } as AgencyPayrollSetupProjection,
+      refetch,
+    };
+    runCommand.mockReturnValue({ unwrap: () => new Promise((resolve) => { resolveCommand = resolve; }) });
+    getOperation.mockReturnValue({ unwrap: () => Promise.resolve({ operationId: "retry-operation", state: "succeeded", resourceType: "company", pollAfterMs: null }) });
+    refetch.mockReturnValue(new Promise<void>((resolve) => { resolveSetupRefresh = resolve; }));
+    getOverview.mockReturnValue(new Promise<void>((resolve) => { resolveOverviewRefresh = resolve; }));
+    const user = userEvent.setup();
+    render(<AgencyPayrollSetupTab scope={scope} />);
+
+    await user.click(screen.getByRole("button", { name: "Retry company sync" }));
+    await waitFor(() => expect(runCommand).toHaveBeenCalledOnce());
+    expect(screen.getByRole("status", { name: "Retrying company sync" })).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("button", { name: "Submit for Check review" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Refresh reconciliation" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Submit for Check review" }));
+    expect(runCommand).toHaveBeenCalledOnce();
+
+    await act(async () => { resolveCommand({ operationId: "retry-operation", state: "accepted", resourceType: "company", pollAfterMs: 1 }); });
+    await waitFor(() => expect(getOperation).toHaveBeenCalledWith({ ...scope, operationId: "retry-operation" }));
+    await waitFor(() => expect(refetch).toHaveBeenCalledOnce());
+    await act(async () => { resolveSetupRefresh(); resolveOverviewRefresh(); });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Submit for Check review" })).toBeEnabled());
+  });
+
+  it("serializes pending company review submission before reconciliation and releases after refresh", async () => {
+    let resolveCommand: (operation: { operationId: string; state: "accepted"; resourceType: "company"; pollAfterMs: number | null }) => void = () => undefined;
+    let resolveSetupRefresh: () => void = () => undefined;
+    let resolveOverviewRefresh: () => void = () => undefined;
+    setupQuery = {
+      data: {
+        ...projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false }),
+        readiness: { status: "needs_attention", blockers: ["implementation_needs_attention"], nextAction: "submit_company_implementation" },
+        capabilities: { canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false, canSubmitCompanyImplementation: true, canRetryCompanySync: true, canRefreshCompanyReconciliation: true },
+      } as AgencyPayrollSetupProjection,
+      refetch,
+    };
+    runCommand.mockReturnValue({ unwrap: () => new Promise((resolve) => { resolveCommand = resolve; }) });
+    getOperation.mockReturnValue({ unwrap: () => Promise.resolve({ operationId: "submit-operation", state: "succeeded", resourceType: "company", pollAfterMs: null }) });
+    refetch.mockReturnValue(new Promise<void>((resolve) => { resolveSetupRefresh = resolve; }));
+    getOverview.mockReturnValue(new Promise<void>((resolve) => { resolveOverviewRefresh = resolve; }));
+    const user = userEvent.setup();
+    render(<AgencyPayrollSetupTab scope={scope} />);
+
+    await user.click(screen.getByRole("button", { name: "Submit for Check review" }));
+    await waitFor(() => expect(runCommand).toHaveBeenCalledOnce());
+    expect(screen.getByRole("status", { name: "Submitting company for Check review" })).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("button", { name: "Retry company sync" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Refresh reconciliation" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Refresh reconciliation" }));
+    expect(runCommand).toHaveBeenCalledOnce();
+
+    await act(async () => { resolveCommand({ operationId: "submit-operation", state: "accepted", resourceType: "company", pollAfterMs: 1 }); });
+    await waitFor(() => expect(getOperation).toHaveBeenCalledWith({ ...scope, operationId: "submit-operation" }));
+    await waitFor(() => expect(refetch).toHaveBeenCalledOnce());
+    await act(async () => { resolveSetupRefresh(); resolveOverviewRefresh(); });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Refresh reconciliation" })).toBeEnabled());
+  });
+
   it("keeps one signer-management command active through its terminal refresh", async () => {
     let resolveCommand: (operation: { operationId: string; state: "accepted"; resourceType: "company"; pollAfterMs: number | null }) => void = () => undefined;
     let resolveSetupRefresh: () => void = () => undefined;
