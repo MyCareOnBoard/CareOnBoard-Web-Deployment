@@ -11,6 +11,7 @@ export const agencyPayrollCommandRequest = (args: PayrollCommandArgs) => {
     : { command: args.command, expectedProjectionRevision: args.projectionRevision };
   return { url: "/checkPayrollAgency/payroll/agency/commands", method: "POST" as const, requiresAuth: true, headers: { "Idempotency-Key": args.idempotencyKey }, data };
 };
+export const agencyPayrollCommandInvalidationTags = (error: unknown, args: PayrollCommandArgs) => error ? [] : companyMutationTags(args);
 
 export const managerPrimaryWorkplaceCommandRequest = (args: ManagedEmployeePrimaryCommandArgs) => ({
   url: "/checkPayrollAgency/payroll/agency/commands",
@@ -32,7 +33,7 @@ export const payrollCommandsApi = checkPayrollApi.injectEndpoints({
       query: (args) => {
         return agencyPayrollCommandRequest(args);
       },
-      invalidatesTags: (_result, _error, args) => companyMutationTags(args),
+      invalidatesTags: (_result, error, args) => agencyPayrollCommandInvalidationTags(error, args),
     }),
     runManagedEmployeePrimaryWorkplaceCommand: build.mutation<PayrollOperation, ManagedEmployeePrimaryCommandArgs>({
       query: managerPrimaryWorkplaceCommandRequest,

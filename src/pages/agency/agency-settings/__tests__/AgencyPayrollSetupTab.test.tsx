@@ -11,7 +11,7 @@ const bootstrapSetup = vi.fn();
 const createCompanyOnboardSession = vi.fn();
 const getOperation = vi.fn();
 const getOverview = vi.fn();
-const mocks = vi.hoisted(() => ({ signerSearchTrigger: vi.fn(), newCommandKey: vi.fn(), createCheckOnboard: vi.fn(), openCheckOnboard: vi.fn(), closeCheckOnboard: vi.fn() }));
+const mocks = vi.hoisted(() => ({ signerSearchTrigger: vi.fn(), newCommandKey: vi.fn(), requireCurrentProjection: vi.fn(), createCheckOnboard: vi.fn(), openCheckOnboard: vi.fn(), closeCheckOnboard: vi.fn() }));
 let setupQuery: { data?: AgencyPayrollSetupProjection; isLoading?: boolean; isFetching?: boolean; error?: unknown; refetch: typeof refetch };
 const signerCandidatesQuery = { data: { ownerCandidate: { userUid: "verified-owner", fullName: "Ada Owner", email: "ada@able.example", title: "Owner", identityVersion: `check_signer_v1_${"a".repeat(64)}`, designated: false }, staffCandidates: [] }, isLoading: false, isError: false };
 
@@ -26,7 +26,7 @@ vi.mock("@/features/payroll/api/agencyPayrollEndpoints", () => ({
   useLazyGetAgencyPayrollOverviewQuery: () => [getOverview],
 }));
 vi.mock("@/features/payroll/api/payrollCommands", () => ({ useRunAgencyPayrollCommandMutation: () => [runCommand], newIdempotencyKey: mocks.newCommandKey }));
-vi.mock("@/features/payroll/hooks/useProjectionFreshness", () => ({ useProjectionFreshness: () => ({ requireCurrentProjection: vi.fn().mockResolvedValue(true) }) }));
+vi.mock("@/features/payroll/hooks/useProjectionFreshness", () => ({ useProjectionFreshness: () => ({ requireCurrentProjection: mocks.requireCurrentProjection }) }));
 vi.mock("@/features/payroll/onboard/loadCheckOnboard", () => ({ loadCheckOnboard: () => Promise.resolve({ create: mocks.createCheckOnboard }) }));
 
 type TestCapabilities = Omit<AgencyPayrollSetupProjection["capabilities"], "canSubmitCompanyImplementation" | "canRetryCompanySync" | "canRefreshCompanyReconciliation"> & Partial<Pick<AgencyPayrollSetupProjection["capabilities"], "canSubmitCompanyImplementation" | "canRetryCompanySync" | "canRefreshCompanyReconciliation">>;
@@ -51,7 +51,7 @@ const notConfigured = (missingFieldCodes: string[] = ["legalName"]): AgencyPayro
 });
 
 describe("AgencyPayrollSetupTab", () => {
-  beforeEach(() => { refetch.mockReset(); runCommand.mockReset(); loadSetup.mockReset(); bootstrapSetup.mockReset(); createCompanyOnboardSession.mockReset(); getOperation.mockReset(); getOverview.mockReset(); mocks.signerSearchTrigger.mockReset(); mocks.newCommandKey.mockReset(); mocks.createCheckOnboard.mockReset(); mocks.openCheckOnboard.mockReset(); mocks.closeCheckOnboard.mockReset(); mocks.createCheckOnboard.mockReturnValue({ open: mocks.openCheckOnboard, close: mocks.closeCheckOnboard }); mocks.newCommandKey.mockReturnValue("00000000-0000-4000-8000-000000000001"); setupQuery = { error: true, refetch }; });
+  beforeEach(() => { refetch.mockReset(); runCommand.mockReset(); loadSetup.mockReset(); bootstrapSetup.mockReset(); createCompanyOnboardSession.mockReset(); getOperation.mockReset(); getOverview.mockReset(); mocks.signerSearchTrigger.mockReset(); mocks.newCommandKey.mockReset(); mocks.requireCurrentProjection.mockReset(); mocks.createCheckOnboard.mockReset(); mocks.openCheckOnboard.mockReset(); mocks.closeCheckOnboard.mockReset(); mocks.createCheckOnboard.mockReturnValue({ open: mocks.openCheckOnboard, close: mocks.closeCheckOnboard }); mocks.newCommandKey.mockReturnValue("00000000-0000-4000-8000-000000000001"); mocks.requireCurrentProjection.mockResolvedValue(true); setupQuery = { error: true, refetch }; });
 
   it("offers an accessible retry that refetches setup", async () => {
     const user = userEvent.setup(); render(<AgencyPayrollSetupTab scope={scope} />);
@@ -435,7 +435,7 @@ describe("AgencyPayrollSetupTab", () => {
     getOperation.mockReturnValue({ unwrap: () => Promise.resolve({ operationId: "review-op", state: "succeeded", resourceType: "company", pollAfterMs: null }) });
     refetch.mockReturnValue(new Promise<void>((resolve) => { resolveRefresh = resolve; }));
     const user = userEvent.setup();
-    render(<AgencyPayrollSetupTab scope={scope} />);
+    const view = render(<AgencyPayrollSetupTab scope={scope} />);
     const submit = screen.getByRole("button", { name: "Submit for Check review" });
     await user.click(submit);
     await user.click(submit);
@@ -443,12 +443,43 @@ describe("AgencyPayrollSetupTab", () => {
     expect(screen.getByRole("button", { name: /submitting for review/i })).toBeDisabled();
     expect(screen.getAllByTestId(/agency-payroll-.*-spinner/)).toHaveLength(1);
     await act(async () => { resolveSubmit({ operationId: "review-op", state: "accepted", resourceType: "company", pollAfterMs: 1 }); });
+    setupQuery = { ...setupQuery, isFetching: true };
+    view.rerender(<AgencyPayrollSetupTab scope={scope} />);
+    expect(screen.getAllByTestId(/agency-payroll-.*-spinner/)).toHaveLength(1);
+    expect(screen.getByTestId("agency-payroll-submit-spinner")).toBeInTheDocument();
+    expect(screen.queryByTestId("agency-payroll-refresh-spinner")).not.toBeInTheDocument();
     await waitFor(() => expect(getOperation).toHaveBeenCalledWith({ ...scope, operationId: "review-op" }));
     await waitFor(() => expect(refetch).toHaveBeenCalledOnce());
     expect(getOverview).toHaveBeenCalledWith(scope);
     expect(screen.getByRole("button", { name: /submitting for review/i })).toBeDisabled();
     await act(async () => { resolveRefresh(); });
     await waitFor(() => expect(screen.getByRole("button", { name: "Submit for Check review" })).toBeEnabled());
+  });
+
+  it("does not dispatch a review command when pending freshness resolves after a scope change", async () => {
+    let resolveFreshness: (current: boolean) => void = () => undefined;
+    setupQuery = { data: { ...projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false }), readiness: { status: "needs_attention", blockers: ["implementation_needs_attention"], nextAction: "submit_company_implementation" }, capabilities: { canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false, canSubmitCompanyImplementation: true, canRetryCompanySync: false, canRefreshCompanyReconciliation: false } }, refetch };
+    mocks.requireCurrentProjection.mockReturnValue(new Promise<boolean>((resolve) => { resolveFreshness = resolve; }));
+    const user = userEvent.setup();
+    const view = render(<AgencyPayrollSetupTab scope={{ ...scope, agencyId: "A" }} />);
+    await user.click(screen.getByRole("button", { name: "Submit for Check review" }));
+    view.rerender(<AgencyPayrollSetupTab scope={{ ...scope, agencyId: "B" }} />);
+    await act(async () => { resolveFreshness(true); });
+    expect(runCommand).not.toHaveBeenCalled();
+    expect(getOperation).not.toHaveBeenCalled();
+  });
+
+  it("does not install an operation watcher when a pending review command resolves after a scope change", async () => {
+    let resolveCommand: (operation: { operationId: string; state: "accepted"; resourceType: "company"; pollAfterMs: number | null }) => void = () => undefined;
+    setupQuery = { data: { ...projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false }), readiness: { status: "needs_attention", blockers: ["implementation_needs_attention"], nextAction: "submit_company_implementation" }, capabilities: { canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false, canSubmitCompanyImplementation: true, canRetryCompanySync: false, canRefreshCompanyReconciliation: false } }, refetch };
+    runCommand.mockReturnValue({ unwrap: () => new Promise((resolve) => { resolveCommand = resolve; }) });
+    const user = userEvent.setup();
+    const view = render(<AgencyPayrollSetupTab scope={{ ...scope, agencyId: "A" }} />);
+    await user.click(screen.getByRole("button", { name: "Submit for Check review" }));
+    await waitFor(() => expect(runCommand).toHaveBeenCalledOnce());
+    view.rerender(<AgencyPayrollSetupTab scope={{ ...scope, agencyId: "B" }} />);
+    await act(async () => { resolveCommand({ operationId: "late-op", state: "accepted", resourceType: "company", pollAfterMs: 1 }); });
+    expect(getOperation).not.toHaveBeenCalled();
   });
 
   it("refreshes stale review submission state without clearing signer details or giving signer guidance", async () => {

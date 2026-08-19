@@ -2,7 +2,7 @@ import { configureStore } from "@reduxjs/toolkit";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as agencyEndpoints from "./agencyPayrollEndpoints";
 import { agencyCompanyOnboardSessionRequest, agencyPayrollApi, agencyPayrollPaths } from "./agencyPayrollEndpoints";
-import { agencyPayrollCommandRequest, type PayrollCommandArgs } from "./payrollCommands";
+import { agencyPayrollCommandInvalidationTags, agencyPayrollCommandRequest, type PayrollCommandArgs } from "./payrollCommands";
 import type { AgencyPayrollSetupProjection } from "../model/types";
 
 const baseQuery = vi.hoisted(() => vi.fn());
@@ -145,5 +145,16 @@ describe("agency payroll wire contracts", () => {
     expect(request.headers).toEqual({ "Idempotency-Key": "00000000-0000-4000-8000-000000000001" });
     expect(request.data).toEqual({ command: "submit_company_implementation", expectedProjectionRevision: 8 });
     expect(JSON.stringify(request.data)).not.toContain("agencyId");
+  });
+
+  it("invalidates company cache tags only for a successful command", () => {
+    const args = { audience: "agency" as const, actorUid: "u", agencyId: "a", command: "submit_company_implementation" as const, projectionRevision: 8, idempotencyKey: "00000000-0000-4000-8000-000000000001" } satisfies PayrollCommandArgs;
+    expect(agencyPayrollCommandInvalidationTags(undefined, args)).toEqual([
+      { type: "AgencySetup", id: "agency:u:a" },
+      { type: "AgencyOverview", id: "agency:u:a" },
+      { type: "Attention", id: "agency:u:a" },
+      { type: "Compliance", id: "agency:u:a" },
+    ]);
+    expect(agencyPayrollCommandInvalidationTags({ status: 409 }, args)).toEqual([]);
   });
 });

@@ -45,10 +45,11 @@ function AgencyPayrollSetupContent({ scope }: { scope: PayrollScope }) {
   const scopeKey = useMemo(() => JSON.stringify([scope.actorUid, scope.agencyId]), [scope.actorUid, scope.agencyId]);
   const activeScopeKey = useRef(scopeKey);
   const requestGeneration = useRef(0);
+  const mounted = useRef(false);
   const [awaitingConfigured, setAwaitingConfigured] = useState(false);
   const [activeCompanyCommand, setActiveCompanyCommand] = useState<"submit_company_implementation" | null>(null);
   const activeCompanyCommandRef = useRef<"submit_company_implementation" | null>(null);
-  useEffect(() => { activeScopeKey.current = scopeKey; requestGeneration.current += 1; configuredSignerIntent.current = null; activeCompanyCommandRef.current = null; setBootstrapProjection(undefined); setSubmissionFieldCodes([]); setConfiguredSignerSelection(null); setConfiguredSignerIdempotencyKey(""); setSignerSelectorResetKey(0); setCommandError(null); setIsScanning(false); setIsCreating(false); setAwaitingConfigured(false); setActiveCompanyCommand(null); }, [scopeKey]);
+  useEffect(() => { mounted.current = true; activeScopeKey.current = scopeKey; requestGeneration.current += 1; configuredSignerIntent.current = null; activeCompanyCommandRef.current = null; setBootstrapProjection(undefined); setSubmissionFieldCodes([]); setConfiguredSignerSelection(null); setConfiguredSignerIdempotencyKey(""); setSignerSelectorResetKey(0); setCommandError(null); setIsScanning(false); setIsCreating(false); setAwaitingConfigured(false); setActiveCompanyCommand(null); return () => { mounted.current = false; requestGeneration.current += 1; activeScopeKey.current = ""; cancelOperation.current?.(); cancelOperation.current = null; }; }, [scopeKey]);
   const onConfiguredSignerSelectionChange = useCallback((selection: SignerDesignation | null) => {
     const intent = selection ? `${selection.candidate.userUid}:${selection.candidate.identityVersion}` : null;
     if (intent !== configuredSignerIntent.current) {
@@ -58,7 +59,6 @@ function AgencyPayrollSetupContent({ scope }: { scope: PayrollScope }) {
     setConfiguredSignerSelection(selection);
   }, []);
   useEffect(() => { if (data?.integration.state === "configured") { setIsCreating(false); setAwaitingConfigured(false); } }, [data?.integration.state]);
-  useEffect(() => () => cancelOperation.current?.(), [scope.actorUid, scope.agencyId]);
   if (isLoading) {
     if (isCreating || awaitingConfigured) return <div role="status" aria-busy="true" className="flex items-center gap-2 rounded-md border border-[#e0e5e5] bg-white p-6 text-sm font-semibold text-[#006f73]"><Loader2 data-testid="agency-payroll-create-spinner" aria-hidden="true" className="h-4 w-4 shrink-0 motion-safe:animate-spin" />Creating payroll setup…</div>;
     return <div role="status" aria-busy="true" aria-label="Loading payroll setup" className="h-32 animate-pulse rounded-md bg-[#f3f6f6]"><span className="sr-only">Loading payroll setup…</span></div>;
@@ -68,7 +68,7 @@ function AgencyPayrollSetupContent({ scope }: { scope: PayrollScope }) {
     const scanAgency = async () => {
       if (isScanning || isCreating || awaitingConfigured) return;
       const generation = ++requestGeneration.current;
-      const current = () => activeScopeKey.current === scopeKey && requestGeneration.current === generation;
+      const current = () => mounted.current && activeScopeKey.current === scopeKey && requestGeneration.current === generation;
       let phase: "scan" | "create" = "scan";
       let freshProjection: typeof bootstrapProjection = undefined;
       setIsScanning(true);
@@ -123,7 +123,7 @@ function AgencyPayrollSetupContent({ scope }: { scope: PayrollScope }) {
         onOpenChange={(open) => { if (!open && !isCreating) { setBootstrapProjection(undefined); setSubmissionFieldCodes([]); setCommandError(null); } }}
         onSubmit={async (checkPayrollProfile, signerSelection) => {
           const generation = ++requestGeneration.current;
-          const current = () => activeScopeKey.current === scopeKey && requestGeneration.current === generation;
+          const current = () => mounted.current && activeScopeKey.current === scopeKey && requestGeneration.current === generation;
           let succeeded = false;
           setIsCreating(true);
           setCommandError(null);
@@ -152,9 +152,9 @@ function AgencyPayrollSetupContent({ scope }: { scope: PayrollScope }) {
     const generation = requestGeneration.current;
     const watchedScopeKey = scopeKey;
     cancelOperation.current = watch(scope, operation.operationId, async () => getOperation({ ...scope, operationId: operation.operationId }).unwrap(), () => {
-      if (activeScopeKey.current !== watchedScopeKey || requestGeneration.current !== generation) return;
+      if (!mounted.current || activeScopeKey.current !== watchedScopeKey || requestGeneration.current !== generation) return;
       void Promise.allSettled([Promise.resolve(refetch()), Promise.resolve(getOverview(scope))]).then(() => {
-        if (activeScopeKey.current !== watchedScopeKey || requestGeneration.current !== generation) return;
+        if (!mounted.current || activeScopeKey.current !== watchedScopeKey || requestGeneration.current !== generation) return;
         onTerminal?.();
       });
     });
@@ -197,7 +197,7 @@ function AgencyPayrollSetupContent({ scope }: { scope: PayrollScope }) {
     if (activeCompanyCommandRef.current) return;
     const command = "submit_company_implementation" as const;
     const generation = ++requestGeneration.current;
-    const current = () => activeScopeKey.current === scopeKey && requestGeneration.current === generation;
+    const current = () => mounted.current && activeScopeKey.current === scopeKey && requestGeneration.current === generation;
     activeCompanyCommandRef.current = command;
     setActiveCompanyCommand(command);
     setCommandError(null);
@@ -242,7 +242,7 @@ function AgencyPayrollSetupContent({ scope }: { scope: PayrollScope }) {
     }
   };
   const refetchCompanySetup = () => { void refetch(); void getOverview(scope); };
-  return <div className="max-w-3xl divide-y divide-[#e5e7eb] rounded-lg border border-[#e0e5e5] bg-white px-6">{isFetching && <p role="status" className="flex items-center gap-2 py-3 text-sm text-[#5d626b]"><Loader2 data-testid="agency-payroll-refresh-spinner" aria-hidden="true" className="h-4 w-4 shrink-0 motion-safe:animate-spin" />Refreshing payroll setup…</p>}{commandError && <p role="alert" className="py-3 text-sm text-[#8b2d2d]">{commandError}</p>}<CompanySetupChecklist projection={data} />{data.capabilities.canSubmitCompanyImplementation && <section className="py-5"><button type="button" disabled={activeCompanyCommand === "submit_company_implementation"} aria-busy={activeCompanyCommand === "submit_company_implementation"} onClick={() => void submitCompanyImplementation()} className="inline-flex min-h-11 min-w-[13rem] items-center justify-center rounded-md bg-[#006f73] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#005b5e] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#006f73] disabled:opacity-60">{activeCompanyCommand === "submit_company_implementation" ? <span role="status" className="inline-flex items-center gap-2"><Loader2 data-testid="agency-payroll-submit-spinner" aria-hidden="true" className="h-4 w-4 shrink-0 motion-safe:animate-spin" />Submitting for review…</span> : "Submit for Check review"}</button></section>}{data.capabilities.createCompanyOnboardSession && <section className="py-5"><Suspense fallback={<p role="status" className="text-sm text-[#5d626b]">Loading payroll onboarding…</p>}><CheckOnboardModal actionLabel="Complete payroll onboarding" openingLabel="Opening payroll onboarding..." launchMode="redirect" requestSession={requestCompanyOnboardSession} onRefetch={refetchCompanySetup} /></Suspense></section>}<SignerSetupCard projection={data} onAction={signerAction} hideDesignation />{data.capabilities.canDesignateSigner && !data.setup.designatedSignerPresent && <section className="py-6"><AuthorizedSignerSelector scope={scope} ownerCandidate={data.setup.signerCandidate} initialSelection={configuredSignerSelection} resetKey={signerSelectorResetKey} onSelectionChange={onConfiguredSignerSelectionChange} /><button type="button" disabled={!configuredSignerSelection || !configuredSignerIdempotencyKey} onClick={() => configuredSignerSelection && configuredSignerIdempotencyKey && void signerAction("designate_signer", true, configuredSignerSelection.candidate, configuredSignerIdempotencyKey)} className="mt-4 text-sm font-semibold text-[#006f73] underline disabled:opacity-50">Designate selected signer</button></section>}{(data.capabilities.canRetryCompanySync || data.capabilities.canRefreshCompanyReconciliation) && <div className="flex flex-wrap gap-3 py-5">{data.capabilities.canRetryCompanySync && <button type="button" onClick={() => void signerAction("retry_company_sync")} className="text-sm font-semibold text-[#006f73] underline">Retry company sync</button>}{data.capabilities.canRefreshCompanyReconciliation && <button type="button" onClick={() => void signerAction("refresh_company_reconciliation")} className="text-sm font-semibold text-[#006f73] underline">Refresh reconciliation</button>}</div>}</div>;
+  return <div className="max-w-3xl divide-y divide-[#e5e7eb] rounded-lg border border-[#e0e5e5] bg-white px-6">{isFetching && activeCompanyCommand !== "submit_company_implementation" && <p role="status" className="flex items-center gap-2 py-3 text-sm text-[#5d626b]"><Loader2 data-testid="agency-payroll-refresh-spinner" aria-hidden="true" className="h-4 w-4 shrink-0 motion-safe:animate-spin" />Refreshing payroll setup…</p>}{commandError && <p role="alert" className="py-3 text-sm text-[#8b2d2d]">{commandError}</p>}<CompanySetupChecklist projection={data} />{data.capabilities.canSubmitCompanyImplementation && <section className="py-5"><button type="button" disabled={activeCompanyCommand === "submit_company_implementation"} aria-busy={activeCompanyCommand === "submit_company_implementation"} onClick={() => void submitCompanyImplementation()} className="inline-flex min-h-11 min-w-[13rem] items-center justify-center rounded-md bg-[#006f73] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#005b5e] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#006f73] disabled:opacity-60">{activeCompanyCommand === "submit_company_implementation" ? <span role="status" className="inline-flex items-center gap-2"><Loader2 data-testid="agency-payroll-submit-spinner" aria-hidden="true" className="h-4 w-4 shrink-0 motion-safe:animate-spin" />Submitting for review…</span> : "Submit for Check review"}</button></section>}{data.capabilities.createCompanyOnboardSession && <section className="py-5"><Suspense fallback={<p role="status" className="text-sm text-[#5d626b]">Loading payroll onboarding…</p>}><CheckOnboardModal actionLabel="Complete payroll onboarding" openingLabel="Opening payroll onboarding..." launchMode="redirect" requestSession={requestCompanyOnboardSession} onRefetch={refetchCompanySetup} /></Suspense></section>}<SignerSetupCard projection={data} onAction={signerAction} hideDesignation />{data.capabilities.canDesignateSigner && !data.setup.designatedSignerPresent && <section className="py-6"><AuthorizedSignerSelector scope={scope} ownerCandidate={data.setup.signerCandidate} initialSelection={configuredSignerSelection} resetKey={signerSelectorResetKey} onSelectionChange={onConfiguredSignerSelectionChange} /><button type="button" disabled={!configuredSignerSelection || !configuredSignerIdempotencyKey} onClick={() => configuredSignerSelection && configuredSignerIdempotencyKey && void signerAction("designate_signer", true, configuredSignerSelection.candidate, configuredSignerIdempotencyKey)} className="mt-4 text-sm font-semibold text-[#006f73] underline disabled:opacity-50">Designate selected signer</button></section>}{(data.capabilities.canRetryCompanySync || data.capabilities.canRefreshCompanyReconciliation) && <div className="flex flex-wrap gap-3 py-5">{data.capabilities.canRetryCompanySync && <button type="button" onClick={() => void signerAction("retry_company_sync")} className="text-sm font-semibold text-[#006f73] underline">Retry company sync</button>}{data.capabilities.canRefreshCompanyReconciliation && <button type="button" onClick={() => void signerAction("refresh_company_reconciliation")} className="text-sm font-semibold text-[#006f73] underline">Refresh reconciliation</button>}</div>}</div>;
 }
 
 export default function AgencyPayrollSetupTab({ scope }: { scope: PayrollScope }) {
