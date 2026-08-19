@@ -17,6 +17,7 @@ export function CheckOnboardModal({ requestSession, onRefetch, actionLabel = "Co
   const busy = requesting || sdkBusy;
 
   useLayoutEffect(() => {
+    mounted.current = true;
     const unregister = registerPayrollOnboardTeardown(() => { generation.current += 1; });
     return () => { mounted.current = false; generation.current += 1; unregister(); };
   }, []);

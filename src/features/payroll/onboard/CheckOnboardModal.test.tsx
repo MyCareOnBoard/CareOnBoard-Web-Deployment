@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen } from "@testing-library/react";
+import { StrictMode } from "react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { CheckOnboardModal } from "./CheckOnboardModal";
 import { clearPayrollOnboardSessions } from "./payrollOnboardSession";
@@ -13,6 +14,19 @@ describe("CheckOnboardModal", () => {
     render(<CheckOnboardModal actionLabel="Complete payroll onboarding" openingLabel="Opening payroll onboarding..." requestSession={requestSession} onRefetch={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Complete payroll onboarding" }));
     expect(screen.getByRole("button", { name: /opening payroll onboarding/i })).toBeDisabled();
+  });
+  it("opens the resolved session and releases the action under Strict Mode", async () => {
+    const open = vi.fn();
+    const create = vi.fn(() => ({ open, close: vi.fn() }));
+    vi.spyOn(loader, "loadCheckOnboard").mockResolvedValue({ create });
+    const user = userEvent.setup();
+    render(<StrictMode><CheckOnboardModal actionLabel="Complete payroll onboarding" requestSession={vi.fn().mockResolvedValue({ link: "https://session.example/company" })} onRefetch={vi.fn()} /></StrictMode>);
+
+    await user.click(screen.getByRole("button", { name: "Complete payroll onboarding" }));
+
+    await waitFor(() => expect(create).toHaveBeenCalledWith(expect.objectContaining({ link: "https://session.example/company" })));
+    expect(open).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "Complete payroll onboarding" })).toHaveAttribute("aria-busy", "false");
   });
   it("shows an accessible retry error when a fresh session fails", async () => { const user = userEvent.setup(); render(<CheckOnboardModal requestSession={vi.fn().mockRejectedValue(new Error("no"))} onRefetch={vi.fn()} />); await user.click(screen.getByRole("button")); expect(await screen.findByRole("alert")).toHaveTextContent(/could not be opened/i); });
   it("ignores a session that resolves after unmount", async () => {
