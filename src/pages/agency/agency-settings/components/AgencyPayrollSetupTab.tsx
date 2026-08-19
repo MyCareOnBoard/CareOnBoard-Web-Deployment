@@ -179,12 +179,16 @@ function AgencyPayrollSetupContent({ scope }: { scope: PayrollScope }) {
       watchOperation(operation);
       return true;
     } catch (requestError: unknown) {
-      if (typeof requestError === "object" && requestError !== null && "status" in requestError && (requestError as { status?: number }).status === 409 && command === "designate_signer") {
-        configuredSignerIntent.current = null;
-        setConfiguredSignerSelection(null);
-        setConfiguredSignerIdempotencyKey("");
-        setSignerSelectorResetKey((current) => current + 1);
-        setCommandError("Payroll setup changed. Reselect the signer and confirm authority before trying again.");
+      if (typeof requestError === "object" && requestError !== null && "status" in requestError && (requestError as { status?: number }).status === 409) {
+        if (command === "designate_signer") {
+          configuredSignerIntent.current = null;
+          setConfiguredSignerSelection(null);
+          setConfiguredSignerIdempotencyKey("");
+          setSignerSelectorResetKey((current) => current + 1);
+          setCommandError("Payroll setup changed. Reselect the signer and confirm authority before trying again.");
+        } else {
+          setCommandError("Payroll setup changed. Review the current setup and try again.");
+        }
         await refetch();
         void getOverview(scope);
         return false;

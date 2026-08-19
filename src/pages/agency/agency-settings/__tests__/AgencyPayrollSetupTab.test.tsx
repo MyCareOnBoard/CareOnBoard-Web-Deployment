@@ -311,9 +311,28 @@ describe("AgencyPayrollSetupTab", () => {
     await user.click(screen.getByRole("checkbox", { name: /selected account is authorized/i }));
     await user.click(screen.getByRole("button", { name: "Designate selected signer" }));
     await waitFor(() => expect(refetch).toHaveBeenCalledOnce());
+    expect(getOverview).toHaveBeenCalledWith(scope);
     expect(screen.getByRole("alert")).toHaveTextContent(/reselect the signer/i);
     expect(screen.getByRole("checkbox", { name: /selected account is authorized/i })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Designate selected signer" })).toBeDisabled();
+  });
+
+  it("refreshes once with generic current-state guidance after retry and reconciliation conflicts", async () => {
+    for (const [capability, label] of [["canRetryCompanySync", "Retry company sync"], ["canRefreshCompanyReconciliation", "Refresh reconciliation"]] as const) {
+      setupQuery = { data: { ...projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false }), capabilities: { canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false, canSubmitCompanyImplementation: false, canRetryCompanySync: capability === "canRetryCompanySync", canRefreshCompanyReconciliation: capability === "canRefreshCompanyReconciliation" } }, refetch };
+      runCommand.mockReturnValue({ unwrap: () => Promise.reject({ status: 409 }) });
+      const user = userEvent.setup();
+      const view = render(<AgencyPayrollSetupTab scope={scope} />);
+      await user.click(screen.getByRole("button", { name: label }));
+      await waitFor(() => expect(refetch).toHaveBeenCalledOnce());
+      expect(getOverview).toHaveBeenCalledWith(scope);
+      expect(screen.getByRole("alert")).toHaveTextContent(/review the current setup/i);
+      expect(screen.getByRole("alert")).not.toHaveTextContent(/reselect the signer/i);
+      view.unmount();
+      refetch.mockReset();
+      getOverview.mockReset();
+      runCommand.mockReset();
+    }
   });
 
   it("keeps the configured signer retry key stable per intent and creates a new key after reselection", async () => {
