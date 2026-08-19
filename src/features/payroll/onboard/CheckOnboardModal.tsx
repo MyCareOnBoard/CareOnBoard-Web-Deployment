@@ -3,7 +3,7 @@ import { Loader2 } from "lucide-react";
 import { useCheckOnboard } from "./useCheckOnboard";
 import { registerPayrollOnboardTeardown } from "./payrollOnboardSession";
 
-export function CheckOnboardModal({ requestSession, onRefetch, actionLabel = "Continue secure setup", openingLabel = "Opening secure setup..." }: { requestSession: () => Promise<{ link: string; expiresAt?: string }>; onRefetch: () => void; actionLabel?: string; openingLabel?: string }) {
+export function CheckOnboardModal({ requestSession, onRefetch, actionLabel = "Continue secure setup", openingLabel = "Opening secure setup...", launchMode = "embedded" }: { requestSession: () => Promise<{ link: string; expiresAt?: string }>; onRefetch: () => void; actionLabel?: string; openingLabel?: string; launchMode?: "embedded" | "redirect" }) {
   const trigger = useRef<HTMLButtonElement>(null);
   const starting = useRef(false);
   const mounted = useRef(true);
@@ -31,6 +31,10 @@ export function CheckOnboardModal({ requestSession, onRefetch, actionLabel = "Co
     try {
       const session = await requestSession();
       if (!mounted.current || generation.current !== current) return;
+      if (launchMode === "redirect") {
+        window.location.assign(session.link);
+        return;
+      }
       await open(session.link, session.expiresAt);
     } catch {
       if (mounted.current) {

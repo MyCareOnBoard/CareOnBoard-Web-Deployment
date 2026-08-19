@@ -350,14 +350,22 @@ describe("AgencyPayrollSetupTab", () => {
     expect(await screen.findByRole("button", { name: "Complete payroll onboarding" })).toBeInTheDocument();
   });
 
-  it("maps the closed company session URL into the shared Check Onboard SDK", async () => {
+  it("redirects the authorized signer to the closed company Onboard URL without embedding it", async () => {
     setupQuery = { data: projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: true }, true), refetch };
     createCompanyOnboardSession.mockReturnValue({ unwrap: () => Promise.resolve({ url: "https://onboard.example/company", expiresAt: new Date(Date.now() + 60_000).toISOString() }) });
+    const originalLocation = window.location;
+    const assign = vi.fn();
+    Object.defineProperty(window, "location", { configurable: true, value: { ...originalLocation, assign } });
     const user = userEvent.setup();
-    render(<AgencyPayrollSetupTab scope={scope} />);
-    await user.click(await screen.findByRole("button", { name: "Complete payroll onboarding" }));
-    await waitFor(() => expect(mocks.createCheckOnboard).toHaveBeenCalledWith(expect.objectContaining({ link: "https://onboard.example/company" })));
-    expect(mocks.openCheckOnboard).toHaveBeenCalledOnce();
+    try {
+      render(<AgencyPayrollSetupTab scope={scope} />);
+      await user.click(await screen.findByRole("button", { name: "Complete payroll onboarding" }));
+      await waitFor(() => expect(assign).toHaveBeenCalledWith("https://onboard.example/company"));
+      expect(mocks.createCheckOnboard).not.toHaveBeenCalled();
+      expect(mocks.openCheckOnboard).not.toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(window, "location", { configurable: true, value: originalLocation });
+    }
   });
 
   it("tells a non-signer manager that the designated signer must complete company onboarding", () => {
