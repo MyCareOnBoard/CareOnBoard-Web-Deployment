@@ -657,4 +657,46 @@ describe("AgencyPayrollSetupTab", () => {
     expect(screen.getByText(/signer designated/i)).toBeInTheDocument();
     expect(getOverview).toHaveBeenCalledWith(scope);
   });
+
+  it("keeps every payroll command locked until a failed terminal refresh is retried successfully", async () => {
+    let resolveRefresh: () => void = () => undefined;
+    setupQuery = { data: projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false }), refetch };
+    runCommand.mockReturnValue({ unwrap: () => Promise.resolve({ operationId: "retry-operation", state: "accepted", resourceType: "company", pollAfterMs: 1 }) });
+    getOperation.mockReturnValue({ unwrap: () => Promise.resolve({ operationId: "retry-operation", state: "succeeded", resourceType: "company", pollAfterMs: null }) });
+    refetch.mockReturnValueOnce({ unwrap: () => Promise.resolve({}) }).mockReturnValueOnce({ unwrap: () => new Promise<void>((resolve) => { resolveRefresh = resolve; }) });
+    getOverview.mockReturnValueOnce({ unwrap: () => Promise.reject(new Error("overview refresh failed")) }).mockReturnValue({ unwrap: () => Promise.resolve({}) });
+    const user = userEvent.setup();
+    render(<AgencyPayrollSetupTab scope={scope} />);
+
+    await user.click(screen.getByRole("button", { name: "Retry company sync" }));
+    await waitFor(() => expect(getOperation).toHaveBeenCalledWith({ ...scope, operationId: "retry-operation" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/status refresh is required/i));
+    expect(screen.getByRole("button", { name: "Retry company sync" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Refresh reconciliation" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /retry status refresh/i })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Refresh reconciliation" }));
+    expect(runCommand).toHaveBeenCalledOnce();
+
+    await user.click(screen.getByRole("button", { name: /retry status refresh/i }));
+    expect(screen.getByRole("button", { name: "Retry company sync" })).toBeDisabled();
+    await act(async () => { resolveRefresh(); });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Retry company sync" })).toBeEnabled());
+  });
+
+  it("ignores a terminal refresh failure after its command scope retires", async () => {
+    let rejectOverview: (reason: unknown) => void = () => undefined;
+    setupQuery = { data: projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false }), refetch };
+    runCommand.mockReturnValue({ unwrap: () => Promise.resolve({ operationId: "scope-operation", state: "accepted", resourceType: "company", pollAfterMs: 1 }) });
+    getOperation.mockReturnValue({ unwrap: () => Promise.resolve({ operationId: "scope-operation", state: "succeeded", resourceType: "company", pollAfterMs: null }) });
+    refetch.mockReturnValue({ unwrap: () => Promise.resolve({}) });
+    getOverview.mockReturnValue({ unwrap: () => new Promise((_resolve, reject) => { rejectOverview = reject; }) });
+    const user = userEvent.setup();
+    const view = render(<AgencyPayrollSetupTab scope={{ ...scope, agencyId: "A" }} />);
+    await user.click(screen.getByRole("button", { name: "Retry company sync" }));
+    await waitFor(() => expect(getOperation).toHaveBeenCalledWith({ ...scope, agencyId: "A", operationId: "scope-operation" }));
+    view.rerender(<AgencyPayrollSetupTab scope={{ ...scope, agencyId: "B" }} />);
+    await act(async () => { rejectOverview(new Error("old scope refresh failed")); });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /retry status refresh/i })).not.toBeInTheDocument();
+  });
 });
