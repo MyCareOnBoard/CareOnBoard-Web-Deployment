@@ -64,7 +64,7 @@ export function CheckOnboardModal({
   launchMode?: "embedded" | "redirect";
   autoStartKey?: string;
   onAutoStartConsumed?: (key: string) => void;
-  onClosed?: () => void;
+  onClosed?: (refetchedSetup: unknown) => void;
   cancelPending?: boolean;
   loadingDialog?: CheckOnboardLoadingDialogConfig;
 }) {
@@ -84,10 +84,11 @@ export function CheckOnboardModal({
   useLayoutEffect(() => { onRefetchRef.current = onRefetch; }, [onRefetch]);
   useLayoutEffect(() => { onClosedRef.current = onClosed; }, [onClosed]);
   const handleClosed = useCallback(() => {
-    onRefetchRef.current();
+    const refetchedSetup = onRefetchRef.current();
     if (mounted.current) trigger.current?.focus();
+    return refetchedSetup;
   }, []);
-  const handleSdkClosed = useCallback(() => { onClosedRef.current?.(); }, []);
+  const handleSdkClosed = useCallback((refetchedSetup: unknown) => { onClosedRef.current?.(refetchedSetup); }, []);
   const { open, cancelPending: cancelPendingOpen, busy: sdkBusy } = useCheckOnboard(onRefetch, handleClosed, handleSdkClosed);
   const busy = launchPhase !== "idle" || sdkBusy;
   const sdkBusyRef = useRef(sdkBusy);

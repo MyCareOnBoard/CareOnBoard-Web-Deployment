@@ -102,7 +102,8 @@ describe("CheckOnboardModal", () => {
   it("retires a session request promptly and ignores its late rejection", async () => {
     let rejectSession!: (reason: Error) => void;
     const requestSession = vi.fn(() => new Promise<{ link: string }>((_, reject) => { rejectSession = reject; }));
-    const renderModal = (cancelPending: boolean) => <CheckOnboardModal loadingDialog={loadingDialog} cancelPending={cancelPending} requestSession={requestSession} onRefetch={vi.fn()} />;
+    const onClosed = vi.fn();
+    const renderModal = (cancelPending: boolean) => <CheckOnboardModal loadingDialog={loadingDialog} cancelPending={cancelPending} requestSession={requestSession} onRefetch={vi.fn()} onClosed={onClosed} />;
     const user = userEvent.setup();
     const view = render(renderModal(false));
     await user.click(screen.getByRole("button"));
@@ -112,6 +113,7 @@ describe("CheckOnboardModal", () => {
     await act(async () => { rejectSession(new Error("late request failure")); });
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Continue secure setup" })).toBeEnabled();
+    expect(onClosed).not.toHaveBeenCalled();
   });
   it("keeps shared employee-style loading inline when loadingDialog is absent", async () => {
     const user = userEvent.setup();
@@ -309,10 +311,10 @@ describe("CheckOnboardModal", () => {
   it("ignores a session that resolves after unmount", async () => {
     let resolveSession!: (value: { link: string }) => void;
     const requestSession = vi.fn(() => new Promise<{ link: string }>((resolve) => { resolveSession = resolve; }));
-    const load = vi.spyOn(loader, "loadCheckOnboard"); const user = userEvent.setup(); const view = render(<CheckOnboardModal requestSession={requestSession} onRefetch={vi.fn()} />);
+    const onClosed = vi.fn(); const load = vi.spyOn(loader, "loadCheckOnboard"); const user = userEvent.setup(); const view = render(<CheckOnboardModal requestSession={requestSession} onRefetch={vi.fn()} onClosed={onClosed} />);
     await user.click(screen.getByRole("button")); view.unmount();
     await act(async () => { resolveSession({ link: "https://session.example/late" }); });
-    expect(requestSession).toHaveBeenCalledOnce(); expect(load).not.toHaveBeenCalled();
+    expect(requestSession).toHaveBeenCalledOnce(); expect(load).not.toHaveBeenCalled(); expect(onClosed).not.toHaveBeenCalled();
   });
   it("ignores a session invalidated by a global payroll teardown", async () => {
     let resolveSession!: (value: { link: string }) => void;
@@ -327,8 +329,9 @@ describe("CheckOnboardModal", () => {
     const close = vi.fn();
     vi.spyOn(loader, "loadCheckOnboard").mockResolvedValue({ create: vi.fn((options) => { onClose = options.onClose; return { open: vi.fn(), close }; }) });
     const onRefetch = vi.fn();
+    const onClosed = vi.fn();
     const user = userEvent.setup();
-    render(<CheckOnboardModal requestSession={vi.fn().mockResolvedValue({ link: "https://session.example/fresh" })} onRefetch={onRefetch} />);
+    render(<CheckOnboardModal requestSession={vi.fn().mockResolvedValue({ link: "https://session.example/fresh" })} onRefetch={onRefetch} onClosed={onClosed} />);
     const button = screen.getByRole("button");
     await user.click(button);
     await vi.waitFor(() => expect(onClose).toBeTypeOf("function"));
@@ -336,6 +339,7 @@ describe("CheckOnboardModal", () => {
     act(() => clearPayrollOnboardSessions());
     expect(close).toHaveBeenCalledOnce();
     expect(onRefetch).not.toHaveBeenCalled();
+    expect(onClosed).not.toHaveBeenCalled();
     expect(button).not.toHaveFocus();
   });
   it("refetches for SDK progress but invokes onClosed once only for a genuine SDK close", async () => {
@@ -354,7 +358,7 @@ describe("CheckOnboardModal", () => {
     act(() => onClose());
     expect(button).toHaveFocus();
     expect(onRefetch).toHaveBeenCalledTimes(2);
-    expect(onClosed).toHaveBeenCalledOnce();
+    await waitFor(() => expect(onClosed).toHaveBeenCalledOnce());
   });
   it("keeps refetch and focus restoration at expiry without invoking onClosed", async () => {
     vi.useFakeTimers();

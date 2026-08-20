@@ -312,7 +312,7 @@ function AgencyPayrollSetupContent({ scope, active }: { scope: PayrollScope; act
       });
     });
   };
-  const signerAction = async (command: "designate_signer" | "clear_signer" | "retry_company_sync" | "refresh_company_reconciliation", authorityAttested?: true, selectedSigner = data.setup.signerCandidate, suppliedIdempotencyKey?: ReturnType<typeof newIdempotencyKey>) => {
+  const signerAction = async (command: "designate_signer" | "clear_signer" | "retry_company_sync" | "refresh_company_reconciliation", authorityAttested?: true, selectedSigner = data.setup.signerCandidate, suppliedIdempotencyKey?: ReturnType<typeof newIdempotencyKey>, projection = data) => {
     if (command === "designate_signer" && authorityAttested !== true) {
       setCommandError("Confirm authority for the verified account before designating a signer.");
       return false;
@@ -333,8 +333,8 @@ function AgencyPayrollSetupContent({ scope, active }: { scope: PayrollScope; act
     const idempotencyKey = suppliedIdempotencyKey ?? newIdempotencyKey();
     try {
       const operation = command === "designate_signer"
-        ? await runCommand({ ...scope, command, projectionRevision: data.projectionRevision, designatedSignerUserUid: signerCandidate!.userUid, designatedSignerIdentityVersion: signerCandidate!.identityVersion, authorityAttested: true, idempotencyKey }).unwrap()
-        : await runCommand({ ...scope, command, projectionRevision: data.projectionRevision, idempotencyKey }).unwrap();
+        ? await runCommand({ ...scope, command, projectionRevision: projection.projectionRevision, designatedSignerUserUid: signerCandidate!.userUid, designatedSignerIdentityVersion: signerCandidate!.identityVersion, authorityAttested: true, idempotencyKey }).unwrap()
+        : await runCommand({ ...scope, command, projectionRevision: projection.projectionRevision, idempotencyKey }).unwrap();
       if (!lease.current()) return false;
       watchOperation(operation, lease.current, lease.release);
       return true;
@@ -385,10 +385,15 @@ function AgencyPayrollSetupContent({ scope, active }: { scope: PayrollScope; act
       lease.release();
     }
   };
-  const refetchCompanySetup = () => { void refetch(); void getOverview(scope); };
-  const refreshCompanyReconciliationAfterOnboardClose = () => {
-    if (!data.capabilities.canRefreshCompanyReconciliation || activePayrollCommandRef.current) return;
-    void signerAction("refresh_company_reconciliation");
+  const refetchCompanySetup = () => {
+    const refreshedSetup = unwrapQueryResult(refetch());
+    void getOverview(scope);
+    return refreshedSetup;
+  };
+  const refreshCompanyReconciliationAfterOnboardClose = (refetchedSetup: unknown) => {
+    const projection = refetchedSetup as AgencyPayrollSetupProjection | undefined;
+    if (!projection?.capabilities.canRefreshCompanyReconciliation || activePayrollCommandRef.current) return;
+    void signerAction("refresh_company_reconciliation", undefined, undefined, undefined, projection);
   };
   const payrollCommandActive = activePayrollCommand !== null;
   const pendingCommandLabel = activePayrollCommand ? commandStatusLabels[activePayrollCommand] : "";

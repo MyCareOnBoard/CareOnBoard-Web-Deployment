@@ -5,7 +5,7 @@ import { registerPayrollOnboardTeardown } from "./payrollOnboardSession";
 
 const LOAD_CANCELLED = Symbol("check-onboard-load-cancelled");
 
-export function useCheckOnboard(onRefetch: () => void, onRestoreFocus?: () => void, onSdkClose?: () => void) {
+export function useCheckOnboard(onRefetch: () => unknown, onRestoreFocus?: () => unknown, onSdkClose?: (refetchedSetup: unknown) => void) {
   const instance = useRef<CheckOnboardInstance | null>(null);
   const timer = useRef<number | null>(null);
   const cancelPendingLoad = useRef<(() => void) | null>(null);
@@ -17,6 +17,7 @@ export function useCheckOnboard(onRefetch: () => void, onRestoreFocus?: () => vo
   const [busy, setBusy] = useState(false);
 
   const cleanup = useCallback((restoreFocus: boolean) => {
+    let refetchedSetup: unknown;
     generation.current += 1;
     cancelPendingLoad.current?.();
     cancelPendingLoad.current = null;
@@ -41,14 +42,15 @@ export function useCheckOnboard(onRefetch: () => void, onRestoreFocus?: () => vo
     }
     if (restoreFocus && !suppressCloseNotification.current && !notified.current) {
       notified.current = true;
-      onRestoreFocus?.();
+      refetchedSetup = onRestoreFocus?.();
     }
+    return refetchedSetup;
   }, [onRestoreFocus]);
   const close = useCallback(() => cleanup(true), [cleanup]);
-  const notifySdkClose = useCallback(() => {
+  const notifySdkClose = useCallback((refetchedSetup: unknown) => {
     if (sdkCloseNotified.current) return;
     sdkCloseNotified.current = true;
-    onSdkClose?.();
+    onSdkClose?.(refetchedSetup);
   }, [onSdkClose]);
   const cancelPending = useCallback(() => {
     if (instance.current) return;
@@ -74,7 +76,15 @@ export function useCheckOnboard(onRefetch: () => void, onRestoreFocus?: () => vo
       });
       const Check = await Promise.race([loadCheckOnboard(), cancelled]);
       if (Check === LOAD_CANCELLED || generation.current !== current) return;
-      const handler = Check.create({ link, appearance: { primaryColor: "#00b4b8" }, onClose: () => { if (generation.current === current) { notifySdkClose(); close(); } }, onEvent: () => { if (generation.current === current) onRefetch(); } });
+      const handler = Check.create({ link, appearance: { primaryColor: "#00b4b8" }, onClose: () => {
+        if (generation.current !== current) return;
+        const refetchedSetup = close();
+        const closedGeneration = generation.current;
+        void Promise.resolve(refetchedSetup).then(
+          (setup) => { if (generation.current === closedGeneration) notifySdkClose(setup); },
+          () => undefined,
+        );
+      }, onEvent: () => { if (generation.current === current) onRefetch(); } });
       if (generation.current !== current) { handler.close(); return; }
       instance.current = handler;
       handler.open();

@@ -551,8 +551,12 @@ describe("AgencyPayrollSetupTab", () => {
 
   it("refreshes company reconciliation once when agency onboarding genuinely closes", async () => {
     let onClose!: () => void;
+    const freshProjection = { ...onboardProjection({ capability: true }), projectionRevision: 5 };
     setupQuery = { data: onboardProjection({ capability: true }), refetch };
     createCompanyOnboardSession.mockReturnValue({ unwrap: () => Promise.resolve({ url: "https://onboard.example/company", expiresAt: new Date(Date.now() + 60_000).toISOString() }) });
+    refetch.mockReturnValue({ unwrap: () => Promise.resolve(freshProjection) });
+    runCommand.mockReturnValue({ unwrap: () => Promise.resolve({ operationId: "reconcile-close", state: "accepted", resourceType: "company", pollAfterMs: 1 }) });
+    getOperation.mockReturnValue({ unwrap: () => Promise.resolve({ operationId: "reconcile-close", state: "succeeded", resourceType: "company", pollAfterMs: null }) });
     mocks.createCheckOnboard.mockImplementation((options) => {
       onClose = options.onClose;
       return { open: mocks.openCheckOnboard, _show: mocks.showCheckOnboard, close: mocks.closeCheckOnboard };
@@ -567,9 +571,11 @@ describe("AgencyPayrollSetupTab", () => {
     await waitFor(() => expect(runCommand).toHaveBeenCalledWith(expect.objectContaining({
       ...scope,
       command: "refresh_company_reconciliation",
-      projectionRevision: 4,
+      projectionRevision: 5,
     })));
     expect(runCommand).toHaveBeenCalledOnce();
+    await waitFor(() => expect(getOperation).toHaveBeenCalledWith({ ...scope, operationId: "reconcile-close" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("auto-opens once when this actor's successful setup reaches the matching onboarding milestone", async () => {
