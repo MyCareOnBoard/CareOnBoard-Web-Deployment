@@ -25,9 +25,9 @@ describe("useCheckOnboard", () => {
     const create = vi.fn(); vi.spyOn(loader, "loadCheckOnboard").mockResolvedValue({ create }); const { result } = renderHook(() => useCheckOnboard(vi.fn()));
     await expect(act(() => result.current.open("https://session.example/one", "invalid"))).rejects.toThrow(/fresh/i); expect(create).not.toHaveBeenCalled();
   });
-  it("closes the handler at expiry and restores the invoker callback", async () => {
-    vi.useFakeTimers(); const close = vi.fn(); const open = vi.fn(); vi.spyOn(loader, "loadCheckOnboard").mockResolvedValue({ create: vi.fn(() => ({ close, open })) }); const restored = vi.fn(); const { result } = renderHook(() => useCheckOnboard(vi.fn(), restored));
-    await act(() => result.current.open("https://session.example/one", new Date(Date.now() + 100).toISOString())); await act(() => vi.advanceTimersByTimeAsync(100)); expect(close).toHaveBeenCalledOnce(); expect(restored).toHaveBeenCalledOnce(); vi.useRealTimers();
+  it("closes the handler at expiry and restores the invoker callback without notifying SDK close", async () => {
+    vi.useFakeTimers(); const close = vi.fn(); const open = vi.fn(); vi.spyOn(loader, "loadCheckOnboard").mockResolvedValue({ create: vi.fn(() => ({ close, open })) }); const restored = vi.fn(); const sdkClosed = vi.fn(); const { result } = renderHook(() => useCheckOnboard(vi.fn(), restored, sdkClosed));
+    await act(() => result.current.open("https://session.example/one", new Date(Date.now() + 100).toISOString())); await act(() => vi.advanceTimersByTimeAsync(100)); expect(close).toHaveBeenCalledOnce(); expect(restored).toHaveBeenCalledOnce(); expect(sdkClosed).not.toHaveBeenCalled(); vi.useRealTimers();
   });
   it("restores focus only once when close synchronously reenters the SDK callback", async () => {
     const restored = vi.fn(); let options: { onClose: () => void } | undefined;

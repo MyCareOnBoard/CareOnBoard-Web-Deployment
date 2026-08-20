@@ -85,10 +85,10 @@ export function CheckOnboardModal({
   useLayoutEffect(() => { onClosedRef.current = onClosed; }, [onClosed]);
   const handleClosed = useCallback(() => {
     onRefetchRef.current();
-    onClosedRef.current?.();
     if (mounted.current) trigger.current?.focus();
   }, []);
-  const { open, cancelPending: cancelPendingOpen, busy: sdkBusy } = useCheckOnboard(onRefetch, handleClosed);
+  const handleSdkClosed = useCallback(() => { onClosedRef.current?.(); }, []);
+  const { open, cancelPending: cancelPendingOpen, busy: sdkBusy } = useCheckOnboard(onRefetch, handleClosed, handleSdkClosed);
   const busy = launchPhase !== "idle" || sdkBusy;
   const sdkBusyRef = useRef(sdkBusy);
   useLayoutEffect(() => { sdkBusyRef.current = sdkBusy; }, [sdkBusy]);

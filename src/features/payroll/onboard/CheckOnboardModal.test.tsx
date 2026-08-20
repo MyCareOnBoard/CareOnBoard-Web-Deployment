@@ -356,4 +356,28 @@ describe("CheckOnboardModal", () => {
     expect(onRefetch).toHaveBeenCalledTimes(2);
     expect(onClosed).toHaveBeenCalledOnce();
   });
+  it("keeps refetch and focus restoration at expiry without invoking onClosed", async () => {
+    vi.useFakeTimers();
+    try {
+      const close = vi.fn();
+      const open = vi.fn();
+      vi.spyOn(loader, "loadCheckOnboard").mockResolvedValue({ create: vi.fn(() => ({ open, close })) });
+      const onRefetch = vi.fn();
+      const onClosed = vi.fn();
+      render(<CheckOnboardModal requestSession={vi.fn().mockResolvedValue({ link: "https://session.example/fresh", expiresAt: new Date(Date.now() + 100).toISOString() })} onRefetch={onRefetch} onClosed={onClosed} />);
+
+      const button = screen.getByRole("button", { name: /continue secure setup/i });
+      await act(async () => { fireEvent.click(button); });
+      await vi.waitFor(() => expect(open).toHaveBeenCalledOnce());
+      button.blur();
+      await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+
+      expect(close).toHaveBeenCalledOnce();
+      expect(button).toHaveFocus();
+      expect(onRefetch).toHaveBeenCalledOnce();
+      expect(onClosed).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
