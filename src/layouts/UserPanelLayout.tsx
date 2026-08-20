@@ -22,6 +22,7 @@ import SupportIcon from "@/assets/icons/support.svg?react";
 import CommunityInclusionIcon from "@/assets/icons/community-inclusion.svg?react";
 import { Sun, Megaphone } from "lucide-react"
 import AnnouncementBanner from "@/components/AnnouncementBanner";
+import { roleLabel } from "@/lib/roleLabel";
 
 const navItems: NavItem[] = [
   { label: "Dashboard", path: Routes.userPanel.dashboard, icon: HomeIcon },
@@ -79,7 +80,7 @@ export default function UserPanelDashboardLayout({ children }: { children?: Reac
       <DashboardHeader
         userName={user?.fullName}
         userImage={(user as any)?.profileImage || user?.photoURL}
-        userRole={(user as any)?.role || 'DSP'}
+        userRole={roleLabel({ applicantType: user?.applicantType, role: user?.profile?.role || user?.role })}
         userType={user?.userType || UserType.APPLICANT}
         onLogout={handleLogout}
       />

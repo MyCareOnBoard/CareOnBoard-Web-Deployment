@@ -12,6 +12,31 @@ import { getUser } from "./users";
 describe("getUser", () => {
   beforeEach(() => get.mockReset());
 
+  it("preserves the employee profile role for HHA display fallbacks", async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        success: true,
+        user: {
+          id: "employee-1",
+          uid: "employee-1",
+          email: "caregiver@example.com",
+          fullName: "Casey Caregiver",
+          userType: "employee",
+          createdAt: "2026-08-20T00:00:00.000Z",
+          updatedAt: "2026-08-20T00:00:00.000Z",
+          profile: {
+            id: "employee-profile-1",
+            role: "hha",
+          },
+        },
+      },
+    });
+
+    const mapped = await getUser();
+
+    expect(mapped.profile?.role).toBe("hha");
+  });
+
   it("maps the canonical super-admin scope profile fields", async () => {
     get.mockResolvedValueOnce({
       data: {

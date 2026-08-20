@@ -114,6 +114,7 @@ export async function getUser(): Promise<User> {
         : Array.isArray(profileSource.agencyIds)
           ? [...profileSource.agencyIds]
           : undefined,
+      role: profileSource.role || backendUser.role,
     };
 
     // The profile bootstrap embeds only minimal agency identity. Contact,

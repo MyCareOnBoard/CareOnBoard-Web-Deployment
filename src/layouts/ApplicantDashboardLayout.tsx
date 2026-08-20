@@ -15,6 +15,7 @@ import CogIcon from "@/assets/icons/cog.svg?react";
 import HomeIcon from "@/assets/icons/home.svg?react";
 import { Megaphone } from "lucide-react"
 import AnnouncementBanner from "@/components/AnnouncementBanner";
+import {roleLabel} from "@/lib/roleLabel";
 
 
 export default function ApplicantDashboardLayout({children}: { children?: ReactNode }) {
@@ -60,7 +61,7 @@ export default function ApplicantDashboardLayout({children}: { children?: ReactN
       <DashboardHeader
         userName={user?.fullName}
         userImage={(user as any)?.profileImage || user?.photoURL}
-        userRole={(user as any)?.role || 'DSP'}
+        userRole={roleLabel({applicantType: user?.applicantType, role: user?.profile?.role || user?.role})}
         userType={user?.userType || UserType.APPLICANT}
         onLogout={handleLogout}
       />
