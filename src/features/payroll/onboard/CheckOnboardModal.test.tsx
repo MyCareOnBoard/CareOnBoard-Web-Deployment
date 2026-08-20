@@ -1,12 +1,34 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StrictMode } from "react";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { CheckOnboardModal } from "./CheckOnboardModal";
 import { clearPayrollOnboardSessions } from "./payrollOnboardSession";
 import * as loader from "./loadCheckOnboard";
+
+const loadingDialog = {
+  preparing: {
+    title: "Preparing payroll onboarding",
+    description: "Creating a fresh, secure link to Check. This will open automatically.",
+  },
+  opening: {
+    title: "Opening Check onboarding",
+    description: "Your secure link is ready. Connecting you to Check now.",
+  },
+};
+
 describe("CheckOnboardModal", () => {
-  beforeEach(() => { vi.restoreAllMocks(); });
+  const originalLocation = window.location;
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    Object.defineProperty(window, "location", {
+      writable: true,
+      value: { ...originalLocation, assign: vi.fn() },
+    });
+  });
+  afterEach(() => {
+    Object.defineProperty(window, "location", { writable: true, value: originalLocation });
+  });
   it("requests only one fresh session for double Continue", async () => { const requestSession = vi.fn(() => new Promise<{ link: string }>(() => {})); const user = userEvent.setup(); render(<CheckOnboardModal requestSession={requestSession} onRefetch={vi.fn()} />); const button = screen.getByRole("button"); await user.dblClick(button); expect(requestSession).toHaveBeenCalledOnce(); });
   it("locks the action with its local opening label while a fresh session is pending", async () => {
     const requestSession = vi.fn(() => new Promise<{ link: string }>(() => {}));
@@ -14,6 +36,118 @@ describe("CheckOnboardModal", () => {
     render(<CheckOnboardModal actionLabel="Complete payroll onboarding" openingLabel="Opening payroll onboarding..." requestSession={requestSession} onRefetch={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Complete payroll onboarding" }));
     expect(screen.getByRole("button", { name: /opening payroll onboarding/i })).toBeDisabled();
+  });
+  it("announces the loading dialog's preparing and opening phases", async () => {
+    let resolveSession!: (value: { link: string }) => void;
+    let resolveLoader!: (value: Awaited<ReturnType<typeof loader.loadCheckOnboard>>) => void;
+    const open = vi.fn();
+    vi.spyOn(loader, "loadCheckOnboard").mockReturnValue(new Promise((resolve) => { resolveLoader = resolve; }));
+    const user = userEvent.setup();
+    render(<CheckOnboardModal loadingDialog={loadingDialog} requestSession={() => new Promise((resolve) => { resolveSession = resolve; })} onRefetch={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: "Continue secure setup" }));
+    expect(screen.getByRole("dialog", { name: "Preparing payroll onboarding" })).toBeVisible();
+    expect(screen.getByRole("status")).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("status")).toHaveAttribute("aria-atomic", "true");
+    expect(screen.queryByRole("status", { name: "Opening secure setup..." })).not.toBeInTheDocument();
+
+    await act(async () => { resolveSession({ link: "https://session.example/loading" }); });
+    expect(await screen.findByRole("dialog", { name: "Opening Check onboarding" })).toBeVisible();
+    expect(screen.getByText("Your secure link is ready. Connecting you to Check now.")).toBeVisible();
+    await act(async () => { resolveLoader({ create: vi.fn(() => ({ open, close: vi.fn() })) }); });
+  });
+  it("keeps the Secure handoff dialog non-dismissible and motion-safe", async () => {
+    const user = userEvent.setup();
+    render(<CheckOnboardModal loadingDialog={loadingDialog} requestSession={vi.fn(() => new Promise(() => undefined))} onRefetch={vi.fn()} />);
+    await user.click(screen.getByRole("button"));
+
+    const dialog = screen.getByRole("dialog", { name: "Preparing payroll onboarding" });
+    expect(dialog.querySelector("[data-slot=dialog-close]")).toBeNull();
+    expect(screen.getByTestId("check-onboard-loading-ring")).toHaveClass("motion-safe:animate-spin");
+    await user.keyboard("{Escape}");
+    expect(dialog).toBeVisible();
+    fireEvent.pointerDown(document.querySelector("[data-slot=dialog-overlay]")!);
+    expect(dialog).toBeVisible();
+  });
+  it("closes the loading dialog without restoring trigger focus after a successful embedded handoff", async () => {
+    let resolveSession!: (value: { link: string }) => void;
+    const open = vi.fn();
+    vi.spyOn(loader, "loadCheckOnboard").mockResolvedValue({ create: vi.fn(() => ({ open, close: vi.fn() })) });
+    const user = userEvent.setup();
+    render(<CheckOnboardModal loadingDialog={loadingDialog} requestSession={() => new Promise((resolve) => { resolveSession = resolve; })} onRefetch={vi.fn()} />);
+
+    const button = screen.getByRole("button", { name: "Continue secure setup" });
+    await user.click(button);
+    expect(screen.getByRole("dialog", { name: "Preparing payroll onboarding" })).toBeVisible();
+    button.blur();
+    await act(async () => { resolveSession({ link: "https://session.example/success" }); });
+    await waitFor(() => expect(open).toHaveBeenCalledOnce());
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(button).not.toHaveFocus();
+  });
+  it("closes the loading dialog before showing a failure and focusing the retry trigger", async () => {
+    let rejectSession!: (reason: Error) => void;
+    const user = userEvent.setup();
+    render(<CheckOnboardModal loadingDialog={loadingDialog} requestSession={() => new Promise((_, reject) => { rejectSession = reject; })} onRefetch={vi.fn()} />);
+
+    const button = screen.getByRole("button", { name: "Continue secure setup" });
+    await user.click(button);
+    expect(screen.getByRole("dialog", { name: "Preparing payroll onboarding" })).toBeVisible();
+    await act(async () => { rejectSession(new Error("no")); });
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not be opened/i);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(button).toBeEnabled();
+    expect(button).toHaveFocus();
+  });
+  it("retires a session request promptly and ignores its late rejection", async () => {
+    let rejectSession!: (reason: Error) => void;
+    const requestSession = vi.fn(() => new Promise<{ link: string }>((_, reject) => { rejectSession = reject; }));
+    const renderModal = (cancelPending: boolean) => <CheckOnboardModal loadingDialog={loadingDialog} cancelPending={cancelPending} requestSession={requestSession} onRefetch={vi.fn()} />;
+    const user = userEvent.setup();
+    const view = render(renderModal(false));
+    await user.click(screen.getByRole("button"));
+    view.rerender(renderModal(true));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await act(async () => { rejectSession(new Error("late request failure")); });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue secure setup" })).toBeEnabled();
+  });
+  it("keeps shared employee-style loading inline when loadingDialog is absent", async () => {
+    const user = userEvent.setup();
+    render(<CheckOnboardModal requestSession={vi.fn(() => new Promise(() => undefined))} onRefetch={vi.fn()} />);
+    await user.click(screen.getByRole("button"));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Opening secure setup...");
+  });
+  it("preserves redirect mode without loading the embedded SDK", async () => {
+    const assign = window.location.assign as ReturnType<typeof vi.fn>;
+    const load = vi.spyOn(loader, "loadCheckOnboard");
+    const user = userEvent.setup();
+    render(<CheckOnboardModal launchMode="redirect" loadingDialog={loadingDialog} requestSession={vi.fn().mockResolvedValue({ link: "https://session.example/redirect" })} onRefetch={vi.fn()} />);
+
+    await user.click(screen.getByRole("button"));
+    await waitFor(() => expect(assign).toHaveBeenCalledWith("https://session.example/redirect"));
+    expect(load).not.toHaveBeenCalled();
+  });
+  it("does not let a retired launch unlock a newer launch", async () => {
+    let resolveFirst!: (session: { link: string }) => void;
+    const requestSession = vi.fn()
+      .mockImplementationOnce(() => new Promise<{ link: string }>((resolve) => { resolveFirst = resolve; }))
+      .mockImplementationOnce(() => new Promise<{ link: string }>(() => undefined));
+    const user = userEvent.setup();
+    const renderModal = (cancelPending: boolean) => <CheckOnboardModal loadingDialog={loadingDialog} cancelPending={cancelPending} requestSession={requestSession} onRefetch={vi.fn()} />;
+    const view = render(renderModal(false));
+    await user.click(screen.getByRole("button"));
+    view.rerender(renderModal(true));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    view.rerender(renderModal(false));
+    await user.click(screen.getByRole("button"));
+    expect(requestSession).toHaveBeenCalledTimes(2);
+    await act(async () => { resolveFirst({ link: "https://session.example/retired" }); });
+    expect(screen.getByRole("button", { hidden: true })).toBeDisabled();
+    expect(requestSession).toHaveBeenCalledTimes(2);
   });
   it("opens the resolved session and releases the action under Strict Mode", async () => {
     const open = vi.fn();
