@@ -58,7 +58,7 @@ describe("CheckOnboardModal", () => {
   });
   it("keeps the Secure handoff dialog non-dismissible and motion-safe", async () => {
     const user = userEvent.setup();
-    render(<CheckOnboardModal loadingDialog={loadingDialog} requestSession={vi.fn(() => new Promise(() => undefined))} onRefetch={vi.fn()} />);
+    render(<CheckOnboardModal loadingDialog={loadingDialog} requestSession={vi.fn(() => new Promise<{ link: string }>(() => undefined))} onRefetch={vi.fn()} />);
     await user.click(screen.getByRole("button"));
 
     const dialog = screen.getByRole("dialog", { name: "Preparing payroll onboarding" });
@@ -117,7 +117,7 @@ describe("CheckOnboardModal", () => {
   });
   it("keeps shared employee-style loading inline when loadingDialog is absent", async () => {
     const user = userEvent.setup();
-    render(<CheckOnboardModal requestSession={vi.fn(() => new Promise(() => undefined))} onRefetch={vi.fn()} />);
+    render(<CheckOnboardModal requestSession={vi.fn(() => new Promise<{ link: string }>(() => undefined))} onRefetch={vi.fn()} />);
     await user.click(screen.getByRole("button"));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Opening secure setup...");
