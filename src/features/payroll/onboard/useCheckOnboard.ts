@@ -3,9 +3,12 @@ import { loadCheckOnboard } from "./loadCheckOnboard";
 import type { CheckOnboardInstance } from "./checkOnboard.types";
 import { registerPayrollOnboardTeardown } from "./payrollOnboardSession";
 
+const LOAD_CANCELLED = Symbol("check-onboard-load-cancelled");
+
 export function useCheckOnboard(onRefetch: () => void, onClosed?: () => void) {
   const instance = useRef<CheckOnboardInstance | null>(null);
   const timer = useRef<number | null>(null);
+  const cancelPendingLoad = useRef<(() => void) | null>(null);
   const generation = useRef(0);
   const notified = useRef(false);
   const closing = useRef(false);
@@ -14,6 +17,8 @@ export function useCheckOnboard(onRefetch: () => void, onClosed?: () => void) {
 
   const cleanup = useCallback((restoreFocus: boolean) => {
     generation.current += 1;
+    cancelPendingLoad.current?.();
+    cancelPendingLoad.current = null;
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
 
@@ -42,9 +47,40 @@ export function useCheckOnboard(onRefetch: () => void, onClosed?: () => void) {
   const cancelPending = useCallback(() => {
     if (instance.current) return;
     generation.current += 1;
+    cancelPendingLoad.current?.();
+    cancelPendingLoad.current = null;
     setBusy(false);
   }, []);
   useEffect(() => { const unregister = registerPayrollOnboardTeardown(() => cleanup(false)); return () => { unregister(); cleanup(false); }; }, [cleanup]);
-  const open = useCallback(async (link: string, expiresAt?: string) => { cleanup(false); notified.current = false; const current = generation.current; setBusy(true); try { const expiry = expiresAt ? Date.parse(expiresAt) : undefined; if (!link || (expiry !== undefined && (!Number.isFinite(expiry) || expiry <= Date.now()))) throw new Error("A fresh onboarding session is required."); const Check = await loadCheckOnboard(); if (generation.current !== current) return; const handler = Check.create({ link, appearance: { primaryColor: "#00b4b8" }, onClose: () => { if (generation.current === current) close(); }, onEvent: () => { if (generation.current === current) onRefetch(); } }); if (generation.current !== current) { handler.close(); return; } instance.current = handler; handler.open(); handler._show?.(); setBusy(false); if (expiry) timer.current = window.setTimeout(close, expiry - Date.now()); } catch (error) { if (generation.current === current) setBusy(false); throw error; } }, [cleanup, close, onRefetch]);
+  const open = useCallback(async (link: string, expiresAt?: string) => {
+    cleanup(false);
+    notified.current = false;
+    const current = generation.current;
+    setBusy(true);
+    let cancelLoad: (() => void) | null = null;
+    try {
+      const expiry = expiresAt ? Date.parse(expiresAt) : undefined;
+      if (!link || (expiry !== undefined && (!Number.isFinite(expiry) || expiry <= Date.now()))) throw new Error("A fresh onboarding session is required.");
+      const cancelled = new Promise<typeof LOAD_CANCELLED>((resolve) => {
+        cancelLoad = () => resolve(LOAD_CANCELLED);
+        cancelPendingLoad.current = cancelLoad;
+      });
+      const Check = await Promise.race([loadCheckOnboard(), cancelled]);
+      if (Check === LOAD_CANCELLED || generation.current !== current) return;
+      const handler = Check.create({ link, appearance: { primaryColor: "#00b4b8" }, onClose: () => { if (generation.current === current) close(); }, onEvent: () => { if (generation.current === current) onRefetch(); } });
+      if (generation.current !== current) { handler.close(); return; }
+      instance.current = handler;
+      handler.open();
+      handler._show?.();
+      setBusy(false);
+      if (expiry) timer.current = window.setTimeout(close, expiry - Date.now());
+    } catch (error) {
+      if (generation.current !== current) return;
+      setBusy(false);
+      throw error;
+    } finally {
+      if (cancelPendingLoad.current === cancelLoad) cancelPendingLoad.current = null;
+    }
+  }, [cleanup, close, onRefetch]);
   return { open, close, cancelPending, busy };
 }

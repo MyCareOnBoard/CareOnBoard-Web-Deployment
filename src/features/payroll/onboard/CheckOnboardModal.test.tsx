@@ -129,6 +129,48 @@ describe("CheckOnboardModal", () => {
     expect(open).not.toHaveBeenCalled();
     expect(show).not.toHaveBeenCalled();
   });
+  it("settles a cancelled automatic SDK load and re-enables the manual fallback", async () => {
+    const load = vi.spyOn(loader, "loadCheckOnboard").mockImplementation(() => new Promise(() => {}));
+    const requestSession = vi.fn().mockResolvedValue({ link: "https://session.example/pending-sdk" });
+    const renderModal = (cancelPending: boolean) => <CheckOnboardModal
+      autoStartKey="setup:agency-a:3:1"
+      cancelPending={cancelPending}
+      requestSession={requestSession}
+      onRefetch={vi.fn()}
+    />;
+    const user = userEvent.setup();
+    const view = render(renderModal(false));
+
+    await waitFor(() => expect(load).toHaveBeenCalledOnce());
+    expect(screen.getByRole("button", { name: /opening secure setup/i })).toBeDisabled();
+    view.rerender(renderModal(true));
+
+    expect(await screen.findByRole("button", { name: "Continue secure setup" })).toBeEnabled();
+    view.rerender(renderModal(false));
+    await user.click(screen.getByRole("button", { name: "Continue secure setup" }));
+
+    await waitFor(() => expect(requestSession).toHaveBeenCalledTimes(2));
+    expect(load).toHaveBeenCalledTimes(2);
+  });
+  it("ignores a loader rejection after a pending launch is cancelled", async () => {
+    let rejectLoader!: (reason: Error) => void;
+    const load = vi.spyOn(loader, "loadCheckOnboard").mockReturnValue(new Promise((_, reject) => { rejectLoader = reject; }));
+    const requestSession = vi.fn().mockResolvedValue({ link: "https://session.example/pending-sdk" });
+    const renderModal = (cancelPending: boolean) => <CheckOnboardModal
+      autoStartKey="setup:agency-a:3:1"
+      cancelPending={cancelPending}
+      requestSession={requestSession}
+      onRefetch={vi.fn()}
+    />;
+    const view = render(renderModal(false));
+
+    await waitFor(() => expect(load).toHaveBeenCalledOnce());
+    view.rerender(renderModal(true));
+    await act(async () => { rejectLoader(new Error("late SDK failure")); });
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue secure setup" })).toBeEnabled();
+  });
   it("shows an accessible retry error when a fresh session fails", async () => { const user = userEvent.setup(); render(<CheckOnboardModal requestSession={vi.fn().mockRejectedValue(new Error("no"))} onRefetch={vi.fn()} />); await user.click(screen.getByRole("button")); expect(await screen.findByRole("alert")).toHaveTextContent(/could not be opened/i); });
   it("ignores a session that resolves after unmount", async () => {
     let resolveSession!: (value: { link: string }) => void;
