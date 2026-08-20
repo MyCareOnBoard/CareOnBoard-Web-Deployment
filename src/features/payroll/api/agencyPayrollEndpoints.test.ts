@@ -13,7 +13,7 @@ const projection = (revision: number): AgencyPayrollSetupProjection => ({
   integration: { state: "configured", environment: "sandbox" },
   preflight: { values: {}, missingFieldCodes: [] },
   readiness: { status: "ready", blockers: [], nextAction: null },
-  setup: { designatedSignerPresent: false, signerCandidate: null, designatedSigner: null, companyLinked: true, officeWorkplaceLinked: true, payScheduleLinked: true, enrollmentProfileLocked: true, signatoryLinked: false },
+  setup: { companyOnboardRevision: null, designatedSignerPresent: false, signerCandidate: null, designatedSigner: null, companyLinked: true, officeWorkplaceLinked: true, payScheduleLinked: true, enrollmentProfileLocked: true, signatoryLinked: false },
   capabilities: { canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false, canSubmitCompanyImplementation: false, canRetryCompanySync: false, canRefreshCompanyReconciliation: false },
 });
 
@@ -30,16 +30,19 @@ describe("agency payroll wire contracts", () => {
     expect(agencyPayrollPaths.signerCandidates).toBeTypeOf("function");
     expect(agencyPayrollPaths.signerCandidates()).toEqual({ url: "/checkPayrollAgency/payroll/agency/signer-candidates", method: "GET", requiresAuth: true });
   });
-  it("creates a company Onboard session through the frozen direct-function contract", () => {
-    const request = agencyCompanyOnboardSessionRequest({ audience: "agency", actorUid: "actor-1", agencyId: "agency-1", expectedProjectionRevision: 19 });
+  it("creates a company Onboard session with only the stable company revision", () => {
+    const request = agencyCompanyOnboardSessionRequest({ audience: "agency", actorUid: "actor-1", agencyId: "agency-1", expectedCompanyOnboardRevision: 19 });
     expect(request).toEqual({
       url: "/checkPayrollOnboard/payroll/agency/setup/onboard-session",
       method: "POST",
       requiresAuth: true,
-      data: { expectedProjectionRevision: 19 },
+      data: { expectedCompanyOnboardRevision: 19 },
     });
+    expect(request.data).not.toHaveProperty("expectedProjectionRevision");
     expect(JSON.stringify(request)).not.toContain('"agencyId"');
     expect(JSON.stringify(request)).not.toContain('"actorUid"');
+    expect(JSON.stringify(request)).not.toContain('"providerId"');
+    expect(JSON.stringify(request)).not.toContain('"signer"');
   });
   it("sends the verified signer in the one frozen bootstrap body and leaves the setup cache out of invalidation", () => {
     const args = {

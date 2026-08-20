@@ -9,7 +9,7 @@ function projection(readiness: AgencyPayrollSetupProjection["readiness"]): Agenc
     integration: { state: "configured", environment: "sandbox" },
     preflight: { values: {}, missingFieldCodes: [] },
     readiness,
-    setup: { designatedSignerPresent: true, signerCandidate: null, designatedSigner: null, companyLinked: true, officeWorkplaceLinked: true, payScheduleLinked: true, enrollmentProfileLocked: true, signatoryLinked: true },
+    setup: { companyOnboardRevision: null, designatedSignerPresent: true, signerCandidate: null, designatedSigner: null, companyLinked: true, officeWorkplaceLinked: true, payScheduleLinked: true, enrollmentProfileLocked: true, signatoryLinked: true },
     capabilities: { canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false, canSubmitCompanyImplementation: false, canRetryCompanySync: false, canRefreshCompanyReconciliation: false },
   };
 }

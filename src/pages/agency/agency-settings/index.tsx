@@ -240,7 +240,7 @@ export default function AgencySettingsPage() {
         {canOpenPayrollSetup && visitedTabs.has("payrollSetup") && user?.uid && user.agencyId && (
           <TabPanel tabId="payrollSetup" activeTab={activeTab}>
             <Suspense fallback={<SettingsTabSkeleton variant="form" cardCount={2} />}>
-              <AgencyPayrollSetupTab scope={{ audience: "agency", actorUid: user.uid, agencyId: user.agencyId }} />
+              <AgencyPayrollSetupTab scope={{ audience: "agency", actorUid: user.uid, agencyId: user.agencyId }} active={activeTab === "payrollSetup"} />
             </Suspense>
           </TabPanel>
         )}

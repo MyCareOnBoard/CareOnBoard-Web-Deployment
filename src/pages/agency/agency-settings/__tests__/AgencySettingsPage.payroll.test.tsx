@@ -6,20 +6,34 @@ import AgencySettingsPage from "../index";
 import { UserType } from "@/utils/auth/types";
 
 let user: any = { uid: "u", agencyId: "a", payrollEmploymentId: "employment-1", canOpenAgencyPayrollSetup: true, userType: UserType.AGENCY, profile: {} };
+const payrollActiveStates = vi.hoisted(() => [] as boolean[]);
 vi.mock("@/utils/auth", () => ({ useAuth: () => ({ user }) }));
 vi.mock("../components/AccountTab", () => ({ default: () => <div>account</div> }));
-vi.mock("../components/AgencyPayrollSetupTab", () => ({ default: ({ scope }: any) => <div data-testid="payroll-scope">{scope.actorUid}:{scope.agencyId}</div> }));
+vi.mock("../components/AgencyPayrollSetupTab", () => ({ default: ({ scope, active }: any) => { payrollActiveStates.push(active); return <div data-testid="payroll-scope" data-active={String(active)}>{scope.actorUid}:{scope.agencyId}</div>; } }));
 vi.mock("@/features/payroll/components/MyPayrollTab", () => ({ default: ({ scope, active }: any) => <div data-testid="my-payroll-scope">{active ? `${scope.audience}:${scope.actorUid}:${scope.agencyId}:${scope.employmentId || "unavailable"}` : "inactive"}</div> }));
 vi.mock("../components/AgencyInfoTab", () => ({ default: () => null })); vi.mock("../components/NotificationTab", () => ({ default: () => null })); vi.mock("../components/UserLevelsTab", () => ({ default: () => null }));
 const LocationProbe = () => <output data-testid="location">{useLocation().search}</output>;
 describe("Agency Settings payroll tab", () => {
-  beforeEach(() => { user = { uid: "u", agencyId: "a", payrollEmploymentId: "employment-1", canOpenAgencyPayrollSetup: true, userType: UserType.AGENCY, profile: {} }; });
+  beforeEach(() => { payrollActiveStates.length = 0; user = { uid: "u", agencyId: "a", payrollEmploymentId: "employment-1", canOpenAgencyPayrollSetup: true, userType: UserType.AGENCY, profile: {} }; });
   it("accepts authorized direct URL navigation with the exact user scope", async () => { render(<MemoryRouter initialEntries={["/settings?tab=payrollSetup"]}><AgencySettingsPage /><LocationProbe /></MemoryRouter>); expect(await screen.findByTestId("payroll-scope")).toHaveTextContent("u:a"); });
   it("keeps Payroll Setup available to the agency owner before the server bootstrap capability exists", async () => {
     user = { ...user, canOpenAgencyPayrollSetup: false };
     render(<MemoryRouter initialEntries={["/settings?tab=payrollSetup"]}><AgencySettingsPage /><LocationProbe /></MemoryRouter>);
     expect(await screen.findByTestId("payroll-scope")).toHaveTextContent("u:a");
     expect(screen.getByRole("tab", { name: "Payroll Setup" })).toBeInTheDocument();
+  });
+  it("keeps a visited Payroll Setup panel mounted while its active state follows tab changes", async () => {
+    const interaction = userEvent.setup();
+    render(<MemoryRouter initialEntries={["/settings?tab=payrollSetup"]}><AgencySettingsPage /></MemoryRouter>);
+    const payrollPanel = await screen.findByTestId("payroll-scope");
+    expect(payrollPanel).toHaveAttribute("data-active", "true");
+    await interaction.click(screen.getByRole("tab", { name: "Account" }));
+    expect(screen.getByTestId("payroll-scope")).toBe(payrollPanel);
+    expect(payrollPanel).toHaveAttribute("data-active", "false");
+    await interaction.click(screen.getByRole("tab", { name: "Payroll Setup" }));
+    expect(screen.getByTestId("payroll-scope")).toBe(payrollPanel);
+    expect(payrollPanel).toHaveAttribute("data-active", "true");
+    expect(payrollActiveStates.filter((state, index) => index === 0 || state !== payrollActiveStates[index - 1])).toEqual([true, false, true]);
   });
   it("removes the payroll query for a staff member without payroll authority", async () => { user = { ...user, userType: UserType.AGENCY_STAFF, canOpenAgencyPayrollSetup: false, profile: { accessList: [] } }; render(<MemoryRouter initialEntries={["/settings?tab=payrollSetup"]}><AgencySettingsPage /><LocationProbe /></MemoryRouter>); expect(screen.queryByTestId("payroll-scope")).not.toBeInTheDocument(); expect(await screen.findByTestId("location")).toHaveTextContent(""); });
   it("removes an unknown tab query", async () => { user = { uid: "u", agencyId: "a", payrollEmploymentId: "employment-1", canOpenAgencyPayrollSetup: true, userType: UserType.AGENCY, profile: {} }; render(<MemoryRouter initialEntries={["/settings?tab=unknown&from=notice"]}><AgencySettingsPage /><LocationProbe /></MemoryRouter>); expect(screen.queryByTestId("payroll-scope")).not.toBeInTheDocument(); expect(await screen.findByTestId("location")).not.toHaveTextContent("tab=unknown"); });

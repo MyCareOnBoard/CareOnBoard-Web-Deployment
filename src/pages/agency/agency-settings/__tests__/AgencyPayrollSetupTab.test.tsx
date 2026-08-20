@@ -11,7 +11,7 @@ const bootstrapSetup = vi.fn();
 const createCompanyOnboardSession = vi.fn();
 const getOperation = vi.fn();
 const getOverview = vi.fn();
-const mocks = vi.hoisted(() => ({ signerSearchTrigger: vi.fn(), newCommandKey: vi.fn(), requireCurrentProjection: vi.fn(), createCheckOnboard: vi.fn(), openCheckOnboard: vi.fn(), closeCheckOnboard: vi.fn() }));
+const mocks = vi.hoisted(() => ({ signerSearchTrigger: vi.fn(), newCommandKey: vi.fn(), requireCurrentProjection: vi.fn(), createCheckOnboard: vi.fn(), openCheckOnboard: vi.fn(), showCheckOnboard: vi.fn(), closeCheckOnboard: vi.fn() }));
 let setupQuery: { data?: AgencyPayrollSetupProjection; isLoading?: boolean; isFetching?: boolean; error?: unknown; refetch: typeof refetch };
 const signerCandidatesQuery = { data: { ownerCandidate: { userUid: "verified-owner", fullName: "Ada Owner", email: "ada@able.example", title: "Owner", identityVersion: `check_signer_v1_${"a".repeat(64)}`, designated: false }, staffCandidates: [] }, isLoading: false, isError: false };
 
@@ -30,28 +30,54 @@ vi.mock("@/features/payroll/hooks/useProjectionFreshness", () => ({ useProjectio
 vi.mock("@/features/payroll/onboard/loadCheckOnboard", () => ({ loadCheckOnboard: () => Promise.resolve({ create: mocks.createCheckOnboard }) }));
 
 type TestCapabilities = Omit<AgencyPayrollSetupProjection["capabilities"], "canSubmitCompanyImplementation" | "canRetryCompanySync" | "canRefreshCompanyReconciliation"> & Partial<Pick<AgencyPayrollSetupProjection["capabilities"], "canSubmitCompanyImplementation" | "canRetryCompanySync" | "canRefreshCompanyReconciliation">>;
-const projection = (capabilities: TestCapabilities, designatedSignerPresent = false, signerCandidate: AgencyPayrollSetupProjection["setup"]["signerCandidate"] = { userUid: "verified-owner", fullName: "Ada Owner", email: "ada@able.example", title: "Owner", identityVersion: `check_signer_v1_${"a".repeat(64)}`, designated: designatedSignerPresent }): AgencyPayrollSetupProjection => ({
+const projection = (capabilities: TestCapabilities, designatedSignerPresent = false, signerCandidate: AgencyPayrollSetupProjection["setup"]["signerCandidate"] = { userUid: "verified-owner", fullName: "Ada Owner", email: "ada@able.example", title: "Owner", identityVersion: `check_signer_v1_${"a".repeat(64)}`, designated: designatedSignerPresent }, companyOnboardRevision: number | null = null): AgencyPayrollSetupProjection => ({
   projectionRevision: 4,
   integration: { state: "configured", environment: "sandbox" },
   preflight: { values: {}, missingFieldCodes: [] },
   readiness: { status: "ready", blockers: [], nextAction: null },
-  setup: { designatedSignerPresent, signerCandidate, designatedSigner: designatedSignerPresent ? signerCandidate : null, companyLinked: true, officeWorkplaceLinked: true, payScheduleLinked: true, enrollmentProfileLocked: true, signatoryLinked: false },
+  setup: { companyOnboardRevision, designatedSignerPresent, signerCandidate, designatedSigner: designatedSignerPresent ? signerCandidate : null, companyLinked: true, officeWorkplaceLinked: true, payScheduleLinked: true, enrollmentProfileLocked: true, signatoryLinked: false },
   capabilities: { canSubmitCompanyImplementation: false, canRetryCompanySync: capabilities.canManage, canRefreshCompanyReconciliation: capabilities.canManage, ...capabilities },
 });
 
 const scope = { audience: "agency" as const, actorUid: "u", agencyId: "a" };
+let documentVisibility: DocumentVisibilityState = "visible";
+const setDocumentVisibility = (visibility: DocumentVisibilityState) => {
+  documentVisibility = visibility;
+  document.dispatchEvent(new Event("visibilitychange"));
+};
+
+const onboardProjection = ({ capability = false, revision = 3, signerUserUid = scope.actorUid, clientRevalidateAfter }: { capability?: boolean; revision?: number; signerUserUid?: string; clientRevalidateAfter?: string } = {}) => {
+  const signer = { userUid: signerUserUid, fullName: "Ada Signer", email: "ada@able.example", title: "Owner", identityVersion: `check_signer_v1_${"c".repeat(64)}`, designated: true };
+  return {
+    ...projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: capability }, true, signer, revision),
+    clientRevalidateAfter,
+  } satisfies AgencyPayrollSetupProjection;
+};
 
 const notConfigured = (missingFieldCodes: string[] = ["legalName"]): AgencyPayrollSetupProjection => ({
   projectionRevision: 0,
   integration: { state: "not_configured", environment: "sandbox" },
   preflight: { values: {}, missingFieldCodes },
   readiness: { status: "needs_information", blockers: ["integration_missing"], nextAction: "create_integration" },
-  setup: { designatedSignerPresent: false, signerCandidate: null, designatedSigner: null, companyLinked: false, officeWorkplaceLinked: false, payScheduleLinked: false, enrollmentProfileLocked: false, signatoryLinked: false },
+  setup: { companyOnboardRevision: null, designatedSignerPresent: false, signerCandidate: null, designatedSigner: null, companyLinked: false, officeWorkplaceLinked: false, payScheduleLinked: false, enrollmentProfileLocked: false, signatoryLinked: false },
   capabilities: { canView: true, canManage: true, canCreateIntegration: true, canDesignateSigner: false, createCompanyOnboardSession: false, canSubmitCompanyImplementation: false, canRetryCompanySync: false, canRefreshCompanyReconciliation: false },
 });
 
+async function completeDirectSetup(returned: AgencyPayrollSetupProjection, renderScope = scope) {
+  const initial = notConfigured([]);
+  setupQuery = { data: initial, refetch };
+  loadSetup.mockReturnValue({ unwrap: () => Promise.resolve(initial) });
+  bootstrapSetup.mockReturnValue({ unwrap: () => Promise.resolve(returned) });
+  const user = userEvent.setup();
+  const view = render(<AgencyPayrollSetupTab scope={renderScope} />);
+  await user.click(screen.getByRole("button", { name: /create payroll setup/i }));
+  await waitFor(() => expect(bootstrapSetup).toHaveBeenCalledOnce());
+  await act(async () => {});
+  return { user, view };
+}
+
 describe("AgencyPayrollSetupTab", () => {
-  beforeEach(() => { refetch.mockReset(); runCommand.mockReset(); loadSetup.mockReset(); bootstrapSetup.mockReset(); createCompanyOnboardSession.mockReset(); getOperation.mockReset(); getOverview.mockReset(); mocks.signerSearchTrigger.mockReset(); mocks.newCommandKey.mockReset(); mocks.requireCurrentProjection.mockReset(); mocks.createCheckOnboard.mockReset(); mocks.openCheckOnboard.mockReset(); mocks.closeCheckOnboard.mockReset(); mocks.createCheckOnboard.mockReturnValue({ open: mocks.openCheckOnboard, close: mocks.closeCheckOnboard }); mocks.newCommandKey.mockReturnValue("00000000-0000-4000-8000-000000000001"); mocks.requireCurrentProjection.mockResolvedValue(true); setupQuery = { error: true, refetch }; });
+  beforeEach(() => { vi.restoreAllMocks(); documentVisibility = "visible"; vi.spyOn(document, "visibilityState", "get").mockImplementation(() => documentVisibility); refetch.mockReset(); runCommand.mockReset(); loadSetup.mockReset(); bootstrapSetup.mockReset(); createCompanyOnboardSession.mockReset(); getOperation.mockReset(); getOverview.mockReset(); mocks.signerSearchTrigger.mockReset(); mocks.newCommandKey.mockReset(); mocks.requireCurrentProjection.mockReset(); mocks.createCheckOnboard.mockReset(); mocks.openCheckOnboard.mockReset(); mocks.showCheckOnboard.mockReset(); mocks.closeCheckOnboard.mockReset(); mocks.createCheckOnboard.mockReturnValue({ open: mocks.openCheckOnboard, _show: mocks.showCheckOnboard, close: mocks.closeCheckOnboard }); mocks.newCommandKey.mockReturnValue("00000000-0000-4000-8000-000000000001"); mocks.requireCurrentProjection.mockResolvedValue(true); setupQuery = { error: true, refetch }; });
 
   it("offers an accessible retry that refetches setup", async () => {
     const user = userEvent.setup(); render(<AgencyPayrollSetupTab scope={scope} />);
@@ -67,7 +93,7 @@ describe("AgencyPayrollSetupTab", () => {
         integration: { state: "not_configured", environment: "sandbox" },
         preflight: { values: {}, missingFieldCodes: ["legalName"] },
         readiness: { status: "needs_information", blockers: ["integration_missing"], nextAction: "create_integration" },
-        setup: { designatedSignerPresent: false, signerCandidate: null, designatedSigner: null, companyLinked: false, officeWorkplaceLinked: false, payScheduleLinked: false, enrollmentProfileLocked: false, signatoryLinked: false },
+        setup: { companyOnboardRevision: null, designatedSignerPresent: false, signerCandidate: null, designatedSigner: null, companyLinked: false, officeWorkplaceLinked: false, payScheduleLinked: false, enrollmentProfileLocked: false, signatoryLinked: false },
         capabilities: { canView: true, canManage: true, canCreateIntegration: true, canDesignateSigner: false, createCompanyOnboardSession: false, canSubmitCompanyImplementation: false, canRetryCompanySync: false, canRefreshCompanyReconciliation: false },
       } as AgencyPayrollSetupProjection,
       refetch,
@@ -84,7 +110,7 @@ describe("AgencyPayrollSetupTab", () => {
       integration: { state: "not_configured" as const, environment: "sandbox" as const },
       preflight: { values: { legalName: "Able Care LLC" }, missingFieldCodes: ["ein"] },
       readiness: { status: "needs_information" as const, blockers: ["integration_missing"], nextAction: "create_integration" },
-      setup: { designatedSignerPresent: false, signerCandidate: null, designatedSigner: null, companyLinked: false, officeWorkplaceLinked: false, payScheduleLinked: false, enrollmentProfileLocked: false, signatoryLinked: false },
+      setup: { companyOnboardRevision: null, designatedSignerPresent: false, signerCandidate: null, designatedSigner: null, companyLinked: false, officeWorkplaceLinked: false, payScheduleLinked: false, enrollmentProfileLocked: false, signatoryLinked: false },
       capabilities: { canView: true, canManage: true, canCreateIntegration: true, canDesignateSigner: false, createCompanyOnboardSession: false as const, canSubmitCompanyImplementation: false, canRetryCompanySync: false, canRefreshCompanyReconciliation: false },
     } satisfies AgencyPayrollSetupProjection;
     setupQuery = { data: scannedProjection, refetch };
@@ -110,13 +136,13 @@ describe("AgencyPayrollSetupTab", () => {
       integration: { state: "not_configured" as const, environment: "sandbox" as const },
       preflight: { values: { legalName: "Able Care LLC" }, missingFieldCodes: ["ein"] },
       readiness: { status: "needs_information" as const, blockers: ["integration_missing"], nextAction: "create_integration" },
-      setup: { designatedSignerPresent: false, signerCandidate: null, designatedSigner: null, companyLinked: false, officeWorkplaceLinked: false, payScheduleLinked: false, enrollmentProfileLocked: false, signatoryLinked: false },
+      setup: { companyOnboardRevision: null, designatedSignerPresent: false, signerCandidate: null, designatedSigner: null, companyLinked: false, officeWorkplaceLinked: false, payScheduleLinked: false, enrollmentProfileLocked: false, signatoryLinked: false },
       capabilities: { canView: true, canManage: true, canCreateIntegration: true, canDesignateSigner: false, createCompanyOnboardSession: false as const, canSubmitCompanyImplementation: false, canRetryCompanySync: false, canRefreshCompanyReconciliation: false },
     } satisfies AgencyPayrollSetupProjection;
     setupQuery = { data: scannedProjection, refetch };
     loadSetup.mockReturnValue({ unwrap: () => Promise.resolve(scannedProjection) });
-    let resolveBootstrap: () => void = () => undefined;
-    bootstrapSetup.mockReturnValue({ unwrap: () => new Promise<void>((resolve) => { resolveBootstrap = resolve; }) });
+    let resolveBootstrap: (value: AgencyPayrollSetupProjection) => void = () => undefined;
+    bootstrapSetup.mockReturnValue({ unwrap: () => new Promise<AgencyPayrollSetupProjection>((resolve) => { resolveBootstrap = resolve; }) });
     const user = userEvent.setup();
     render(<AgencyPayrollSetupTab scope={scope} />);
     await user.click(screen.getByRole("button", { name: /create payroll setup/i }));
@@ -131,7 +157,7 @@ describe("AgencyPayrollSetupTab", () => {
     expect(screen.getByRole("button", { name: /creating payroll setup/i })).toBeDisabled();
     expect(screen.getByTestId("agency-payroll-modal-create-spinner")).toBeInTheDocument();
     expect(screen.getAllByTestId(/agency-payroll-.*-spinner/)).toHaveLength(1);
-    await act(async () => { resolveBootstrap(); });
+    await act(async () => { resolveBootstrap(projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false })); });
     expect(refetch).not.toHaveBeenCalled();
   });
 
@@ -139,8 +165,8 @@ describe("AgencyPayrollSetupTab", () => {
     const scannedProjection = notConfigured([]);
     setupQuery = { data: scannedProjection, refetch };
     loadSetup.mockReturnValue({ unwrap: () => Promise.resolve(scannedProjection) });
-    let resolveBootstrap: () => void = () => undefined;
-    bootstrapSetup.mockReturnValue({ unwrap: () => new Promise<void>((resolve) => { resolveBootstrap = resolve; }) });
+    let resolveBootstrap: (value: AgencyPayrollSetupProjection) => void = () => undefined;
+    bootstrapSetup.mockReturnValue({ unwrap: () => new Promise<AgencyPayrollSetupProjection>((resolve) => { resolveBootstrap = resolve; }) });
     const user = userEvent.setup();
     const view = render(<AgencyPayrollSetupTab scope={scope} />);
     await user.click(screen.getByRole("button", { name: /create payroll setup/i }));
@@ -148,7 +174,7 @@ describe("AgencyPayrollSetupTab", () => {
     expect(await screen.findByRole("status")).toHaveTextContent("Creating payroll setup…");
     expect(screen.getByTestId("agency-payroll-create-spinner")).toBeInTheDocument();
     expect(screen.queryByText("Scanning agency details…")).not.toBeInTheDocument();
-    await act(async () => { resolveBootstrap(); });
+    await act(async () => { resolveBootstrap(projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false })); });
     expect(screen.getByRole("status")).toHaveTextContent("Creating payroll setup…");
     expect(screen.queryByRole("button", { name: /^create payroll setup$/i })).not.toBeInTheDocument();
     setupQuery = { isLoading: true, refetch };
@@ -502,28 +528,190 @@ describe("AgencyPayrollSetupTab", () => {
     expect(screen.queryByRole("button", { name: /onboard|secure setup/i })).not.toBeInTheDocument();
   });
 
-  it("offers Complete payroll onboarding only to the authorized signer", async () => {
-    setupQuery = { data: projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: true }, true), refetch };
+  it("keeps an eligible historical setup manual without auto-opening it", async () => {
+    setupQuery = { data: onboardProjection({ capability: true }), refetch };
     render(<AgencyPayrollSetupTab scope={scope} />);
     expect(await screen.findByRole("button", { name: "Complete payroll onboarding" })).toBeInTheDocument();
+    await act(async () => {});
+    expect(createCompanyOnboardSession).not.toHaveBeenCalled();
+    expect(mocks.openCheckOnboard).not.toHaveBeenCalled();
   });
 
-  it("redirects the authorized signer to the closed company Onboard URL without embedding it", async () => {
-    setupQuery = { data: projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: true }, true), refetch };
+  it("opens the authorized signer's company Onboard session in the embedded SDK", async () => {
+    setupQuery = { data: onboardProjection({ capability: true }), refetch };
     createCompanyOnboardSession.mockReturnValue({ unwrap: () => Promise.resolve({ url: "https://onboard.example/company", expiresAt: new Date(Date.now() + 60_000).toISOString() }) });
-    const originalLocation = window.location;
-    const assign = vi.fn();
-    Object.defineProperty(window, "location", { configurable: true, value: { ...originalLocation, assign } });
     const user = userEvent.setup();
-    try {
-      render(<AgencyPayrollSetupTab scope={scope} />);
-      await user.click(await screen.findByRole("button", { name: "Complete payroll onboarding" }));
-      await waitFor(() => expect(assign).toHaveBeenCalledWith("https://onboard.example/company"));
-      expect(mocks.createCheckOnboard).not.toHaveBeenCalled();
-      expect(mocks.openCheckOnboard).not.toHaveBeenCalled();
-    } finally {
-      Object.defineProperty(window, "location", { configurable: true, value: originalLocation });
-    }
+    render(<AgencyPayrollSetupTab scope={scope} />);
+    await user.click(await screen.findByRole("button", { name: "Complete payroll onboarding" }));
+    await waitFor(() => expect(mocks.createCheckOnboard).toHaveBeenCalledWith(expect.objectContaining({ link: "https://onboard.example/company" })));
+    expect(mocks.openCheckOnboard).toHaveBeenCalledOnce();
+    expect(mocks.showCheckOnboard).toHaveBeenCalledOnce();
+    expect(createCompanyOnboardSession).toHaveBeenCalledWith({ ...scope, expectedCompanyOnboardRevision: 3 });
+  });
+
+  it("auto-opens once when this actor's successful setup reaches the matching onboarding milestone", async () => {
+    const waiting = onboardProjection({ clientRevalidateAfter: new Date(Date.now() + 60_000).toISOString() });
+    const { view } = await completeDirectSetup(waiting);
+    setupQuery = { data: waiting, refetch };
+    view.rerender(<AgencyPayrollSetupTab scope={scope} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Preparing payroll onboarding… Company provisioning will continue in the background.");
+
+    createCompanyOnboardSession.mockReturnValue({ unwrap: () => Promise.resolve({ url: "https://onboard.example/automatic", expiresAt: new Date(Date.now() + 60_000).toISOString() }) });
+    const eligible = onboardProjection({ capability: true });
+    setupQuery = { data: eligible, refetch };
+    view.rerender(<AgencyPayrollSetupTab scope={scope} />);
+
+    await waitFor(() => expect(mocks.openCheckOnboard).toHaveBeenCalledOnce());
+    expect(mocks.showCheckOnboard).toHaveBeenCalledOnce();
+    expect(createCompanyOnboardSession).toHaveBeenCalledOnce();
+    expect(createCompanyOnboardSession).toHaveBeenCalledWith({ ...scope, expectedCompanyOnboardRevision: 3 });
+
+    setupQuery = { data: { ...eligible, projectionRevision: 8 }, refetch };
+    view.rerender(<AgencyPayrollSetupTab scope={scope} />);
+    await act(async () => {});
+    expect(createCompanyOnboardSession).toHaveBeenCalledOnce();
+    expect(mocks.openCheckOnboard).toHaveBeenCalledOnce();
+  });
+
+  it("does not arm automatic onboarding when setup designates another signer", async () => {
+    const waiting = onboardProjection({ signerUserUid: "other-signer", clientRevalidateAfter: new Date(Date.now() + 60_000).toISOString() });
+    const { view } = await completeDirectSetup(waiting);
+    setupQuery = { data: onboardProjection({ capability: true, signerUserUid: "other-signer" }), refetch };
+    view.rerender(<AgencyPayrollSetupTab scope={scope} />);
+    expect(await screen.findByRole("button", { name: "Complete payroll onboarding" })).toBeInTheDocument();
+    await act(async () => {});
+    expect(createCompanyOnboardSession).not.toHaveBeenCalled();
+    expect(mocks.openCheckOnboard).not.toHaveBeenCalled();
+  });
+
+  it("retires a late setup success when scope A changes before it resolves", async () => {
+    let resolveSetup!: (value: AgencyPayrollSetupProjection) => void;
+    const initial = notConfigured([]);
+    setupQuery = { data: initial, refetch };
+    loadSetup.mockReturnValue({ unwrap: () => Promise.resolve(initial) });
+    bootstrapSetup.mockReturnValue({ unwrap: () => new Promise<AgencyPayrollSetupProjection>((resolve) => { resolveSetup = resolve; }) });
+    const user = userEvent.setup();
+    const scopeA = { ...scope, agencyId: "A" };
+    const scopeB = { ...scope, agencyId: "B" };
+    const view = render(<AgencyPayrollSetupTab scope={scopeA} />);
+    await user.click(screen.getByRole("button", { name: /create payroll setup/i }));
+    await waitFor(() => expect(bootstrapSetup).toHaveBeenCalledOnce());
+    setupQuery = { data: onboardProjection({ capability: true }), refetch };
+    view.rerender(<AgencyPayrollSetupTab scope={scopeB} />);
+    await act(async () => { resolveSetup(onboardProjection({ clientRevalidateAfter: new Date(Date.now() + 60_000).toISOString() })); });
+    expect(createCompanyOnboardSession).not.toHaveBeenCalled();
+    expect(mocks.openCheckOnboard).not.toHaveBeenCalled();
+  });
+
+  it("retires a late automatic session response when scope A changes", async () => {
+    let resolveSession!: (value: { url: string; expiresAt: string }) => void;
+    const waiting = onboardProjection({ clientRevalidateAfter: new Date(Date.now() + 60_000).toISOString() });
+    const scopeA = { ...scope, agencyId: "A" };
+    const scopeB = { ...scope, agencyId: "B" };
+    const { view } = await completeDirectSetup(waiting, scopeA);
+    setupQuery = { data: waiting, refetch };
+    view.rerender(<AgencyPayrollSetupTab scope={scopeA} />);
+    createCompanyOnboardSession.mockReturnValue({ unwrap: () => new Promise((resolve) => { resolveSession = resolve; }) });
+    setupQuery = { data: onboardProjection({ capability: true }), refetch };
+    view.rerender(<AgencyPayrollSetupTab scope={scopeA} />);
+    await waitFor(() => expect(createCompanyOnboardSession).toHaveBeenCalledOnce());
+    setupQuery = { data: onboardProjection({ capability: true }), refetch };
+    view.rerender(<AgencyPayrollSetupTab scope={scopeB} />);
+    await act(async () => { resolveSession({ url: "https://onboard.example/retired-a", expiresAt: new Date(Date.now() + 60_000).toISOString() }); });
+    expect(mocks.openCheckOnboard).not.toHaveBeenCalled();
+  });
+
+  it("cancels intent when the settings tab becomes inactive and does not resurrect it", async () => {
+    const waiting = onboardProjection({ clientRevalidateAfter: new Date(Date.now() + 60_000).toISOString() });
+    const { view } = await completeDirectSetup(waiting);
+    setupQuery = { data: waiting, refetch };
+    view.rerender(<AgencyPayrollSetupTab scope={scope} active />);
+    expect(screen.getByRole("status")).toHaveTextContent(/preparing payroll onboarding/i);
+    view.rerender(<AgencyPayrollSetupTab scope={scope} active={false} />);
+    setupQuery = { data: onboardProjection({ capability: true }), refetch };
+    view.rerender(<AgencyPayrollSetupTab scope={scope} active />);
+    expect(await screen.findByRole("button", { name: "Complete payroll onboarding" })).toBeInTheDocument();
+    await act(async () => {});
+    expect(createCompanyOnboardSession).not.toHaveBeenCalled();
+  });
+
+  it("waits for visibility when the onboarding milestone arrives while hidden", async () => {
+    const waiting = onboardProjection({ clientRevalidateAfter: new Date(Date.now() + 60_000).toISOString() });
+    const { view } = await completeDirectSetup(waiting);
+    setupQuery = { data: waiting, refetch };
+    view.rerender(<AgencyPayrollSetupTab scope={scope} />);
+    act(() => setDocumentVisibility("hidden"));
+    createCompanyOnboardSession.mockReturnValue({ unwrap: () => Promise.resolve({ url: "https://onboard.example/visible", expiresAt: new Date(Date.now() + 60_000).toISOString() }) });
+    setupQuery = { data: onboardProjection({ capability: true }), refetch };
+    view.rerender(<AgencyPayrollSetupTab scope={scope} />);
+    await act(async () => {});
+    expect(createCompanyOnboardSession).not.toHaveBeenCalled();
+    act(() => setDocumentVisibility("visible"));
+    await waitFor(() => expect(mocks.openCheckOnboard).toHaveBeenCalledOnce());
+  });
+
+  it.each(["hidden", "inactive"] as const)("invalidates a deferred automatic session when the tab becomes %s", async (retirement) => {
+    let resolveSession!: (value: { url: string; expiresAt: string }) => void;
+    const waiting = onboardProjection({ clientRevalidateAfter: new Date(Date.now() + 60_000).toISOString() });
+    const { view } = await completeDirectSetup(waiting);
+    setupQuery = { data: waiting, refetch };
+    view.rerender(<AgencyPayrollSetupTab scope={scope} />);
+    createCompanyOnboardSession.mockReturnValue({ unwrap: () => new Promise((resolve) => { resolveSession = resolve; }) });
+    setupQuery = { data: onboardProjection({ capability: true }), refetch };
+    view.rerender(<AgencyPayrollSetupTab scope={scope} />);
+    await waitFor(() => expect(createCompanyOnboardSession).toHaveBeenCalledOnce());
+    if (retirement === "hidden") act(() => setDocumentVisibility("hidden"));
+    else view.rerender(<AgencyPayrollSetupTab scope={scope} active={false} />);
+    await act(async () => { resolveSession({ url: `https://onboard.example/${retirement}`, expiresAt: new Date(Date.now() + 60_000).toISOString() }); });
+    expect(mocks.openCheckOnboard).not.toHaveBeenCalled();
+  });
+
+  it("does not close an opened onboarding session when the document becomes hidden", async () => {
+    const waiting = onboardProjection({ clientRevalidateAfter: new Date(Date.now() + 60_000).toISOString() });
+    const { view } = await completeDirectSetup(waiting);
+    setupQuery = { data: waiting, refetch };
+    view.rerender(<AgencyPayrollSetupTab scope={scope} />);
+    createCompanyOnboardSession.mockReturnValue({ unwrap: () => Promise.resolve({ url: "https://onboard.example/open", expiresAt: new Date(Date.now() + 60_000).toISOString() }) });
+    setupQuery = { data: onboardProjection({ capability: true }), refetch };
+    view.rerender(<AgencyPayrollSetupTab scope={scope} />);
+    await waitFor(() => expect(mocks.openCheckOnboard).toHaveBeenCalledOnce());
+    act(() => setDocumentVisibility("hidden"));
+    expect(mocks.closeCheckOnboard).not.toHaveBeenCalled();
+  });
+
+  it("does not auto-retry a failed session and leaves manual retry as the only second request", async () => {
+    refetch.mockResolvedValue(undefined);
+    const waiting = onboardProjection({ clientRevalidateAfter: new Date(Date.now() + 60_000).toISOString() });
+    const { user, view } = await completeDirectSetup(waiting);
+    setupQuery = { data: waiting, refetch };
+    view.rerender(<AgencyPayrollSetupTab scope={scope} />);
+    createCompanyOnboardSession
+      .mockReturnValueOnce({ unwrap: () => Promise.reject({ status: 409 }) })
+      .mockReturnValueOnce({ unwrap: () => Promise.reject(new Error("manual retry failed")) });
+    const eligible = onboardProjection({ capability: true });
+    setupQuery = { data: eligible, refetch };
+    view.rerender(<AgencyPayrollSetupTab scope={scope} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not be opened/i);
+    expect(createCompanyOnboardSession).toHaveBeenCalledOnce();
+    expect(refetch).toHaveBeenCalledOnce();
+    view.rerender(<AgencyPayrollSetupTab scope={scope} />);
+    await act(async () => {});
+    expect(createCompanyOnboardSession).toHaveBeenCalledOnce();
+    await user.click(screen.getByRole("button", { name: "Complete payroll onboarding" }));
+    await waitFor(() => expect(createCompanyOnboardSession).toHaveBeenCalledTimes(2));
+    expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it("clears the preparing status when provisioning reaches a terminal pre-milestone state", async () => {
+    const waiting = onboardProjection({ clientRevalidateAfter: new Date(Date.now() + 60_000).toISOString() });
+    const { view } = await completeDirectSetup(waiting);
+    setupQuery = { data: waiting, refetch };
+    view.rerender(<AgencyPayrollSetupTab scope={scope} />);
+    expect(screen.getByRole("status")).toHaveTextContent(/preparing payroll onboarding/i);
+    setupQuery = { data: { ...waiting, clientRevalidateAfter: undefined, readiness: { status: "needs_attention", blockers: ["company_sync_failed"], nextAction: "retry_company_sync" } }, refetch };
+    view.rerender(<AgencyPayrollSetupTab scope={scope} />);
+    await waitFor(() => expect(screen.queryByText(/preparing payroll onboarding/i)).not.toBeInTheDocument());
+    expect(createCompanyOnboardSession).not.toHaveBeenCalled();
   });
 
   it("tells a non-signer manager that the designated signer must complete company onboarding", () => {
@@ -534,14 +722,14 @@ describe("AgencyPayrollSetupTab", () => {
   });
 
   it("refreshes after a stale company Onboard response and waits for a new click", async () => {
-    setupQuery = { data: projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: true }, true), refetch };
+    setupQuery = { data: onboardProjection({ capability: true }), refetch };
     createCompanyOnboardSession.mockReturnValue({ unwrap: () => Promise.reject({ status: 409 }) });
     const user = userEvent.setup();
     render(<AgencyPayrollSetupTab scope={scope} />);
     await user.click(await screen.findByRole("button", { name: "Complete payroll onboarding" }));
     await waitFor(() => expect(refetch).toHaveBeenCalledOnce());
     expect(createCompanyOnboardSession).toHaveBeenCalledTimes(1);
-    expect(createCompanyOnboardSession).toHaveBeenCalledWith({ ...scope, expectedProjectionRevision: 4 });
+    expect(createCompanyOnboardSession).toHaveBeenCalledWith({ ...scope, expectedCompanyOnboardRevision: 3 });
   });
 
   it("renders Payroll Management actions without signer authority", () => {

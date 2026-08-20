@@ -59,6 +59,7 @@ export interface AgencyPayrollSetupProjection {
   preflight: { values: CheckPayrollProfileRead; missingFieldCodes: string[] };
   readiness: { status: "needs_information" | "ready_to_sync" | "needs_attention" | "ready"; blockers: string[]; nextAction: string | null };
   setup: {
+    companyOnboardRevision: number | null;
     designatedSignerPresent: boolean;
     signerCandidate: PayrollSignerCandidate | null;
     designatedSigner: PayrollSignerCandidate | null;

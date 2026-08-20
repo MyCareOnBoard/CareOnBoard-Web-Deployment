@@ -3,7 +3,7 @@ import { companyMutationTags, payrollTag, payrollScopeKey } from "./cacheTags";
 import type { AgencyPayrollBootstrapArgs, AgencyPayrollSetupProjection, AgencyPayrollSignerCandidates, AgencyPayrollSignerCandidatesArgs, ManagedEmployeePrimaryWorkplaceProjection, ManagedEmployeePrimaryWorkplaceScope, PayrollOperation, PayrollScope } from "../model/types";
 
 export type AgencyCompanyOnboardSessionArgs = PayrollScope & {
-  expectedProjectionRevision: number;
+  expectedCompanyOnboardRevision: number;
 };
 
 export type AgencyCompanyOnboardSession = { url: string; expiresAt: string };
@@ -28,7 +28,7 @@ export const agencyPayrollBootstrapRequest = (args: AgencyPayrollBootstrapArgs) 
 
 export const agencyCompanyOnboardSessionRequest = (args: AgencyCompanyOnboardSessionArgs) => ({
   ...agencyPayrollPaths.companyOnboardSession(),
-  data: { expectedProjectionRevision: args.expectedProjectionRevision },
+  data: { expectedCompanyOnboardRevision: args.expectedCompanyOnboardRevision },
 });
 
 export const agencyPayrollBootstrapInvalidationTags = (error: unknown, args: AgencyPayrollBootstrapArgs) => (
