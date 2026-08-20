@@ -28,6 +28,55 @@ describe("CheckOnboardModal", () => {
     expect(open).toHaveBeenCalledOnce();
     expect(screen.getByRole("button", { name: "Complete payroll onboarding" })).toHaveAttribute("aria-busy", "false");
   });
+  it("automatically consumes a key and opens one embedded session under Strict Mode", async () => {
+    const open = vi.fn(); const show = vi.fn(); const create = vi.fn(() => ({ open, _show: show, close: vi.fn() }));
+    const requestSession = vi.fn().mockResolvedValue({ link: "https://session.example/agency-a" });
+    const onAutoStartConsumed = vi.fn();
+    vi.spyOn(loader, "loadCheckOnboard").mockResolvedValue({ create });
+    const view = render(<StrictMode><CheckOnboardModal autoStartKey="setup:agency-a:3:1" onAutoStartConsumed={onAutoStartConsumed} requestSession={requestSession} onRefetch={vi.fn()} /></StrictMode>);
+
+    await waitFor(() => expect(open).toHaveBeenCalledOnce());
+    expect(onAutoStartConsumed).toHaveBeenCalledOnce();
+    expect(onAutoStartConsumed).toHaveBeenCalledWith("setup:agency-a:3:1");
+    expect(requestSession).toHaveBeenCalledOnce();
+    expect(create).toHaveBeenCalledOnce();
+    expect(show).toHaveBeenCalledOnce();
+
+    view.rerender(<StrictMode><CheckOnboardModal autoStartKey="setup:agency-a:3:1" onAutoStartConsumed={onAutoStartConsumed} requestSession={requestSession} onRefetch={vi.fn()} /></StrictMode>);
+    await act(async () => {});
+    expect(requestSession).toHaveBeenCalledOnce();
+    expect(create).toHaveBeenCalledOnce();
+    expect(open).toHaveBeenCalledOnce();
+    expect(show).toHaveBeenCalledOnce();
+  });
+  it("does not retry a failed automatic launch until the user clicks Continue", async () => {
+    const open = vi.fn(); const create = vi.fn(() => ({ open, close: vi.fn() }));
+    const requestSession = vi.fn().mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce({ link: "https://session.example/retry" });
+    vi.spyOn(loader, "loadCheckOnboard").mockResolvedValue({ create });
+    const user = userEvent.setup();
+    const view = render(<CheckOnboardModal autoStartKey="setup:agency-a:3:1" requestSession={requestSession} onRefetch={vi.fn()} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not be opened/i);
+    expect(requestSession).toHaveBeenCalledOnce();
+    view.rerender(<CheckOnboardModal autoStartKey="setup:agency-a:3:1" requestSession={requestSession} onRefetch={vi.fn()} />);
+    await act(async () => {});
+    expect(requestSession).toHaveBeenCalledOnce();
+
+    await user.click(screen.getByRole("button", { name: "Continue secure setup" }));
+    await waitFor(() => expect(open).toHaveBeenCalledOnce());
+    expect(requestSession).toHaveBeenCalledTimes(2);
+  });
+  it("does not open the SDK when a pending automatic request is torn down", async () => {
+    let resolveSession!: (value: { link: string }) => void;
+    const requestSession = vi.fn(() => new Promise<{ link: string }>((resolve) => { resolveSession = resolve; }));
+    const load = vi.spyOn(loader, "loadCheckOnboard");
+    render(<CheckOnboardModal autoStartKey="setup:agency-a:3:1" requestSession={requestSession} onRefetch={vi.fn()} />);
+
+    await waitFor(() => expect(requestSession).toHaveBeenCalledOnce());
+    act(() => clearPayrollOnboardSessions());
+    await act(async () => { resolveSession({ link: "https://session.example/late" }); });
+    expect(load).not.toHaveBeenCalled();
+  });
   it("shows an accessible retry error when a fresh session fails", async () => { const user = userEvent.setup(); render(<CheckOnboardModal requestSession={vi.fn().mockRejectedValue(new Error("no"))} onRefetch={vi.fn()} />); await user.click(screen.getByRole("button")); expect(await screen.findByRole("alert")).toHaveTextContent(/could not be opened/i); });
   it("ignores a session that resolves after unmount", async () => {
     let resolveSession!: (value: { link: string }) => void;

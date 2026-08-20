@@ -10,7 +10,9 @@ describe("useCheckOnboard", () => {
     const { result } = renderHook(() => useCheckOnboard(refetch));
     await act(() => result.current.open("https://session.example/one"));
     expect(create).toHaveBeenCalledWith(expect.objectContaining({ link: "https://session.example/one" })); expect(open).toHaveBeenCalledOnce();
-    options?.onEvent("check-onboard-app-completed", { untrusted: true }); expect(refetch).toHaveBeenCalledOnce();
+    options?.onEvent("check-onboard-app-completed", { untrusted: true });
+    expect(refetch).toHaveBeenCalledOnce();
+    expect(close).not.toHaveBeenCalled();
     act(() => result.current.close()); expect(close).toHaveBeenCalledOnce();
   });
   it("closes an expired session without opening it", async () => {
