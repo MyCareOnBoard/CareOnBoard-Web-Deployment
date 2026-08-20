@@ -3,7 +3,7 @@ import { Loader2 } from "lucide-react";
 import { useCheckOnboard } from "./useCheckOnboard";
 import { registerPayrollOnboardTeardown } from "./payrollOnboardSession";
 
-export function CheckOnboardModal({ requestSession, onRefetch, actionLabel = "Continue secure setup", openingLabel = "Opening secure setup...", launchMode = "embedded", autoStartKey, onAutoStartConsumed }: { requestSession: () => Promise<{ link: string; expiresAt?: string }>; onRefetch: () => void; actionLabel?: string; openingLabel?: string; launchMode?: "embedded" | "redirect"; autoStartKey?: string; onAutoStartConsumed?: (key: string) => void }) {
+export function CheckOnboardModal({ requestSession, onRefetch, actionLabel = "Continue secure setup", openingLabel = "Opening secure setup...", launchMode = "embedded", autoStartKey, onAutoStartConsumed, cancelPending = false }: { requestSession: () => Promise<{ link: string; expiresAt?: string }>; onRefetch: () => void; actionLabel?: string; openingLabel?: string; launchMode?: "embedded" | "redirect"; autoStartKey?: string; onAutoStartConsumed?: (key: string) => void; cancelPending?: boolean }) {
   const trigger = useRef<HTMLButtonElement>(null);
   const starting = useRef(false);
   const mounted = useRef(true);
@@ -15,8 +15,10 @@ export function CheckOnboardModal({ requestSession, onRefetch, actionLabel = "Co
   const [autoStartTick, setAutoStartTick] = useState(0);
   useLayoutEffect(() => { onRefetchRef.current = onRefetch; }, [onRefetch]);
   const handleClosed = useCallback(() => { onRefetchRef.current(); if (mounted.current) trigger.current?.focus(); }, []);
-  const { open, busy: sdkBusy } = useCheckOnboard(onRefetch, handleClosed);
+  const { open, cancelPending: cancelPendingOpen, busy: sdkBusy } = useCheckOnboard(onRefetch, handleClosed);
   const busy = requesting || sdkBusy;
+
+  useLayoutEffect(() => { if (cancelPending) cancelPendingOpen(); }, [cancelPending, cancelPendingOpen]);
 
   useLayoutEffect(() => {
     mounted.current = true;

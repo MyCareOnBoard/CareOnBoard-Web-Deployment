@@ -11,7 +11,7 @@ const bootstrapSetup = vi.fn();
 const createCompanyOnboardSession = vi.fn();
 const getOperation = vi.fn();
 const getOverview = vi.fn();
-const mocks = vi.hoisted(() => ({ signerSearchTrigger: vi.fn(), newCommandKey: vi.fn(), requireCurrentProjection: vi.fn(), createCheckOnboard: vi.fn(), openCheckOnboard: vi.fn(), showCheckOnboard: vi.fn(), closeCheckOnboard: vi.fn() }));
+const mocks = vi.hoisted(() => ({ signerSearchTrigger: vi.fn(), newCommandKey: vi.fn(), requireCurrentProjection: vi.fn(), loadCheckOnboard: vi.fn(), createCheckOnboard: vi.fn(), openCheckOnboard: vi.fn(), showCheckOnboard: vi.fn(), closeCheckOnboard: vi.fn() }));
 let setupQuery: { data?: AgencyPayrollSetupProjection; isLoading?: boolean; isFetching?: boolean; error?: unknown; refetch: typeof refetch };
 const signerCandidatesQuery = { data: { ownerCandidate: { userUid: "verified-owner", fullName: "Ada Owner", email: "ada@able.example", title: "Owner", identityVersion: `check_signer_v1_${"a".repeat(64)}`, designated: false }, staffCandidates: [] }, isLoading: false, isError: false };
 
@@ -27,7 +27,7 @@ vi.mock("@/features/payroll/api/agencyPayrollEndpoints", () => ({
 }));
 vi.mock("@/features/payroll/api/payrollCommands", () => ({ useRunAgencyPayrollCommandMutation: () => [runCommand], newIdempotencyKey: mocks.newCommandKey }));
 vi.mock("@/features/payroll/hooks/useProjectionFreshness", () => ({ useProjectionFreshness: () => ({ requireCurrentProjection: mocks.requireCurrentProjection }) }));
-vi.mock("@/features/payroll/onboard/loadCheckOnboard", () => ({ loadCheckOnboard: () => Promise.resolve({ create: mocks.createCheckOnboard }) }));
+vi.mock("@/features/payroll/onboard/loadCheckOnboard", () => ({ loadCheckOnboard: mocks.loadCheckOnboard }));
 
 type TestCapabilities = Omit<AgencyPayrollSetupProjection["capabilities"], "canSubmitCompanyImplementation" | "canRetryCompanySync" | "canRefreshCompanyReconciliation"> & Partial<Pick<AgencyPayrollSetupProjection["capabilities"], "canSubmitCompanyImplementation" | "canRetryCompanySync" | "canRefreshCompanyReconciliation">>;
 const projection = (capabilities: TestCapabilities, designatedSignerPresent = false, signerCandidate: AgencyPayrollSetupProjection["setup"]["signerCandidate"] = { userUid: "verified-owner", fullName: "Ada Owner", email: "ada@able.example", title: "Owner", identityVersion: `check_signer_v1_${"a".repeat(64)}`, designated: designatedSignerPresent }, companyOnboardRevision: number | null = null): AgencyPayrollSetupProjection => ({
@@ -77,7 +77,7 @@ async function completeDirectSetup(returned: AgencyPayrollSetupProjection, rende
 }
 
 describe("AgencyPayrollSetupTab", () => {
-  beforeEach(() => { vi.restoreAllMocks(); documentVisibility = "visible"; vi.spyOn(document, "visibilityState", "get").mockImplementation(() => documentVisibility); refetch.mockReset(); runCommand.mockReset(); loadSetup.mockReset(); bootstrapSetup.mockReset(); createCompanyOnboardSession.mockReset(); getOperation.mockReset(); getOverview.mockReset(); mocks.signerSearchTrigger.mockReset(); mocks.newCommandKey.mockReset(); mocks.requireCurrentProjection.mockReset(); mocks.createCheckOnboard.mockReset(); mocks.openCheckOnboard.mockReset(); mocks.showCheckOnboard.mockReset(); mocks.closeCheckOnboard.mockReset(); mocks.createCheckOnboard.mockReturnValue({ open: mocks.openCheckOnboard, _show: mocks.showCheckOnboard, close: mocks.closeCheckOnboard }); mocks.newCommandKey.mockReturnValue("00000000-0000-4000-8000-000000000001"); mocks.requireCurrentProjection.mockResolvedValue(true); setupQuery = { error: true, refetch }; });
+  beforeEach(() => { vi.restoreAllMocks(); documentVisibility = "visible"; vi.spyOn(document, "visibilityState", "get").mockImplementation(() => documentVisibility); refetch.mockReset(); runCommand.mockReset(); loadSetup.mockReset(); bootstrapSetup.mockReset(); createCompanyOnboardSession.mockReset(); getOperation.mockReset(); getOverview.mockReset(); mocks.signerSearchTrigger.mockReset(); mocks.newCommandKey.mockReset(); mocks.requireCurrentProjection.mockReset(); mocks.loadCheckOnboard.mockReset(); mocks.createCheckOnboard.mockReset(); mocks.openCheckOnboard.mockReset(); mocks.showCheckOnboard.mockReset(); mocks.closeCheckOnboard.mockReset(); mocks.loadCheckOnboard.mockResolvedValue({ create: mocks.createCheckOnboard }); mocks.createCheckOnboard.mockReturnValue({ open: mocks.openCheckOnboard, _show: mocks.showCheckOnboard, close: mocks.closeCheckOnboard }); mocks.newCommandKey.mockReturnValue("00000000-0000-4000-8000-000000000001"); mocks.requireCurrentProjection.mockResolvedValue(true); setupQuery = { error: true, refetch }; });
 
   it("offers an accessible retry that refetches setup", async () => {
     const user = userEvent.setup(); render(<AgencyPayrollSetupTab scope={scope} />);
@@ -664,6 +664,26 @@ describe("AgencyPayrollSetupTab", () => {
     else view.rerender(<AgencyPayrollSetupTab scope={scope} active={false} />);
     await act(async () => { resolveSession({ url: `https://onboard.example/${retirement}`, expiresAt: new Date(Date.now() + 60_000).toISOString() }); });
     expect(mocks.openCheckOnboard).not.toHaveBeenCalled();
+  });
+
+  it("retires SDK construction when visibility changes after an automatic session resolves", async () => {
+    let resolveLoader!: (value: { create: typeof mocks.createCheckOnboard }) => void;
+    const waiting = onboardProjection({ clientRevalidateAfter: new Date(Date.now() + 60_000).toISOString() });
+    const { view } = await completeDirectSetup(waiting);
+    setupQuery = { data: waiting, refetch };
+    view.rerender(<AgencyPayrollSetupTab scope={scope} />);
+    mocks.loadCheckOnboard.mockReturnValue(new Promise((resolve) => { resolveLoader = resolve; }));
+    createCompanyOnboardSession.mockReturnValue({ unwrap: () => Promise.resolve({ url: "https://onboard.example/pending-sdk", expiresAt: new Date(Date.now() + 60_000).toISOString() }) });
+    setupQuery = { data: onboardProjection({ capability: true }), refetch };
+    view.rerender(<AgencyPayrollSetupTab scope={scope} />);
+    await waitFor(() => expect(mocks.loadCheckOnboard).toHaveBeenCalledOnce());
+
+    act(() => setDocumentVisibility("hidden"));
+    await act(async () => { resolveLoader({ create: mocks.createCheckOnboard }); });
+
+    expect(mocks.createCheckOnboard).not.toHaveBeenCalled();
+    expect(mocks.openCheckOnboard).not.toHaveBeenCalled();
+    expect(mocks.showCheckOnboard).not.toHaveBeenCalled();
   });
 
   it("does not close an opened onboarding session when the document becomes hidden", async () => {

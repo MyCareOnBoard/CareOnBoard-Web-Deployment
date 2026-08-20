@@ -104,6 +104,31 @@ describe("CheckOnboardModal", () => {
     await act(async () => { resolveSession({ link: "https://session.example/late" }); });
     expect(load).not.toHaveBeenCalled();
   });
+  it.each(["automatic", "manual"] as const)("retires a pending SDK load for a %s launch without constructing the SDK", async (launch) => {
+    let resolveLoader!: (value: Awaited<ReturnType<typeof loader.loadCheckOnboard>>) => void;
+    const open = vi.fn();
+    const show = vi.fn();
+    const create = vi.fn(() => ({ open, _show: show, close: vi.fn() }));
+    const load = vi.spyOn(loader, "loadCheckOnboard").mockReturnValue(new Promise((resolve) => { resolveLoader = resolve; }));
+    const requestSession = vi.fn().mockResolvedValue({ link: "https://session.example/pending-sdk" });
+    const renderModal = (cancelPending: boolean) => <CheckOnboardModal
+      {...(launch === "automatic" ? { autoStartKey: "setup:agency-a:3:1" } : {})}
+      cancelPending={cancelPending}
+      requestSession={requestSession}
+      onRefetch={vi.fn()}
+    />;
+    const view = render(renderModal(false));
+
+    if (launch === "manual") await userEvent.setup().click(screen.getByRole("button", { name: "Continue secure setup" }));
+    await waitFor(() => expect(load).toHaveBeenCalledOnce());
+    view.rerender(renderModal(true));
+    await act(async () => { resolveLoader({ create }); });
+
+    expect(requestSession).toHaveBeenCalledOnce();
+    expect(create).not.toHaveBeenCalled();
+    expect(open).not.toHaveBeenCalled();
+    expect(show).not.toHaveBeenCalled();
+  });
   it("shows an accessible retry error when a fresh session fails", async () => { const user = userEvent.setup(); render(<CheckOnboardModal requestSession={vi.fn().mockRejectedValue(new Error("no"))} onRefetch={vi.fn()} />); await user.click(screen.getByRole("button")); expect(await screen.findByRole("alert")).toHaveTextContent(/could not be opened/i); });
   it("ignores a session that resolves after unmount", async () => {
     let resolveSession!: (value: { link: string }) => void;
