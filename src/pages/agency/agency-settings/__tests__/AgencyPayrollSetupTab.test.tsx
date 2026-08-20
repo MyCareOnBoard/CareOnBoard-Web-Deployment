@@ -549,6 +549,29 @@ describe("AgencyPayrollSetupTab", () => {
     expect(createCompanyOnboardSession).toHaveBeenCalledWith({ ...scope, expectedCompanyOnboardRevision: 3 });
   });
 
+  it("refreshes company reconciliation once when agency onboarding genuinely closes", async () => {
+    let onClose!: () => void;
+    setupQuery = { data: onboardProjection({ capability: true }), refetch };
+    createCompanyOnboardSession.mockReturnValue({ unwrap: () => Promise.resolve({ url: "https://onboard.example/company", expiresAt: new Date(Date.now() + 60_000).toISOString() }) });
+    mocks.createCheckOnboard.mockImplementation((options) => {
+      onClose = options.onClose;
+      return { open: mocks.openCheckOnboard, _show: mocks.showCheckOnboard, close: mocks.closeCheckOnboard };
+    });
+    const user = userEvent.setup();
+    render(<AgencyPayrollSetupTab scope={scope} />);
+
+    await user.click(await screen.findByRole("button", { name: "Complete payroll onboarding" }));
+    await waitFor(() => expect(onClose).toBeTypeOf("function"));
+    act(() => onClose());
+
+    await waitFor(() => expect(runCommand).toHaveBeenCalledWith(expect.objectContaining({
+      ...scope,
+      command: "refresh_company_reconciliation",
+      projectionRevision: 4,
+    })));
+    expect(runCommand).toHaveBeenCalledOnce();
+  });
+
   it("auto-opens once when this actor's successful setup reaches the matching onboarding milestone", async () => {
     const waiting = onboardProjection({ clientRevalidateAfter: new Date(Date.now() + 60_000).toISOString() });
     const { view } = await completeDirectSetup(waiting);

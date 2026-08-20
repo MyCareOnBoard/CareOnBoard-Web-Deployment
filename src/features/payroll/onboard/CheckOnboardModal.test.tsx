@@ -338,16 +338,22 @@ describe("CheckOnboardModal", () => {
     expect(onRefetch).not.toHaveBeenCalled();
     expect(button).not.toHaveFocus();
   });
-  it("restores focus and refetches when the SDK closes", async () => {
+  it("refetches for SDK progress but invokes onClosed once only for a genuine SDK close", async () => {
     let onClose!: () => void;
-    vi.spyOn(loader, "loadCheckOnboard").mockResolvedValue({ create: vi.fn((options) => { onClose = options.onClose; return { open: vi.fn(), close: vi.fn() }; }) });
-    const onRefetch = vi.fn(); const user = userEvent.setup(); render(<CheckOnboardModal requestSession={vi.fn().mockResolvedValue({ link: "https://session.example/fresh" })} onRefetch={onRefetch} />);
+    let onEvent!: () => void;
+    vi.spyOn(loader, "loadCheckOnboard").mockResolvedValue({ create: vi.fn((options) => { onClose = options.onClose; onEvent = options.onEvent; return { open: vi.fn(), close: vi.fn() }; }) });
+    const onRefetch = vi.fn(); const onClosed = vi.fn(); const user = userEvent.setup(); render(<CheckOnboardModal requestSession={vi.fn().mockResolvedValue({ link: "https://session.example/fresh" })} onRefetch={onRefetch} onClosed={onClosed} />);
     const button = screen.getByRole("button", { name: /continue secure setup/i });
     await user.click(button); await vi.waitFor(() => expect(onClose).toBeTypeOf("function"));
     await vi.waitFor(() => expect(button).toHaveAttribute("aria-busy", "false"));
     button.blur(); expect(button).not.toHaveFocus();
+    act(() => onEvent());
+    expect(onRefetch).toHaveBeenCalledOnce();
+    expect(onClosed).not.toHaveBeenCalled();
+    act(() => onClose());
     act(() => onClose());
     expect(button).toHaveFocus();
-    expect(onRefetch).toHaveBeenCalledOnce();
+    expect(onRefetch).toHaveBeenCalledTimes(2);
+    expect(onClosed).toHaveBeenCalledOnce();
   });
 });

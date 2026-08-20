@@ -53,6 +53,7 @@ export function CheckOnboardModal({
   launchMode = "embedded",
   autoStartKey,
   onAutoStartConsumed,
+  onClosed,
   cancelPending = false,
   loadingDialog,
 }: {
@@ -63,6 +64,7 @@ export function CheckOnboardModal({
   launchMode?: "embedded" | "redirect";
   autoStartKey?: string;
   onAutoStartConsumed?: (key: string) => void;
+  onClosed?: () => void;
   cancelPending?: boolean;
   loadingDialog?: CheckOnboardLoadingDialogConfig;
 }) {
@@ -74,13 +76,16 @@ export function CheckOnboardModal({
   const restoreTriggerAfterDialogRef = useRef(false);
   const pendingDialogErrorRef = useRef<string | null>(null);
   const onRefetchRef = useRef(onRefetch);
+  const onClosedRef = useRef(onClosed);
   const [error, setError] = useState<string | null>(null);
   const [launchPhase, setLaunchPhase] = useState<LaunchPhase>("idle");
   const [autoStartTick, setAutoStartTick] = useState(0);
 
   useLayoutEffect(() => { onRefetchRef.current = onRefetch; }, [onRefetch]);
+  useLayoutEffect(() => { onClosedRef.current = onClosed; }, [onClosed]);
   const handleClosed = useCallback(() => {
     onRefetchRef.current();
+    onClosedRef.current?.();
     if (mounted.current) trigger.current?.focus();
   }, []);
   const { open, cancelPending: cancelPendingOpen, busy: sdkBusy } = useCheckOnboard(onRefetch, handleClosed);
