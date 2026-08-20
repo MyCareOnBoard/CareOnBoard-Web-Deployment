@@ -49,6 +49,33 @@ describe("CheckOnboardModal", () => {
     expect(open).toHaveBeenCalledOnce();
     expect(show).toHaveBeenCalledOnce();
   });
+  it("keeps a newer automatic key pending until the active launch settles", async () => {
+    let resolveFirst!: (value: { link: string }) => void;
+    const open = vi.fn(); const create = vi.fn(() => ({ open, close: vi.fn() }));
+    const requestSession = vi.fn(() => Promise.resolve({ link: "https://session.example/default" }));
+    requestSession.mockImplementationOnce(() => new Promise<{ link: string }>((resolve) => { resolveFirst = resolve; }));
+    requestSession.mockResolvedValueOnce({ link: "https://session.example/agency-b" });
+    const onAutoStartConsumed = vi.fn();
+    vi.spyOn(loader, "loadCheckOnboard").mockResolvedValue({ create });
+    const view = render(<CheckOnboardModal autoStartKey="setup:agency-a:3:1" onAutoStartConsumed={onAutoStartConsumed} requestSession={requestSession} onRefetch={vi.fn()} />);
+
+    await waitFor(() => expect(requestSession).toHaveBeenCalledOnce());
+    expect(onAutoStartConsumed).toHaveBeenCalledWith("setup:agency-a:3:1");
+    view.rerender(<CheckOnboardModal autoStartKey="setup:agency-b:3:1" onAutoStartConsumed={onAutoStartConsumed} requestSession={requestSession} onRefetch={vi.fn()} />);
+    await act(async () => {});
+    expect(onAutoStartConsumed).toHaveBeenCalledOnce();
+    expect(requestSession).toHaveBeenCalledOnce();
+
+    await act(async () => { resolveFirst({ link: "https://session.example/agency-a" }); });
+    await waitFor(() => expect(requestSession).toHaveBeenCalledTimes(2));
+    expect(onAutoStartConsumed).toHaveBeenNthCalledWith(2, "setup:agency-b:3:1");
+    await waitFor(() => expect(open).toHaveBeenCalledTimes(2));
+
+    view.rerender(<CheckOnboardModal autoStartKey="setup:agency-b:3:1" onAutoStartConsumed={onAutoStartConsumed} requestSession={requestSession} onRefetch={vi.fn()} />);
+    await act(async () => {});
+    expect(requestSession).toHaveBeenCalledTimes(2);
+    expect(onAutoStartConsumed).toHaveBeenCalledTimes(2);
+  });
   it("does not retry a failed automatic launch until the user clicks Continue", async () => {
     const open = vi.fn(); const create = vi.fn(() => ({ open, close: vi.fn() }));
     const requestSession = vi.fn().mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce({ link: "https://session.example/retry" });

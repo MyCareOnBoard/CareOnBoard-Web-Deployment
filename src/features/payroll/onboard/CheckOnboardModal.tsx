@@ -12,6 +12,7 @@ export function CheckOnboardModal({ requestSession, onRefetch, actionLabel = "Co
   const onRefetchRef = useRef(onRefetch);
   const [error, setError] = useState<string | null>(null);
   const [requesting, setRequesting] = useState(false);
+  const [autoStartTick, setAutoStartTick] = useState(0);
   useLayoutEffect(() => { onRefetchRef.current = onRefetch; }, [onRefetch]);
   const handleClosed = useCallback(() => { onRefetchRef.current(); if (mounted.current) trigger.current?.focus(); }, []);
   const { open, busy: sdkBusy } = useCheckOnboard(onRefetch, handleClosed);
@@ -23,39 +24,50 @@ export function CheckOnboardModal({ requestSession, onRefetch, actionLabel = "Co
     return () => { mounted.current = false; generation.current += 1; unregister(); };
   }, []);
 
-  const continueOnboard = useCallback(async () => {
-    if (starting.current) return;
+  const continueOnboard = useCallback((onAccepted?: () => void) => {
+    if (starting.current) return false;
     starting.current = true;
+    onAccepted?.();
     setRequesting(true);
     setError(null);
     const current = ++generation.current;
-    try {
-      const session = await requestSession();
-      if (!mounted.current || generation.current !== current) return;
-      if (launchMode === "redirect") {
-        window.location.assign(session.link);
-        return;
+    void (async () => {
+      try {
+        const session = await requestSession();
+        if (!mounted.current || generation.current !== current) return;
+        if (launchMode === "redirect") {
+          window.location.assign(session.link);
+          return;
+        }
+        await open(session.link, session.expiresAt);
+      } catch {
+        if (mounted.current) {
+          setError("Secure setup could not be opened. Please try again.");
+          trigger.current?.focus();
+        }
+      } finally {
+        starting.current = false;
+        if (mounted.current) {
+          setRequesting(false);
+          if (generation.current === current) setAutoStartTick((tick) => tick + 1);
+        }
       }
-      await open(session.link, session.expiresAt);
-    } catch {
-      if (mounted.current) {
-        setError("Secure setup could not be opened. Please try again.");
-        trigger.current?.focus();
-      }
-    } finally {
-      starting.current = false;
-      if (mounted.current) setRequesting(false);
-    }
+    })();
+    return true;
   }, [launchMode, open, requestSession]);
 
   useEffect(() => {
     if (!autoStartKey || autoStartedKeyRef.current === autoStartKey) return;
-    autoStartedKeyRef.current = autoStartKey;
-    onAutoStartConsumed?.(autoStartKey);
+    let cancelled = false;
     queueMicrotask(() => {
-      if (mounted.current) void continueOnboard();
+      if (cancelled || !mounted.current || autoStartedKeyRef.current === autoStartKey) return;
+      continueOnboard(() => {
+        autoStartedKeyRef.current = autoStartKey;
+        onAutoStartConsumed?.(autoStartKey);
+      });
     });
-  }, [autoStartKey, continueOnboard, onAutoStartConsumed]);
+    return () => { cancelled = true; };
+  }, [autoStartKey, autoStartTick, continueOnboard, onAutoStartConsumed]);
 
   return <div className="space-y-2"><button ref={trigger} type="button" disabled={busy} aria-busy={busy} onClick={() => void continueOnboard()} className="inline-flex min-h-11 items-center justify-center rounded-md bg-[#006f73] px-4 py-2 text-sm font-medium text-white hover:bg-[#00595c] disabled:opacity-60">{busy ? <span role="status" className="inline-flex items-center gap-2"><Loader2 aria-hidden="true" className="h-4 w-4 motion-safe:animate-spin" />{openingLabel}</span> : actionLabel}</button>{error && <p role="alert" className="text-sm text-[#8b2d2d]">{error}</p>}</div>;
 }
