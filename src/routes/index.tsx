@@ -32,7 +32,9 @@ const ApplicantDashboardLayout = lazy(() => import("@/layouts/ApplicantDashboard
 const OnboardingLayout = lazy(() => import("@/layouts/OnboardingLayout"));
 const UserPanelDashboardLayout = lazy(() => import("@/layouts/UserPanelLayout"));
 const AgencyDashboardLayout = lazy(() => import("@/layouts/AgencyLayout"));
-const MyPayrollPage = lazy(() => import("@/features/payroll/pages/MyPayrollPage"));
+const MyPayrollPage = lazy(() =>
+    import("@/features/payroll/pages/MyPayrollPage").then((module) => ({ default: module.MyPayrollPage }))
+);
 const UserPanelDashboard = lazy(() => import("@/pages/userPanel/dashboard"));
 const UserPanelMileage = lazy(() => import("@/pages/userPanel/mileage"));
 const UserPanelIncidentPage = lazy(() => import("@/pages/userPanel/incident"));

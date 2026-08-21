@@ -36,6 +36,13 @@ function findRoute(path: string) {
   }
   return undefined;
 }
+
+function getRouteComponent(route: unknown) {
+  if (typeof route !== "object" || route === null || !("Component" in route)) {
+    throw new Error("Expected a route with a Component");
+  }
+  return route.Component;
+}
 vi.mock("@/components/AnnouncementBanner", () => ({ default: () => null }));
 vi.mock("@/hooks/useSidebarCollapsed", () => ({
   useSidebarCollapsed: () => [false],
@@ -85,7 +92,9 @@ describe("field staff header role", () => {
   });
 
   it("registers employee and agency My Payroll routes with the same lazy page module", () => {
-    expect(findRoute("/user-panel/payroll")?.Component).toBe(findRoute("/agency/my-payroll")?.Component);
+    expect(getRouteComponent(findRoute("/user-panel/payroll"))).toBe(
+      getRouteComponent(findRoute("/agency/my-payroll")),
+    );
   });
 
   it("labels an HHA applicant as Caregiver", () => {

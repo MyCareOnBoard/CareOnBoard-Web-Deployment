@@ -18,6 +18,7 @@ export type NavItem = {
   path?: string;
   icon: ComponentType<{ className?: string }>;
   accessKey?: string;
+  staffOnly?: boolean;
   children?: NavSubItem[];
 };
 

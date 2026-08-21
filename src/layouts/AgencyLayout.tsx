@@ -57,8 +57,8 @@ function hasAgencyStaffAccess(accessList: string[], accessKey: string | undefine
     return false;
 }
 
-/** Extended NavItem with optional program-type and staff-only restrictions. */
-type AgencyNavItem = NavItem & { programTypes?: AgencyMode[]; staffOnly?: boolean };
+/** Extended NavItem with an optional program-type restriction. */
+type AgencyNavItem = NavItem & { programTypes?: AgencyMode[] };
 
 function filterNavItemsByAccess(items: AgencyNavItem[], userType: UserType | undefined, accessList?: string[]): AgencyNavItem[] {
     if (userType === UserType.AGENCY) {
