@@ -23,6 +23,7 @@ export const employeePayrollPaths = {
   setup: (employmentId: string) => ({ url: `/checkPayrollEmployee/payroll/employees/${encodeURIComponent(employmentId)}/setup`, method: "GET" as const, requiresAuth: true }),
   commands: (employmentId: string) => ({ url: `/checkPayrollEmployee/payroll/employees/${encodeURIComponent(employmentId)}/commands`, method: "POST" as const, requiresAuth: true }),
   onboardSession: (employmentId: string) => ({ url: `/checkPayrollEmployeeOnboard/payroll/employees/${encodeURIComponent(employmentId)}/onboard-session`, method: "POST" as const, requiresAuth: true }),
+  onboardReconciliation: (employmentId: string) => ({ url: `/checkPayrollEmployeeOnboard/payroll/employees/${encodeURIComponent(employmentId)}/onboard-reconciliation`, method: "POST" as const, requiresAuth: true }),
 };
 
 export const employeePayrollCommandRequest = (args: EmployeePayrollCommandArgs) => ({
@@ -38,6 +39,11 @@ export const employeePayrollCommandRequest = (args: EmployeePayrollCommandArgs) 
 export const employeeOnboardSessionRequest = (args: EmployeeOnboardSessionArgs) => ({
   ...employeePayrollPaths.onboardSession(args.employmentId),
   data: { expectedProjectionRevision: args.projectionRevision },
+});
+
+export const employeeOnboardReconciliationRequest = (args: EmployeePayrollScope) => ({
+  ...employeePayrollPaths.onboardReconciliation(args.employmentId),
+  data: {},
 });
 
 export const employeePayrollMutationTags = (scope: EmployeePayrollScope) => employeeSetupMutationTags(scope);
@@ -59,6 +65,9 @@ export const employeePayrollApi = checkPayrollApi.injectEndpoints({
       query: employeeOnboardSessionRequest,
       invalidatesTags: employeeOnboardSessionInvalidationTags,
     }),
+    reconcileEmployeeOnboard: build.mutation<EmployeePayrollSetupProjection, EmployeePayrollScope>({
+      query: employeeOnboardReconciliationRequest,
+    }),
   }),
 });
 
@@ -67,4 +76,5 @@ export const {
   useLazyGetEmployeePayrollSetupQuery,
   useRunEmployeePayrollCommandMutation,
   useCreateEmployeeOnboardSessionMutation,
+  useReconcileEmployeeOnboardMutation,
 } = employeePayrollApi;

@@ -1,8 +1,9 @@
 import { configureStore } from "@reduxjs/toolkit";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { employeePayrollApi } from "../api/employeePayrollEndpoints";
 import type { EmployeePayrollSetupProjection, EmployeePayrollScope } from "../model/types";
 
 const testState = vi.hoisted(() => ({
@@ -11,7 +12,20 @@ const testState = vi.hoisted(() => ({
   commandResponse: { data: { operationId: "operation-1", state: "accepted", resourceType: "employee", pollAfterMs: null } } as unknown,
   commandResponses: [] as Array<Promise<unknown> | unknown>,
   onboardResponse: { data: { url: "https://onboard.example/session", expiresAt: "2099-01-01T00:00:00.000Z" } } as unknown,
-  modalProps: null as null | { requestSession: () => Promise<{ link: string; expiresAt?: string }>; onRefetch: () => void },
+  reconcileResponse: null as unknown,
+  modalProps: null as null | {
+    requestSession: () => Promise<{ link: string; expiresAt?: string }>;
+    onRefetch: () => unknown;
+    onClosed?: (refetchedSetup: unknown) => unknown;
+    actionLabel?: string;
+    autoStartKey?: string;
+    onAutoStartConsumed?: (key: string) => void;
+    cancelPending?: boolean;
+    loadingDialog?: {
+      preparing: { title: string; description: string };
+      opening: { title: string; description: string };
+    };
+  },
   modalModuleLoads: 0,
   modalRenders: 0,
   documentFocused: true,
@@ -25,6 +39,7 @@ vi.mock("@/lib/baseQuery", () => ({
       return next instanceof Promise ? await next : next;
     }
     if (args.url.endsWith("/onboard-session")) return testState.onboardResponse;
+    if (args.url.endsWith("/onboard-reconciliation")) return testState.reconcileResponse;
     const next = testState.commandResponses.shift() ?? testState.commandResponse;
     return next instanceof Promise ? await next : next;
   },
@@ -33,10 +48,22 @@ vi.mock("@/lib/baseQuery", () => ({
 vi.mock("../onboard/CheckOnboardModal", () => {
   testState.modalModuleLoads += 1;
   return {
-    CheckOnboardModal: (props: { requestSession: () => Promise<{ link: string; expiresAt?: string }>; onRefetch: () => void }) => {
+    CheckOnboardModal: (props: {
+      requestSession: () => Promise<{ link: string; expiresAt?: string }>;
+      onRefetch: () => unknown;
+      onClosed?: (refetchedSetup: unknown) => unknown;
+      actionLabel?: string;
+      autoStartKey?: string;
+      onAutoStartConsumed?: (key: string) => void;
+      cancelPending?: boolean;
+      loadingDialog?: {
+        preparing: { title: string; description: string };
+        opening: { title: string; description: string };
+      };
+    }) => {
       testState.modalProps = props;
       testState.modalRenders += 1;
-      return <button type="button" onClick={() => void props.requestSession()}>Continue secure setup</button>;
+      return <button type="button" onClick={() => void props.requestSession()}>{props.actionLabel ?? "Continue secure setup"}</button>;
     },
   };
 });
@@ -100,6 +127,7 @@ describe("MyPayrollTab", () => {
     testState.commandResponse = { data: { operationId: "operation-1", state: "accepted", resourceType: "employee", pollAfterMs: null } };
     testState.commandResponses = [];
     testState.onboardResponse = { data: { url: "https://onboard.example/session", expiresAt: "2099-01-01T00:00:00.000Z" } };
+    testState.reconcileResponse = null;
     testState.modalProps = null;
     testState.modalRenders = 0;
     testState.documentFocused = true;
@@ -136,6 +164,7 @@ describe("MyPayrollTab", () => {
     testState.getResponses.push(new Promise(() => {}));
     renderPayroll();
     expect(screen.getByRole("status", { name: /loading payroll setup/i })).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByLabelText("Loading settings").children).toHaveLength(1);
     expect(screen.queryByRole("heading", { name: "My Payroll" })).not.toBeInTheDocument();
   });
 
@@ -146,8 +175,19 @@ describe("MyPayrollTab", () => {
     })));
     renderPayroll();
     expect(await screen.findByText("Your agency must complete Payroll Setup before you can start your personal payroll setup.")).toBeVisible();
+    const steps = within(screen.getByRole("list", { name: "Payroll setup progress" })).getAllByRole("listitem");
+    expect(steps).toHaveLength(3);
+    expect(steps.map((step) => within(step).getByRole("heading", { level: 3 }).textContent)).toEqual([
+      "Agency payroll connection",
+      "Employee payroll record",
+      "Payment and tax onboarding",
+    ]);
+    expect(steps[0]).toHaveAttribute("aria-current", "step");
+    expect(within(steps[0]).getByText("Waiting on agency")).toBeVisible();
+    expect(within(steps[1]).getByText("Upcoming")).toBeVisible();
+    expect(within(steps[2]).getByText("Upcoming")).toBeVisible();
     expect(screen.queryByRole("button", { name: /start payroll setup|continue secure setup|create payroll/i })).not.toBeInTheDocument();
-    expect(screen.queryByText(/ssn|social security|date of birth|bank account|tax/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/ssn|social security|date of birth|bank account/i)).not.toBeInTheDocument();
   });
 
   it("scans first, then collects only missing identity details before starting payroll", async () => {
@@ -161,7 +201,7 @@ describe("MyPayrollTab", () => {
     await user.click(await screen.findByRole("button", { name: "Start payroll setup" }));
     expect(await screen.findByRole("dialog")).toBeVisible();
     expect(screen.getByLabelText("Legal name")).toHaveFocus();
-    expect(screen.queryByText(/ssn|social security|date of birth|bank|tax|address/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/ssn|social security|date of birth|bank|tax|address/i)).not.toBeInTheDocument();
     await user.type(screen.getByLabelText("Legal name"), "Ada Lovelace");
     await user.click(screen.getByRole("button", { name: "Remove email" }));
     await user.click(screen.getByRole("button", { name: "Start payroll setup" }));
@@ -204,6 +244,7 @@ describe("MyPayrollTab", () => {
     renderPayroll();
     expect(await screen.findByText(/choose a primary work location/i)).toBeVisible();
     expect(screen.getByText(/needs attention from your agency/i)).toBeVisible();
+    expect(screen.getByRole("list", { name: "Payroll setup blockers" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Retry payroll setup" })).toBeEnabled();
     expect(screen.queryByRole("button", { name: "Start payroll setup" })).not.toBeInTheDocument();
   });
@@ -327,57 +368,129 @@ describe("MyPayrollTab", () => {
     await act(async () => { resolveCurrentCommand({ data: { operationId: "operation-2", state: "accepted", resourceType: "employee", pollAfterMs: null } }); });
   });
 
-  it("defers the Onboard module and session until the user continues, then coalesces event bursts", async () => {
-    let resolveFirst!: (value: unknown) => void;
-    let resolveSecond!: (value: unknown) => void;
+  it("keeps an initially ready setup manual and configures the employee onboarding loader", async () => {
     testState.getResponses.push(
       readyResponse(projection({ setup: { state: "ready", blockers: [], onboardingStatus: "blocking", blockingStepCodes: [], remainingStepCodes: [] } })),
-      new Promise((resolve) => { resolveFirst = resolve; }),
-      new Promise((resolve) => { resolveSecond = resolve; }),
     );
     const user = userEvent.setup();
     renderPayroll();
-    expect(await screen.findByRole("button", { name: "Continue secure setup" })).toBeVisible();
-    expect(testState.modalModuleLoads).toBe(0);
-    expect(testState.modalRenders).toBe(0);
+    expect(await screen.findByRole("button", { name: "Continue payroll setup" })).toBeVisible();
+    await waitFor(() => expect(testState.modalProps).not.toBeNull());
+    expect(testState.modalModuleLoads).toBe(1);
+    expect(testState.modalProps?.autoStartKey).toBeUndefined();
+    expect(testState.modalProps?.loadingDialog).toEqual({
+      preparing: {
+        title: "Preparing your payroll onboarding",
+        description: "Creating a secure session with Check. Your setup will open automatically.",
+      },
+      opening: {
+        title: "Opening your payroll onboarding",
+        description: "Your secure session is ready. Connecting you to Check now.",
+      },
+    });
     expect(sessionRequests()).toHaveLength(0);
-    await user.click(screen.getByRole("button", { name: "Continue secure setup" }));
-    await waitFor(() => expect(testState.modalModuleLoads).toBe(1));
-    expect(testState.modalRenders).toBe(1);
-    expect(sessionRequests()).toHaveLength(0);
-    await user.click(await screen.findByRole("button", { name: "Continue secure setup" }));
+    await user.click(screen.getByRole("button", { name: "Continue payroll setup" }));
     expect(sessionRequests()).toHaveLength(1);
-    expect(testState.modalProps).not.toBeNull();
     act(() => {
       testState.modalProps?.onRefetch();
       testState.modalProps?.onRefetch();
       testState.modalProps?.onRefetch();
     });
-    await waitFor(() => expect(getRequests()).toHaveLength(2));
-    await act(async () => { resolveFirst(readyResponse(projection())); });
-    await waitFor(() => expect(getRequests()).toHaveLength(3));
-    await act(async () => { resolveSecond(readyResponse(projection())); });
-    await waitFor(() => expect(getRequests()).toHaveLength(3));
+    expect(getRequests()).toHaveLength(1);
   });
 
-  it("does not send a queued Onboard refetch after the tab unmounts", async () => {
-    let resolveRefetch!: (value: unknown) => void;
-    testState.getResponses.push(
-      readyResponse(projection({ setup: { state: "ready", blockers: [], onboardingStatus: "blocking", blockingStepCodes: [], remainingStepCodes: [] } })),
-      new Promise((resolve) => { resolveRefetch = resolve; }),
-    );
-    const view = renderPayroll();
-    await screen.findByRole("button", { name: "Continue secure setup" });
-    await userEvent.setup().click(screen.getByRole("button", { name: "Continue secure setup" }));
-    await screen.findByRole("button", { name: "Continue secure setup" });
-    act(() => {
-      testState.modalProps?.onRefetch();
-      testState.modalProps?.onRefetch();
+  it("arms one automatic onboarding launch only after this visit starts provisioning", async () => {
+    const ready = projection({
+      projectionRevision: 4,
+      setup: { state: "ready", blockers: [], onboardingStatus: "blocking", blockingStepCodes: [], remainingStepCodes: [] },
     });
-    await waitFor(() => expect(getRequests()).toHaveLength(2));
-    view.unmount();
-    await act(async () => { resolveRefetch(readyResponse(projection())); });
-    expect(getRequests()).toHaveLength(2);
+    testState.getResponses.push(readyResponse(projection()), readyResponse(projection()), readyResponse(ready));
+    const user = userEvent.setup();
+    const view = renderPayroll();
+
+    await user.click(await screen.findByRole("button", { name: "Start payroll setup" }));
+    await waitFor(() => expect(commandRequests()).toHaveLength(1));
+    await waitFor(() => expect(testState.modalProps?.autoStartKey).toBe("employment-1:auto:payroll-action-uuid"));
+    expect(sessionRequests()).toHaveLength(0);
+
+    act(() => { testState.modalProps?.onAutoStartConsumed?.("employment-1:auto:payroll-action-uuid"); });
+    await waitFor(() => expect(testState.modalProps?.autoStartKey).toBeUndefined());
+    act(() => {
+      view.store.dispatch(employeePayrollApi.util.upsertQueryData(
+        "getEmployeePayrollSetup",
+        scope,
+        { ...ready, projectionRevision: 5 },
+      ));
+    });
+    await waitFor(() => expect(testState.modalProps?.autoStartKey).toBeUndefined());
+  });
+
+  it("reconciles once on genuine close, directly installs the returned setup, and suppresses legacy refetches", async () => {
+    let resolveReconciliation!: (value: unknown) => void;
+    const completed = projection({
+      projectionRevision: 7,
+      setup: { state: "ready", blockers: [], onboardingStatus: "completed", blockingStepCodes: [], remainingStepCodes: [] },
+      capabilities: { canStartProvisioning: false, canRetryEmployeeSync: false, createEmployeeOnboardSession: false },
+    });
+    testState.getResponses.push(readyResponse(projection({
+      setup: { state: "ready", blockers: [], onboardingStatus: "blocking", blockingStepCodes: [], remainingStepCodes: [] },
+    })));
+    testState.reconcileResponse = new Promise((resolve) => { resolveReconciliation = resolve; });
+    renderPayroll();
+    await waitFor(() => expect(testState.modalProps).not.toBeNull());
+
+    await act(async () => { testState.modalProps?.onRefetch(); });
+    expect(getRequests()).toHaveLength(1);
+    let firstClose: unknown;
+    let duplicateClose: unknown;
+    act(() => {
+      firstClose = testState.modalProps?.onClosed?.(undefined);
+      duplicateClose = testState.modalProps?.onClosed?.(undefined);
+    });
+    await waitFor(() => expect(testState.requests.filter((request) => request.url.endsWith("/onboard-reconciliation"))).toHaveLength(1));
+    expect(screen.getByRole("status", { name: "Updating payroll status" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Continue payroll setup" })).not.toBeInTheDocument();
+    await act(async () => {
+      resolveReconciliation(readyResponse(completed));
+      await Promise.all([firstClose, duplicateClose]);
+    });
+    expect(getRequests()).toHaveLength(1);
+    expect(await screen.findByText(/payroll setup is complete/i)).toBeVisible();
+  });
+
+  it("does not install a late close reconciliation into a retired employee scope", async () => {
+    let resolveReconciliation!: (value: unknown) => void;
+    const nextScope = { ...scope, employmentId: "employment-2" };
+    const blocking = projection({
+      setup: { state: "ready", blockers: [], onboardingStatus: "blocking", blockingStepCodes: [], remainingStepCodes: [] },
+    });
+    testState.getResponses.push(
+      readyResponse(blocking),
+      readyResponse(projection({
+        employmentId: nextScope.employmentId,
+        setup: { state: "ready", blockers: [], onboardingStatus: "blocking", blockingStepCodes: [], remainingStepCodes: [] },
+      })),
+    );
+    testState.reconcileResponse = new Promise((resolve) => { resolveReconciliation = resolve; });
+    const view = renderPayroll();
+    await waitFor(() => expect(testState.modalProps).not.toBeNull());
+    let closeResult: unknown;
+    act(() => { closeResult = testState.modalProps?.onClosed?.(undefined); });
+    await waitFor(() => expect(testState.requests.filter((request) => request.url.endsWith("/onboard-reconciliation"))).toHaveLength(1));
+
+    view.rerender(<Provider store={view.store}><MyPayrollTab scope={nextScope} active /></Provider>);
+    expect(await screen.findByRole("button", { name: "Continue payroll setup" })).toBeVisible();
+    await act(async () => {
+      resolveReconciliation(readyResponse(projection({
+        projectionRevision: 8,
+        setup: { state: "ready", blockers: [], onboardingStatus: "completed", blockingStepCodes: [], remainingStepCodes: [] },
+      })));
+      await closeResult;
+    });
+
+    const retired = employeePayrollApi.endpoints.getEmployeePayrollSetup.select(scope)(view.store.getState());
+    expect(retired.data?.setup.onboardingStatus).toBe("blocking");
+    expect(screen.queryByText(/payroll setup is complete/i)).not.toBeInTheDocument();
   });
 
   it("keeps global focus state unchanged when a focused tab unmounts", async () => {
@@ -405,7 +518,10 @@ describe("MyPayrollTab", () => {
     })));
     renderPayroll();
     expect(await screen.findByText(/payroll setup is complete/i)).toBeVisible();
-    expect(screen.queryByRole("button", { name: /start payroll setup|retry payroll setup|continue secure setup/i })).not.toBeInTheDocument();
+    const steps = within(screen.getByRole("list", { name: "Payroll setup progress" })).getAllByRole("listitem");
+    expect(steps).toHaveLength(3);
+    steps.forEach((step) => expect(within(step).getByText("Complete")).toBeVisible());
+    expect(screen.queryByRole("button", { name: /start payroll setup|retry payroll setup|continue payroll setup/i })).not.toBeInTheDocument();
   });
 
   it("withholds Continue when the server denies secure onboarding", async () => {
@@ -415,7 +531,7 @@ describe("MyPayrollTab", () => {
     })));
     renderPayroll();
     await waitFor(() => expect(getRequests()).toHaveLength(1));
-    expect(screen.queryByRole("button", { name: "Continue secure setup" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Continue payroll setup" })).not.toBeInTheDocument();
     expect(testState.modalRenders).toBe(0);
     expect(sessionRequests()).toHaveLength(0);
   });

@@ -6,6 +6,7 @@ import {
   employeePayrollInvalidationTags,
   employeeOnboardSessionInvalidationTags,
   employeeOnboardSessionRequest,
+  employeeOnboardReconciliationRequest,
 } from "./employeePayrollEndpoints";
 import { agencyPayrollPaths } from "./agencyPayrollEndpoints";
 import { managerPrimaryWorkplaceCommandRequest, managerPrimaryWorkplaceInvalidationTags } from "./payrollCommands";
@@ -49,6 +50,13 @@ describe("employee payroll wire contracts", () => {
       data: { expectedProjectionRevision: 3 },
     });
     expect(employeeOnboardSessionInvalidationTags()).toEqual([]);
+
+    expect(employeeOnboardReconciliationRequest(employeeScope)).toEqual({
+      url: "/checkPayrollEmployeeOnboard/payroll/employees/employment-1/onboard-reconciliation",
+      method: "POST",
+      requiresAuth: true,
+      data: {},
+    });
   });
 
   it("replays explicit employee action keys and invalidates only its setup identity", () => {

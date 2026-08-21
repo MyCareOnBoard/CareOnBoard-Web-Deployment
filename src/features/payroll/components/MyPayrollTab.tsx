@@ -1,10 +1,17 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Children, lazy, Suspense, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
-import { useDispatch } from "react-redux";
-import { employeePayrollApi, useCreateEmployeeOnboardSessionMutation, useRunEmployeePayrollCommandMutation } from "../api/employeePayrollEndpoints";
-import type { EmployeePayrollAction, EmployeePayrollScope } from "../model/types";
+import { Building2, Check, CircleAlert, Loader2, UserRound, WalletCards } from "lucide-react";
+import SettingsSectionCard from "@/pages/shared/settings/SettingsSectionCard";
+import SettingsTabSkeleton from "@/pages/shared/settings/SettingsTabSkeleton";
+import { useAppDispatch } from "@/store/redux/hooks";
+import {
+  employeePayrollApi,
+  useCreateEmployeeOnboardSessionMutation,
+  useReconcileEmployeeOnboardMutation,
+  useRunEmployeePayrollCommandMutation,
+} from "../api/employeePayrollEndpoints";
+import type { EmployeePayrollAction, EmployeePayrollScope, EmployeePayrollSetupProjection } from "../model/types";
 import { employeePayrollBlockerMessage } from "./employeePayrollCopy";
-import { Loader2 } from "lucide-react";
 
 const CheckOnboardModal = lazy(async () => {
   const module = await import("../onboard/CheckOnboardModal");
@@ -13,6 +20,63 @@ const CheckOnboardModal = lazy(async () => {
 const EmployeePayrollPrerequisitesModal = lazy(() => import("./EmployeePayrollPrerequisitesModal"));
 
 const pollingStates = new Set(["queued", "waiting", "awaiting_provider"]);
+
+const employeeOnboardLoadingDialog = {
+  preparing: {
+    title: "Preparing your payroll onboarding",
+    description: "Creating a secure session with Check. Your setup will open automatically.",
+  },
+  opening: {
+    title: "Opening your payroll onboarding",
+    description: "Your secure session is ready. Connecting you to Check now.",
+  },
+} as const;
+
+type AutoOnboardIntent = {
+  key: string;
+  scope: EmployeePayrollScope;
+  baselineRevision: number;
+};
+
+type JourneyState = "complete" | "current" | "attention" | "upcoming";
+
+const journeyTone = {
+  complete: { marker: "bg-emerald-50 text-emerald-700 ring-emerald-100", status: "bg-emerald-50 text-emerald-700" },
+  current: { marker: "bg-[#e8fafa] text-[#006f73] ring-[#cceff0]", status: "bg-[#e8fafa] text-[#006f73]" },
+  attention: { marker: "bg-amber-50 text-amber-700 ring-amber-100", status: "bg-amber-50 text-amber-800" },
+  upcoming: { marker: "bg-[#f4f5f6] text-[#92979f] ring-[#e8eaed]", status: "bg-[#f4f5f6] text-[#6f747c]" },
+} satisfies Record<JourneyState, { marker: string; status: string }>;
+
+function PayrollJourneyStep({ title, status, state, icon, last = false, children }: {
+  title: string;
+  status: string;
+  state: JourneyState;
+  icon: ReactNode;
+  last?: boolean;
+  children?: ReactNode;
+}) {
+  const tone = journeyTone[state];
+  const active = state === "current" || state === "attention";
+  const details = Children.toArray(children);
+
+  return (
+    <li aria-current={active ? "step" : undefined} className="flex gap-3 py-4 first:pt-0 last:pb-0 sm:gap-4">
+      <div aria-hidden="true" className="flex w-9 shrink-0 flex-col items-center self-stretch">
+        <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ring-1 ${tone.marker}`}>
+          {state === "complete" ? <Check className="h-4 w-4" strokeWidth={2.5} /> : state === "attention" ? <CircleAlert className="h-4 w-4" /> : icon}
+        </span>
+        {!last ? <span className="mt-1 min-h-6 w-px flex-1 bg-[#e3e7e9]" /> : null}
+      </div>
+      <div className="min-w-0 flex-1 pt-1">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h3 className="text-sm font-semibold text-[#10141a] sm:text-[15px]">{title}</h3>
+          <span className={`w-fit rounded-full px-2.5 py-1 text-[11px] font-semibold ${tone.status}`}>{status}</span>
+        </div>
+        {details.length ? <div className="mt-3 text-sm leading-6 text-[#5d626b]">{details}</div> : null}
+      </div>
+    </li>
+  );
+}
 
 function documentIsFocused() {
   return typeof document === "undefined" || (document.visibilityState !== "hidden" && document.hasFocus());
@@ -29,29 +93,46 @@ function samePayrollScope(left: EmployeePayrollScope, right: EmployeePayrollScop
     && left.employmentId === right.employmentId;
 }
 
+function hasPrerequisites(payroll: EmployeePayrollSetupProjection) {
+  return payroll.prerequisites.missingFieldCodes.includes("legalName")
+    || payroll.prerequisites.invalidFieldCodes.includes("email");
+}
+
 export default function MyPayrollTab({ scope, active }: { scope: EmployeePayrollScope; active: boolean }) {
-  const dispatch = useDispatch();
+  const dispatch = useAppDispatch();
   const [focused, setFocused] = useState(documentIsFocused);
   const [pendingAction, setPendingAction] = useState<EmployeePayrollAction | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [prerequisitesOpen, setPrerequisitesOpen] = useState(false);
+  const [autoOnboardIntent, setAutoOnboardIntent] = useState<AutoOnboardIntent | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [reconciling, setReconciling] = useState(false);
+  const [reconciliationFailed, setReconciliationFailed] = useState(false);
   const actionInFlight = useRef(false);
   const actionToken = useRef(0);
+  const reconciliationInFlight = useRef(false);
+  const reconciliationToken = useRef(0);
+  const payrollJourney = useRef<HTMLOListElement>(null);
+  const wasReconciling = useRef(false);
   const mounted = useRef(true);
   const currentScope = useRef(scope);
   currentScope.current = scope;
-  const coalescedRefetch = useRef({ employmentId: "", inFlight: false, trailing: false });
   const queryArg = active && scope.employmentId ? scope : skipToken;
   const queryState = employeePayrollApi.endpoints.getEmployeePayrollSetup.useQueryState(queryArg);
-  const shouldPoll = active && focused && pollingStates.has(queryState.currentData?.setup.state ?? "");
+  const payroll = queryState.currentData;
+  const shouldPoll = active && focused && pollingStates.has(payroll?.setup.state ?? "");
   const subscription = employeePayrollApi.endpoints.getEmployeePayrollSetup.useQuerySubscription(queryArg, {
     pollingInterval: shouldPoll ? 5_000 : 0,
     skipPollingIfUnfocused: true,
   });
   const [runCommand] = useRunEmployeePayrollCommandMutation();
   const [createOnboardSession] = useCreateEmployeeOnboardSessionMutation();
+  const [reconcileOnboard] = useReconcileEmployeeOnboardMutation();
+  const canContinue = Boolean(
+    payroll?.setup.state === "ready"
+    && (payroll.setup.onboardingStatus === "blocking" || payroll.setup.onboardingStatus === "needs_attention")
+    && payroll.capabilities.createEmployeeOnboardSession,
+  );
 
   useEffect(() => {
     const updateFocus = () => {
@@ -75,7 +156,8 @@ export default function MyPayrollTab({ scope, active }: { scope: EmployeePayroll
     return () => {
       mounted.current = false;
       actionToken.current += 1;
-      coalescedRefetch.current.trailing = false;
+      reconciliationToken.current += 1;
+      reconciliationInFlight.current = false;
     };
   }, []);
 
@@ -84,37 +166,43 @@ export default function MyPayrollTab({ scope, active }: { scope: EmployeePayroll
     actionInFlight.current = false;
     setPendingAction(null);
     setActionError(null);
-    setOnboardingOpen(false);
     setPrerequisitesOpen(false);
+    setAutoOnboardIntent(null);
     setScanning(false);
-    coalescedRefetch.current = { employmentId: scope.employmentId, inFlight: false, trailing: false };
+    setReconciling(false);
+    setReconciliationFailed(false);
+    reconciliationToken.current += 1;
+    reconciliationInFlight.current = false;
   }, [scope.actorUid, scope.agencyId, scope.employmentId]);
 
-  const refetchCoalesced = useCallback(() => {
-    const state = coalescedRefetch.current;
-    if (!mounted.current || state.employmentId !== scope.employmentId) return;
-    if (state.inFlight) {
-      state.trailing = true;
-      return;
+  useEffect(() => {
+    if (reconciling) {
+      payrollJourney.current?.focus();
+    } else if (wasReconciling.current) {
+      const retry = payrollJourney.current?.querySelector<HTMLButtonElement>("button:not([disabled])");
+      (retry ?? payrollJourney.current)?.focus();
     }
-    state.inFlight = true;
-    void subscription.refetch().catch(() => undefined).finally(() => {
-      if (!mounted.current || coalescedRefetch.current !== state) return;
-      state.inFlight = false;
-      if (state.trailing) {
-        state.trailing = false;
-        refetchCoalesced();
-      }
-    });
-  }, [scope.employmentId, subscription]);
+    wasReconciling.current = reconciling;
+  }, [reconciling]);
 
-  const hasPrerequisites = (payroll: NonNullable<typeof queryState.currentData>) => payroll.prerequisites.missingFieldCodes.includes("legalName") || payroll.prerequisites.invalidFieldCodes.includes("email");
+  useEffect(() => {
+    if (!autoOnboardIntent) return;
+    const terminalSetup = payroll && (
+      payroll.agencyIntegration.state === "missing"
+      || payroll.setup.state === "blocked"
+      || payroll.setup.state === "needs_attention"
+      || (payroll.setup.state === "ready" && payroll.setup.onboardingStatus === "completed")
+    );
+    if (!active || !samePayrollScope(autoOnboardIntent.scope, scope) || terminalSetup) setAutoOnboardIntent(null);
+  }, [active, autoOnboardIntent, payroll, scope]);
 
   const runAction = async (command: EmployeePayrollAction, profile?: { legalName: string; email: string | null }) => {
     const current = queryState.currentData;
     if (!current || actionInFlight.current) return;
     const actionScope = { ...scope };
     const token = ++actionToken.current;
+    const idempotencyKey = crypto.randomUUID();
+    const baselineRevision = current.projectionRevision;
     const isCurrentAction = () => mounted.current
       && actionToken.current === token
       && samePayrollScope(currentScope.current, actionScope);
@@ -123,14 +211,17 @@ export default function MyPayrollTab({ scope, active }: { scope: EmployeePayroll
     setActionError(null);
     try {
       await runCommand({
-        ...scope,
+        ...actionScope,
         command,
-        projectionRevision: current.projectionRevision,
-        idempotencyKey: crypto.randomUUID(),
+        projectionRevision: baselineRevision,
+        idempotencyKey,
         ...(profile ? { profile } : {}),
       }).unwrap();
       if (!isCurrentAction()) return;
-      if (command === "start_provisioning" && profile) setPrerequisitesOpen(false);
+      if (command === "start_provisioning") {
+        setAutoOnboardIntent({ key: `${actionScope.employmentId}:auto:${idempotencyKey}`, scope: actionScope, baselineRevision });
+        if (profile) setPrerequisitesOpen(false);
+      }
     } catch (error) {
       if (!isCurrentAction()) return;
       if (errorStatus(error) === 409) {
@@ -159,7 +250,9 @@ export default function MyPayrollTab({ scope, active }: { scope: EmployeePayroll
     if (actionInFlight.current || scanning) return;
     const actionScope = { ...scope };
     const token = ++actionToken.current;
-    const isCurrent = () => mounted.current && actionToken.current === token && samePayrollScope(currentScope.current, actionScope);
+    const isCurrent = () => mounted.current
+      && actionToken.current === token
+      && samePayrollScope(currentScope.current, actionScope);
     actionInFlight.current = true;
     setScanning(true);
     setActionError(null);
@@ -167,7 +260,10 @@ export default function MyPayrollTab({ scope, active }: { scope: EmployeePayroll
       const fresh = await subscription.refetch().unwrap();
       if (!isCurrent()) return;
       if (fresh.agencyIntegration.state === "missing") return;
-      if (hasPrerequisites(fresh)) { setPrerequisitesOpen(true); return; }
+      if (hasPrerequisites(fresh)) {
+        setPrerequisitesOpen(true);
+        return;
+      }
       actionInFlight.current = false;
       setScanning(false);
       await runAction("start_provisioning");
@@ -187,44 +283,229 @@ export default function MyPayrollTab({ scope, active }: { scope: EmployeePayroll
     return { link: session.url, expiresAt: session.expiresAt };
   }, [createOnboardSession, queryState.currentData, scope]);
 
+  const ignoreOnboardProgress = useCallback(() => undefined, []);
+  const consumeAutoOnboard = useCallback((key: string) => {
+    setAutoOnboardIntent((intent) => intent?.key === key ? null : intent);
+  }, []);
+  const reconcileAfterOnboardClose = useCallback(async () => {
+    if (reconciliationInFlight.current) return;
+    const reconciliationScope = { ...scope };
+    const token = ++reconciliationToken.current;
+    const isCurrent = () => mounted.current
+      && reconciliationToken.current === token
+      && samePayrollScope(currentScope.current, reconciliationScope);
+    reconciliationInFlight.current = true;
+    setReconciling(true);
+    setReconciliationFailed(false);
+    setActionError(null);
+    try {
+      const projection = await reconcileOnboard(reconciliationScope).unwrap();
+      if (!isCurrent()) return;
+      await dispatch(employeePayrollApi.util.upsertQueryData("getEmployeePayrollSetup", reconciliationScope, projection));
+    } catch {
+      if (isCurrent()) {
+        setReconciliationFailed(true);
+        setActionError("Payroll setup could not be refreshed. Refresh payroll status to try again.");
+      }
+    } finally {
+      if (isCurrent()) {
+        reconciliationInFlight.current = false;
+        setReconciling(false);
+      }
+    }
+  }, [dispatch, reconcileOnboard, scope]);
+
   if (!active) return null;
 
   if (!scope.employmentId) {
-    return <section aria-labelledby="my-payroll-heading" className="border-b border-[#e5e7eb] py-6"><h2 id="my-payroll-heading" className="text-xl font-semibold text-[#10141a]">My Payroll</h2><p role="alert" className="mt-3 text-sm text-[#5d626b]">Payroll setup is not available for this account.</p></section>;
+    return (
+      <div className="flex flex-col gap-4">
+        <SettingsSectionCard title="My Payroll" subtitle="Manage your personal payroll onboarding.">
+          <p role="alert" className="text-sm text-[#5d626b]">Payroll setup is not available for this account.</p>
+        </SettingsSectionCard>
+      </div>
+    );
   }
 
-  if (!queryState.currentData && (queryState.isUninitialized || queryState.isLoading || queryState.isFetching)) {
-    return <section aria-label="Loading payroll setup" aria-busy="true" role="status" className="min-h-[188px] animate-pulse border-b border-[#e5e7eb] py-6"><div className="h-3 w-24 rounded bg-[#dfe7e7]" /><div className="mt-3 h-6 w-48 rounded bg-[#e8eeee]" /><div className="mt-5 h-4 w-full max-w-md rounded bg-[#e8eeee]" /></section>;
+  if (!payroll && (queryState.isUninitialized || queryState.isLoading || queryState.isFetching)) {
+    return <div role="status" aria-label="Loading payroll setup" aria-busy="true"><SettingsTabSkeleton variant="form" cardCount={1} /></div>;
   }
 
-  if (!queryState.currentData && queryState.isError) {
-    return <section aria-labelledby="my-payroll-heading" className="border-b border-[#e5e7eb] py-6"><h2 id="my-payroll-heading" className="text-xl font-semibold text-[#10141a]">My Payroll</h2><p role="alert" className="mt-3 text-sm text-[#8b2d2d]">Payroll setup could not be loaded.</p><button type="button" onClick={() => void subscription.refetch()} className="mt-3 text-sm font-semibold text-[#006f73] underline">Try again</button></section>;
+  if (!payroll && queryState.isError) {
+    return (
+      <div className="flex flex-col gap-4">
+        <SettingsSectionCard title="My Payroll" subtitle="Manage your personal payroll onboarding.">
+          <p role="alert" className="text-sm text-[#8b2d2d]">Payroll setup could not be loaded.</p>
+          <button type="button" onClick={() => void subscription.refetch()} className="mt-3 min-h-11 rounded-lg border border-[#b8dfe0] px-4 text-sm font-semibold text-[#006f73] hover:bg-[#f0fbfb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2">Try again</button>
+        </SettingsSectionCard>
+      </div>
+    );
   }
 
-  const payroll = queryState.currentData;
   if (!payroll) return null;
+
   const { setup, capabilities } = payroll;
   const integrationMissing = payroll.agencyIntegration.state === "missing";
   const busy = pendingAction !== null || scanning;
   const progress = pollingStates.has(setup.state);
   const needsAttention = setup.state === "blocked" || setup.state === "needs_attention";
-  const canContinue = setup.state === "ready" && (setup.onboardingStatus === "blocking" || setup.onboardingStatus === "needs_attention") && capabilities.createEmployeeOnboardSession;
+  const onboardingComplete = setup.state === "ready" && setup.onboardingStatus === "completed";
+  const onboardingNeedsAction = setup.state === "ready"
+    && (setup.onboardingStatus === "blocking" || setup.onboardingStatus === "needs_attention");
+  const eligibleAutoStartKey = autoOnboardIntent
+    && focused
+    && samePayrollScope(autoOnboardIntent.scope, scope)
+    && payroll.projectionRevision > autoOnboardIntent.baselineRevision
+    && canContinue
+    ? autoOnboardIntent.key
+    : undefined;
+  const overallStatus = integrationMissing
+    ? "Waiting on agency"
+    : setup.state === "not_started"
+      ? "Ready to start"
+      : progress
+        ? "In progress"
+        : needsAttention
+          ? "Needs attention"
+          : onboardingComplete
+            ? "Complete"
+            : canContinue
+              ? "Action needed"
+              : "Preparing";
+  const overallTone = overallStatus === "Complete"
+    ? "bg-emerald-50 text-emerald-700"
+    : overallStatus === "Needs attention" || overallStatus === "Action needed"
+      ? "bg-amber-50 text-amber-800"
+      : "bg-[#e8fafa] text-[#006f73]";
 
-  return <section aria-labelledby="my-payroll-heading" className="border-b border-[#e5e7eb] py-6">
-    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#006f73]">Payroll</p>
-    <h2 id="my-payroll-heading" className="mt-1 text-xl font-semibold text-[#10141a]">My Payroll</h2>
-    {queryState.isFetching && <span role="status" aria-label="Refreshing payroll setup" className="ml-2 inline-flex align-middle"><Loader2 aria-hidden="true" className="h-4 w-4 text-[#006f73] motion-safe:animate-spin" /></span>}
-    {integrationMissing ? <p role="status" className="mt-3 text-sm text-[#5d626b]">Your agency must complete Payroll Setup before you can start your personal payroll setup.</p> : setup.state === "not_started" && <p className="mt-3 text-sm text-[#5d626b]">Start payroll setup when you are ready.</p>}
-    {progress && <p role="status" aria-label="Payroll setup is in progress" aria-live="polite" className="mt-3 text-sm text-[#5d626b]">Payroll setup is in progress. This page will update automatically.</p>}
-    {needsAttention && <div role="status" aria-live="polite" className="mt-3 space-y-1 text-sm text-[#5d626b]">{setup.blockers.map((blocker) => <p key={blocker}>{employeePayrollBlockerMessage(blocker)}</p>)}</div>}
-    {setup.state === "ready" && setup.onboardingStatus === "completed" && <p role="status" className="mt-3 text-sm text-[#176b4d]">Payroll setup is complete.</p>}
-    {actionError && <p role="alert" className="mt-3 text-sm text-[#8b2d2d]">{actionError}</p>}
-    <div className="mt-4 flex flex-wrap items-center gap-3">
-      {!integrationMissing && setup.state === "not_started" && capabilities.canStartProvisioning && <button type="button" disabled={busy} aria-busy={busy} onClick={() => void startPayroll()} className="inline-flex min-h-11 min-w-[13rem] items-center justify-center rounded-md bg-[#006f73] px-4 py-2 text-sm font-medium text-white hover:bg-[#00595c] disabled:opacity-60">{scanning ? <span role="status" className="inline-flex items-center gap-2"><Loader2 aria-hidden="true" className="h-4 w-4 motion-safe:animate-spin" />Scanning payroll details…</span> : pendingAction === "start_provisioning" ? <span role="status" className="inline-flex items-center gap-2"><Loader2 aria-hidden="true" className="h-4 w-4 motion-safe:animate-spin" />Starting payroll setup…</span> : "Start payroll setup"}</button>}
-      {!integrationMissing && needsAttention && capabilities.canRetryEmployeeSync && <button type="button" disabled={busy} onClick={() => void runAction("retry_employee_sync")} className="text-sm font-semibold text-[#006f73] underline disabled:opacity-60">{pendingAction === "retry_employee_sync" ? "Retrying payroll setup..." : "Retry payroll setup"}</button>}
-      {!integrationMissing && canContinue && !onboardingOpen && <button type="button" onClick={() => setOnboardingOpen(true)} className="rounded-md bg-[#006f73] px-4 py-2 text-sm font-medium text-white hover:bg-[#00595c]">Continue secure setup</button>}
-      {!integrationMissing && canContinue && onboardingOpen && <Suspense fallback={<p role="status" className="text-sm text-[#5d626b]">Loading secure setup...</p>}><CheckOnboardModal requestSession={requestOnboardSession} onRefetch={refetchCoalesced} /></Suspense>}
+  return (
+    <div className="flex flex-col gap-4">
+      <SettingsSectionCard
+        title="My Payroll"
+        subtitle="Follow your setup from your agency connection through payment and tax onboarding."
+        className="min-h-[420px]"
+      >
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <p className="max-w-xl text-sm leading-6 text-[#5d626b]">
+            {onboardingComplete ? "Payroll setup is complete." : "Complete the current step to keep your payroll setup moving."}
+          </p>
+          <span role="status" aria-live="polite" aria-atomic="true" className={`w-fit shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${overallTone}`}>{overallStatus}</span>
+        </div>
+
+        {actionError ? <p role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-[#8b2d2d]">{actionError}</p> : null}
+
+        <ol ref={payrollJourney} tabIndex={-1} aria-label="Payroll setup progress" className="mt-5 divide-y divide-[#edf0f1] border-y border-[#edf0f1] py-4 focus-visible:rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2">
+          <PayrollJourneyStep
+            title="Agency payroll connection"
+            status={integrationMissing ? "Waiting on agency" : "Complete"}
+            state={integrationMissing ? "current" : "complete"}
+            icon={<Building2 className="h-4 w-4" />}
+          >
+            {integrationMissing ? <p role="status">Your agency must complete Payroll Setup before you can start your personal payroll setup.</p> : null}
+          </PayrollJourneyStep>
+
+          <PayrollJourneyStep
+            title="Employee payroll record"
+            status={integrationMissing ? "Upcoming" : setup.state === "not_started" ? "Ready to start" : progress ? "In progress" : needsAttention ? "Needs attention" : "Complete"}
+            state={integrationMissing ? "upcoming" : setup.state === "not_started" || progress ? "current" : needsAttention ? "attention" : "complete"}
+            icon={<UserRound className="h-4 w-4" />}
+          >
+            {!integrationMissing && setup.state === "not_started" ? (
+              <div>
+                <p>We’ll verify your employee record before opening your secure onboarding.</p>
+                {capabilities.canStartProvisioning ? (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    aria-busy={busy}
+                    onClick={() => void startPayroll()}
+                    className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-[#006f73] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#00595c] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2 disabled:opacity-60 sm:w-auto"
+                  >
+                    {scanning ? <span role="status" className="inline-flex items-center gap-2"><Loader2 aria-hidden="true" className="h-4 w-4 motion-safe:animate-spin" />Scanning payroll details…</span> : pendingAction === "start_provisioning" ? <span role="status" className="inline-flex items-center gap-2"><Loader2 aria-hidden="true" className="h-4 w-4 motion-safe:animate-spin" />Starting payroll setup…</span> : "Start payroll setup"}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+            {!integrationMissing && progress ? <p role="status" aria-label="Payroll setup is in progress" aria-live="polite">Payroll setup is in progress. This page will update automatically.</p> : null}
+            {!integrationMissing && needsAttention ? (
+              <div>
+                {setup.blockers.length ? (
+                  <ul aria-label="Payroll setup blockers" className="list-disc space-y-1 pl-5">
+                    {setup.blockers.map((blocker) => <li key={blocker}>{employeePayrollBlockerMessage(blocker)}</li>)}
+                  </ul>
+                ) : null}
+                {capabilities.canRetryEmployeeSync ? (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void runAction("retry_employee_sync")}
+                    className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-[#b8dfe0] bg-white px-4 py-2 text-sm font-semibold text-[#006f73] transition-colors hover:bg-[#f0fbfb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2 disabled:opacity-60 sm:w-auto"
+                  >
+                    {pendingAction === "retry_employee_sync" ? "Retrying payroll setup..." : "Retry payroll setup"}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </PayrollJourneyStep>
+
+          <PayrollJourneyStep
+            title="Payment and tax onboarding"
+            status={integrationMissing || setup.state !== "ready" ? "Upcoming" : onboardingComplete ? "Complete" : canContinue ? "Action needed" : onboardingNeedsAction ? "Waiting" : "Preparing"}
+            state={integrationMissing || setup.state !== "ready" ? "upcoming" : onboardingComplete ? "complete" : onboardingNeedsAction ? "attention" : "current"}
+            icon={<WalletCards className="h-4 w-4" />}
+            last
+          >
+            {setup.state === "ready" && !onboardingComplete ? (
+              <div className="space-y-3">
+                {reconciliationFailed && !reconciling ? (
+                  <button
+                    type="button"
+                    onClick={() => void reconcileAfterOnboardClose()}
+                    className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-[#b8dfe0] bg-white px-4 py-2 text-sm font-semibold text-[#006f73] transition-colors hover:bg-[#f0fbfb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2 sm:w-auto"
+                  >
+                    Refresh payroll status
+                  </button>
+                ) : null}
+                {reconciling ? (
+                  <div role="status" aria-label="Updating payroll status" aria-live="polite" className="inline-flex min-h-11 items-center gap-2 font-medium text-[#006f73]">
+                    <Loader2 aria-hidden="true" className="h-4 w-4 motion-safe:animate-spin" />Updating payroll status…
+                  </div>
+                ) : canContinue ? (
+                  <Suspense fallback={<p role="status" className="min-h-11 py-2 text-sm text-[#5d626b]">Loading payroll onboarding…</p>}>
+                    <div className="[&_button]:w-full sm:[&_button]:w-auto">
+                      <CheckOnboardModal
+                        actionLabel="Continue payroll setup"
+                        requestSession={requestOnboardSession}
+                        onRefetch={ignoreOnboardProgress}
+                        onClosed={reconcileAfterOnboardClose}
+                        autoStartKey={eligibleAutoStartKey}
+                        onAutoStartConsumed={consumeAutoOnboard}
+                        cancelPending={typeof document !== "undefined" && document.visibilityState === "hidden"}
+                        loadingDialog={employeeOnboardLoadingDialog}
+                      />
+                    </div>
+                  </Suspense>
+                ) : <p>Payroll onboarding is not available yet. Contact your agency if this continues.</p>}
+              </div>
+            ) : null}
+          </PayrollJourneyStep>
+        </ol>
+
+        {!integrationMissing && prerequisitesOpen ? (
+          <Suspense fallback={<p role="status" aria-busy="true" className="mt-4 text-sm text-[#5d626b]">Loading payroll details…</p>}>
+            <EmployeePayrollPrerequisitesModal
+              open
+              values={payroll.prerequisites.values}
+              missingFieldCodes={payroll.prerequisites.missingFieldCodes}
+              invalidFieldCodes={payroll.prerequisites.invalidFieldCodes}
+              isSubmitting={pendingAction === "start_provisioning"}
+              error={actionError}
+              onOpenChange={setPrerequisitesOpen}
+              onSubmit={async (profile) => { await runAction("start_provisioning", profile); }}
+            />
+          </Suspense>
+        ) : null}
+      </SettingsSectionCard>
     </div>
-    {!integrationMissing && prerequisitesOpen && <Suspense fallback={<p role="status" aria-busy="true" className="mt-4 text-sm text-[#5d626b]">Loading payroll details…</p>}><EmployeePayrollPrerequisitesModal open values={payroll.prerequisites.values} missingFieldCodes={payroll.prerequisites.missingFieldCodes} invalidFieldCodes={payroll.prerequisites.invalidFieldCodes} isSubmitting={pendingAction === "start_provisioning"} error={actionError} onOpenChange={setPrerequisitesOpen} onSubmit={async (profile) => { await runAction("start_provisioning", profile); }} /></Suspense>}
-  </section>;
+  );
 }

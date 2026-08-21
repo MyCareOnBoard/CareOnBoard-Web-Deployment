@@ -85,7 +85,7 @@ export default function SettingsPage() {
 
         {user && isEmployee && activeTab === "myPayroll" && visitedTabs.has("myPayroll") && (
           <TabPanel tabId="myPayroll" activeTab={activeTab}>
-            <Suspense fallback={<SettingsTabSkeleton variant="form" cardCount={2} />}>
+            <Suspense fallback={<SettingsTabSkeleton variant="form" cardCount={1} />}>
               <MyPayrollTab
                 active={activeTab === "myPayroll"}
                 scope={{
