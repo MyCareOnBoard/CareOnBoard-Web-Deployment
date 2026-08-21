@@ -90,9 +90,13 @@ export const employeePayrollApi = checkPayrollApi.injectEndpoints({
       serializeQueryArgs: ({ queryArgs }) => `employee-pay-statements:${payrollScopeKey(queryArgs)}:${queryArgs.year}`,
       forceRefetch: ({ currentArg, previousArg }) => currentArg?.cursor !== previousArg?.cursor,
       merge: (currentCache, response, { arg }) => {
-        if (!arg.cursor) return response;
+        if (!arg.cursor || response.setupRequired) return response;
         const seen = new Set(currentCache.statements.map(({ statementId }) => statementId));
-        currentCache.statements.push(...response.statements.filter(({ statementId }) => !seen.has(statementId)));
+        for (const statement of response.statements) {
+          if (seen.has(statement.statementId)) continue;
+          seen.add(statement.statementId);
+          currentCache.statements.push(statement);
+        }
         currentCache.nextCursor = response.nextCursor;
       },
     }),

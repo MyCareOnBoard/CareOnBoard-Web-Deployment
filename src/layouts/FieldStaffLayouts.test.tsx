@@ -91,6 +91,21 @@ describe("field staff header role", () => {
     expect(screen.getByText("My Payroll")).toHaveAttribute("data-path", "/user-panel/payroll");
   });
 
+  it("does not mount employee content for a resolved non-employee user", () => {
+    const deniedChild = vi.fn(() => <div>Denied child</div>);
+    const DeniedChild = deniedChild;
+    state.user = { ...state.user, userType: "agency_staff" };
+
+    render(
+      <MemoryRouter>
+        <UserPanelDashboardLayout><DeniedChild /></UserPanelDashboardLayout>
+      </MemoryRouter>,
+    );
+
+    expect(deniedChild).not.toHaveBeenCalled();
+    expect(screen.queryByText("Denied child")).not.toBeInTheDocument();
+  });
+
   it("registers employee and agency My Payroll routes with the same lazy page module", () => {
     expect(getRouteComponent(findRoute("/user-panel/payroll"))).toBe(
       getRouteComponent(findRoute("/agency/my-payroll")),

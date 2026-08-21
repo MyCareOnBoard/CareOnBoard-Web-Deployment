@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
-import { useEffect } from "react";
-import { Outlet, useNavigate } from "react-router";
+import { Navigate, Outlet, useNavigate } from "react-router";
 import { useAuth } from "@/utils/auth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Routes } from "@/routes/constants";
@@ -69,15 +68,9 @@ export default function UserPanelDashboardLayout({ children }: { children?: Reac
     }
   };
 
-  useEffect(() => {
-    if (!user || (user?.userType !== UserType.EMPLOYEE)) {
-      navigate(Routes.auth.login, { replace: true });
-    }
-  }, [user]);
-
   return (
     <ProtectedRoute>
-    <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
+    {user?.userType !== UserType.EMPLOYEE ? <Navigate to={Routes.auth.login} replace /> : <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
       <DashboardHeader
         userName={user?.fullName}
         userImage={(user as any)?.profileImage || user?.photoURL}
@@ -90,7 +83,7 @@ export default function UserPanelDashboardLayout({ children }: { children?: Reac
         <AnnouncementBanner endpoint="/employeePortal/announcements" viewAllPath={Routes.userPanel.announcements} />
         <div className="px-8">{children ?? <Outlet />}</div>
       </main>
-    </div>
+    </div>}
     </ProtectedRoute>
   );
 }

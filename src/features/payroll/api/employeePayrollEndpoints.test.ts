@@ -169,7 +169,7 @@ describe("employee pay statements", () => {
       middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(employeePayrollApi.middleware),
     });
     const first = page(["statement-1", "statement-2"], "next-a");
-    baseQuery.mockResolvedValueOnce({ data: first }).mockResolvedValueOnce({ data: page(["statement-2", "statement-3"], null, null) });
+    baseQuery.mockResolvedValueOnce({ data: first }).mockResolvedValueOnce({ data: page(["statement-2", "statement-3", "statement-3"], null, null) });
 
     await store.dispatch(employeePayrollApi.endpoints.getEmployeePayStatements.initiate({ ...employeeScope, year: 2026 })).unwrap();
     await store.dispatch(employeePayrollApi.endpoints.getEmployeePayStatements.initiate({ ...employeeScope, year: 2026, cursor: "next-a" })).unwrap();
@@ -179,6 +179,21 @@ describe("employee pay statements", () => {
     expect(cached?.summary).toEqual(first.summary);
     expect(cached?.nextCursor).toBeNull();
     expect(Object.keys((store.getState() as { checkPayrollApi: { queries: Record<string, unknown> } }).checkPayrollApi.queries)).toHaveLength(1);
+  });
+
+  it("replaces stale cached statements when a cursor response requires setup", async () => {
+    const store = configureStore({
+      reducer: { [employeePayrollApi.reducerPath]: employeePayrollApi.reducer },
+      middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(employeePayrollApi.middleware),
+    });
+    const setupRequired = { ...page([], null, null), setupRequired: true };
+    baseQuery.mockResolvedValueOnce({ data: page(["statement-1"], "next-a") }).mockResolvedValueOnce({ data: setupRequired });
+
+    await store.dispatch(employeePayrollApi.endpoints.getEmployeePayStatements.initiate({ ...employeeScope, year: 2026 })).unwrap();
+    await store.dispatch(employeePayrollApi.endpoints.getEmployeePayStatements.initiate({ ...employeeScope, year: 2026, cursor: "next-a" })).unwrap();
+
+    const cached = employeePayrollApi.endpoints.getEmployeePayStatements.select({ ...employeeScope, year: 2026 })(store.getState()).data;
+    expect(cached).toEqual(setupRequired);
   });
 
   it("downloads the encoded statement PDF through the authenticated Axios blob helper", async () => {

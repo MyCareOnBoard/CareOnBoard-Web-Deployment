@@ -26,6 +26,9 @@ describe("PayStatementDetailModal", () => {
     render(<PayStatementDetailModal open statement={statement()} currency="USD" employmentId="employment-1" onOpenChange={vi.fn()} />);
     expect(screen.getByText(/regular hours/i)).toBeVisible();
     expect(screen.getByText(/direct deposit/i)).toBeVisible();
+    expect(screen.getByText(/pay date jun 20, 2026/i)).toBeVisible();
+    expect(screen.queryByText(/· paid jun 20, 2026/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /close pay statement/i })).toBeVisible();
     await user.dblClick(screen.getByRole("button", { name: /download statement/i }));
     expect(download).toHaveBeenCalledOnce();
     expect(download).toHaveBeenCalledWith({ employmentId: "employment-1", statementId: "statement-1" });
