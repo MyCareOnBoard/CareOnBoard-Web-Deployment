@@ -144,6 +144,7 @@ describe("MyPayrollTab", () => {
   it("keeps a missing identity closed with no setup or mutation request", async () => {
     renderPayroll({ payrollScope: { ...scope, employmentId: "" } });
     expect(await screen.findByRole("alert")).toHaveTextContent(/not available/i);
+    expect(screen.getByRole("heading", { name: "Payroll Setup" })).toBeVisible();
     expect(testState.requests).toHaveLength(0);
   });
 

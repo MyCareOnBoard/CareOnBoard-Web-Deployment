@@ -15,6 +15,7 @@ export const Routes = {
     },
     agency: {
         dashboard: "/agency/dashboard",
+        myPayroll: "/agency/my-payroll",
         dspManagement: "/agency/dsp-management",
         manualStaffOnboarding: "/agency/dsp-management/manual-staff-onboarding",
         dspProfile: "/agency/dsp-management/:dspId",
@@ -98,6 +99,7 @@ export const Routes = {
     },
     userPanel: {
         dashboard: "/user-panel/dashboard",
+        payroll: "/user-panel/payroll",
         shiftManagement: "/user-panel/shift-management",
         manualShiftManagement: "/user-panel/shift-management/manual",
         clientsAndServices: "/user-panel/clients-and-services",

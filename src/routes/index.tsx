@@ -32,6 +32,7 @@ const ApplicantDashboardLayout = lazy(() => import("@/layouts/ApplicantDashboard
 const OnboardingLayout = lazy(() => import("@/layouts/OnboardingLayout"));
 const UserPanelDashboardLayout = lazy(() => import("@/layouts/UserPanelLayout"));
 const AgencyDashboardLayout = lazy(() => import("@/layouts/AgencyLayout"));
+const MyPayrollPage = lazy(() => import("@/features/payroll/pages/MyPayrollPage"));
 const UserPanelDashboard = lazy(() => import("@/pages/userPanel/dashboard"));
 const UserPanelMileage = lazy(() => import("@/pages/userPanel/mileage"));
 const UserPanelIncidentPage = lazy(() => import("@/pages/userPanel/incident"));
@@ -507,6 +508,10 @@ export const router = createBrowserRouter([
                 Component: AgencySettingsPage,
             },
             {
+                path: Routes.agency.myPayroll,
+                Component: MyPayrollPage,
+            },
+            {
                 path: Routes.agency.agencySettingsInternalUsers,
                 Component: InternalUsersPage,
             },
@@ -630,6 +635,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.userPanel.settings,
                 Component: SettingsPage,
+            },
+            {
+                path: Routes.userPanel.payroll,
+                Component: MyPayrollPage,
             },
             {
                 path: Routes.userPanel.profile,

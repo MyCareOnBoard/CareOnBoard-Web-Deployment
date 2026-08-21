@@ -57,15 +57,16 @@ function hasAgencyStaffAccess(accessList: string[], accessKey: string | undefine
     return false;
 }
 
-/** Extended NavItem with optional program-type restriction. */
-type AgencyNavItem = NavItem & { programTypes?: AgencyMode[] };
+/** Extended NavItem with optional program-type and staff-only restrictions. */
+type AgencyNavItem = NavItem & { programTypes?: AgencyMode[]; staffOnly?: boolean };
 
 function filterNavItemsByAccess(items: AgencyNavItem[], userType: UserType | undefined, accessList?: string[]): AgencyNavItem[] {
     if (userType === UserType.AGENCY) {
-        return items;
+        return items.filter((item) => !item.staffOnly);
     }
 
     return items.flatMap((item) => {
+        if (item.staffOnly) return userType === UserType.AGENCY_STAFF ? [item] : [];
         if (item.label === "Billing" && item.children) {
             const children = item.children.filter((child) =>
                 !child.accessKey || canAccessBillingChild(userType, accessList ?? [], child.accessKey as AgencyBillingScope),
@@ -99,6 +100,7 @@ const allNavItems: AgencyNavItem[] = [
     { label: "Analytics", path: Routes.agency.analytics, icon: AnalyticsIcon, accessKey: "Analytics" },
     { label: "Notes", path: Routes.agency.notes, icon: NotesIcon, accessKey: "Notes" },
     { label: "Timesheet", path: Routes.agency.staffTimesheet, icon: CalendarClock },
+    { label: "My Payroll", path: Routes.agency.myPayroll, icon: BillingIcon, staffOnly: true },
     { label: "Community Inclusion", path: Routes.agency.communityInclusions, icon: CommunityInclusionIcon, accessKey: "Community Inclusion", programTypes: ["ddd"] },
     { label: "Day Program", path: Routes.agency.dayProgram, icon: Sun, programTypes: ["ddd"] },
     {
@@ -305,9 +307,11 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
     );
     const currentNavItem = resolveActiveNavItem(location.pathname, allNavItems);
     const mayAccessNonBillingRoute = billingRoute ? true : (
-        user?.userType === UserType.AGENCY ||
-        !currentNavItem?.accessKey ||
+        (currentNavItem?.staffOnly
+            ? user?.userType === UserType.AGENCY_STAFF
+            : user?.userType === UserType.AGENCY || !currentNavItem?.accessKey ||
         hasAgencyStaffAccess(user?.profile?.accessList ?? [], currentNavItem.accessKey)
+        )
     );
     const canRenderCurrentRoute = mayAccessBillingRoute && mayAccessNonBillingRoute;
 

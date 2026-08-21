@@ -1,13 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter, useLocation } from "react-router";
 import SettingsPage from "../index";
 import { UserType } from "@/utils/auth/types";
 
 let user: any;
 
+vi.unmock("react-router");
 vi.mock("@/utils/auth", () => ({ useAuth: () => ({ user }) }));
 vi.mock("@/pages/shared/settings/AccountSettingsTab", () => ({ default: () => <div>account</div> }));
+vi.mock("@/pages/shared/settings/NotificationPreferencesTab", () => ({
+  default: () => <div>notifications</div>,
+}));
 vi.mock("@/features/payroll/components/MyPayrollTab", () => ({
   default: ({ scope, active }: any) => (
     <div data-testid="my-payroll-scope">
@@ -15,6 +21,10 @@ vi.mock("@/features/payroll/components/MyPayrollTab", () => ({
     </div>
   ),
 }));
+const LocationProbe = () => <output data-testid="location">{useLocation().search}</output>;
+const expectLocation = async (search: string) => {
+  await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent(search));
+};
 
 describe("SettingsPage My Payroll", () => {
   beforeEach(() => {
@@ -26,37 +36,55 @@ describe("SettingsPage My Payroll", () => {
     };
   });
 
-  it("replaces the legacy payroll form with My Payroll using the authenticated employment scope", async () => {
+  it("uses payrollSetup for personal payroll setup and preserves unrelated URL parameters", async () => {
     const interaction = userEvent.setup();
-    render(<SettingsPage />);
-
-    await interaction.click(screen.getByRole("tab", { name: "My Payroll" }));
+    render(<MemoryRouter initialEntries={["/settings?from=notice&tab=payrollSetup"]}><SettingsPage /><LocationProbe /></MemoryRouter>);
 
     expect(await screen.findByTestId("my-payroll-scope")).toHaveTextContent(
       "employee:employee-1:agency-1:employment-1",
     );
-    expect(screen.queryByRole("textbox", { name: /bank|routing|account number/i })).not.toBeInTheDocument();
+    await expectLocation("?from=notice&tab=payrollSetup");
+    expect(screen.getByRole("tab", { name: "Payroll Setup" })).toHaveAttribute("aria-selected", "true");
 
+    await interaction.click(screen.getByRole("tab", { name: "Notifications" }));
+    await expectLocation("?from=notice&tab=notification");
     await interaction.click(screen.getByRole("tab", { name: "Account" }));
-    expect(screen.queryByTestId("my-payroll-scope")).not.toBeInTheDocument();
+    await expectLocation("?from=notice&tab=account");
+    await interaction.click(screen.getByRole("tab", { name: "Payroll Setup" }));
+    await expectLocation("?from=notice&tab=payrollSetup");
+    expect(screen.queryByRole("textbox", { name: /bank|routing|account number/i })).not.toBeInTheDocument();
   });
 
   it("keeps My Payroll available without an employment ID so the shared unavailable state can render", async () => {
     user = { ...user, payrollEmploymentId: undefined };
     const interaction = userEvent.setup();
-    render(<SettingsPage />);
+    render(<MemoryRouter><SettingsPage /></MemoryRouter>);
 
-    await interaction.click(screen.getByRole("tab", { name: "My Payroll" }));
+    await interaction.click(screen.getByRole("tab", { name: "Payroll Setup" }));
 
     expect(await screen.findByTestId("my-payroll-scope")).toHaveTextContent(
       "employee:employee-1:agency-1:unavailable",
     );
   });
 
-  it("does not expose My Payroll to non-employees", () => {
+  it("canonicalizes unknown and unavailable payroll tabs to account after auth resolves", async () => {
     user = { ...user, userType: UserType.APPLICANT };
-    render(<SettingsPage />);
+    render(<MemoryRouter initialEntries={["/settings?from=notice&tab=payrollSetup"]}><SettingsPage /><LocationProbe /></MemoryRouter>);
 
-    expect(screen.queryByRole("tab", { name: "My Payroll" })).not.toBeInTheDocument();
+    await expectLocation("?from=notice&tab=account");
+    expect(screen.queryByRole("tab", { name: "Payroll Setup" })).not.toBeInTheDocument();
+  });
+
+  it("canonicalizes an unknown tab to account after auth resolves", async () => {
+    render(<MemoryRouter initialEntries={["/settings?from=notice&tab=unknown"]}><SettingsPage /><LocationProbe /></MemoryRouter>);
+
+    await expectLocation("?from=notice&tab=account");
+  });
+
+  it("does not expose Payroll Setup to non-employees", () => {
+    user = { ...user, userType: UserType.APPLICANT };
+    render(<MemoryRouter><SettingsPage /></MemoryRouter>);
+
+    expect(screen.queryByRole("tab", { name: "Payroll Setup" })).not.toBeInTheDocument();
   });
 });

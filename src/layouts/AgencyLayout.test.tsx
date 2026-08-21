@@ -115,6 +115,40 @@ describe("AgencyDashboardLayout billing authorization", () => {
     expect(mounted).not.toHaveBeenCalled();
   });
 
+  it("shows My Payroll to agency staff without a payroll-management permission", () => {
+    routing.pathname = "/agency/dashboard";
+    state.user.profile.accessList = [];
+
+    render(<MemoryRouter><AgencyDashboardLayout /></MemoryRouter>);
+
+    expect(screen.getByText("My Payroll")).toHaveAttribute("data-path", "/agency/my-payroll");
+  });
+
+  it("allows agency staff to directly open My Payroll without mounting a billing permission check", () => {
+    routing.pathname = "/agency/my-payroll";
+    const mounted = vi.fn();
+    function Child() { mounted(); return <div>My payroll child</div>; }
+
+    render(<MemoryRouter><AgencyDashboardLayout><Child /></AgencyDashboardLayout></MemoryRouter>);
+
+    expect(screen.getByText("My payroll child")).toBeVisible();
+    expect(mounted).toHaveBeenCalledOnce();
+  });
+
+  it("hides My Payroll from an agency owner and denies the direct route before child mount", () => {
+    routing.pathname = "/agency/my-payroll";
+    state.user = { ...state.user, userType: "agency", profile: { accessList: [] } };
+    const mounted = vi.fn();
+    function Child() { mounted(); return <div>Owner payroll child</div>; }
+
+    render(<MemoryRouter><AgencyDashboardLayout><Child /></AgencyDashboardLayout></MemoryRouter>);
+
+    expect(screen.queryByText("My Payroll")).not.toBeInTheDocument();
+    expect(screen.queryByText("Owner payroll child")).not.toBeInTheDocument();
+    expect(mounted).not.toHaveBeenCalled();
+    expect(screen.getByTestId("route-redirect")).toHaveAttribute("data-to", "/agency/dashboard");
+  });
+
   it.each(DIRECT_BILLING_ROUTE_CASES)(
     "authorizes $path only for owner, $view, or its matching elevated scope",
     ({ path, view: requiredView, implied, unrelated }) => {

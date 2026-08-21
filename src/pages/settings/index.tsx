@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router";
 import { useAuth } from "@/utils/auth";
 import { UserType } from "@/utils/auth/types";
 import {
@@ -14,11 +15,11 @@ const NotificationPreferencesTab = lazy(
 );
 const MyPayrollTab = lazy(() => import("@/features/payroll/components/MyPayrollTab"));
 
-type UserSettingsTabId = "account" | "notification" | "myPayroll";
+type UserSettingsTabId = "account" | "notification" | "payrollSetup";
 
 export default function SettingsPage() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<UserSettingsTabId>("account");
+  const [searchParams, setSearchParams] = useSearchParams();
   const [visitedTabs, setVisitedTabs] = useState<Set<UserSettingsTabId>>(
     () => new Set(["account"]),
   );
@@ -30,31 +31,37 @@ export default function SettingsPage() {
       { id: "notification", label: "Notifications" },
     ];
     if (user && isEmployee) {
-      items.push({ id: "myPayroll", label: "My Payroll" });
+      items.push({ id: "payrollSetup", label: "Payroll Setup" });
     }
     return items;
   }, [user, isEmployee]);
 
   const subtitle =
     user && isEmployee
-      ? "Manage your account, notifications, and payroll."
+      ? "Manage your account, notifications, and payroll setup."
       : "Manage your account and notifications.";
 
+  const requestedTab = searchParams.get("tab");
+  const activeTab = tabs.some((tab) => tab.id === requestedTab)
+    ? requestedTab as UserSettingsTabId
+    : "account";
+
   const handleTabChange = useCallback((tabId: UserSettingsTabId) => {
-    setActiveTab(tabId);
-    setVisitedTabs((prev) => new Set(prev).add(tabId));
-  }, []);
+    const next = new URLSearchParams(searchParams);
+    next.set("tab", tabId);
+    setSearchParams(next);
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
-    if (!isEmployee && activeTab === "myPayroll") {
-      setActiveTab("account");
-      setVisitedTabs((prev) => {
-        const next = new Set(prev);
-        next.delete("myPayroll");
-        return next;
-      });
-    }
-  }, [isEmployee, activeTab]);
+    setVisitedTabs((prev) => prev.has(activeTab) ? prev : new Set(prev).add(activeTab));
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (!user || !requestedTab || tabs.some((tab) => tab.id === requestedTab)) return;
+    const next = new URLSearchParams(searchParams);
+    next.set("tab", "account");
+    setSearchParams(next, { replace: true });
+  }, [requestedTab, searchParams, setSearchParams, tabs, user]);
 
   return (
     <div className="min-w-0">
@@ -83,11 +90,11 @@ export default function SettingsPage() {
           </TabPanel>
         )}
 
-        {user && isEmployee && activeTab === "myPayroll" && visitedTabs.has("myPayroll") && (
-          <TabPanel tabId="myPayroll" activeTab={activeTab}>
+        {user && isEmployee && activeTab === "payrollSetup" && visitedTabs.has("payrollSetup") && (
+          <TabPanel tabId="payrollSetup" activeTab={activeTab}>
             <Suspense fallback={<SettingsTabSkeleton variant="form" cardCount={1} />}>
               <MyPayrollTab
-                active={activeTab === "myPayroll"}
+                active={activeTab === "payrollSetup"}
                 scope={{
                   audience: "employee",
                   actorUid: user.uid,

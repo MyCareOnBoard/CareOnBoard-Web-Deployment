@@ -320,7 +320,7 @@ export default function MyPayrollTab({ scope, active }: { scope: EmployeePayroll
   if (!scope.employmentId) {
     return (
       <div className="flex flex-col gap-4">
-        <SettingsSectionCard title="My Payroll" subtitle="Manage your personal payroll onboarding.">
+        <SettingsSectionCard title="Payroll Setup" subtitle="Manage your personal payroll onboarding.">
           <p role="alert" className="text-sm text-[#5d626b]">Payroll setup is not available for this account.</p>
         </SettingsSectionCard>
       </div>
@@ -334,7 +334,7 @@ export default function MyPayrollTab({ scope, active }: { scope: EmployeePayroll
   if (!payroll && queryState.isError) {
     return (
       <div className="flex flex-col gap-4">
-        <SettingsSectionCard title="My Payroll" subtitle="Manage your personal payroll onboarding.">
+        <SettingsSectionCard title="Payroll Setup" subtitle="Manage your personal payroll onboarding.">
           <p role="alert" className="text-sm text-[#8b2d2d]">Payroll setup could not be loaded.</p>
           <button type="button" onClick={() => void subscription.refetch()} className="mt-3 min-h-11 rounded-lg border border-[#b8dfe0] px-4 text-sm font-semibold text-[#006f73] hover:bg-[#f0fbfb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2">Try again</button>
         </SettingsSectionCard>
@@ -381,7 +381,7 @@ export default function MyPayrollTab({ scope, active }: { scope: EmployeePayroll
   return (
     <div className="flex flex-col gap-4">
       <SettingsSectionCard
-        title="My Payroll"
+        title="Payroll Setup"
         subtitle="Follow your setup from your agency connection through payment and tax onboarding."
         className="min-h-[420px]"
       >

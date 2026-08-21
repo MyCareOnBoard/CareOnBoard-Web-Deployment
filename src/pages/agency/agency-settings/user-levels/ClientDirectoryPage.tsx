@@ -99,7 +99,7 @@ export default function ClientDirectoryPage() {
     <div className="space-y-6">
       {/* Back Button */}
       <button
-        onClick={() => navigate(Routes.agency.agencySettings, { state: { activeTab: "userLevels" } })}
+        onClick={() => navigate(`${Routes.agency.agencySettings}?tab=userLevels`)}
         className="flex items-center gap-2 text-gray-600 transition-colors cursor-pointer hover:text-gray-900"
       >
         <ArrowLeft className="w-5 h-5" />
