@@ -100,7 +100,6 @@ const allNavItems: AgencyNavItem[] = [
     { label: "Analytics", path: Routes.agency.analytics, icon: AnalyticsIcon, accessKey: "Analytics" },
     { label: "Notes", path: Routes.agency.notes, icon: NotesIcon, accessKey: "Notes" },
     { label: "Timesheet", path: Routes.agency.staffTimesheet, icon: CalendarClock },
-    { label: "My Payroll", path: Routes.agency.myPayroll, icon: BillingIcon, staffOnly: true },
     { label: "Community Inclusion", path: Routes.agency.communityInclusions, icon: CommunityInclusionIcon, accessKey: "Community Inclusion", programTypes: ["ddd"] },
     { label: "Day Program", path: Routes.agency.dayProgram, icon: Sun, programTypes: ["ddd"] },
     {
@@ -122,6 +121,7 @@ const allNavItems: AgencyNavItem[] = [
     { label: "Incident", path: Routes.agency.incident, icon: IncidentIcon, accessKey: "Incident" },
     { label: "Support", path: Routes.agency.support, icon: SupportIcon, accessKey: "Support" },
     { label: "Announcements", path: Routes.agency.announcements, icon: Megaphone },
+    { label: "My Payroll", path: Routes.agency.myPayroll, icon: BillingIcon, staffOnly: true },
     { label: "Settings", path: Routes.agency.agencySettings, icon: Settings },
 ];
 
