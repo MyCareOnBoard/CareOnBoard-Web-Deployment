@@ -14,6 +14,7 @@ import {
 import { agencyPayrollPaths } from "./agencyPayrollEndpoints";
 import { managerPrimaryWorkplaceCommandRequest, managerPrimaryWorkplaceInvalidationTags } from "./payrollCommands";
 import { employeeSetupMutationTags } from "./cacheTags";
+import type { PayStatementPage } from "../model/types";
 
 const baseQuery = vi.hoisted(() => vi.fn());
 const axiosGet = vi.hoisted(() => vi.fn());
@@ -118,7 +119,7 @@ describe("employee pay statements", () => {
     agencyId: "agency-1",
     employmentId: "employment/a",
   };
-  const page = (statementIds: string[], nextCursor: string | null, summary = { yearToDateGrossCents: 120_000, latestNetPayCents: 90_000, latestPayDate: "2026-06-15", nextPayDate: null, nextPayStatus: null }) => ({
+  const page = (statementIds: string[], nextCursor: string | null, summary: PayStatementPage["summary"] = { yearToDateGrossCents: 120_000, latestNetPayCents: 90_000, latestPayDate: "2026-06-15", nextPayDate: null, nextPayStatus: null }) => ({
     setupRequired: false,
     year: 2026,
     currency: "USD" as const,
