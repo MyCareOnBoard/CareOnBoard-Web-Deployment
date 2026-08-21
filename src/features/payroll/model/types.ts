@@ -12,6 +12,47 @@ export type EmployeePayrollScope = Omit<PayrollScope, "audience"> & {
   employmentId: string;
 };
 
+export type PayStatementStatus = "processing" | "paid" | "needs_attention";
+
+export type PayStatementLine = {
+  label: string;
+  hours: number | null;
+  rateCents: number | null;
+  amountCents: number;
+};
+
+export type PayStatement = {
+  statementId: string;
+  periodStart: string;
+  periodEnd: string;
+  payDate: string;
+  status: PayStatementStatus;
+  grossPayCents: number | null;
+  deductionsCents: number | null;
+  netPayCents: number | null;
+  earnings: PayStatementLine[];
+  reimbursements: PayStatementLine[];
+  taxes: PayStatementLine[];
+  otherDeductions: PayStatementLine[];
+  paymentMethod: "direct_deposit" | "manual" | "unknown";
+  downloadAvailable: boolean;
+};
+
+export type PayStatementPage = {
+  setupRequired: boolean;
+  year: number;
+  currency: "USD";
+  summary: {
+    yearToDateGrossCents: number | null;
+    latestNetPayCents: number | null;
+    latestPayDate: string | null;
+    nextPayDate: string | null;
+    nextPayStatus: PayStatementStatus | null;
+  } | null;
+  statements: PayStatement[];
+  nextCursor: string | null;
+};
+
 export type ManagedEmployeePrimaryWorkplaceScope = Omit<PayrollScope, "audience"> & {
   audience: "agency";
   employmentId: string;

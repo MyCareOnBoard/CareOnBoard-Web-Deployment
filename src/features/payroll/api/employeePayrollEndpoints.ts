@@ -1,6 +1,7 @@
 import { checkPayrollApi } from "./checkPayrollApi";
 import { employeeSetupMutationTags, payrollTag, payrollScopeKey } from "./cacheTags";
-import type { EmployeePayrollScope, EmployeePayrollSetupProjection, PayrollOperation } from "../model/types";
+import axiosClient from "@/lib/axios";
+import type { EmployeePayrollScope, EmployeePayrollSetupProjection, PayrollOperation, PayStatementPage } from "../model/types";
 
 export type EmployeePayrollCommandArgs = EmployeePayrollScope & ({
   command: "start_provisioning";
@@ -18,12 +19,16 @@ export type EmployeeOnboardSessionArgs = EmployeePayrollScope & {
 };
 
 export type EmployeeOnboardSession = { url: string; expiresAt: string };
+export type EmployeePayStatementsArgs = EmployeePayrollScope & { year: number; cursor?: string };
+export type EmployeePayStatementDownloadArgs = { employmentId: string; statementId: string };
 
 export const employeePayrollPaths = {
   setup: (employmentId: string) => ({ url: `/checkPayrollEmployee/payroll/employees/${encodeURIComponent(employmentId)}/setup`, method: "GET" as const, requiresAuth: true }),
   commands: (employmentId: string) => ({ url: `/checkPayrollEmployee/payroll/employees/${encodeURIComponent(employmentId)}/commands`, method: "POST" as const, requiresAuth: true }),
   onboardSession: (employmentId: string) => ({ url: `/checkPayrollEmployeeOnboard/payroll/employees/${encodeURIComponent(employmentId)}/onboard-session`, method: "POST" as const, requiresAuth: true }),
   onboardReconciliation: (employmentId: string) => ({ url: `/checkPayrollEmployeeOnboard/payroll/employees/${encodeURIComponent(employmentId)}/onboard-reconciliation`, method: "POST" as const, requiresAuth: true }),
+  payStatements: (employmentId: string) => ({ url: `/checkPayrollEmployee/payroll/employees/${encodeURIComponent(employmentId)}/pay-statements`, method: "GET" as const, requiresAuth: true }),
+  payStatementPdf: (employmentId: string, statementId: string) => ({ url: `/checkPayrollEmployee/payroll/employees/${encodeURIComponent(employmentId)}/pay-statements/${encodeURIComponent(statementId)}/pdf`, method: "GET" as const, requiresAuth: true }),
 };
 
 export const employeePayrollCommandRequest = (args: EmployeePayrollCommandArgs) => ({
@@ -45,6 +50,18 @@ export const employeeOnboardReconciliationRequest = (args: EmployeePayrollScope)
   ...employeePayrollPaths.onboardReconciliation(args.employmentId),
   data: {},
 });
+
+export const employeePayStatementsRequest = ({ employmentId, year, cursor }: EmployeePayStatementsArgs) => ({
+  ...employeePayrollPaths.payStatements(employmentId),
+  params: { year, ...(cursor ? { cursor } : {}) },
+});
+
+export async function downloadEmployeePayStatementPdf({ employmentId, statementId }: EmployeePayStatementDownloadArgs): Promise<Blob> {
+  const response = await axiosClient.get<Blob>(employeePayrollPaths.payStatementPdf(employmentId, statementId).url, {
+    responseType: "blob",
+  });
+  return response.data;
+}
 
 export const employeePayrollMutationTags = (scope: EmployeePayrollScope) => employeeSetupMutationTags(scope);
 export const employeePayrollInvalidationTags = (error: unknown, scope: EmployeePayrollScope) => error ? [] : employeePayrollMutationTags(scope);
@@ -68,6 +85,17 @@ export const employeePayrollApi = checkPayrollApi.injectEndpoints({
     reconcileEmployeeOnboard: build.mutation<EmployeePayrollSetupProjection, EmployeePayrollScope>({
       query: employeeOnboardReconciliationRequest,
     }),
+    getEmployeePayStatements: build.query<PayStatementPage, EmployeePayStatementsArgs>({
+      query: employeePayStatementsRequest,
+      serializeQueryArgs: ({ queryArgs }) => `employee-pay-statements:${payrollScopeKey(queryArgs)}:${queryArgs.year}`,
+      forceRefetch: ({ currentArg, previousArg }) => currentArg?.cursor !== previousArg?.cursor,
+      merge: (currentCache, response, { arg }) => {
+        if (!arg.cursor) return response;
+        const seen = new Set(currentCache.statements.map(({ statementId }) => statementId));
+        currentCache.statements.push(...response.statements.filter(({ statementId }) => !seen.has(statementId)));
+        currentCache.nextCursor = response.nextCursor;
+      },
+    }),
   }),
 });
 
@@ -77,4 +105,6 @@ export const {
   useRunEmployeePayrollCommandMutation,
   useCreateEmployeeOnboardSessionMutation,
   useReconcileEmployeeOnboardMutation,
+  useGetEmployeePayStatementsQuery,
+  useLazyGetEmployeePayStatementsQuery,
 } = employeePayrollApi;
