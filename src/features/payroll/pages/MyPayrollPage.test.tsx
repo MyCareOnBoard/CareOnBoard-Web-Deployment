@@ -47,7 +47,7 @@ describe("MyPayrollPage", () => {
     view.rerender(<MyPayrollPage />);
     expect(usePayStatements).toHaveBeenLastCalledWith(expect.objectContaining({ actorUid: "staff-1", employmentId: "staff-employment-1" }));
 
-    useAuth.mockReturnValue({ user: { uid: "staff-2", agency: { id: "agency-2" }, payrollEmploymentId: "staff-employment-2", userType: "agency_staff" } });
+    useAuth.mockReturnValue({ user: { uid: "staff-2", agencyId: "", agency: { id: "agency-2" }, payrollEmploymentId: "staff-employment-2", userType: "agency_staff" } });
     view.rerender(<MyPayrollPage />);
     expect(usePayStatements).toHaveBeenLastCalledWith(expect.objectContaining({ actorUid: "staff-2", agencyId: "agency-2", employmentId: "staff-employment-2" }));
   });
@@ -88,6 +88,10 @@ describe("MyPayrollPage", () => {
     await userEvent.setup().click(screen.getByRole("button", { name: /load more/i }));
     expect(loadMore).toHaveBeenCalledOnce();
     expect(loadMore).toHaveBeenCalledWith(expect.objectContaining({ cursor: "cursor-2" }));
+
+    usePayStatements.mockReturnValue({ currentData: data(), isLoading: false, isFetching: true, isError: false, refetch: vi.fn() });
+    view.rerender(<MyPayrollPage />);
+    expect(screen.getByRole("button", { name: /load more/i })).toBeDisabled();
   });
 
   it("keeps existing rows when load more fails and retries the same current cursor only for the active year", async () => {
@@ -106,6 +110,7 @@ describe("MyPayrollPage", () => {
   });
 
   it("resets statement download errors after closing and reopening the detail dialog", async () => {
+    usePayStatements.mockReturnValue({ currentData: data({ statements: [{ ...statement, statementId: "closed" }] }), isLoading: false, isFetching: false, isError: false, refetch: vi.fn() });
     download.mockRejectedValueOnce(new Error("download unavailable"));
     const user = userEvent.setup();
     render(<MyPayrollPage />);
