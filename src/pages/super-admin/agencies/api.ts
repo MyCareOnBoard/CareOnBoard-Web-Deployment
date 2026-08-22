@@ -17,6 +17,7 @@ export interface CreateAgencyWithUserPayloadAgency {
   legalBusinessName?: string;
   dba?: string;
   agencyType?: string;
+  timezone: string;
   checkPayrollProfile?: CheckPayrollProfileWrite;
   npi?: string;
   providerId?: string;

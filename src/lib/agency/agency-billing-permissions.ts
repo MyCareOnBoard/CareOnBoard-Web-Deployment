@@ -6,12 +6,14 @@ export const AGENCY_BILLING_SCOPES = Object.freeze([
   "Claims Management",
   "Payroll View",
   "Payroll Management",
+  "Payroll Approval",
   "Expenses View",
   "Expenses Management",
   "Timesheets View",
   "Timesheets Approval",
 ] as const);
 
+export type PayrollApprovalScope = "Payroll Approval";
 export type AgencyBillingScope = (typeof AGENCY_BILLING_SCOPES)[number];
 
 export const AGENCY_BILLING_SCOPE_IMPLICATIONS: Readonly<
@@ -19,6 +21,7 @@ export const AGENCY_BILLING_SCOPE_IMPLICATIONS: Readonly<
 > = Object.freeze({
   "Claims Management": "Claims View",
   "Payroll Management": "Payroll View",
+  "Payroll Approval": "Payroll View",
   "Expenses Management": "Expenses View",
   "Timesheets Approval": "Timesheets View",
 });
@@ -42,5 +45,14 @@ export function canManageEmployeePayroll(
 ): boolean {
   return userType === UserType.AGENCY || (
     userType === UserType.AGENCY_STAFF && accessList.includes("Payroll Management")
+  );
+}
+
+export function canApprovePayroll(
+  userType: UserType,
+  accessList: readonly string[] = [],
+): boolean {
+  return userType === UserType.AGENCY || (
+    userType === UserType.AGENCY_STAFF && accessList.includes("Payroll Approval")
   );
 }

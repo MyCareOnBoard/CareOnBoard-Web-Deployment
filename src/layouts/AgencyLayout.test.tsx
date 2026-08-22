@@ -62,6 +62,23 @@ describe("AgencyDashboardLayout billing authorization", () => {
     expect(mounted).toHaveBeenCalled();
   });
 
+  it("treats Payroll Approval as payroll view access without granting claims", () => {
+    routing.pathname = "/agency/dashboard";
+    state.user.profile.accessList = ["Payroll Approval"];
+    const view = render(<MemoryRouter><AgencyDashboardLayout /></MemoryRouter>);
+
+    expect(screen.getByText("Billing")).toHaveAttribute("data-path", "/agency/billing/payroll-management");
+    expect(screen.getByText("Payroll management")).toBeVisible();
+    expect(screen.queryByText("Claims dashboard")).not.toBeInTheDocument();
+
+    routing.pathname = "/agency/billing/claims";
+    const mounted = vi.fn();
+    function Child() { mounted(); return <div>Claims child</div>; }
+    view.rerender(<MemoryRouter><AgencyDashboardLayout><Child /></AgencyDashboardLayout></MemoryRouter>);
+    expect(mounted).not.toHaveBeenCalled();
+    expect(screen.getByTestId("route-redirect")).toHaveAttribute("data-to", "/agency/dashboard");
+  });
+
   it("lands Billing at the first authorized child and preserves nonbilling authorization", () => {
     routing.pathname = "/agency/dashboard";
     state.user.profile.accessList = ["Payroll Management", "Shift Management"];

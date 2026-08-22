@@ -9,13 +9,18 @@ import { networkBillingLogoutResetMiddleware } from "./store";
 vi.mock("@/features/payroll/onboard/payrollOnboardSession", () => ({
   clearPayrollOnboardSessions: vi.fn(),
 }));
+vi.mock("@/lib/firebase", () => ({ auth: { currentUser: null }, db: {}, default: {} }));
 
 type PayrollScopeUser = {
   uid: string;
   agencyId: string;
   userType: string;
   payrollEmploymentId: string;
-  profile: { accessList?: string[] };
+  profile: {
+    accessList?: string[];
+    agencyScope?: "all" | "selected";
+    agencyIds?: string[];
+  };
   canOpenAgencyPayrollSetup: boolean;
 };
 
@@ -43,7 +48,7 @@ function createRecursiveMiddlewareHarness(previous: PayrollScopeUser) {
   return {
     dispatch,
     next,
-    setUser: (user: PayrollScopeUser) => middleware(setUser(user as never)),
+    setUser: (user: PayrollScopeUser | null) => middleware(setUser(user as never)),
   };
 }
 
@@ -99,6 +104,23 @@ describe("payroll scope middleware", () => {
     }
   });
 
+  it("treats reordered and duplicate selected agency ids as the same authority", () => {
+    const previous = {
+      ...currentUser,
+      profile: { ...currentUser.profile, agencyScope: "selected" as const, agencyIds: ["agency-a", "agency-b"] },
+    };
+    const harness = createRecursiveMiddlewareHarness(previous);
+
+    harness.setUser({
+      ...previous,
+      profile: { ...previous.profile, agencyIds: ["agency-b", "agency-a", "agency-a"] },
+    });
+
+    expect(harness.dispatch).not.toHaveBeenCalled();
+    expect(clearSessionsMock).not.toHaveBeenCalled();
+    expect(harness.next).toHaveBeenCalledOnce();
+  });
+
   it("resets once for every payroll identity dimension", () => {
     const identityChanges: Array<[string, Partial<PayrollScopeUser>]> = [
       ["uid", { uid: "u2" }],
@@ -117,10 +139,27 @@ describe("payroll scope middleware", () => {
     }
   });
 
-  it("resets once for an exact Payroll Management grant or setup-capability change", () => {
-    const previous = { ...currentUser, profile: { accessList: [] }, canOpenAgencyPayrollSetup: false };
+  it("resets payroll caches before a null user reaches reducers", () => {
+    const harness = createRecursiveMiddlewareHarness(currentUser);
+
+    harness.setUser(null);
+
+    expectOneResetBeforeOuterSetUserForwarding(harness);
+  });
+
+  it("resets once for every payroll authorization dimension", () => {
+    const previous = {
+      ...currentUser,
+      profile: { accessList: [], agencyScope: "all" as const, agencyIds: [] },
+      canOpenAgencyPayrollSetup: false,
+    };
     const scopeChanges: Array<[string, PayrollScopeUser]> = [
-      ["Payroll Management", { ...previous, profile: { accessList: ["Payroll Management"] } }],
+      ["Payroll View", { ...previous, profile: { ...previous.profile, accessList: ["Payroll View"] } }],
+      ["Payroll Management", { ...previous, profile: { ...previous.profile, accessList: ["Payroll Management"] } }],
+      ["Payroll Approval", { ...previous, profile: { ...previous.profile, accessList: ["Payroll Approval"] } }],
+      ["Super Admin Billing Management", { ...previous, profile: { ...previous.profile, accessList: ["Billing Management"] } }],
+      ["agency scope", { ...previous, profile: { ...previous.profile, agencyScope: "selected" } }],
+      ["selected agency ids", { ...previous, profile: { ...previous.profile, agencyIds: ["agency-b", "agency-a"] } }],
       ["setup capability", { ...previous, canOpenAgencyPayrollSetup: true }],
     ];
 

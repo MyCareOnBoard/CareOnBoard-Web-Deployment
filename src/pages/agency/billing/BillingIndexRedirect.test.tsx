@@ -15,6 +15,7 @@ import BillingIndexRedirect, { AgencyBillingIndexRedirect, getAgencyBillingIndex
 describe("BillingIndexRedirect", () => {
   it("selects the first authorized agency child", () => {
     expect(getAgencyBillingIndexDestination(UserType.AGENCY_STAFF, ["Payroll Management"])).toBe("/agency/billing/payroll-management");
+    expect(getAgencyBillingIndexDestination(UserType.AGENCY_STAFF, ["Payroll Approval"])).toBe("/agency/billing/payroll-management");
     expect(getAgencyBillingIndexDestination(UserType.AGENCY, [])).toBe("/agency/billing/financial-overview");
     expect(getAgencyBillingIndexDestination(UserType.AGENCY_STAFF, [])).toBe("/agency/dashboard");
   });

@@ -14,7 +14,7 @@ import {
 } from "./api";
 import {UserType} from "@/utils/auth/types/user.types";
 import {SaveDraftModal} from "./SaveDraftModal";
-import Step1AgencyIdentity from "@/pages/super-admin/agencies/components/StepOne";
+import Step1AgencyIdentity, { isIanaTimezone } from "@/pages/super-admin/agencies/components/StepOne";
 import Step3Leadership from "@/pages/super-admin/agencies/components/StepTwo";
 import Step5Operational from "@/pages/super-admin/agencies/components/StepThree";
 import Step6AISettings from "@/pages/super-admin/agencies/components/StepFour";
@@ -39,6 +39,7 @@ export interface AgencyFormData {
     legalBusinessName: string;
     dba: string;
     agencyType: string;
+    timezone: string;
     payrollEin: string;
     payrollEinPresent: boolean;
     payrollLegalName: string;
@@ -159,6 +160,7 @@ const STEPS = [
         requiredFields: [
             "agencyName",
             "agencyType",
+            "timezone",
             "primaryAddress",
             "county_or_state",
             "zipCode",
@@ -283,6 +285,7 @@ export default function AddAgencyWizard() {
         legalBusinessName: "",
         dba: "",
         agencyType: "",
+        timezone: "",
         payrollEin: "",
         payrollEinPresent: false,
         payrollLegalName: "",
@@ -375,6 +378,7 @@ export default function AddAgencyWizard() {
             legalBusinessName: responseData.agencyData?.legalBusinessName || "",
             dba: responseData.agencyData?.dba || "",
             agencyType: responseData.agencyData?.agencyType || "",
+            timezone: responseData.agencyData?.timezone || "",
             payrollEin: "",
             payrollEinPresent: responseData.agencyData?.checkPayrollProfile?.einStatus?.present === true,
             payrollLegalName: responseData.agencyData?.checkPayrollProfile?.legalName || "",
@@ -537,6 +541,7 @@ export default function AddAgencyWizard() {
         legalBusinessName: formData.legalBusinessName,
         dba: formData.dba,
         agencyType: formData.agencyType,
+        timezone: formData.timezone,
         checkPayrollProfile: buildCheckPayrollProfilePayload(payrollFormValues()),
         npi: formData.npi,
         providerId: formData.providerId,
@@ -617,6 +622,12 @@ export default function AddAgencyWizard() {
     // so this is a safe partial update (no full-form validation required).
     const handleSaveEdit = async () => {
         if (!agencyId) return;
+        if (!isIanaTimezone(formData.timezone)) {
+            setCurrentStep(1);
+            setFieldsWithErrors(["timezone"]);
+            toast({ title: "Agency timezone required", description: "Select a valid IANA timezone.", variant: "destructive" });
+            return;
+        }
         const payrollErrors = validateCompanySetup(payrollFormValues());
         if (Object.keys(payrollErrors).length > 0) {
             setCurrentStep(1);
@@ -690,6 +701,7 @@ export default function AddAgencyWizard() {
             if (field === "logo" && imagesPreview.logo && !!agencyId) return false;
             if (field === "letterhead" && imagesPreview.letterHead && !!agencyId) return false;
             const value = formData[field as keyof AgencyFormData];
+            if (field === "timezone") return !isIanaTimezone(String(value ?? ""));
             return value === '' || value === null || value === undefined || 
                    (Array.isArray(value) && value.length === 0);
         });
@@ -755,6 +767,7 @@ export default function AddAgencyWizard() {
                     if (field === "logo" && imagesPreview.logo && !!agencyId) return false;
                     if (field === "letterhead" && imagesPreview.letterHead && !!agencyId) return false;
                     const value = formData[field as keyof AgencyFormData];
+                    if (field === "timezone") return !isIanaTimezone(String(value ?? ""));
                     return value === '' || value === null || value === undefined || 
                            (Array.isArray(value) && value.length === 0);
                 });

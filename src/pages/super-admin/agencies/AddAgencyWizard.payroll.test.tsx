@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AddAgencyWizard from "./AddAgencyWizard";
@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   refreshProfile: vi.fn(),
   search: "",
   currentAgency: undefined as any,
+  currentDraft: undefined as any,
 }));
 
 const mutationResult = (value?: unknown) => ({ unwrap: vi.fn().mockResolvedValue(value) });
@@ -25,7 +26,7 @@ vi.mock("./api", () => ({
   useSaveDraftMutation: () => [mocks.draft, { isLoading: false }],
   useUpdateAgencyMutation: () => [mocks.update, { isLoading: false }],
   useUploadAgencyFileMutation: () => [mocks.upload, { isLoading: false }],
-  useLazyGetDraftAgencyQuery: () => [mocks.getDraft, { data: undefined }],
+  useLazyGetDraftAgencyQuery: () => [mocks.getDraft, { data: mocks.currentDraft }],
   useLazyGetAgencyQuery: () => [mocks.getAgency, { data: mocks.currentAgency }],
   useGetServicesQuery: () => ({ data: { services: [{ name: "Personal Care", code: "S5125", program: "ddd" }] } }),
 }));
@@ -45,14 +46,17 @@ vi.mock("@/pages/super-admin/user-access-control/resetSuperAdminCaches", () => (
 vi.mock("./agencyAccessRefreshToast", () => ({ dismissAgencyAccessRefreshWarning: vi.fn(), showAgencyAccessRefreshWarning: vi.fn() }));
 
 vi.mock("@/pages/super-admin/agencies/components/StepOne", async () => {
-  const { default: StepOne } = await vi.importActual<typeof import("@/pages/super-admin/agencies/components/StepOne")>("@/pages/super-admin/agencies/components/StepOne");
+  const actual = await vi.importActual<typeof import("@/pages/super-admin/agencies/components/StepOne")>("@/pages/super-admin/agencies/components/StepOne");
+  const StepOne = actual.default;
   return {
+    ...actual,
     default: ({ formData, onChange, fieldsWithErrors }: any) => <div>
       <StepOne formData={formData} onChange={onChange} fieldsWithErrors={fieldsWithErrors} />
       <button type="button" onClick={() => {
         const values = {
           agencyName: "Able Care", agencyType: "provider", primaryAddress: "100 Agency Way",
           county_or_state: "TX", zipCode: "78701", mainPhone: "5125550123", supportEmail: "hello@able.example",
+          timezone: "America/Chicago",
           websiteUrl: "https://able.example", payrollLegalName: "Able Care LLC", payrollEin: "12-3456789",
           payrollEntityType: "llc", payrollIndustry: "health_care",
           payrollLegalAddress: { line1: "1 Legal Street", line2: "Suite 1", city: "Austin", state: "TX", postalCode: "78701", country: "US" },
@@ -99,6 +103,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.search = "";
   mocks.currentAgency = undefined;
+  mocks.currentDraft = undefined;
   mocks.create.mockReturnValue(mutationResult({ success: true }));
   mocks.draft.mockReturnValue(mutationResult());
   mocks.update.mockReturnValue(mutationResult());
@@ -107,6 +112,40 @@ beforeEach(() => {
 });
 
 describe("AddAgencyWizard payroll endpoint payloads", () => {
+  it("starts with no browser-derived timezone and exposes a searchable IANA control", async () => {
+    const user = userEvent.setup();
+    render(<AddAgencyWizard />);
+
+    const timezone = screen.getByRole("combobox", { name: "Agency timezone" });
+    expect(timezone).toHaveValue("");
+    fireEvent.change(timezone, { target: { value: "New_York" } });
+    expect(timezone).toHaveAccessibleDescription("Select a valid IANA timezone.");
+    expect(screen.getByRole("alert")).toHaveTextContent("Select a valid IANA timezone.");
+    await user.click(screen.getByRole("option", { name: "America/New_York" }));
+    expect(timezone).toHaveValue("America/New_York");
+
+    fireEvent.change(timezone, { target: { value: "Mars/Olympus_Mons" } });
+    expect(timezone).toHaveValue("Mars/Olympus_Mons");
+    expect(timezone).toHaveAccessibleDescription("Select a valid IANA timezone.");
+  });
+
+  it("does not advance or submit with an empty or invalid timezone", async () => {
+    const user = userEvent.setup();
+    render(<AddAgencyWizard />);
+    await user.click(screen.getByRole("button", { name: "Fill identity and payroll" }));
+    const timezone = screen.getByRole("combobox", { name: "Agency timezone" });
+
+    fireEvent.change(timezone, { target: { value: "" } });
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.queryByRole("button", { name: "Fill leadership" })).not.toBeInTheDocument();
+    expect(mocks.create).not.toHaveBeenCalled();
+
+    fireEvent.change(timezone, { target: { value: "Mars/Olympus_Mons" } });
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.queryByRole("button", { name: "Fill leadership" })).not.toBeInTheDocument();
+    expect(mocks.create).not.toHaveBeenCalled();
+  }, 15_000);
+
   it("sends a blank needs-information profile through the draft endpoint without empty nested groups", async () => {
     const user = userEvent.setup();
     render(<AddAgencyWizard />);
@@ -127,6 +166,7 @@ describe("AddAgencyWizard payroll endpoint payloads", () => {
       agencyData: {
         name: "Able Care",
         email: "hello@able.example",
+        timezone: "America/Denver",
         checkPayrollProfile: { legalName: "Able Care LLC", einStatus: { present: true, last4: "6789" } },
       },
       user: { fullName: "Agency Owner", email: "owner@able.example", phone: "+15125550125", userType: "agency" },
@@ -135,6 +175,7 @@ describe("AddAgencyWizard payroll endpoint payloads", () => {
     render(<AddAgencyWizard />);
 
     await waitFor(() => expect(screen.getByLabelText("EIN")).toHaveAttribute("placeholder", "EIN on file"));
+    expect(screen.getByRole("combobox", { name: "Agency timezone" })).toHaveValue("America/Denver");
     expect(screen.getByLabelText("EIN")).toHaveValue("");
     expect(screen.queryByText("6789")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Save Changes" }));
@@ -142,7 +183,7 @@ describe("AddAgencyWizard payroll endpoint payloads", () => {
     await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
     expect(mocks.update.mock.calls[0][0]).toMatchObject({
       agencyId: "agency-1",
-      data: { agency: { checkPayrollProfile: { legalName: "Able Care LLC", einChange: { mode: "preserve" } } } },
+      data: { agency: { timezone: "America/Denver", checkPayrollProfile: { legalName: "Able Care LLC", einChange: { mode: "preserve" } } } },
     });
     expect(JSON.stringify(mocks.update.mock.calls[0][0])).not.toMatch(/einStatus|designatedSignerUserUid|payrollSchedule|nextPayoutDate|last4/);
   }, 15_000);
@@ -153,6 +194,7 @@ describe("AddAgencyWizard payroll endpoint payloads", () => {
       agencyData: {
         name: "Able Care",
         email: "hello@able.example",
+        timezone: "America/Denver",
         phone: "+15125550123",
         checkPayrollProfile: { payrollContact: { name: "Pat Payroll", email: "pat@able.example", phone: "+15125550124" } },
       },
@@ -164,10 +206,29 @@ describe("AddAgencyWizard payroll endpoint payloads", () => {
     expect(screen.getAllByText("+1")).toHaveLength(2);
   });
 
+  it("retains a saved draft timezone when hydrating and saving again", async () => {
+    mocks.search = "?draftId=draft-1";
+    mocks.currentDraft = {
+      agencyData: { name: "Draft Care", email: "draft@example.com", timezone: "America/Los_Angeles", checkPayrollProfile: {} },
+      user: { fullName: "Draft Owner", email: "owner@example.com", phone: "+15125550125", userType: "agency" },
+    };
+    const user = userEvent.setup();
+    render(<AddAgencyWizard />);
+
+    expect(await screen.findByRole("combobox", { name: "Agency timezone" })).toHaveValue("America/Los_Angeles");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    const dialog = screen.getByRole("dialog");
+    await user.type(within(dialog).getByLabelText("Save Name"), "Draft with timezone");
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(mocks.draft).toHaveBeenCalledTimes(1));
+    expect(mocks.draft.mock.calls[0][0].agency.timezone).toBe("America/Los_Angeles");
+  });
+
   it("keeps a malformed company phone visible and invalid until it is explicitly replaced", async () => {
     mocks.search = "?agencyId=agency-1";
     mocks.currentAgency = {
-      agencyData: { name: "Able Care", email: "hello@able.example", phone: "+445125550123", checkPayrollProfile: {} },
+      agencyData: { name: "Able Care", email: "hello@able.example", phone: "+445125550123", timezone: "America/Denver", checkPayrollProfile: {} },
       user: { fullName: "Agency Owner", email: "owner@able.example", phone: "+15125550125", userType: "agency" },
     };
     const user = userEvent.setup();
@@ -200,6 +261,7 @@ describe("AddAgencyWizard payroll endpoint payloads", () => {
     await user.click(screen.getByRole("button", { name: "Create Agency" }));
 
     await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1));
+    expect(mocks.create.mock.calls[0][0].agency.timezone).toBe("America/Chicago");
     expect(mocks.create.mock.calls[0][0].agency.checkPayrollProfile).toEqual(expectedPayrollWrite);
     expect(mocks.create.mock.calls[0][0].user).toEqual({
       fullName: "Agency Owner", email: "owner@able.example", password: "StrongPass1!", phone: "+15125550125", userType: "agency",

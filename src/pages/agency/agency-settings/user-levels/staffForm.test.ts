@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { AgencyAccessScope, getAgencyAccessScopes } from "@/lib/api/agency-staff";
 import {
   isCustomRole,
   isBillingRateValid,
@@ -10,9 +11,14 @@ import {
   toggleAgencyAccess,
 } from "./staffForm";
 
+vi.mock("@/lib/firebase", () => ({ auth: { currentUser: null }, db: {}, default: {} }));
+
 describe("agency billing access form invariants", () => {
   it("uses canonical billing options and removes legacy values", () => {
     expect(AGENCY_ACCESS_OPTIONS).toContain("Payroll Management");
+    expect(AGENCY_ACCESS_OPTIONS).toContain("Payroll Approval");
+    expect(AgencyAccessScope.PAYROLL_APPROVAL).toBe("Payroll Approval");
+    expect(getAgencyAccessScopes()).toContain("Payroll Approval");
     expect(AGENCY_ACCESS_OPTIONS).not.toContain("Billing & Management");
     expect(normalizeAgencyAccessListForUi(["Billing & Management", "Scheduling", "Mileage"])).toEqual(["Shift Management", "Mileage"]);
   });
@@ -23,6 +29,8 @@ describe("agency billing access form invariants", () => {
     expect(toggleAgencyAccess(["Claims Management", "Claims View"], "Claims Management")).toEqual(["Claims View"]);
     expect(toggleAgencyAccess(["Claims Management", "Claims View"], "Claims View")).toEqual([]);
     expect(toggleAgencyAccess([], "Payroll View")).toEqual(["Payroll View"]);
+    expect(toggleAgencyAccess([], "Payroll Approval")).toEqual(["Payroll Approval", "Payroll View"]);
+    expect(toggleAgencyAccess(["Payroll Approval", "Payroll View"], "Payroll View")).toEqual([]);
     expect(toggleAgencyAccess(["Mileage", "Incident"], "Payroll View")).toEqual(["Mileage", "Incident", "Payroll View"]);
   });
 });
@@ -78,8 +86,11 @@ describe("staffHrFieldsValid", () => {
   const full = {
     role: "Administrator",
     employmentType: "full_time" as const,
+    employmentStartDate: "2026-08-20",
+    employmentEndDate: "",
     billingType: "hourly" as const,
     billingRate: "25",
+    compensationEffectiveDate: "2026-08-20",
   };
 
   it("create requires every field", () => {
@@ -87,17 +98,50 @@ describe("staffHrFieldsValid", () => {
     expect(staffHrFieldsValid({ mode: "create", ...full, role: "" })).toBe(false);
     expect(staffHrFieldsValid({ mode: "create", ...full, employmentType: "" })).toBe(false);
     expect(staffHrFieldsValid({ mode: "create", ...full, billingRate: "" })).toBe(false);
+    expect(staffHrFieldsValid({ mode: "create", ...full, employmentStartDate: "" })).toBe(false);
+    expect(staffHrFieldsValid({ mode: "create", ...full, compensationEffectiveDate: "" })).toBe(false);
+  });
+
+  it("rejects an employment end date before the start date", () => {
+    expect(staffHrFieldsValid({
+      mode: "create",
+      ...full,
+      employmentEndDate: "2026-08-19",
+    })).toBe(false);
   });
 
   it("edit allows all empty (legacy backfill)", () => {
     expect(
-      staffHrFieldsValid({ mode: "edit", role: "", employmentType: "", billingType: "", billingRate: "" })
+      staffHrFieldsValid({ mode: "edit", role: "", employmentType: "", employmentStartDate: "", employmentEndDate: "", billingType: "", billingRate: "", compensationEffectiveDate: "" })
     ).toBe(true);
   });
 
   it("edit still rejects a half-filled billing pair", () => {
     expect(
-      staffHrFieldsValid({ mode: "edit", role: "", employmentType: "", billingType: "hourly", billingRate: "" })
+      staffHrFieldsValid({ mode: "edit", role: "", employmentType: "", employmentStartDate: "", employmentEndDate: "", billingType: "hourly", billingRate: "", compensationEffectiveDate: "" })
     ).toBe(false);
+  });
+
+  it("edit requires current pay terms and their effective date as one unit", () => {
+    expect(staffHrFieldsValid({
+      mode: "edit",
+      role: "",
+      employmentType: "",
+      employmentStartDate: "",
+      employmentEndDate: "",
+      billingType: "hourly",
+      billingRate: "25",
+      compensationEffectiveDate: "",
+    })).toBe(false);
+    expect(staffHrFieldsValid({
+      mode: "edit",
+      role: "",
+      employmentType: "",
+      employmentStartDate: "",
+      employmentEndDate: "",
+      billingType: "",
+      billingRate: "",
+      compensationEffectiveDate: "2026-08-20",
+    })).toBe(false);
   });
 });

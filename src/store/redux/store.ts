@@ -41,7 +41,7 @@ import { networkBillingApi } from "@/lib/api/network-billing";
 import { staffDirectoryApi } from "@/lib/api/staff-directory";
 import { checkPayrollApi } from "@/features/payroll/api/checkPayrollApi";
 import { clearPayrollOnboardSessions } from "@/features/payroll/onboard/payrollOnboardSession";
-import { payrollScopeChanged } from "@/features/payroll/api/payrollCacheLifecycle";
+import { payrollAuthorizationKey, payrollScopeChanged } from "@/features/payroll/api/payrollCacheLifecycle";
 
 const appReducer = combineReducers({
     auth: authReducer,
@@ -91,19 +91,11 @@ export const networkBillingLogoutResetMiddleware: Middleware = ({ dispatch, getS
     }
     if ((action as { type?: unknown }).type === setUser.type) {
         const previous = (getState() as RootState).auth?.user;
-        const nextUser = (action as { payload?: { uid?: string; agencyId?: string; userType?: string; payrollEmploymentId?: string; profile?: { accessList?: string[] }; canOpenAgencyPayrollSetup?: boolean } | null }).payload;
-        if (
-            previous?.uid !== nextUser?.uid ||
-            previous?.agencyId !== nextUser?.agencyId ||
-            previous?.userType !== nextUser?.userType ||
-            previous?.payrollEmploymentId !== nextUser?.payrollEmploymentId ||
-            (previous?.profile?.accessList?.includes("Payroll Management") === true) !== (nextUser?.profile?.accessList?.includes("Payroll Management") === true) ||
-            previous?.canOpenAgencyPayrollSetup !== nextUser?.canOpenAgencyPayrollSetup
-        ) {
-            const key = (value: typeof previous) => value
-                ? `${value.uid ?? ""}:${value.agencyId ?? ""}:${value.userType ?? ""}:${value.payrollEmploymentId ?? ""}:${value.profile?.accessList?.includes("Payroll Management") === true}:${value.canOpenAgencyPayrollSetup === true}`
-                : null;
-            dispatch(payrollScopeChanged({ previousKey: key(previous), nextKey: key(nextUser as typeof previous) }));
+        const nextUser = (action as ReturnType<typeof setUser>).payload;
+        const previousKey = payrollAuthorizationKey(previous);
+        const nextKey = payrollAuthorizationKey(nextUser);
+        if (previousKey !== nextKey) {
+            dispatch(payrollScopeChanged({ previousKey, nextKey }));
         }
     }
     return next(action);

@@ -19,6 +19,7 @@ export enum AgencyAccessScope {
     CLAIMS_MANAGEMENT = "Claims Management",
     PAYROLL_VIEW = "Payroll View",
     PAYROLL_MANAGEMENT = "Payroll Management",
+    PAYROLL_APPROVAL = "Payroll Approval",
     EXPENSES_VIEW = "Expenses View",
     EXPENSES_MANAGEMENT = "Expenses Management",
     TIMESHEETS_VIEW = "Timesheets View",
@@ -51,8 +52,11 @@ export interface StaffFormValues {
     agencyModes: ("ddd" | "hha")[];
     role?: string;
     employmentType?: EmploymentType;
+    employmentStartDate?: string;
+    employmentEndDate?: string | null;
     billingType?: StaffBillingType;
     billingRate?: number;
+    compensationEffectiveDate?: string;
 }
 
 /**
@@ -68,8 +72,11 @@ export interface AgencyStaffMember {
     agencyModes?: ("ddd" | "hha")[];
     role?: string;
     employmentType?: EmploymentType;
+    employmentStartDate?: string;
+    employmentEndDate?: string | null;
     billingType?: StaffBillingType;
     billingRate?: number;
+    compensationEffectiveDate?: string;
     isActive: boolean;
     agencyId: string;
     createdAt: Date | string;
@@ -90,8 +97,11 @@ export interface CreateAgencyStaffRequest {
     agencyModes: ("ddd" | "hha")[];
     role: string;
     employmentType: EmploymentType;
+    employmentStartDate: string;
+    employmentEndDate?: string | null;
     billingType: StaffBillingType;
     billingRate: number;
+    compensationEffectiveDate: string;
 }
 
 /**
@@ -105,8 +115,11 @@ export interface UpdateAgencyStaffRequest {
     agencyModes?: ("ddd" | "hha")[];
     role?: string;
     employmentType?: EmploymentType;
+    employmentStartDate?: string;
+    employmentEndDate?: string | null;
     billingType?: StaffBillingType;
     billingRate?: number;
+    compensationEffectiveDate?: string;
 }
 
 /**

@@ -95,14 +95,34 @@ export function staffHrFieldsValid(args: {
   mode: "create" | "edit";
   role: string;
   employmentType: EmploymentType | "";
+  employmentStartDate: string;
+  employmentEndDate: string;
   billingType: StaffBillingType | "";
   billingRate: string;
+  compensationEffectiveDate: string;
 }): boolean {
-  const { mode, role, employmentType, billingType, billingRate } = args;
+  const {
+    mode,
+    role,
+    employmentType,
+    employmentStartDate,
+    employmentEndDate,
+    billingType,
+    billingRate,
+    compensationEffectiveDate,
+  } = args;
+  if (employmentStartDate && employmentEndDate && employmentEndDate < employmentStartDate) {
+    return false;
+  }
   if (mode === "create") {
     return (
-      !!role.trim() && !!employmentType && !!billingType && isBillingRateValid(billingRate)
+      !!role.trim() && !!employmentType && !!employmentStartDate && !!billingType &&
+      isBillingRateValid(billingRate) && !!compensationEffectiveDate
     );
   }
-  return isBillingPairComplete(billingType, billingRate);
+  const hasBillingTerms = Boolean(billingType || billingRate.trim());
+  const hasCompensationEffectiveDate = Boolean(compensationEffectiveDate);
+  if (!hasBillingTerms && !hasCompensationEffectiveDate) return true;
+  return isBillingPairComplete(billingType, billingRate) &&
+    hasBillingTerms && hasCompensationEffectiveDate;
 }

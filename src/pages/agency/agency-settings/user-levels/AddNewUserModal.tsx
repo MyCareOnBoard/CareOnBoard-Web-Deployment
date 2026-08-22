@@ -41,8 +41,11 @@ interface AddNewUserModalProps {
     agencyModes?: ("ddd" | "hha")[];
     role?: string;
     employmentType?: EmploymentType;
+    employmentStartDate?: string;
+    employmentEndDate?: string | null;
     billingType?: StaffBillingType;
     billingRate?: number;
+    compensationEffectiveDate?: string;
   };
   onSave?: (data: StaffFormValues) => Promise<void>;
 }
@@ -90,11 +93,20 @@ export default function AddNewUserModal({
   const [employmentType, setEmploymentType] = useState<EmploymentType | "">(
     initialData?.employmentType ?? ""
   );
+  const [employmentStartDate, setEmploymentStartDate] = useState(
+    initialData?.employmentStartDate ?? ""
+  );
+  const [employmentEndDate, setEmploymentEndDate] = useState(
+    initialData?.employmentEndDate ?? ""
+  );
   const [billingType, setBillingType] = useState<StaffBillingType | "">(
     initialData?.billingType ?? ""
   );
   const [billingRate, setBillingRate] = useState(
     initialData?.billingRate !== undefined ? String(initialData.billingRate) : ""
+  );
+  const [compensationEffectiveDate, setCompensationEffectiveDate] = useState(
+    initialData?.compensationEffectiveDate ?? ""
   );
   const [isSaving, setIsSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -133,8 +145,24 @@ export default function AddNewUserModal({
 
   const billingRateValid = isBillingRateValid(billingRate);
   const billingPairComplete = isBillingPairComplete(billingType, billingRate);
+  const employmentRangeInvalid = Boolean(
+    employmentStartDate && employmentEndDate && employmentEndDate < employmentStartDate
+  );
+  const editCompensationTermsIncomplete = mode === "edit" && (
+    (Boolean(billingType || billingRate.trim()) && !compensationEffectiveDate) ||
+    (Boolean(compensationEffectiveDate) && !billingType && !billingRate.trim())
+  );
   // Create requires all HR fields; edit leaves them optional (legacy backfill).
-  const canSave = staffHrFieldsValid({ mode, role, employmentType, billingType, billingRate });
+  const canSave = staffHrFieldsValid({
+    mode,
+    role,
+    employmentType,
+    employmentStartDate,
+    employmentEndDate,
+    billingType,
+    billingRate,
+    compensationEffectiveDate,
+  });
 
   const handleSendResetLink = async () => {
     // TODO: Implement actual reset link functionality
@@ -161,9 +189,15 @@ export default function AddNewUserModal({
         // record with empties; create-mode gating guarantees they're all present.
         if (role.trim()) values.role = role.trim();
         if (employmentType) values.employmentType = employmentType;
+        if (employmentStartDate) values.employmentStartDate = employmentStartDate;
+        if (employmentEndDate) values.employmentEndDate = employmentEndDate;
+        else if (mode === "edit" && initialData?.employmentEndDate) values.employmentEndDate = null;
         if (billingType && billingRateValid) {
           values.billingType = billingType;
           values.billingRate = Number(roundRate(billingRate));
+        }
+        if (compensationEffectiveDate) {
+          values.compensationEffectiveDate = compensationEffectiveDate;
         }
         await onSave(values);
       } else {
@@ -211,10 +245,13 @@ export default function AddNewUserModal({
         setRole(r);
         setRoleIsCustom(isCustomRole(r));
         setEmploymentType(initialData.employmentType ?? "");
+        setEmploymentStartDate(initialData.employmentStartDate ?? "");
+        setEmploymentEndDate(initialData.employmentEndDate ?? "");
         setBillingType(initialData.billingType ?? "");
         setBillingRate(
           initialData.billingRate !== undefined ? String(initialData.billingRate) : ""
         );
+        setCompensationEffectiveDate(initialData.compensationEffectiveDate ?? "");
       } else {
         setName("");
         setEmail("");
@@ -224,8 +261,11 @@ export default function AddNewUserModal({
         setRole("");
         setRoleIsCustom(false);
         setEmploymentType("");
+        setEmploymentStartDate("");
+        setEmploymentEndDate("");
         setBillingType("");
         setBillingRate("");
+        setCompensationEffectiveDate("");
       }
       setIsSaving(false);
       setShowPassword(false);
@@ -444,6 +484,48 @@ export default function AddNewUserModal({
             )}
           </div>
 
+          {/* Employment dates */}
+          <div className="grid grid-cols-1 gap-[12px] sm:grid-cols-2">
+            <div className="flex flex-col gap-[4px]">
+              <Label htmlFor="employment-start-date" className="text-[12px] font-normal leading-[normal] text-[#10141a]">
+                Employment start date
+              </Label>
+              <Input
+                id="employment-start-date"
+                type="date"
+                value={employmentStartDate}
+                onChange={(event) => setEmploymentStartDate(event.target.value)}
+                disabled={isSaving}
+                aria-invalid={mode === "create" && !employmentStartDate}
+                aria-describedby={mode === "create" && !employmentStartDate ? "employment-start-date-error" : undefined}
+                className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white px-[16px] text-[14px] font-normal text-black focus-visible:ring-1 focus-visible:ring-[#00b4b8] disabled:cursor-not-allowed disabled:opacity-50"
+              />
+              {mode === "create" && !employmentStartDate && (
+                <p id="employment-start-date-error" className="text-[11px] text-[#ef4444]">Enter an employment start date.</p>
+              )}
+            </div>
+            <div className="flex flex-col gap-[4px]">
+              <Label htmlFor="employment-end-date" className="text-[12px] font-normal leading-[normal] text-[#10141a]">
+                Employment end date (optional)
+              </Label>
+              <Input
+                id="employment-end-date"
+                type="date"
+                value={employmentEndDate}
+                onChange={(event) => setEmploymentEndDate(event.target.value)}
+                disabled={isSaving}
+                aria-invalid={employmentRangeInvalid}
+                aria-describedby={employmentRangeInvalid ? "employment-end-date-error" : undefined}
+                className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white px-[16px] text-[14px] font-normal text-black focus-visible:ring-1 focus-visible:ring-[#00b4b8] disabled:cursor-not-allowed disabled:opacity-50"
+              />
+              {employmentRangeInvalid && (
+                <p id="employment-end-date-error" role="alert" className="text-[11px] text-[#ef4444]">
+                  Employment end date cannot be before the start date.
+                </p>
+              )}
+            </div>
+          </div>
+
           {/* Pay Rate */}
           <div className="flex flex-col gap-[4px] w-full">
             <Label className="text-[12px] font-normal leading-[normal] text-[#10141a]">
@@ -491,6 +573,29 @@ export default function AddNewUserModal({
             )}
             {mode === "edit" && !billingPairComplete && (
               <p className="text-[11px] text-[#ef4444]">Enter both a billing type and a rate.</p>
+            )}
+          </div>
+
+          {/* Compensation effective date */}
+          <div className="flex flex-col gap-[4px] w-full">
+            <Label htmlFor="compensation-effective-date" className="text-[12px] font-normal leading-[normal] text-[#10141a]">
+              Compensation effective date
+            </Label>
+            <Input
+              id="compensation-effective-date"
+              type="date"
+              value={compensationEffectiveDate}
+              onChange={(event) => setCompensationEffectiveDate(event.target.value)}
+              disabled={isSaving}
+              aria-invalid={(mode === "create" && !compensationEffectiveDate) || editCompensationTermsIncomplete}
+              aria-describedby={(mode === "create" && !compensationEffectiveDate) || editCompensationTermsIncomplete ? "compensation-effective-date-error" : undefined}
+              className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white px-[16px] text-[14px] font-normal text-black focus-visible:ring-1 focus-visible:ring-[#00b4b8] disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            {mode === "create" && !compensationEffectiveDate && (
+              <p id="compensation-effective-date-error" className="text-[11px] text-[#ef4444]">Enter the date these compensation terms take effect.</p>
+            )}
+            {editCompensationTermsIncomplete && (
+              <p id="compensation-effective-date-error" className="text-[11px] text-[#ef4444]">Enter the effective date for these compensation terms.</p>
             )}
           </div>
 
