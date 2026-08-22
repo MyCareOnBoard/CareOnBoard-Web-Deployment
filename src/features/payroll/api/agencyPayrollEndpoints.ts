@@ -32,7 +32,7 @@ export const agencyCompanyOnboardSessionRequest = (args: AgencyCompanyOnboardSes
 });
 
 export const agencyPayrollBootstrapInvalidationTags = (error: unknown, args: AgencyPayrollBootstrapArgs) => (
-  error ? [] : companyMutationTags(args).filter((tag) => tag.type !== "AgencySetup")
+  error ? [] : companyMutationTags(args)
 );
 export const agencyPayrollSetupTags = (scope: PayrollScope) => [payrollTag("AgencySetup", scope)];
 

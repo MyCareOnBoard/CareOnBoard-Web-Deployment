@@ -185,6 +185,23 @@ describe("CheckOnboardModal", () => {
     expect(open).toHaveBeenCalledOnce();
     expect(show).toHaveBeenCalledOnce();
   });
+  it("keeps a disabled automatic launch unconsumed until the launcher is reenabled", async () => {
+    const open = vi.fn();
+    const requestSession = vi.fn().mockResolvedValue({ link: "https://session.example/agency-a" });
+    const onAutoStartConsumed = vi.fn();
+    vi.spyOn(loader, "loadCheckOnboard").mockResolvedValue({ create: vi.fn(() => ({ open, close: vi.fn() })) });
+    const view = render(<CheckOnboardModal disabled autoStartKey="setup:agency-a:3:1" onAutoStartConsumed={onAutoStartConsumed} requestSession={requestSession} onRefetch={vi.fn()} />);
+
+    expect(screen.getByRole("button")).toBeDisabled();
+    await act(async () => {});
+    expect(requestSession).not.toHaveBeenCalled();
+    expect(onAutoStartConsumed).not.toHaveBeenCalled();
+
+    view.rerender(<CheckOnboardModal disabled={false} autoStartKey="setup:agency-a:3:1" onAutoStartConsumed={onAutoStartConsumed} requestSession={requestSession} onRefetch={vi.fn()} />);
+    await waitFor(() => expect(open).toHaveBeenCalledOnce());
+    expect(requestSession).toHaveBeenCalledOnce();
+    expect(onAutoStartConsumed).toHaveBeenCalledOnce();
+  });
   it("keeps a newer automatic key pending until the active launch settles", async () => {
     let resolveFirst!: (value: { link: string }) => void;
     const open = vi.fn(); const create = vi.fn(() => ({ open, close: vi.fn() }));

@@ -95,7 +95,7 @@ export type AgencyPayrollSignerCandidates = {
 export interface AgencyPayrollSetupProjection {
   projectionRevision: number;
   generatedAt?: string;
-  clientRevalidateAfter?: string;
+  activeOperation?: PayrollOperation;
   integration: { state: "not_configured" | "configured"; environment: "sandbox" | "production" };
   preflight: { values: CheckPayrollProfileRead; missingFieldCodes: string[] };
   readiness: { status: "needs_information" | "ready_to_sync" | "needs_attention" | "ready"; blockers: string[]; nextAction: string | null };

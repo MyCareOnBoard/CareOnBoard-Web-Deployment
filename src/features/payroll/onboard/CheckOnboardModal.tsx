@@ -55,6 +55,7 @@ export function CheckOnboardModal({
   onAutoStartConsumed,
   onClosed,
   cancelPending = false,
+  disabled = false,
   loadingDialog,
 }: {
   requestSession: () => Promise<{ link: string; expiresAt?: string }>;
@@ -66,6 +67,7 @@ export function CheckOnboardModal({
   onAutoStartConsumed?: (key: string) => void;
   onClosed?: (refetchedSetup: unknown) => void;
   cancelPending?: boolean;
+  disabled?: boolean;
   loadingDialog?: CheckOnboardLoadingDialogConfig;
 }) {
   const trigger = useRef<HTMLButtonElement>(null);
@@ -135,7 +137,7 @@ export function CheckOnboardModal({
   }, [cancelPendingOpen, retirePendingLaunch]);
 
   const continueOnboard = useCallback((onAccepted?: () => void) => {
-    if (activeLaunchRef.current !== null) return false;
+    if (disabled || activeLaunchRef.current !== null) return false;
     const current = ++generation.current;
     activeLaunchRef.current = current;
     restoreTriggerAfterDialogRef.current = false;
@@ -172,10 +174,10 @@ export function CheckOnboardModal({
       }
     })();
     return true;
-  }, [launchMode, loadingDialog, open, requestSession]);
+  }, [disabled, launchMode, loadingDialog, open, requestSession]);
 
   useEffect(() => {
-    if (!autoStartKey || autoStartedKeyRef.current === autoStartKey) return;
+    if (disabled || !autoStartKey || autoStartedKeyRef.current === autoStartKey) return;
     let cancelled = false;
     queueMicrotask(() => {
       if (cancelled || !mounted.current || autoStartedKeyRef.current === autoStartKey) return;
@@ -185,13 +187,13 @@ export function CheckOnboardModal({
       });
     });
     return () => { cancelled = true; };
-  }, [autoStartKey, autoStartTick, continueOnboard, onAutoStartConsumed]);
+  }, [autoStartKey, autoStartTick, continueOnboard, disabled, onAutoStartConsumed]);
 
   const loadingCopy = launchPhase === "loading-sdk" || sdkBusy ? loadingDialog?.opening : loadingDialog?.preparing;
 
   return (
     <div className="space-y-2">
-      <button ref={trigger} type="button" disabled={busy} aria-busy={busy} onClick={() => void continueOnboard()} className="inline-flex min-h-11 items-center justify-center rounded-md bg-[#006f73] px-4 py-2 text-sm font-medium text-white hover:bg-[#00595c] disabled:opacity-60">
+      <button ref={trigger} type="button" disabled={disabled || busy} aria-busy={busy} onClick={() => void continueOnboard()} className="inline-flex min-h-11 items-center justify-center rounded-md bg-[#006f73] px-4 py-2 text-sm font-medium text-white hover:bg-[#00595c] disabled:opacity-60">
         {busy && !loadingDialog ? <span role="status" className="inline-flex items-center gap-2"><Loader2 aria-hidden="true" className="h-4 w-4 motion-safe:animate-spin" />{openingLabel}</span> : actionLabel}
       </button>
       {loadingDialog && loadingCopy ? <CheckOnboardLoadingDialog open={busy} copy={loadingCopy} onAfterClose={handleLoadingDialogClosed} /> : null}

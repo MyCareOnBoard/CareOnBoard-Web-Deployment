@@ -9,5 +9,5 @@ describe("payrollTag", () => {
     expect(payrollTagTypes).toEqual(["AgencySetup", "AgencyOverview", "EmployeeSetup", "EmployeeReadiness", "Attention", "Compliance", "PayrollRun", "PayrollHistory"]);
   });
   it("keeps employee records distinct by employment identity", () => { const scope = { audience: "employee" as const, actorUid: "u", agencyId: "a" }; expect(payrollTag("EmployeeSetup", scope, "employment-a").id).not.toBe(payrollTag("EmployeeSetup", scope, "employment-b").id); });
-  it("invalidates all company-owned projections after a company command", () => { const scope = { audience: "agency" as const, actorUid: "u", agencyId: "a" }; expect(companyMutationTags(scope).map((tag) => tag.type)).toEqual(["AgencySetup", "AgencyOverview", "Attention", "Compliance"]); });
+  it("invalidates downstream attention and compliance caches without pre-terminal setup reads", () => { const scope = { audience: "agency" as const, actorUid: "u", agencyId: "a" }; expect(companyMutationTags(scope).map((tag) => tag.type)).toEqual(["Attention", "Compliance"]); });
 });

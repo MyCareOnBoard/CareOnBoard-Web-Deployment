@@ -1,6 +1,6 @@
-import { Children, lazy, Suspense, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
-import { Building2, Check, CircleAlert, Loader2, UserRound, WalletCards } from "lucide-react";
+import { Building2, Loader2, UserRound, WalletCards } from "lucide-react";
 import SettingsSectionCard from "@/pages/shared/settings/SettingsSectionCard";
 import SettingsTabSkeleton from "@/pages/shared/settings/SettingsTabSkeleton";
 import { useAppDispatch } from "@/store/redux/hooks";
@@ -12,6 +12,7 @@ import {
 } from "../api/employeePayrollEndpoints";
 import type { EmployeePayrollAction, EmployeePayrollScope, EmployeePayrollSetupProjection } from "../model/types";
 import { employeePayrollBlockerMessage } from "./employeePayrollCopy";
+import { PayrollJourneyStep } from "./PayrollJourneyStep";
 
 const CheckOnboardModal = lazy(async () => {
   const module = await import("../onboard/CheckOnboardModal");
@@ -37,46 +38,6 @@ type AutoOnboardIntent = {
   scope: EmployeePayrollScope;
   baselineRevision: number;
 };
-
-type JourneyState = "complete" | "current" | "attention" | "upcoming";
-
-const journeyTone = {
-  complete: { marker: "bg-emerald-50 text-emerald-700 ring-emerald-100", status: "bg-emerald-50 text-emerald-700" },
-  current: { marker: "bg-[#e8fafa] text-[#006f73] ring-[#cceff0]", status: "bg-[#e8fafa] text-[#006f73]" },
-  attention: { marker: "bg-amber-50 text-amber-700 ring-amber-100", status: "bg-amber-50 text-amber-800" },
-  upcoming: { marker: "bg-[#f4f5f6] text-[#92979f] ring-[#e8eaed]", status: "bg-[#f4f5f6] text-[#6f747c]" },
-} satisfies Record<JourneyState, { marker: string; status: string }>;
-
-function PayrollJourneyStep({ title, status, state, icon, last = false, children }: {
-  title: string;
-  status: string;
-  state: JourneyState;
-  icon: ReactNode;
-  last?: boolean;
-  children?: ReactNode;
-}) {
-  const tone = journeyTone[state];
-  const active = state === "current" || state === "attention";
-  const details = Children.toArray(children);
-
-  return (
-    <li aria-current={active ? "step" : undefined} className="flex gap-3 py-4 first:pt-0 last:pb-0 sm:gap-4">
-      <div aria-hidden="true" className="flex w-9 shrink-0 flex-col items-center self-stretch">
-        <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ring-1 ${tone.marker}`}>
-          {state === "complete" ? <Check className="h-4 w-4" strokeWidth={2.5} /> : state === "attention" ? <CircleAlert className="h-4 w-4" /> : icon}
-        </span>
-        {!last ? <span className="mt-1 min-h-6 w-px flex-1 bg-[#e3e7e9]" /> : null}
-      </div>
-      <div className="min-w-0 flex-1 pt-1">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <h3 className="text-sm font-semibold text-[#10141a] sm:text-[15px]">{title}</h3>
-          <span className={`w-fit rounded-full px-2.5 py-1 text-[11px] font-semibold ${tone.status}`}>{status}</span>
-        </div>
-        {details.length ? <div className="mt-3 text-sm leading-6 text-[#5d626b]">{details}</div> : null}
-      </div>
-    </li>
-  );
-}
 
 function documentIsFocused() {
   return typeof document === "undefined" || (document.visibilityState !== "hidden" && document.hasFocus());
