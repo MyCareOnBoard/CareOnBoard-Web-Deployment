@@ -87,10 +87,10 @@ async function renderAfterIneligibleActivation(actionable: AgencyPayrollSetupPro
 describe("AgencyPayrollSetupTab", () => {
   beforeEach(() => { vi.restoreAllMocks(); documentVisibility = "visible"; vi.spyOn(document, "visibilityState", "get").mockImplementation(() => documentVisibility); refetch.mockReset(); runCommand.mockReset(); loadSetup.mockReset(); bootstrapSetup.mockReset(); createCompanyOnboardSession.mockReset(); getOperation.mockReset(); getOverview.mockReset(); mocks.signerSearchTrigger.mockReset(); mocks.newCommandKey.mockReset(); mocks.loadCheckOnboard.mockReset(); mocks.createCheckOnboard.mockReset(); mocks.openCheckOnboard.mockReset(); mocks.showCheckOnboard.mockReset(); mocks.closeCheckOnboard.mockReset(); mocks.loadCheckOnboard.mockResolvedValue({ create: mocks.createCheckOnboard }); mocks.createCheckOnboard.mockReturnValue({ open: mocks.openCheckOnboard, _show: mocks.showCheckOnboard, close: mocks.closeCheckOnboard }); mocks.newCommandKey.mockReturnValue("00000000-0000-4000-8000-000000000001"); setupQuery = { error: true, refetch }; });
 
-  it("renders one four-stage journey with progress derived from completed stages", () => {
-    const configured = projection({ canView: true, canManage: false, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false }, true);
+  it("keeps all four stages complete when a ready company can still be manually refreshed", () => {
+    const configured = projection({ canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false, canRefreshCompanyReconciliation: true }, true);
     setupQuery = { data: { ...configured, setup: { ...configured.setup, signatoryLinked: true } }, refetch };
-    render(<AgencyPayrollSetupTab scope={scope} />);
+    render(<AgencyPayrollSetupTab scope={scope} active={false} />);
 
     expect(screen.getByRole("heading", { name: "Agency Payroll Setup" })).toBeInTheDocument();
     expect(screen.getByText("Follow your agency setup from company connection through Check approval.")).toBeInTheDocument();
@@ -100,6 +100,9 @@ describe("AgencyPayrollSetupTab", () => {
       expect(screen.getByRole("heading", { name: title })).toBeInTheDocument();
     }
     expect(screen.getByText("Complete", { selector: "span[aria-live='polite']" })).toBeInTheDocument();
+    expect(screen.getByText("Payroll setup complete")).toBeInTheDocument();
+    expect(screen.getByText("Your company is ready to run payroll.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Refresh payroll status" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Payroll company connection" }).closest("li")).not.toHaveTextContent("Your CareOnboard agency is connected");
     expect(screen.queryByText(/signer designated/i)).not.toBeInTheDocument();
   });

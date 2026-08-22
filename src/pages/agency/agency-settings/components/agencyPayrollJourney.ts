@@ -44,9 +44,11 @@ export function deriveAgencyPayrollJourney(projection: AgencyPayrollSetupProject
   const reviewCurrent = projection.capabilities.canSubmitCompanyImplementation
     || projection.readiness.nextAction === "submit_company_implementation";
   const onboardingComplete = reviewComplete || reviewWaiting || reviewCurrent;
-  const onboardingCurrent = projection.readiness.nextAction === "complete_company_onboard"
+  const onboardingCurrent = !onboardingComplete && (
+    projection.readiness.nextAction === "complete_company_onboard"
     || projection.capabilities.createCompanyOnboardSession
-    || projection.capabilities.canRefreshCompanyReconciliation;
+    || projection.capabilities.canRefreshCompanyReconciliation
+  );
   const onboardingAttention = readinessUnknown
     || projection.readiness.status === "needs_attention"
     || projection.capabilities.canRetryCompanySync;

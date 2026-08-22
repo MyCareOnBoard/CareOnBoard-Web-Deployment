@@ -18,7 +18,7 @@ const journeyTone = {
   upcoming: { marker: "bg-[#f4f5f6] text-[#92979f] ring-[#e8eaed]", status: "bg-[#f4f5f6] text-[#6f747c]" },
 } satisfies Record<PayrollJourneyState, { marker: string; status: string }>;
 
-export function PayrollJourneyStep({ title, status, state, icon, last = false, description, children }: {
+export function PayrollJourneyStep({ title, status, state, icon, last = false, description, children, showDetails = false }: {
   title: string;
   status: string;
   state: PayrollJourneyState;
@@ -26,10 +26,11 @@ export function PayrollJourneyStep({ title, status, state, icon, last = false, d
   last?: boolean;
   description?: string;
   children?: ReactNode;
+  showDetails?: boolean;
 }) {
   const tone = journeyTone[state];
   const active = state === "current" || state === "waiting" || state === "attention" || state === "blocked";
-  const expanded = state !== "complete" && state !== "upcoming";
+  const expanded = showDetails || (state !== "complete" && state !== "upcoming");
   const details = Children.toArray(children);
   const role = state === "attention" || state === "blocked" ? "alert" : undefined;
 
