@@ -112,6 +112,9 @@ describe("AgencyPayrollSetupTab", () => {
     render(<AgencyPayrollSetupTab scope={scope} />);
 
     expect(screen.getByText("0 of 4 steps complete")).toBeInTheDocument();
+    const progress = screen.getByLabelText("0 of 4 payroll setup steps complete");
+    expect(progress.children).toHaveLength(4);
+    for (const segment of progress.children) expect(segment).toHaveClass("bg-[#e5e7eb]");
     expect(screen.getAllByRole("listitem")).toHaveLength(4);
     expect(screen.getAllByRole("listitem")[0]).toHaveAttribute("aria-current", "step");
     expect(screen.getByRole("button", { name: "Create payroll setup" })).toBeInTheDocument();

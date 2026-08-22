@@ -93,6 +93,36 @@ describe("AgencyPayrollBootstrapModal", () => {
     expect(screen.getByText("Second scheduled payday")).toBeInTheDocument();
   });
 
+  it("shows the expected EIN format in the empty input", () => {
+    render(<AgencyPayrollBootstrapModal open values={{}} missingFieldCodes={["ein"]} onOpenChange={vi.fn()} onSubmit={vi.fn()} />);
+
+    expect(screen.getByLabelText("Employer Identification Number (EIN)")).toHaveAttribute("placeholder", "##-#######");
+  });
+
+  it("exposes EIN validity while the required value is edited", async () => {
+    const user = userEvent.setup();
+    render(<AgencyPayrollBootstrapModal open values={{}} missingFieldCodes={["ein"]} onOpenChange={vi.fn()} onSubmit={vi.fn()} />);
+    const ein = screen.getByLabelText("Employer Identification Number (EIN)");
+
+    expect(ein).toHaveAttribute("aria-invalid", "false");
+    await user.type(ein, "12-3");
+    expect(ein).toHaveAttribute("aria-invalid", "true");
+    expect(ein).toHaveAccessibleDescription(/enter a nine-digit federal tax id/i);
+    await user.type(ein, "456789");
+    expect(ein).toHaveAttribute("aria-invalid", "false");
+  });
+
+  it("clears a server-reported EIN error after the value is corrected", async () => {
+    const user = userEvent.setup();
+    render(<AgencyPayrollBootstrapModal open values={{}} missingFieldCodes={["ein"]} submissionFieldCodes={["ein"]} onOpenChange={vi.fn()} onSubmit={vi.fn()} />);
+    const ein = screen.getByLabelText("Employer Identification Number (EIN)");
+
+    await waitFor(() => expect(ein).toHaveAccessibleDescription(/this required payroll field is missing/i));
+    await user.type(ein, "12-3456789");
+    expect(ein).toHaveAttribute("aria-invalid", "false");
+    expect(screen.queryByText("This required payroll field is missing.")).not.toBeInTheDocument();
+  });
+
   it("renders fixed +1 US phone controls that own exactly ten digits", () => {
     render(<AgencyPayrollBootstrapModal
       open

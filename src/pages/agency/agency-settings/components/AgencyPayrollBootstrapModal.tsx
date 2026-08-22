@@ -182,6 +182,7 @@ export default function AgencyPayrollBootstrapModal({ open, values, missingField
   const firstGroup = GROUP_ORDER.find((group) => groups.has(group));
   const validationErrors = useMemo(() => validateAgencyPayrollBootstrapForm(form, allFieldCodes), [form, allFieldCodes]);
   const hasValidationErrors = Object.keys(validationErrors).length > 0;
+  const visibleEinError = fieldErrors.ein ?? (form.ein?.trim() ? validationErrors.ein : undefined);
 
   useEffect(() => {
     if (open && !wasOpen.current) {
@@ -205,6 +206,15 @@ export default function AgencyPayrollBootstrapModal({ open, values, missingField
   }, [submissionFieldCodes]);
 
   const update = <K extends keyof CheckPayrollProfileFormValues>(key: K, value: CheckPayrollProfileFormValues[K]) => setForm((current) => ({ ...current, [key]: value }));
+  const updateEin = (ein: string) => {
+    setFieldErrors((current) => {
+      if (!current.ein) return current;
+      const next = { ...current };
+      delete next.ein;
+      return next;
+    });
+    update("ein", ein);
+  };
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (Object.keys(validationErrors).length || (requireSignerConfirmation && !signerSelection)) { setFieldErrors(validationErrors); setError(requireSignerConfirmation && !signerSelection ? "Choose an authorized signer and confirm authority before creating payroll setup." : "Review the highlighted payroll details."); return; }
@@ -225,7 +235,7 @@ export default function AgencyPayrollBootstrapModal({ open, values, missingField
       </DialogHeader>
       <form onSubmit={(event) => void submit(event)} className="flex min-h-0 flex-1 flex-col overflow-hidden"><div tabIndex={0} role="region" aria-label="Payroll setup form" className="min-h-0 flex-1 overflow-y-auto px-5 py-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#00b4b8]/30 sm:px-6"><fieldset disabled={isSubmitting} className="space-y-5 disabled:opacity-70">
         {groups.has("identity") && <Field label="Legal business name" value={form.legalName} inputRef={firstGroup === "identity" ? firstFieldRef : undefined} error={fieldErrors.legalName} onChange={(legalName) => update("legalName", legalName)} />}
-        {groups.has("ein") && <Field label="Employer Identification Number (EIN)" ein value={form.ein} error={fieldErrors.ein} inputRef={firstGroup === "ein" ? firstFieldRef : undefined} helperText="Enter your nine-digit federal tax ID. For security, we won’t display it again after you save." onChange={(ein) => update("ein", ein)} />}
+        {groups.has("ein") && <Field label="Employer Identification Number (EIN)" ein value={form.ein} error={visibleEinError} inputRef={firstGroup === "ein" ? firstFieldRef : undefined} helperText="Enter your nine-digit federal tax ID. For security, we won’t display it again after you save." placeholder="##-#######" onChange={updateEin} />}
         {groups.has("business") && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><EnumField label="Business structure" value={form.entityType} options={CHECK_ENTITY_TYPES} inputRef={firstGroup === "business" ? firstSelectRef : undefined} error={fieldErrors.entityType} onChange={(entityType) => update("entityType", entityType)} /><EnumField label="Industry" value={form.industry} options={CHECK_INDUSTRIES} error={fieldErrors.industry} onChange={(industry) => update("industry", industry)} /></div>}
         {groups.has("legalAddress") && <AddressFields label="Legal business address" value={form.legalAddress ?? emptyAddress()} searchValue={legalAddressSearch} onSearchChange={setLegalAddressSearch} autocompleteId="payroll-bootstrap-legal-business-address-search" autocompleteLabel="Find legal business address" autocompletePlaceholder="Find legal business address" idPrefix="payroll-bootstrap-legal-business-address" firstRef={firstGroup === "legalAddress" ? firstFieldRef : undefined} error={fieldErrors.legalAddress} onChange={(legalAddress) => update("legalAddress", legalAddress)} />}
         {groups.has("workplace") && <><Field label="Primary workplace name" value={form.officeName} inputRef={firstGroup === "workplace" ? firstFieldRef : undefined} error={fieldErrors.officeName} onChange={(officeName) => update("officeName", officeName)} /><AddressFields label="Primary workplace address" value={form.officeAddress ?? emptyAddress()} searchValue={officeAddressSearch} onSearchChange={setOfficeAddressSearch} autocompleteId="payroll-bootstrap-primary-workplace-address-search" autocompleteLabel="Find primary workplace address" autocompletePlaceholder="Find primary workplace address" idPrefix="payroll-bootstrap-primary-workplace-address" error={fieldErrors.officeAddress} onChange={(officeAddress) => update("officeAddress", officeAddress)} /><div><label className="flex min-h-11 items-center gap-2 text-sm text-[#10141a]"><input type="checkbox" aria-invalid={Boolean(fieldErrors.actualWorkLocationAttested)} aria-describedby={fieldErrors.actualWorkLocationAttested ? "payroll-bootstrap-workplace-attestation-error" : undefined} checked={form.actualWorkLocationAttested === true} onChange={(event) => update("actualWorkLocationAttested", event.target.checked)} /> I confirm employees physically work at this location.</label>{fieldErrors.actualWorkLocationAttested && <p id="payroll-bootstrap-workplace-attestation-error" role="alert" className="mt-1 text-xs text-[#8b2d2d]">{fieldErrors.actualWorkLocationAttested}</p>}</div></>}
