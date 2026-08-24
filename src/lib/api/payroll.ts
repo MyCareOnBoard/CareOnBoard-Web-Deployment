@@ -229,7 +229,13 @@ type StaffToPayResponse = {
 
 type PayrollInvoicesListResponse = {
   success: boolean;
-  data: { invoices: PayrollInvoiceListItem[]; total: number };
+  data: {
+    items?: PayrollInvoiceListItem[];
+    nextCursor?: string | null;
+    hasMore?: boolean;
+    invoices?: PayrollInvoiceListItem[];
+    total?: number;
+  };
   message?: string;
 };
 
@@ -328,7 +334,18 @@ export async function listPayrollInvoices(
     throw new Error(response.data.message || "Failed to list payroll invoices");
   }
 
-  return response.data.data;
+  const data = response.data.data;
+  const invoices = Array.isArray(data.items) ? data.items : data.invoices;
+  if (!Array.isArray(invoices)) {
+    throw new Error("Invalid payroll invoice list response");
+  }
+
+  return {
+    invoices,
+    total: typeof data.total === "number" && Number.isFinite(data.total)
+      ? data.total
+      : invoices.length,
+  };
 }
 
 export async function getPayrollInvoiceById(input: {

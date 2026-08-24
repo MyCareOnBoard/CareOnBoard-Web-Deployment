@@ -282,6 +282,23 @@ describe("operational billing request context", () => {
     });
   });
 
+  it("normalizes cursor-paginated payroll invoice history", async () => {
+    const invoice = { id: "payroll-1" };
+    mockedAxios.get.mockResolvedValue({
+      data: {
+        success: true,
+        data: { items: [invoice], nextCursor: null, hasMore: false },
+      },
+    } as never);
+
+    const result = await listPayrollInvoices({
+      context: { agencyId: "agency-a" },
+      query: { startDate: "2026-07-01", endDate: "2026-07-31" },
+    });
+
+    expect(result).toEqual({ invoices: [invoice], total: 1 });
+  });
+
   it("overwrites forged agency IDs in payroll queries and create bodies", async () => {
     mockedAxios.get.mockResolvedValue({ data: { success: true, data: { invoices: [] } } } as never);
     mockedAxios.post.mockResolvedValue({ data: { success: true, data: { id: "payroll-1" } } } as never);
