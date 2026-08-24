@@ -81,6 +81,7 @@ export function PayrollRunActions({
   onAction,
   activeIntent = null,
   extendedCapabilities,
+  employeeActionsAvailable = false,
   now,
 }: {
   projection: PayrollRunProjection;
@@ -88,11 +89,13 @@ export function PayrollRunActions({
   onAction: (command: PayrollRunCommandName) => void;
   activeIntent?: PayrollRunCommandName | null;
   extendedCapabilities?: { deferralOffCycle?: boolean };
+  employeeActionsAvailable?: boolean;
   now?: Date;
 }) {
   const commands: PayrollRunCommandName[] = [
-    "refresh_sources", "add_adjustment",
-    ...(extendedCapabilities?.deferralOffCycle ? ["defer_employee" as const] : []),
+    "refresh_sources",
+    ...(employeeActionsAvailable ? ["add_adjustment" as const] : []),
+    ...(employeeActionsAvailable && extendedCapabilities?.deferralOffCycle ? ["defer_employee" as const] : []),
     "request_preview", "approve_payroll", "reopen_payroll", "refresh_reconciliation",
   ];
   return (

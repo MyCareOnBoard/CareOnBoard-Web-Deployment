@@ -60,8 +60,10 @@ describe("PayrollRunActions", () => {
     const value = projection();
     const props = { projection: value, freshness: "fresh" as const, onAction: vi.fn(), now: new Date("2026-08-24T12:00:00Z") };
     const view = render(<PayrollRunActions {...props} />);
+    expect(screen.queryByRole("button", { name: /add adjustment/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /defer employee/i })).not.toBeInTheDocument();
-    view.rerender(<PayrollRunActions {...props} extendedCapabilities={{ deferralOffCycle: true }} />);
+    view.rerender(<PayrollRunActions {...props} employeeActionsAvailable extendedCapabilities={{ deferralOffCycle: true }} />);
+    expect(screen.getByRole("button", { name: /add adjustment/i })).toBeEnabled();
     expect(screen.getByRole("button", { name: /defer employee/i })).toBeEnabled();
   });
 

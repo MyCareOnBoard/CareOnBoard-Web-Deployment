@@ -32,7 +32,9 @@ type PayrollInvoiceModalProps = {
   staffName: string;
   invoice: PayrollInvoiceDocument;
   onClose: () => void;
+  /** @deprecated Legacy compatibility only. This read-only modal never invokes mutations. */
   onMarkPaid?: () => void;
+  /** @deprecated Legacy compatibility only. */
   markingPaid?: boolean;
 };
 
@@ -226,8 +228,6 @@ export default function PayrollInvoiceModal({
   staffName,
   invoice,
   onClose,
-  onMarkPaid,
-  markingPaid = false,
 }: PayrollInvoiceModalProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -274,7 +274,7 @@ export default function PayrollInvoiceModal({
                   aria-label="CareOnboard"
                 />
                 <DialogTitle className={cn("mt-3 text-left font-bold", INVOICE_TEXT_CLASS)}>
-                  Paystub Invoice
+                  Legacy payroll invoice — read only
                 </DialogTitle>
                 <DialogDescription className={cn("mt-1 font-medium", INVOICE_TEXT_MUTED_CLASS)}>
                   {staffName} · {invoice.dateRangeLabel}
@@ -298,19 +298,6 @@ export default function PayrollInvoiceModal({
           </div>
 
           <div className="payroll-invoice-no-print flex shrink-0 flex-col gap-3 border-t border-[#e5e5e6] pb-2 pt-4 sm:flex-row sm:justify-end">
-            {invoice.status === "pending" && onMarkPaid && (
-              <button
-                type="button"
-                disabled={markingPaid}
-                onClick={() => onMarkPaid()}
-                className={cn(
-                  BILLING_SECONDARY_BUTTON_CLASS,
-                  "w-full rounded-[10px] text-[14px] sm:mr-auto sm:w-auto",
-                )}
-              >
-                {markingPaid ? "Marking as paid…" : "Mark as paid"}
-              </button>
-            )}
             <button
               type="button"
               onClick={() => void handlePrint()}

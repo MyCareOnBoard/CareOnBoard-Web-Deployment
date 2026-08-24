@@ -122,4 +122,32 @@ describe("MyPayrollPage", () => {
     await user.click(screen.getByRole("button", { name: /view details/i }));
     expect(screen.queryByText(/couldn't download/i)).not.toBeInTheDocument();
   });
+
+  it("remains employee-self-only and never renders manager, funding, other-employee, or audit data", () => {
+    usePayStatements.mockReturnValue({
+      currentData: data({
+        managerBlockers: ["Compensation missing"],
+        fundingTotals: { expectedCashRequirementCents: 999_999 },
+        auditEvents: [{ type: "approval_requested" }],
+        otherEmployees: [{ employeeId: "employee-2", displayName: "Other Employee" }],
+      }),
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    render(<MyPayrollPage />);
+
+    expect(usePayStatements).toHaveBeenCalledWith({
+      audience: "employee",
+      actorUid: "user-1",
+      agencyId: "agency-1",
+      employmentId: "employment-1",
+      year: new Date().getUTCFullYear(),
+    });
+    expect(screen.queryByText("Compensation missing")).not.toBeInTheDocument();
+    expect(screen.queryByText("Other Employee")).not.toBeInTheDocument();
+    expect(screen.queryByText(/expected cash requirement/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/approval requested/i)).not.toBeInTheDocument();
+  });
 });

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
@@ -6,6 +6,7 @@ import type {
   CurrentPayrollRunResponse,
   PayrollEmployeeSummary,
   PayrollRun,
+  PayrollRunProjection,
 } from "../model/types";
 import { AgencyPayrollRunsWorkspace } from "./AgencyPayrollRunsWorkspace";
 
@@ -15,6 +16,14 @@ const api = vi.hoisted(() => ({
   pageTrigger: vi.fn(),
   detailTrigger: vi.fn(),
   sourceTrigger: vi.fn(),
+  historyHook: vi.fn(),
+  eventsHook: vi.fn(),
+  obligationsHook: vi.fn(),
+  legacyHook: vi.fn(),
+  legacyDetailTrigger: vi.fn(),
+  approvalDetailTrigger: vi.fn(),
+  runCommand: vi.fn(),
+  createOffCycleRun: vi.fn(),
   currentState: {} as Record<string, unknown>,
   employeesState: {} as Record<string, unknown>,
 }));
@@ -25,6 +34,24 @@ vi.mock("../api/payrollRunEndpoints", () => ({
   useLazyListPayrollRunEmployeesQuery: () => [api.pageTrigger, { isFetching: false }],
   useLazyGetPayrollRunEmployeeQuery: () => [api.detailTrigger, { isFetching: false }],
   useLazyListPayrollRunEmployeeSourcesQuery: () => [api.sourceTrigger, { isFetching: false }],
+  useListPayrollRunsQuery: (...args: unknown[]) => api.historyHook(...args),
+  useListPayrollRunEventsQuery: (...args: unknown[]) => api.eventsHook(...args),
+  useListPayrollObligationsQuery: (...args: unknown[]) => api.obligationsHook(...args),
+  useLazyGetPayrollRunQuery: () => [api.approvalDetailTrigger, { isFetching: false }],
+}));
+
+vi.mock("../api/legacyPayrollHistoryEndpoints", () => ({
+  useListLegacyPayrollHistoryQuery: (...args: unknown[]) => api.legacyHook(...args),
+  useLazyGetLegacyPayrollInvoiceQuery: () => [api.legacyDetailTrigger, { isFetching: false }],
+}));
+
+vi.mock("../hooks/usePayrollRunCommand", () => ({
+  usePayrollRunCommand: () => ({
+    runCommand: api.runCommand,
+    createOffCycleRun: api.createOffCycleRun,
+    activeIntent: null,
+    error: null,
+  }),
 }));
 
 const scope = { audience: "agency" as const, actorUid: "actor-1", agencyId: "agency-1" };
@@ -62,7 +89,7 @@ const run = (workflowState: PayrollRun["workflowState"] = "review"): PayrollRun 
   asOf: "2026-08-24T12:00:00.000Z",
 });
 
-const current = (workflowState: PayrollRun["workflowState"] = "review"): CurrentPayrollRunResponse => ({
+const current = (workflowState: PayrollRun["workflowState"] = "review"): PayrollRunProjection => ({
   kind: "run",
   runId: "run-1",
   activeRevisionId: "revision-1",
@@ -139,12 +166,27 @@ describe("AgencyPayrollRunsWorkspace", () => {
     api.pageTrigger.mockReset();
     api.detailTrigger.mockReset();
     api.sourceTrigger.mockReset();
+    api.historyHook.mockReset();
+    api.eventsHook.mockReset();
+    api.obligationsHook.mockReset();
+    api.legacyHook.mockReset();
+    api.legacyDetailTrigger.mockReset();
+    api.approvalDetailTrigger.mockReset();
+    api.runCommand.mockReset();
+    api.createOffCycleRun.mockReset();
     const currentData = current();
     const employeeData = employees();
     api.currentState = { data: currentData, currentData, isLoading: false, isFetching: false, refetch: vi.fn() };
     api.employeesState = { data: employeeData, currentData: employeeData, isLoading: false, isFetching: false, refetch: vi.fn() };
     api.currentHook.mockImplementation(() => api.currentState);
     api.employeesHook.mockImplementation(() => api.employeesState);
+    const emptyPage = { data: { items: [], nextCursor: null, hasMore: false }, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() };
+    api.historyHook.mockReturnValue(emptyPage);
+    api.eventsHook.mockReturnValue(emptyPage);
+    api.obligationsHook.mockReturnValue(emptyPage);
+    api.legacyHook.mockReturnValue(emptyPage);
+    api.runCommand.mockResolvedValue({ operationId: "b".repeat(64), command: "refresh_sources", state: "succeeded", pollAfterMs: null });
+    api.createOffCycleRun.mockResolvedValue({ operationId: "c".repeat(64), command: "create_off_cycle", state: "succeeded", pollAfterMs: null });
   });
 
   it("starts only the atomic current pair and defers every detail, history, and legacy request", () => {
@@ -155,10 +197,106 @@ describe("AgencyPayrollRunsWorkspace", () => {
     expect(api.pageTrigger).not.toHaveBeenCalled();
     expect(api.detailTrigger).not.toHaveBeenCalled();
     expect(api.sourceTrigger).not.toHaveBeenCalled();
+    expect(api.historyHook).not.toHaveBeenCalled();
+    expect(api.eventsHook).not.toHaveBeenCalled();
+    expect(api.obligationsHook).not.toHaveBeenCalled();
+    expect(api.legacyHook).not.toHaveBeenCalled();
     expect(screen.getByRole("heading", { name: "Current payroll" })).toBeInTheDocument();
     expect(screen.getAllByText("$130.00")).toHaveLength(2);
     expect(screen.getByText("Refreshing payroll sources…")).toBeInTheDocument();
     expect(screen.getByText("1 blocker · 1 warning")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Refresh sources" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Approve payroll" })).toBeDisabled();
+  });
+
+  it("mounts only the selected stable payroll tab and starts its read lazily", () => {
+    const view = render(<AgencyPayrollRunsWorkspace scope={scope} />);
+    const labels = ["Current", "History", "Audit", "Obligations", "Legacy"];
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(labels);
+
+    fireEvent.click(screen.getByRole("tab", { name: "History" }));
+    expect(api.historyHook).toHaveBeenCalledWith({ ...scope, runType: "regular" });
+    expect(screen.queryByRole("heading", { name: "Current payroll" })).not.toBeInTheDocument();
+    expect(api.eventsHook).not.toHaveBeenCalled();
+    expect(api.obligationsHook).not.toHaveBeenCalled();
+    expect(api.legacyHook).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Audit" }));
+    expect(api.eventsHook).toHaveBeenCalledWith({ ...scope, runId: "run-1", activeRevisionId: "revision-1" });
+    expect(screen.queryByRole("heading", { name: "Payroll history" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Obligations" }));
+    expect(api.obligationsHook).toHaveBeenCalledWith({ ...scope, state: "open" });
+    expect(screen.queryByRole("heading", { name: "Audit timeline" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Create off-cycle payroll" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Legacy" }));
+    expect(api.legacyHook).toHaveBeenCalledOnce();
+    expect(api.legacyHook.mock.calls[0]?.[0]).toEqual(expect.objectContaining(scope));
+    expect(screen.queryByRole("heading", { name: "Off-cycle obligations" })).not.toBeInTheDocument();
+
+    api.legacyHook.mockClear();
+    view.rerender(<AgencyPayrollRunsWorkspace scope={{ ...scope, agencyId: "agency-2" }} />);
+    expect(screen.getByRole("tab", { name: "Current" })).toHaveAttribute("aria-selected", "true");
+    expect(api.legacyHook).not.toHaveBeenCalled();
+  });
+
+  it("hides employee-scoped actions and refreshes only from a server-authoritative run command", async () => {
+    const projection = current();
+    delete projection.activeOperation;
+    projection.capabilities.commands.request_preview = { enabled: true, reasonCode: null };
+    projection.prerequisites.noBlockers = true;
+    api.currentState = { ...api.currentState, data: projection, currentData: projection };
+    render(<AgencyPayrollRunsWorkspace scope={scope} />);
+
+    expect(screen.queryByRole("button", { name: "Add adjustment" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Defer employee" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Refresh sources" }));
+    await waitFor(() => expect(api.runCommand).toHaveBeenCalledWith(expect.objectContaining({
+      ...scope,
+      runId: "run-1",
+      command: "refresh_sources",
+      expectedProjectionRevision: 7,
+      expectedActiveRevisionId: "revision-1",
+      idempotencyKey: expect.any(String),
+    })));
+    await waitFor(() => expect(api.currentState.refetch).toHaveBeenCalledOnce());
+
+    (api.currentState.refetch as ReturnType<typeof vi.fn>).mockClear();
+    api.runCommand.mockRejectedValueOnce(Object.assign(new Error("stale"), { code: "PROJECTION_STALE", refreshRequired: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Request preview" }));
+    await waitFor(() => expect(api.currentState.refetch).toHaveBeenCalledOnce());
+  });
+
+  it("opens and cancels approval without mutation, then refreshes after a confirmed successful command", async () => {
+    const projection = current("ready_to_approve");
+    delete projection.activeOperation;
+    projection.prerequisites = { revisionReady: true, dispositionsComplete: true, noBlockers: true, providerSynchronized: true, previewReady: true };
+    projection.capabilities.commands.approve_payroll = { enabled: true, reasonCode: null };
+    projection.run.preview = {
+      status: "succeeded", revisionId: "revision-1", hash: "a".repeat(64), observedAt: "2026-08-24T12:00:00.000Z",
+      totals: { grossCents: 125_00, reimbursementsCents: 5_00, employeeTaxesCents: 10_00, employeeDeductionsCents: 0, employerTaxesCents: 10_00, employerContributionsCents: 0, netPayCents: 120_00, expectedCashRequirementCents: 140_00 },
+    };
+    const approvalDetail = { ...projection, approvalChallenge: "challenge-1", approvalChallengeExpiresAt: "2099-08-24T12:05:00.000Z" };
+    api.currentState = { ...api.currentState, data: projection, currentData: projection };
+    api.approvalDetailTrigger.mockReturnValue({ unwrap: () => Promise.resolve(approvalDetail), abort: vi.fn() });
+    render(<AgencyPayrollRunsWorkspace scope={scope} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Approve payroll" }));
+    expect(await screen.findByRole("heading", { name: "Approve payroll" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Keep reviewing" }));
+    expect(api.runCommand).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Approve payroll" }));
+    await screen.findByText("Expected cash requirement");
+    fireEvent.click(screen.getByRole("checkbox", { name: /reviewed these totals/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Approve payroll" }));
+    await waitFor(() => expect(api.runCommand).toHaveBeenCalledWith(expect.objectContaining({
+      ...scope, runId: "run-1", command: "approve_payroll", expectedProjectionRevision: 7,
+      expectedActiveRevisionId: "revision-1", expectedPreviewRevisionId: "revision-1",
+      expectedPreviewHash: "a".repeat(64), approvalChallenge: "challenge-1", acknowledgement: true,
+    })));
+    await waitFor(() => expect(api.currentState.refetch).toHaveBeenCalledOnce());
   });
 
   it("distinguishes a current run with nothing to pay from no active period", () => {
