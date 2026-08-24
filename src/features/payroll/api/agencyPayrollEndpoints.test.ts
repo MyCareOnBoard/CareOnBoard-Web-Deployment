@@ -83,9 +83,10 @@ describe("agency payroll wire contracts", () => {
       },
     });
     expect(JSON.stringify(request(args))).not.toContain('"agencyId"');
+    const scopeId = JSON.stringify(["agency", "actor-1", "agency-1", null]);
     expect(invalidationTags(undefined, args)).toEqual([
-      { type: "Attention", id: "agency:actor-1:agency-1" },
-      { type: "Compliance", id: "agency:actor-1:agency-1" },
+      { type: "Attention", id: scopeId },
+      { type: "Compliance", id: scopeId },
     ]);
     expect(invalidationTags(new Error("no"), args)).toEqual([]);
   });
@@ -95,7 +96,7 @@ describe("agency payroll wire contracts", () => {
     expect(setupTags).toBeTypeOf("function");
     if (typeof setupTags !== "function") return;
     expect(setupTags({ audience: "agency", actorUid: "actor-1", agencyId: "agency-1" })).toEqual([
-      { type: "AgencySetup", id: "agency:actor-1:agency-1" },
+      { type: "AgencySetup", id: JSON.stringify(["agency", "actor-1", "agency-1", null]) },
     ]);
   });
   it("replaces only the successful bootstrap scope without immediately refetching setup", async () => {
@@ -151,9 +152,10 @@ describe("agency payroll wire contracts", () => {
 
   it("invalidates company cache tags only for a successful command", () => {
     const args = { audience: "agency" as const, actorUid: "u", agencyId: "a", command: "submit_company_implementation" as const, projectionRevision: 8, idempotencyKey: "00000000-0000-4000-8000-000000000001" } satisfies PayrollCommandArgs;
+    const scopeId = JSON.stringify(["agency", "u", "a", null]);
     expect(agencyPayrollCommandInvalidationTags(undefined, args)).toEqual([
-      { type: "Attention", id: "agency:u:a" },
-      { type: "Compliance", id: "agency:u:a" },
+      { type: "Attention", id: scopeId },
+      { type: "Compliance", id: scopeId },
     ]);
     expect(agencyPayrollCommandInvalidationTags({ status: 409 }, args)).toEqual([]);
   });

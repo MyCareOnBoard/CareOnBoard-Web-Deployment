@@ -23,8 +23,8 @@ describe("PayrollOperationProvider", () => {
     vi.useFakeTimers(); let visibility = "hidden"; Object.defineProperty(document, "visibilityState", { configurable: true, get: () => visibility }); const poll = vi.fn().mockResolvedValue({ operationId: "op", state: "succeeded", resourceType: "company", pollAfterMs: null } satisfies PayrollOperation);
     const wrapper = ({ children }: { children: React.ReactNode }) => <PayrollOperationProvider>{children}</PayrollOperationProvider>; const { result } = renderHook(() => usePayrollOperations(), { wrapper }); act(() => { result.current.watch({ audience: "agency", actorUid: "u", agencyId: "a" }, "op", poll); }); expect(poll).not.toHaveBeenCalled(); visibility = "visible"; act(() => document.dispatchEvent(new Event("visibilitychange"))); await Promise.resolve(); expect(poll).toHaveBeenCalledOnce(); vi.useRealTimers();
   });
-  it("stops after a terminal backend state", async () => {
-    vi.useFakeTimers(); const poll = vi.fn().mockResolvedValue({ operationId: "op", state: "succeeded", resourceType: "company", pollAfterMs: null } satisfies PayrollOperation); const settled = vi.fn();
+  it("stops after a terminal payroll-run backend state", async () => {
+    vi.useFakeTimers(); const poll = vi.fn().mockResolvedValue({ operationId: "op", state: "succeeded", resourceType: "payroll_run", pollAfterMs: null } satisfies PayrollOperation); const settled = vi.fn();
     const wrapper = ({ children }: { children: React.ReactNode }) => <PayrollOperationProvider>{children}</PayrollOperationProvider>; const { result } = renderHook(() => usePayrollOperations(), { wrapper }); act(() => { result.current.watch({ audience: "agency", actorUid: "u", agencyId: "a" }, "op", poll, settled); }); await Promise.resolve(); await vi.runAllTimersAsync(); expect(poll).toHaveBeenCalledOnce(); expect(settled).toHaveBeenCalledOnce(); vi.useRealTimers();
   });
   it("backs off consecutive polling errors through the cap before a later terminal response", async () => {

@@ -1,16 +1,21 @@
 import { BaseQueryFn, FetchBaseQueryError } from "@reduxjs/toolkit/query/react";
+import type { AxiosRequestConfig } from "axios";
 import axiosClient, {axiosClientWithoutAuth} from "@/lib/axios";
+
+type AxiosBaseQueryArgs = {
+  url: string;
+  method: string;
+  data?: FormData | unknown;
+  params?: unknown;
+  headers?: Record<string, string>;
+  responseType?: AxiosRequestConfig["responseType"];
+};
+
 const baseQueryWithAuth: BaseQueryFn<
-  {
-    url: string;
-    method: string;
-    data?: FormData | any;
-    params?: any;
-    headers?: any;
-  },
+  AxiosBaseQueryArgs,
   unknown,
   FetchBaseQueryError
-> = async (args) => {
+> = async (args, api) => {
   try {
     const headers =
       args.data instanceof FormData
@@ -23,6 +28,8 @@ const baseQueryWithAuth: BaseQueryFn<
       data: args.data,
       params: args.params,
       headers: headers,
+      responseType: args.responseType,
+      signal: api.signal,
     });
 
     return { data: result.data };
@@ -37,16 +44,10 @@ const baseQueryWithAuth: BaseQueryFn<
 };
 
 const baseQueryWithoutAuth: BaseQueryFn<
-  {
-    url: string;
-    method: string;
-    data?: FormData | any;
-    params?: any;
-    headers?: any;
-  },
+  AxiosBaseQueryArgs,
   unknown,
   unknown
-> = async (args) => {
+> = async (args, api) => {
   try {
     const headers =
       args.data instanceof FormData
@@ -59,6 +60,8 @@ const baseQueryWithoutAuth: BaseQueryFn<
       data: args.data,
       params: args.params,
       headers: headers,
+      responseType: args.responseType,
+      signal: api.signal,
     });
 
     return { data: result.data };
@@ -72,12 +75,7 @@ const baseQueryWithoutAuth: BaseQueryFn<
   }
 };
 
-type CustomQueryArgs = {
-  url: string;
-  method: string;
-  data?: FormData | any;
-  params?: any;
-  headers?: any;
+type CustomQueryArgs = AxiosBaseQueryArgs & {
   requiresAuth?: boolean;
 };
 

@@ -82,7 +82,10 @@ describe("employee payroll wire contracts", () => {
     expect(replay).toEqual(first);
     expect(nextAction).toEqual({ ...first, headers: { "Idempotency-Key": "employee-action-3" } });
     expect(employeePayrollMutationTags(args)).toEqual([
-      { type: "EmployeeSetup", id: "employee:user-1:agency-1:employment-1" },
+      {
+        type: "EmployeeSetup",
+        id: JSON.stringify(["employee", "user-1", "agency-1", "employment-1"]),
+      },
     ]);
     expect(employeePayrollInvalidationTags(undefined, args)).toEqual(employeePayrollMutationTags(args));
     expect(employeePayrollInvalidationTags({ status: 409 }, args)).toEqual([]);
@@ -259,7 +262,10 @@ describe("manager primary-workplace wire contracts", () => {
     expect(replay).toEqual(first);
     expect(nextAction).toEqual({ ...first, headers: { "Idempotency-Key": "manager-action-3" } });
     expect(employeeSetupMutationTags(args)).toEqual([
-      { type: "EmployeeSetup", id: "agency:manager-1:agency-1:employment/a" },
+      {
+        type: "EmployeeSetup",
+        id: JSON.stringify(["agency", "manager-1", "agency-1", "employment/a"]),
+      },
     ]);
     expect(managerPrimaryWorkplaceInvalidationTags(undefined, args)).toEqual(employeeSetupMutationTags(args));
     expect(managerPrimaryWorkplaceInvalidationTags({ status: 409 }, args)).toEqual([]);

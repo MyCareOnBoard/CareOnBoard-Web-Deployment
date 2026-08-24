@@ -158,7 +158,7 @@ export interface ManagedEmployeePrimaryWorkplaceProjection {
 export interface PayrollOperation {
   operationId: string;
   state: PayrollOperationState;
-  resourceType: "company" | "employee";
+  resourceType: "company" | "employee" | "payroll_run";
   pollAfterMs: number | null;
   statusUrl?: string;
 }
