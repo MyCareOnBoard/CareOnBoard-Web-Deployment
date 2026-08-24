@@ -119,21 +119,15 @@ describe("BillingManagementHeader", () => {
     );
   });
 
-  it("uses an accessible payroll-week control only for network due payroll", async () => {
-    const user = userEvent.setup();
-    const callbacks = renderHeader({
+  it("hides legacy date, payroll-week, and program controls on the payroll-run route", () => {
+    renderHeader({
       path: "/super-admin/billing/payroll-management?scope=network&payrollTab=due",
     });
 
-    expect(screen.getByLabelText("Payroll week")).toHaveTextContent("Jul 27, 2026");
+    expect(screen.queryByLabelText("Payroll week")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Dates 2026-07-01/ })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Previous payroll week" }));
-    expect(callbacks.onPayrollWeekChange).toHaveBeenCalledWith("2026-07-20");
-
-    renderHeader({
-      path: "/super-admin/billing/payroll-management?scope=network&payrollTab=saved",
-      payrollTab: "saved",
-    });
-    expect(screen.getAllByRole("button", { name: /Dates 2026-07-01/ })).toHaveLength(1);
+    expect(screen.queryByRole("combobox", { name: "Program mode" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "All authorized agencies" })).toBeVisible();
+    expect(screen.getByRole("navigation", { name: "Billing workspace sections" })).toBeVisible();
   });
 });

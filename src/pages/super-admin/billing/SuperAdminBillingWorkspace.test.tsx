@@ -332,11 +332,15 @@ const domainRequest = vi.fn();
 
 function BillingDomainProbe() {
   const operational = useOperationalAgency();
+  const workspace = useBillingWorkspaceContext();
   const location = useLocation();
   domainRequest(operational.agencyId);
   return (
     <div>
       <output aria-label="Billing domain agency">{operational.agency.name}</output>
+      <output aria-label="Billing operational context revision">
+        {(workspace as typeof workspace & { operationalContextRevision?: number }).operationalContextRevision ?? 0}
+      </output>
       <output aria-label="Billing location">{`${location.pathname}${location.search}`}</output>
     </div>
   );
@@ -344,6 +348,7 @@ function BillingDomainProbe() {
 
 function BillingWorkspaceProbe() {
   const workspace = useBillingWorkspaceContext();
+  const operationalContextRevision = (workspace as typeof workspace & { operationalContextRevision?: number }).operationalContextRevision;
   const location = useLocation();
   return (
     <div>
@@ -352,6 +357,7 @@ function BillingWorkspaceProbe() {
       </output>
       <output aria-label="Billing workspace actor">{workspace.actorUid}</output>
       <output aria-label="Billing workspace environment">{workspace.environment}</output>
+      <output aria-label="Billing operational context revision">{operationalContextRevision ?? 0}</output>
       <output aria-label="Billing workspace dates">{`${workspace.startDate}:${workspace.endDate}`}</output>
       <output aria-label="Billing workspace mode">{workspace.mode ?? "all"}</output>
       <output aria-label="Billing payroll week">{workspace.payrollWeekStart}</output>
@@ -597,6 +603,7 @@ describe("SuperAdminBillingWorkspace", () => {
       expect.any(AbortSignal),
     );
     expect(domainRequest).toHaveBeenCalledWith("atlas");
+    expect(screen.getByLabelText("Billing operational context revision")).toHaveTextContent("1");
   });
 
   it("normalizes agency mode once and gives the provider and child the same workspace context", async () => {

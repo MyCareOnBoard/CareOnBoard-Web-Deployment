@@ -228,6 +228,7 @@ function AuthorizedBillingWorkspace({
   const [loading, setLoading] = useState(Boolean(agencyId));
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retryVersion, setRetryVersion] = useState(0);
+  const [operationalContextRevision, setOperationalContextRevision] = useState(0);
 
   useEffect(() => {
     if (!agencyId) {
@@ -246,6 +247,7 @@ function AuthorizedBillingWorkspace({
         if (agency.id !== agencyId) throw new Error("Could not load this agency.");
         if (!controller.signal.aborted) {
           setResolvedAgency(agency);
+          setOperationalContextRevision((current) => current + 1);
           setKnownAgencies((current) => rememberAgencies(current, [agency]));
         }
       })
@@ -307,10 +309,11 @@ function AuthorizedBillingWorkspace({
   const onPayrollTabChange = (tab: BillingPayrollTab) => {
     navigateWithSearch(updateBillingWorkspacePayrollTab(location.search, tab));
   };
-  const context: ResolvedBillingWorkspaceContextValue = {
+  const context: ResolvedBillingWorkspaceContextValue & { operationalContextRevision: number } = {
     ...activeWorkspace,
     actorUid,
     environment: apiEnvironment,
+    operationalContextRevision,
     onDateRangeChange,
     onPayrollWeekChange,
     onPayrollTabChange,

@@ -9,8 +9,6 @@ import type {
   BillingWorkspaceState,
 } from "./billingWorkspaceState";
 import type { BillingWorkspaceScope } from "./types";
-import NetworkPayrollWeekControl from "./network/NetworkPayrollWeekControl";
-import { normalizeNetworkPayrollWeekStart } from "./network/networkPayrollWeek";
 
 export interface BillingManagementHeaderProps {
   workspace: BillingWorkspaceState;
@@ -50,11 +48,7 @@ export default function BillingManagementHeader({
   const workspaceSearch = search ?? location.search;
   const selectedAgencyIds = workspace.scope.kind === "agency" ? [workspace.scope.agencyId] : [];
   const pathname = location.pathname.replace(/\/+$/, "");
-  const payrollWeekStart = workspace.payrollWeekStart
-    ?? normalizeNetworkPayrollWeekStart("", workspace.endDate);
-  const showPayrollWeek = pathname === Routes.superAdmin.billing.payrollManagement
-    && workspace.scope.kind === "network"
-    && workspace.payrollTab === "due";
+  const isPayrollRunRoute = pathname === Routes.superAdmin.billing.payrollManagement;
 
   return (
     <>
@@ -94,16 +88,9 @@ export default function BillingManagementHeader({
               />
             </div>
 
-            <div className="min-w-0">
-              <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-[#687173]">
-                {showPayrollWeek ? "Payroll week" : "Date range"}
-              </span>
-              {showPayrollWeek ? (
-                <NetworkPayrollWeekControl
-                  value={payrollWeekStart}
-                  onChange={onPayrollWeekChange}
-                />
-              ) : (
+            {!isPayrollRunRoute ? <>
+              <div className="min-w-0">
+                <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-[#687173]">Date range</span>
                 <ShiftDateRangeControl
                   value={{ startDate: workspace.startDate, endDate: workspace.endDate }}
                   onApply={onDateRangeChange}
@@ -112,27 +99,25 @@ export default function BillingManagementHeader({
                   description="Choose the dates to show in billing management"
                   maxRangeDays={366}
                 />
-              )}
-            </div>
+              </div>
 
-            <label className="min-w-0 sm:col-span-2 lg:col-span-1">
-              <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-[#687173]">
-                Program mode
-              </span>
-              <select
-                aria-label="Program mode"
-                value={workspace.mode ?? ""}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  onModeChange(value === "ddd" || value === "hha" ? value : null);
-                }}
-                className="min-h-11 w-full cursor-pointer rounded-xl border border-[#cfd7d7] bg-white px-3.5 text-[13px] font-semibold text-[#20282a] hover:bg-[#edf5f5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#008f92]"
-              >
-                <option value="">All programs</option>
-                <option value="ddd">DDD</option>
-                <option value="hha">HHA</option>
-              </select>
-            </label>
+              <label className="min-w-0 sm:col-span-2 lg:col-span-1">
+                <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.1em] text-[#687173]">Program mode</span>
+                <select
+                  aria-label="Program mode"
+                  value={workspace.mode ?? ""}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    onModeChange(value === "ddd" || value === "hha" ? value : null);
+                  }}
+                  className="min-h-11 w-full cursor-pointer rounded-xl border border-[#cfd7d7] bg-white px-3.5 text-[13px] font-semibold text-[#20282a] hover:bg-[#edf5f5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#008f92]"
+                >
+                  <option value="">All programs</option>
+                  <option value="ddd">DDD</option>
+                  <option value="hha">HHA</option>
+                </select>
+              </label>
+            </> : null}
           </div>
         </div>
       </header>
