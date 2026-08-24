@@ -1,6 +1,7 @@
 import { lazy } from "react";
 import { createBrowserRouter } from "react-router";
 import { Routes } from "@/routes/constants";
+import { preloadDirectAgencyPayrollRoute } from "@/routes/preloadDirectPayrollRoute";
 import RouteErrorPage from "@/pages/error/RouteErrorPage";
 
 const SplashScreen = lazy(() => import("@/pages/splash"));
@@ -70,8 +71,12 @@ const BillingAndApprovalsPage = lazy(() => import("@/pages/agency/billing-and-ap
 const BillingFinancialOverviewPage = lazy(() =>
     import("@/pages/agency/billing/pages").then((module) => ({ default: module.FinancialOverview }))
 );
-const BillingPayrollManagementPage = lazy(() =>
-    import("@/pages/agency/billing/payroll").then((module) => ({ default: module.AgencyPayrollDashboardPage }))
+const loadBillingPayrollManagementPage = () =>
+    import("@/pages/agency/billing/payroll").then((module) => ({ default: module.AgencyPayrollDashboardPage }));
+const BillingPayrollManagementPage = lazy(loadBillingPayrollManagementPage);
+preloadDirectAgencyPayrollRoute(
+    window.location.pathname,
+    loadBillingPayrollManagementPage,
 );
 const StaffTimesheetPage = lazy(() => import("@/pages/agency/staff-timesheet"));
 const StaffTimesheetsApprovalPage = lazy(() =>
