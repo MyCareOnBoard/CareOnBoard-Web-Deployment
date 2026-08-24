@@ -39,9 +39,9 @@ export function PayrollRunHeader({ run, activeOperation }: {
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#007f83]">
           Payroll management
         </p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-[-0.02em] text-[#10141a]">
+        <h2 className="mt-1 text-2xl font-semibold tracking-[-0.02em] text-[#10141a]">
           Current payroll
-        </h1>
+        </h2>
         <p className="mt-2 text-sm text-[#62686f]">
           {dateLabel(run.periodStart)} – {dateLabel(run.periodEnd)} · Payday {dateLabel(run.payday)}
         </p>

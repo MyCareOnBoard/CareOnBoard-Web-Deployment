@@ -1,6 +1,11 @@
 import { lazy, Suspense, useRef, useState } from "react";
+import { Link } from "react-router";
 
 import { PayrollOperationProvider } from "../../operations/PayrollOperationProvider";
+import BillingDashboardHeader from "@/pages/agency/billing/components/BillingDashboardHeader";
+import PayrollOverviewCards, {
+  mapPayrollRunToOverviewStats,
+} from "@/pages/agency/billing/payroll/components/PayrollOverviewCards";
 import { CurrentPayrollPanel } from "../components/CurrentPayrollPanel";
 import { PayrollRunActions } from "../components/PayrollRunActions";
 import { PayrollApprovalDialog } from "../components/dialogs/PayrollApprovalDialog";
@@ -30,6 +35,85 @@ const tabs: ReadonlyArray<{ id: WorkspaceTab; label: string }> = [
   { id: "obligations", label: "Obligations" },
   { id: "legacy", label: "Legacy" },
 ];
+
+const agencyPayrollSetupHref = "/agency/agency-settings?tab=payrollSetup";
+
+function PayrollManagementHeader() {
+  return (
+    <BillingDashboardHeader
+      title="Payroll management"
+      subtitle="Review the current pay period, resolve exceptions, and approve payroll."
+    />
+  );
+}
+
+const emptyPayrollOverviewStats = [
+  { id: "total-due", label: "Total payroll due", value: "—" },
+  { id: "gross-earnings", label: "Gross earnings", value: "—" },
+  { id: "reimbursements", label: "Reimbursements", value: "—" },
+  { id: "adjustments", label: "Adjustments", value: "—" },
+  { id: "payday", label: "Payday", value: "—" },
+];
+
+export type PayrollWorkspaceEmptyStateProps =
+  | {
+    kind: "setup-required";
+    setupHref?: string;
+    canOpenSetup?: boolean;
+    title?: string;
+    description?: string;
+    actionLabel?: string;
+  }
+  | { kind: "error"; onRetry: () => void };
+
+export function PayrollWorkspaceEmptyState(props: PayrollWorkspaceEmptyStateProps) {
+  const setupRequired = props.kind === "setup-required";
+
+  return (
+    <div className="min-h-[calc(100vh-200px)] space-y-8 pb-8">
+      <PayrollManagementHeader />
+      <PayrollOverviewCards stats={emptyPayrollOverviewStats} />
+      <section
+        role={setupRequired ? undefined : "alert"}
+        aria-labelledby="payroll-workspace-state-heading"
+        className="rounded-[16px] border border-[#d8e4e5] bg-white px-5 py-8 sm:px-8 sm:py-10"
+      >
+        <div className="max-w-2xl">
+          <h2
+            id="payroll-workspace-state-heading"
+            className="text-[20px] font-semibold leading-7 text-[#10141a]"
+          >
+            {setupRequired
+              ? props.title ?? "Set up payroll to get started"
+              : "Payroll couldn't be loaded"}
+          </h2>
+          <p className="mt-2 text-[14px] leading-6 text-[#62686f]">
+            {setupRequired
+              ? props.description
+                ?? "Connect your agency's payroll account before managing pay periods, employees, and approvals."
+              : "We couldn't load the current payroll workspace. Try again to refresh the latest payroll data."}
+          </p>
+          {setupRequired && props.canOpenSetup !== false ? (
+            <Link
+              to={props.setupHref ?? agencyPayrollSetupHref}
+              className="mt-5 inline-flex min-h-11 items-center justify-center rounded-full bg-[#00b4b8] px-5 text-[14px] font-semibold text-white transition-colors hover:bg-[#009da1] active:bg-[#009199] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2"
+            >
+              {props.actionLabel ?? "Open payroll setup"}
+            </Link>
+          ) : !setupRequired ? (
+            <button
+              type="button"
+              onClick={props.onRetry}
+              className="mt-5 inline-flex min-h-11 items-center justify-center rounded-full border border-[#00b4b8] bg-white px-5 text-[14px] font-semibold text-[#006f73] transition-colors hover:bg-[#eefafa] active:bg-[#e3f5f5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2"
+            >
+              Try again
+            </button>
+          ) : null}
+        </div>
+      </section>
+    </div>
+  );
+}
 
 const intentKey = () => crypto.randomUUID();
 const legacyRange = () => {
@@ -161,75 +245,93 @@ function AgencyPayrollRunsWorkspaceContent({ scope, workspace }: {
   };
 
   return (
-    <main
+    <div
       data-testid="payroll-workspace"
       aria-busy={workspace.freshness === "loading" && !workspace.runResponse}
-      className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8"
+      className="min-h-[calc(100vh-200px)] space-y-8 pb-8"
     >
-      <div role="tablist" aria-label="Payroll management sections" className="mb-6 flex gap-1 overflow-x-auto border-b border-[#dfe7e8]">
-        {tabs.map(({ id, label }, index) => (
-          <button
-            key={id}
-            ref={(node) => { if (node) tabRefs.current.set(id, node); else tabRefs.current.delete(id); }}
-            type="button"
-            role="tab"
-            id={`payroll-workspace-tab-${id}`}
-            aria-controls={`payroll-workspace-panel-${id}`}
-            aria-selected={tab === id}
-            tabIndex={tab === id ? 0 : -1}
-            onClick={() => selectTab(id)}
-            onKeyDown={(event) => {
-              if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-              event.preventDefault();
-              const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1
-                : (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
-              selectTab(tabs[nextIndex].id);
-            }}
-            className={`min-h-11 shrink-0 border-b-2 px-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] ${tab === id ? "border-[#006f73] text-[#006f73]" : "border-transparent text-[#62686f]"}`}
-          >
-            {label}
-          </button>
-        ))}
+      <PayrollManagementHeader />
+
+      <PayrollOverviewCards
+        stats={projection ? mapPayrollRunToOverviewStats(projection.run) : emptyPayrollOverviewStats}
+        loading={workspace.freshness === "loading" && !workspace.runResponse}
+      />
+
+      <div className="min-w-0 space-y-4">
+        <div
+          role="tablist"
+          aria-label="Payroll management sections"
+          className="flex flex-wrap items-center gap-2"
+        >
+          {tabs.map(({ id, label }, index) => (
+            <button
+              key={id}
+              ref={(node) => { if (node) tabRefs.current.set(id, node); else tabRefs.current.delete(id); }}
+              type="button"
+              role="tab"
+              id={`payroll-workspace-tab-${id}`}
+              aria-controls={`payroll-workspace-panel-${id}`}
+              aria-selected={tab === id}
+              tabIndex={tab === id ? 0 : -1}
+              onClick={() => selectTab(id)}
+              onKeyDown={(event) => {
+                if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+                event.preventDefault();
+                const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1
+                  : (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+                selectTab(tabs[nextIndex].id);
+              }}
+              className={`min-h-11 shrink-0 rounded-full border px-5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2 ${tab === id ? "border-[#00b4b8] bg-[#00b4b8] text-white" : "border-[#e5e5e6] text-[#10141a] hover:border-[#00b4b8]/40 hover:bg-[#eef4f5]"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div
+          id={`payroll-workspace-panel-${tab}`}
+          role="tabpanel"
+          aria-labelledby={`payroll-workspace-tab-${tab}`}
+          className="min-w-0"
+        >
+          {tab === "current" ? (
+            <div className="space-y-6">
+              <CurrentPayrollPanel scope={scope} workspace={workspace} />
+              {projection ? (
+                <CurrentPayrollControls
+                  scope={scope}
+                  workspace={workspace}
+                  projection={projection}
+                  activeIntent={commands.activeIntent}
+                  errorMessage={commands.error?.message ?? null}
+                  onAction={action}
+                  onApprove={approve}
+                />
+              ) : null}
+            </div>
+          ) : (
+            <Suspense fallback={<p role="status" className="py-8 text-sm text-[#62686f]">Loading payroll section…</p>}>
+              {tab === "history" ? (
+                <PayrollHistoryPanel scope={scope} />
+              ) : tab === "audit" ? (
+                projection ? <PayrollAuditPanel scope={scope} runId={projection.runId} activeRevisionId={projection.activeRevisionId} />
+                  : <p className="py-8 text-sm text-[#62686f]">No active payroll is available for audit.</p>
+              ) : tab === "obligations" ? (
+                <PayrollObligationsPanel
+                  scope={scope}
+                  createOffCycleCapability={false}
+                  restoreCapability={false}
+                  onCreateOffCycle={(submission) => commands.createOffCycleRun({ ...scope, ...submission })}
+                  onRestore={() => Promise.reject(new Error("Restore is unavailable without a bound originating revision."))}
+                  submissionRetention={offCycleSubmission}
+                />
+              ) : (
+                <LegacyPayrollHistoryPanel scope={scope} startDate={range.startDate} endDate={range.endDate} />
+              )}
+            </Suspense>
+          )}
+        </div>
       </div>
-      <div id={`payroll-workspace-panel-${tab}`} role="tabpanel" aria-labelledby={`payroll-workspace-tab-${tab}`}>
-        {tab === "current" ? (
-          <div className="space-y-6">
-            <CurrentPayrollPanel scope={scope} workspace={workspace} />
-            {projection ? (
-              <CurrentPayrollControls
-                scope={scope}
-                workspace={workspace}
-                projection={projection}
-                activeIntent={commands.activeIntent}
-                errorMessage={commands.error?.message ?? null}
-                onAction={action}
-                onApprove={approve}
-              />
-            ) : null}
-          </div>
-        ) : (
-          <Suspense fallback={<p role="status" className="py-8 text-sm text-[#62686f]">Loading payroll section…</p>}>
-            {tab === "history" ? (
-              <PayrollHistoryPanel scope={scope} />
-            ) : tab === "audit" ? (
-              projection ? <PayrollAuditPanel scope={scope} runId={projection.runId} activeRevisionId={projection.activeRevisionId} />
-                : <p className="py-8 text-sm text-[#62686f]">No active payroll is available for audit.</p>
-            ) : tab === "obligations" ? (
-              <PayrollObligationsPanel
-                scope={scope}
-                createOffCycleCapability={false}
-                restoreCapability={false}
-                onCreateOffCycle={(submission) => commands.createOffCycleRun({ ...scope, ...submission })}
-                onRestore={() => Promise.reject(new Error("Restore is unavailable without a bound originating revision."))}
-                submissionRetention={offCycleSubmission}
-              />
-            ) : (
-              <LegacyPayrollHistoryPanel scope={scope} startDate={range.startDate} endDate={range.endDate} />
-            )}
-          </Suspense>
-        )}
-      </div>
-    </main>
+    </div>
   );
 }
 

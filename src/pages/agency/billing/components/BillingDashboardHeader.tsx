@@ -15,8 +15,8 @@ type PrimaryAction = {
 type BillingDashboardHeaderProps = {
   title: string;
   subtitle: string;
-  dateRange: BillingDateRangeValues;
-  onDateRangeChange: (values: BillingDateRangeValues) => void;
+  dateRange?: BillingDateRangeValues;
+  onDateRangeChange?: (values: BillingDateRangeValues) => void;
   primaryAction?: PrimaryAction;
   dateRangeModalTitle?: string;
   dateRangeModalDescription?: string;
@@ -44,7 +44,10 @@ export default function BillingDashboardHeader({
   maxRangeDays,
 }: BillingDashboardHeaderProps) {
   const [showDateModal, setShowDateModal] = useState(false);
-  const [draftRange, setDraftRange] = useState(dateRange);
+  const [draftRange, setDraftRange] = useState<BillingDateRangeValues>(
+    dateRange ?? { startDate: "", endDate: "" },
+  );
+  const showControls = Boolean((dateRange && onDateRangeChange) || primaryAction);
 
   return (
     <>
@@ -56,47 +59,53 @@ export default function BillingDashboardHeader({
           <p className="mt-2 text-[14px] font-medium text-[#808081]">{subtitle}</p>
         </div>
 
-        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
-          <button
-            type="button"
-            aria-haspopup="dialog"
-            onClick={() => {
-              setDraftRange(dateRange);
-              setShowDateModal(true);
-            }}
-            className="inline-flex h-11 min-h-[44px] w-full cursor-pointer items-center justify-between gap-3 rounded-[12px] border border-[#e5e5e6] bg-white px-4 text-[14px] font-medium text-[#10141a] transition-colors hover:bg-[#eef4f5] active:bg-[#eef4f5] sm:w-auto sm:min-w-[240px]"
-          >
-            <span className="min-w-0 truncate">{formatDateRangeLabel(dateRange)}</span>
-            <Calendar2Icon className="h-5 w-5 shrink-0" aria-hidden />
-          </button>
+        {showControls ? (
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+            {dateRange && onDateRangeChange ? (
+              <button
+                type="button"
+                aria-haspopup="dialog"
+                onClick={() => {
+                  setDraftRange(dateRange);
+                  setShowDateModal(true);
+                }}
+                className="inline-flex h-11 min-h-[44px] w-full cursor-pointer items-center justify-between gap-3 rounded-[12px] border border-[#e5e5e6] bg-white px-4 text-[14px] font-medium text-[#10141a] transition-colors hover:bg-[#eef4f5] active:bg-[#eef4f5] sm:w-auto sm:min-w-[240px]"
+              >
+                <span className="min-w-0 truncate">{formatDateRangeLabel(dateRange)}</span>
+                <Calendar2Icon className="h-5 w-5 shrink-0" aria-hidden />
+              </button>
+            ) : null}
 
-          {primaryAction && (
-            <button
-              type="button"
-              onClick={primaryAction.onClick}
-              disabled={primaryAction.loading}
-              className="inline-flex h-11 min-h-[44px] w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#00b4b8] px-5 text-[14px] font-medium text-white transition-colors hover:bg-[#009da1] active:bg-[#009199] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:min-w-[160px]"
-            >
-              {!primaryAction.loading && primaryAction.icon ? (
-                <primaryAction.icon className="h-4 w-4 shrink-0" aria-hidden />
-              ) : null}
-              {primaryAction.loading ? "Loading…" : primaryAction.label}
-            </button>
-          )}
-        </div>
+            {primaryAction ? (
+              <button
+                type="button"
+                onClick={primaryAction.onClick}
+                disabled={primaryAction.loading}
+                className="inline-flex h-11 min-h-[44px] w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#00b4b8] px-5 text-[14px] font-medium text-white transition-colors hover:bg-[#009da1] active:bg-[#009199] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:min-w-[160px]"
+              >
+                {!primaryAction.loading && primaryAction.icon ? (
+                  <primaryAction.icon className="h-4 w-4 shrink-0" aria-hidden />
+                ) : null}
+                {primaryAction.loading ? "Loading…" : primaryAction.label}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
-      <BillingDateRangeModal
-        open={showDateModal}
-        onClose={() => setShowDateModal(false)}
-        values={draftRange}
-        onChange={setDraftRange}
-        onApply={onDateRangeChange}
-        title={dateRangeModalTitle}
-        description={dateRangeModalDescription}
-        enforceMaxDateRange={enforceMaxDateRange}
-        maxRangeDays={maxRangeDays}
-      />
+      {dateRange && onDateRangeChange ? (
+        <BillingDateRangeModal
+          open={showDateModal}
+          onClose={() => setShowDateModal(false)}
+          values={draftRange}
+          onChange={setDraftRange}
+          onApply={onDateRangeChange}
+          title={dateRangeModalTitle}
+          description={dateRangeModalDescription}
+          enforceMaxDateRange={enforceMaxDateRange}
+          maxRangeDays={maxRangeDays}
+        />
+      ) : null}
     </>
   );
 }

@@ -5,17 +5,11 @@ import { PayrollEmployeeList } from "./PayrollEmployeeList";
 import { PayrollExceptionsPanel } from "./PayrollExceptionsPanel";
 import { PayrollFreshnessStatus } from "./PayrollFreshnessStatus";
 import { PayrollRunHeader } from "./PayrollRunHeader";
-import { PayrollRunSummary } from "./PayrollRunSummary";
 
 function PayrollWorkspaceSkeleton() {
   return (
     <div data-testid="payroll-workspace-skeleton" aria-hidden="true" className="space-y-6">
       <div className="h-24 animate-pulse rounded-2xl bg-[#eef4f5]" />
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {Array.from({ length: 4 }, (_, index) => (
-          <div key={index} className="h-20 animate-pulse rounded-xl bg-[#eef4f5]" />
-        ))}
-      </div>
       <div className="h-72 animate-pulse rounded-2xl bg-[#eef4f5]" />
     </div>
   );
@@ -43,7 +37,6 @@ function CurrentPayrollRunPanel({ scope, workspace }: {
     <div className="space-y-6">
       <PayrollFreshnessStatus freshness={workspace.freshness} error={workspace.error} />
       <PayrollRunHeader run={runResponse.run} activeOperation={runResponse.activeOperation} />
-      <PayrollRunSummary run={runResponse.run} />
       <PayrollExceptionsPanel
         blockerCodes={runResponse.run.blockerCodes}
         warningCodes={runResponse.run.warningCodes}
@@ -98,7 +91,7 @@ export function CurrentPayrollPanel({ scope, workspace }: {
   if (workspace.runResponse.kind === "empty" && workspace.employeePage.kind === "empty") {
     return (
       <section className="border-y border-[#e5e5e6] py-12 text-center">
-        <h1 className="text-2xl font-semibold text-[#10141a]">No active payroll period.</h1>
+        <h2 className="text-2xl font-semibold text-[#10141a]">No active payroll period.</h2>
         <p className="mt-2 text-sm text-[#62686f]">The next payroll will appear when its pay period becomes active.</p>
       </section>
     );

@@ -1,5 +1,44 @@
 import BillingOverviewCards from "../../components/BillingOverviewCards";
 import type { BillingOverviewStat } from "../../components/types";
+import type { PayrollRun } from "@/features/payroll/runs/model/types";
+
+const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+const date = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+export function mapPayrollRunToOverviewStats(run: PayrollRun): BillingOverviewStat[] {
+  return [
+    {
+      id: "total-due",
+      label: "Total payroll due",
+      value: currency.format(run.totals.totalDueCents / 100),
+    },
+    {
+      id: "gross-earnings",
+      label: "Gross earnings",
+      value: currency.format(run.totals.grossEarningsCents / 100),
+    },
+    {
+      id: "reimbursements",
+      label: "Reimbursements",
+      value: currency.format(run.totals.reimbursementCents / 100),
+    },
+    {
+      id: "adjustments",
+      label: "Adjustments",
+      value: currency.format(run.totals.adjustmentCents / 100),
+    },
+    {
+      id: "payday",
+      label: "Payday",
+      value: date.format(new Date(`${run.payday}T00:00:00.000Z`)),
+    },
+  ];
+}
 
 type PayrollOverviewCardsProps = {
   stats: BillingOverviewStat[];

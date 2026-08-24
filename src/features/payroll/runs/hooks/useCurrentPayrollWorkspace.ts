@@ -14,16 +14,21 @@ export type CurrentPayrollWorkspaceState = AcceptedPayrollSnapshot & {
   refetch: () => void;
 };
 
+export type CurrentPayrollWorkspaceOptions = {
+  skip?: boolean;
+};
+
 export function currentPayrollScopeKey(scope: AgencyPayrollRunScope): string {
   return JSON.stringify([scope.audience, scope.actorUid, scope.agencyId]);
 }
 
 export function useCurrentPayrollWorkspace(
   scope: AgencyPayrollRunScope,
+  { skip = false }: CurrentPayrollWorkspaceOptions = {},
 ): CurrentPayrollWorkspaceState {
-  const skip = !scope.actorUid || !scope.agencyId;
-  const current = useGetCurrentPayrollRunQuery(scope, { skip });
-  const employees = useGetCurrentPayrollEmployeesQuery(scope, { skip });
+  const skipCurrent = skip || !scope.actorUid || !scope.agencyId;
+  const current = useGetCurrentPayrollRunQuery(scope, { skip: skipCurrent });
+  const employees = useGetCurrentPayrollEmployeesQuery(scope, { skip: skipCurrent });
   const scopeKey = currentPayrollScopeKey(scope);
   const previousRef = useRef<AcceptedPayrollSnapshot | null>(null);
   const refetchedMismatchKeys = useRef(new Set<string>());
@@ -36,8 +41,8 @@ export function useCurrentPayrollWorkspace(
   }
 
   const accepted = acceptCurrentPayrollSnapshot({
-    runResponse: current.currentData,
-    employeePage: employees.currentData,
+    runResponse: skipCurrent ? undefined : current.currentData,
+    employeePage: skipCurrent ? undefined : employees.currentData,
     previous: previousRef.current,
     scopeKey,
   });
@@ -53,7 +58,7 @@ export function useCurrentPayrollWorkspace(
       : accepted;
 
   useEffect(() => {
-    if (!accepted.mismatchIdentity || !current.currentData || !employees.currentData
+    if (skipCurrent || !accepted.mismatchIdentity || !current.currentData || !employees.currentData
       || current.isFetching || employees.isFetching
       || refetchedMismatchKeys.current.has(accepted.mismatchIdentity)) {
       return;
@@ -61,7 +66,7 @@ export function useCurrentPayrollWorkspace(
     refetchedMismatchKeys.current.add(accepted.mismatchIdentity);
     current.refetch();
     employees.refetch();
-  }, [accepted.mismatchIdentity, current, employees]);
+  }, [accepted.mismatchIdentity, current, employees, skipCurrent]);
 
   return {
     ...visibleAccepted,
@@ -69,6 +74,7 @@ export function useCurrentPayrollWorkspace(
     isFetching,
     error,
     refetch: () => {
+      if (skipCurrent) return;
       current.refetch();
       employees.refetch();
     },

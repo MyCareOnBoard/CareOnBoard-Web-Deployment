@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 
+import { canManageEmployeePayroll } from "@/lib/agency/agency-billing-permissions";
 import { useAuth } from "@/utils/auth";
 
 import { PayrollWorkspaceCutoverBoundary } from "@/features/payroll/runs/pages/PayrollWorkspaceCutoverBoundary";
@@ -20,6 +21,10 @@ export function AgencyPayrollDashboardPage() {
   const { user } = useAuth();
   const actorUid = user?.uid ?? "";
   const agencyId = user?.agencyId || user?.agency?.id || "";
+  const setupAuthorized = canManageEmployeePayroll(
+    user?.userType,
+    user?.profile?.accessList ?? [],
+  ) || user?.canOpenAgencyPayrollSetup === true;
 
   if (!actorUid || !agencyId) {
     return (
@@ -32,6 +37,7 @@ export function AgencyPayrollDashboardPage() {
   return (
     <PayrollWorkspaceCutoverBoundary
       scope={{ audience: "agency", actorUid, agencyId }}
+      setupAuthorized={setupAuthorized}
     />
   );
 }
