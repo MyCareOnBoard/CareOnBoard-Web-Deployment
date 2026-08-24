@@ -54,8 +54,7 @@ describe("PayrollApprovalDialog", () => {
     expect(screen.getByRole("heading", { name: "Approve payroll" })).toHaveFocus();
     expect(screen.getByRole("status")).toHaveTextContent(/loading current approval/i);
     const overlay = document.querySelector('[data-slot="dialog-overlay"]');
-    expect(overlay).toHaveClass("bg-black/20", "backdrop-blur-sm", "data-[state=open]:animate-in");
-    expect(overlay).not.toHaveClass("!backdrop-blur-none");
+    expect(overlay).toHaveClass("bg-black/20", "backdrop-blur-none", "data-[state=open]:animate-in");
     expect(api.lazyHook).toHaveBeenCalledOnce();
     const options = api.lazyHook.mock.calls[0][0] as { selectFromResult?: (value: unknown) => unknown };
     expect(options.selectFromResult?.(api.state)).toEqual({});
