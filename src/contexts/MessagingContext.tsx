@@ -11,7 +11,7 @@ import {
   Conversation,
   Message,
 } from "@/lib/hooks/useMessaging";
-import { useMultiplePresence, usePresenceManager, UserPresence } from "@/lib/hooks/usePresence";
+import { useMultiplePresence, UserPresence } from "@/lib/hooks/usePresence";
 import {
   useLazyGetContactsQuery,
   useLazyGetConversationsQuery,
@@ -219,9 +219,6 @@ export function MessagingProvider({ children }: MessagingProviderProps) {
   const [contactOwnerScopeKey, setContactOwnerScopeKey] = useState("");
   const [contactPagination, setContactPagination] =
     useState<MessagingContinuationState>(emptyContinuation);
-
-  // Initialize presence manager
-  usePresenceManager();
 
   // RTK Query hooks - skip for unauthenticated users and family members (they use their own messaging API)
   const conversationListBaseKey = useMemo(() => JSON.stringify([

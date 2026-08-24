@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { Profiler } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({ list: vi.fn() }));
@@ -71,7 +72,8 @@ const rows = [
 describe("NetworkPayrollRunsWorkspace", () => {
   it("keeps agency identity on every read-only row and enters trusted agency context", async () => {
     const onOpenAgency = vi.fn();
-    api.list.mockReturnValue({ data: { items: rows, nextCursor: null, hasMore: false }, isLoading: false, isFetching: false, error: null, refetch: vi.fn() });
+    const page = { items: rows, nextCursor: null, hasMore: false };
+    api.list.mockReturnValue({ data: page, currentData: page, isLoading: false, isFetching: false, error: null, refetch: vi.fn() });
     render(<NetworkPayrollRunsWorkspace actorUid="super-1" onOpenAgency={onOpenAgency} />);
 
     const list = screen.getByRole("list", { name: "Authorized network payroll runs" });
@@ -88,8 +90,9 @@ describe("NetworkPayrollRunsWorkspace", () => {
   it("navigates bounded cursor pages without mounting multiple network lists", async () => {
     const firstPage = { items: [rows[0]], nextCursor: "network-page-2", hasMore: true };
     const secondPage = { items: [rows[1]], nextCursor: null, hasMore: false };
-    api.list.mockImplementation((args: { cursor?: string }) => ({
-      data: args.cursor ? secondPage : firstPage,
+    api.list.mockImplementation((args?: { cursor?: string }) => ({
+      data: args?.cursor ? secondPage : firstPage,
+      currentData: args?.cursor ? secondPage : firstPage,
       isLoading: false,
       isFetching: false,
       error: null,
@@ -106,5 +109,42 @@ describe("NetworkPayrollRunsWorkspace", () => {
     expect(screen.getByRole("listitem", { name: /Beacon Supports/ })).toBeVisible();
     await userEvent.click(screen.getByRole("button", { name: "Previous network payroll page" }));
     expect(screen.getByRole("listitem", { name: /Atlas Care/ })).toBeVisible();
+  });
+
+  it("never paints the prior actor's agency rows during a direct actor transition", () => {
+    const firstActorResult = {
+      data: { items: [rows[0]], nextCursor: null, hasMore: false },
+      currentData: { items: [rows[0]], nextCursor: null, hasMore: false },
+      isLoading: false,
+      isFetching: false,
+      error: null,
+    };
+    const secondActorResult = {
+      data: firstActorResult.data,
+      currentData: undefined,
+      isLoading: true,
+      isFetching: true,
+      error: null,
+    };
+    api.list.mockImplementation((args?: { actorUid: string }) => (
+      args?.actorUid === "super-1" ? firstActorResult : secondActorResult
+    ));
+    const commits: string[] = [];
+    const view = render(
+      <Profiler id="network-payroll" onRender={() => commits.push(document.body.textContent ?? "")}>
+        <NetworkPayrollRunsWorkspace actorUid="super-1" onOpenAgency={vi.fn()} />
+      </Profiler>,
+    );
+    expect(screen.getByText("Atlas Care")).toBeVisible();
+    const transitionStart = commits.length;
+
+    view.rerender(
+      <Profiler id="network-payroll" onRender={() => commits.push(document.body.textContent ?? "")}>
+        <NetworkPayrollRunsWorkspace actorUid="super-2" onOpenAgency={vi.fn()} />
+      </Profiler>,
+    );
+
+    expect(commits.slice(transitionStart)).not.toEqual([]);
+    expect(commits.slice(transitionStart).every((content) => !content.includes("Atlas Care"))).toBe(true);
   });
 });

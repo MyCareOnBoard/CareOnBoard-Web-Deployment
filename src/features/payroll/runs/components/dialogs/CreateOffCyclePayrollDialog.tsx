@@ -10,6 +10,10 @@ export type OffCycleObligationOption = {
   compatibility: { paydayNotBefore: string; paydayNotAfter: string | null }; context: OffCycleContext;
 };
 export type OffCycleSubmission = { idempotencyKey: string; obligations: Array<{ obligationId: string; expectedVersion: number }>; requestedPayday: string };
+export type OffCycleSubmissionRetention = {
+  intent: { key: string; fingerprint: string } | null;
+  flight: Promise<PayrollOperation> | null;
+};
 
 const isoDate = /^\d{4}-\d{2}-\d{2}$/;
 function validDate(value: string): boolean {
@@ -44,21 +48,50 @@ export function validateOffCycleSelection({ context, obligations, selected, requ
 }
 
 const acceptedStates = new Set(["accepted", "queued", "running", "retrying", "awaiting_provider", "succeeded"]);
+
+function isDefinitiveRejection(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const failure = value as {
+    status?: unknown;
+    code?: unknown;
+    data?: { code?: unknown };
+  };
+  const status = typeof failure.status === "number" ? failure.status : null;
+  if (status !== null && status >= 400 && status < 500 && ![408, 425, 429].includes(status)) {
+    return true;
+  }
+  const code = typeof failure.code === "string" ? failure.code : failure.data?.code;
+  return code === "PROJECTION_STALE";
+}
 const money = (cents: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
 
-export function CreateOffCyclePayrollDialog({ open, capability, context, obligations, activeConflict, onOpenChange, onSubmit, createIntentKey = () => crypto.randomUUID() }: {
+export function CreateOffCyclePayrollDialog({ open, capability, context, obligations, activeConflict, onOpenChange, onSubmit, createIntentKey = () => crypto.randomUUID(), submissionRetention }: {
   open: boolean; capability: boolean; context: OffCycleContext; obligations: OffCycleObligationOption[]; activeConflict: boolean;
   onOpenChange: (open: boolean) => void; onSubmit: (submission: OffCycleSubmission) => Promise<PayrollOperation>;
   createIntentKey?: () => string;
+  submissionRetention?: OffCycleSubmissionRetention;
 }) {
+  const localRetention = useRef<OffCycleSubmissionRetention>({ intent: null, flight: null });
+  const retention = submissionRetention ?? localRetention.current;
   const [selected, setSelected] = useState(new Map<string, number>());
   const [requestedPayday, setRequestedPayday] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const flightRef = useRef<Promise<PayrollOperation> | null>(null);
-  const intentKeyRef = useRef<string | null>(null);
+  const [busy, setBusy] = useState(retention.flight !== null);
   const paydayRef = useRef<HTMLInputElement>(null);
-  useEffect(() => { if (!open) { setSelected(new Map()); setRequestedPayday(""); setError(null); intentKeyRef.current = null; flightRef.current = null; } }, [open]);
+  useEffect(() => { if (!open) { setSelected(new Map()); setRequestedPayday(""); setError(null); } }, [open]);
+  useEffect(() => {
+    const flight = retention.flight;
+    if (!flight) {
+      setBusy(false);
+      return;
+    }
+    let mounted = true;
+    setBusy(true);
+    void flight.finally(() => {
+      if (mounted) setBusy(false);
+    }).catch(() => undefined);
+    return () => { mounted = false; };
+  }, [retention]);
   if (!capability) return null;
 
   const validation = validateOffCycleSelection({ context, obligations, selected, requestedPayday, activeConflict });
@@ -68,22 +101,32 @@ export function CreateOffCyclePayrollDialog({ open, capability, context, obligat
     setError(null);
   };
   const submit = (): Promise<PayrollOperation> => {
-    if (flightRef.current) return flightRef.current;
+    if (retention.flight) return retention.flight;
     const issue = validateOffCycleSelection({ context, obligations, selected, requestedPayday, activeConflict });
     if (issue) { setError(issue); if (!validDate(requestedPayday)) queueMicrotask(() => paydayRef.current?.focus()); return Promise.reject(new Error(issue)); }
-    const idempotencyKey = intentKeyRef.current ?? createIntentKey();
-    intentKeyRef.current = idempotencyKey;
+    const selectedObligations = [...selected]
+      .map(([obligationId, expectedVersion]) => ({ obligationId, expectedVersion }))
+      .sort((left, right) => left.obligationId.localeCompare(right.obligationId));
+    const fingerprint = JSON.stringify([requestedPayday, selectedObligations]);
+    if (retention.intent?.fingerprint !== fingerprint) {
+      retention.intent = { key: createIntentKey(), fingerprint };
+    }
+    const idempotencyKey = retention.intent.key;
     setBusy(true); setError(null);
-    const promise = onSubmit({ idempotencyKey, obligations: [...selected].map(([obligationId, expectedVersion]) => ({ obligationId, expectedVersion })), requestedPayday })
+    const promise = onSubmit({ idempotencyKey, obligations: selectedObligations, requestedPayday })
       .then((operation) => {
-        if (!acceptedStates.has(operation.state)) throw new Error("The off-cycle payroll was not accepted. Refresh and try again.");
+        if (!acceptedStates.has(operation.state)) {
+          retention.intent = null;
+          throw new Error("The off-cycle payroll was not accepted. Refresh and try again.");
+        }
+        retention.intent = null;
         onOpenChange(false); return operation;
       }).catch((value) => {
         setError(value instanceof Error ? value.message : "The off-cycle payroll could not be started. Refresh and try again.");
-        intentKeyRef.current = null;
+        if (isDefinitiveRejection(value)) retention.intent = null;
         throw value;
-      }).finally(() => { if (flightRef.current === promise) flightRef.current = null; setBusy(false); });
-    flightRef.current = promise;
+      }).finally(() => { if (retention.flight === promise) retention.flight = null; setBusy(false); });
+    retention.flight = promise;
     return promise;
   };
   return <Dialog open={open} onOpenChange={(next) => { if (!busy) onOpenChange(next); }}><DialogContent className="max-h-[90vh] w-[min(95vw,40rem)] overflow-y-auto border border-[#dfe7e8] p-6">

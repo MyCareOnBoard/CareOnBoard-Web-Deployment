@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PayrollEmployeeSummary } from "../model/types";
 import { PayrollEmployeeList } from "./PayrollEmployeeList";
+import { payrollEmployeeRowPropsEqual } from "./PayrollEmployeeRow";
 
 const api = vi.hoisted(() => ({
   detailTrigger: vi.fn(),
@@ -68,7 +69,9 @@ describe("PayrollEmployeeList", () => {
     Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
     renderList();
 
-    expect(screen.getAllByTestId("payroll-employee-row")).toHaveLength(50);
+    const rows = screen.getAllByTestId("payroll-employee-row");
+    expect(rows).toHaveLength(50);
+    expect(rows[49]).toHaveClass("[content-visibility:auto]", "[contain-intrinsic-size:auto_92px]");
     expect(screen.getByRole("list", { name: "Employees in this payroll" })).toBeInTheDocument();
   });
 
@@ -123,5 +126,24 @@ describe("PayrollEmployeeList", () => {
       .toHaveAttribute("aria-disabled", "true");
     expect(screen.getByRole("button", { name: "Next employee page" })).not.toBeDisabled();
     expect(screen.getByRole("button", { name: "Next employee page" })).toHaveFocus();
+  });
+
+  it("reuses unchanged rows across structurally shared payroll refreshes", () => {
+    const previous = { scope, identity, employee: items[0] };
+    expect(payrollEmployeeRowPropsEqual(previous, {
+      scope: { ...scope },
+      identity: { ...identity },
+      employee: {
+        ...items[0],
+        sourceCounts: { ...items[0].sourceCounts },
+        blockerCodes: [...items[0].blockerCodes],
+        warningCodes: [...items[0].warningCodes],
+      },
+    })).toBe(true);
+    expect(payrollEmployeeRowPropsEqual(previous, {
+      scope,
+      identity,
+      employee: { ...items[0], totalDueCents: items[0].totalDueCents + 100 },
+    })).toBe(false);
   });
 });

@@ -19,6 +19,8 @@ export type SuperAdminPayrollScope = {
   operationalContextRevision: number;
 };
 
+export type SuperAdminPayrollEmployeesArgs = SuperAdminPayrollScope & { cursor?: string };
+
 export type SuperAdminNetworkPayrollArgs = {
   actorUid: string;
   agencyId?: string;
@@ -82,9 +84,9 @@ export const superAdminPayrollRunRequests = {
     },
   }),
   current: (scope: SuperAdminPayrollScope) => get(`${agencyPath(scope)}/runs/current`),
-  currentEmployees: (scope: SuperAdminPayrollScope) => ({
+  currentEmployees: ({ cursor, ...scope }: SuperAdminPayrollEmployeesArgs) => ({
     ...get(`${agencyPath(scope)}/runs/current/employees`),
-    params: { limit: 50 },
+    params: { limit: 50, ...optional("cursor", cursor) },
   }),
 };
 
@@ -103,16 +105,42 @@ export const superAdminPayrollRunCacheKeys = {
     scope.agencyId,
     scope.operationalContextRevision,
   ),
-  currentEmployees: (scope: SuperAdminPayrollScope) => key(
+  currentEmployees: (scope: SuperAdminPayrollEmployeesArgs) => key(
     "super-admin-selected-payroll-employees",
     scope.actorUid,
     scope.agencyId,
     scope.operationalContextRevision,
+    scope.cursor ?? null,
   ),
 };
 
+const MAX_RESPONSE_BYTES = 500 * 1_024;
+const MAX_ID_BYTES = 512;
+const MAX_CURSOR_BYTES = 4_096;
+
+function byteLength(value: string): number {
+  return new TextEncoder().encode(value).byteLength;
+}
+
+function assertResponseSize(value: unknown): void {
+  let serialized: string | undefined;
+  try {
+    serialized = JSON.stringify(value);
+  } catch {
+    throw new TypeError("Invalid Super Admin payroll response.");
+  }
+  if (serialized === undefined || byteLength(serialized) > MAX_RESPONSE_BYTES) {
+    throw new TypeError("Invalid Super Admin payroll response.");
+  }
+}
+
 function record(value: unknown, path: string): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
+  if (!value || typeof value !== "object" || Array.isArray(value)
+    || Object.getPrototypeOf(value) !== Object.prototype
+    || Object.getOwnPropertySymbols(value).length > 0
+    || Object.values(Object.getOwnPropertyDescriptors(value)).some(
+      (descriptor) => !descriptor.enumerable || !("value" in descriptor),
+    )) {
     throw new TypeError(`Invalid Super Admin payroll response at ${path}.`);
   }
   return value as Record<string, unknown>;
@@ -126,8 +154,9 @@ function exactRecord(value: unknown, keys: readonly string[], path: string): Rec
   return candidate;
 }
 
-function requiredText(value: unknown, path: string): string {
-  if (typeof value !== "string" || !value.trim() || value !== value.trim()) {
+function requiredText(value: unknown, path: string, maximumBytes = MAX_ID_BYTES): string {
+  if (typeof value !== "string" || !value.trim() || value !== value.trim()
+    || byteLength(value) > maximumBytes || /[\u0000-\u001F\u007F]/.test(value)) {
     throw new TypeError(`Invalid Super Admin payroll response at ${path}.`);
   }
   return value;
@@ -160,6 +189,14 @@ function dateOnly(value: unknown, path: string): string {
 function nullableInstant(value: unknown, path: string): void {
   if (value === null) return;
   const text = requiredText(value, path);
+  const milliseconds = Date.parse(text);
+  if (!Number.isFinite(milliseconds) || new Date(milliseconds).toISOString() !== text) {
+    throw new TypeError(`Invalid Super Admin payroll response at ${path}.`);
+  }
+}
+
+function instant(value: unknown, path: string): void {
+  const text = requiredText(value, path, 64);
   const milliseconds = Date.parse(text);
   if (!Number.isFinite(milliseconds) || new Date(milliseconds).toISOString() !== text) {
     throw new TypeError(`Invalid Super Admin payroll response at ${path}.`);
@@ -204,9 +241,7 @@ function parseNetworkRow(value: unknown, index: number): void {
   for (const field of moneyKeys) nonNegativeInteger(totals[field], `${path}.totals.${field}`);
   const preview = exactRecord(row.preview, ["status", "revisionId", "totals"], `${path}.preview`);
   const previewStatus = oneOf(preview.status, ["none", "pending", "succeeded", "failed"], `${path}.preview.status`);
-  if (!(preview.revisionId === null || typeof preview.revisionId === "string" && preview.revisionId.trim())) {
-    throw new TypeError(`Invalid Super Admin payroll response at ${path}.preview.revisionId.`);
-  }
+  if (preview.revisionId !== null) requiredText(preview.revisionId, `${path}.preview.revisionId`);
   if (preview.totals === null) {
     if (previewStatus === "succeeded") throw new TypeError(`Invalid Super Admin payroll response at ${path}.preview.totals.`);
   } else {
@@ -214,14 +249,16 @@ function parseNetworkRow(value: unknown, index: number): void {
     const previewTotals = exactRecord(preview.totals, previewMoneyKeys, `${path}.preview.totals`);
     for (const field of previewMoneyKeys) nonNegativeInteger(previewTotals[field], `${path}.preview.totals.${field}`);
   }
-  nullableInstant(row.asOf, `${path}.asOf`);
+  instant(row.asOf, `${path}.asOf`);
 }
 
 export function parseNetworkPayrollRunPage(value: unknown): NetworkPayrollRunPage {
+  assertResponseSize(value);
   const page = exactRecord(value, ["items", "nextCursor", "hasMore"], "$");
-  if (!Array.isArray(page.items) || page.items.length > 50
+  if (!Array.isArray(page.items) || page.items.length > 25
     || typeof page.hasMore !== "boolean"
-    || !(page.nextCursor === null || typeof page.nextCursor === "string")
+    || !(page.nextCursor === null || typeof page.nextCursor === "string"
+      && requiredText(page.nextCursor, "$.nextCursor", MAX_CURSOR_BYTES))
     || page.hasMore !== (page.nextCursor !== null)) {
     throw new TypeError("Invalid Super Admin payroll response.");
   }
@@ -247,7 +284,7 @@ export const superAdminPayrollRunApi = checkPayrollApi.injectEndpoints({
       transformResponse: parseCurrentPayrollRunResponse,
       keepUnusedDataFor: 0,
     }),
-    getSuperAdminCurrentPayrollEmployees: build.query<CurrentPayrollEmployeePage, SuperAdminPayrollScope>({
+    getSuperAdminCurrentPayrollEmployees: build.query<CurrentPayrollEmployeePage, SuperAdminPayrollEmployeesArgs>({
       query: superAdminPayrollRunRequests.currentEmployees,
       serializeQueryArgs: ({ queryArgs }) => superAdminPayrollRunCacheKeys.currentEmployees(queryArgs),
       transformResponse: parseCurrentPayrollEmployeePage,

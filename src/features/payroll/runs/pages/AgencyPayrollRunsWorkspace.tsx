@@ -1,20 +1,26 @@
-import { useRef, useState } from "react";
+import { lazy, Suspense, useRef, useState } from "react";
 
 import { PayrollOperationProvider } from "../../operations/PayrollOperationProvider";
 import { CurrentPayrollPanel } from "../components/CurrentPayrollPanel";
 import { PayrollRunActions } from "../components/PayrollRunActions";
 import { PayrollApprovalDialog } from "../components/dialogs/PayrollApprovalDialog";
-import { LegacyPayrollHistoryPanel } from "../components/tabs/LegacyPayrollHistoryPanel";
-import { PayrollAuditPanel } from "../components/tabs/PayrollAuditPanel";
-import { PayrollHistoryPanel } from "../components/tabs/PayrollHistoryPanel";
-import { PayrollObligationsPanel } from "../components/tabs/PayrollObligationsPanel";
 import {
   useCurrentPayrollWorkspace,
   type CurrentPayrollWorkspaceState,
 } from "../hooks/useCurrentPayrollWorkspace";
 import { usePayrollRunCommand } from "../hooks/usePayrollRunCommand";
 import type { PayrollRunCommandArgs } from "../api/payrollRunCommands";
-import type { AgencyPayrollRunScope, PayrollRunCommandName } from "../model/types";
+import type { OffCycleSubmissionRetention } from "../components/dialogs/CreateOffCyclePayrollDialog";
+import type { AgencyPayrollRunScope, PayrollRunCommandName, PayrollRunProjection } from "../model/types";
+
+const LegacyPayrollHistoryPanel = lazy(() => import("../components/tabs/LegacyPayrollHistoryPanel")
+  .then((module) => ({ default: module.LegacyPayrollHistoryPanel })));
+const PayrollAuditPanel = lazy(() => import("../components/tabs/PayrollAuditPanel")
+  .then((module) => ({ default: module.PayrollAuditPanel })));
+const PayrollHistoryPanel = lazy(() => import("../components/tabs/PayrollHistoryPanel")
+  .then((module) => ({ default: module.PayrollHistoryPanel })));
+const PayrollObligationsPanel = lazy(() => import("../components/tabs/PayrollObligationsPanel")
+  .then((module) => ({ default: module.PayrollObligationsPanel })));
 
 type WorkspaceTab = "current" | "history" | "audit" | "obligations" | "legacy";
 const tabs: ReadonlyArray<{ id: WorkspaceTab; label: string }> = [
@@ -32,30 +38,82 @@ const legacyRange = () => {
   return { startDate: `${year}-01-01`, endDate: now.toISOString().slice(0, 10) };
 };
 
+function CurrentPayrollControls({
+  scope, workspace, projection, activeIntent, errorMessage, onAction, onApprove,
+}: {
+  scope: AgencyPayrollRunScope;
+  workspace: CurrentPayrollWorkspaceState;
+  projection: PayrollRunProjection;
+  activeIntent: PayrollRunCommandName | null;
+  errorMessage: string | null;
+  onAction: (command: PayrollRunCommandName) => void;
+  onApprove: (submission: {
+    expectedPreviewRevisionId: string;
+    expectedPreviewHash: string;
+    approvalChallenge: string;
+    acknowledgement: true;
+  }) => Promise<unknown>;
+}) {
+  const approvalKey = JSON.stringify([scope.actorUid, scope.agencyId, projection.runId, projection.activeRevisionId]);
+  const [approvalState, setApprovalState] = useState<{ key: string; open: boolean }>({ key: approvalKey, open: false });
+  const approvalOpen = approvalState.key === approvalKey && approvalState.open;
+
+  return (
+    <>
+      <PayrollRunActions
+        projection={projection}
+        freshness={workspace.freshness}
+        activeIntent={activeIntent}
+        employeeActionsAvailable={false}
+        onAction={(command) => {
+          if (command === "approve_payroll") {
+            setApprovalState({ key: approvalKey, open: true });
+            return;
+          }
+          onAction(command);
+        }}
+      />
+      {errorMessage ? <p role="alert" className="text-sm text-[#8d3131]">{errorMessage}</p> : null}
+      <PayrollApprovalDialog
+        open={approvalOpen}
+        scope={scope}
+        runId={projection.runId}
+        activeRevisionId={projection.activeRevisionId}
+        capability={workspace.commandsEnabled && projection.capabilities.commands.approve_payroll?.enabled === true}
+        agencyName="Your agency"
+        onOpenChange={(open) => setApprovalState({ key: approvalKey, open })}
+        onSubmit={onApprove}
+        onRefresh={workspace.refetch}
+      />
+    </>
+  );
+}
+
 function AgencyPayrollRunsWorkspaceContent({ scope, workspace }: {
   scope: AgencyPayrollRunScope;
   workspace: CurrentPayrollWorkspaceState;
 }) {
   const scopeKey = JSON.stringify([scope.actorUid, scope.agencyId]);
   const [tabState, setTabState] = useState<{ key: string; tab: WorkspaceTab }>({ key: scopeKey, tab: "current" });
-  const [approvalState, setApprovalState] = useState<{ key: string; open: boolean }>({ key: scopeKey, open: false });
   const tabRefs = useRef(new Map<WorkspaceTab, HTMLButtonElement>());
-  const commands = usePayrollRunCommand(scope);
+  const offCycleSubmissions = useRef(new Map<string, OffCycleSubmissionRetention>());
+  let offCycleSubmission = offCycleSubmissions.current.get(scopeKey);
+  if (!offCycleSubmission) {
+    offCycleSubmission = { intent: null, flight: null };
+    offCycleSubmissions.current.set(scopeKey, offCycleSubmission);
+  }
+  const commands = usePayrollRunCommand(scope, workspace.refetch);
   const projection = workspace.runResponse?.kind === "run" ? workspace.runResponse : null;
   const range = legacyRange();
   const tab = tabState.key === scopeKey ? tabState.tab : "current";
-  const approvalKey = JSON.stringify([scopeKey, projection?.runId, projection?.activeRevisionId]);
-  const approvalOpen = approvalState.key === approvalKey && approvalState.open;
 
   const selectTab = (next: WorkspaceTab) => {
     setTabState({ key: scopeKey, tab: next });
-    setApprovalState({ key: approvalKey, open: false });
     tabRefs.current.get(next)?.focus();
   };
   const execute = async (args: PayrollRunCommandArgs) => {
     try {
       await commands.runCommand(args);
-      workspace.refetch();
     } catch (value) {
       if ((value as { refreshRequired?: unknown } | undefined)?.refreshRequired === true) workspace.refetch();
       throw value;
@@ -63,10 +121,6 @@ function AgencyPayrollRunsWorkspaceContent({ scope, workspace }: {
   };
   const action = (command: PayrollRunCommandName) => {
     if (!projection || !workspace.commandsEnabled) return;
-    if (command === "approve_payroll") {
-      setApprovalState({ key: approvalKey, open: true });
-      return;
-    }
     const base = {
       ...scope,
       runId: projection.runId,
@@ -142,44 +196,37 @@ function AgencyPayrollRunsWorkspaceContent({ scope, workspace }: {
           <div className="space-y-6">
             <CurrentPayrollPanel scope={scope} workspace={workspace} />
             {projection ? (
-              <PayrollRunActions
-                projection={projection}
-                freshness={workspace.freshness}
-                activeIntent={commands.activeIntent}
-                employeeActionsAvailable={false}
-                onAction={action}
-              />
-            ) : null}
-            {commands.error ? <p role="alert" className="text-sm text-[#8d3131]">{commands.error.message}</p> : null}
-            {projection ? (
-              <PayrollApprovalDialog
-                open={approvalOpen}
+              <CurrentPayrollControls
                 scope={scope}
-                runId={projection.runId}
-                activeRevisionId={projection.activeRevisionId}
-                capability={workspace.commandsEnabled && projection.capabilities.commands.approve_payroll?.enabled === true}
-                agencyName="Your agency"
-                onOpenChange={(open) => setApprovalState({ key: approvalKey, open })}
-                onSubmit={approve}
-                onRefresh={workspace.refetch}
+                workspace={workspace}
+                projection={projection}
+                activeIntent={commands.activeIntent}
+                errorMessage={commands.error?.message ?? null}
+                onAction={action}
+                onApprove={approve}
               />
             ) : null}
           </div>
-        ) : tab === "history" ? (
-          <PayrollHistoryPanel scope={scope} />
-        ) : tab === "audit" ? (
-          projection ? <PayrollAuditPanel scope={scope} runId={projection.runId} activeRevisionId={projection.activeRevisionId} />
-            : <p className="py-8 text-sm text-[#62686f]">No active payroll is available for audit.</p>
-        ) : tab === "obligations" ? (
-          <PayrollObligationsPanel
-            scope={scope}
-            createOffCycleCapability={false}
-            restoreCapability={false}
-            onCreateOffCycle={(submission) => commands.createOffCycleRun({ ...scope, ...submission })}
-            onRestore={() => Promise.reject(new Error("Restore is unavailable without a bound originating revision."))}
-          />
         ) : (
-          <LegacyPayrollHistoryPanel scope={scope} startDate={range.startDate} endDate={range.endDate} />
+          <Suspense fallback={<p role="status" className="py-8 text-sm text-[#62686f]">Loading payroll section…</p>}>
+            {tab === "history" ? (
+              <PayrollHistoryPanel scope={scope} />
+            ) : tab === "audit" ? (
+              projection ? <PayrollAuditPanel scope={scope} runId={projection.runId} activeRevisionId={projection.activeRevisionId} />
+                : <p className="py-8 text-sm text-[#62686f]">No active payroll is available for audit.</p>
+            ) : tab === "obligations" ? (
+              <PayrollObligationsPanel
+                scope={scope}
+                createOffCycleCapability={false}
+                restoreCapability={false}
+                onCreateOffCycle={(submission) => commands.createOffCycleRun({ ...scope, ...submission })}
+                onRestore={() => Promise.reject(new Error("Restore is unavailable without a bound originating revision."))}
+                submissionRetention={offCycleSubmission}
+              />
+            ) : (
+              <LegacyPayrollHistoryPanel scope={scope} startDate={range.startDate} endDate={range.endDate} />
+            )}
+          </Suspense>
         )}
       </div>
     </main>

@@ -22,6 +22,7 @@ const api = vi.hoisted(() => ({
   legacyHook: vi.fn(),
   legacyDetailTrigger: vi.fn(),
   approvalDetailTrigger: vi.fn(),
+  commandHook: vi.fn(),
   runCommand: vi.fn(),
   createOffCycleRun: vi.fn(),
   currentState: {} as Record<string, unknown>,
@@ -46,12 +47,15 @@ vi.mock("../api/legacyPayrollHistoryEndpoints", () => ({
 }));
 
 vi.mock("../hooks/usePayrollRunCommand", () => ({
-  usePayrollRunCommand: () => ({
+  usePayrollRunCommand: (...args: unknown[]) => {
+    api.commandHook(...args);
+    return ({
     runCommand: api.runCommand,
     createOffCycleRun: api.createOffCycleRun,
     activeIntent: null,
     error: null,
-  }),
+    });
+  },
 }));
 
 const scope = { audience: "agency" as const, actorUid: "actor-1", agencyId: "agency-1" };
@@ -172,6 +176,7 @@ describe("AgencyPayrollRunsWorkspace", () => {
     api.legacyHook.mockReset();
     api.legacyDetailTrigger.mockReset();
     api.approvalDetailTrigger.mockReset();
+    api.commandHook.mockReset();
     api.runCommand.mockReset();
     api.createOffCycleRun.mockReset();
     const currentData = current();
@@ -209,12 +214,13 @@ describe("AgencyPayrollRunsWorkspace", () => {
     expect(screen.getByRole("button", { name: "Approve payroll" })).toBeDisabled();
   });
 
-  it("mounts only the selected stable payroll tab and starts its read lazily", () => {
+  it("mounts only the selected stable payroll tab and starts its read lazily", async () => {
     const view = render(<AgencyPayrollRunsWorkspace scope={scope} />);
     const labels = ["Current", "History", "Audit", "Obligations", "Legacy"];
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(labels);
 
     fireEvent.click(screen.getByRole("tab", { name: "History" }));
+    await screen.findByRole("heading", { name: "Payroll history" });
     expect(api.historyHook).toHaveBeenCalledWith({ ...scope, runType: "regular" });
     expect(screen.queryByRole("heading", { name: "Current payroll" })).not.toBeInTheDocument();
     expect(api.eventsHook).not.toHaveBeenCalled();
@@ -222,15 +228,18 @@ describe("AgencyPayrollRunsWorkspace", () => {
     expect(api.legacyHook).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("tab", { name: "Audit" }));
+    await screen.findByRole("heading", { name: "Audit timeline" });
     expect(api.eventsHook).toHaveBeenCalledWith({ ...scope, runId: "run-1", activeRevisionId: "revision-1" });
     expect(screen.queryByRole("heading", { name: "Payroll history" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Obligations" }));
+    await screen.findByRole("heading", { name: "Off-cycle obligations" });
     expect(api.obligationsHook).toHaveBeenCalledWith({ ...scope, state: "open" });
     expect(screen.queryByRole("heading", { name: "Audit timeline" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Create off-cycle payroll" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Legacy" }));
+    await screen.findByRole("heading", { name: "Legacy payroll invoice history" }, { timeout: 5_000 });
     expect(api.legacyHook).toHaveBeenCalledOnce();
     expect(api.legacyHook.mock.calls[0]?.[0]).toEqual(expect.objectContaining(scope));
     expect(screen.queryByRole("heading", { name: "Off-cycle obligations" })).not.toBeInTheDocument();
@@ -239,9 +248,9 @@ describe("AgencyPayrollRunsWorkspace", () => {
     view.rerender(<AgencyPayrollRunsWorkspace scope={{ ...scope, agencyId: "agency-2" }} />);
     expect(screen.getByRole("tab", { name: "Current" })).toHaveAttribute("aria-selected", "true");
     expect(api.legacyHook).not.toHaveBeenCalled();
-  });
+  }, 10_000);
 
-  it("hides employee-scoped actions and refreshes only from a server-authoritative run command", async () => {
+  it("hides employee-scoped actions and avoids a duplicate refresh after a terminal command", async () => {
     const projection = current();
     delete projection.activeOperation;
     projection.capabilities.commands.request_preview = { enabled: true, reasonCode: null };
@@ -260,7 +269,8 @@ describe("AgencyPayrollRunsWorkspace", () => {
       expectedActiveRevisionId: "revision-1",
       idempotencyKey: expect.any(String),
     })));
-    await waitFor(() => expect(api.currentState.refetch).toHaveBeenCalledOnce());
+    expect(api.currentState.refetch).not.toHaveBeenCalled();
+    expect(api.commandHook).toHaveBeenCalledWith(scope, expect.any(Function));
 
     (api.currentState.refetch as ReturnType<typeof vi.fn>).mockClear();
     api.runCommand.mockRejectedValueOnce(Object.assign(new Error("stale"), { code: "PROJECTION_STALE", refreshRequired: true }));
@@ -268,7 +278,7 @@ describe("AgencyPayrollRunsWorkspace", () => {
     await waitFor(() => expect(api.currentState.refetch).toHaveBeenCalledOnce());
   });
 
-  it("opens and cancels approval without mutation, then refreshes after a confirmed successful command", async () => {
+  it("opens and cancels approval without mutation, then relies on terminal invalidation after success", async () => {
     const projection = current("ready_to_approve");
     delete projection.activeOperation;
     projection.prerequisites = { revisionReady: true, dispositionsComplete: true, noBlockers: true, providerSynchronized: true, previewReady: true };
@@ -282,9 +292,11 @@ describe("AgencyPayrollRunsWorkspace", () => {
     api.approvalDetailTrigger.mockReturnValue({ unwrap: () => Promise.resolve(approvalDetail), abort: vi.fn() });
     render(<AgencyPayrollRunsWorkspace scope={scope} />);
 
+    api.commandHook.mockClear();
     fireEvent.click(screen.getByRole("button", { name: "Approve payroll" }));
     expect(await screen.findByRole("heading", { name: "Approve payroll" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Keep reviewing" }));
+    expect(api.commandHook).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole("button", { name: "Keep reviewing" }));
     expect(api.runCommand).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Approve payroll" }));
@@ -296,6 +308,18 @@ describe("AgencyPayrollRunsWorkspace", () => {
       expectedActiveRevisionId: "revision-1", expectedPreviewRevisionId: "revision-1",
       expectedPreviewHash: "a".repeat(64), approvalChallenge: "challenge-1", acknowledgement: true,
     })));
+    expect(api.currentState.refetch).not.toHaveBeenCalled();
+
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Approve payroll" })).not.toBeInTheDocument());
+    (api.currentState.refetch as ReturnType<typeof vi.fn>).mockClear();
+    api.runCommand.mockRejectedValueOnce(Object.assign(new Error("stale"), {
+      code: "PROJECTION_STALE",
+      refreshRequired: true,
+    }));
+    fireEvent.click(screen.getByRole("button", { name: "Approve payroll" }));
+    await screen.findByText("Expected cash requirement");
+    fireEvent.click(screen.getByRole("checkbox", { name: /reviewed these totals/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Approve payroll" }));
     await waitFor(() => expect(api.currentState.refetch).toHaveBeenCalledOnce());
   });
 
@@ -351,6 +375,10 @@ describe("AgencyPayrollRunsWorkspace", () => {
     expect(screen.getByText("Payroll data is updating")).toBeInTheDocument();
     expect(screen.getAllByText("$130.00")).toHaveLength(2);
     expect(screen.queryByText(/success/i)).not.toBeInTheDocument();
+    expect(api.currentState.refetch).not.toHaveBeenCalled();
+
+    api.currentState = { ...api.currentState, isFetching: false };
+    view.rerender(<AgencyPayrollRunsWorkspace scope={scope} />);
     await waitFor(() => expect(api.currentState.refetch).toHaveBeenCalledOnce());
   });
 

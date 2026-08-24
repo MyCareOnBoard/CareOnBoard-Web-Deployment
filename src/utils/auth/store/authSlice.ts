@@ -5,16 +5,8 @@
  */
 
 import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit'
-import {
-  createUserWithEmailAndPassword,
-  signOut,
-  updateProfile,
-  sendPasswordResetEmail as firebaseSendPasswordResetEmail,
-  type User as FirebaseUser,
-} from 'firebase/auth'
-import { auth } from '@/lib/firebase'
+import type { User as FirebaseUser } from 'firebase/auth'
 import type { AuthState, LoginCredentials, SignupCredentials } from '../types'
-import { transformFirebaseUser, loginWithEmail } from '@/utils/auth/services/authService'
 import type { User } from '../types/user.types'
 
 // Initial state
@@ -31,6 +23,7 @@ const initialState: AuthState = {
 export const loginUser = createAsyncThunk(
   'auth/login',
   async (credentials: LoginCredentials, { rejectWithValue }) => {
+    const { loginWithEmail } = await import('../services/authService')
     const result = await loginWithEmail(credentials.email, credentials.password)
     if (result.status === 'success') {
       return result.user
@@ -52,6 +45,15 @@ export const signupUser = createAsyncThunk(
   'auth/signup',
   async (credentials: SignupCredentials, { rejectWithValue }) => {
     try {
+      const [
+        { createUserWithEmailAndPassword, updateProfile },
+        { auth },
+        { transformFirebaseUser },
+      ] = await Promise.all([
+        import('firebase/auth'),
+        import('@/lib/firebase'),
+        import('../services/authService'),
+      ])
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         credentials.email,
@@ -81,6 +83,10 @@ export const logoutUser = createAsyncThunk(
   'auth/logout',
   async (_, { rejectWithValue }) => {
     try {
+      const [{ signOut }, { auth }] = await Promise.all([
+        import('firebase/auth'),
+        import('@/lib/firebase'),
+      ])
       await signOut(auth)
     } catch (error: any) {
       return rejectWithValue(error.message || 'Logout failed')
@@ -95,6 +101,11 @@ export const resetPassword = createAsyncThunk(
   'auth/resetPassword',
   async (email: string, { rejectWithValue }) => {
     try {
+      const [{ sendPasswordResetEmail: firebaseSendPasswordResetEmail }, { auth }] =
+        await Promise.all([
+          import('firebase/auth'),
+          import('@/lib/firebase'),
+        ])
       await firebaseSendPasswordResetEmail(auth, email)
     } catch (error: any) {
       return rejectWithValue(error.message || 'Password reset failed')
@@ -108,6 +119,10 @@ export const resetPassword = createAsyncThunk(
 export const checkAuthState = createAsyncThunk(
   'auth/checkState',
   async (_, { rejectWithValue }) => {
+    const [{ auth }, { transformFirebaseUser }] = await Promise.all([
+      import('@/lib/firebase'),
+      import('../services/authService'),
+    ])
     return new Promise<User | null>((resolve) => {
       const unsubscribe = auth.onAuthStateChanged(
         (firebaseUser: FirebaseUser | null) => {

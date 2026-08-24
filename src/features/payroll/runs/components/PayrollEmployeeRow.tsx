@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { memo, useId, useState } from "react";
 import { ChevronDown } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -21,22 +21,44 @@ function dispositionLabel(value: PayrollEmployeeSummary["disposition"]): string 
   return value.replace("_", " ");
 }
 
-export function PayrollEmployeeRow({
-  scope,
-  identity,
-  employee,
-}: {
+export type PayrollEmployeeRowProps = {
   scope: AgencyPayrollRunScope;
   identity: Extract<PayrollRunIdentity, { kind: "run" }>;
   employee: PayrollEmployeeSummary;
-}) {
+};
+
+export function payrollEmployeeRowPropsEqual(
+  previous: PayrollEmployeeRowProps,
+  next: PayrollEmployeeRowProps,
+): boolean {
+  return previous.employee.employeeId === next.employee.employeeId
+    && previous.employee.displayName === next.employee.displayName
+    && previous.employee.employmentType === next.employee.employmentType
+    && previous.employee.disposition === next.employee.disposition
+    && previous.employee.regularHours === next.employee.regularHours
+    && previous.employee.overtimeHours === next.employee.overtimeHours
+    && previous.employee.totalDueCents === next.employee.totalDueCents
+    && previous.employee.hasBlockers === next.employee.hasBlockers
+    && previous.scope.audience === next.scope.audience
+    && previous.scope.actorUid === next.scope.actorUid
+    && previous.scope.agencyId === next.scope.agencyId
+    && previous.identity.runId === next.identity.runId
+    && previous.identity.activeRevisionId === next.identity.activeRevisionId
+    && previous.identity.revisionNumber === next.identity.revisionNumber;
+}
+
+function PayrollEmployeeRowComponent({
+  scope,
+  identity,
+  employee,
+}: PayrollEmployeeRowProps) {
   const [expanded, setExpanded] = useState(false);
   const detailId = useId();
 
   return (
     <li
       data-testid="payroll-employee-row"
-      className="border-b border-[#e5e5e6] last:border-b-0"
+      className="border-b border-[#e5e5e6] last:border-b-0 [content-visibility:auto] [contain-intrinsic-size:auto_92px]"
     >
       <div className="grid gap-x-4 gap-y-3 px-4 py-4 md:grid-cols-[minmax(12rem,1.4fr)_0.7fr_0.7fr_0.8fr_auto] md:items-center md:px-5">
         <div className="min-w-0">
@@ -83,3 +105,6 @@ export function PayrollEmployeeRow({
     </li>
   );
 }
+
+export const PayrollEmployeeRow = memo(PayrollEmployeeRowComponent, payrollEmployeeRowPropsEqual);
+PayrollEmployeeRow.displayName = "PayrollEmployeeRow";

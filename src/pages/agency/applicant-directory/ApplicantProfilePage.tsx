@@ -34,6 +34,7 @@ import { roleLabel } from "@/lib/roleLabel";
 import { VoiceRecordingProvider } from "@/contexts/VoiceRecordingContext";
 import VoiceInputButton from "@/components/VoiceInputButton";
 import VoiceEnabledTextarea from "@/components/VoiceEnabledTextarea";
+import { withMessagingProvider } from "@/contexts/withMessagingProvider";
 
 // Type alias for document file from eligibility data
 type DocumentFile = NonNullable<EligibilityData['photoIdUrl']>;
@@ -46,7 +47,7 @@ const getValidTab = (tab: string | null): TabSection => {
   return validTabs.includes(tab as TabSection) ? (tab as TabSection) : "profile";
 };
 
-export default function ApplicantProfilePage() {
+function ApplicantProfilePageContent() {
   const navigate = useNavigate();
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1181,3 +1182,5 @@ export default function ApplicantProfilePage() {
     </VoiceRecordingProvider>
   );
 }
+
+export default withMessagingProvider(ApplicantProfilePageContent);

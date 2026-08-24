@@ -67,6 +67,15 @@ describe("PayrollRunActions", () => {
     expect(screen.getByRole("button", { name: /defer employee/i })).toBeEnabled();
   });
 
+  it("associates disabled financial actions with an accessible reason instead of title-only text", () => {
+    render(<PayrollRunActions projection={projection()} freshness="stale" onAction={vi.fn()} />);
+
+    const approve = screen.getByRole("button", { name: "Approve payroll" });
+    expect(approve).toBeDisabled();
+    expect(approve).not.toHaveAttribute("title");
+    expect(approve).toHaveAccessibleDescription("Refresh the payroll before making financial changes.");
+  });
+
   it("shows progress without claiming financial success", () => {
     render(<PayrollRunActions projection={projection()} freshness="fresh" onAction={vi.fn()} activeIntent="request_preview" />);
     expect(screen.getByRole("status")).toHaveTextContent("Starting payroll preview");

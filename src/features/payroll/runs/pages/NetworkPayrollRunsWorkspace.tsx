@@ -51,19 +51,27 @@ export function NetworkPayrollRunsWorkspace({ actorUid, onOpenAgency }: {
   actorUid: string;
   onOpenAgency: (agencyId: string) => void;
 }) {
-  const [cursors, setCursors] = useState<Array<string | undefined>>([undefined]);
+  const [storedCursors, setStoredCursors] = useState<{
+    actorUid: string;
+    values: Array<string | undefined>;
+  }>(() => ({ actorUid, values: [undefined] }));
+  const cursors = storedCursors.actorUid === actorUid ? storedCursors.values : [undefined];
   const cursor = cursors.at(-1);
   const query = useListSuperAdminNetworkPayrollRunsQuery({ actorUid, ...(cursor ? { cursor } : {}) }, { skip: !actorUid });
-  const [visiblePage, setVisiblePage] = useState(query.data ?? null);
+  const [storedPage, setStoredPage] = useState<{
+    actorUid: string;
+    page: NonNullable<typeof query.currentData>;
+  } | null>(() => query.currentData ? { actorUid, page: query.currentData } : null);
+  const visiblePage = storedPage?.actorUid === actorUid ? storedPage.page : null;
 
   useEffect(() => {
-    setCursors([undefined]);
-    setVisiblePage(null);
+    setStoredCursors({ actorUid, values: [undefined] });
+    setStoredPage(null);
   }, [actorUid]);
 
   useEffect(() => {
-    if (query.data) setVisiblePage(query.data);
-  }, [query.data]);
+    if (query.currentData) setStoredPage({ actorUid, page: query.currentData });
+  }, [actorUid, query.currentData]);
 
   const rows = visiblePage?.items ?? [];
 
@@ -77,7 +85,7 @@ export function NetworkPayrollRunsWorkspace({ actorUid, onOpenAgency }: {
         </p>
       </header>
 
-      {query.error && !query.data ? (
+      {query.error && !query.currentData ? (
         <div role="alert" className="rounded-xl border border-[#efcaca] bg-[#fff1f1] px-5 py-5 text-sm text-[#8d3131]">
           Network payroll runs could not be loaded.
         </div>
@@ -95,7 +103,12 @@ export function NetworkPayrollRunsWorkspace({ actorUid, onOpenAgency }: {
             aria-disabled={cursors.length === 1 || query.isFetching}
             aria-label="Previous network payroll page"
             onClick={() => {
-              if (!query.isFetching) setCursors((current) => current.slice(0, -1));
+              if (!query.isFetching) {
+                setStoredCursors((current) => ({
+                  actorUid,
+                  values: current.actorUid === actorUid ? current.values.slice(0, -1) : [undefined],
+                }));
+              }
             }}
           >Previous</Button>
           <Button
@@ -106,7 +119,13 @@ export function NetworkPayrollRunsWorkspace({ actorUid, onOpenAgency }: {
             aria-label="Next network payroll page"
             onClick={() => {
               if (!query.isFetching && visiblePage?.hasMore && visiblePage.nextCursor) {
-                setCursors((current) => [...current, visiblePage.nextCursor ?? undefined]);
+                setStoredCursors((current) => ({
+                  actorUid,
+                  values: [
+                    ...(current.actorUid === actorUid ? current.values : [undefined]),
+                    visiblePage.nextCursor ?? undefined,
+                  ],
+                }));
               }
             }}
           >Next</Button>

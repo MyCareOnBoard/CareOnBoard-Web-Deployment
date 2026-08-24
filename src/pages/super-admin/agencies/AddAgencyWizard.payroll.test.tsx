@@ -129,6 +129,78 @@ describe("AddAgencyWizard payroll endpoint payloads", () => {
     expect(timezone).toHaveAccessibleDescription("Select a valid IANA timezone.");
   });
 
+  it("keeps focus on the timezone combobox while navigating and selecting an active option", async () => {
+    const user = userEvent.setup();
+    render(<AddAgencyWizard />);
+
+    const timezone = screen.getByRole("combobox", { name: "Agency timezone" });
+    await user.click(timezone);
+    fireEvent.change(timezone, { target: { value: "New_York" } });
+    const option = screen.getByRole("option", { name: "America/New_York" });
+
+    await user.keyboard("{ArrowDown}");
+    expect(timezone).toHaveFocus();
+    expect(timezone).toHaveAttribute("aria-activedescendant", option.id);
+    expect(option).toHaveAttribute("aria-selected", "true");
+
+    await user.keyboard("{ArrowUp}");
+    expect(timezone).toHaveAttribute("aria-activedescendant", option.id);
+
+    await user.keyboard("{Enter}");
+    expect(timezone).toHaveValue("America/New_York");
+    expect(screen.queryByRole("listbox", { name: "IANA timezones" })).not.toBeInTheDocument();
+    expect(timezone).toHaveFocus();
+  });
+
+  it("scrolls the active timezone option into view during keyboard navigation", async () => {
+    const scrollIntoView = vi.fn();
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoView,
+    });
+    try {
+      const user = userEvent.setup();
+      render(<AddAgencyWizard />);
+
+      const timezone = screen.getByRole("combobox", { name: "Agency timezone" });
+      await user.click(timezone);
+      fireEvent.change(timezone, { target: { value: "America/" } });
+      expect(screen.getAllByRole("option").length).toBeGreaterThan(5);
+
+      await user.keyboard("{ArrowDown}{ArrowDown}{ArrowDown}{ArrowDown}{ArrowDown}{ArrowDown}");
+
+      const activeId = timezone.getAttribute("aria-activedescendant");
+      const activeOption = activeId ? document.getElementById(activeId) : null;
+      expect(activeOption).not.toBeNull();
+      expect(scrollIntoView).toHaveBeenLastCalledWith({ block: "nearest" });
+      expect(scrollIntoView.mock.contexts.at(-1)).toBe(activeOption);
+    } finally {
+      if (originalScrollIntoView) {
+        Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+          configurable: true,
+          value: originalScrollIntoView,
+        });
+      } else {
+        Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
+      }
+    }
+  });
+
+  it("closes timezone options with Escape without moving focus from the combobox", async () => {
+    const user = userEvent.setup();
+    render(<AddAgencyWizard />);
+
+    const timezone = screen.getByRole("combobox", { name: "Agency timezone" });
+    await user.click(timezone);
+    fireEvent.change(timezone, { target: { value: "New_York" } });
+    await user.keyboard("{ArrowDown}{Escape}");
+
+    expect(screen.queryByRole("listbox", { name: "IANA timezones" })).not.toBeInTheDocument();
+    expect(timezone).not.toHaveAttribute("aria-activedescendant");
+    expect(timezone).toHaveFocus();
+  });
+
   it("does not advance or submit with an empty or invalid timezone", async () => {
     const user = userEvent.setup();
     render(<AddAgencyWizard />);

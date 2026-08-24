@@ -19,6 +19,7 @@ import { getInitials, sanitizeSearchQuery } from "@/lib/utils/string-utils";
 import { matchesAgencyMode } from "@/lib/roleLabel";
 import type { AgencyMode } from "@/store/redux/agencyModeSlice";
 import { useDebounce } from "@/hooks/useDebounce";
+import { withMessagingProvider } from "@/contexts/withMessagingProvider";
 
 export type FilterTab = "all" | "dsp" | "staff" | "administration" | "agency";
 
@@ -43,7 +44,7 @@ export interface MessagingPageProps {
     programMode?: AgencyMode | null;
 }
 
-export function MessagingPage({
+function MessagingPageContent({
     pageTitle,
     basePath,
     buttonColor = "#00b8d4",
@@ -323,3 +324,5 @@ export function MessagingPage({
         </>
     );
 }
+
+export const MessagingPage = withMessagingProvider(MessagingPageContent);

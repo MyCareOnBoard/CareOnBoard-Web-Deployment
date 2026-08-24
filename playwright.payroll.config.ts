@@ -10,8 +10,8 @@ export default defineConfig({
   use: {
     baseURL,
     browserName: "chromium",
-    // The shared baseline probe owns the trace so the focused spec and the
-    // standalone capture produce the same artifact.
+    // Each focused capture helper owns its trace so specs and standalone
+    // captures produce the same evidence shape.
     trace: "off",
   },
   webServer: process.env.PAYROLL_BASE_URL ? undefined : {

@@ -96,6 +96,29 @@ describe("useCurrentPayrollWorkspace", () => {
     expect(employeeRefetch).toHaveBeenCalledTimes(2);
   });
 
+  it("waits for an in-flight mismatched pair to settle before requesting recovery", async () => {
+    const currentRefetch = queryState.current.refetch as ReturnType<typeof vi.fn>;
+    const employeeRefetch = queryState.employees.refetch as ReturnType<typeof vi.fn>;
+    const { rerender } = renderHook(() => useCurrentPayrollWorkspace(scope));
+
+    act(() => {
+      const currentData = runResponse("revision-2", 2);
+      queryState.current = { ...queryState.current, data: currentData, currentData, isFetching: false };
+      queryState.employees = { ...queryState.employees, isFetching: true };
+      rerender();
+    });
+    await Promise.resolve();
+    expect(currentRefetch).not.toHaveBeenCalled();
+    expect(employeeRefetch).not.toHaveBeenCalled();
+
+    act(() => {
+      queryState.employees = { ...queryState.employees, isFetching: false };
+      rerender();
+    });
+    await waitFor(() => expect(currentRefetch).toHaveBeenCalledOnce());
+    expect(employeeRefetch).toHaveBeenCalledOnce();
+  });
+
   it("drops the previous snapshot synchronously when the scope changes", () => {
     let activeScope = scope;
     const { result, rerender } = renderHook(() => useCurrentPayrollWorkspace(activeScope));

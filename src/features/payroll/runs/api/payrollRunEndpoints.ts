@@ -13,6 +13,12 @@ import {
   assertPayrollRevisionIdentity,
   parseCurrentPayrollEmployeePage,
   parseCurrentPayrollRunResponse,
+  parsePayrollEmployeePage,
+  parsePayrollObligationPage,
+  parsePayrollRunEmployeeDetail,
+  parsePayrollRunEmployeeSourcePage,
+  parsePayrollRunEventPage,
+  parsePayrollRunPage,
   parsePayrollRunProjectionResponse,
 } from "./payrollRunContracts";
 import type {
@@ -186,6 +192,7 @@ export const payrollRunApi = checkPayrollApi.injectEndpoints({
     listPayrollRuns: build.query<PayrollRunPage, PayrollRunListArgs>({
       query: payrollRunRequests.list,
       serializeQueryArgs: ({ queryArgs }) => payrollRunCacheKeys.list(queryArgs),
+      transformResponse: parsePayrollRunPage,
       providesTags: (_result, _error, scope) => [payrollTag("PayrollHistory", scope)],
     }),
     getPayrollRun: build.query<PayrollRunProjection, PayrollRunDetailArgs>({
@@ -206,8 +213,9 @@ export const payrollRunApi = checkPayrollApi.injectEndpoints({
       query: payrollRunRequests.employees,
       serializeQueryArgs: ({ queryArgs }) => payrollRunCacheKeys.employees(queryArgs),
       transformResponse: (value: unknown, _meta, args) => {
-        assertPayrollRevisionIdentity(value, args);
-        return value as PayrollEmployeePage;
+        const page = parsePayrollEmployeePage(value);
+        assertPayrollRevisionIdentity(page, args);
+        return page;
       },
       providesTags: (_result, _error, args) => payrollRunEmployeeQueryTags(
         args,
@@ -219,11 +227,12 @@ export const payrollRunApi = checkPayrollApi.injectEndpoints({
       query: payrollRunRequests.employeeDetail,
       serializeQueryArgs: ({ queryArgs }) => payrollRunCacheKeys.employeeDetail(queryArgs),
       transformResponse: (value: unknown, _meta, args) => {
-        assertPayrollRevisionIdentity(value, {
+        const detail = parsePayrollRunEmployeeDetail(value);
+        assertPayrollRevisionIdentity(detail, {
           activeRevisionId: args.activeRevisionId,
           employeeId: args.employeeId,
         });
-        return value as PayrollRunEmployeeDetail;
+        return detail;
       },
       providesTags: (_result, _error, args) => payrollRunEmployeeQueryTags(
         args,
@@ -236,8 +245,9 @@ export const payrollRunApi = checkPayrollApi.injectEndpoints({
       query: payrollRunRequests.sources,
       serializeQueryArgs: ({ queryArgs }) => payrollRunCacheKeys.sources(queryArgs),
       transformResponse: (value: unknown, _meta, args) => {
-        assertPayrollRevisionIdentity(value, args);
-        return value as PayrollRunEmployeeSourcePage;
+        const page = parsePayrollRunEmployeeSourcePage(value);
+        assertPayrollRevisionIdentity(page, args);
+        return page;
       },
       providesTags: (_result, _error, args) => payrollRunEmployeeQueryTags(
         args,
@@ -249,6 +259,7 @@ export const payrollRunApi = checkPayrollApi.injectEndpoints({
     listPayrollRunEvents: build.query<PayrollRunEventPage, PayrollRunEventsArgs>({
       query: payrollRunRequests.events,
       serializeQueryArgs: ({ queryArgs }) => payrollRunCacheKeys.events(queryArgs),
+      transformResponse: parsePayrollRunEventPage,
       providesTags: (_result, _error, args) => [
         payrollRunEventTag(args, args.runId, PAYROLL_RUN_WIDE_REVISION_TAG),
         payrollRunEventTag(args, args.runId, args.activeRevisionId),
@@ -257,6 +268,7 @@ export const payrollRunApi = checkPayrollApi.injectEndpoints({
     listPayrollObligations: build.query<PayrollObligationPage, PayrollObligationsArgs>({
       query: payrollRunRequests.obligations,
       serializeQueryArgs: ({ queryArgs }) => payrollRunCacheKeys.obligations(queryArgs),
+      transformResponse: parsePayrollObligationPage,
       providesTags: (_result, _error, scope) => [payrollObligationTag(scope)],
     }),
   }),

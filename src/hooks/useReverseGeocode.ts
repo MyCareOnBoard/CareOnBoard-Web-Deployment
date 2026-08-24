@@ -1,3 +1,5 @@
+import { useGoogleMapsDemand } from "@/providers/GoogleMapsProvider";
+
 export type ReverseGeocodeResult = {
     formattedAddress: string;
     street: string;
@@ -29,6 +31,8 @@ function parseAddressComponents(
 }
 
 export function useReverseGeocode() {
+    useGoogleMapsDemand();
+
     const reverseGeocode = async (
         lat: number,
         lng: number

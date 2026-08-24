@@ -1,30 +1,27 @@
 import type React from "react"
 import { createContext, useContext, useEffect, useRef, useState } from "react"
 import { useDispatch, useSelector } from "react-redux"
-import { setUser } from "@/utils/auth"
 import type { AppDispatch, RootState } from "@/store/redux/store"
 import { persistor } from "@/store/redux/store"
-import {
-  loginWithEmail,
-  registerWithEmail,
-  sendPasswordResetEmail,
-  getIdToken,
-  deleteCurrentUser,
-  removeUserData,
-  type LoginResponse,
-} from "../services/authService"
-import { logoutUser } from "../store/authSlice"
+import type { LoginResponse } from "../services/authService"
+import { logoutUser, setUser } from "../store/authSlice"
 import type { LoginResult } from "../types/login.types"
-import { createUser as createBackendUser } from "../api/client"
 import { PageLoader } from "@/components/ui/loader"
 import { auth } from "@/lib/firebase";
-import { reload } from "firebase/auth";
 import { clearAuthCache } from "@/lib/axios";
 import { getUser } from "@/lib/api/users";
-import { clearMfaResolverSession } from "@/utils/auth/services/mfaSessionStore";
+import { clearMfaResolverSession } from "../services/mfaSessionStore";
 import type { User } from "../types/user.types"
 import { checkPayrollApi } from "@/features/payroll/api/checkPayrollApi"
 import { clearPayrollOnboardSessions } from "@/features/payroll/onboard/payrollOnboardSession"
+
+function removeStoredUserData(): void {
+  try {
+    localStorage.removeItem("auth_user")
+  } catch (error) {
+    console.error("Failed to remove user data:", error)
+  }
+}
 
 interface AuthContextType {
   user: User | null
@@ -131,6 +128,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Login user with email and password
    */
   const login = async (email: string, password: string): Promise<LoginResult> => {
+    const { loginWithEmail } = await import("../services/authService")
     const response: LoginResponse = await loginWithEmail(email, password)
 
     if (response.status === 'error') {
@@ -155,6 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     agencyId?: string,
     applicantType?: string
   ) => {
+    const { registerWithEmail } = await import("../services/authService")
     const response = await registerWithEmail(fullName, email, password)
 
     if (!response.success || !response.user) {
@@ -164,13 +163,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Create user in backend FIRST (before updating state so presence/heartbeat don't run)
     try {
+      const { createUser: createBackendUser } = await import("../api/client")
       await createBackendUser(fullName, agencyId, applicantType)
       if (auth.currentUser) {
+        const { reload } = await import("firebase/auth")
         await reload(auth.currentUser)
       }
     } catch (error: any) {
       console.error('[signup] Failed to create user in backend:', error)
       try {
+        const { deleteCurrentUser } = await import("../services/authService")
         await deleteCurrentUser()
       } catch (deleteErr: any) {
         console.error('[signup] Failed to remove Firebase user after backend error:', deleteErr)
@@ -188,6 +190,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    */
   const createUser = async (fullName: string) => {
     try {
+      const { createUser: createBackendUser } = await import("../api/client")
       await createBackendUser(fullName)
     } catch (error: any) {
       console.error('[createUser] Failed to create user in backend:', error)
@@ -205,7 +208,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearRecaptchaVerifier()
     await dispatch(logoutUser())  // Firebase signOut + triggers root reducer reset (clears all RTK Query caches)
     clearAuthCache()
-    removeUserData()
+    removeStoredUserData()
     await persistor.purge()       // clears redux-persist localStorage keys (auth + agencyMode)
     setUserState(null)
   }
@@ -214,6 +217,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Send password reset email
    */
   const resetPassword = async (email: string) => {
+    const { sendPasswordResetEmail } = await import("../services/authService")
     const response = await sendPasswordResetEmail(email)
 
     if (!response.success) {
@@ -225,6 +229,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Get Firebase ID token for backend authentication
    */
   const getToken = async (forceRefresh = false) => {
+    const { getIdToken } = await import("../services/authService")
     return await getIdToken(forceRefresh)
   }
 

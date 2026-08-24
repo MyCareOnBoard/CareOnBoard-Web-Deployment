@@ -43,7 +43,7 @@ function normalizeError(value: unknown): PayrollRunCommandError {
 
 type Flight = { key: string; promise: Promise<PayrollOperation> };
 
-export function usePayrollRunCommand(scope: AgencyPayrollRunScope) {
+export function usePayrollRunCommand(scope: AgencyPayrollRunScope, onAsyncTerminal?: () => unknown) {
   const [runMutation] = useRunPayrollRunCommandMutation();
   const [offCycleMutation] = useCreateOffCyclePayrollRunMutation();
   const [getOperation] = useLazyGetAgencyPayrollOperationQuery();
@@ -53,6 +53,9 @@ export function usePayrollRunCommand(scope: AgencyPayrollRunScope) {
   const runFlight = useRef<Flight | null>(null);
   const offCycleFlight = useRef<Flight | null>(null);
   const stops = useRef(new Set<() => void>());
+  const terminalRefreshFrames = useRef(new Set<number>());
+  const asyncTerminalRef = useRef(onAsyncTerminal);
+  asyncTerminalRef.current = onAsyncTerminal;
   const scopeKey = `${scope.audience}:${scope.actorUid}:${scope.agencyId}`;
   const liveScopeKey = useRef(scopeKey);
   if (liveScopeKey.current !== scopeKey) {
@@ -67,8 +70,30 @@ export function usePayrollRunCommand(scope: AgencyPayrollRunScope) {
     return () => {
       stops.current.forEach((stop) => stop());
       stops.current.clear();
+      if (typeof window !== "undefined" && typeof window.cancelAnimationFrame === "function") {
+        terminalRefreshFrames.current.forEach((frame) => window.cancelAnimationFrame(frame));
+      }
+      terminalRefreshFrames.current.clear();
     };
   }, [scopeKey]);
+
+  const refreshAfterTerminalPaint = (commandScopeKey: string) => {
+    const refresh = asyncTerminalRef.current;
+    if (!refresh) return;
+    const invoke = () => {
+      if (liveScopeKey.current === commandScopeKey) refresh();
+    };
+    if (typeof window === "undefined" || typeof window.requestAnimationFrame !== "function") {
+      invoke();
+      return;
+    }
+    let frame = 0;
+    frame = window.requestAnimationFrame(() => {
+      terminalRefreshFrames.current.delete(frame);
+      invoke();
+    });
+    terminalRefreshFrames.current.add(frame);
+  };
 
   const beginWatching = (operation: PayrollOperation, commandScopeKey: string, onTerminal: () => void): boolean => {
     if (liveScopeKey.current !== commandScopeKey || ["succeeded", "failed", "dead"].includes(operation.state)) return false;
@@ -77,7 +102,10 @@ export function usePayrollRunCommand(scope: AgencyPayrollRunScope) {
       () => getOperation({ ...scope, operationId: operation.operationId }, false).unwrap(),
       () => {
         stops.current.delete(stop);
-        if (liveScopeKey.current === commandScopeKey) onTerminal();
+        if (liveScopeKey.current === commandScopeKey) {
+          onTerminal();
+          refreshAfterTerminalPaint(commandScopeKey);
+        }
       });
     stops.current.add(stop);
     return true;

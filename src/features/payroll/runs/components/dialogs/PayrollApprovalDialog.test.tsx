@@ -1,13 +1,37 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PayrollApprovalDialog } from "./PayrollApprovalDialog";
 import type { PayrollRunProjection } from "../../model/types";
 
-const api = vi.hoisted(() => ({ trigger: vi.fn(), state: {} as Record<string, unknown>, abort: vi.fn() }));
-vi.mock("../../api/payrollRunEndpoints", () => ({ useLazyGetPayrollRunQuery: () => [api.trigger, api.state] }));
+const api = vi.hoisted(() => ({ trigger: vi.fn(), lazyHook: vi.fn(), state: {} as Record<string, unknown>, abort: vi.fn() }));
+vi.mock("../../api/payrollRunEndpoints", () => ({
+  useLazyGetPayrollRunQuery: (...args: unknown[]) => {
+    api.lazyHook(...args);
+    return [api.trigger, api.state];
+  },
+}));
 
 const scope = { audience: "agency" as const, actorUid: "actor-1", agencyId: "agency-1" };
+function installFrameQueue() {
+  let sequence = 0;
+  const callbacks = new Map<number, FrameRequestCallback>();
+  vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+    sequence += 1;
+    callbacks.set(sequence, callback);
+    return sequence;
+  });
+  vi.spyOn(window, "cancelAnimationFrame").mockImplementation((id) => { callbacks.delete(id); });
+  return {
+    flush() {
+      const pending = [...callbacks.values()];
+      callbacks.clear();
+      pending.forEach((callback) => callback(performance.now()));
+    },
+  };
+}
+
 function detail(): PayrollRunProjection {
   const enabled = { enabled: true as const, reasonCode: null };
   return {
@@ -21,22 +45,46 @@ function detail(): PayrollRunProjection {
 
 describe("PayrollApprovalDialog", () => {
   beforeEach(() => { vi.clearAllMocks(); api.state = { isFetching: true }; api.trigger.mockReturnValue({ abort: api.abort, unwrap: () => new Promise(() => undefined) }); });
+  afterEach(() => { vi.restoreAllMocks(); });
 
   it("opens the focus-trapped shell immediately and forces a fresh detail request on each open", () => {
+    const frames = installFrameQueue();
     const view = render(<PayrollApprovalDialog open scope={scope} runId="run-1" activeRevisionId="revision-1" capability agencyName="Harbor Care" fundingSummary="Operating •••• 4242" onOpenChange={vi.fn()} onSubmit={vi.fn()} />);
     expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Approve payroll" })).toHaveFocus();
     expect(screen.getByRole("status")).toHaveTextContent(/loading current approval/i);
+    const overlay = document.querySelector('[data-slot="dialog-overlay"]');
+    expect(overlay).toHaveClass("bg-black/20", "backdrop-blur-sm", "data-[state=open]:animate-in");
+    expect(overlay).not.toHaveClass("!backdrop-blur-none");
+    expect(api.lazyHook).toHaveBeenCalledOnce();
+    const options = api.lazyHook.mock.calls[0][0] as { selectFromResult?: (value: unknown) => unknown };
+    expect(options.selectFromResult?.(api.state)).toEqual({});
+    expect(api.trigger).not.toHaveBeenCalled();
+    act(() => { frames.flush(); });
+    expect(api.trigger).not.toHaveBeenCalled();
+    act(() => { frames.flush(); });
     expect(api.trigger).toHaveBeenCalledWith({ ...scope, runId: "run-1", activeRevisionId: "revision-1" }, false);
     view.rerender(<PayrollApprovalDialog open={false} scope={scope} runId="run-1" activeRevisionId="revision-1" capability agencyName="Harbor Care" onOpenChange={vi.fn()} onSubmit={vi.fn()} />);
     expect(api.abort).toHaveBeenCalledOnce();
   });
 
+  it("cancels a queued detail request when the dialog closes before its first paint settles", () => {
+    const frames = installFrameQueue();
+    const view = render(<PayrollApprovalDialog open scope={scope} runId="run-1" activeRevisionId="revision-1" capability agencyName="Harbor Care" onOpenChange={vi.fn()} onSubmit={vi.fn()} />);
+    view.rerender(<PayrollApprovalDialog open={false} scope={scope} runId="run-1" activeRevisionId="revision-1" capability agencyName="Harbor Care" onOpenChange={vi.fn()} onSubmit={vi.fn()} />);
+    act(() => { frames.flush(); frames.flush(); });
+    expect(api.trigger).not.toHaveBeenCalled();
+    expect(window.cancelAnimationFrame).toHaveBeenCalled();
+  });
+
   it("shows all bound totals, masked funding, deadlines and revision, then requires acknowledgement", async () => {
+    const frames = installFrameQueue();
     api.trigger.mockReturnValue({ abort: api.abort, unwrap: vi.fn().mockResolvedValue(detail()) });
     const submit = vi.fn().mockResolvedValue(undefined);
     const trigger = document.createElement("button"); document.body.append(trigger); trigger.focus();
     const returnFocusRef = { current: trigger };
     render(<PayrollApprovalDialog open scope={scope} runId="run-1" activeRevisionId="revision-1" capability agencyName="Harbor Care" fundingSummary="Operating •••• 4242" returnFocusRef={returnFocusRef} onOpenChange={vi.fn()} onSubmit={submit} />);
+    act(() => { frames.flush(); frames.flush(); });
     expect(await screen.findByText("Harbor Care")).toBeInTheDocument();
     for (const value of ["$100.00", "$2.00", "$10.00", "$3.00", "$5.00", "$1.00", "$89.00", "$111.00", "$105.00"]) expect(screen.getByText(value)).toBeInTheDocument();
     expect(screen.getByText("Operating •••• 4242")).toBeInTheDocument();

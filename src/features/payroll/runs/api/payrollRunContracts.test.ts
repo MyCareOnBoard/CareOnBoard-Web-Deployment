@@ -5,6 +5,12 @@ import {
   parseCurrentPayrollBootstrapPair,
   parseCurrentPayrollEmployeePage,
   parseCurrentPayrollRunResponse,
+  parsePayrollEmployeePage,
+  parsePayrollObligationPage,
+  parsePayrollRunEmployeeDetail,
+  parsePayrollRunEmployeeSourcePage,
+  parsePayrollRunEventPage,
+  parsePayrollRunPage,
   parsePayrollRunProjectionResponse,
 } from "./payrollRunContracts";
 
@@ -321,6 +327,107 @@ describe("current payroll runtime contracts", () => {
     }, {
       employeeId: "employee-a",
       activeRevisionId: "revision-a",
+    })).toThrow();
+  });
+
+  it("parses exact bounded historical run and employee projections", () => {
+    const run = structuredClone(validRunResponse().run);
+    expect(parsePayrollRunPage({ items: [run], nextCursor: null, hasMore: false })).toMatchObject({
+      items: [{ runId: "run-a" }],
+    });
+
+    const employeePage = validEmployeePage();
+    delete employeePage.workspaceMode;
+    delete employeePage.capabilities;
+    expect(parsePayrollEmployeePage(employeePage)).toMatchObject({
+      runId: "run-a",
+      items: [{ employeeId: "employee-a" }],
+    });
+
+    const employee = structuredClone((employeePage.items as unknown[])[0]) as Record<string, unknown>;
+    expect(parsePayrollRunEmployeeDetail({ ...employee, sourceDetailsAvailable: true })).toMatchObject({
+      employeeId: "employee-a",
+      sourceDetailsAvailable: true,
+    });
+
+    expect(() => parsePayrollRunPage({
+      items: [{ ...(run as Record<string, unknown>), providerPayrollId: "private" }],
+      nextCursor: null,
+      hasMore: false,
+    })).toThrow();
+    expect(() => parsePayrollEmployeePage({
+      ...employeePage,
+      items: [{ ...employee, bankAccount: "private" }],
+    })).toThrow();
+  });
+
+  it("parses exact bounded source, event, and obligation pages without private payloads", () => {
+    const sourcePage = {
+      kind: "run",
+      runId: "run-a",
+      activeRevisionId: "revision-a",
+      revisionNumber: 2,
+      employeeId: "employee-a",
+      items: [{
+        key: "source-a",
+        type: "timesheet",
+        refPath: "staffTimesheets/source-a",
+        serviceDate: "2026-08-20",
+        sourceVersion: 3,
+        payrollInput: { regularHours: 8, serviceCode: "HHA" },
+      }],
+      nextCursor: null,
+      hasMore: false,
+    };
+    expect(parsePayrollRunEmployeeSourcePage(sourcePage)).toMatchObject({ employeeId: "employee-a" });
+    expect(() => parsePayrollRunEmployeeSourcePage({
+      ...sourcePage,
+      items: [{ ...(sourcePage.items[0]), payrollInput: { taxId: "private" } }],
+    })).toThrow();
+
+    const eventPage = {
+      items: [{
+        eventId: "event-a",
+        revisionId: "revision-a",
+        type: "preview_requested",
+        occurredAt: "2026-08-24T12:00:00.000Z",
+        data: { sourceCount: 1 },
+      }],
+      nextCursor: null,
+      hasMore: false,
+    };
+    expect(parsePayrollRunEventPage(eventPage)).toMatchObject({ items: [{ eventId: "event-a" }] });
+    expect(() => parsePayrollRunEventPage({
+      ...eventPage,
+      items: [{ ...eventPage.items[0], occurredAt: "not-a-date" }],
+    })).toThrow();
+
+    const obligationPage = {
+      items: [{
+        obligationId: "obligation-a",
+        kind: "correction",
+        state: "open",
+        version: 1,
+        employeeId: "employee-a",
+        originatingRunId: "run-a",
+        originatingRevisionId: "revision-a",
+        attachedRunId: null,
+        reasonCategory: "underpayment",
+        amountCents: 500,
+        compatibility: { paydayNotBefore: "2026-08-25", paydayNotAfter: null },
+        requestedPayday: null,
+        createdAt: "2026-08-24T12:00:00.000Z",
+        updatedAt: "2026-08-24T12:00:00.000Z",
+      }],
+      nextCursor: null,
+      hasMore: false,
+    };
+    expect(parsePayrollObligationPage(obligationPage)).toMatchObject({
+      items: [{ obligationId: "obligation-a", amountCents: 500 }],
+    });
+    expect(() => parsePayrollObligationPage({
+      ...obligationPage,
+      items: [{ ...obligationPage.items[0], amountCents: 0.5 }],
     })).toThrow();
   });
 });

@@ -1,5 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { usePayrollRunCommand } from "./usePayrollRunCommand";
 
@@ -31,6 +31,24 @@ const command = (idempotencyKey: string) => ({
   idempotencyKey,
 });
 
+function installFrameQueue() {
+  let sequence = 0;
+  const callbacks = new Map<number, FrameRequestCallback>();
+  vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+    sequence += 1;
+    callbacks.set(sequence, callback);
+    return sequence;
+  });
+  vi.spyOn(window, "cancelAnimationFrame").mockImplementation((id) => { callbacks.delete(id); });
+  return {
+    flush() {
+      const pending = [...callbacks.values()];
+      callbacks.clear();
+      pending.forEach((callback) => callback(performance.now()));
+    },
+  };
+}
+
 describe("usePayrollRunCommand", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -39,6 +57,7 @@ describe("usePayrollRunCommand", () => {
       operationId: "op-1", state: "succeeded", resourceType: "payroll_run", pollAfterMs: null,
     }) });
   });
+  afterEach(() => { vi.restoreAllMocks(); });
 
   it("coalesces a rapid duplicate command into one accepted operation and begins authoritative polling", async () => {
     let resolve!: (value: unknown) => void;
@@ -65,6 +84,55 @@ describe("usePayrollRunCommand", () => {
     expect(result.current.activeIntent).toBe("request_preview");
     act(() => { transport.watch.mock.calls[0][3]({ operationId: "op-1", state: "succeeded", resourceType: "payroll_run", pollAfterMs: null }); });
     expect(result.current.activeIntent).toBeNull();
+  });
+
+  it("requests one refresh only when an accepted operation later reaches terminal state", async () => {
+    const frames = installFrameQueue();
+    const onAsyncTerminal = vi.fn();
+    transport.run.mockReturnValue({ unwrap: vi.fn().mockResolvedValue({
+      operationId: "op-1", state: "accepted", resourceType: "payroll_run", pollAfterMs: 250,
+    }) });
+    const { result } = renderHook(() => usePayrollRunCommand(scope, onAsyncTerminal));
+
+    await act(async () => { await result.current.runCommand(command("intent-1")); });
+    expect(onAsyncTerminal).not.toHaveBeenCalled();
+    act(() => {
+      transport.watch.mock.calls[0][3]({
+        operationId: "op-1", state: "succeeded", resourceType: "payroll_run", pollAfterMs: null,
+      });
+    });
+    expect(onAsyncTerminal).not.toHaveBeenCalled();
+    act(() => { frames.flush(); });
+    expect(onAsyncTerminal).toHaveBeenCalledOnce();
+
+    transport.run.mockReturnValue({ unwrap: vi.fn().mockResolvedValue({
+      operationId: "op-2", state: "succeeded", resourceType: "payroll_run", pollAfterMs: null,
+    }) });
+    await act(async () => { await result.current.runCommand(command("intent-2")); });
+    expect(onAsyncTerminal).toHaveBeenCalledOnce();
+  });
+
+  it("cancels a queued terminal refresh when the command scope changes before the next frame", async () => {
+    const frames = installFrameQueue();
+    const onAsyncTerminal = vi.fn();
+    transport.run.mockReturnValue({ unwrap: vi.fn().mockResolvedValue({
+      operationId: "op-1", state: "accepted", resourceType: "payroll_run", pollAfterMs: 250,
+    }) });
+    const { result, rerender } = renderHook(
+      ({ agencyId }) => usePayrollRunCommand({ ...scope, agencyId }, onAsyncTerminal),
+      { initialProps: { agencyId: "agency-1" } },
+    );
+
+    await act(async () => { await result.current.runCommand(command("intent-1")); });
+    act(() => {
+      transport.watch.mock.calls[0][3]({
+        operationId: "op-1", state: "succeeded", resourceType: "payroll_run", pollAfterMs: null,
+      });
+    });
+    rerender({ agencyId: "agency-2" });
+    act(() => { frames.flush(); });
+    expect(onAsyncTerminal).not.toHaveBeenCalled();
+    expect(window.cancelAnimationFrame).toHaveBeenCalled();
   });
 
   it("maps typed stale errors without discarding safe UI state and permits a new-key retry", async () => {

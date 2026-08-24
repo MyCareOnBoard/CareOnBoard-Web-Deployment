@@ -9,6 +9,7 @@ import {
   type OffCycleContext,
   type OffCycleObligationOption,
   type OffCycleSubmission,
+  type OffCycleSubmissionRetention,
 } from "../dialogs/CreateOffCyclePayrollDialog";
 
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
@@ -69,6 +70,7 @@ export function PayrollObligationsPanel({
   restoreCapability,
   onCreateOffCycle,
   onRestore,
+  submissionRetention,
 }: {
   scope: AgencyPayrollRunScope;
   context?: OffCycleContext;
@@ -76,6 +78,7 @@ export function PayrollObligationsPanel({
   restoreCapability: boolean;
   onCreateOffCycle: (submission: OffCycleSubmission) => Promise<PayrollOperation>;
   onRestore: (obligation: PayrollObligation) => Promise<void>;
+  submissionRetention?: OffCycleSubmissionRetention;
 }) {
   const scopeKey = JSON.stringify([scope.actorUid, scope.agencyId]);
   const [pagination, setPagination] = useState<{ key: string; cursors: Array<string | undefined> }>({
@@ -230,6 +233,7 @@ export function PayrollObligationsPanel({
           activeConflict={false}
           onOpenChange={setDialogOpen}
           onSubmit={onCreateOffCycle}
+          submissionRetention={submissionRetention}
         />
       ) : null}
       <Dialog open={restoreTarget !== null} onOpenChange={(open) => { if (!open && restoringId === null) setRestoreSelection(null); }}>

@@ -1,50 +1,50 @@
-import { useEffect } from "react";
-import { useJsApiLoader } from "@react-google-maps/api";
-import type { Libraries } from "@react-google-maps/api";
+import {
+    createContext,
+    lazy,
+    Suspense,
+    useCallback,
+    useContext,
+    useEffect,
+    useState,
+    type ReactNode,
+} from "react";
 
-const libraries: Libraries = ["places"];
-const apiKey = import.meta.env.VITE_GOOGLE_PLACES_API_KEY ?? "";
+const GoogleMapsLoader = lazy(() => import("./GoogleMapsLoader"));
+const hasApiKey = Boolean(import.meta.env.VITE_GOOGLE_PLACES_API_KEY);
+const ignoreGoogleMapsDemand = () => undefined;
+const GoogleMapsDemandContext = createContext<() => void>(ignoreGoogleMapsDemand);
+
+/** Requests the shared Maps loader when a Places-dependent consumer mounts. */
+export function useGoogleMapsDemand(): void {
+    const requestGoogleMaps = useContext(GoogleMapsDemandContext);
+
+    useEffect(() => {
+        requestGoogleMaps();
+    }, [requestGoogleMaps]);
+}
 
 /**
  * Loads the Google Maps JS API (Places) once for the whole app.
  *
- * Uses `useJsApiLoader` instead of the `<LoadScript>` component: under React 18
- * StrictMode, `<LoadScript>` re-mounts and re-injects the script on every render,
- * which produces a mount-time "Maximum update depth exceeded" loop on every page.
- * The hook loads the script a single time and caches it globally.
- *
- * Map consumers (the autocomplete/reverse-geocode hooks) read `window.google`
- * directly and guard the not-yet-loaded state, so children render immediately
- * rather than waiting on the script.
+ * The implementation lives in a lazy sibling so non-map routes do not evaluate
+ * the Google Maps package and children never suspend while it loads.
  */
-function GoogleMapsLoader() {
-    const { loadError } = useJsApiLoader({
-        id: "google-map-script",
-        googleMapsApiKey: apiKey,
-        libraries,
-    });
-
-    useEffect(() => {
-        if (loadError) {
-            console.error(
-                "Google Maps failed to load — address autocomplete and current-location will be unavailable:",
-                loadError,
-            );
-        }
-    }, [loadError]);
-
-    return null;
-}
-
 export function GoogleMapsProvider({
     children,
 }: {
-    children: React.ReactNode;
+    children: ReactNode;
 }) {
+    const [requested, setRequested] = useState(false);
+    const requestGoogleMaps = useCallback(() => setRequested(true), []);
+
     return (
-        <>
-            {apiKey ? <GoogleMapsLoader /> : null}
+        <GoogleMapsDemandContext.Provider value={requestGoogleMaps}>
+            {requested && hasApiKey ? (
+                <Suspense fallback={null}>
+                    <GoogleMapsLoader />
+                </Suspense>
+            ) : null}
             {children}
-        </>
+        </GoogleMapsDemandContext.Provider>
     );
 }

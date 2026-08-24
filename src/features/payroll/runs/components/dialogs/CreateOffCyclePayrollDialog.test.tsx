@@ -1,7 +1,11 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { CreateOffCyclePayrollDialog, validateOffCycleSelection } from "./CreateOffCyclePayrollDialog";
+import {
+  CreateOffCyclePayrollDialog,
+  validateOffCycleSelection,
+  type OffCycleSubmissionRetention,
+} from "./CreateOffCyclePayrollDialog";
 
 const context = { agencyId: "agency-1", environment: "sandbox", companyId: "company-1" } as const;
 const option = (overrides: Record<string, unknown> = {}) => ({
@@ -44,5 +48,79 @@ describe("CreateOffCyclePayrollDialog", () => {
     expect(createIntentKey).toHaveBeenCalledTimes(2);
     expect(submit.mock.calls[1][0].idempotencyKey).toBe("00000000-0000-4000-8000-000000000002");
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+  });
+
+  it("reuses the same idempotency key after an ambiguous server failure", async () => {
+    const submit = vi.fn()
+      .mockRejectedValueOnce(Object.assign(new Error("The request timed out."), {
+        status: 503,
+        code: "CHECK_INTERNAL_ERROR",
+      }))
+      .mockResolvedValueOnce({
+        operationId: "op-2",
+        state: "accepted",
+        resourceType: "payroll_run",
+        pollAfterMs: 250,
+      });
+    const createIntentKey = vi.fn().mockReturnValue("00000000-0000-4000-8000-000000000001");
+    const submissionRetention: OffCycleSubmissionRetention = { intent: null, flight: null };
+    const props = {
+      capability: true,
+      context,
+      obligations: [option()],
+      activeConflict: false,
+      onOpenChange: vi.fn(),
+      onSubmit: submit,
+      createIntentKey,
+      submissionRetention,
+    };
+    const view = render(<CreateOffCyclePayrollDialog {...props} open />);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /alex morgan/i }));
+    fireEvent.change(screen.getByLabelText("Requested payday"), { target: { value: "2026-09-04" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create off-cycle payroll" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/timed out/i);
+    view.rerender(<CreateOffCyclePayrollDialog {...props} open={false} />);
+    view.unmount();
+    render(<CreateOffCyclePayrollDialog {...props} open />);
+    fireEvent.click(screen.getByRole("checkbox", { name: /alex morgan/i }));
+    fireEvent.change(screen.getByLabelText("Requested payday"), { target: { value: "2026-09-04" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create off-cycle payroll" }));
+
+    await waitFor(() => expect(submit).toHaveBeenCalledTimes(2));
+    expect(createIntentKey).toHaveBeenCalledOnce();
+    expect(submit.mock.calls.map(([submission]) => submission.idempotencyKey)).toEqual([
+      "00000000-0000-4000-8000-000000000001",
+      "00000000-0000-4000-8000-000000000001",
+    ]);
+  });
+
+  it("keeps an in-flight request fenced while the dialog remounts", async () => {
+    let resolve!: (operation: Awaited<ReturnType<NonNullable<React.ComponentProps<typeof CreateOffCyclePayrollDialog>["onSubmit"]>>>) => void;
+    const submit = vi.fn().mockReturnValue(new Promise((done) => { resolve = done; }));
+    const submissionRetention: OffCycleSubmissionRetention = { intent: null, flight: null };
+    const props = {
+      open: true,
+      capability: true,
+      context,
+      obligations: [option()],
+      activeConflict: false,
+      onOpenChange: vi.fn(),
+      onSubmit: submit,
+      submissionRetention,
+    };
+    const view = render(<CreateOffCyclePayrollDialog {...props} />);
+    fireEvent.click(screen.getByRole("checkbox", { name: /alex morgan/i }));
+    fireEvent.change(screen.getByLabelText("Requested payday"), { target: { value: "2026-09-04" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create off-cycle payroll" }));
+    expect(submit).toHaveBeenCalledOnce();
+
+    view.unmount();
+    render(<CreateOffCyclePayrollDialog {...props} />);
+    expect(screen.getByRole("checkbox", { name: /alex morgan/i })).toBeDisabled();
+    expect(submit).toHaveBeenCalledOnce();
+
+    resolve({ operationId: "op-3", state: "accepted", resourceType: "payroll_run", pollAfterMs: 250 });
+    await waitFor(() => expect(submissionRetention.flight).toBeNull());
   });
 });

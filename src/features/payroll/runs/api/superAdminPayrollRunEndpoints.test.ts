@@ -45,12 +45,21 @@ describe("Super Admin payroll run read transport", () => {
       requiresAuth: true,
       params: { limit: 50 },
     });
+    expect(superAdminPayrollRunRequests.currentEmployees({ ...selected, cursor: "employee-page-2" })).toEqual({
+      url: "/superAdminOperations/agencies/atlas/payroll/runs/current/employees",
+      method: "GET",
+      requiresAuth: true,
+      params: { limit: 50, cursor: "employee-page-2" },
+    });
     expect(JSON.stringify(superAdminPayrollRunRequests)).not.toMatch(/post|commands|approve/i);
   });
 
   it("isolates caches by actor, selected agency, and trusted context revision", () => {
     expect(superAdminPayrollRunCacheKeys.current(selected)).not.toBe(
       superAdminPayrollRunCacheKeys.current({ ...selected, actorUid: "super-2" }),
+    );
+    expect(superAdminPayrollRunCacheKeys.currentEmployees(selected)).not.toBe(
+      superAdminPayrollRunCacheKeys.currentEmployees({ ...selected, cursor: "employee-page-2" }),
     );
     expect(superAdminPayrollRunCacheKeys.current(selected)).not.toBe(
       superAdminPayrollRunCacheKeys.current({ ...selected, agencyId: "beacon" }),
@@ -107,6 +116,19 @@ describe("Super Admin payroll run read transport", () => {
       }],
       nextCursor: null,
       hasMore: false,
+    })).toThrow("Invalid Super Admin payroll response");
+  });
+
+  it("rejects oversized network cursors and payloads before caching", () => {
+    expect(() => parseNetworkPayrollRunPage({
+      items: [],
+      nextCursor: "x".repeat(4_097),
+      hasMore: true,
+    })).toThrow("Invalid Super Admin payroll response");
+    expect(() => parseNetworkPayrollRunPage({
+      items: [],
+      nextCursor: "x".repeat(500 * 1_024),
+      hasMore: true,
     })).toThrow("Invalid Super Admin payroll response");
   });
 });

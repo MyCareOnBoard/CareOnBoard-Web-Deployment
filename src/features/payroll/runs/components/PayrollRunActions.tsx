@@ -1,3 +1,5 @@
+import { Fragment, useId } from "react";
+
 import type {
   PayrollRunCommandName,
   PayrollRunProjection,
@@ -92,6 +94,8 @@ export function PayrollRunActions({
   employeeActionsAvailable?: boolean;
   now?: Date;
 }) {
+  const descriptionIdPrefix = useId();
+  const progressId = `${descriptionIdPrefix}-progress`;
   const commands: PayrollRunCommandName[] = [
     "refresh_sources",
     ...(employeeActionsAvailable ? ["add_adjustment" as const] : []),
@@ -104,24 +108,29 @@ export function PayrollRunActions({
         {commands.map((command) => {
           const availability = getPayrollActionAvailability(projection, command, { freshness, now });
           const primary = command === "approve_payroll";
+          const reasonId = availability.reason ? `${descriptionIdPrefix}-${command}-reason` : undefined;
           return (
-            <button
-              key={command}
-              type="button"
-              disabled={!availability.enabled || activeIntent !== null}
-              title={availability.reason ?? undefined}
-              onClick={() => onAction(command)}
-              className={primary
-                ? "min-h-11 rounded-lg bg-[#006f73] px-4 text-sm font-semibold text-white hover:bg-[#005b5e] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                : "min-h-11 rounded-lg border border-[#b8dfe0] px-4 text-sm font-semibold text-[#006f73] hover:bg-[#edf8f8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"}
-            >
-              {labels[command]}
-            </button>
+            <Fragment key={command}>
+              <button
+                type="button"
+                disabled={!availability.enabled || activeIntent !== null}
+                aria-describedby={reasonId ?? (activeIntent ? progressId : undefined)}
+                onClick={() => onAction(command)}
+                className={primary
+                  ? "min-h-11 rounded-lg bg-[#006f73] px-4 text-sm font-semibold text-white hover:bg-[#005b5e] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  : "min-h-11 rounded-lg border border-[#b8dfe0] px-4 text-sm font-semibold text-[#006f73] hover:bg-[#edf8f8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"}
+              >
+                {labels[command]}
+              </button>
+              {availability.reason ? (
+                <span id={reasonId} className="sr-only">{availability.reason}</span>
+              ) : null}
+            </Fragment>
           );
         })}
       </div>
       {activeIntent ? (
-        <p role="status" className="mt-3 text-sm font-medium text-[#006f73]">
+        <p id={progressId} role="status" className="mt-3 text-sm font-medium text-[#006f73]">
           {activeIntent === "request_preview" ? "Starting payroll preview…" : "Starting payroll action…"}
         </p>
       ) : null}

@@ -54,6 +54,7 @@ export function useCurrentPayrollWorkspace(
 
   useEffect(() => {
     if (!accepted.mismatchIdentity || !current.currentData || !employees.currentData
+      || current.isFetching || employees.isFetching
       || refetchedMismatchKeys.current.has(accepted.mismatchIdentity)) {
       return;
     }

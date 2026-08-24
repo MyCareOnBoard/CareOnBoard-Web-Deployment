@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useGoogleMapsDemand } from "@/providers/GoogleMapsProvider";
 
 const DEBOUNCE_MS = 500;
 const MIN_QUERY_LENGTH = 3;
@@ -176,6 +177,7 @@ export async function fetchFirstPlaceDetailsForQuery(query: string): Promise<Add
 }
 
 export function useGooglePlacesAutocomplete(): UseGooglePlacesAutocompleteReturn {
+    useGoogleMapsDemand();
     const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [showSuggestions, setShowSuggestions] = useState(false);

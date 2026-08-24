@@ -1,12 +1,14 @@
 import type {
   CurrentPayrollEmployeePage,
   CurrentPayrollRunResponse,
+  CursorPage,
   EmptyCurrentPayrollProjection,
   PayrollActiveOperation,
   PayrollCommandCapabilities,
   PayrollCommandCapability,
   PayrollCommandDisabledReason,
   PayrollEmployeeSummary,
+  PayrollEmployeePage,
   PayrollPreview,
   PayrollPreviewTotals,
   PayrollRun,
@@ -16,6 +18,16 @@ import type {
   PayrollRunProjection,
   PayrollTotals,
 } from "../model/types";
+import type {
+  PayrollObligation,
+  PayrollObligationPage,
+  PayrollRunEmployeeDetail,
+  PayrollRunEmployeeSourcePage,
+  PayrollRunEvent,
+  PayrollRunEventPage,
+  PayrollRunPage,
+  PayrollRunSource,
+} from "./payrollRunEndpoints";
 
 const MAX_RESPONSE_BYTES = 500 * 1_024;
 const MAX_ID_BYTES = 512;
@@ -24,6 +36,10 @@ const MAX_CODE_BYTES = 128;
 const MAX_CODES = 100;
 const MAX_EMPLOYEES = 50;
 const MAX_SOURCE_COUNT_KEYS = 32;
+const MAX_PUBLIC_VALUE_NODES = 10_000;
+const MAX_PUBLIC_ARRAY_ITEMS = 100;
+const MAX_PUBLIC_OBJECT_KEYS = 64;
+const MAX_PUBLIC_TEXT_BYTES = 16 * 1_024;
 
 const RUN_TYPES = ["regular", "off_cycle"] as const;
 const WORKFLOW_STATES = [
@@ -49,6 +65,15 @@ const PREVIEW_STATUSES = ["none", "pending", "succeeded", "failed"] as const;
 const EMPLOYMENT_TYPES = ["field", "staff"] as const;
 const EMPLOYEE_DISPOSITIONS = ["included", "zero_due", "blocked", "deferred"] as const;
 const PROVIDER_ITEM_STATES = ["pending", "none"] as const;
+const OBLIGATION_KINDS = ["deferral", "correction"] as const;
+const OBLIGATION_STATES = [
+  "open",
+  "attached",
+  "processing",
+  "satisfied",
+  "cancelled",
+  "operations_required",
+] as const;
 const OPERATION_STATES = [
   "accepted",
   "queued",
@@ -200,6 +225,10 @@ function isoInstant(value: unknown, path: string): string {
 
 function nullableInstant(value: unknown, path: string): string | null {
   return value === null ? null : isoInstant(value, path);
+}
+
+function nullableDate(value: unknown, path: string): string | null {
+  return value === null ? null : isoDate(value, path);
 }
 
 function hash(value: unknown, path: string): string {
@@ -535,6 +564,201 @@ function parseEmployeePage(value: unknown): CurrentPayrollEmployeePage {
   const hasMore = booleanValue(record.hasMore, "$.hasMore");
   if (hasMore !== (nextCursor !== null)) throw invalid("$.nextCursor");
   return record as CurrentPayrollEmployeePage;
+}
+
+function parseCursorPage<T>(
+  value: unknown,
+  maximumItems: number,
+  parseItem: (item: unknown, path: string) => T,
+): CursorPage<T> {
+  const record = exactObject(value, "$", ["items", "nextCursor", "hasMore"]);
+  if (!Array.isArray(record.items) || record.items.length > maximumItems) throw invalid("$.items");
+  record.items.forEach((item, index) => parseItem(item, `$.items[${index}]`));
+  const nextCursor = record.nextCursor === null
+    ? null
+    : boundedText(record.nextCursor, "$.nextCursor", MAX_CURSOR_BYTES);
+  const hasMore = booleanValue(record.hasMore, "$.hasMore");
+  if (hasMore !== (nextCursor !== null)) throw invalid("$.nextCursor");
+  return record as CursorPage<T>;
+}
+
+function parsePublicValue(
+  value: unknown,
+  path: string,
+  budget: { nodes: number },
+  depth = 0,
+): unknown {
+  budget.nodes += 1;
+  if (budget.nodes > MAX_PUBLIC_VALUE_NODES || depth > 8) throw invalid(path);
+  if (value === null || typeof value === "boolean") return value;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw invalid(path);
+    return value;
+  }
+  if (typeof value === "string") return boundedText(value, path, MAX_PUBLIC_TEXT_BYTES, true);
+  if (Array.isArray(value)) {
+    if (value.length > MAX_PUBLIC_ARRAY_ITEMS) throw invalid(path);
+    value.forEach((entry, index) => parsePublicValue(entry, `${path}[${index}]`, budget, depth + 1));
+    return value;
+  }
+  const record = exactObject(
+    value,
+    path,
+    [],
+    value !== null && typeof value === "object" && !Array.isArray(value) ? Object.keys(value) : [],
+  );
+  const entries = Object.entries(record);
+  if (entries.length > MAX_PUBLIC_OBJECT_KEYS) throw invalid(path);
+  for (const [key, entry] of entries) {
+    if (!/^[A-Za-z][A-Za-z0-9_.-]{0,127}$/.test(key)
+      || /(provider.*id|bank|tax|token|secret|raw|checkPayroll)/i.test(key)) {
+      throw invalid(`${path}.${key}`);
+    }
+    parsePublicValue(entry, `${path}.${key}`, budget, depth + 1);
+  }
+  return value;
+}
+
+function parseHistoricalEmployeePage(value: unknown): PayrollEmployeePage {
+  const record = exactObject(value, "$", [
+    "kind", "runId", "activeRevisionId", "revisionNumber", "items", "nextCursor", "hasMore",
+  ]);
+  if (record.kind !== "run") throw invalid("$.kind");
+  opaqueId(record.runId, "$.runId");
+  const activeRevisionId = opaqueId(record.activeRevisionId, "$.activeRevisionId");
+  positiveInteger(record.revisionNumber, "$.revisionNumber");
+  if (!Array.isArray(record.items) || record.items.length > MAX_EMPLOYEES) throw invalid("$.items");
+  record.items.forEach((item, index) => parseEmployee(item, `$.items[${index}]`, activeRevisionId));
+  const nextCursor = record.nextCursor === null
+    ? null
+    : boundedText(record.nextCursor, "$.nextCursor", MAX_CURSOR_BYTES);
+  const hasMore = booleanValue(record.hasMore, "$.hasMore");
+  if (hasMore !== (nextCursor !== null)) throw invalid("$.nextCursor");
+  return record as PayrollEmployeePage;
+}
+
+function parseRunSource(value: unknown, path: string): PayrollRunSource {
+  const record = exactObject(value, path, [
+    "key", "type", "refPath", "serviceDate", "sourceVersion", "payrollInput",
+  ]);
+  opaqueId(record.key, `${path}.key`);
+  opaqueId(record.type, `${path}.type`);
+  boundedText(record.refPath, `${path}.refPath`, 1_024);
+  nullableDate(record.serviceDate, `${path}.serviceDate`);
+  nonNegativeInteger(record.sourceVersion, `${path}.sourceVersion`);
+  const payrollInput = exactObject(
+    record.payrollInput,
+    `${path}.payrollInput`,
+    [],
+    record.payrollInput !== null && typeof record.payrollInput === "object"
+      && !Array.isArray(record.payrollInput) ? Object.keys(record.payrollInput) : [],
+  );
+  parsePublicValue(payrollInput, `${path}.payrollInput`, { nodes: 0 });
+  return record as PayrollRunSource;
+}
+
+function parseRunEvent(value: unknown, path: string): PayrollRunEvent {
+  const record = exactObject(value, path, ["eventId", "revisionId", "type", "occurredAt", "data"]);
+  opaqueId(record.eventId, `${path}.eventId`);
+  opaqueId(record.revisionId, `${path}.revisionId`);
+  const type = boundedText(record.type, `${path}.type`, MAX_CODE_BYTES);
+  if (!/^[a-z][a-z0-9_]{0,127}$/.test(type)) throw invalid(`${path}.type`);
+  isoInstant(record.occurredAt, `${path}.occurredAt`);
+  const data = exactObject(
+    record.data,
+    `${path}.data`,
+    [],
+    record.data !== null && typeof record.data === "object" && !Array.isArray(record.data)
+      ? Object.keys(record.data) : [],
+  );
+  parsePublicValue(data, `${path}.data`, { nodes: 0 });
+  return record as PayrollRunEvent;
+}
+
+function parseObligation(value: unknown, path: string): PayrollObligation {
+  const record = exactObject(value, path, [
+    "obligationId", "kind", "state", "version", "employeeId", "originatingRunId",
+    "originatingRevisionId", "attachedRunId", "reasonCategory", "amountCents", "compatibility",
+    "requestedPayday", "createdAt", "updatedAt",
+  ]);
+  opaqueId(record.obligationId, `${path}.obligationId`);
+  const kind = enumValue(record.kind, OBLIGATION_KINDS, `${path}.kind`);
+  const state = enumValue(record.state, OBLIGATION_STATES, `${path}.state`);
+  positiveInteger(record.version, `${path}.version`);
+  opaqueId(record.employeeId, `${path}.employeeId`);
+  nullableOpaqueId(record.originatingRunId, `${path}.originatingRunId`);
+  nullableOpaqueId(record.originatingRevisionId, `${path}.originatingRevisionId`);
+  nullableOpaqueId(record.attachedRunId, `${path}.attachedRunId`);
+  boundedText(record.reasonCategory, `${path}.reasonCategory`, MAX_CODE_BYTES);
+  if (record.amountCents === null) {
+    if (kind === "correction" && state !== "operations_required") throw invalid(`${path}.amountCents`);
+  } else {
+    const amount = positiveInteger(record.amountCents, `${path}.amountCents`);
+    if (kind !== "correction" || amount < 1) throw invalid(`${path}.amountCents`);
+  }
+  const compatibility = exactObject(record.compatibility, `${path}.compatibility`, [
+    "paydayNotBefore", "paydayNotAfter",
+  ]);
+  const notBefore = isoDate(compatibility.paydayNotBefore, `${path}.compatibility.paydayNotBefore`);
+  const notAfter = nullableDate(compatibility.paydayNotAfter, `${path}.compatibility.paydayNotAfter`);
+  if (notAfter !== null && notAfter < notBefore) throw invalid(`${path}.compatibility.paydayNotAfter`);
+  nullableDate(record.requestedPayday, `${path}.requestedPayday`);
+  isoInstant(record.createdAt, `${path}.createdAt`);
+  isoInstant(record.updatedAt, `${path}.updatedAt`);
+  return record as PayrollObligation;
+}
+
+export function parsePayrollRunPage(value: unknown): PayrollRunPage {
+  assertResponseSize(value);
+  return parseCursorPage(value, 25, parseRun) as PayrollRunPage;
+}
+
+export function parsePayrollEmployeePage(value: unknown): PayrollEmployeePage {
+  assertResponseSize(value);
+  return parseHistoricalEmployeePage(value);
+}
+
+export function parsePayrollRunEmployeeDetail(value: unknown): PayrollRunEmployeeDetail {
+  assertResponseSize(value);
+  const record = exactObject(value, "$", [
+    "employeeId", "activeRevisionId", "revisionId", "employmentType", "displayName", "disposition",
+    "grossEarningsCents", "reimbursementCents", "adjustmentCents", "totalDueCents", "regularHours",
+    "overtimeHours", "sourceCount", "sourceCounts", "hasBlockers", "blockerCodes", "warningCodes",
+    "obligationId", "providerItemState", "sourceDetailsAvailable",
+  ]);
+  const { sourceDetailsAvailable, ...employee } = record;
+  const activeRevisionId = opaqueId(employee.activeRevisionId, "$.activeRevisionId");
+  parseEmployee(employee, "$", activeRevisionId);
+  booleanValue(sourceDetailsAvailable, "$.sourceDetailsAvailable");
+  return record as PayrollRunEmployeeDetail;
+}
+
+export function parsePayrollRunEmployeeSourcePage(value: unknown): PayrollRunEmployeeSourcePage {
+  assertResponseSize(value);
+  const record = exactObject(value, "$", [
+    "kind", "runId", "activeRevisionId", "revisionNumber", "employeeId", "items", "nextCursor", "hasMore",
+  ]);
+  if (record.kind !== "run") throw invalid("$.kind");
+  opaqueId(record.runId, "$.runId");
+  opaqueId(record.activeRevisionId, "$.activeRevisionId");
+  positiveInteger(record.revisionNumber, "$.revisionNumber");
+  opaqueId(record.employeeId, "$.employeeId");
+  if (!Array.isArray(record.items) || record.items.length > 50) throw invalid("$.items");
+  record.items.forEach((item, index) => parseRunSource(item, `$.items[${index}]`));
+  const nextCursor = record.nextCursor === null ? null : boundedText(record.nextCursor, "$.nextCursor", MAX_CURSOR_BYTES);
+  const hasMore = booleanValue(record.hasMore, "$.hasMore");
+  if (hasMore !== (nextCursor !== null)) throw invalid("$.nextCursor");
+  return record as PayrollRunEmployeeSourcePage;
+}
+
+export function parsePayrollRunEventPage(value: unknown): PayrollRunEventPage {
+  assertResponseSize(value);
+  return parseCursorPage(value, 25, parseRunEvent) as PayrollRunEventPage;
+}
+
+export function parsePayrollObligationPage(value: unknown): PayrollObligationPage {
+  assertResponseSize(value);
+  return parseCursorPage(value, 25, parseObligation) as PayrollObligationPage;
 }
 
 export function parseCurrentPayrollRunResponse(value: unknown): CurrentPayrollRunResponse {

@@ -343,3 +343,162 @@ export async function ensureCaptureOutput(distDirectory, outputDirectory) {
   await mkdir(absoluteOutput, { recursive: true });
   return { absoluteDist, absoluteOutput };
 }
+
+export async function readHtmlModuleEntry(distDirectory) {
+  const html = await readFile(join(resolve(distDirectory), "index.html"), "utf8");
+  const match = html.match(/<script\b[^>]*\btype=["']module["'][^>]*\bsrc=["']([^"']+)["'][^>]*>/i)
+    ?? html.match(/<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*\btype=["']module["'][^>]*>/i);
+  if (!match) throw new Error("Production index.html must contain one module entry script.");
+  return new URL(match[1], "http://payroll.invalid/").pathname;
+}
+
+export async function installMarkedFixture(target, {
+  marker,
+  markerHeader,
+  markerField,
+  initScript,
+  initScriptArg,
+  getFixtureResponse,
+  isFixtureUrl,
+  isBlockedUrl = () => false,
+  unhandledRequests = [],
+}) {
+  const ledger = [];
+  const pageIds = new WeakMap();
+  const pendingResponses = new Set();
+  let nextPageId = 1;
+  let nextSequence = 1;
+  const targetIdForPage = (page) => {
+    if (!page) return "non-page-target";
+    if (!pageIds.has(page)) pageIds.set(page, `fixture-page-${nextPageId++}`);
+    return pageIds.get(page);
+  };
+  const provenance = (request) => {
+    try {
+      const frame = request.frame();
+      const page = frame.page();
+      return {
+        targetId: targetIdForPage(page),
+        pageUrl: page.url(),
+        frameUrl: frame.url(),
+        isMainFrame: frame === page.mainFrame(),
+        resourceType: request.resourceType(),
+      };
+    } catch {
+      return {
+        targetId: "non-page-target",
+        pageUrl: null,
+        frameUrl: null,
+        isMainFrame: false,
+        resourceType: request.resourceType(),
+      };
+    }
+  };
+  const record = (action, request, details = {}) => {
+    const entry = {
+      sequence: nextSequence++,
+      marker,
+      action,
+      method: request.method(),
+      url: request.url(),
+      ...provenance(request),
+      ...details,
+      servedAt: new Date().toISOString(),
+    };
+    ledger.push(entry);
+    return entry;
+  };
+  const fixtureHeaders = (headers = {}) => ({ ...headers, [markerHeader]: marker });
+  const fixtureBody = (body) => {
+    if (body === null) return null;
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      throw new Error("Marked fixture responses must use an object body or null.");
+    }
+    return markerField ? { ...body, [markerField]: marker } : body;
+  };
+  const runtime = {
+    marker,
+    ledger,
+    unhandledRequests,
+    active: false,
+    targetIdForPage,
+    record,
+    async flush() {
+      await Promise.all([...pendingResponses]);
+    },
+    checkpoint(probeTargetId) {
+      return {
+        sequence: ledger.at(-1)?.sequence ?? 0,
+        fulfilledCount: ledger.filter((entry) => entry.action === "fulfilled").length,
+        receivedCount: ledger.filter((entry) => entry.action === "received").length,
+        probeTargetId,
+      };
+    },
+  };
+  const responseHandler = (response) => {
+    const request = response.request();
+    if (!isFixtureUrl(request.url())) return;
+    const task = (async () => {
+      const headerMarker = await response.headerValue(markerHeader);
+      const responseHasBody = request.method() !== "OPTIONS" && response.status() !== 204;
+      const bodyMarker = responseHasBody && markerField
+        ? (await response.json().catch(() => null))?.[markerField] ?? null
+        : null;
+      const marked = headerMarker === marker && (!responseHasBody || !markerField || bodyMarker === marker);
+      record(marked ? "received" : "unmarked-response", request, {
+        status: response.status(),
+        headerMarker,
+        bodyMarker,
+      });
+      if (!marked) unhandledRequests.push(`UNMARKED ${request.method()} ${request.url()}`);
+    })().finally(() => pendingResponses.delete(task));
+    pendingResponses.add(task);
+  };
+  const routeHandler = async (route) => {
+    const request = route.request();
+    if (isBlockedUrl(request.url())) {
+      await route.abort("blockedbyclient");
+      record("blocked", request, { status: null });
+      return;
+    }
+    if (!isFixtureUrl(request.url())) {
+      await route.continue();
+      return;
+    }
+    try {
+      const response = getFixtureResponse(request.method(), request.url());
+      const body = fixtureBody(response.body);
+      await route.fulfill({
+        status: response.status,
+        headers: fixtureHeaders(response.headers),
+        body: body === null ? "" : JSON.stringify(body),
+      });
+      record("fulfilled", request, { status: response.status });
+    } catch (error) {
+      unhandledRequests.push(`${request.method()} ${request.url()}`);
+      await route.fulfill({
+        status: 500,
+        headers: fixtureHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(fixtureBody({
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        })),
+      });
+      record("fulfilled-error", request, { status: 500 });
+    }
+  };
+  if (initScript) await target.addInitScript(initScript, initScriptArg);
+  target.on("response", responseHandler);
+  await target.route("**/*", routeHandler);
+  runtime.active = true;
+  runtime.dispose = async () => {
+    if (!runtime.active) return;
+    runtime.active = false;
+    target.off("response", responseHandler);
+    await cleanupCaptureResources([
+      () => target.unroute("**/*", routeHandler),
+      () => runtime.flush(),
+    ]);
+  };
+  return runtime;
+}

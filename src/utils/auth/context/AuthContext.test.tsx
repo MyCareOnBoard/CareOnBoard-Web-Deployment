@@ -16,9 +16,6 @@ vi.mock("react-redux", () => ({
   useDispatch: () => mocks.dispatch,
   useSelector: () => mocks.reduxUser,
 }));
-vi.mock("@/utils/auth", () => ({
-  setUser: (user: unknown) => ({ type: "auth/setUser", payload: user }),
-}));
 vi.mock("@/store/redux/store", () => ({
   persistor: { purge: mocks.purge },
 }));
@@ -30,7 +27,10 @@ vi.mock("@/utils/auth/services/authService", () => ({
   deleteCurrentUser: vi.fn(),
   removeUserData: vi.fn(),
 }));
-vi.mock("@/utils/auth/store/authSlice", () => ({ logoutUser: mocks.logoutUser }));
+vi.mock("@/utils/auth/store/authSlice", () => ({
+  logoutUser: mocks.logoutUser,
+  setUser: (user: unknown) => ({ type: "auth/setUser", payload: user }),
+}));
 vi.mock("@/utils/auth/api/client", () => ({ createUser: vi.fn() }));
 vi.mock("@/components/ui/loader", () => ({ PageLoader: () => null }));
 vi.mock("@/lib/firebase", () => ({

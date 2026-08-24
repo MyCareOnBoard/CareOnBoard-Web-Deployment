@@ -15,13 +15,14 @@ import { ShiftsTab } from "./components/ShiftsTab";
 import { ProfileTab } from "./components/ProfileTab";
 import { EditProfileModal } from "./components/EditProfileModal";
 import { RequestDocumentModal } from "./components/RequestDocumentModal";
+import { withMessagingProvider } from "@/contexts/withMessagingProvider";
 
 interface DSPProfileProps {
   dsp: DSP;
   onBack: () => void;
 }
 
-export function DSPProfile({ dsp, onBack }: DSPProfileProps) {
+function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
   const [activeTab, setActiveTab] = useState<"Activity" | "Shifts" | "Profile">("Activity");
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showRequestDocument, setShowRequestDocument] = useState(false);
@@ -353,3 +354,5 @@ export function DSPProfile({ dsp, onBack }: DSPProfileProps) {
     </div>
   );
 }
+
+export const DSPProfile = withMessagingProvider(DSPProfileContent);
