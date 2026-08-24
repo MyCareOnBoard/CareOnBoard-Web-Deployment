@@ -13,9 +13,7 @@ import {
   Timestamp,
   DocumentData,
 } from "firebase/firestore";
-import { db } from "../firebase";
-import { useAuth } from "@/utils/auth";
-import axiosClient from "../axios";
+import { db } from "../firebase-firestore";
 
 // ==================== Type Definitions ====================
 
@@ -24,7 +22,6 @@ export interface UserPresence {
   lastSeen: Date | null;
   updatedAt: Date | null;
 }
-
 interface UseUserPresenceReturn {
   presence: UserPresence | null;
   loading: boolean;
@@ -58,7 +55,6 @@ function parsePresenceDoc(data: DocumentData): UserPresence {
       : null,
   };
 }
-
 // ==================== Hooks ====================
 
 /**
@@ -185,138 +181,4 @@ export function useMultiplePresence(
     loading,
     error,
   };
-}
-
-// ==================== Presence Manager ====================
-
-/**
- * Presence Manager Service
- * Handles heartbeat updates and presence lifecycle
- */
-class PresenceManager {
-  private heartbeatInterval: NodeJS.Timeout | null = null;
-  private readonly HEARTBEAT_INTERVAL = 30000; // 30 seconds
-  private isActive = false;
-
-  constructor(private userId: string | null) {}
-
-  start() {
-    if (!this.userId || this.isActive) return;
-
-    this.isActive = true;
-    this.sendHeartbeat();
-
-    // Send heartbeat every 30 seconds
-    this.heartbeatInterval = setInterval(() => {
-      this.sendHeartbeat();
-    }, this.HEARTBEAT_INTERVAL);
-
-    // Handle page visibility changes
-    if (typeof document !== "undefined") {
-      document.addEventListener("visibilitychange", this.handleVisibilityChange);
-    }
-  }
-
-  stop() {
-    this.isActive = false;
-
-    if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval);
-      this.heartbeatInterval = null;
-    }
-
-    if (typeof document !== "undefined") {
-      document.removeEventListener("visibilitychange", this.handleVisibilityChange);
-    }
-
-    // Set offline on stop
-    if (this.userId) {
-      this.setOffline();
-    }
-  }
-
-  private sendHeartbeat = async () => {
-    if (!this.userId || !this.isActive) return;
-
-    try {
-      await axiosClient.post("/presence/heartbeat");
-    } catch (error) {
-      console.error("Error sending presence heartbeat:", error);
-    }
-  };
-
-  private handleVisibilityChange = () => {
-    if (typeof document === "undefined") return;
-
-    if (document.hidden) {
-      // Tab is inactive, pause heartbeat
-      if (this.heartbeatInterval) {
-        clearInterval(this.heartbeatInterval);
-        this.heartbeatInterval = null;
-      }
-    } else {
-      // Tab is active, resume heartbeat
-      if (this.isActive && !this.heartbeatInterval) {
-        this.sendHeartbeat();
-        this.heartbeatInterval = setInterval(() => {
-          this.sendHeartbeat();
-        }, this.HEARTBEAT_INTERVAL);
-      }
-    }
-  };
-
-  private async setOffline() {
-    if (!this.userId) return;
-
-    try {
-      await axiosClient.post("/presence/offline");
-    } catch (error) {
-      console.error("Error setting presence offline:", error);
-    }
-  }
-
-  updateUserId(newUserId: string | null) {
-    const wasActive = this.isActive;
-    this.stop();
-    this.userId = newUserId;
-    if (wasActive && newUserId) {
-      this.start();
-    }
-  }
-}
-
-// Global presence manager instance
-let presenceManager: PresenceManager | null = null;
-
-/**
- * Hook to manage presence heartbeat
- * Should be called once at app level
- */
-export function usePresenceManager() {
-  const { user } = useAuth();
-
-  useEffect(() => {
-    if (!user?.uid) {
-      if (presenceManager) {
-        presenceManager.stop();
-        presenceManager = null;
-      }
-      return;
-    }
-
-    // Initialize presence manager
-    if (!presenceManager) {
-      presenceManager = new PresenceManager(user.uid);
-    } else {
-      presenceManager.updateUserId(user.uid);
-    }
-
-    presenceManager.start();
-
-    return () => {
-      if (presenceManager) {
-        presenceManager.stop();
-      }
-    };
-  }, [user?.uid]);
 }

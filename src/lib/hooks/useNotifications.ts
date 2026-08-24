@@ -13,7 +13,7 @@ import {
     Timestamp,
     serverTimestamp
 } from "firebase/firestore";
-import { db } from "../firebase";
+import { db } from "../firebase-firestore";
 import { useAuth } from "@/utils/auth";
 
 export interface Notification {

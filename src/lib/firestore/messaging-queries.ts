@@ -16,7 +16,7 @@ import {
   QueryDocumentSnapshot,
   DocumentReference,
 } from "firebase/firestore";
-import { db } from "../firebase";
+import { db } from "../firebase-firestore";
 
 const COLLECTIONS = {
   CONVERSATIONS: "conversations",

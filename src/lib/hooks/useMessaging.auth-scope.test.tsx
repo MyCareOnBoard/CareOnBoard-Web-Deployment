@@ -22,7 +22,7 @@ vi.mock("@/utils/auth", () => ({
   useAuth: () => ({ user: mocks.authUser }),
 }));
 
-vi.mock("../firebase", () => ({
+vi.mock("../firebase-firestore", () => ({
   db: {},
 }));
 
