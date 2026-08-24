@@ -1,5 +1,4 @@
 import { auth } from '@/lib/firebase';
-import { getAuth } from 'firebase/auth';
 import { handleMfaApiError } from '@/utils/auth/helpers/handleMfaApiError';
 
 // Backend API base URL from environment
@@ -158,7 +157,6 @@ export async function uploadFile(
 }
 
 export async function createUser(fullName: string, agencyId?: string, applicantType?: string): Promise<any> {
-  const auth = getAuth();
   const token = await auth.currentUser?.getIdToken();
 
   if (!token) {

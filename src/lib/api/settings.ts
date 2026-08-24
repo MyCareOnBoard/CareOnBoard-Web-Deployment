@@ -1,5 +1,6 @@
 import axiosClient from '../axios';
-import { getAuth, updateProfile } from 'firebase/auth'
+import { auth } from '../firebase'
+import { updateProfile } from 'firebase/auth'
 
 export interface AccountInfo {
   email: string
@@ -55,7 +56,6 @@ function parseAccount(raw: any): AccountInfo {
 export async function getAccountInfo(): Promise<AccountInfo> {
   try {
     // First try Firebase Auth for immediate data
-    const auth = getAuth()
     await auth.authStateReady?.()
     const currentUser = auth.currentUser
     
@@ -152,7 +152,6 @@ export async function updateAccountInfo(data: {
   fullName?: string
   profilePictureFile?: File
 }): Promise<AccountInfo> {
-  const auth = getAuth()
   await auth.authStateReady?.()
   const currentUser = auth.currentUser
 

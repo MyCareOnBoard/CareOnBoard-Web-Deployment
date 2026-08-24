@@ -3,7 +3,6 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import AccountTab from '../components/AccountTab'
 import * as settingsApi from '@/lib/api/settings'
-import { getAuth } from 'firebase/auth'
 
 // Mock dependencies
 vi.mock('@/lib/api/settings')
@@ -25,15 +24,15 @@ vi.mock('@/components/ui/loader', () => ({
   ButtonLoader: () => null,
   PageLoader: () => null,
 }))
-vi.mock('firebase/auth', () => ({
-  getAuth: vi.fn(() => ({
+vi.mock('@/lib/firebase', () => ({
+  auth: {
     currentUser: {
       email: 'test@example.com',
       displayName: 'Test User',
       uid: 'test-uid-123',
     },
     authStateReady: vi.fn().mockResolvedValue(undefined),
-  })),
+  },
 }))
 
 describe('AccountTab', () => {

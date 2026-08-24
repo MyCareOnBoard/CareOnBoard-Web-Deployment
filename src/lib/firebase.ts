@@ -6,7 +6,13 @@
  */
 
 import { initializeApp, getApps, getApp } from "firebase/app"
-import { getAuth, connectAuthEmulator } from "firebase/auth"
+import {
+  browserLocalPersistence,
+  browserSessionPersistence,
+  connectAuthEmulator,
+  indexedDBLocalPersistence,
+  initializeAuth,
+} from "firebase/auth"
 
 // Firebase configuration from environment variables
 const firebaseConfig = {
@@ -27,7 +33,13 @@ if (!firebaseConfig.apiKey || !firebaseConfig.authDomain) {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp()
 
 // Export auth instance for use in authentication
-export const auth = getAuth(app)
+export const auth = initializeAuth(app, {
+  persistence: [
+    indexedDBLocalPersistence,
+    browserLocalPersistence,
+    browserSessionPersistence,
+  ],
+})
 
 // Connect to Firebase Emulators in development mode
 if (import.meta.env.DEV && import.meta.env.VITE_USE_FIREBASE_EMULATOR === 'true') {

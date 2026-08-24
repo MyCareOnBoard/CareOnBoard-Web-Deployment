@@ -4,6 +4,13 @@ const moduleEvaluations = vi.hoisted(() => ({
   firestore: 0,
 }));
 
+const authMocks = vi.hoisted(() => ({
+  initializeAuth: vi.fn(() => ({ settings: {} })),
+  indexedDBLocalPersistence: { name: "indexed-db" },
+  browserLocalPersistence: { name: "local" },
+  browserSessionPersistence: { name: "session" },
+}));
+
 vi.mock("firebase/app", () => ({
   getApp: () => ({}),
   getApps: () => [],
@@ -11,8 +18,11 @@ vi.mock("firebase/app", () => ({
 }));
 
 vi.mock("firebase/auth", () => ({
+  browserLocalPersistence: authMocks.browserLocalPersistence,
+  browserSessionPersistence: authMocks.browserSessionPersistence,
   connectAuthEmulator: vi.fn(),
-  getAuth: () => ({ settings: {} }),
+  indexedDBLocalPersistence: authMocks.indexedDBLocalPersistence,
+  initializeAuth: authMocks.initializeAuth,
 }));
 
 vi.mock("firebase/firestore", () => {
@@ -26,6 +36,7 @@ vi.mock("firebase/firestore", () => {
 describe("Firebase auth startup boundary", () => {
   beforeEach(() => {
     moduleEvaluations.firestore = 0;
+    authMocks.initializeAuth.mockClear();
     vi.resetModules();
     vi.stubEnv("VITE_FIREBASE_API_KEY", "test-api-key");
     vi.stubEnv("VITE_FIREBASE_AUTH_DOMAIN", "test.example.test");
@@ -35,10 +46,21 @@ describe("Firebase auth startup boundary", () => {
     vi.unstubAllEnvs();
   });
 
-  it("does not evaluate Firestore when auth initializes", async () => {
+  it("initializes persistent auth without popup/redirect or Firestore dependencies", async () => {
     const { auth } = await import("./firebase");
 
     expect(auth).toBeDefined();
+    expect(authMocks.initializeAuth).toHaveBeenCalledOnce();
+    expect(authMocks.initializeAuth).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        persistence: [
+          authMocks.indexedDBLocalPersistence,
+          authMocks.browserLocalPersistence,
+          authMocks.browserSessionPersistence,
+        ],
+      },
+    );
     expect(moduleEvaluations.firestore).toBe(0);
   });
 });

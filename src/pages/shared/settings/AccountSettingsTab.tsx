@@ -10,7 +10,7 @@ import SettingsTabActions from "./SettingsTabActions";
 import SettingsSectionCard from "./SettingsSectionCard";
 import SettingsFormFieldRow from "./SettingsFormFieldRow";
 import SettingsTabSkeleton from "./SettingsTabSkeleton";
-import { getAuth } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 import { Trash2, User, AlertCircle, MapPin } from "lucide-react";
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
 import { useNavigate } from "react-router";
@@ -120,7 +120,6 @@ export default function AccountSettingsTab() {
 
       let fullName = data.fullName || "";
       let email = data.email || "";
-      const auth = getAuth();
       await auth.authStateReady?.();
       const current = auth.currentUser;
 

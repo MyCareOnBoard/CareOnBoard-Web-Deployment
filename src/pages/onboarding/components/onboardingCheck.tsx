@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router'
 import { getOnboardingStatus } from '@/lib/api/onboarding'
-import { getAuth } from 'firebase/auth'
+import { auth } from '@/lib/firebase'
 import { Routes } from '@/routes/constants'
 
 interface OnboardingCheckProps {
@@ -39,7 +39,6 @@ export function OnboardingCheck({ children }: OnboardingCheckProps) {
       }
 
       // Check if user is authenticated
-      const auth = getAuth()
       await auth.authStateReady?.()
       const currentUser = auth.currentUser
 

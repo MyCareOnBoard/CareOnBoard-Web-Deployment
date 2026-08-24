@@ -32,7 +32,7 @@ import {
   type ProfileInfo,
 } from "@/lib/api/profile"
 import { updateAccountInfo } from "@/lib/api/settings"
-import { getAuth } from "firebase/auth"
+import { auth } from "@/lib/firebase"
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal"
 import { VoiceRecordingProvider } from "@/contexts/VoiceRecordingContext"
 import VoiceInputButton from "@/components/VoiceInputButton"
@@ -121,7 +121,6 @@ export default function ProfilePage() {
       let joiningDate = data.joiningDate || ""
       let profilePicture = data.profilePicture || ""
 
-      const auth = getAuth()
       await auth.authStateReady?.()
       const currentUser = auth.currentUser
 
