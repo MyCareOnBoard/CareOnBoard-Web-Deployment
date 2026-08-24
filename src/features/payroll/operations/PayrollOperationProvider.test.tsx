@@ -122,4 +122,14 @@ describe("PayrollOperationProvider", () => {
     await act(async () => { resolveFirst({ operationId: "op", state: "succeeded", resourceType: "company", pollAfterMs: null } satisfies PayrollOperation); });
     expect(firstSettled).not.toHaveBeenCalled(); expect(secondSettled).not.toHaveBeenCalled();
   });
+  it("delivers the authoritative terminal operation to the subscriber", async () => {
+    const operation = { operationId: "op", state: "failed", resourceType: "payroll_run", pollAfterMs: null } satisfies PayrollOperation;
+    const poll = vi.fn().mockResolvedValue(operation);
+    const settled = vi.fn();
+    const wrapper = ({ children }: { children: React.ReactNode }) => <PayrollOperationProvider>{children}</PayrollOperationProvider>;
+    const { result } = renderHook(() => usePayrollOperations(), { wrapper });
+    act(() => { result.current.watch({ audience: "agency", actorUid: "u", agencyId: "a" }, "op", poll, settled); });
+    await act(async () => { await Promise.resolve(); });
+    expect(settled).toHaveBeenCalledWith(operation);
+  });
 });
