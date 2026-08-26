@@ -19,6 +19,7 @@ export function shiftToScheduleFormData(shift: Shift): ScheduleFormData {
     client: clientName,
     clientId: shift.client?.id || "",
     clientLocation: shift.location || null,
+    serviceLocationSource: shift.serviceLocationSource || "primaryAddress",
     assignedDsp: employeeName,
     assignedDspId: (shift.employee as { id?: string } | undefined)?.id || "",
     billingRate: "",

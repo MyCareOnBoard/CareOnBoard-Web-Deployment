@@ -106,11 +106,17 @@ export type Stage1ClientIdentityAndContactData = {
     state?: string;
     postalCode?: string;
     country?: string;
-    payrollServiceLocation?: { source: "primaryAddress"; attestedActualServiceLocation: true; effectiveFrom: string } | null;
+    payrollServiceLocations?: { source: "primaryAddress" | "secondaryAddress"; attestedActualServiceLocation: true; effectiveFrom: string }[];
     secondaryAddress: string;
     secondaryLocation?: { lat: string; lon: string };
     secondaryCountyState: string;
     secondaryZipCode: string;
+    secondaryLine1?: string;
+    secondaryLine2?: string | null;
+    secondaryCity?: string;
+    secondaryState?: string;
+    secondaryPostalCode?: string;
+    secondaryCountry?: string;
     phone: string;
     email: string;
     language?: string;
@@ -795,11 +801,12 @@ export function createInitialAddClientFormData(): AddClientFormData {
             countyState: "",
             zipCode: "",
             line1: undefined, line2: undefined, city: undefined, state: undefined, postalCode: undefined, country: undefined,
-            payrollServiceLocation: undefined,
+            payrollServiceLocations: undefined,
             secondaryAddress: "",
             secondaryLocation: undefined,
             secondaryCountyState: "",
             secondaryZipCode: "",
+            secondaryLine1: undefined, secondaryLine2: undefined, secondaryCity: undefined, secondaryState: undefined, secondaryPostalCode: undefined, secondaryCountry: undefined,
             phone: "",
             email: "",
             language: undefined,

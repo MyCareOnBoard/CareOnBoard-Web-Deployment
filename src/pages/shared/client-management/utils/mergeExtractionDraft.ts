@@ -946,7 +946,9 @@ export function mergeExtractionDraft(
       const importedApartment = String(next.stage1.homeInfo.apartmentNumber ?? "").trim();
       if (importedApartment && importedApartment !== priorApartment) {
         next.stage1.line2 = next.stage1.homeInfo.apartmentNumber ?? undefined;
-        next.stage1.payrollServiceLocation = null;
+        next.stage1.payrollServiceLocations = next.stage1.payrollServiceLocations?.filter(
+          (location) => location.source !== "primaryAddress",
+        );
       }
     }
     if (s1.referralInfo) {
@@ -979,7 +981,9 @@ export function mergeExtractionDraft(
       next.stage1.state = undefined;
       next.stage1.postalCode = undefined;
       next.stage1.country = undefined;
-      next.stage1.payrollServiceLocation = null;
+      next.stage1.payrollServiceLocations = next.stage1.payrollServiceLocations?.filter(
+        (location) => location.source !== "primaryAddress",
+      );
       next._pendingImportedPrimaryGeocode = true;
       const importedApartment = String(s1.homeInfo?.apartmentNumber ?? "").trim();
       if (importedApartment) {

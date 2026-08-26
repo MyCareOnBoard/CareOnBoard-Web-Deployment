@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { CalendarDays, ArrowLeft, Plus, Trash2, Eye, EyeOff } from "lucide-react";
 import { useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";
@@ -20,8 +20,9 @@ import {
 import { AddClientFormData, type InsuranceDetail } from "@/pages/shared/client-management/types/formData";
 import { Button } from "@/components/ui/button";
 import { Agency } from "@/lib/api/clients";
-import { useGooglePlacesAutocomplete, fetchFirstPlaceDetailsForQuery, type AddressDetails } from "@/hooks/useGooglePlacesAutocomplete";
+import { fetchFirstPlaceDetailsForQuery, type AddressDetails } from "@/hooks/useGooglePlacesAutocomplete";
 import HhaBlankFormsCard from "@/pages/shared/client-management/components/HhaBlankFormsCard";
+import { AddressAutocompleteField } from "@/pages/shared/client-management/components/forms/AddressAutocompleteField";
 
 const SELECT_TRIGGER_CN =
   "w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white";
@@ -60,9 +61,14 @@ export function Stage1ClientIdentityAndContact({
   const isHhaClient = formData.type === "hha";
   const updateStage1 = (patch: Partial<AddClientFormData["stage1"]>) =>
     setFormData((prev) => ({ ...prev, stage1: { ...prev.stage1, ...patch } }));
+  const clearServiceLocation = (source: "primaryAddress" | "secondaryAddress") =>
+    stage1.payrollServiceLocations?.filter((location) => location.source !== source);
   const clearPrimaryPayrollIdentity = (patch: Partial<AddClientFormData["stage1"]>) =>
-    updateStage1({ ...patch, line1: undefined, line2: undefined, city: undefined, state: undefined, postalCode: undefined, country: undefined, payrollServiceLocation: null });
+    updateStage1({ ...patch, line1: undefined, line2: undefined, city: undefined, state: undefined, postalCode: undefined, country: undefined, payrollServiceLocations: clearServiceLocation("primaryAddress") });
+  const clearSecondaryPayrollIdentity = (patch: Partial<AddClientFormData["stage1"]>) =>
+    updateStage1({ ...patch, secondaryLine1: undefined, secondaryLine2: undefined, secondaryCity: undefined, secondaryState: undefined, secondaryPostalCode: undefined, secondaryCountry: undefined, payrollServiceLocations: clearServiceLocation("secondaryAddress") });
   const hasStructuredPrimaryAddress = Boolean(stage1.line1?.trim() && stage1.city?.trim() && stage1.state?.trim() && stage1.postalCode?.trim() && /^[A-Z]{2}$/.test(stage1.country?.trim() ?? ""));
+  const hasStructuredSecondaryAddress = Boolean(stage1.secondaryLine1?.trim() && stage1.secondaryCity?.trim() && stage1.secondaryState?.trim() && stage1.secondaryPostalCode?.trim() && /^[A-Z]{2}$/.test(stage1.secondaryCountry?.trim() ?? ""));
   const normalizedIdentity = (value: string | null | undefined) => value?.trim().replace(/\s+/g, " ").toUpperCase() || null;
   const canonicalPrimaryDetails = (details: AddressDetails) => ({
     ...details,
@@ -72,6 +78,16 @@ export function Stage1ClientIdentityAndContact({
   });
   const samePrimaryIdentity = (details: { line1: string; line2: string | null; city: string; state: string; zipCode: string; country: string }, current = stage1) =>
     normalizedIdentity(current.line1) === normalizedIdentity(details.line1) && normalizedIdentity(current.line2) === normalizedIdentity(details.line2) && normalizedIdentity(current.city) === normalizedIdentity(details.city) && normalizedIdentity(current.state) === normalizedIdentity(details.state) && normalizedIdentity(current.postalCode) === normalizedIdentity(details.zipCode) && normalizedIdentity(current.country) === normalizedIdentity(details.country);
+  const sameSecondaryIdentity = (details: { line1: string; line2: string | null; city: string; state: string; zipCode: string; country: string }) =>
+    normalizedIdentity(stage1.secondaryLine1) === normalizedIdentity(details.line1) && normalizedIdentity(stage1.secondaryLine2) === normalizedIdentity(details.line2) && normalizedIdentity(stage1.secondaryCity) === normalizedIdentity(details.city) && normalizedIdentity(stage1.secondaryState) === normalizedIdentity(details.state) && normalizedIdentity(stage1.secondaryPostalCode) === normalizedIdentity(details.zipCode) && normalizedIdentity(stage1.secondaryCountry) === normalizedIdentity(details.country);
+  const setServiceLocationAttestation = (source: "primaryAddress" | "secondaryAddress", checked: boolean) => {
+    const existing = stage1.payrollServiceLocations ?? [];
+    updateStage1({ payrollServiceLocations: checked
+      ? [...existing.filter((location) => location.source !== source), { source, attestedActualServiceLocation: true, effectiveFrom: "" }]
+      : existing.filter((location) => location.source !== source) });
+  };
+  const updateServiceLocationDate = (source: "primaryAddress" | "secondaryAddress", effectiveFrom: string) =>
+    updateStage1({ payrollServiceLocations: (stage1.payrollServiceLocations ?? []).map((location) => location.source === source ? { ...location, effectiveFrom } : location) });
   const updateHomeInfo = (patch: Partial<NonNullable<AddClientFormData["stage1"]["homeInfo"]>>) =>
     setFormData((prev) => ({
       ...prev,
@@ -119,14 +135,6 @@ export function Stage1ClientIdentityAndContact({
   const [isWaiverEnrollmentOpen, setIsWaiverEnrollmentOpen] = useState(false);
   const [isPlanPrintOpen, setIsPlanPrintOpen] = useState(false);
   const [isReferralDateOpen, setIsReferralDateOpen] = useState(false);
-
-  const addressInputRef = useRef<HTMLDivElement>(null);
-  const secondaryAddressInputRef = useRef<HTMLDivElement>(null);
-
-  const primaryAddress = useGooglePlacesAutocomplete();
-  const secondaryAddress = useGooglePlacesAutocomplete();
-  const [primarySuggestionIndex, setPrimarySuggestionIndex] = useState(-1);
-  const primarySuggestionsExpanded = primaryAddress.showSuggestions && primaryAddress.suggestions.length > 0;
 
   useEffect(() => {
     if (!formData._pendingImportedPrimaryGeocode) return undefined;
@@ -178,14 +186,11 @@ export function Stage1ClientIdentityAndContact({
             zipCode: details.zipCode,
             line1: canonical.line1, line2: canonical.line2 ?? prev.stage1.line2, city: canonical.city, state: canonical.state, postalCode: canonical.zipCode, country: canonical.country,
             homeInfo: { ...(prev.stage1.homeInfo ?? {}), apartmentNumber: canonical.line2 ?? prev.stage1.line2 ?? undefined },
-            ...(samePrimaryIdentity(canonical, prev.stage1) ? {} : { payrollServiceLocation: null }),
+            ...(samePrimaryIdentity(canonical, prev.stage1) ? {} : { payrollServiceLocations: prev.stage1.payrollServiceLocations?.filter((location) => location.source !== "primaryAddress") }),
           },
         };
       });
 
-      if (!cancelled) {
-        primaryAddress.clearSuggestions();
-      }
     })();
 
     return () => {
@@ -195,57 +200,16 @@ export function Stage1ClientIdentityAndContact({
     formData._pendingImportedPrimaryGeocode,
     formData.stage1.address,
     setFormData,
-    primaryAddress.clearSuggestions,
   ]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (addressInputRef.current && !addressInputRef.current.contains(event.target as Node)) {
-        primaryAddress.setShowSuggestions(false);
-      }
-      if (secondaryAddressInputRef.current && !secondaryAddressInputRef.current.contains(event.target as Node)) {
-        secondaryAddress.setShowSuggestions(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [primaryAddress.setShowSuggestions, secondaryAddress.setShowSuggestions]);
-
-  const handleSelectAddressSuggestion = async (placeId: string) => {
-    const details = await primaryAddress.selectSuggestion(placeId);
-    if (details) {
-      const canonical = canonicalPrimaryDetails(details);
-      const countyStateValue =
-        details.county && details.stateLong
-          ? `${details.county} / ${details.stateLong}`
-          : details.county || details.stateLong;
-      updateStage1({
-        address: details.formattedAddress,
-        location: { lat: String(details.lat), lon: String(details.lng) },
-        countyState: countyStateValue,
-        zipCode: details.zipCode,
-        line1: canonical.line1, line2: canonical.line2, city: canonical.city, state: canonical.state, postalCode: canonical.zipCode, country: canonical.country,
-        homeInfo: { ...(stage1.homeInfo ?? {}), apartmentNumber: canonical.line2 ?? undefined },
-        ...(samePrimaryIdentity(canonical) ? {} : { payrollServiceLocation: null }),
-      });
-    }
+  const handlePrimaryAddressDetails = (details: AddressDetails) => {
+    const canonical = canonicalPrimaryDetails(details);
+    const countyStateValue = details.county && details.stateLong ? `${details.county} / ${details.stateLong}` : details.county || details.stateLong;
+    updateStage1({ address: details.formattedAddress, location: { lat: String(details.lat), lon: String(details.lng) }, countyState: countyStateValue, zipCode: details.zipCode, line1: canonical.line1, line2: canonical.line2, city: canonical.city, state: canonical.state, postalCode: canonical.zipCode, country: canonical.country, homeInfo: { ...(stage1.homeInfo ?? {}), apartmentNumber: canonical.line2 ?? undefined }, payrollServiceLocations: samePrimaryIdentity(canonical) ? stage1.payrollServiceLocations : clearServiceLocation("primaryAddress") });
   };
-
-  const handleSelectSecondaryAddressSuggestion = async (placeId: string) => {
-    const details = await secondaryAddress.selectSuggestion(placeId);
-    if (details) {
-      const countyStateValue =
-        details.county && details.stateLong
-          ? `${details.county} / ${details.stateLong}`
-          : details.county || details.stateLong;
-      updateStage1({
-        secondaryAddress: details.formattedAddress,
-        secondaryLocation: { lat: String(details.lat), lon: String(details.lng) },
-        secondaryCountyState: countyStateValue,
-        secondaryZipCode: details.zipCode,
-      });
-    }
+  const handleSecondaryAddressDetails = (details: AddressDetails) => {
+    const canonical = canonicalPrimaryDetails(details);
+    const countyStateValue = details.county && details.stateLong ? `${details.county} / ${details.stateLong}` : details.county || details.stateLong;
+    updateStage1({ secondaryAddress: details.formattedAddress, secondaryLocation: { lat: String(details.lat), lon: String(details.lng) }, secondaryCountyState: countyStateValue, secondaryZipCode: details.zipCode, secondaryLine1: canonical.line1, secondaryLine2: canonical.line2, secondaryCity: canonical.city, secondaryState: canonical.state, secondaryPostalCode: canonical.zipCode, secondaryCountry: canonical.country, payrollServiceLocations: sameSecondaryIdentity(canonical) ? stage1.payrollServiceLocations : clearServiceLocation("secondaryAddress") });
   };
 
   // SSN Hashing
@@ -601,116 +565,54 @@ const maskSSN = (value: string) => {
             2. Contact Information
           </p>
           <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-            Used for communication, verification, and notifications.
+            Used for communication and verification. Confirmed service addresses also become payroll workplaces.
           </p>
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 xl:grid-cols-4">
-          <div className="flex flex-col gap-1">
-            <label className="text-[12px] font-normal text-[#10141a]" htmlFor="primary-mailing-address">Primary / mailing address</label>
-            <div className="relative" ref={addressInputRef}>
-              <Input
-                id="primary-mailing-address"
-                value={stage1.address}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setPrimarySuggestionIndex(-1);
-                  clearPrimaryPayrollIdentity({ address: v, location: undefined });
-                  primaryAddress.handleInputChange(v);
-                }}
-                onFocus={() => {
-                  if (primaryAddress.suggestions.length > 0) {
-                    primaryAddress.setShowSuggestions(true);
-                  }
-                }}
-                role="combobox"
-                aria-autocomplete="list"
-                aria-expanded={primarySuggestionsExpanded}
-                aria-controls="primary-address-suggestions"
-                aria-activedescendant={primarySuggestionsExpanded && primarySuggestionIndex >= 0 ? `primary-address-suggestion-${primarySuggestionIndex}` : undefined}
-                onKeyDown={(event) => {
-                  if (!primaryAddress.suggestions.length) return;
-                  if (event.key === "ArrowDown") { event.preventDefault(); if (!primarySuggestionsExpanded) primaryAddress.setShowSuggestions(true); setPrimarySuggestionIndex((index) => Math.min(index + 1, primaryAddress.suggestions.length - 1)); }
-                  if (event.key === "ArrowUp") { event.preventDefault(); setPrimarySuggestionIndex((index) => Math.max(index - 1, 0)); }
-                  if (event.key === "Enter" && primarySuggestionsExpanded && primarySuggestionIndex >= 0) { event.preventDefault(); void handleSelectAddressSuggestion(primaryAddress.suggestions[primarySuggestionIndex].placeId); setPrimarySuggestionIndex(-1); }
-                  if (event.key === "Escape") { event.preventDefault(); primaryAddress.setShowSuggestions(false); setPrimarySuggestionIndex(-1); }
-                }}
-                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-                placeholder="Enter primary address"
-              />
-
-              {primaryAddress.showSuggestions && primaryAddress.suggestions.length > 0 && (
-                <div id="primary-address-suggestions" role="listbox" className="absolute z-50 w-full mt-1 bg-white border border-[#e5e5e6] rounded-md shadow-lg max-h-[200px] overflow-y-auto">
-                  {primaryAddress.isSearching && (
-                    <div className="px-4 py-3 text-sm text-[#808081] flex items-center gap-2">
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-[#00b4b8] border-r-transparent" />
-                      Searching...
-                    </div>
-                  )}
-                  {!primaryAddress.isSearching &&
-                    primaryAddress.suggestions.map((suggestion, index) => (
-                      <div
-                        key={suggestion.placeId}
-                        id={`primary-address-suggestion-${index}`}
-                        role="option"
-                        aria-selected={primarySuggestionIndex === index}
-                        onClick={() => handleSelectAddressSuggestion(suggestion.placeId)}
-                        className={`px-4 py-3 text-sm text-[#10141a] hover:bg-[#f8f9fa] cursor-pointer border-b border-[#e5e5e6] last:border-b-0 transition-colors ${primarySuggestionIndex === index ? "bg-[#e6f7f7]" : ""}`}
-                      >
-                        <span className="line-clamp-2">
-                          {suggestion.description}
-                        </span>
-                      </div>
-                    ))}
-                </div>
-              )}
-            </div>
+          <div className="flex flex-col gap-1 lg:col-span-3 xl:col-span-4">
+            <AddressAutocompleteField label="Primary / mailing address search" id="primary-mailing-address" value={stage1.address} required placeholder="Search for the primary address" onChange={(address) => clearPrimaryPayrollIdentity({ address, location: undefined })} onSelectDetails={handlePrimaryAddressDetails} />
+            <p className="text-[12px] text-[#5d5d5f]">Select an address to fill the verified payroll address fields below.</p>
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-[12px] font-normal text-[#10141a]">Primary County / State</label>
-            <Input
-              value={stage1.countyState}
-              onChange={(e) => clearPrimaryPayrollIdentity({ countyState: e.target.value, location: undefined })}
-              className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-              placeholder="Enter County / State"
-            />
+            <label className="text-[12px] font-normal text-[#10141a]" htmlFor="primary-street-address">Street address</label>
+            <Input id="primary-street-address" value={stage1.line1 ?? ""} readOnly className="h-[44px] rounded-[12px] border-[#cccccd] bg-white" />
           </div>
-
           <div className="flex flex-col gap-1">
-            <label className="text-[12px] font-normal text-[#10141a]">Primary Zip Code</label>
-            <Input
-              value={stage1.zipCode}
-              onChange={(e) => clearPrimaryPayrollIdentity({ zipCode: e.target.value, location: undefined })}
-              inputMode="numeric"
-              className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-              placeholder="Enter Zip Code"
-            />
+            <label className="text-[12px] font-normal text-[#10141a]" htmlFor="primary-city">City</label>
+            <Input id="primary-city" value={stage1.city ?? ""} readOnly className="h-[44px] rounded-[12px] border-[#cccccd] bg-white" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[12px] font-normal text-[#10141a]" htmlFor="primary-state">State abbreviation</label>
+            <Input id="primary-state" value={stage1.state ?? ""} readOnly className="h-[44px] rounded-[12px] border-[#cccccd] bg-white" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[12px] font-normal text-[#10141a]" htmlFor="primary-postal-code">ZIP code</label>
+            <Input id="primary-postal-code" value={stage1.postalCode ?? ""} readOnly className="h-[44px] rounded-[12px] border-[#cccccd] bg-white" />
           </div>
 
           <div className="flex flex-col gap-2 lg:col-span-3 xl:col-span-4">
             <Checkbox
               id="actual-service-location"
-              checked={Boolean(stage1.payrollServiceLocation)}
+              checked={(stage1.payrollServiceLocations ?? []).some((location) => location.source === "primaryAddress")}
               disabled={!hasStructuredPrimaryAddress}
               aria-describedby={!hasStructuredPrimaryAddress ? "actual-service-location-address-help" : undefined}
-              onChange={(event) => updateStage1(event.target.checked
-                ? { payrollServiceLocation: { source: "primaryAddress", attestedActualServiceLocation: true, effectiveFrom: "" } }
-                : { payrollServiceLocation: null })}
-              label="I attest that this primary/mailing address is where services are actually delivered."
+              onChange={(event) => setServiceLocationAttestation("primaryAddress", event.target.checked)}
+              label="I confirm services are delivered at this primary address. Use it as a Check payroll workplace."
               labelClassName="text-[13px] font-normal"
             />
-            {!hasStructuredPrimaryAddress && <p id="actual-service-location-address-help" className="text-[12px] text-[#5d5d5f]">Select a suggested primary/mailing address to attest to the actual service location.</p>}
-            <p className="text-[12px] text-[#5d5d5f]">Future address changes apply to future payroll assignments and do not rewrite history.</p>
-            {stage1.payrollServiceLocation && (
+            {!hasStructuredPrimaryAddress && <p id="actual-service-location-address-help" className="text-[12px] text-[#5d5d5f]">Enter a complete primary address before confirming it as a service location.</p>}
+            <p className="text-[12px] text-[#5d5d5f]">Choose the first service date at this address. Later address changes will not rewrite earlier payroll records.</p>
+            {(stage1.payrollServiceLocations ?? []).find((location) => location.source === "primaryAddress") && (
               <div className="flex max-w-[260px] flex-col gap-1">
-                <label className="text-[12px] font-normal text-[#10141a]" htmlFor="actual-service-location-effective-from">Effective date</label>
-                <Input id="actual-service-location-effective-from" type="date" required value={stage1.payrollServiceLocation.effectiveFrom}
-                  onChange={(event) => updateStage1({ payrollServiceLocation: { ...stage1.payrollServiceLocation!, effectiveFrom: event.target.value } })}
-                  aria-invalid={!stage1.payrollServiceLocation.effectiveFrom}
-                  aria-describedby={!stage1.payrollServiceLocation.effectiveFrom ? "actual-service-location-effective-from-error" : undefined}
+                <label className="text-[12px] font-normal text-[#10141a]" htmlFor="actual-service-location-effective-from">Primary service effective date</label>
+                <Input id="actual-service-location-effective-from" type="date" required value={(stage1.payrollServiceLocations ?? []).find((location) => location.source === "primaryAddress")?.effectiveFrom ?? ""}
+                  onChange={(event) => updateServiceLocationDate("primaryAddress", event.target.value)}
+                  aria-invalid={!(stage1.payrollServiceLocations ?? []).find((location) => location.source === "primaryAddress")?.effectiveFrom}
+                  aria-describedby={!(stage1.payrollServiceLocations ?? []).find((location) => location.source === "primaryAddress")?.effectiveFrom ? "actual-service-location-effective-from-error" : undefined}
                   className="h-[44px] rounded-[12px] border-[#cccccd] bg-white" />
-                {!stage1.payrollServiceLocation.effectiveFrom && <p id="actual-service-location-effective-from-error" className="text-[12px] text-red-600" role="alert">An effective date is required to save this attestation.</p>}
+                {!(stage1.payrollServiceLocations ?? []).find((location) => location.source === "primaryAddress")?.effectiveFrom && <p id="actual-service-location-effective-from-error" className="text-[12px] text-red-600" role="alert">Choose an effective date before saving.</p>}
               </div>
             )}
           </div>
@@ -730,9 +632,9 @@ const maskSSN = (value: string) => {
                       stage1: {
                         ...prev.stage1,
                         line2: apartmentNumber,
-                        payrollServiceLocation: sameLine2
-                          ? prev.stage1.payrollServiceLocation
-                          : null,
+                        payrollServiceLocations: sameLine2
+                          ? prev.stage1.payrollServiceLocations
+                          : prev.stage1.payrollServiceLocations?.filter((location) => location.source !== "primaryAddress"),
                         homeInfo: { ...(prev.stage1.homeInfo ?? {}), apartmentNumber },
                       },
                     }));
@@ -786,69 +688,45 @@ const maskSSN = (value: string) => {
             Secondary Address (Optional)
           </p>
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 xl:grid-cols-4">
-            <div className="flex flex-col gap-1">
-              <label className="text-[12px] font-normal text-[#10141a]">Secondary Address</label>
-              <div className="relative" ref={secondaryAddressInputRef}>
-                <Input
-                  value={stage1.secondaryAddress}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    updateStage1({ secondaryAddress: v, secondaryLocation: undefined });
-                    secondaryAddress.handleInputChange(v);
-                  }}
-                  onFocus={() => {
-                    if (secondaryAddress.suggestions.length > 0) {
-                      secondaryAddress.setShowSuggestions(true);
-                    }
-                  }}
-                  className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-                  placeholder="Enter secondary address"
-                />
-
-                {secondaryAddress.showSuggestions && secondaryAddress.suggestions.length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-[#e5e5e6] rounded-md shadow-lg max-h-[200px] overflow-y-auto">
-                    {secondaryAddress.isSearching && (
-                      <div className="px-4 py-3 text-sm text-[#808081] flex items-center gap-2">
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-[#00b4b8] border-r-transparent" />
-                        Searching...
-                      </div>
-                    )}
-                    {!secondaryAddress.isSearching &&
-                      secondaryAddress.suggestions.map((suggestion) => (
-                        <div
-                          key={suggestion.placeId}
-                          onClick={() => handleSelectSecondaryAddressSuggestion(suggestion.placeId)}
-                          className="px-4 py-3 text-sm text-[#10141a] hover:bg-[#f8f9fa] cursor-pointer border-b border-[#e5e5e6] last:border-b-0 transition-colors"
-                        >
-                          <span className="line-clamp-2">
-                            {suggestion.description}
-                          </span>
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </div>
+            <div className="flex flex-col gap-1 lg:col-span-3 xl:col-span-4">
+              <AddressAutocompleteField label="Secondary address search" id="secondary-address" value={stage1.secondaryAddress} placeholder="Search for the secondary address" onChange={(secondaryAddress) => clearSecondaryPayrollIdentity({ secondaryAddress, secondaryLocation: undefined })} onSelectDetails={handleSecondaryAddressDetails} />
+              <p className="text-[12px] text-[#5d5d5f]">Select an address to fill the verified payroll address fields below.</p>
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-[12px] font-normal text-[#10141a]">Secondary County / State</label>
-              <Input
-                value={stage1.secondaryCountyState}
-                onChange={(e) => updateStage1({ secondaryCountyState: e.target.value })}
-                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-                placeholder="Enter County / State"
-              />
+              <label className="text-[12px] font-normal text-[#10141a]" htmlFor="secondary-street-address">Street address</label>
+              <Input id="secondary-street-address" value={stage1.secondaryLine1 ?? ""} readOnly className="h-[44px] rounded-[12px] border-[#cccccd] bg-white" />
             </div>
-
             <div className="flex flex-col gap-1">
-              <label className="text-[12px] font-normal text-[#10141a]">Secondary Zip Code</label>
-              <Input
-                value={stage1.secondaryZipCode}
-                onChange={(e) => updateStage1({ secondaryZipCode: e.target.value })}
-                inputMode="numeric"
-                className="h-[44px] rounded-[12px] border-[#cccccd] bg-white"
-                placeholder="Enter Zip Code"
+              <label className="text-[12px] font-normal text-[#10141a]" htmlFor="secondary-city">City</label>
+              <Input id="secondary-city" value={stage1.secondaryCity ?? ""} readOnly className="h-[44px] rounded-[12px] border-[#cccccd] bg-white" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-normal text-[#10141a]" htmlFor="secondary-state">State abbreviation</label>
+              <Input id="secondary-state" value={stage1.secondaryState ?? ""} readOnly className="h-[44px] rounded-[12px] border-[#cccccd] bg-white" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-normal text-[#10141a]" htmlFor="secondary-postal-code">ZIP code</label>
+              <Input id="secondary-postal-code" value={stage1.secondaryPostalCode ?? ""} readOnly className="h-[44px] rounded-[12px] border-[#cccccd] bg-white" />
+            </div>
+            <div className="flex flex-col gap-2 lg:col-span-3 xl:col-span-4">
+              <Checkbox
+                id="actual-secondary-service-location"
+                checked={(stage1.payrollServiceLocations ?? []).some((location) => location.source === "secondaryAddress")}
+                disabled={!hasStructuredSecondaryAddress}
+                aria-describedby={!hasStructuredSecondaryAddress ? "actual-secondary-service-location-address-help" : undefined}
+                onChange={(event) => setServiceLocationAttestation("secondaryAddress", event.target.checked)}
+                label="I confirm services are delivered at this secondary address. Use it as a Check payroll workplace."
+                labelClassName="text-[13px] font-normal"
               />
+              {!hasStructuredSecondaryAddress && <p id="actual-secondary-service-location-address-help" className="text-[12px] text-[#5d5d5f]">Enter a complete secondary address before confirming it as a service location.</p>}
+              {(stage1.payrollServiceLocations ?? []).find((location) => location.source === "secondaryAddress") && (
+                <div className="mt-2 flex max-w-[260px] flex-col gap-1">
+                  <label className="text-[12px] font-normal text-[#10141a]" htmlFor="actual-secondary-service-location-effective-from">Secondary service effective date</label>
+                  <Input id="actual-secondary-service-location-effective-from" type="date" required value={(stage1.payrollServiceLocations ?? []).find((location) => location.source === "secondaryAddress")?.effectiveFrom ?? ""} onChange={(event) => updateServiceLocationDate("secondaryAddress", event.target.value)} aria-invalid={!(stage1.payrollServiceLocations ?? []).find((location) => location.source === "secondaryAddress")?.effectiveFrom} aria-describedby={!(stage1.payrollServiceLocations ?? []).find((location) => location.source === "secondaryAddress")?.effectiveFrom ? "actual-secondary-service-location-effective-from-error" : undefined} className="h-[44px] rounded-[12px] border-[#cccccd] bg-white" />
+                  {!(stage1.payrollServiceLocations ?? []).find((location) => location.source === "secondaryAddress")?.effectiveFrom && <p id="actual-secondary-service-location-effective-from-error" className="text-[12px] text-red-600" role="alert">Choose an effective date before saving.</p>}
+                </div>
+              )}
             </div>
           </div>
         </div>

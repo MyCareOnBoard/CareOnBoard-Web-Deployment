@@ -8,7 +8,7 @@ import { CoverageFields } from "@/components/CoverageFields";
 import { COVERAGE, isValidSplit, resolveLineCoverage, type Coverage, type SplitMode } from "@/lib/coverage";
 import { useAuth } from "@/utils/auth";
 import { useToast } from "@/hooks/use-toast";
-import { listShifts, Shift, ShiftStatus, createShift, ShiftType, SubmissionStatus, updateShift, CreateShiftRequest, ShiftActionStatus, ShiftLocation, formatShiftLocation, ShiftResponse } from "@/lib/api/shifts";
+import { listShifts, Shift, ShiftStatus, createShift, ShiftType, SubmissionStatus, updateShift, CreateShiftRequest, ShiftActionStatus, ShiftLocation, formatShiftLocation, ShiftResponse, type ServiceLocationSource } from "@/lib/api/shifts";
 import type { CreateActivityLogRequest } from "@/lib/api/employees";
 import ScheduleSuccessModal from "./ScheduleSuccessModal";
 import ScheduleSavedModal from "./ScheduleSavedModal";
@@ -189,6 +189,7 @@ interface AddScheduleModalProps {
 
 interface FormErrors {
   client?: string;
+  serviceLocation?: string;
   serviceCode?: string;
   assignedDsp?: string;
   schedulingType?: string;
@@ -205,6 +206,7 @@ export interface ScheduleFormData {
   client: string;
   clientId: string;
   clientLocation: ShiftLocation | null;
+  serviceLocationSource: ServiceLocationSource;
   assignedDsp: string;
   assignedDspId: string;
   billingRate: string;
@@ -275,6 +277,7 @@ const initialFormData: ScheduleFormData = {
   client: "",
   clientId: "",
   clientLocation: null,
+  serviceLocationSource: "primaryAddress",
   assignedDsp: "",
   assignedDspId: "",
   billingRate: "",
@@ -443,7 +446,12 @@ export default function AddScheduleModal({
     dspVerifyTokenRef.current += 1;
     if (isOpen) {
       if (editData && mode === "edit") {
-        setFormData(editData);
+        setSelectedClient(null);
+        setSelectedClientServices([]);
+        setFormData({
+          ...editData,
+          serviceLocationSource: editData.serviceLocationSource || "primaryAddress",
+        });
 
         // Fetch client data to populate services dropdown
         if (editData.clientId) {
@@ -458,7 +466,8 @@ export default function AddScheduleModal({
                 clientContextAbortRef.current !== controller ||
                 latestClientSelectIdRef.current !== requestKey ||
                 !mountedRef.current ||
-                !isOpenRef.current
+                !isOpenRef.current ||
+                client.id !== editData.clientId
               ) return;
               setSelectedClient(client);
               setSelectedClientServices(getClientServicesForOperations(client));
@@ -561,6 +570,7 @@ export default function AddScheduleModal({
                 employeeId: data.assignedDspId,
                 agencyId,
                 location: data.clientLocation || "",
+                serviceLocationSource: data.serviceLocationSource,
                 startTime: weekdaySchedule.clockInTime,
                 endTime: weekdaySchedule.clockOutTime,
                 clientId: data.clientId,
@@ -589,6 +599,7 @@ export default function AddScheduleModal({
             employeeId: data.assignedDspId,
             agencyId,
             location: data.clientLocation || "",
+            serviceLocationSource: data.serviceLocationSource,
             startTime: data.clockInTime,
             endTime: data.clockOutTime,
             clientId: data.clientId,
@@ -616,6 +627,7 @@ export default function AddScheduleModal({
         employeeId: data.assignedDspId,
         agencyId,
         location: data.clientLocation || "",
+        serviceLocationSource: data.serviceLocationSource,
         startTime: weekdaySchedule?.clockInTime || data.clockInTime,
         endTime: weekdaySchedule?.clockOutTime || data.clockOutTime,
         clientId: data.clientId,
@@ -683,16 +695,21 @@ export default function AddScheduleModal({
     }, 300);
   }, [agencyMode, data]);
 
-  const getClientPrimaryAddress = (client: Client): ShiftLocation | null => {
-    if (client.primaryAddress) {
+  const getClientServiceAddress = (
+    client: Client,
+    source: ServiceLocationSource,
+  ): ShiftLocation | null => {
+    const selectedAddress = client[source];
+    if (selectedAddress) {
       return {
-        address: client.primaryAddress.address,
-        countyState: client.primaryAddress.countyState,
-        zipCode: client.primaryAddress.zipCode,
-        latlon: client.primaryAddress.location,
+        address: selectedAddress.address || selectedAddress.line1,
+        countyState: selectedAddress.countyState || [selectedAddress.city, selectedAddress.state].filter(Boolean).join(", "),
+        zipCode: selectedAddress.zipCode || selectedAddress.postalCode,
+        latlon: selectedAddress.location,
       };
     }
 
+    if (source === "secondaryAddress") return null;
     const fallback: ShiftLocation = {
       address: client.address,
       countyState: client.countyState,
@@ -705,6 +722,26 @@ export default function AddScheduleModal({
     }
 
     return null;
+  };
+
+  const payrollServiceDateKeyFor = (schedule: ScheduleFormData): string | null => {
+    const serviceDate = schedule.schedulingType === "recurring"
+      ? schedule.startDate
+      : schedule.date;
+    return serviceDate && isValid(serviceDate) ? format(serviceDate, "yyyy-MM-dd") : null;
+  };
+
+  const isConfirmedPayrollServiceLocation = (
+    client: Client,
+    source: ServiceLocationSource,
+    serviceDateKey: string | null,
+  ): boolean => {
+    const confirmation = client.payrollServiceLocations?.find(
+      (location) => location.source === source,
+    );
+    return confirmation?.attestedActualServiceLocation === true
+      && /^\d{4}-\d{2}-\d{2}$/.test(confirmation.effectiveFrom)
+      && (!serviceDateKey || confirmation.effectiveFrom <= serviceDateKey);
   };
 
   const handleClientSelect = (clientOption: OperationalClientOption) => {
@@ -722,6 +759,7 @@ export default function AddScheduleModal({
       client: clientOption.name,
       clientId: clientOption.id,
       clientLocation: null,
+      serviceLocationSource: "primaryAddress",
       serviceCode: "",
       serviceAuthorizationId: "",
       assignedDsp: "",
@@ -747,14 +785,22 @@ export default function AddScheduleModal({
           !isOpenRef.current
         ) return;
         const coverage = resolveLineCoverage(null, client);
-        setFormData((prev) => ({
-          ...prev,
-          client: `${client.firstName || ""} ${client.lastName || ""}`.trim() || clientOption.name,
-          clientLocation: getClientPrimaryAddress(client),
-          coverage: coverage.coverage,
-          splitMode: coverage.splitMode,
-          splitValue: coverage.splitValue,
-        }));
+        setFormData((prev) => {
+          const serviceDateKey = payrollServiceDateKeyFor(prev);
+          const source = (["primaryAddress", "secondaryAddress"] as const).find((candidate) => (
+            isConfirmedPayrollServiceLocation(client, candidate, serviceDateKey)
+            && getClientServiceAddress(client, candidate)
+          ));
+          return {
+            ...prev,
+            client: `${client.firstName || ""} ${client.lastName || ""}`.trim() || clientOption.name,
+            clientLocation: source ? getClientServiceAddress(client, source) : null,
+            serviceLocationSource: source || "primaryAddress",
+            coverage: coverage.coverage,
+            splitMode: coverage.splitMode,
+            splitValue: coverage.splitValue,
+          };
+        });
         setSelectedClient(client);
         setSelectedClientServices(getClientServicesForOperations(client));
       })
@@ -1299,13 +1345,61 @@ export default function AddScheduleModal({
     selectedDistributionSnapshot,
   ]);
 
+  const payrollClient = selectedClient?.id === formData.clientId ? selectedClient : null;
+  const payrollServiceDateKey = payrollServiceDateKeyFor(formData);
+  const savedEditServiceDateKey = editData ? payrollServiceDateKeyFor(editData) : null;
+  const hasUnchangedEditServiceContext = mode === "edit"
+    && Boolean(editData)
+    && formData.clientId === editData?.clientId
+    && payrollServiceDateKey === savedEditServiceDateKey;
+  const payrollLocationOptions = payrollClient
+    ? (["primaryAddress", "secondaryAddress"] as const).flatMap((source) => {
+        const savedEditSource = editData?.serviceLocationSource || "primaryAddress";
+        const isSavedEditLocation = hasUnchangedEditServiceContext
+          && source === savedEditSource
+          && Boolean(editData?.clientLocation);
+        const isConfirmedAndEffective = isConfirmedPayrollServiceLocation(
+          payrollClient,
+          source,
+          payrollServiceDateKey,
+        );
+        if (!isSavedEditLocation && !isConfirmedAndEffective) return [];
+        const location = isSavedEditLocation
+          ? editData?.clientLocation
+          : getClientServiceAddress(payrollClient, source);
+        if (!location) return [];
+        return [{
+          source,
+          location,
+          prefix: source === "primaryAddress" ? "Primary address" : "Secondary address",
+          editLabel: mode !== "edit"
+            ? ""
+            : isSavedEditLocation
+              ? " — saved for this shift"
+              : " — switch payroll location",
+        }];
+      })
+    : [];
+  const selectedPayrollLocationOption = payrollLocationOptions.find(
+    (option) => option.source === formData.serviceLocationSource,
+  );
+  const hasSelectedPayrollLocation = Boolean(selectedPayrollLocationOption);
+
   // Form validation
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
 
     // Client validation
     if (!formData.client.trim()) {
-      newErrors.client = "Client is required";
+      newErrors.client = "Choose a client.";
+    } else if (!formData.clientId.trim()) {
+      newErrors.client = "Choose a client from the search results.";
+    } else if (!payrollClient) {
+      newErrors.client = "Wait for the selected client details to finish loading.";
+    } else if (!hasSelectedPayrollLocation) {
+      newErrors.serviceLocation = payrollLocationOptions.length === 0
+        ? "Confirm a client payroll service location that is effective on the shift date."
+        : "Choose a payroll service location for this shift.";
     }
 
     if (formData.clientId && !formData.serviceCode.trim()) {
@@ -1413,6 +1507,7 @@ export default function AddScheduleModal({
   const isFormValid = useMemo(() => {
     // Client validation
     if (!formData.client.trim()) return false;
+    if (!formData.clientId.trim() || !payrollClient || !hasSelectedPayrollLocation) return false;
 
     if (formData.clientId && !formData.serviceCode.trim()) return false;
 
@@ -1474,6 +1569,8 @@ export default function AddScheduleModal({
     selectedDistributionSnapshot,
     effectiveWeekdaySchedules,
     getWeeklyDistributionValidationError,
+    payrollClient,
+    hasSelectedPayrollLocation,
   ]);
 
   // Builds the activity-log payload for a shift. The backend upserts by shiftId,
@@ -1583,7 +1680,6 @@ export default function AddScheduleModal({
         setIsSubmitting(true);
         try {
           const updatePayload: any = {
-            location: formData.clientLocation,
             startTime: formData.clockInTime,
             endTime: formData.clockOutTime,
             notesType: formData.notesType || undefined,
@@ -1596,6 +1692,10 @@ export default function AddScheduleModal({
             employeeId: formData.assignedDspId || undefined,
             clientId: formData.clientId || undefined
           };
+
+          if (formData.serviceLocationSource !== (editData?.serviceLocationSource || "primaryAddress")) {
+            updatePayload.serviceLocationSource = formData.serviceLocationSource;
+          }
 
           if (formData.date) {
             updatePayload.date = format(formData.date, "yyyy-MM-dd");
@@ -1787,7 +1887,6 @@ export default function AddScheduleModal({
       // Edit existing shift - schedule (submit)
       if (mode === "edit" && formData.shiftId) {
         const updatePayload: any = {
-          location: formData.clientLocation,
           startTime: formData.clockInTime,
           endTime: formData.clockOutTime,
           notesType: formData.notesType || undefined,
@@ -1801,6 +1900,10 @@ export default function AddScheduleModal({
           clientId: formData.clientId || undefined,
           submissionStatus: SubmissionStatus.SUBMITTED
         };
+
+        if (formData.serviceLocationSource !== (editData?.serviceLocationSource || "primaryAddress")) {
+          updatePayload.serviceLocationSource = formData.serviceLocationSource;
+        }
 
         if (formData.date) {
           updatePayload.date = format(formData.date, "yyyy-MM-dd");
@@ -2113,6 +2216,7 @@ export default function AddScheduleModal({
                           client: value,
                           clientId: "",
                           clientLocation: null,
+                          serviceLocationSource: "primaryAddress",
                           serviceCode: "",
                           serviceAuthorizationId: "",
                           assignedDsp: "",
@@ -2124,6 +2228,7 @@ export default function AddScheduleModal({
                         setSelectedClientServices([]);
                         handleClientSearch(value);
                         clearError("client");
+                        clearError("serviceLocation");
                         clearError("serviceCode");
                         clearError("assignedDsp");
                       }}
@@ -2137,10 +2242,10 @@ export default function AddScheduleModal({
                   {errors.client && (
                     <span className="text-[12px] font-normal text-[#D53411]">{errors.client}</span>
                   )}
-                  {formData.clientId ? (
+                  {formData.clientId && selectedPayrollLocationOption ? (
                     <span className="text-[12px] font-normal text-[#808081]">
-                      Location:{" "}
-                      {formatShiftLocation(formData.clientLocation) || "Not on file"}
+                      Selected payroll service location:{" "}
+                      {formatShiftLocation(selectedPayrollLocationOption.location)}
                     </span>
                   ) : null}
                   {/* Client Dropdown */}
@@ -2152,6 +2257,7 @@ export default function AddScheduleModal({
                           onClick={() => {
                             handleClientSelect(client);
                             clearError("client");
+                            clearError("serviceLocation");
                           }}
                           className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-[12px] last:rounded-b-[12px] cursor-pointer border-b border-[#f0f0f0] last:border-b-0"
                         >
@@ -2163,6 +2269,58 @@ export default function AddScheduleModal({
                     </div>
                   )}
                 </div>
+
+                {payrollClient ? (
+                  <fieldset
+                    className="flex flex-col gap-2"
+                    aria-invalid={Boolean(errors.serviceLocation)}
+                  >
+                    <legend className="text-[12px] font-normal text-[#10141a]">
+                      Service location for payroll
+                    </legend>
+                    {payrollLocationOptions.length > 0 ? payrollLocationOptions.map((option) => {
+                      return (
+                        <label
+                          key={option.source}
+                          className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#cccccd] bg-white px-4 py-3"
+                        >
+                          <input
+                            type="radio"
+                            name="serviceLocationSource"
+                            value={option.source}
+                            checked={formData.serviceLocationSource === option.source}
+                            onChange={() => {
+                              setFormData((prev) => ({
+                                ...prev,
+                                serviceLocationSource: option.source,
+                                clientLocation: option.location,
+                              }));
+                              clearError("serviceLocation");
+                            }}
+                            className="mt-0.5"
+                          />
+                          <span className="text-[14px] font-normal text-[#10141a]">
+                            {option.prefix} — {formatShiftLocation(option.location)}{option.editLabel}
+                          </span>
+                        </label>
+                      );
+                    }) : (
+                      <p className="text-[12px] font-normal text-[#808081]">
+                        This client has no confirmed payroll service location for the shift date. Add one on the client record before scheduling.
+                      </p>
+                    )}
+                    {payrollLocationOptions.length > 0 ? (
+                      <p className="text-[12px] font-normal text-[#808081]">
+                        This determines the Check workplace used for payroll. Later client address changes do not rewrite this shift.
+                      </p>
+                    ) : null}
+                    {errors.serviceLocation ? (
+                      <p role="alert" className="text-[12px] font-normal text-[#D53411]">
+                        {errors.serviceLocation}
+                      </p>
+                    ) : null}
+                  </fieldset>
+                ) : null}
 
                 {/* Service */}
                 <div className="flex flex-col gap-1 relative">

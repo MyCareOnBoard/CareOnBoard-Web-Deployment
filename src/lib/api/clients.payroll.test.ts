@@ -9,45 +9,36 @@ vi.mock("@/lib/axios", () => ({
 import { createClient, updateClient } from "./clients";
 
 describe("client payroll API transport", () => {
-  const payrollServiceLocation = {
-    source: "primaryAddress" as const,
-    attestedActualServiceLocation: true as const,
-    effectiveFrom: "2026-08-14",
-  };
+  const payrollServiceLocations = [
+    { source: "primaryAddress" as const, attestedActualServiceLocation: true as const, effectiveFrom: "2026-08-14" },
+    { source: "secondaryAddress" as const, attestedActualServiceLocation: true as const, effectiveFrom: "2026-09-01" },
+  ];
 
   it("passes the public payroll DTO through create without adding scope or provider fields", async () => {
     post.mockResolvedValueOnce({ data: { data: { id: "client-1" } } });
-    await createClient({ primaryAddress: { line1: "42 Service Lane", city: "Newark", state: "NJ", postalCode: "07102", country: "US" }, payrollServiceLocation });
+    await createClient({ primaryAddress: { line1: "42 Service Lane", city: "Newark", state: "NJ", postalCode: "07102", country: "US" }, payrollServiceLocations });
 
     expect(post).toHaveBeenCalledWith("/clients", {
       primaryAddress: { line1: "42 Service Lane", city: "Newark", state: "NJ", postalCode: "07102", country: "US" },
-      payrollServiceLocation: {
-        source: "primaryAddress",
-        attestedActualServiceLocation: true,
-        effectiveFrom: "2026-08-14",
-      },
+      payrollServiceLocations,
     });
   });
 
   it("passes the public payroll DTO through update without a scope or provider field", async () => {
     put.mockResolvedValueOnce({ data: { success: true, data: { id: "client-1" } } });
-    await updateClient("client-1", { payrollServiceLocation });
+    await updateClient("client-1", { payrollServiceLocations });
 
     expect(put).toHaveBeenCalledWith("/clients/client-1", {
-      payrollServiceLocation: {
-        source: "primaryAddress",
-        attestedActualServiceLocation: true,
-        effectiveFrom: "2026-08-14",
-      },
+      payrollServiceLocations,
     }, { params: undefined });
   });
 
-  it("preserves explicit null and omitted payroll choices distinctly", async () => {
+  it("preserves an explicit empty service-location selection and an omitted selection distinctly", async () => {
     put.mockResolvedValue({ data: { success: true, data: { id: "client-1" } } });
-    await updateClient("client-1", { payrollServiceLocation: null });
+    await updateClient("client-1", { payrollServiceLocations: [] });
     await updateClient("client-1", {});
 
-    expect(put).toHaveBeenNthCalledWith(1, "/clients/client-1", { payrollServiceLocation: null }, { params: undefined });
+    expect(put).toHaveBeenNthCalledWith(1, "/clients/client-1", { payrollServiceLocations: [] }, { params: undefined });
     expect(put).toHaveBeenNthCalledWith(2, "/clients/client-1", {}, { params: undefined });
   });
 });

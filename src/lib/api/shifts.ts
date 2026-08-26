@@ -57,6 +57,8 @@ export interface ShiftLocation {
     latlon?: { lat?: string; lon?: string };
 }
 
+export type ServiceLocationSource = "primaryAddress" | "secondaryAddress";
+
 export const formatShiftLocation = (location?: ShiftLocation | string | null): string => {
     if (!location) return "";
     if (typeof location === "string") return location;
@@ -106,6 +108,7 @@ export interface Shift {
     timeRemaining?: number; // minutes remaining
     sessionDuration?: string; // e.g., "2 hour session"
     serviceCode?: string;
+    serviceLocationSource?: ServiceLocationSource;
     /** Nested client service row id — disambiguates duplicate serviceCode authorizations. */
     serviceAuthorizationId?: string;
     /** YYYY-MM-DD; sent with serviceCode when multiple authorizations share a code. */
@@ -155,6 +158,7 @@ export interface CreateShiftRequest {
     goalsType?: string;
     goalsAndDocumentsId?: string;
     serviceCode?: string;
+    serviceLocationSource?: ServiceLocationSource;
     schedulingType?: string;
     ispOutcome?: string;
     assignedDsp?: string; // Name of assigned DSP
@@ -192,6 +196,7 @@ export interface UpdateShiftRequest {
     goalsType?: string;
     goalsAndDocumentsId?: string;
     serviceCode?: string;
+    serviceLocationSource?: ServiceLocationSource;
     schedulingType?: string;
     ispOutcome?: string;
     assignedDsp?: string; // Name of assigned DSP

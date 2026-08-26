@@ -35,11 +35,11 @@ function payrollFormData() {
     state: "NJ",
     postalCode: "07102",
     country: "US",
-    payrollServiceLocation: {
+    payrollServiceLocations: [{
       source: "primaryAddress" as const,
       attestedActualServiceLocation: true as const,
       effectiveFrom: "2026-08-14",
-    },
+    }],
   });
   return data;
 }
@@ -86,8 +86,8 @@ describe("useClientSave", () => {
 
     const firstPayload = vi.mocked(createClient).mock.calls[0][0];
     expect(firstPayload.primaryAddress).toEqual({ address: "42 Service Lane, Newark, NJ 07102, USA", location: { lat: "40.7357", lon: "-74.1724" }, countyState: "Essex / NJ", zipCode: "07102", line1: "42 Service Lane", line2: "Suite 3", city: "Newark", state: "NJ", postalCode: "07102", country: "US" });
-    expect(firstPayload.payrollServiceLocation).toEqual({ source: "primaryAddress", attestedActualServiceLocation: true, effectiveFrom: "2026-08-14" });
-    expect(Object.keys(firstPayload.payrollServiceLocation!)).toEqual(["source", "attestedActualServiceLocation", "effectiveFrom"]);
+    expect(firstPayload.payrollServiceLocations).toEqual([{ source: "primaryAddress", attestedActualServiceLocation: true, effectiveFrom: "2026-08-14" }]);
+    expect(Object.keys(firstPayload.payrollServiceLocations![0])).toEqual(["source", "attestedActualServiceLocation", "effectiveFrom"]);
     expect(firstPayload).not.toHaveProperty("providerAssignmentId");
     expect(firstPayload).not.toHaveProperty("agencyId");
     expect(updateClient).toHaveBeenLastCalledWith("client-1", { documents: [], status: "active" });
@@ -100,18 +100,18 @@ describe("useClientSave", () => {
     });
 
     expect(updateClient).toHaveBeenNthCalledWith(1, "client-1", expect.objectContaining({
-      payrollServiceLocation: {
+      payrollServiceLocations: [{
         source: "primaryAddress",
         attestedActualServiceLocation: true,
         effectiveFrom: "2026-08-14",
-      },
+      }],
     }));
     expect(updateClient).toHaveBeenNthCalledWith(2, "client-1", { documents: [] });
   });
 
   it("does not call either API when the requested attestation has no effective date", async () => {
     const data = payrollFormData();
-    data.stage1.payrollServiceLocation = { source: "primaryAddress", attestedActualServiceLocation: true, effectiveFrom: "" };
+    data.stage1.payrollServiceLocations = [{ source: "primaryAddress", attestedActualServiceLocation: true, effectiveFrom: "" }];
     const { result } = renderHook(() => useClientSave());
     let saveResult;
     await act(async () => { saveResult = await result.current.saveClient(data, false, undefined, false, true, false); });
@@ -123,20 +123,20 @@ describe("useClientSave", () => {
 
   it("owns an explicit payroll opt-out only in the first update request", async () => {
     const data = payrollFormData();
-    data.stage1.payrollServiceLocation = null;
+    data.stage1.payrollServiceLocations = [];
     const { result } = renderHook(() => useClientSave());
     await act(async () => { await result.current.saveClient(data, true, "client-1", false, true, false); });
 
-    expect(updateClient).toHaveBeenNthCalledWith(1, "client-1", expect.objectContaining({ payrollServiceLocation: null }));
+    expect(updateClient).toHaveBeenNthCalledWith(1, "client-1", expect.objectContaining({ payrollServiceLocations: [] }));
     expect(updateClient).toHaveBeenNthCalledWith(2, "client-1", { documents: [] });
   });
 
   it("omits an untouched payroll choice from the first update request", async () => {
     const data = payrollFormData();
-    data.stage1.payrollServiceLocation = undefined;
+    data.stage1.payrollServiceLocations = undefined;
     const { result } = renderHook(() => useClientSave());
     await act(async () => { await result.current.saveClient(data, true, "client-1", false, true, false); });
 
-    expect(Object.hasOwn(vi.mocked(updateClient).mock.calls[0][1], "payrollServiceLocation")).toBe(false);
+    expect(Object.hasOwn(vi.mocked(updateClient).mock.calls[0][1], "payrollServiceLocations")).toBe(false);
   });
 });

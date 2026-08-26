@@ -23,8 +23,26 @@ function structuredPrimaryAddress(s1: AddClientFormData["stage1"]) {
   return Object.values(value).some((item) => item) ? value : {};
 }
 
+function structuredSecondaryAddress(s1: AddClientFormData["stage1"]) {
+  const value = { line1: s1.secondaryLine1?.trim(), line2: s1.secondaryLine2?.trim() || null, city: s1.secondaryCity?.trim(), state: s1.secondaryState?.trim(), postalCode: s1.secondaryPostalCode?.trim(), country: s1.secondaryCountry?.trim().toUpperCase() };
+  return Object.values(value).some((item) => item) ? value : {};
+}
+
 function hasCompleteStructuredPrimaryAddress(s1: AddClientFormData["stage1"]) {
   return Boolean(s1.line1?.trim() && s1.city?.trim() && s1.state?.trim() && s1.postalCode?.trim() && /^[A-Z]{2}$/.test(s1.country?.trim() ?? ""));
+}
+
+function hasCompleteStructuredSecondaryAddress(s1: AddClientFormData["stage1"]) {
+  return Boolean(s1.secondaryLine1?.trim() && s1.secondaryCity?.trim() && s1.secondaryState?.trim() && s1.secondaryPostalCode?.trim() && /^[A-Z]{2}$/.test(s1.secondaryCountry?.trim() ?? ""));
+}
+
+function uniqueServiceLocations(locations: NonNullable<AddClientFormData["stage1"]["payrollServiceLocations"]>) {
+  const seen = new Set<string>();
+  return locations.filter((location) => {
+    if (seen.has(location.source)) return false;
+    seen.add(location.source);
+    return true;
+  }).slice(0, 2);
 }
 
 function isMeaningfulHhaInsuranceRow(row: HhaInsuranceInfo): boolean {
@@ -83,9 +101,11 @@ export function formDataToApiPayload(
   const isHhaClient = formData.type === "hha";
 
   const primaryLocation = s1.location;
-  if (s1.payrollServiceLocation) {
-    if (!isRealIsoDate(s1.payrollServiceLocation.effectiveFrom)) throw new Error("Enter a valid effective date for the actual service-location attestation.");
-    if (!hasCompleteStructuredPrimaryAddress(s1)) throw new Error("Select a complete primary address before attesting to the actual service location.");
+  const payrollServiceLocations = s1.payrollServiceLocations && uniqueServiceLocations(s1.payrollServiceLocations);
+  for (const serviceLocation of payrollServiceLocations ?? []) {
+    if (!isRealIsoDate(serviceLocation.effectiveFrom)) throw new Error("Enter a valid effective date for the actual service-location attestation.");
+    if (serviceLocation.source === "primaryAddress" && !hasCompleteStructuredPrimaryAddress(s1)) throw new Error("Select a complete primary address before attesting to the actual service location.");
+    if (serviceLocation.source === "secondaryAddress" && !hasCompleteStructuredSecondaryAddress(s1)) throw new Error("Select a complete secondary address before attesting to the actual service location.");
   }
   if (!progressive && (!primaryLocation || !primaryLocation.lat || !primaryLocation.lon)) {
     throw new Error("Please select an address from the suggestions so we can capture coordinates.");
@@ -189,13 +209,14 @@ export function formDataToApiPayload(
               ...structuredPrimaryAddress(s1),
             }
           : undefined,
-    ...(s1.payrollServiceLocation === null ? { payrollServiceLocation: null } : s1.payrollServiceLocation ? { payrollServiceLocation: { source: "primaryAddress" as const, attestedActualServiceLocation: true as const, effectiveFrom: s1.payrollServiceLocation.effectiveFrom } } : {}),
-    secondaryAddress: s1.secondaryAddress || s1.secondaryLocation || s1.secondaryCountyState || s1.secondaryZipCode
+    ...(payrollServiceLocations ? { payrollServiceLocations: payrollServiceLocations.map(({ source, effectiveFrom }) => ({ source, attestedActualServiceLocation: true as const, effectiveFrom })) } : {}),
+    secondaryAddress: s1.secondaryAddress || s1.secondaryLocation || s1.secondaryCountyState || s1.secondaryZipCode || Object.keys(structuredSecondaryAddress(s1)).length
       ? {
           address: s1.secondaryAddress || undefined,
           location: s1.secondaryLocation || undefined,
           countyState: s1.secondaryCountyState || undefined,
           zipCode: s1.secondaryZipCode || undefined,
+          ...structuredSecondaryAddress(s1),
         }
       : undefined,
     languagePreference: s1.language || undefined,

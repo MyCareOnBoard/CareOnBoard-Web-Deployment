@@ -58,7 +58,7 @@ export interface Client {
   zipCode?: string;
   countyState?: string;
   primaryAddress?: Address;
-  payrollServiceLocation?: ClientPayrollServiceLocation | null;
+  payrollServiceLocations?: ClientPayrollServiceLocation[];
   secondaryAddress?: Address;
   languagePreference?: string;
   communicationMethod?: string;
@@ -610,7 +610,7 @@ export interface Address {
   country?: string;
 }
 
-export interface ClientPayrollServiceLocation { source: "primaryAddress"; attestedActualServiceLocation: true; effectiveFrom: string; }
+export interface ClientPayrollServiceLocation { source: "primaryAddress" | "secondaryAddress"; attestedActualServiceLocation: true; effectiveFrom: string; }
 
 /**
  * Create Client Request
@@ -640,7 +640,7 @@ export interface CreateClientRequest {
   zipCode?: string;
   countyState?: string;
   primaryAddress?: Address;
-  payrollServiceLocation?: ClientPayrollServiceLocation | null;
+  payrollServiceLocations?: ClientPayrollServiceLocation[];
   secondaryAddress?: Address;
   languagePreference?: string;
   communicationMethod?: string;
@@ -781,7 +781,8 @@ export interface UpdateClientRequest {
   zipCode?: string;
   countyState?: string;
   primaryAddress?: Address;
-  payrollServiceLocation?: ClientPayrollServiceLocation | null;
+  payrollServiceLocations?: ClientPayrollServiceLocation[];
+  secondaryAddress?: Address;
   languagePreference?: string;
   communicationMethod?: string;
   medicaidId?: string;

@@ -60,12 +60,20 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
         clientType === "hha" &&
         !client.primaryAddress?.line2?.trim() &&
         Boolean(client.homeInfo?.apartmentNumber?.trim());
-    const payrollServiceLocation = client.payrollServiceLocation === null ? null :
-        client.payrollServiceLocation?.source === "primaryAddress" && client.payrollServiceLocation.attestedActualServiceLocation === true && isRealIsoDate(client.payrollServiceLocation.effectiveFrom) && hasCompleteStructuredAddress(client.primaryAddress)
-            ? promotedHhaLine2
-                ? null
-                : { source: "primaryAddress" as const, attestedActualServiceLocation: true as const, effectiveFrom: client.payrollServiceLocation.effectiveFrom }
-            : undefined;
+    const payrollServiceLocations = client.payrollServiceLocations === undefined
+        ? undefined
+        : (() => {
+            const seenServiceLocationSources = new Set<string>();
+            return (client.payrollServiceLocations ?? []).flatMap((location) => {
+                if (location.attestedActualServiceLocation !== true || !isRealIsoDate(location.effectiveFrom)) return [];
+                const address = location.source === "primaryAddress" ? client.primaryAddress : client.secondaryAddress;
+                if (!hasCompleteStructuredAddress(address)) return [];
+                if (location.source === "primaryAddress" && promotedHhaLine2) return [];
+                if (seenServiceLocationSources.has(location.source)) return [];
+                seenServiceLocationSources.add(location.source);
+                return [{ source: location.source, attestedActualServiceLocation: true as const, effectiveFrom: location.effectiveFrom }];
+            }).slice(0, 2);
+        })();
     const parseDate = (dateValue?: string | { _seconds?: number; _nanoseconds?: number } | Date): Date | undefined => {
         if (!dateValue) return undefined;
 
@@ -199,11 +207,17 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
             state: client.primaryAddress?.state,
             postalCode: client.primaryAddress?.postalCode,
             country: client.primaryAddress?.country,
-            payrollServiceLocation,
+            payrollServiceLocations,
             secondaryAddress: client.secondaryAddress?.address || "",
             secondaryLocation: client.secondaryAddress?.location,
             secondaryCountyState: client.secondaryAddress?.countyState || "",
             secondaryZipCode: client.secondaryAddress?.zipCode || "",
+            secondaryLine1: client.secondaryAddress?.line1,
+            secondaryLine2: client.secondaryAddress?.line2,
+            secondaryCity: client.secondaryAddress?.city,
+            secondaryState: client.secondaryAddress?.state,
+            secondaryPostalCode: client.secondaryAddress?.postalCode,
+            secondaryCountry: client.secondaryAddress?.country,
             phone: client.phone || "",
             email: client.email || "",
             language: client.languagePreference,
