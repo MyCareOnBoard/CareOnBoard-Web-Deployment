@@ -1,14 +1,7 @@
-import type { ReactNode } from "react";
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import OverviewCards from "./OverviewCards";
-
-vi.mock("recharts", () => ({
-  ResponsiveContainer: ({ children }: { children: ReactNode }) => <>{children}</>,
-  AreaChart: ({ children }: { children: ReactNode }) => <svg>{children}</svg>,
-  Area: () => null,
-}));
 
 const metric = (value: number, trend: number) => ({
   value,
@@ -37,6 +30,12 @@ describe("OverviewCards", () => {
     const regression = screen.getByLabelText("10% regression");
     expect(regression).toHaveClass("text-[#E5484D]");
     expect(regression.querySelector(".lucide-arrow-down")).not.toBeNull();
+
+    const colorBlocks = screen.getAllByTestId("overview-metric-color-block");
+    expect(colorBlocks).toHaveLength(4);
+    expect(colorBlocks[0]).toHaveClass("opacity-80");
+    expect(colorBlocks[0]).toHaveStyle({ backgroundColor: "#12B5B0" });
+    expect(colorBlocks[2]).toHaveStyle({ backgroundColor: "#E5484D" });
   });
 
   it("renders four shared skeletons", () => {

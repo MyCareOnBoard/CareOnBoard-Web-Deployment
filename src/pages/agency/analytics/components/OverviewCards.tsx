@@ -1,9 +1,3 @@
-import {
-  Area,
-  AreaChart,
-  ResponsiveContainer,
-} from "recharts";
-
 import AnalyticsMetricCard, {
   AnalyticsMetricCardSkeleton,
 } from "@/components/analytics/AnalyticsMetricCard";
@@ -16,7 +10,6 @@ type OverviewCard = {
   trend: number;
   positive: boolean;
   color: string;
-  data: { value: number }[];
 };
 
 interface OverviewCardsProps {
@@ -37,7 +30,6 @@ const FALLBACK_CARDS: OverviewCard[] = [
     trend: 10.5,
     positive: true,
     color: "#12B5B0",
-    data: [{ value: 8 }, { value: 10 }, { value: 16 }, { value: 28 }, { value: 25 }, { value: 24 }, { value: 30 }],
   },
   {
     id: "issues",
@@ -46,7 +38,6 @@ const FALLBACK_CARDS: OverviewCard[] = [
     trend: 2,
     positive: true,
     color: "#12B5B0",
-    data: [{ value: 6 }, { value: 8 }, { value: 12 }, { value: 22 }, { value: 20 }, { value: 19 }, { value: 24 }],
   },
   {
     id: "revenue",
@@ -55,7 +46,6 @@ const FALLBACK_CARDS: OverviewCard[] = [
     trend: -10.5,
     positive: false,
     color: "#E5484D",
-    data: [{ value: 28 }, { value: 24 }, { value: 26 }, { value: 24 }, { value: 14 }, { value: 8 }, { value: 9 }],
   },
   {
     id: "billed",
@@ -64,7 +54,6 @@ const FALLBACK_CARDS: OverviewCard[] = [
     trend: 10.5,
     positive: true,
     color: "#12B5B0",
-    data: [{ value: 8 }, { value: 10 }, { value: 16 }, { value: 28 }, { value: 25 }, { value: 24 }, { value: 30 }],
   },
 ];
 
@@ -87,7 +76,6 @@ function buildCards(data: NonNullable<OverviewCardsProps["data"]>): OverviewCard
     trend: metric.trend,
     positive: metric.trend >= 0,
     color: metric.trend >= 0 ? "#12B5B0" : "#E5484D",
-    data: metric.sparkline,
   });
 
   return [
@@ -98,21 +86,13 @@ function buildCards(data: NonNullable<OverviewCardsProps["data"]>): OverviewCard
   ];
 }
 
-function MiniGraph({ data, color, id }: { data: { value: number }[]; color: string; id: string }) {
+function MetricColorBlock({ color }: { color: string }) {
   return (
-    <div className="h-[52px] w-[92px]">
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data}>
-          <defs>
-            <linearGradient id={`gradient-${id}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={color} stopOpacity={0.18} />
-              <stop offset="100%" stopColor={color} stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <Area type="monotone" dataKey="value" stroke={color} strokeWidth={2.2} fill={`url(#gradient-${id})`} />
-        </AreaChart>
-      </ResponsiveContainer>
-    </div>
+    <div
+      data-testid="overview-metric-color-block"
+      className="h-[52px] w-[92px] opacity-80"
+      style={{ backgroundColor: color }}
+    />
   );
 }
 
@@ -140,7 +120,7 @@ export default function OverviewCards({ data, isLoading }: OverviewCardsProps) {
           trend={card.trend}
           sentiment={card.positive ? "improvement" : "regression"}
           graph={
-            <MiniGraph id={card.id} color={card.color} data={card.data} />
+            <MetricColorBlock color={card.color} />
           }
         />
       ))}
