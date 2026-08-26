@@ -1,6 +1,5 @@
 import { createApi } from "@reduxjs/toolkit/query/react";
 import { customBaseQuery } from "@/lib/baseQuery";
-import { invalidatePayrollData } from "@/pages/agency/billing/shared/billingInvalidation";
 import type { AgencyMode } from "@/store/redux/agencyModeSlice";
 import { operationalAgencyId } from "@/lib/operational-agency/request";
 
@@ -196,14 +195,6 @@ export const billingExpensesApi = createApi({
         billingExpenseTag("ExpensesDashboard", agencyId),
         billingExpenseTag("ExpensesList", agencyId),
       ],
-      async onQueryStarted({ agencyId }, { queryFulfilled }) {
-        try {
-          await queryFulfilled;
-          invalidatePayrollData(agencyId);
-        } catch {
-          // no-op
-        }
-      },
     }),
     deleteExpense: builder.mutation<
       { success: boolean; message: string; data: { id: string } },
@@ -224,14 +215,6 @@ export const billingExpensesApi = createApi({
         billingExpenseTag("ExpensesDashboard", agencyId),
         billingExpenseTag("ExpensesList", agencyId),
       ],
-      async onQueryStarted({ agencyId }, { queryFulfilled }) {
-        try {
-          await queryFulfilled;
-          invalidatePayrollData(agencyId);
-        } catch {
-          // no-op
-        }
-      },
     }),
   }),
 });

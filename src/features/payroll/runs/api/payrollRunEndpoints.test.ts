@@ -19,10 +19,11 @@ const scope = {
 describe("payroll run read transport", () => {
   beforeEach(() => baseQuery.mockReset());
 
-  it("registers all nine authenticated agency read endpoints", () => {
+  it("registers all ten authenticated agency read endpoints", () => {
     expect(Object.keys(payrollRunApi.endpoints)).toEqual(expect.arrayContaining([
       "getCurrentPayrollRun",
       "getCurrentPayrollEmployees",
+      "getUpcomingPayroll",
       "listPayrollRuns",
       "getPayrollRun",
       "listPayrollRunEmployees",
@@ -66,6 +67,16 @@ describe("payroll run read transport", () => {
   });
 
   it("sends fixed limits and only each list route's allowlisted query fields", () => {
+    const upcoming = (payrollRunRequests as typeof payrollRunRequests & {
+      upcoming?: (args: typeof scope & { cursor?: string }) => unknown;
+    }).upcoming;
+    expect(upcoming).toBeTypeOf("function");
+    expect(upcoming?.({ ...scope, cursor: "upcoming-page" })).toEqual({
+      url: "/checkPayrollAgency/payroll/agency/upcoming",
+      method: "GET",
+      requiresAuth: true,
+      params: { limit: 50, cursor: "upcoming-page" },
+    });
     expect(payrollRunRequests.currentEmployees({
       ...scope,
       filter: "blocked",
@@ -123,7 +134,12 @@ describe("payroll run read transport", () => {
   });
 
   it("omits optional list fields instead of sending empty or unauthorized values", () => {
+    const upcoming = (payrollRunRequests as typeof payrollRunRequests & {
+      upcoming?: (args: typeof scope & { cursor?: string }) => { params: unknown };
+    }).upcoming;
+    expect(upcoming).toBeTypeOf("function");
     const requests = [
+      upcoming?.(scope),
       payrollRunRequests.currentEmployees(scope),
       payrollRunRequests.list(scope),
       payrollRunRequests.employees({ ...scope, runId: "run-a", activeRevisionId: "revision-a" }),
@@ -131,7 +147,8 @@ describe("payroll run read transport", () => {
       payrollRunRequests.events({ ...scope, runId: "run-a", activeRevisionId: "revision-a" }),
       payrollRunRequests.obligations(scope),
     ];
-    expect(requests.map(({ params }) => params)).toEqual([
+    expect(requests.map((request) => request?.params)).toEqual([
+      { limit: 50 },
       { limit: 50 },
       { limit: 25 },
       { limit: 50 },
@@ -155,6 +172,15 @@ describe("payroll run read transport", () => {
     expect(payrollRunCacheKeys.employeeDetail({ ...base, employeeId: "employee-a" })).not.toBe(
       payrollRunCacheKeys.employeeDetail({ ...base, employeeId: "employee-b" }),
     );
+  });
+
+  it("keys upcoming pages by trusted scope and opaque cursor", () => {
+    const upcoming = (payrollRunCacheKeys as typeof payrollRunCacheKeys & {
+      upcoming?: (args: typeof scope & { cursor?: string }) => string;
+    }).upcoming;
+    expect(upcoming).toBeTypeOf("function");
+    expect(upcoming?.(scope)).not.toBe(upcoming?.({ ...scope, cursor: "upcoming-page" }));
+    expect(upcoming?.(scope)).not.toBe(upcoming?.({ ...scope, agencyId: "agency-2" }));
   });
 
   it("rejects malformed actionable detail instead of caching server capabilities", async () => {

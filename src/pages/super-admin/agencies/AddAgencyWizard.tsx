@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from "react";
+import React, {useState, useEffect, useRef} from "react";
 import {Button} from "@/components/ui/button";
 import {useToast} from "@/hooks/use-toast";
 import {useNavigate, useLocation} from "react-router";
@@ -368,11 +368,24 @@ export default function AddAgencyWizard() {
     });
 
     const [agreedToTerms, setAgreedToTerms] = useState(false);
+    const editBaselineRef = useRef<AgencyFormData | null>(null);
+
+    const snapshotFormData = (value: AgencyFormData): AgencyFormData => {
+        const snapshot = (entry: any): any => {
+            if (entry instanceof File) return entry;
+            if (Array.isArray(entry)) return entry.map(snapshot);
+            if (entry && typeof entry === "object") {
+                return Object.fromEntries(Object.entries(entry).map(([key, nested]) => [key, snapshot(nested)]));
+            }
+            return entry;
+        };
+        return snapshot(value);
+    };
 
     const setFormDataBasedOnAPIResponse = (
         responseData: GetDraftAgencyResponse
     ) => {
-        setFormData({
+        const hydratedFormData: AgencyFormData = {
             // Step 1: Agency Identity Information
             agencyName: responseData.agencyData?.name || "",
             legalBusinessName: responseData.agencyData?.legalBusinessName || "",
@@ -475,7 +488,9 @@ export default function AddAgencyWizard() {
             auditRetentionPeriodNumber: responseData.agencyData?.auditRetentionPeriodNumber || "",
             planEndDate: responseData.agencyData?.planEndDate || null,
             planStartDate: responseData.agencyData?.planStartDate || "",
-        });
+        };
+        setFormData(hydratedFormData);
+        if (agencyId) editBaselineRef.current = snapshotFormData(hydratedFormData);
         setImagesPreview({
             logo: responseData.agencyData?.logo || "",
             letterHead: responseData.agencyData?.letterhead || "",
@@ -503,6 +518,15 @@ export default function AddAgencyWizard() {
     const handleInputChange = (field: keyof AgencyFormData, value: any) => {
         setFormData((prev) => ({...prev, [field]: value}));
         setFieldsWithErrors((prev) => prev.filter((f) => f !== field));
+    };
+
+    const isEditFieldDirty = (field: keyof AgencyFormData) => {
+        const baseline = editBaselineRef.current;
+        if (baseline === null) return false;
+        const current = formData[field];
+        const initial = baseline[field];
+        if (current instanceof File || initial instanceof File) return current !== initial;
+        return JSON.stringify(current) !== JSON.stringify(initial);
     };
 
     // Upload logo/letterhead files (if newly selected) and return their URLs.
@@ -617,6 +641,184 @@ export default function AddAgencyWizard() {
         userType: UserType.AGENCY,
     });
 
+    const buildSparsePayrollPayload = () => {
+        const values = payrollFormValues();
+        const sparseValues = {
+            ...(isEditFieldDirty("payrollLegalName") ? {legalName: values.legalName} : {}),
+            ...(isEditFieldDirty("payrollEin") ? {ein: values.ein} : {}),
+            ...(isEditFieldDirty("payrollEntityType") ? {entityType: values.entityType} : {}),
+            ...(isEditFieldDirty("payrollIndustry") ? {industry: values.industry} : {}),
+            ...(isEditFieldDirty("payrollLegalAddress") ? {legalAddress: values.legalAddress} : {}),
+            ...(isEditFieldDirty("websiteUrl") ? {website: values.website} : {}),
+            ...(isEditFieldDirty("mainPhone") ? {phone: values.phone} : {}),
+            ...(
+                isEditFieldDirty("payrollOfficeName")
+                || isEditFieldDirty("payrollOfficeAddress")
+                || isEditFieldDirty("payrollActualWorkLocationAttested")
+                    ? {
+                        officeName: values.officeName,
+                        officeAddress: values.officeAddress,
+                        actualWorkLocationAttested: values.actualWorkLocationAttested,
+                    }
+                    : {}
+            ),
+            ...(
+                isEditFieldDirty("payrollContactName")
+                || isEditFieldDirty("payrollContactEmail")
+                || isEditFieldDirty("payrollContactPhone")
+                    ? {
+                        payrollContactName: values.payrollContactName,
+                        payrollContactEmail: values.payrollContactEmail,
+                        payrollContactPhone: values.payrollContactPhone,
+                    }
+                    : {}
+            ),
+            ...(
+                isEditFieldDirty("payrollFrequency")
+                || isEditFieldDirty("payrollFirstPayday")
+                || isEditFieldDirty("payrollSecondPayday")
+                || isEditFieldDirty("payrollFirstPeriodEnd")
+                || isEditFieldDirty("payrollStartDate")
+                    ? {
+                        payFrequency: values.payFrequency,
+                        firstPayday: values.firstPayday,
+                        secondPayday: values.secondPayday,
+                        firstPeriodEnd: values.firstPeriodEnd,
+                        payrollStartDate: values.payrollStartDate,
+                    }
+                    : {}
+            ),
+            ...(isEditFieldDirty("expectedW2Workers") ? {expectedW2Workers: values.expectedW2Workers} : {}),
+        };
+        const payload = buildCheckPayrollProfilePayload(sparseValues);
+        const emissionErrors: Record<string, string> = {};
+        const requireEmitted = (
+            dirty: boolean,
+            payloadField: keyof typeof payload,
+            formField: keyof AgencyFormData,
+            message: string,
+        ) => {
+            if (dirty && !Object.hasOwn(payload, payloadField)) emissionErrors[formField] = message;
+        };
+        requireEmitted(isEditFieldDirty("payrollLegalName"), "legalName", "payrollLegalName", "Enter the agency’s legal business name.");
+        requireEmitted(isEditFieldDirty("payrollEin"), "einChange", "payrollEin", "Enter a nine-digit federal tax ID.");
+        requireEmitted(isEditFieldDirty("payrollEntityType"), "entityType", "payrollEntityType", "Select a supported business structure.");
+        requireEmitted(isEditFieldDirty("payrollIndustry"), "industry", "payrollIndustry", "Select a supported industry.");
+        requireEmitted(isEditFieldDirty("payrollLegalAddress"), "legalAddress", "payrollLegalAddress", "Enter a complete U.S. legal business address.");
+        requireEmitted(isEditFieldDirty("websiteUrl"), "website", "websiteUrl", "Enter an http or https company website.");
+        requireEmitted(isEditFieldDirty("mainPhone"), "phone", "mainPhone", "Enter a valid US ten-digit company phone number.");
+        requireEmitted(
+            isEditFieldDirty("payrollOfficeName")
+            || isEditFieldDirty("payrollOfficeAddress")
+            || isEditFieldDirty("payrollActualWorkLocationAttested"),
+            "officeWorkplace",
+            "payrollOfficeName",
+            "Complete the primary workplace before saving.",
+        );
+        requireEmitted(
+            isEditFieldDirty("payrollContactName")
+            || isEditFieldDirty("payrollContactEmail")
+            || isEditFieldDirty("payrollContactPhone"),
+            "payrollContact",
+            "payrollContactName",
+            "Complete the payroll contact before saving.",
+        );
+        requireEmitted(
+            isEditFieldDirty("payrollFrequency")
+            || isEditFieldDirty("payrollFirstPayday")
+            || isEditFieldDirty("payrollSecondPayday")
+            || isEditFieldDirty("payrollFirstPeriodEnd")
+            || isEditFieldDirty("payrollStartDate"),
+            "paySchedule",
+            "payrollFrequency",
+            "Complete the pay schedule before saving.",
+        );
+        requireEmitted(isEditFieldDirty("expectedW2Workers"), "expectedWorkerCounts", "expectedW2Workers", "Enter a whole number of W-2 employees, 0 or more.");
+        return {payload, values: sparseValues, emissionErrors};
+    };
+
+    const buildSparseAgencyPayload = (branding: { logoUrl?: string; letterheadUrl?: string }) => {
+        const agency: Partial<CreateAgencyWithUserPayloadAgency> = {};
+        if (isEditFieldDirty("agencyName")) agency.name = formData.agencyName;
+        if (isEditFieldDirty("legalBusinessName")) agency.legalBusinessName = formData.legalBusinessName;
+        if (isEditFieldDirty("dba")) agency.dba = formData.dba;
+        if (isEditFieldDirty("agencyType")) agency.agencyType = formData.agencyType;
+        if (isEditFieldDirty("timezone")) agency.timezone = formData.timezone;
+        if (isEditFieldDirty("npi")) agency.npi = formData.npi;
+        if (isEditFieldDirty("providerId")) agency.providerId = formData.providerId;
+        if (isEditFieldDirty("medicaidProviderId")) agency.medicaidProviderId = formData.medicaidProviderId;
+        if (isEditFieldDirty("supportEmail")) agency.email = formData.supportEmail;
+        if (isEditFieldDirty("mainPhone")) agency.phone = toCanonicalUsPayrollPhone(formData.mainPhone) ?? "";
+        if (isEditFieldDirty("primaryAddress")) agency.address = formData.primaryAddress;
+        if (isEditFieldDirty("county_or_state")) agency.state = formData.county_or_state;
+        if (isEditFieldDirty("zipCode")) agency.zipCode = formData.zipCode;
+        if (isEditFieldDirty("websiteUrl")) agency.website = formData.websiteUrl;
+        if (isEditFieldDirty("supportedClientTypes")) agency.supportedClientTypes = formData.supportedClientTypes;
+        if (isEditFieldDirty("services")) agency.services = formData.services;
+        if (isEditFieldDirty("serviceCodeMapping")) agency.serviceCodeMapping = formData.serviceCodeMapping;
+        if (isEditFieldDirty("evvSettings")) agency.evvSettings = formData.evvSettings;
+        if (isEditFieldDirty("schedulingRules")) agency.schedulingRules = formData.schedulingRules;
+        if (isEditFieldDirty("maxShiftPerDay")) agency.maxShiftPerDay = parseInt(formData.maxShiftPerDay);
+        if (isEditFieldDirty("travelTimeRules")) agency.travelTimeRules = formData.travelTimeRules;
+        if (isEditFieldDirty("travelTimeRate")) agency.travelTimeRate = formData.travelTimeRate;
+        if (isEditFieldDirty("mileageSettings")) agency.mileageSettings = formData.mileageSettings;
+        if (isEditFieldDirty("mileageRate")) agency.mileageRate = formData.mileageRate;
+        if (isEditFieldDirty("incidentReportingSettings")) agency.incidentReportingSettings = formData.incidentReportingSettings;
+        if (isEditFieldDirty("whoReceivesNotifications")) agency.whoReceivesNotifications = formData.whoReceivesNotifications;
+        if (isEditFieldDirty("expenseReportSettings")) agency.expenseReportSettings = formData.expenseReportSettings;
+        if (isEditFieldDirty("allowedFileTypes")) agency.allowedFileTypes = formData.allowedFileTypes;
+        if (isEditFieldDirty("allowRecurringSchedules")) agency.allowRecurringSchedules = formData.allowRecurringSchedules;
+        if (isEditFieldDirty("allowOverlappingVisits")) agency.allowOverlappingVisits = formData.allowOverlappingVisits;
+        if (isEditFieldDirty("offerMileageReimbursements")) agency.offerMileageReimbursements = formData.offerMileageReimbursements;
+        if (isEditFieldDirty("realtimeGpsTracking")) agency.realtimeGpsTracking = formData.realtimeGpsTracking;
+        if (isEditFieldDirty("aiNotesReview")) agency.aiNotesReview = formData.aiNotesReview;
+        if (isEditFieldDirty("aiPlanOfCareBuilder")) agency.aiPlanOfCareBuilder = formData.aiPlanOfCareBuilder;
+        if (isEditFieldDirty("aiScheduleOptimizer")) agency.aiScheduleOptimizer = formData.aiScheduleOptimizer;
+        if (isEditFieldDirty("aiDataCleaner")) agency.aiDataCleaner = formData.aiDataCleaner;
+        if (isEditFieldDirty("aiBillingValidator")) agency.aiBillingValidator = formData.aiBillingValidator;
+        if (isEditFieldDirty("requireIds")) agency.requireIds = formData.requireIds;
+        if (isEditFieldDirty("requireSsn")) agency.requireSsn = formData.requireSsn;
+        if (isEditFieldDirty("requireResume")) agency.requireResume = formData.requireResume;
+        if (isEditFieldDirty("requireCertificates")) agency.requireCertificates = formData.requireCertificates;
+        if (isEditFieldDirty("requireTrainings")) agency.requireTrainings = formData.requireTrainings;
+        if (isEditFieldDirty("requireClearances")) agency.requireClearances = formData.requireClearances;
+        if (isEditFieldDirty("expiryRules")) agency.expiryRules = formData.expiryRules;
+        if (isEditFieldDirty("autoReminders")) agency.autoReminders = formData.autoReminders;
+        if (isEditFieldDirty("reminderFrequency")) agency.reminderFrequency = formData.reminderFrequency;
+        if (isEditFieldDirty("whoReceivesReminders")) agency.whoReceivesReminders = formData.whoReceivesReminders;
+        if (isEditFieldDirty("logo") && branding.logoUrl !== undefined) agency.logo = branding.logoUrl;
+        if (isEditFieldDirty("themeColor")) { agency.themeColor = formData.themeColor; agency.primaryColor = formData.themeColor; }
+        if (isEditFieldDirty("letterhead") && branding.letterheadUrl !== undefined) agency.letterhead = branding.letterheadUrl;
+        if (isEditFieldDirty("billingFormat")) agency.billingFormat = formData.billingFormat;
+        if (isEditFieldDirty("dddFormat")) agency.dddFormat = formData.dddFormat;
+        if (isEditFieldDirty("hhaExchangeFormat")) agency.hhaExchangeFormat = formData.hhaExchangeFormat;
+        if (isEditFieldDirty("allowCustomReport")) agency.allowCustomReport = formData.allowCustomReport;
+        if (isEditFieldDirty("invoiceName")) agency.invoiceName = formData.invoiceName;
+        if (isEditFieldDirty("invoiceEmail")) agency.invoiceEmail = formData.invoiceEmail;
+        if (isEditFieldDirty("invoiceFax")) agency.invoiceFax = formData.invoiceFax;
+        if (isEditFieldDirty("payrollSystemIntegration")) agency.payrollSystemIntegration = formData.payrollSystemIntegration;
+        if (isEditFieldDirty("quickBooks")) agency.quickBooks = formData.quickBooks;
+        if (isEditFieldDirty("adp")) agency.adp = formData.adp;
+        if (isEditFieldDirty("paycheck")) agency.paycheck = formData.paycheck;
+        if (isEditFieldDirty("subscriptionTier")) agency.subscriptionTier = formData.subscriptionTier;
+        if (isEditFieldDirty("addOns")) agency.addOns = formData.addOns;
+        if (isEditFieldDirty("permissionTemplates")) agency.permissionTemplates = formData.permissionTemplates;
+        if (isEditFieldDirty("auditRetentionPeriod")) agency.auditRetentionPeriod = formData.auditRetentionPeriod;
+        if (isEditFieldDirty("auditRetentionPeriodNumber")) agency.auditRetentionPeriodNumber = formData.auditRetentionPeriodNumber;
+        if (isEditFieldDirty("planStartDate")) agency.planStartDate = formData.planStartDate;
+        if (isEditFieldDirty("planEndDate")) agency.planEndDate = formData.planEndDate;
+        return agency;
+    };
+
+    const buildSparseUserPayload = (): Partial<CreateAgencyWithUserPayloadUser> | undefined => {
+        const user: Partial<CreateAgencyWithUserPayloadUser> = {};
+        if (isEditFieldDirty("userName")) user.fullName = formData.userName;
+        if (isEditFieldDirty("userEmail")) user.email = formData.userEmail;
+        if (isEditFieldDirty("userPassword")) user.password = formData.userPassword;
+        if (isEditFieldDirty("userPhone")) user.phone = formData.userPhone;
+        return Object.keys(user).length ? user : undefined;
+    };
+
     // Edit mode: persist the current form data to the agency document at any
     // stage. The backend PATCH preserves existing values for fields left blank,
     // so this is a safe partial update (no full-form validation required).
@@ -628,7 +830,11 @@ export default function AddAgencyWizard() {
             toast({ title: "Agency timezone required", description: "Select a valid IANA timezone.", variant: "destructive" });
             return;
         }
-        const payrollErrors = validateCompanySetup(payrollFormValues());
+        const sparsePayroll = buildSparsePayrollPayload();
+        const payrollErrors = {
+            ...validateCompanySetup(sparsePayroll.values),
+            ...sparsePayroll.emissionErrors,
+        };
         if (Object.keys(payrollErrors).length > 0) {
             setCurrentStep(1);
             setFieldsWithErrors(Object.keys(payrollErrors));
@@ -636,14 +842,26 @@ export default function AddAgencyWizard() {
             return;
         }
         try {
-            const { logoUrl, letterheadUrl } = await uploadBrandingAssets();
+            let branding: { logoUrl?: string; letterheadUrl?: string } = {};
+            if (isEditFieldDirty("logo") || isEditFieldDirty("letterhead")) {
+                const uploaded = await uploadBrandingAssets();
+                branding = {
+                    ...(isEditFieldDirty("logo") ? {logoUrl: uploaded.logoUrl} : {}),
+                    ...(isEditFieldDirty("letterhead") ? {letterheadUrl: uploaded.letterheadUrl} : {}),
+                };
+            }
+            const agency = buildSparseAgencyPayload(branding);
+            if (Object.keys(sparsePayroll.payload).length > 0) agency.checkPayrollProfile = sparsePayroll.payload;
+            const sparseUser = buildSparseUserPayload();
+            if (Object.keys(agency).length === 0 && !sparseUser) return;
             await updateAgency({
                 agencyId,
                 data: {
-                    agency: buildAgencyPayload(logoUrl, letterheadUrl),
-                    user: buildUserPayload(),
+                    agency,
+                    ...(sparseUser ? {user: sparseUser} : {}),
                 },
             }).unwrap();
+            editBaselineRef.current = snapshotFormData(formData);
             toast({
                 title: "Changes Saved",
                 description: "Agency information has been updated.",
@@ -715,7 +933,10 @@ export default function AddAgencyWizard() {
     };
 
     const handleNext = () => {
-        const payrollErrors = validateCompanySetup(payrollFormValues());
+        const sparsePayroll = agencyId ? buildSparsePayrollPayload() : null;
+        const payrollErrors = sparsePayroll
+            ? {...validateCompanySetup(sparsePayroll.values), ...sparsePayroll.emissionErrors}
+            : validateCompanySetup(payrollFormValues());
         if (currentStep === 1 && Object.keys(payrollErrors).length > 0) {
             setFieldsWithErrors(Object.keys(payrollErrors));
             toast({ title: "Check payroll prerequisites", description: Object.values(payrollErrors)[0], variant: "destructive" });
@@ -751,6 +972,10 @@ export default function AddAgencyWizard() {
     };
 
     const handleSubmit = async () => {
+        if (agencyId) {
+            await handleSaveEdit();
+            return;
+        }
         const payrollErrors = validateCompanySetup(payrollFormValues());
         if (Object.keys(payrollErrors).length > 0) {
             setCurrentStep(1);

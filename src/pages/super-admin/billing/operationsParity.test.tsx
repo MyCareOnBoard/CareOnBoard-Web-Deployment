@@ -19,7 +19,6 @@ const expenseApi = vi.hoisted(() => ({
 const timesheetApi = vi.hoisted(() => ({
   list: vi.fn(),
   review: vi.fn(),
-  createPayroll: vi.fn(),
 }));
 const ui = vi.hoisted(() => ({ toast: vi.fn() }));
 
@@ -61,7 +60,6 @@ vi.mock("@/lib/api/billing-expenses", () => ({
 vi.mock("@/lib/api/staff-timesheets", () => ({
   listStaffTimesheets: timesheetApi.list,
   reviewStaffTimesheet: timesheetApi.review,
-  createStaffPayrollInvoice: timesheetApi.createPayroll,
   getStaffTimesheetErrorMessage: (error: unknown) =>
     error instanceof Error ? error.message : "Timesheet request failed",
 }));
@@ -258,7 +256,6 @@ describe("super-admin expense and submitted-timesheet parity", () => {
     expenseApi.remove.mockImplementation(() => mutationRequest({ success: true }));
     timesheetApi.list.mockResolvedValue({ timesheets: [pendingTimesheet, approvedTimesheet], total: 2 });
     timesheetApi.review.mockResolvedValue(undefined);
-    timesheetApi.createPayroll.mockResolvedValue({ id: "payroll-1" });
   });
 
   afterEach(() => {
@@ -322,7 +319,7 @@ describe("super-admin expense and submitted-timesheet parity", () => {
     await waitFor(() => expect(expenseApi.remove).toHaveBeenCalledWith({ agencyId: "atlas", expenseId: "expense-1" }));
   });
 
-  it("lists, details, reviews, and creates payroll from submitted timesheets in one operational agency", async () => {
+  it("lists, details, and reviews submitted timesheets in one operational agency", async () => {
     const user = userEvent.setup();
     render(<Scope actor="super_admin"><StaffTimesheetsApprovalPage /></Scope>);
     await waitFor(() => expect(timesheetApi.list).toHaveBeenCalledWith({
@@ -361,19 +358,6 @@ describe("super-admin expense and submitted-timesheet parity", () => {
       signal: expect.any(AbortSignal),
     }));
 
-    await user.click(screen.getAllByRole("button", { name: "Timesheet actions" })[1]);
-    await user.click(await screen.findByRole("menuitem", { name: "View" }));
-    await user.click(await screen.findByRole("button", { name: "Create payroll" }));
-    await waitFor(() => expect(timesheetApi.createPayroll).toHaveBeenCalledWith({
-      context: { agencyId: "atlas" },
-      payload: {
-        staffUid: "staff-2",
-        periodStart: "2026-07-14",
-        periodEnd: "2026-07-27",
-        staffTimesheetIds: ["timesheet-approved"],
-      },
-      signal: expect.any(AbortSignal),
-    }));
   }, 10_000);
 
   it("aborts and clears stale timesheet reads, filters, details, and toasts when agency changes", async () => {

@@ -23,11 +23,8 @@ import {
   parseBillingWorkspace,
   updateBillingWorkspaceDateRange,
   updateBillingWorkspaceMode,
-  updateBillingWorkspacePayrollTab,
-  updateBillingWorkspacePayrollWeek,
   updateBillingWorkspaceScope,
   type BillingProgramMode,
-  type BillingPayrollTab,
   type BillingWorkspaceDateRange,
   type BillingWorkspaceState,
 } from "./billingWorkspaceState";
@@ -149,7 +146,6 @@ function WorkspaceFrame({
   onAgenciesDiscovered,
   onDateRangeChange,
   onModeChange,
-  onPayrollWeekChange,
   onRetry,
   onScopeChange,
   resolvedAgency,
@@ -162,7 +158,6 @@ function WorkspaceFrame({
   onAgenciesDiscovered: (agencies: OperationalAgencySummary[]) => void;
   onDateRangeChange: (range: BillingWorkspaceDateRange) => void;
   onModeChange: (mode: BillingProgramMode | null) => void;
-  onPayrollWeekChange: (weekStart: string) => void;
   onRetry: () => void;
   onScopeChange: (scope: BillingWorkspaceScope) => void;
   resolvedAgency: OperationalAgencySummary | null;
@@ -177,7 +172,6 @@ function WorkspaceFrame({
           onScopeChange={onScopeChange}
           onDateRangeChange={onDateRangeChange}
           onModeChange={onModeChange}
-          onPayrollWeekChange={onPayrollWeekChange}
           initialAgencies={agencies.length ? agencies : undefined}
           onAgenciesDiscovered={onAgenciesDiscovered}
         />
@@ -303,20 +297,12 @@ function AuthorizedBillingWorkspace({
   const onDateRangeChange = (range: BillingWorkspaceDateRange) => {
     navigateWithSearch(updateBillingWorkspaceDateRange(location.search, range));
   };
-  const onPayrollWeekChange = (weekStart: string) => {
-    navigateWithSearch(updateBillingWorkspacePayrollWeek(location.search, weekStart));
-  };
-  const onPayrollTabChange = (tab: BillingPayrollTab) => {
-    navigateWithSearch(updateBillingWorkspacePayrollTab(location.search, tab));
-  };
   const context: ResolvedBillingWorkspaceContextValue & { operationalContextRevision: number } = {
     ...activeWorkspace,
     actorUid,
     environment: apiEnvironment,
     operationalContextRevision,
     onDateRangeChange,
-    onPayrollWeekChange,
-    onPayrollTabChange,
   };
 
   return (
@@ -332,7 +318,6 @@ function AuthorizedBillingWorkspace({
       onScopeChange={(scope) => navigateWithSearch(updateBillingWorkspaceScope(location.search, scope))}
       onDateRangeChange={onDateRangeChange}
       onModeChange={(mode) => navigateWithSearch(updateBillingWorkspaceMode(location.search, mode))}
-      onPayrollWeekChange={onPayrollWeekChange}
     />
   );
 }

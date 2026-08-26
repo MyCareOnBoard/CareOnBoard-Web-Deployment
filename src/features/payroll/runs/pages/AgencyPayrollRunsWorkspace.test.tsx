@@ -16,17 +16,17 @@ const api = vi.hoisted(() => ({
   pageTrigger: vi.fn(),
   detailTrigger: vi.fn(),
   sourceTrigger: vi.fn(),
+  upcomingHook: vi.fn(),
   historyHook: vi.fn(),
   eventsHook: vi.fn(),
   obligationsHook: vi.fn(),
-  legacyHook: vi.fn(),
-  legacyDetailTrigger: vi.fn(),
   approvalDetailTrigger: vi.fn(),
   commandHook: vi.fn(),
   runCommand: vi.fn(),
   createOffCycleRun: vi.fn(),
   currentState: {} as Record<string, unknown>,
   employeesState: {} as Record<string, unknown>,
+  upcomingState: {} as Record<string, unknown>,
 }));
 
 vi.mock("../api/payrollRunEndpoints", () => ({
@@ -35,15 +35,11 @@ vi.mock("../api/payrollRunEndpoints", () => ({
   useLazyListPayrollRunEmployeesQuery: () => [api.pageTrigger, { isFetching: false }],
   useLazyGetPayrollRunEmployeeQuery: () => [api.detailTrigger, { isFetching: false }],
   useLazyListPayrollRunEmployeeSourcesQuery: () => [api.sourceTrigger, { isFetching: false }],
+  useGetUpcomingPayrollQuery: (...args: unknown[]) => api.upcomingHook(...args),
   useListPayrollRunsQuery: (...args: unknown[]) => api.historyHook(...args),
   useListPayrollRunEventsQuery: (...args: unknown[]) => api.eventsHook(...args),
   useListPayrollObligationsQuery: (...args: unknown[]) => api.obligationsHook(...args),
   useLazyGetPayrollRunQuery: () => [api.approvalDetailTrigger, { isFetching: false }],
-}));
-
-vi.mock("../api/legacyPayrollHistoryEndpoints", () => ({
-  useListLegacyPayrollHistoryQuery: (...args: unknown[]) => api.legacyHook(...args),
-  useLazyGetLegacyPayrollInvoiceQuery: () => [api.legacyDetailTrigger, { isFetching: false }],
 }));
 
 vi.mock("../hooks/usePayrollRunCommand", () => ({
@@ -99,9 +95,7 @@ const current = (workflowState: PayrollRun["workflowState"] = "review"): Payroll
   activeRevisionId: "revision-1",
   revisionNumber: 1,
   run: run(workflowState),
-  workspaceMode: "run",
   capabilities: {
-    replacementWorkspace: true,
     commands: {
       refresh_sources: { enabled: true, reasonCode: null },
       add_adjustment: { enabled: true, reasonCode: null },
@@ -156,8 +150,6 @@ const employees = (): CurrentPayrollEmployeePage => ({
   runId: "run-1",
   activeRevisionId: "revision-1",
   revisionNumber: 1,
-  workspaceMode: "run",
-  capabilities: { replacementWorkspace: true },
   items: [employee],
   nextCursor: null,
   hasMore: false,
@@ -170,11 +162,10 @@ describe("AgencyPayrollRunsWorkspace", () => {
     api.pageTrigger.mockReset();
     api.detailTrigger.mockReset();
     api.sourceTrigger.mockReset();
+    api.upcomingHook.mockReset();
     api.historyHook.mockReset();
     api.eventsHook.mockReset();
     api.obligationsHook.mockReset();
-    api.legacyHook.mockReset();
-    api.legacyDetailTrigger.mockReset();
     api.approvalDetailTrigger.mockReset();
     api.commandHook.mockReset();
     api.runCommand.mockReset();
@@ -183,18 +174,53 @@ describe("AgencyPayrollRunsWorkspace", () => {
     const employeeData = employees();
     api.currentState = { data: currentData, currentData, isLoading: false, isFetching: false, refetch: vi.fn() };
     api.employeesState = { data: employeeData, currentData: employeeData, isLoading: false, isFetching: false, refetch: vi.fn() };
+    const upcomingData = {
+      kind: "upcoming" as const,
+      projectionRevision: 8,
+      periodStart: "2026-08-24",
+      periodEnd: "2026-09-06",
+      payday: "2026-09-11",
+      totals: { regularHours: 40, overtimeHours: 4, totalHours: 44, grossEarningsCents: 88_000 },
+      employeeCount: 1,
+      blockerCount: 1,
+      blockerCodes: ["SHIFT_AWAITING_APPROVAL"],
+      sourceCounts: { shift: 2, staff_timesheet: 0 },
+      items: [{
+        employeeId: "upcoming-employee-1",
+        employmentType: "field" as const,
+        displayName: "Alex Morgan",
+        regularHours: 40,
+        overtimeHours: 4,
+        grossEarningsCents: 88_000,
+        sourceCount: 2,
+        sourceCounts: { shift: 2, staff_timesheet: 0 },
+        hasBlockers: true,
+        blockerCodes: ["SHIFT_AWAITING_APPROVAL"],
+      }],
+      nextCursor: null,
+      hasMore: false,
+      asOf: "2026-08-25T12:00:00.000Z",
+    };
+    api.upcomingState = {
+      data: upcomingData,
+      currentData: upcomingData,
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      refetch: vi.fn(),
+    };
     api.currentHook.mockImplementation(() => api.currentState);
     api.employeesHook.mockImplementation(() => api.employeesState);
+    api.upcomingHook.mockImplementation(() => api.upcomingState);
     const emptyPage = { data: { items: [], nextCursor: null, hasMore: false }, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() };
     api.historyHook.mockReturnValue(emptyPage);
     api.eventsHook.mockReturnValue(emptyPage);
     api.obligationsHook.mockReturnValue(emptyPage);
-    api.legacyHook.mockReturnValue(emptyPage);
     api.runCommand.mockResolvedValue({ operationId: "b".repeat(64), command: "refresh_sources", state: "succeeded", pollAfterMs: null });
     api.createOffCycleRun.mockResolvedValue({ operationId: "c".repeat(64), command: "create_off_cycle", state: "succeeded", pollAfterMs: null });
   });
 
-  it("starts only the atomic current pair and defers every detail, history, and legacy request", () => {
+  it("starts only the atomic current pair and defers detail and secondary Check reads", () => {
     render(<AgencyPayrollRunsWorkspace scope={scope} />);
 
     expect(api.currentHook).toHaveBeenCalledWith(scope, { skip: false });
@@ -202,22 +228,32 @@ describe("AgencyPayrollRunsWorkspace", () => {
     expect(api.pageTrigger).not.toHaveBeenCalled();
     expect(api.detailTrigger).not.toHaveBeenCalled();
     expect(api.sourceTrigger).not.toHaveBeenCalled();
+    expect(api.upcomingHook).not.toHaveBeenCalled();
     expect(api.historyHook).not.toHaveBeenCalled();
     expect(api.eventsHook).not.toHaveBeenCalled();
     expect(api.obligationsHook).not.toHaveBeenCalled();
-    expect(api.legacyHook).not.toHaveBeenCalled();
     expect(screen.getByRole("heading", { name: "Current payroll" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Current payroll overview" })).toBeInTheDocument();
+    expect(screen.getByText(/Review current and upcoming pay periods/i)).toBeInTheDocument();
     expect(screen.getAllByText("$130.00")).toHaveLength(2);
     expect(screen.getByText("Refreshing payroll sources…")).toBeInTheDocument();
-    expect(screen.getByText("1 blocker · 1 warning")).toBeInTheDocument();
+    expect(screen.getByText("1 blocking · 1 to review")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Refresh sources" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Approve payroll" })).toBeDisabled();
   });
 
   it("mounts only the selected stable payroll tab and starts its read lazily", async () => {
     const view = render(<AgencyPayrollRunsWorkspace scope={scope} />);
-    const labels = ["Current", "History", "Audit", "Obligations", "Legacy"];
+    const labels = ["Current", "Upcoming", "History", "Audit", "Obligations"];
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(labels);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Upcoming" }));
+    await screen.findByRole("heading", { name: "Upcoming payroll" });
+    expect(api.upcomingHook).toHaveBeenCalledWith(scope, { refetchOnMountOrArgChange: true });
+    expect(screen.getByText("Alex Morgan")).toBeInTheDocument();
+    expect(screen.getAllByText("$880.00")).toHaveLength(2);
+    expect(screen.queryByRole("heading", { name: "Current payroll" })).not.toBeInTheDocument();
+    expect(api.historyHook).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("tab", { name: "History" }));
     await screen.findByRole("heading", { name: "Payroll history" });
@@ -225,7 +261,6 @@ describe("AgencyPayrollRunsWorkspace", () => {
     expect(screen.queryByRole("heading", { name: "Current payroll" })).not.toBeInTheDocument();
     expect(api.eventsHook).not.toHaveBeenCalled();
     expect(api.obligationsHook).not.toHaveBeenCalled();
-    expect(api.legacyHook).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("tab", { name: "Audit" }));
     await screen.findByRole("heading", { name: "Audit timeline" });
@@ -238,16 +273,11 @@ describe("AgencyPayrollRunsWorkspace", () => {
     expect(screen.queryByRole("heading", { name: "Audit timeline" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Create off-cycle payroll" })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("tab", { name: "Legacy" }));
-    await screen.findByRole("heading", { name: "Legacy payroll invoice history" }, { timeout: 5_000 });
-    expect(api.legacyHook).toHaveBeenCalledOnce();
-    expect(api.legacyHook.mock.calls[0]?.[0]).toEqual(expect.objectContaining(scope));
-    expect(screen.queryByRole("heading", { name: "Off-cycle obligations" })).not.toBeInTheDocument();
-
-    api.legacyHook.mockClear();
+    api.obligationsHook.mockClear();
     view.rerender(<AgencyPayrollRunsWorkspace scope={{ ...scope, agencyId: "agency-2" }} />);
     expect(screen.getByRole("tab", { name: "Current" })).toHaveAttribute("aria-selected", "true");
-    expect(api.legacyHook).not.toHaveBeenCalled();
+    expect(api.obligationsHook).not.toHaveBeenCalled();
+    expect(api.upcomingHook).toHaveBeenCalledTimes(1);
   }, 10_000);
 
   it("hides employee-scoped actions and avoids a duplicate refresh after a terminal command", async () => {
@@ -338,8 +368,6 @@ describe("AgencyPayrollRunsWorkspace", () => {
       revisionNumber: null,
       run: null,
       emptyReason: "no_active_period" as const,
-      workspaceMode: "run" as const,
-      capabilities: { replacementWorkspace: true },
     };
     api.currentState = {
       ...api.currentState,
@@ -349,6 +377,7 @@ describe("AgencyPayrollRunsWorkspace", () => {
     api.employeesState = { ...api.employeesState, data: empty, currentData: empty };
     view.rerender(<AgencyPayrollRunsWorkspace scope={scope} />);
     expect(screen.getByText("No active payroll period.")).toBeInTheDocument();
+    expect(screen.getByText(/Check Upcoming for the next scheduled pay period/i)).toBeInTheDocument();
   });
 
   it("reserves geometry while loading and announces localized progress politely", () => {

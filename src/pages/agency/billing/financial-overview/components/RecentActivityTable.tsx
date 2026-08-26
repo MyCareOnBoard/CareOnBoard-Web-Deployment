@@ -47,11 +47,13 @@ function ActivityStatusBadge({ activity }: { activity: RecentActivity }) {
     return (
       <BillingStatusBadge
         domain="payroll"
-        status={activity.status === "paid" ? "paid" : "pending"}
+        status={activity.status === "paid" || activity.status === "partially_paid" || activity.status === "failed"
+          ? activity.status
+          : "pending"}
       />
     );
   }
-  return <BillingStatusBadge domain="claim" status={activity.status} />;
+  return <BillingStatusBadge domain="claim" status={activity.status as "pending" | "paid" | "rejected"} />;
 }
 
 type RecentActivityRowProps = {

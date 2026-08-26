@@ -8,7 +8,6 @@ function projection(): PayrollRunProjection {
   const enabled = { enabled: true as const, reasonCode: null };
   return {
     kind: "run", runId: "run-1", activeRevisionId: "revision-1", revisionNumber: 2,
-    workspaceMode: "run",
     run: {
       runId: "run-1", runType: "regular", periodStart: "2026-08-10", periodEnd: "2026-08-23",
       payday: "2026-08-28", approvalDeadline: "2026-08-27T17:00:00.000Z",
@@ -20,7 +19,7 @@ function projection(): PayrollRunProjection {
       preview: { status: "succeeded", revisionId: "revision-1", hash: "a".repeat(64), observedAt: "2026-08-24T12:00:00.000Z", totals: { grossCents: 10_000, reimbursementsCents: 0, employeeTaxesCents: 1_000, employeeDeductionsCents: 0, employerTaxesCents: 500, employerContributionsCents: 0, netPayCents: 9_000, expectedCashRequirementCents: 10_500 } },
       asOf: "2026-08-24T12:00:00.000Z",
     },
-    capabilities: { replacementWorkspace: true, commands: {
+    capabilities: { commands: {
       refresh_sources: enabled, add_adjustment: enabled, remove_adjustment: enabled,
       defer_employee: enabled, restore_employee: enabled, request_preview: enabled,
       approve_payroll: enabled, reopen_payroll: enabled, refresh_reconciliation: enabled,

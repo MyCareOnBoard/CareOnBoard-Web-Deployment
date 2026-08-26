@@ -100,46 +100,6 @@ export type NetworkBillingClaimRow =
   | NetworkBillingReadyShiftRow
   | NetworkBillingReadyRideRow;
 
-type NetworkBillingPayrollBase = NetworkBillingRowBase & {
-  staffKey: string;
-  staffName?: string | null;
-  grossAmount: number | null;
-  totalHours: number | null;
-  mode: "ddd" | "hha" | null;
-  employeeId?: string | null;
-};
-
-export type NetworkBillingPayrollSavedRow = NetworkBillingPayrollBase & {
-  kind: "payrollInvoice";
-  sourceType?: never;
-  invoiceNumber?: string | null;
-  status?: "pending" | "paid" | null;
-  employeeName?: string | null;
-  periodStart?: NetworkBillingJsonValue;
-  periodEnd?: NetworkBillingJsonValue;
-  shiftCount?: number;
-  createdAt?: NetworkBillingJsonValue;
-  paidAt?: NetworkBillingJsonValue;
-};
-
-export type NetworkBillingPayrollDueRow = NetworkBillingPayrollBase & {
-  kind?: never;
-  sourceType: "shift" | "ride";
-  sourceId: string;
-  totalsExact: boolean;
-};
-
-export type NetworkBillingPayrollRow =
-  | NetworkBillingPayrollSavedRow
-  | NetworkBillingPayrollDueRow;
-
-export type NetworkBillingPayPreview = {
-  billingType: "hourly" | "monthly";
-  billingRate: number;
-  totalHours: number;
-  grossAmount: number;
-};
-
 export type NetworkBillingTimesheetRow = NetworkBillingRowBase & {
   staffKey: string;
   status: "pending" | "approved" | "rejected";
@@ -148,9 +108,8 @@ export type NetworkBillingTimesheetRow = NetworkBillingRowBase & {
   staffName: string | null;
   periodStart: NetworkBillingJsonValue;
   periodEnd: NetworkBillingJsonValue;
-  payrollInvoiceId?: string | null;
+  totalHours: number;
   createdAt?: NetworkBillingJsonValue;
-  payPreview: NetworkBillingPayPreview | null;
 };
 
 export type NetworkBillingExpenseRow = NetworkBillingRowBase & {
@@ -184,34 +143,6 @@ export type NetworkBillingClaimsSummary = {
   rejectionReasons: { total: number; segments: Array<{ reason: string; count: number }> };
   meta: { atRiskDays: number; evaluatedAt: string };
 };
-
-export type NetworkBillingPayrollDueSummary = {
-  overview: {
-    totalDue: { amount: number | null; count: number; exact: boolean };
-    staffCount: { count: number };
-    pendingHours: { hours: number };
-    overtimeHours: { hours: number };
-    missingTimesheets: { count: number };
-  };
-  coverage: {
-    expectedAgencyCount: number;
-    readyAgencyCount: number;
-    pendingAgencyCount: number;
-    staleAgencyCount: number;
-    failedAgencyCount: number;
-  };
-  freshness: { oldestComputedAt: string | null; newestComputedAt: string | null };
-  meta: { evaluatedAt: string; calculationVersion: 1; totalsExact: boolean };
-};
-
-export type NetworkBillingPayrollSavedSummary = {
-  overview: { savedInvoices: { count: number; exact: boolean } };
-  meta: { evaluatedAt: string; totalsExact: boolean };
-};
-
-export type NetworkBillingPayrollSummary =
-  | NetworkBillingPayrollDueSummary
-  | NetworkBillingPayrollSavedSummary;
 
 export type NetworkBillingExpensesSummary = {
   overview: Record<"submitted" | "awaitingReview" | "approved" | "declined", NetworkBillingAmount>;

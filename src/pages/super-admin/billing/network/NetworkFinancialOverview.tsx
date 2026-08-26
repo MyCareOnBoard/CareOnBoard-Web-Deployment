@@ -23,8 +23,7 @@ import FinancialOverviewCards from "@/pages/agency/billing/financial-overview/co
 import RecentActivityTable from "@/pages/agency/billing/financial-overview/components/RecentActivityTable";
 import PayrollSummaryChart from "@/pages/agency/billing/payroll/components/PayrollSummaryChart";
 import type { ClaimsStatusChartData } from "@/pages/agency/billing/claims/utils/claimsDashboardUtils";
-import type { FinancialOverviewStat } from "@/pages/agency/billing/financial-overview/utils/financialOverviewUtils";
-import type { PayrollStatusChartData } from "@/pages/agency/billing/payroll/utils/payrollDashboardUtils";
+import type { FinancialOverviewStat, FinancialPayrollChartData } from "@/pages/agency/billing/financial-overview/utils/financialOverviewUtils";
 import type { RecentActivity } from "@/pages/agency/billing/shared/types";
 import { useBillingWorkspaceContext } from "../BillingWorkspaceContext";
 import type {
@@ -113,7 +112,7 @@ function buildClaimsChart(data: NetworkBillingOverview | undefined): ClaimsStatu
   };
 }
 
-function buildPayrollChart(data: NetworkBillingOverview | undefined): PayrollStatusChartData {
+function buildPayrollChart(data: NetworkBillingOverview | undefined): FinancialPayrollChartData {
   const total = amountCount(data?.current.payroll ?? null);
   const segment = { label: "Payroll", value: total, color: NETWORK_CHART_COLORS.payroll };
   return {
@@ -224,7 +223,6 @@ export default function NetworkFinancialOverview() {
   const [preparationOpen, setPreparationOpen] = useState(false);
   const [preparationError, setPreparationError] = useState<string | null>(null);
   const [prepareNetworkBilling, preparation] = networkBillingApi.usePrepareNetworkBillingMutation();
-  const [startNetworkPayrollRollupBackfill, payrollBackfill] = networkBillingApi.useStartNetworkPayrollRollupBackfillMutation();
   const query = networkBillingApi.useGetOverviewBootstrapQuery({
     actorUid: workspace.actorUid,
     environment: workspace.environment,
@@ -252,18 +250,6 @@ export default function NetworkFinancialOverview() {
       }
       if (!result.ready) {
         setPreparationError("Preparation completed, but some billing records still need attention. Please retry after resolving them.");
-        return;
-      }
-      try {
-        await startNetworkPayrollRollupBackfill({
-          actorUid: workspace.actorUid,
-          environment: workspace.environment,
-          scope: workspace.scope,
-          days: 90,
-          confirmProduction: workspace.environment !== "staging",
-        }).unwrap();
-      } catch {
-        setPreparationError("Preparation succeeded, but scheduling the 90-day payroll rollup backfill failed. Please try again.");
         return;
       }
       setPreparationOpen(false);
@@ -295,20 +281,20 @@ export default function NetworkFinancialOverview() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Prepare network billing?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This one-time action populates the fields required to load aggregate billing data for all authorized agencies, then schedules the 90-day payroll rollup backfill.
+                    This one-time action populates the fields required to load aggregate billing data for all authorized agencies.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 {preparationError && <p role="alert" className="text-sm text-destructive">{preparationError}</p>}
                 <AlertDialogFooter>
-                  <AlertDialogCancel disabled={preparation.isLoading || payrollBackfill.isLoading}>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel disabled={preparation.isLoading}>Cancel</AlertDialogCancel>
                   <AlertDialogAction
-                    disabled={preparation.isLoading || payrollBackfill.isLoading}
+                    disabled={preparation.isLoading}
                     onClick={(event) => {
                       event.preventDefault();
                       void prepareNetwork();
                     }}
                   >
-                    {preparation.isLoading || payrollBackfill.isLoading ? "Preparing data and scheduling payroll…" : "Prepare billing now"}
+                    {preparation.isLoading ? "Preparing billing…" : "Prepare billing now"}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

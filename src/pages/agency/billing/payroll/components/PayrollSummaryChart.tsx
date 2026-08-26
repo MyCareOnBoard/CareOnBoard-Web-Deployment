@@ -1,9 +1,9 @@
 import BillingAiInsightsButton from "../../components/BillingAiInsightsButton";
 import ClaimsDonutChart from "../../claims/components/ClaimsDonutChart";
-import type { PayrollStatusChartData } from "../utils/payrollDashboardUtils";
+import type { FinancialPayrollChartData } from "../../financial-overview/utils/financialOverviewUtils";
 
 type PayrollSummaryChartProps = {
-  chart: PayrollStatusChartData;
+  chart: FinancialPayrollChartData;
   loading?: boolean;
 };
 
@@ -26,7 +26,7 @@ export default function PayrollSummaryChart({ chart, loading = false }: PayrollS
         <ChartSkeleton />
       ) : chart.total === 0 ? (
         <div className="flex min-h-[280px] items-center justify-center px-4 text-center text-[14px] text-[#808081]">
-          No payroll invoices in this date range yet.
+          No payroll runs in this date range yet.
         </div>
       ) : (
         <ClaimsDonutChart

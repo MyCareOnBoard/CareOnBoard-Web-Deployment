@@ -113,6 +113,11 @@ export interface CreateAgencyWithUserPayload {
   user: CreateAgencyWithUserPayloadUser;
 }
 
+export interface UpdateAgencyPayload {
+  agency: Partial<CreateAgencyWithUserPayloadAgency>;
+  user?: Partial<CreateAgencyWithUserPayloadUser>;
+}
+
 export interface SaveAgencyDraftPayload extends CreateAgencyWithUserPayload {
   name: string;
 }
@@ -245,7 +250,7 @@ export const superAdminApi = createApi({
     }),
     updateAgency: builder.mutation<
       void,
-      { agencyId: string, data: CreateAgencyWithUserPayload }
+      { agencyId: string, data: UpdateAgencyPayload }
     >({
       query: ({ agencyId, data }) => ({
         url: `/agencyManagement/agencies/${agencyId}`,

@@ -26,9 +26,8 @@ const runResponse = (revision = "revision-1", number = 1): CurrentPayrollRunResp
   runId: "run-1",
   activeRevisionId: revision,
   revisionNumber: number,
-  workspaceMode: "run",
   run: { runId: "run-1", activeRevisionId: revision, revisionNumber: number },
-  capabilities: { replacementWorkspace: true, commands: {} },
+  capabilities: { commands: {} },
   prerequisites: {},
 } as unknown as CurrentPayrollRunResponse);
 
@@ -37,8 +36,6 @@ const employeePage = (revision = "revision-1", number = 1): CurrentPayrollEmploy
   runId: "run-1",
   activeRevisionId: revision,
   revisionNumber: number,
-  workspaceMode: "run",
-  capabilities: { replacementWorkspace: true },
   items: [],
   nextCursor: null,
   hasMore: false,

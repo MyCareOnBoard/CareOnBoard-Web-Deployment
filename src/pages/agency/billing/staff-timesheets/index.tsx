@@ -11,13 +11,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Check, CornerDownLeft, Loader2, Wallet } from "lucide-react";
+import { Check, CornerDownLeft, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { resolveEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 import {
   listStaffTimesheets,
   reviewStaffTimesheet,
-  createStaffPayrollInvoice,
   getStaffTimesheetErrorMessage,
   type StaffTimesheet,
   type StaffTimesheetStatus,
@@ -184,38 +183,6 @@ export function StaffTimesheetsApprovalContent() {
     }
   }
 
-  async function handleCreatePayroll(t: StaffTimesheet) {
-    const controller = beginMutation();
-    setBusyId(t.id);
-    try {
-      await createStaffPayrollInvoice({
-        context: { agencyId },
-        payload: {
-          staffUid: t.staffUid,
-          periodStart: t.periodStart,
-          periodEnd: t.periodEnd,
-          staffTimesheetIds: [t.id],
-        },
-        signal: controller.signal,
-      });
-      if (controller.signal.aborted) return;
-      toast({
-        title: "Payroll created",
-        description: `Invoice created for ${t.staffName}. Find it in Payroll → Generated.`,
-        variant: "success",
-      });
-      await load();
-    } catch (error) {
-      if (controller.signal.aborted || isAbort(error)) return;
-      toast({ title: "Couldn't create payroll", description: getStaffTimesheetErrorMessage(error), variant: "destructive" });
-    } finally {
-      if (!controller.signal.aborted && mutationControllerRef.current === controller) {
-        setBusyId(null);
-        mutationControllerRef.current = null;
-      }
-    }
-  }
-
   return (
     <div className="min-h-[calc(100vh-200px)] px-4 sm:px-6 lg:px-0">
       <div className="mb-4 sm:mb-6">
@@ -234,7 +201,6 @@ export function StaffTimesheetsApprovalContent() {
           setRejectTarget(timesheet);
           setRejectNotes("");
         }}
-        onCreatePayroll={handleCreatePayroll}
       />
 
       {/* Detail modal */}
@@ -340,18 +306,6 @@ export function StaffTimesheetsApprovalContent() {
                       Approve
                     </Button>
                   </>
-                )}
-                {viewing.status === "approved" && !viewing.payrollInvoiceId && (
-                  <Button
-                    className="gap-1.5 rounded-full bg-[#00b4b8] text-white hover:bg-[#009da1]"
-                    onClick={() => {
-                      handleCreatePayroll(viewing);
-                      setViewing(null);
-                    }}
-                  >
-                    <Wallet className="h-3.5 w-3.5" />
-                    Create payroll
-                  </Button>
                 )}
               </DialogFooter>
             </>

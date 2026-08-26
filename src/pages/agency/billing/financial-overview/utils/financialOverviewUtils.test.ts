@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { ClaimsDashboardSummary } from "@/lib/api/claims";
-import type { PayrollDashboardSummary } from "@/lib/api/payroll";
+import type { PayrollRun } from "@/features/payroll/runs/model/types";
 import {
   assertValidDateRange,
   buildRecentActivity,
   computeTrend,
   getPreviousPeriodRange,
-  mapDashboardToFinancialPayrollChart,
+  mapPayrollRunsToFinancialPayrollChart,
   mapDashboardToOverviewStats,
+  shouldLoadNextPayrollRunPage,
 } from "./financialOverviewUtils";
 
 const sampleClaimsDashboard: ClaimsDashboardSummary = {
@@ -40,23 +41,45 @@ const previousClaimsDashboard: ClaimsDashboardSummary = {
   },
 };
 
-const samplePayrollDashboard: PayrollDashboardSummary = {
-  overview: {
-    totalDue: { count: 2, amount: 900 },
-    hoursPendingApproval: { hours: 12 },
-    overtime: { hours: 4 },
-    missingTimesheet: { count: 1 },
-    upcomingPayout: { date: "2026-05-01" },
-  },
-  payrollByStatus: {
-    total: 4,
-    segments: [
-      { status: "paid", count: 2 },
-      { status: "pending", count: 2 },
-    ],
-  },
-  overtimeAlerts: [{ employeeId: "e1", staffName: "Alex", overtimeHours: "2" }],
-};
+function payrollRun(
+  runId: string,
+  providerStatus: PayrollRun["providerStatus"],
+  overrides: Partial<PayrollRun> = {},
+): PayrollRun {
+  return {
+    runId,
+    runType: "regular",
+    periodStart: "2026-04-28",
+    periodEnd: "2026-05-04",
+    payday: "2026-05-09",
+    approvalDeadline: null,
+    reopenDeadline: null,
+    timezone: "America/New_York",
+    workflowState: "review",
+    providerStatus,
+    projectionRevision: 1,
+    revisionNumber: 1,
+    activeRevisionId: `revision-${runId}`,
+    stale: false,
+    employeeCount: 1,
+    includedCount: 1,
+    deferredCount: 0,
+    zeroDueCount: 0,
+    blockerCount: 0,
+    warningCount: 0,
+    blockerCodes: [],
+    warningCodes: [],
+    totals: {
+      grossEarningsCents: 25_000,
+      reimbursementCents: 0,
+      adjustmentCents: 0,
+      totalDueCents: 25_000,
+    },
+    preview: { status: "none", revisionId: null, hash: null, observedAt: null, totals: null },
+    asOf: "2026-05-04T12:00:00.000Z",
+    ...overrides,
+  };
+}
 
 describe("financialOverviewUtils", () => {
   describe("getPreviousPeriodRange", () => {
@@ -131,21 +154,47 @@ describe("financialOverviewUtils", () => {
     });
   });
 
-  describe("mapDashboardToFinancialPayrollChart", () => {
-    it("includes paid, pending, and overtime segments", () => {
-      const chart = mapDashboardToFinancialPayrollChart(samplePayrollDashboard);
-      expect(chart.total).toBe(5);
-      expect(chart.centerLabel).toBe("Total staff");
-      expect(chart.data).toEqual([
-        { label: "Paid", value: 2, color: "#22c55e" },
-        { label: "Pending", value: 2, color: "#3b82f6" },
-        { label: "Overtime", value: 1, color: "#f97316" },
+  describe("mapPayrollRunsToFinancialPayrollChart", () => {
+    it("classifies every payroll run into one explicit status bucket", () => {
+      const chart = mapPayrollRunsToFinancialPayrollChart([
+        payrollRun("paid", "paid"),
+        payrollRun("partial", "partially_paid"),
+        payrollRun("failed", "failed"),
+        payrollRun("attention", "pending", { workflowState: "needs_attention", blockerCount: 1 }),
+        payrollRun("progress", "processing"),
       ]);
+      expect(chart.total).toBe(5);
+      expect(chart.centerLabel).toBe("Payroll runs");
+      expect(chart.data).toEqual([
+        { label: "Paid", value: 1, color: "#0eaf52" },
+        { label: "Partially paid", value: 1, color: "#3b82f6" },
+        { label: "Failed", value: 1, color: "#dc2626" },
+        { label: "Needs attention", value: 1, color: "#f97316" },
+        { label: "In progress", value: 1, color: "#ffb020" },
+      ]);
+      expect(chart.data.reduce((total, segment) => total + segment.value, 0)).toBe(chart.total);
+    });
+  });
+
+  describe("shouldLoadNextPayrollRunPage", () => {
+    it("continues through cursor pages until the requested start date is crossed", () => {
+      const page = {
+        items: [payrollRun("newer", "paid", { periodEnd: "2026-08-10" })],
+        nextCursor: "page-2",
+        hasMore: true,
+      };
+
+      expect(shouldLoadNextPayrollRunPage(page, "2026-06-01", 1)).toBe(true);
+      expect(shouldLoadNextPayrollRunPage({
+        ...page,
+        items: [payrollRun("older", "paid", { periodEnd: "2026-05-31" })],
+      }, "2026-06-01", 2)).toBe(false);
+      expect(shouldLoadNextPayrollRunPage(page, "2026-06-01", 20)).toBe(false);
     });
   });
 
   describe("buildRecentActivity", () => {
-    it("merges and sorts by paidAt or createdAt", () => {
+    it("merges claims and Check payroll runs by activity date", () => {
       const activity = buildRecentActivity(
         [
           {
@@ -162,29 +211,20 @@ describe("financialOverviewUtils", () => {
             rejectionReason: null,
           },
         ],
-        [
-          {
-            id: "p1",
-            invoiceNumber: "PAY-1",
-            status: "paid",
-            grossAmount: 250,
-            employeeId: "e1",
-            employeeName: "Fred",
-            periodStart: "2026-04-28",
-            periodEnd: "2026-05-04",
-            totalHours: 8,
-            shiftCount: 1,
-            createdAt: "2026-05-02T10:00:00.000Z",
-            paidAt: "2026-05-03T12:00:00.000Z",
-          },
-        ],
+        [payrollRun("p1", "partially_paid", { payday: "2026-05-03", totals: {
+          grossEarningsCents: 25_000,
+          reimbursementCents: 0,
+          adjustmentCents: 0,
+          totalDueCents: 25_000,
+        } })],
         { limit: 20 },
       );
 
       expect(activity).toHaveLength(2);
       expect(activity[0].module).toBe("Payroll");
-      expect(activity[0].status).toBe("paid");
-      expect(activity[0].description).toContain("Fred");
+      expect(activity[0].status).toBe("partially_paid");
+      expect(activity[0].description).toBe("Payroll run partially paid");
+      expect(activity[0].amount).toBe(250);
       expect(activity[1].module).toBe("Claim");
       expect(activity[1].status).toBe("pending");
     });

@@ -1,14 +1,14 @@
 import { format } from "date-fns";
 
-export function buildPayrollInvoiceFilename(name: string, docType = "payroll_invoice") {
+export function buildInvoiceFilename(name: string, docType = "invoice") {
   const safe = name.trim().replace(/\s+/g, "_").replace(/[^\w-]/g, "") || "document";
   return `${safe}_${docType}_${format(new Date(), "yyyy-MM-dd")}.pdf`;
 }
 
-export async function downloadPayrollInvoicePdf(
+export async function downloadInvoicePdf(
   root: HTMLElement,
   name: string,
-  docType = "payroll_invoice",
+  docType = "invoice",
 ) {
   const offscreen = document.createElement("div");
   offscreen.setAttribute("aria-hidden", "true");
@@ -18,9 +18,9 @@ export async function downloadPayrollInvoicePdf(
   clone.style.overflow = "visible";
   clone.style.maxHeight = "none";
 
-  clone.querySelectorAll(".payroll-invoice-no-print").forEach((el) => el.remove());
+  clone.querySelectorAll(".invoice-no-print").forEach((element) => element.remove());
 
-  const scrollBody = clone.querySelector(".payroll-invoice-modal-body") as HTMLElement | null;
+  const scrollBody = clone.querySelector(".invoice-modal-body") as HTMLElement | null;
   if (scrollBody) {
     scrollBody.style.overflow = "visible";
     scrollBody.style.maxHeight = "none";
@@ -55,26 +55,26 @@ export async function downloadPayrollInvoicePdf(
     const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-    const PDF_MARGIN_MM = 10;
-    const imgWidth = pageWidth - PDF_MARGIN_MM * 2;
-    const usableHeight = pageHeight - PDF_MARGIN_MM * 2;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    const margin = 10;
+    const imageWidth = pageWidth - margin * 2;
+    const usableHeight = pageHeight - margin * 2;
+    const imageHeight = (canvas.height * imageWidth) / canvas.width;
     const imageData = canvas.toDataURL("image/jpeg", 0.98);
 
-    let heightLeft = imgHeight;
-    let position = PDF_MARGIN_MM;
+    let heightLeft = imageHeight;
+    let position = margin;
 
-    pdf.addImage(imageData, "JPEG", PDF_MARGIN_MM, position, imgWidth, imgHeight);
+    pdf.addImage(imageData, "JPEG", margin, position, imageWidth, imageHeight);
     heightLeft -= usableHeight;
 
     while (heightLeft > 0) {
       position -= usableHeight;
       pdf.addPage();
-      pdf.addImage(imageData, "JPEG", PDF_MARGIN_MM, position, imgWidth, imgHeight);
+      pdf.addImage(imageData, "JPEG", margin, position, imageWidth, imageHeight);
       heightLeft -= usableHeight;
     }
 
-    pdf.save(buildPayrollInvoiceFilename(name, docType));
+    pdf.save(buildInvoiceFilename(name, docType));
   } finally {
     offscreen.remove();
   }

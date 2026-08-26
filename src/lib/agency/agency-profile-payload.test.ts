@@ -27,10 +27,37 @@ const baseValues: AgencyProfileFormValues = {
   billingFormat: "",
   invoiceName: "",
   invoiceEmail: "",
+  timezone: "",
   ...OPERATIONAL_FORM_DEFAULTS,
 };
 
 describe("buildAgencyProfileUpdatePayload", () => {
+  it("sends only a changed timezone", () => {
+    const payload = buildAgencyProfileUpdatePayload(
+      { ...baseValues, timezone: "America/Chicago" },
+      { timezone: true },
+    );
+
+    expect(payload).toEqual({ timezone: "America/Chicago" });
+  });
+
+  it("does not resend timezone with an unrelated profile change", () => {
+    const payload = buildAgencyProfileUpdatePayload(
+      { ...baseValues, timezone: "America/Chicago", name: "Updated Agency" },
+      { name: true },
+    );
+
+    expect(payload).toEqual({
+      name: "Updated Agency",
+      legalBusinessName: null,
+      dba: null,
+      agencyType: null,
+      npi: null,
+      providerId: null,
+      medicaidProviderId: null,
+    });
+  });
+
   it("includes only identity fields when identity is dirty", () => {
     const payload = buildAgencyProfileUpdatePayload(baseValues, { name: true });
     expect(payload.name).toBe("Test Agency");

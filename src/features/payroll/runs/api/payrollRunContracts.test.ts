@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import * as payrollRunContracts from "./payrollRunContracts";
 import {
   assertPayrollRevisionIdentity,
   parseCurrentPayrollBootstrapPair,
@@ -13,6 +14,49 @@ import {
   parsePayrollRunPage,
   parsePayrollRunProjectionResponse,
 } from "./payrollRunContracts";
+
+type UpcomingParser = (value: unknown) => unknown;
+
+const upcomingParser = (): UpcomingParser => {
+  const parser = (payrollRunContracts as typeof payrollRunContracts & {
+    parseUpcomingPayrollResponse?: UpcomingParser;
+  }).parseUpcomingPayrollResponse;
+  expect(parser).toBeTypeOf("function");
+  return parser as UpcomingParser;
+};
+
+const validUpcomingResponse = () => ({
+  kind: "upcoming",
+  projectionRevision: 4,
+  periodStart: "2026-08-24",
+  periodEnd: "2026-09-06",
+  payday: "2026-09-11",
+  totals: {
+    regularHours: 72,
+    overtimeHours: 4,
+    totalHours: 76,
+    grossEarningsCents: 152_000,
+  },
+  employeeCount: 2,
+  blockerCount: 1,
+  blockerCodes: ["compensation_missing"],
+  sourceCounts: { shift: 8, staff_timesheet: 1 },
+  items: [{
+    employeeId: "employee-a",
+    employmentType: "field",
+    displayName: "Alex Morgan",
+    regularHours: 40,
+    overtimeHours: 4,
+    grossEarningsCents: 88_000,
+    sourceCount: 5,
+    sourceCounts: { shift: 5, staff_timesheet: 0 },
+    hasBlockers: true,
+    blockerCodes: ["compensation_missing"],
+  }],
+  nextCursor: "upcoming-page-2",
+  hasMore: true,
+  asOf: "2026-08-25T12:00:00.000Z",
+});
 
 const disabled = { enabled: false, reasonCode: "capability_disabled" };
 
@@ -69,9 +113,7 @@ function validRunResponse(): Record<string, unknown> {
       },
       asOf: "2026-08-24T12:00:00.000Z",
     },
-    workspaceMode: "run",
     capabilities: {
-      replacementWorkspace: true,
       commands: {
         refresh_sources: { enabled: true, reasonCode: null },
         add_adjustment: disabled,
@@ -106,8 +148,6 @@ function validEmployeePage(): Record<string, unknown> {
     runId: "run-a",
     activeRevisionId: "revision-a",
     revisionNumber: 2,
-    workspaceMode: "run",
-    capabilities: { replacementWorkspace: true },
     items: [{
       employeeId: "employee-a",
       activeRevisionId: "revision-a",
@@ -134,7 +174,7 @@ function validEmployeePage(): Record<string, unknown> {
   };
 }
 
-function validEmpty(workspaceMode: "legacy" | "run" = "legacy"): Record<string, unknown> {
+function validEmpty(): Record<string, unknown> {
   return {
     kind: "empty",
     runId: null,
@@ -142,8 +182,6 @@ function validEmpty(workspaceMode: "legacy" | "run" = "legacy"): Record<string, 
     revisionNumber: null,
     run: null,
     emptyReason: "no_active_period",
-    workspaceMode,
-    capabilities: { replacementWorkspace: workspaceMode === "run" },
   };
 }
 
@@ -163,12 +201,12 @@ describe("current payroll runtime contracts", () => {
     expect(parseCurrentPayrollRunResponse(validRunResponse()).kind).toBe("run");
     expect(parseCurrentPayrollEmployeePage(validEmployeePage()).kind).toBe("run");
     expect(parseCurrentPayrollRunResponse(validEmpty()).kind).toBe("empty");
-    expect(parseCurrentPayrollEmployeePage(validEmpty("run")).kind).toBe("empty");
+    expect(parseCurrentPayrollEmployeePage(validEmpty()).kind).toBe("empty");
   });
 
   it("parses actionable run detail and rejects the current empty union", () => {
     expect(parsePayrollRunProjectionResponse(validRunResponse()).kind).toBe("run");
-    expect(() => parsePayrollRunProjectionResponse(validEmpty("run"))).toThrow();
+    expect(() => parsePayrollRunProjectionResponse(validEmpty())).toThrow();
   });
 
   it.each([
@@ -236,26 +274,9 @@ describe("current payroll runtime contracts", () => {
     expect(() => parseCurrentPayrollEmployeePage({ ...validEmployeePage(), revisionNumber: 0 })).toThrow();
   });
 
-  it("requires workspace mode to match the monotonic replacement capability", () => {
-    expect(() => parseCurrentPayrollRunResponse({
-      ...validEmpty("run"),
-      capabilities: { replacementWorkspace: false },
-    })).toThrow();
-    expect(() => parseCurrentPayrollRunResponse({
-      ...validEmpty("legacy"),
-      capabilities: { replacementWorkspace: true },
-    })).toThrow();
-    expect(() => parseCurrentPayrollEmployeePage({
-      ...validEmployeePage(),
-      workspaceMode: "legacy",
-    })).toThrow();
-  });
-
-  it("requires identical workspace bootstrap values across the current pair", () => {
-    expect(() => parseCurrentPayrollBootstrapPair(validEmpty("legacy"), validEmpty("run"))).toThrow();
-    expect(parseCurrentPayrollBootstrapPair(validEmpty("run"), validEmpty("run"))).toMatchObject({
-      runResponse: { workspaceMode: "run" },
-      employeePage: { workspaceMode: "run" },
+  it("accepts matching empty bootstrap values", () => {
+    expect(parseCurrentPayrollBootstrapPair(validEmpty(), validEmpty())).toMatchObject({
+      runResponse: { kind: "empty" }, employeePage: { kind: "empty" },
     });
   });
 
@@ -275,8 +296,8 @@ describe("current payroll runtime contracts", () => {
   });
 
   it("rejects mixed empty and run identities even when workspace values match", () => {
-    expect(() => parseCurrentPayrollBootstrapPair(validEmpty("run"), validEmployeePage())).toThrow();
-    expect(() => parseCurrentPayrollBootstrapPair(validRunResponse(), validEmpty("run"))).toThrow();
+    expect(() => parseCurrentPayrollBootstrapPair(validEmpty(), validEmployeePage())).toThrow();
+    expect(() => parseCurrentPayrollBootstrapPair(validRunResponse(), validEmpty())).toThrow();
   });
 
   it("requires all server capabilities and prerequisites with closed disabled reasons", () => {
@@ -337,8 +358,6 @@ describe("current payroll runtime contracts", () => {
     });
 
     const employeePage = validEmployeePage();
-    delete employeePage.workspaceMode;
-    delete employeePage.capabilities;
     expect(parsePayrollEmployeePage(employeePage)).toMatchObject({
       runId: "run-a",
       items: [{ employeeId: "employee-a" }],
@@ -429,5 +448,93 @@ describe("current payroll runtime contracts", () => {
       ...obligationPage,
       items: [{ ...obligationPage.items[0], amountCents: 0.5 }],
     })).toThrow();
+  });
+});
+
+describe("upcoming payroll runtime contract", () => {
+  it("accepts the exact bounded upcoming worker page and empty response", () => {
+    const parse = upcomingParser();
+    const upcoming = validUpcomingResponse();
+    const empty = {
+      kind: "empty",
+      projectionRevision: 5,
+      emptyReason: "no_upcoming_period",
+      items: [],
+      nextCursor: null,
+      hasMore: false,
+      asOf: "2026-08-25T12:00:00.000Z",
+    };
+
+    expect(parse(upcoming)).toEqual(upcoming);
+    expect(parse(empty)).toEqual(empty);
+  });
+
+  it("accepts an actionable empty projection when the agency timezone is missing", () => {
+    const parse = upcomingParser();
+    const timezoneRequired = {
+      kind: "empty",
+      projectionRevision: 5,
+      emptyReason: "agency_timezone_required",
+      items: [],
+      nextCursor: null,
+      hasMore: false,
+      asOf: "2026-08-25T12:00:00.000Z",
+    };
+
+    expect(parse(timezoneRequired)).toEqual(timezoneRequired);
+  });
+
+  it("rejects private fields, malformed page state, and unsupported source counts", () => {
+    const parse = upcomingParser();
+    const upcoming = validUpcomingResponse();
+
+    expect(() => parse({ ...upcoming, agencyId: "private-agency" })).toThrow();
+    expect(() => parse({ ...upcoming, hasMore: false })).toThrow();
+    expect(() => parse({
+      ...upcoming,
+      items: [{ ...upcoming.items[0], sourceCounts: { shift: 5, expense: 1 } }],
+    })).toThrow();
+    expect(() => parse({
+      ...upcoming,
+      totals: { ...upcoming.totals, grossEarningsCents: 1520.5 },
+    })).toThrow();
+  });
+
+  it("rejects internally inconsistent upcoming projections", () => {
+    const parse = upcomingParser();
+    const upcoming = validUpcomingResponse();
+
+    expect(() => parse({ ...upcoming, periodEnd: "2026-08-23" })).toThrow();
+    expect(() => parse({
+      ...upcoming,
+      totals: { ...upcoming.totals, totalHours: 75 },
+    })).toThrow();
+    expect(() => parse({
+      ...upcoming,
+      items: [{ ...upcoming.items[0], sourceCount: 4 }],
+    })).toThrow();
+    expect(() => parse({
+      ...upcoming,
+      items: [{ ...upcoming.items[0], hasBlockers: false }],
+    })).toThrow();
+    expect(() => parse({
+      ...upcoming,
+      items: [upcoming.items[0], { ...upcoming.items[0] }],
+    })).toThrow();
+    expect(() => parse({ ...upcoming, employeeCount: 0 })).toThrow();
+  });
+
+  it("accepts a run-level blocker when no displayed worker is blocked", () => {
+    const parse = upcomingParser();
+    const upcoming = validUpcomingResponse();
+    upcoming.blockerCount = 0;
+    upcoming.blockerCodes = ["source_blocker_scan_incomplete"];
+    upcoming.items = upcoming.items.map((employee) => ({
+      ...employee,
+      hasBlockers: false,
+      blockerCodes: [],
+    }));
+
+    expect(parse(upcoming)).toEqual(upcoming);
   });
 });

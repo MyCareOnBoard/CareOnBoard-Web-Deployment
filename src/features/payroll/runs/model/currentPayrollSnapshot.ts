@@ -2,7 +2,6 @@ import type {
   CurrentPayrollEmployeePage,
   CurrentPayrollRunResponse,
   PayrollRunIdentity,
-  PayrollWorkspaceMode,
 } from "./types";
 
 export type PayrollSnapshotFreshness = "loading" | "fresh" | "stale" | "unavailable";
@@ -12,7 +11,6 @@ export type AcceptedPayrollSnapshot = {
   runResponse: CurrentPayrollRunResponse | null;
   employeePage: CurrentPayrollEmployeePage | null;
   identity: PayrollRunIdentity | null;
-  workspaceMode: PayrollWorkspaceMode | null;
   freshness: PayrollSnapshotFreshness;
   commandsEnabled: boolean;
   mismatchIdentity: string | null;
@@ -44,16 +42,9 @@ function matchingPair(
   employeePage: CurrentPayrollEmployeePage,
 ): boolean {
   if (runResponse.kind !== employeePage.kind) return false;
-  if (runResponse.kind === "empty" && employeePage.kind === "empty") {
-    return runResponse.workspaceMode === employeePage.workspaceMode
-      && runResponse.capabilities.replacementWorkspace
-        === employeePage.capabilities.replacementWorkspace;
-  }
+  if (runResponse.kind === "empty" && employeePage.kind === "empty") return true;
   if (runResponse.kind !== "run" || employeePage.kind !== "run") return false;
-  return runResponse.workspaceMode === employeePage.workspaceMode
-    && runResponse.capabilities.replacementWorkspace
-      === employeePage.capabilities.replacementWorkspace
-    && runResponse.runId === employeePage.runId
+  return runResponse.runId === employeePage.runId
     && runResponse.activeRevisionId === employeePage.activeRevisionId
     && runResponse.revisionNumber === employeePage.revisionNumber;
 }
@@ -64,7 +55,7 @@ function pairKey(
 ): string {
   const identity = (value: CurrentPayrollRunResponse | CurrentPayrollEmployeePage | undefined) => (
     value
-      ? [value.kind, value.runId, value.activeRevisionId, value.revisionNumber, value.workspaceMode]
+      ? [value.kind, value.runId, value.activeRevisionId, value.revisionNumber]
       : null
   );
   return JSON.stringify([identity(runResponse), identity(employeePage)]);
@@ -76,7 +67,6 @@ function blank(scopeKey: string, freshness: "loading" | "unavailable", mismatchI
     runResponse: null,
     employeePage: null,
     identity: null,
-    workspaceMode: null,
     freshness,
     commandsEnabled: false,
     mismatchIdentity,
@@ -119,7 +109,6 @@ export function acceptCurrentPayrollSnapshot(
     runResponse: args.runResponse,
     employeePage: args.employeePage,
     identity,
-    workspaceMode: args.runResponse.workspaceMode,
     freshness: "fresh",
     commandsEnabled: args.runResponse.kind === "run",
     mismatchIdentity: null,

@@ -74,6 +74,7 @@ export type AgencyProfileFormValues = {
   billingFormat: string;
   invoiceName: string;
   invoiceEmail: string;
+  timezone: string;
 } & OperationalFormSlice;
 
 type DirtyFields = Partial<Record<keyof AgencyProfileFormValues, boolean | boolean[]>>;
@@ -154,6 +155,10 @@ export function buildAgencyProfileUpdatePayload(
     payload.state = nullable(values.state);
     payload.zipCode = nullable(values.zipCode);
     payload.website = nullable(values.website);
+  }
+
+  if (isFieldDirty(dirtyFields, "timezone")) {
+    payload.timezone = trim(values.timezone);
   }
 
   if (hasAnyDirty(dirtyFields, BRANDING_KEYS)) {

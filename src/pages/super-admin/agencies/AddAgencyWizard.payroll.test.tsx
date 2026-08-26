@@ -72,9 +72,12 @@ vi.mock("@/pages/super-admin/agencies/components/StepOne", async () => {
     </div>,
   };
 });
-vi.mock("@/pages/super-admin/agencies/components/StepTwo", () => ({ default: ({ onChange }: any) => <button type="button" onClick={() => {
-  Object.entries({ userName: "Agency Owner", userPhone: "+15125550125", userEmail: "owner@able.example", userPassword: "StrongPass1!", supportedClientTypes: ["ddd"], services: ["S5125"] }).forEach(([key, value]) => onChange(key, value));
-}}>Fill leadership</button> }));
+vi.mock("@/pages/super-admin/agencies/components/StepTwo", () => ({ default: ({ onChange }: any) => <div>
+  <button type="button" onClick={() => {
+    Object.entries({ userName: "Agency Owner", userPhone: "+15125550125", userEmail: "owner@able.example", userPassword: "StrongPass1!", supportedClientTypes: ["ddd"], services: ["S5125"] }).forEach(([key, value]) => onChange(key, value));
+  }}>Fill leadership</button>
+  <button type="button" onClick={() => onChange("userName", "Updated Owner")}>Change leadership name</button>
+</div> }));
 vi.mock("@/pages/super-admin/agencies/components/StepThree", () => ({ default: ({ onChange }: any) => <button type="button" onClick={() => { onChange("travelTimeRules", "Paid"); onChange("allowedFileTypes", ["pdf"]); }}>Fill operations</button> }));
 vi.mock("@/pages/super-admin/agencies/components/StepFour", () => ({ default: () => <p>AI settings</p> }));
 vi.mock("@/pages/super-admin/agencies/components/StepFive", () => ({ default: ({ onChange }: any) => <button type="button" onClick={() => onChange("logo", new File(["logo"], "logo.png", { type: "image/png" }))}>Fill branding</button> }));
@@ -232,14 +235,18 @@ describe("AddAgencyWizard payroll endpoint payloads", () => {
     expect(JSON.stringify(mocks.draft.mock.calls[0][0])).not.toMatch(/einStatus|designatedSignerUserUid|payrollSchedule|nextPayoutDate|last4/);
   }, 15_000);
 
-  it("hydrates an EIN status and sends preserve through the edit endpoint without exposing last4", async () => {
+  it("sends exactly the changed timezone after hydration and skips unrelated payroll validation", async () => {
     mocks.search = "?agencyId=agency-1";
     mocks.currentAgency = {
       agencyData: {
         name: "Able Care",
         email: "hello@able.example",
         timezone: "America/Denver",
-        checkPayrollProfile: { legalName: "Able Care LLC", einStatus: { present: true, last4: "6789" } },
+        checkPayrollProfile: {
+          legalName: "Able Care LLC",
+          einStatus: { present: true, last4: "6789" },
+          payrollContact: { name: "Payroll Contact", email: "payroll@able.example", phone: "+441234567890" },
+        },
       },
       user: { fullName: "Agency Owner", email: "owner@able.example", phone: "+15125550125", userType: "agency" },
     };
@@ -250,14 +257,135 @@ describe("AddAgencyWizard payroll endpoint payloads", () => {
     expect(screen.getByRole("combobox", { name: "Agency timezone" })).toHaveValue("America/Denver");
     expect(screen.getByLabelText("EIN")).toHaveValue("");
     expect(screen.queryByText("6789")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole("combobox", { name: "Agency timezone" }), { target: { value: "America/New_York" } });
     await user.click(screen.getByRole("button", { name: "Save Changes" }));
 
     await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
-    expect(mocks.update.mock.calls[0][0]).toMatchObject({
+    expect(mocks.update.mock.calls[0][0]).toEqual({
       agencyId: "agency-1",
-      data: { agency: { timezone: "America/Denver", checkPayrollProfile: { legalName: "Able Care LLC", einChange: { mode: "preserve" } } } },
+      data: { agency: { timezone: "America/New_York" } },
     });
+    expect(mocks.upload).not.toHaveBeenCalled();
     expect(JSON.stringify(mocks.update.mock.calls[0][0])).not.toMatch(/einStatus|designatedSignerUserUid|payrollSchedule|nextPayoutDate|last4/);
+  }, 15_000);
+
+  it("omits a field that is changed and then restored to its hydrated value", async () => {
+    mocks.search = "?agencyId=agency-1";
+    mocks.currentAgency = {
+      agencyData: { name: "Able Care", email: "hello@able.example", timezone: "America/Denver", checkPayrollProfile: {} },
+      user: { fullName: "Agency Owner", email: "owner@able.example", phone: "+15125550125", userType: "agency" },
+    };
+    const user = userEvent.setup();
+    render(<AddAgencyWizard />);
+
+    const agencyName = await screen.findByLabelText("Agency Name");
+    await user.clear(agencyName);
+    await user.type(agencyName, "Renamed Care");
+    await user.clear(agencyName);
+    await user.type(agencyName, "Able Care");
+    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
+  it("sends a changed agency identity field without unrelated agency, user, or payroll fields", async () => {
+    mocks.search = "?agencyId=agency-1";
+    mocks.currentAgency = {
+      agencyData: { name: "Able Care", email: "hello@able.example", timezone: "America/Denver", checkPayrollProfile: {} },
+      user: { fullName: "Agency Owner", email: "owner@able.example", phone: "+15125550125", userType: "agency" },
+    };
+    const user = userEvent.setup();
+    render(<AddAgencyWizard />);
+
+    const agencyName = await screen.findByLabelText("Agency Name");
+    await user.clear(agencyName);
+    await user.type(agencyName, "Renamed Care");
+    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
+    expect(mocks.update.mock.calls[0][0]).toEqual({
+      agencyId: "agency-1",
+      data: { agency: { name: "Renamed Care" } },
+    });
+  });
+
+  it("sends only the changed leadership field in the optional user payload", async () => {
+    mocks.search = "?agencyId=agency-1";
+    mocks.currentAgency = {
+      agencyData: {
+        name: "Able Care", agencyType: "provider", email: "hello@able.example", timezone: "America/Denver",
+        address: "100 Agency Way", state: "TX", zipCode: "78701", phone: "+15125550123", checkPayrollProfile: {},
+      },
+      user: { fullName: "Agency Owner", email: "owner@able.example", phone: "+15125550125", userType: "agency" },
+    };
+    const user = userEvent.setup();
+    render(<AddAgencyWizard />);
+
+    await screen.findByLabelText("Agency Name");
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Change leadership name" }));
+    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
+    expect(mocks.update.mock.calls[0][0]).toEqual({
+      agencyId: "agency-1",
+      data: { agency: {}, user: {fullName: "Updated Owner"} },
+    });
+  });
+
+  it("sends only the changed payroll top-level field without resending locked profile data", async () => {
+    mocks.search = "?agencyId=agency-1";
+    mocks.currentAgency = {
+      agencyData: {
+        name: "Able Care", email: "hello@able.example", timezone: "America/Denver",
+        checkPayrollProfile: {
+          legalName: "Able Care LLC", einStatus: {present: true, last4: "6789"}, entityType: "llc",
+          payrollContact: {name: "Payroll Contact", email: "payroll@able.example", phone: "+15125550124"},
+        },
+      },
+      user: { fullName: "Agency Owner", email: "owner@able.example", phone: "+15125550125", userType: "agency" },
+    };
+    const user = userEvent.setup();
+    render(<AddAgencyWizard />);
+
+    const legalName = await screen.findByLabelText("Legal name");
+    await user.clear(legalName);
+    await user.type(legalName, "Renamed Care LLC");
+    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
+    expect(mocks.update.mock.calls[0][0]).toEqual({
+      agencyId: "agency-1",
+      data: {agency: {checkPayrollProfile: {legalName: "Renamed Care LLC"}}},
+    });
+    expect(JSON.stringify(mocks.update.mock.calls[0][0])).not.toMatch(/einStatus|last4|entityType|payrollContact/);
+  });
+
+  it("rejects a cleared payroll legal name before saving another agency change", async () => {
+    mocks.search = "?agencyId=agency-1";
+    mocks.currentAgency = {
+      agencyData: {
+        name: "Able Care", email: "hello@able.example", timezone: "America/Denver",
+        checkPayrollProfile: { legalName: "Able Care LLC" },
+      },
+      user: { fullName: "Agency Owner", email: "owner@able.example", phone: "+15125550125", userType: "agency" },
+    };
+    const user = userEvent.setup();
+    render(<AddAgencyWizard />);
+
+    const legalName = await screen.findByLabelText("Legal name");
+    await user.clear(legalName);
+    const agencyName = screen.getByLabelText("Agency Name");
+    await user.clear(agencyName);
+    await user.type(agencyName, "Renamed Care");
+    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.toast).toHaveBeenCalledWith({
+      title: "Check payroll prerequisites",
+      description: "Enter the agency’s legal business name.",
+      variant: "destructive",
+    });
   }, 15_000);
 
   it("hydrates canonical payroll phones into fixed-prefix ten-digit controls", async () => {

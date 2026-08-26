@@ -11,9 +11,9 @@ vi.mock("@/lib/operational-agency/OperationalAgencyProvider", () => ({
   OperationalAgencyProvider: () => <div data-testid="legacy-provider">Legacy provider</div>,
   useOperationalAgency: () => ({ agencyId: "agency-1" }),
 }));
-vi.mock("@/features/payroll/runs/pages/PayrollWorkspaceCutoverBoundary", () => ({
-  PayrollWorkspaceCutoverBoundary: ({ scope }: { scope: { actorUid: string; agencyId: string } }) => (
-    <div data-testid="payroll-cutover-scope">{scope.actorUid}:{scope.agencyId}</div>
+vi.mock("@/features/payroll/runs/pages/AgencyPayrollWorkspaceBoundary", () => ({
+  AgencyPayrollWorkspaceBoundary: ({ scope }: { scope: { actorUid: string; agencyId: string } }) => (
+    <div data-testid="payroll-workspace-scope">{scope.actorUid}:{scope.agencyId}</div>
   ),
 }));
 
@@ -27,9 +27,9 @@ describe("agency payroll route adapter", () => {
     };
   });
 
-  it("passes the authenticated agency scope to the cutover bootstrap", () => {
+  it("passes the authenticated agency scope to the payroll workspace", () => {
     render(<AgencyPayrollDashboardPage />);
-    expect(screen.getByTestId("payroll-cutover-scope")).toHaveTextContent("actor-1:agency-1");
+    expect(screen.getByTestId("payroll-workspace-scope")).toHaveTextContent("actor-1:agency-1");
     expect(screen.queryByTestId("legacy-provider")).not.toBeInTheDocument();
   });
 
@@ -37,6 +37,6 @@ describe("agency payroll route adapter", () => {
     auth.user = { uid: "actor-1" };
     render(<AgencyPayrollDashboardPage />);
     expect(screen.getByRole("alert")).toHaveTextContent("Sign in again to manage payroll.");
-    expect(screen.queryByTestId("payroll-cutover-scope")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("payroll-workspace-scope")).not.toBeInTheDocument();
   });
 });

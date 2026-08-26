@@ -176,7 +176,6 @@ export default function NetworkExpenses() {
     dispatch(networkBillingApi.util.invalidateTags([
       { type: "Expenses", id: "NETWORK" },
       { type: "Overview", id: "NETWORK" },
-      { type: "Payroll", id: "NETWORK" },
       { type: "NETWORK", id: agencyId },
     ]));
   }

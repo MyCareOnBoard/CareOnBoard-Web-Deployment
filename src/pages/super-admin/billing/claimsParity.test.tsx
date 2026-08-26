@@ -143,8 +143,8 @@ vi.mock("@/components/modals/DeleteConfirmationModal", () => ({
     ? <button type="button" onClick={onConfirm}>Confirm invoice cancellation</button>
     : null,
 }));
-vi.mock("@/pages/agency/billing/payroll/utils/payrollInvoicePrintUtils", () => ({
-  downloadPayrollInvoicePdf: vi.fn(),
+vi.mock("@/pages/agency/billing/shared/invoicePrint", () => ({
+  downloadInvoicePdf: vi.fn(),
 }));
 
 import ClaimsDashboardPage from "@/pages/agency/billing/claims";

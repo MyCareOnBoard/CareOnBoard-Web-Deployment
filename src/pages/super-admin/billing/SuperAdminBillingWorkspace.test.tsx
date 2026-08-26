@@ -21,8 +21,13 @@ import { Routes } from "@/routes/constants";
 const billingApi = vi.hoisted(() => ({
   getClaimsDashboard: vi.fn(),
   listBillingClaims: vi.fn(),
-  getPayrollDashboard: vi.fn(),
-  listPayrollInvoices: vi.fn(),
+}));
+const payrollRunsApi = vi.hoisted(() => ({
+  current: vi.fn(),
+  history: vi.fn(),
+  lazy: vi.fn(),
+  refetchCurrent: vi.fn(),
+  refetchHistory: vi.fn(),
 }));
 const operationsApi = vi.hoisted(() => ({
   getOperationalAgencyContext: vi.fn(),
@@ -40,7 +45,6 @@ const networkBilling = vi.hoisted(() => ({
   expensesBootstrap: vi.fn(),
   expensesPage: vi.fn(),
   prepare: vi.fn(),
-  backfill: vi.fn(),
   refetch: vi.fn(),
 }));
 const unfinishedClaimsPage = vi.hoisted(() => vi.fn());
@@ -50,9 +54,10 @@ vi.mock("@/lib/api/claims", () => ({
   getClaimsDashboard: billingApi.getClaimsDashboard,
   listBillingClaims: billingApi.listBillingClaims,
 }));
-vi.mock("@/lib/api/payroll", () => ({
-  getPayrollDashboard: billingApi.getPayrollDashboard,
-  listPayrollInvoices: billingApi.listPayrollInvoices,
+vi.mock("@/features/payroll/runs/api/payrollRunEndpoints", () => ({
+  useGetCurrentPayrollRunQuery: payrollRunsApi.current,
+  useListPayrollRunsQuery: payrollRunsApi.history,
+  useLazyListPayrollRunsQuery: () => [payrollRunsApi.lazy],
 }));
 vi.mock("@/hooks/useEffectiveAgencyMode", async () => ({
   ...(await vi.importActual<typeof import("@/hooks/useEffectiveAgencyMode")>("@/hooks/useEffectiveAgencyMode")),
@@ -90,7 +95,6 @@ vi.mock("@/lib/api/network-billing", () => ({
     useGetExpensesBootstrapQuery: networkBilling.expensesBootstrap,
     useLazyGetExpensesPageQuery: networkBilling.expensesPage,
     usePrepareNetworkBillingMutation: () => [networkBilling.prepare, { isLoading: false }],
-    useStartNetworkPayrollRollupBackfillMutation: () => [networkBilling.backfill, { isLoading: false }],
     util: { invalidateTags: vi.fn() },
   },
 }));
@@ -162,18 +166,6 @@ const claimsDashboard = {
   rejectionReasons: { total: 0, segments: [] },
 };
 
-const payrollDashboard = {
-  overview: {
-    totalDue: { count: 0, amount: 0 },
-    hoursPendingApproval: { hours: 0 },
-    overtime: { hours: 0 },
-    missingTimesheet: { count: 0 },
-    upcomingPayout: { date: null },
-  },
-  payrollByStatus: { total: 0, segments: [] },
-  overtimeAlerts: [],
-};
-
 function FinancialProbe() {
   const overview = useFinancialOverview({ startDate: "2026-07-01", endDate: "2026-07-07" });
   return (
@@ -227,9 +219,9 @@ describe("shared financial overview context", () => {
       (_feature: string, agencyId: string) => Promise.resolve(agencyId === "beacon" ? beacon : atlas),
     );
     billingApi.getClaimsDashboard.mockResolvedValue(claimsDashboard);
-    billingApi.getPayrollDashboard.mockResolvedValue(payrollDashboard);
     billingApi.listBillingClaims.mockResolvedValue({ claims: [], total: 0 });
-    billingApi.listPayrollInvoices.mockResolvedValue({ invoices: [], total: 0 });
+    payrollRunsApi.current.mockReturnValue({ data: { kind: "empty" }, isLoading: false, refetch: payrollRunsApi.refetchCurrent });
+    payrollRunsApi.history.mockReturnValue({ data: { items: [], hasMore: false, nextCursor: null }, isLoading: false, refetch: payrollRunsApi.refetchHistory });
   });
 
   it("defines all planned billing URLs before mounting later billing pages", () => {
@@ -257,9 +249,9 @@ describe("shared financial overview context", () => {
 
     vi.clearAllMocks();
     billingApi.getClaimsDashboard.mockResolvedValue(claimsDashboard);
-    billingApi.getPayrollDashboard.mockResolvedValue(payrollDashboard);
     billingApi.listBillingClaims.mockResolvedValue({ claims: [], total: 0 });
-    billingApi.listPayrollInvoices.mockResolvedValue({ invoices: [], total: 0 });
+    payrollRunsApi.current.mockReturnValue({ data: { kind: "empty" }, isLoading: false, refetch: payrollRunsApi.refetchCurrent });
+    payrollRunsApi.history.mockReturnValue({ data: { items: [], hasMore: false, nextCursor: null }, isLoading: false, refetch: payrollRunsApi.refetchHistory });
 
     renderFinancialOverview("super_admin");
     await waitFor(() => expect(screen.getByLabelText("Total revenue")).toHaveTextContent("$200.00"));
@@ -272,9 +264,15 @@ describe("shared financial overview context", () => {
     }));
     expect(superAdminCurrentRequest.context).toEqual(agencyCurrentRequest.context);
     expect(superAdminCurrentRequest.query).toEqual(agencyCurrentRequest.query);
-    expect(billingApi.getPayrollDashboard).toHaveBeenCalledTimes(1);
     expect(billingApi.listBillingClaims).toHaveBeenCalledTimes(1);
-    expect(billingApi.listPayrollInvoices).toHaveBeenCalledTimes(1);
+    expect(payrollRunsApi.current).toHaveBeenCalledWith(
+      { audience: "agency", actorUid: "super-1", agencyId: "atlas" },
+      { skip: false },
+    );
+    expect(payrollRunsApi.history).toHaveBeenCalledWith(
+      { audience: "agency", actorUid: "super-1", agencyId: "atlas" },
+      { skip: false },
+    );
   });
 
   it("clears prior metrics and aborts stale overview requests when the provider agency changes", async () => {
@@ -360,11 +358,7 @@ function BillingWorkspaceProbe() {
       <output aria-label="Billing operational context revision">{operationalContextRevision ?? 0}</output>
       <output aria-label="Billing workspace dates">{`${workspace.startDate}:${workspace.endDate}`}</output>
       <output aria-label="Billing workspace mode">{workspace.mode ?? "all"}</output>
-      <output aria-label="Billing payroll week">{workspace.payrollWeekStart}</output>
-      <output aria-label="Billing payroll tab">{workspace.payrollTab}</output>
       <output aria-label="Billing location">{`${location.pathname}${location.search}`}</output>
-      <button type="button" onClick={() => workspace.onPayrollWeekChange?.("2026-08-03")}>Change payroll week</button>
-      <button type="button" onClick={() => workspace.onPayrollTabChange?.("saved")}>Show saved payroll</button>
     </div>
   );
 }
@@ -505,6 +499,8 @@ describe("SuperAdminBillingWorkspace", () => {
       refetch: networkBilling.refetch,
     });
     networkBilling.expensesPage.mockReturnValue([vi.fn(), { isFetching: false }]);
+    payrollRunsApi.current.mockReturnValue({ data: { kind: "empty" }, isLoading: false, refetch: payrollRunsApi.refetchCurrent });
+    payrollRunsApi.history.mockReturnValue({ data: { items: [], hasMore: false, nextCursor: null }, isLoading: false, refetch: payrollRunsApi.refetchHistory });
   });
 
   it("fails closed before loading agencies or mounting content without Billing Management", () => {
@@ -569,28 +565,6 @@ describe("SuperAdminBillingWorkspace", () => {
     expect(operationsApi.getOperationalAgencyContext).not.toHaveBeenCalled();
   });
 
-  it("canonicalizes network payroll week state and keeps it independent from the billing date range", async () => {
-    const user = userEvent.setup();
-    renderWorkspace(
-      "/super-admin/billing/payroll-management?scope=network&startDate=2026-07-01&endDate=2026-08-02&payrollWeekStart=2026-07-29&payrollTab=invalid",
-    );
-
-    expect(await screen.findByLabelText("Billing payroll week")).toHaveTextContent("2026-07-27");
-    expect(screen.getByLabelText("Billing payroll tab")).toHaveTextContent("due");
-    expect(screen.getByLabelText("Billing workspace dates")).toHaveTextContent("2026-07-01:2026-08-02");
-
-    await user.click(screen.getByRole("button", { name: "Change payroll week" }));
-    await user.click(screen.getByRole("button", { name: "Show saved payroll" }));
-    await waitFor(() => {
-      expect(screen.getByLabelText("Billing payroll week")).toHaveTextContent("2026-08-03");
-      expect(screen.getByLabelText("Billing payroll tab")).toHaveTextContent("saved");
-    });
-    expect(screen.getByLabelText("Billing workspace dates")).toHaveTextContent("2026-07-01:2026-08-02");
-    expect(screen.getByLabelText("Billing location")).toHaveTextContent(
-      "payrollWeekStart=2026-08-03&payrollTab=saved",
-    );
-  });
-
   it("revalidates a direct-link agency before mounting nested billing content", async () => {
     renderWorkspace("/super-admin/billing/financial-overview?agencyId=atlas", <BillingDomainProbe />);
 
@@ -626,9 +600,7 @@ describe("SuperAdminBillingWorkspace", () => {
     vi.setSystemTime(new Date("2026-08-03T12:00:00"));
     const user = userEvent.setup();
     billingApi.getClaimsDashboard.mockResolvedValue(claimsDashboard);
-    billingApi.getPayrollDashboard.mockResolvedValue(payrollDashboard);
     billingApi.listBillingClaims.mockResolvedValue({ claims: [], total: 0 });
-    billingApi.listPayrollInvoices.mockResolvedValue({ invoices: [], total: 0 });
 
     renderWorkspace(
       "/super-admin/billing/financial-overview?agencyId=atlas&clientType=ddd&startDate=2026-07-01&endDate=2026-07-31",
@@ -637,18 +609,13 @@ describe("SuperAdminBillingWorkspace", () => {
 
     const financialDateControl = await screen.findByRole("button", { name: "July 1 - July 31, 2026" });
     expect(financialDateControl).toBeVisible();
-    await waitFor(() => expect(billingApi.getPayrollDashboard).toHaveBeenCalledWith(
-      expect.objectContaining({
-        context: { agencyId: "atlas" },
-        query: { startDate: "2026-07-01", endDate: "2026-07-31", mode: "ddd" },
-      }),
-    ));
     expect(billingApi.listBillingClaims).toHaveBeenCalledWith(expect.objectContaining({
       query: expect.objectContaining({ startDate: "2026-07-01", endDate: "2026-07-31" }),
     }));
-    expect(billingApi.listPayrollInvoices).toHaveBeenCalledWith(expect.objectContaining({
-      query: expect.objectContaining({ startDate: "2026-07-01", endDate: "2026-07-31" }),
-    }));
+    expect(payrollRunsApi.history).toHaveBeenCalledWith(
+      { audience: "agency", actorUid: "super-1", agencyId: "atlas" },
+      { skip: false },
+    );
 
     const expectedRange = {
       startDate: "2026-07-27",
@@ -659,12 +626,9 @@ describe("SuperAdminBillingWorkspace", () => {
     await user.click(screen.getByRole("button", { name: "Use this date range" }));
 
     expect(await screen.findByRole("button", { name: "July 27 - August 3, 2026" })).toBeVisible();
-    await waitFor(() => expect(billingApi.getPayrollDashboard).toHaveBeenCalledWith(
-      expect.objectContaining({
-        context: { agencyId: "atlas" },
-        query: { ...expectedRange, mode: "ddd" },
-      }),
-    ));
+    await waitFor(() => expect(billingApi.listBillingClaims).toHaveBeenCalledWith(expect.objectContaining({
+      query: expect.objectContaining(expectedRange),
+    })));
     const updatedSearch = new URL(
       screen.getByRole("link", { name: "Payroll" }).getAttribute("href") ?? "",
       "https://careonboard.test",

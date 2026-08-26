@@ -21,7 +21,6 @@ export type PayrollProviderStatus =
   | "partially_paid"
   | "failed";
 
-export type PayrollWorkspaceMode = "legacy" | "run";
 export type PayrollRunType = "regular" | "off_cycle";
 export type PayrollPreviewStatus = "none" | "pending" | "succeeded" | "failed";
 export type PayrollEmploymentType = "field" | "staff";
@@ -132,7 +131,6 @@ export type PayrollCommandCapability =
 export type PayrollCommandCapabilities = Record<PayrollRunCommandName, PayrollCommandCapability>;
 
 export type PayrollRunCapabilities = {
-  replacementWorkspace: true;
   commands: PayrollCommandCapabilities;
 };
 
@@ -158,8 +156,6 @@ export type EmptyCurrentPayrollProjection = {
   revisionNumber: null;
   run: null;
   emptyReason: "no_active_period";
-  workspaceMode: PayrollWorkspaceMode;
-  capabilities: { replacementWorkspace: boolean };
 };
 
 export type PayrollRunProjection = {
@@ -168,7 +164,6 @@ export type PayrollRunProjection = {
   activeRevisionId: string;
   revisionNumber: number;
   run: PayrollRun;
-  workspaceMode: "run";
   capabilities: PayrollRunCapabilities;
   prerequisites: PayrollRunPrerequisites;
   activeOperation?: PayrollActiveOperation;
@@ -203,10 +198,7 @@ export type PayrollEmployeeSummary = {
 export type PayrollEmployeePage = Extract<PayrollRunIdentity, { kind: "run" }>
   & CursorPage<PayrollEmployeeSummary>;
 
-export type CurrentPayrollRunEmployeePage = PayrollEmployeePage & {
-  workspaceMode: "run";
-  capabilities: { replacementWorkspace: true };
-};
+export type CurrentPayrollRunEmployeePage = PayrollEmployeePage;
 
 export type CurrentPayrollEmployeePage =
   | EmptyCurrentPayrollProjection

@@ -1,20 +1,10 @@
-import { lazy, Suspense } from "react";
-
 import { canManageEmployeePayroll } from "@/lib/agency/agency-billing-permissions";
 import { useAuth } from "@/utils/auth";
 
-import { PayrollWorkspaceCutoverBoundary } from "@/features/payroll/runs/pages/PayrollWorkspaceCutoverBoundary";
-
-const LegacyPayrollDashboardPage = lazy(() => import("./legacy").then((module) => ({
-  default: module.default,
-})));
+import { AgencyPayrollWorkspaceBoundary } from "@/features/payroll/runs/pages/AgencyPayrollWorkspaceBoundary";
 
 export default function PayrollDashboardPage() {
-  return (
-    <Suspense fallback={<p role="status" className="px-4 py-8 text-sm text-[#62686f]">Loading payroll…</p>}>
-      <LegacyPayrollDashboardPage />
-    </Suspense>
-  );
+  return <AgencyPayrollDashboardPage />;
 }
 
 export function AgencyPayrollDashboardPage() {
@@ -35,7 +25,7 @@ export function AgencyPayrollDashboardPage() {
   }
 
   return (
-    <PayrollWorkspaceCutoverBoundary
+    <AgencyPayrollWorkspaceBoundary
       scope={{ audience: "agency", actorUid, agencyId }}
       setupAuthorized={setupAuthorized}
     />

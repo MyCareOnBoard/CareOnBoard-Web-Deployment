@@ -27,6 +27,9 @@ import type {
   PayrollRunEventPage,
   PayrollRunPage,
   PayrollRunSource,
+  UpcomingPayrollEmployee,
+  UpcomingPayrollResponse,
+  UpcomingPayrollSourceCounts,
 } from "./payrollRunEndpoints";
 
 const MAX_RESPONSE_BYTES = 500 * 1_024;
@@ -63,6 +66,7 @@ const PROVIDER_STATUSES = [
 ] as const;
 const PREVIEW_STATUSES = ["none", "pending", "succeeded", "failed"] as const;
 const EMPLOYMENT_TYPES = ["field", "staff"] as const;
+const UPCOMING_EMPTY_REASONS = ["no_upcoming_period", "agency_timezone_required"] as const;
 const EMPLOYEE_DISPOSITIONS = ["included", "zero_due", "blocked", "deferred"] as const;
 const PROVIDER_ITEM_STATES = ["pending", "none"] as const;
 const OBLIGATION_KINDS = ["deferral", "correction"] as const;
@@ -370,16 +374,9 @@ function parseCommands(value: unknown, path: string): PayrollCommandCapabilities
 }
 
 function parseRunCapabilities(value: unknown, path: string): PayrollRunCapabilities {
-  const record = exactObject(value, path, ["replacementWorkspace", "commands"]);
-  if (record.replacementWorkspace !== true) throw invalid(`${path}.replacementWorkspace`);
+  const record = exactObject(value, path, ["commands"]);
   parseCommands(record.commands, `${path}.commands`);
   return record as PayrollRunCapabilities;
-}
-
-function parseWorkspaceCapability(value: unknown, path: string): { replacementWorkspace: boolean } {
-  const record = exactObject(value, path, ["replacementWorkspace"]);
-  booleanValue(record.replacementWorkspace, `${path}.replacementWorkspace`);
-  return record as { replacementWorkspace: boolean };
 }
 
 function parsePrerequisites(value: unknown, path: string): PayrollRunPrerequisites {
@@ -415,18 +412,11 @@ function parseEmpty(value: unknown): EmptyCurrentPayrollProjection {
     "revisionNumber",
     "run",
     "emptyReason",
-    "workspaceMode",
-    "capabilities",
   ]);
   if (record.kind !== "empty" || record.runId !== null || record.activeRevisionId !== null
     || record.revisionNumber !== null || record.run !== null
     || record.emptyReason !== "no_active_period") {
     throw invalid("$");
-  }
-  const workspaceMode = enumValue(record.workspaceMode, ["legacy", "run"] as const, "$.workspaceMode");
-  const capabilities = parseWorkspaceCapability(record.capabilities, "$.capabilities");
-  if ((workspaceMode === "run") !== capabilities.replacementWorkspace) {
-    throw invalid("$.capabilities.replacementWorkspace");
   }
   return record as EmptyCurrentPayrollProjection;
 }
@@ -438,11 +428,10 @@ function parseRunProjection(value: unknown): PayrollRunProjection {
     "activeRevisionId",
     "revisionNumber",
     "run",
-    "workspaceMode",
     "capabilities",
     "prerequisites",
   ], ["activeOperation", "approvalChallenge", "approvalChallengeExpiresAt"]);
-  if (record.kind !== "run" || record.workspaceMode !== "run") throw invalid("$");
+  if (record.kind !== "run") throw invalid("$");
   const runId = opaqueId(record.runId, "$.runId");
   const activeRevisionId = opaqueId(record.activeRevisionId, "$.activeRevisionId");
   const revisionNumber = positiveInteger(record.revisionNumber, "$.revisionNumber");
@@ -540,18 +529,14 @@ function parseEmployeePage(value: unknown): CurrentPayrollEmployeePage {
     "runId",
     "activeRevisionId",
     "revisionNumber",
-    "workspaceMode",
-    "capabilities",
     "items",
     "nextCursor",
     "hasMore",
   ]);
-  if (record.kind !== "run" || record.workspaceMode !== "run") throw invalid("$");
+  if (record.kind !== "run") throw invalid("$");
   opaqueId(record.runId, "$.runId");
   const activeRevisionId = opaqueId(record.activeRevisionId, "$.activeRevisionId");
   positiveInteger(record.revisionNumber, "$.revisionNumber");
-  const capabilities = parseWorkspaceCapability(record.capabilities, "$.capabilities");
-  if (!capabilities.replacementWorkspace) throw invalid("$.capabilities.replacementWorkspace");
   if (!Array.isArray(record.items) || record.items.length > MAX_EMPLOYEES) throw invalid("$.items");
   record.items.forEach((employee, index) => parseEmployee(
     employee,
@@ -564,6 +549,125 @@ function parseEmployeePage(value: unknown): CurrentPayrollEmployeePage {
   const hasMore = booleanValue(record.hasMore, "$.hasMore");
   if (hasMore !== (nextCursor !== null)) throw invalid("$.nextCursor");
   return record as CurrentPayrollEmployeePage;
+}
+
+function parseUpcomingSourceCounts(value: unknown, path: string): UpcomingPayrollSourceCounts {
+  const record = exactObject(value, path, ["shift", "staff_timesheet"]);
+  nonNegativeInteger(record.shift, `${path}.shift`);
+  nonNegativeInteger(record.staff_timesheet, `${path}.staff_timesheet`);
+  return record as UpcomingPayrollSourceCounts;
+}
+
+function parseUpcomingEmployee(value: unknown, path: string): UpcomingPayrollEmployee {
+  const record = exactObject(value, path, [
+    "employeeId",
+    "employmentType",
+    "displayName",
+    "regularHours",
+    "overtimeHours",
+    "grossEarningsCents",
+    "sourceCount",
+    "sourceCounts",
+    "hasBlockers",
+    "blockerCodes",
+  ]);
+  opaqueId(record.employeeId, `${path}.employeeId`);
+  enumValue(record.employmentType, EMPLOYMENT_TYPES, `${path}.employmentType`);
+  boundedText(record.displayName, `${path}.displayName`, MAX_ID_BYTES);
+  nonNegativeNumber(record.regularHours, `${path}.regularHours`);
+  nonNegativeNumber(record.overtimeHours, `${path}.overtimeHours`);
+  nonNegativeInteger(record.grossEarningsCents, `${path}.grossEarningsCents`);
+  const sourceCount = nonNegativeInteger(record.sourceCount, `${path}.sourceCount`);
+  const sourceCounts = parseUpcomingSourceCounts(record.sourceCounts, `${path}.sourceCounts`);
+  if (sourceCount !== sourceCounts.shift + sourceCounts.staff_timesheet) {
+    throw invalid(`${path}.sourceCount`);
+  }
+  const hasBlockers = booleanValue(record.hasBlockers, `${path}.hasBlockers`);
+  const blockerCodes = codeList(record.blockerCodes, `${path}.blockerCodes`);
+  if (hasBlockers !== (blockerCodes.length > 0)) throw invalid(`${path}.hasBlockers`);
+  return record as UpcomingPayrollEmployee;
+}
+
+function parseUpcoming(value: unknown): UpcomingPayrollResponse {
+  const record = exactObject(value, "$", [
+    "kind",
+    "projectionRevision",
+    "periodStart",
+    "periodEnd",
+    "payday",
+    "totals",
+    "employeeCount",
+    "blockerCount",
+    "blockerCodes",
+    "sourceCounts",
+    "items",
+    "nextCursor",
+    "hasMore",
+    "asOf",
+  ]);
+  if (record.kind !== "upcoming") throw invalid("$.kind");
+  nonNegativeInteger(record.projectionRevision, "$.projectionRevision");
+  const periodStart = isoDate(record.periodStart, "$.periodStart");
+  const periodEnd = isoDate(record.periodEnd, "$.periodEnd");
+  const payday = isoDate(record.payday, "$.payday");
+  if (periodStart >= periodEnd || periodEnd > payday) throw invalid("$.periodEnd");
+  const totals = exactObject(record.totals, "$.totals", [
+    "regularHours",
+    "overtimeHours",
+    "totalHours",
+    "grossEarningsCents",
+  ]);
+  const regularHours = nonNegativeNumber(totals.regularHours, "$.totals.regularHours");
+  const overtimeHours = nonNegativeNumber(totals.overtimeHours, "$.totals.overtimeHours");
+  const totalHours = nonNegativeNumber(totals.totalHours, "$.totals.totalHours");
+  if (Math.abs(totalHours - (regularHours + overtimeHours)) > Number.EPSILON * 16) {
+    throw invalid("$.totals.totalHours");
+  }
+  nonNegativeInteger(totals.grossEarningsCents, "$.totals.grossEarningsCents");
+  const employeeCount = nonNegativeInteger(record.employeeCount, "$.employeeCount");
+  const blockerCount = nonNegativeInteger(record.blockerCount, "$.blockerCount");
+  if (blockerCount > employeeCount) throw invalid("$.blockerCount");
+  const blockerCodes = codeList(record.blockerCodes, "$.blockerCodes");
+  if (blockerCount > 0 && blockerCodes.length === 0) throw invalid("$.blockerCodes");
+  parseUpcomingSourceCounts(record.sourceCounts, "$.sourceCounts");
+  if (!Array.isArray(record.items) || record.items.length > MAX_EMPLOYEES) throw invalid("$.items");
+  if (record.items.length > employeeCount) throw invalid("$.items");
+  const employeeIds = new Set<string>();
+  let pageBlockerCount = 0;
+  record.items.forEach((employee, index) => {
+    const parsed = parseUpcomingEmployee(employee, `$.items[${index}]`);
+    if (employeeIds.has(parsed.employeeId)) throw invalid(`$.items[${index}].employeeId`);
+    employeeIds.add(parsed.employeeId);
+    if (parsed.hasBlockers) pageBlockerCount += 1;
+  });
+  if (pageBlockerCount > blockerCount) throw invalid("$.blockerCount");
+  const nextCursor = record.nextCursor === null
+    ? null
+    : boundedText(record.nextCursor, "$.nextCursor", MAX_CURSOR_BYTES);
+  const hasMore = booleanValue(record.hasMore, "$.hasMore");
+  if (hasMore !== (nextCursor !== null)) throw invalid("$.nextCursor");
+  isoInstant(record.asOf, "$.asOf");
+  return record as UpcomingPayrollResponse;
+}
+
+function parseEmptyUpcoming(value: unknown): UpcomingPayrollResponse {
+  const record = exactObject(value, "$", [
+    "kind",
+    "projectionRevision",
+    "emptyReason",
+    "items",
+    "nextCursor",
+    "hasMore",
+    "asOf",
+  ]);
+  if (record.kind !== "empty" || !Array.isArray(record.items) || record.items.length > 0 || record.nextCursor !== null
+    || record.hasMore !== false) {
+    throw invalid("$");
+  }
+  enumValue(record.emptyReason, UPCOMING_EMPTY_REASONS, "$.emptyReason");
+  nonNegativeInteger(record.projectionRevision, "$.projectionRevision");
+  isoInstant(record.asOf, "$.asOf");
+  return record as UpcomingPayrollResponse;
 }
 
 function parseCursorPage<T>(
@@ -713,6 +817,19 @@ export function parsePayrollRunPage(value: unknown): PayrollRunPage {
   return parseCursorPage(value, 25, parseRun) as PayrollRunPage;
 }
 
+export function parseUpcomingPayrollResponse(value: unknown): UpcomingPayrollResponse {
+  assertResponseSize(value);
+  const discriminator = exactObject(
+    value,
+    "$",
+    [],
+    value !== null && typeof value === "object" && !Array.isArray(value) ? Object.keys(value) : [],
+  ).kind;
+  if (discriminator === "upcoming") return parseUpcoming(value);
+  if (discriminator === "empty") return parseEmptyUpcoming(value);
+  throw invalid("$.kind");
+}
+
 export function parsePayrollEmployeePage(value: unknown): PayrollEmployeePage {
   assertResponseSize(value);
   return parseHistoricalEmployeePage(value);
@@ -820,11 +937,6 @@ export function parseCurrentPayrollBootstrapPair(
 } {
   const runResponse = parseCurrentPayrollRunResponse(runResponseValue);
   const employeePage = parseCurrentPayrollEmployeePage(employeePageValue);
-  if (runResponse.workspaceMode !== employeePage.workspaceMode
-    || runResponse.capabilities.replacementWorkspace
-      !== employeePage.capabilities.replacementWorkspace) {
-    throw invalid("$.workspaceMode");
-  }
   if (runResponse.kind !== employeePage.kind) throw invalid("$.kind");
   if (runResponse.kind === "run"
     && (runResponse.runId !== employeePage.runId

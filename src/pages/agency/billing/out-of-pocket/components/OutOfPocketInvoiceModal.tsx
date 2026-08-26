@@ -16,7 +16,7 @@ import {
   BILLING_PRIMARY_BUTTON_CLASS,
   BILLING_SECONDARY_BUTTON_CLASS,
 } from "../../components/billingModalStyles";
-import { downloadPayrollInvoicePdf } from "../../payroll/utils/payrollInvoicePrintUtils";
+import { downloadInvoicePdf } from "../../shared/invoicePrint";
 import { sendOutOfPocketInvoice, type OutOfPocketInvoiceDetail } from "@/lib/api/out-of-pocket";
 import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
 
@@ -56,7 +56,7 @@ export default function OutOfPocketInvoiceModal({ open, invoice, onClose, onSent
     if (!printRef.current || downloading) return;
     setDownloading(true);
     try {
-      await downloadPayrollInvoicePdf(printRef.current, invoice.invoiceNumber, "invoice");
+      await downloadInvoicePdf(printRef.current, invoice.invoiceNumber);
     } catch {
       console.error("Error generating invoice PDF.");
       toast({ title: "Couldn't download this invoice. Try Print instead.", variant: "destructive" });
@@ -128,7 +128,7 @@ export default function OutOfPocketInvoiceModal({ open, invoice, onClose, onSent
                 type="button"
                 aria-label="Close invoice"
                 onClick={onClose}
-                className="payroll-invoice-no-print inline-flex min-h-[44px] min-w-[44px] shrink-0 cursor-pointer items-center justify-center"
+                className="invoice-no-print inline-flex min-h-[44px] min-w-[44px] shrink-0 cursor-pointer items-center justify-center"
               >
                 <span className="flex h-9 w-9 items-center justify-center rounded-full border border-[#e5e5e6] bg-[#f5f5f5] text-[#808081] hover:bg-[#eef4f5]">
                   <X className="h-4 w-4" />
@@ -137,9 +137,9 @@ export default function OutOfPocketInvoiceModal({ open, invoice, onClose, onSent
             </div>
           </DialogHeader>
 
-          <div className="payroll-invoice-modal-body flex-1 overflow-y-auto pb-4 pt-4">
+          <div className="invoice-modal-body flex-1 overflow-y-auto pb-4 pt-4">
             {(doc.unratedLineCount ?? 0) > 0 && (
-              <div className="payroll-invoice-no-print mb-3 rounded-[10px] border border-[#F5A623] bg-[#FFF7E6] px-3 py-2 text-[12px] text-[#8A5A00]">
+              <div className="invoice-no-print mb-3 rounded-[10px] border border-[#F5A623] bg-[#FFF7E6] px-3 py-2 text-[12px] text-[#8A5A00]">
                 {doc.unratedLineCount} line{doc.unratedLineCount === 1 ? "" : "s"} bill $0 — no client rate is
                 set on the service. Set a client rate on the client&apos;s service to bill them.
               </div>
@@ -198,7 +198,7 @@ export default function OutOfPocketInvoiceModal({ open, invoice, onClose, onSent
             </p>
           </div>
 
-          <div className="payroll-invoice-no-print flex shrink-0 flex-col gap-3 border-t border-[#e5e5e6] pb-2 pt-4 sm:flex-row sm:justify-end">
+          <div className="invoice-no-print flex shrink-0 flex-col gap-3 border-t border-[#e5e5e6] pb-2 pt-4 sm:flex-row sm:justify-end">
             <button
               type="button"
               disabled={downloading}

@@ -58,7 +58,7 @@ export default function PayrollOverviewCards({ stats, loading = false }: Payroll
   if (loading) {
     return (
       <section>
-        <h2 className="mb-4 text-[16px] font-semibold text-[#10141a]">Overview</h2>
+        <h2 className="mb-4 text-[16px] font-semibold text-[#10141a]">Current payroll overview</h2>
         <div className="flex flex-wrap gap-6">
           {Array.from({ length: 5 }).map((_, index) => (
             <OverviewCardSkeleton key={index} />
@@ -68,5 +68,5 @@ export default function PayrollOverviewCards({ stats, loading = false }: Payroll
     );
   }
 
-  return <BillingOverviewCards stats={stats} showCountBadge />;
+  return <BillingOverviewCards stats={stats} showCountBadge heading="Current payroll overview" />;
 }

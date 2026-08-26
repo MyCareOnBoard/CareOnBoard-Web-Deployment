@@ -24,8 +24,6 @@ describe("billing workspace URL state", () => {
       startDate: "2026-07-04",
       endDate: "2026-08-02",
       mode: null,
-      payrollWeekStart: "2026-07-27",
-      payrollTab: "due",
     });
   });
 
@@ -37,8 +35,6 @@ describe("billing workspace URL state", () => {
       startDate: "2026-07-01",
       endDate: "2026-07-31",
       mode: "hha",
-      payrollWeekStart: "2026-07-27",
-      payrollTab: "due",
     });
   });
 
@@ -59,8 +55,6 @@ describe("billing workspace URL state", () => {
       scope: "network",
       startDate: "2026-07-04",
       endDate: "2026-08-02",
-      payrollWeekStart: "2026-07-27",
-      payrollTab: "due",
     });
   });
 

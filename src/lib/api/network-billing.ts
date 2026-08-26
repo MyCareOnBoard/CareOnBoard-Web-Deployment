@@ -16,10 +16,6 @@ import type {
   NetworkBillingPage,
   NetworkBillingPageResponse,
   NetworkBillingPartialErrorKey,
-  NetworkBillingPayrollDueRow,
-  NetworkBillingPayrollRow,
-  NetworkBillingPayrollSavedRow,
-  NetworkBillingPayrollSummary,
   NetworkBillingPublicScope,
   NetworkBillingReadyRideRow,
   NetworkBillingReadyShiftRow,
@@ -62,11 +58,6 @@ type ModeFilter = { mode?: "ddd" | "hha" };
 export type ClaimsNetworkBillingArgs = DatePageContext & ClientSelection & (
   | { tab: "ready"; mode?: "ddd" | "hha"; status?: never; sort?: never; employeeId?: never; employeeAgencyId?: never }
   | { tab: "saved"; status?: "pending" | "paid" | "rejected"; sort?: "createdAt:desc" | "createdAt:asc"; mode?: never; employeeId?: never; employeeAgencyId?: never }
-);
-
-export type PayrollNetworkBillingArgs = DatePageContext & StaffSelection & ModeFilter & (
-  | { tab: "due"; status?: never; clientId?: never; clientAgencyId?: never; sort?: never }
-  | { tab: "saved"; status?: "pending" | "paid"; clientId?: never; clientAgencyId?: never; sort?: never }
 );
 
 export type ExpensesNetworkBillingArgs = DatePageContext & StaffSelection & ModeFilter & (
@@ -115,27 +106,6 @@ export type NetworkBillingPreparationResult = {
       userDocumentDeleted: boolean;
     }>;
   };
-};
-
-export type NetworkPayrollRollupBackfillArgs = QueryContext & {
-  days: 90;
-  confirmProduction: boolean;
-};
-
-export type NetworkPayrollRolloutStatus = {
-  version: 1;
-  enabled: boolean;
-  status: string;
-  days: 90;
-  weekCount: number;
-  activeAgencyCount: number;
-  expectedRollupCount: number;
-  verifiedRollupCount: number;
-  missingRollupCount: number;
-  invalidRollupCount: number;
-  failedRollupCount: number;
-  enqueuedAt: string | null;
-  completedAt: string | null;
 };
 
 class NetworkBillingContractError extends Error {
@@ -513,94 +483,9 @@ function validateClaimRow(value: unknown, context: string): NetworkBillingClaimR
     : validateReadyRideRow(source, context);
 }
 
-const PAYROLL_BASE_KEYS = ["id", "agencyId", "agencyName", "staffKey", "staffName", "grossAmount", "totalHours", "mode", "employeeId"] as const;
-
-function payrollBase(source: Record<string, unknown>, context: string) {
-  return {
-    ...agencyFields(source, context),
-    staffKey: requiredString(source, "staffKey", context),
-    staffName: optionalNullableString(source, "staffName", context),
-    grossAmount: nullableNumber(source, "grossAmount", context),
-    totalHours: nullableNumber(source, "totalHours", context),
-    mode: nullableEnum(source, "mode", ["ddd", "hha"] as const, context),
-    employeeId: optionalNullableString(source, "employeeId", context),
-  };
-}
-
-function validatePayrollSavedRow(source: Record<string, unknown>, context: string): NetworkBillingPayrollSavedRow {
-  onlyKeys(source, [...PAYROLL_BASE_KEYS, "kind", "invoiceNumber", "status", "employeeName", "periodStart", "periodEnd", "shiftCount", "createdAt", "paidAt"], context);
-  const base = payrollBase(source, context);
-  const result: NetworkBillingPayrollSavedRow = {
-    id: base.id,
-    agencyId: base.agencyId,
-    agencyName: base.agencyName,
-    kind: requiredEnum(source, "kind", ["payrollInvoice"] as const, context),
-    staffKey: base.staffKey,
-    grossAmount: base.grossAmount,
-    totalHours: base.totalHours,
-    mode: base.mode,
-  };
-  if (base.employeeId !== undefined) result.employeeId = base.employeeId;
-  if (base.staffName !== undefined) result.staffName = base.staffName;
-  const invoiceNumber = optionalNullableString(source, "invoiceNumber", context);
-  const status = optionalNullableEnum(source, "status", ["pending", "paid"] as const, context);
-  const employeeName = optionalNullableString(source, "employeeName", context);
-  const shiftCount = optionalNonNegativeInteger(source, "shiftCount", context);
-  const periodStart = optionalJsonValue(source, "periodStart", context);
-  const periodEnd = optionalJsonValue(source, "periodEnd", context);
-  const createdAt = optionalJsonValue(source, "createdAt", context);
-  const paidAt = optionalJsonValue(source, "paidAt", context);
-  if (invoiceNumber !== undefined) result.invoiceNumber = invoiceNumber;
-  if (status !== undefined) result.status = status;
-  if (employeeName !== undefined) result.employeeName = employeeName;
-  if (shiftCount !== undefined) result.shiftCount = shiftCount;
-  if (periodStart !== undefined) result.periodStart = periodStart;
-  if (periodEnd !== undefined) result.periodEnd = periodEnd;
-  if (createdAt !== undefined) result.createdAt = createdAt;
-  if (paidAt !== undefined) result.paidAt = paidAt;
-  return result;
-}
-
-function validatePayrollDueRow(source: Record<string, unknown>, context: string): NetworkBillingPayrollDueRow {
-  onlyKeys(source, [...PAYROLL_BASE_KEYS, "sourceType", "sourceId", "totalsExact"], context);
-  const base = payrollBase(source, context);
-  return {
-    id: base.id,
-    agencyId: base.agencyId,
-    agencyName: base.agencyName,
-    sourceType: requiredEnum(source, "sourceType", ["shift", "ride"] as const, context),
-    sourceId: requiredString(source, "sourceId", context),
-    staffKey: base.staffKey,
-    ...(base.staffName === undefined ? {} : { staffName: base.staffName }),
-    grossAmount: base.grossAmount,
-    totalHours: base.totalHours,
-    mode: base.mode,
-    totalsExact: requiredBoolean(source, "totalsExact", context),
-    ...(base.employeeId === undefined ? {} : { employeeId: base.employeeId }),
-  };
-}
-
-function validatePayrollRow(value: unknown, context: string): NetworkBillingPayrollRow {
-  const source = record(value, context);
-  if (source.kind !== undefined) return validatePayrollSavedRow(source, context);
-  return validatePayrollDueRow(source, context);
-}
-
-function validatePayPreview(value: unknown, context: string) {
-  const source = record(value, context);
-  onlyKeys(source, ["billingType", "billingRate", "totalHours", "grossAmount"], context);
-  return {
-    billingType: requiredEnum(source, "billingType", ["hourly", "monthly"] as const, context),
-    billingRate: requiredNumber(source, "billingRate", context),
-    totalHours: requiredNumber(source, "totalHours", context),
-    grossAmount: requiredNumber(source, "grossAmount", context),
-  };
-}
-
 function validateTimesheetRow(value: unknown, context: string): NetworkBillingTimesheetRow {
   const source = record(value, context);
-  onlyKeys(source, ["id", "agencyId", "agencyName", "staffKey", "status", "mode", "staffUid", "staffName", "periodStart", "periodEnd", "payrollInvoiceId", "createdAt", "payPreview"], context);
-  const payPreview = source.payPreview === null ? null : validatePayPreview(source.payPreview, `${context}.payPreview`);
+  onlyKeys(source, ["id", "agencyId", "agencyName", "staffKey", "status", "mode", "staffUid", "staffName", "periodStart", "periodEnd", "totalHours", "createdAt"], context);
   return {
     ...agencyFields(source, context),
     staffKey: requiredString(source, "staffKey", context),
@@ -610,8 +495,7 @@ function validateTimesheetRow(value: unknown, context: string): NetworkBillingTi
     staffName: nullableString(source, "staffName", context),
     periodStart: jsonValue(source.periodStart, `${context}.periodStart`),
     periodEnd: jsonValue(source.periodEnd, `${context}.periodEnd`),
-    payPreview,
-    ...(has(source, "payrollInvoiceId") ? { payrollInvoiceId: nullableString(source, "payrollInvoiceId", context) } : {}),
+    totalHours: nonNegativeNumber(source, "totalHours", context),
     ...(has(source, "createdAt") ? { createdAt: jsonValue(source.createdAt, `${context}.createdAt`) } : {}),
   };
 }
@@ -702,87 +586,6 @@ function validateClaimsSummary(value: unknown): NetworkBillingClaimsSummary {
   };
 }
 
-function validateDuePayrollSummary(value: unknown): NetworkBillingPayrollSummary {
-  const source = record(value, "response.data.summary");
-  onlyKeys(source, ["overview", "coverage", "freshness", "meta"], "response.data.summary");
-  const overview = record(source.overview, "response.data.summary.overview");
-  const coverage = record(source.coverage, "response.data.summary.coverage");
-  const freshness = record(source.freshness, "response.data.summary.freshness");
-  const meta = record(source.meta, "response.data.summary.meta");
-  onlyKeys(overview, ["totalDue", "staffCount", "pendingHours", "overtimeHours", "missingTimesheets"], "response.data.summary.overview");
-  onlyKeys(coverage, ["expectedAgencyCount", "readyAgencyCount", "pendingAgencyCount", "staleAgencyCount", "failedAgencyCount"], "response.data.summary.coverage");
-  onlyKeys(freshness, ["oldestComputedAt", "newestComputedAt"], "response.data.summary.freshness");
-  onlyKeys(meta, ["evaluatedAt", "calculationVersion", "totalsExact"], "response.data.summary.meta");
-  const totalDue = record(overview.totalDue, "response.data.summary.overview.totalDue");
-  const staffCount = record(overview.staffCount, "response.data.summary.overview.staffCount");
-  const pendingHours = record(overview.pendingHours, "response.data.summary.overview.pendingHours");
-  const overtimeHours = record(overview.overtimeHours, "response.data.summary.overview.overtimeHours");
-  const missingTimesheets = record(overview.missingTimesheets, "response.data.summary.overview.missingTimesheets");
-  onlyKeys(totalDue, ["amount", "count", "exact"], "response.data.summary.overview.totalDue");
-  onlyKeys(staffCount, ["count"], "response.data.summary.overview.staffCount");
-  onlyKeys(pendingHours, ["hours"], "response.data.summary.overview.pendingHours");
-  onlyKeys(overtimeHours, ["hours"], "response.data.summary.overview.overtimeHours");
-  onlyKeys(missingTimesheets, ["count"], "response.data.summary.overview.missingTimesheets");
-  const parsedCoverage = {
-    expectedAgencyCount: nonNegativeInteger(coverage, "expectedAgencyCount", "response.data.summary.coverage"),
-    readyAgencyCount: nonNegativeInteger(coverage, "readyAgencyCount", "response.data.summary.coverage"),
-    pendingAgencyCount: nonNegativeInteger(coverage, "pendingAgencyCount", "response.data.summary.coverage"),
-    staleAgencyCount: nonNegativeInteger(coverage, "staleAgencyCount", "response.data.summary.coverage"),
-    failedAgencyCount: nonNegativeInteger(coverage, "failedAgencyCount", "response.data.summary.coverage"),
-  };
-  if (parsedCoverage.readyAgencyCount + parsedCoverage.pendingAgencyCount + parsedCoverage.staleAgencyCount + parsedCoverage.failedAgencyCount !== parsedCoverage.expectedAgencyCount) {
-    fail("response.data.summary.coverage must add up to expectedAgencyCount.");
-  }
-  const amount = nullableNumber(totalDue, "amount", "response.data.summary.overview.totalDue");
-  if (amount !== null && amount < 0) fail("response.data.summary.overview.totalDue.amount must be a non-negative number or null.");
-  if (amount === null && parsedCoverage.readyAgencyCount + parsedCoverage.staleAgencyCount > 0) {
-    fail("response.data.summary.overview.totalDue.amount may be null only without a usable rollup.");
-  }
-  const oldestComputedAt = nullableIsoDate(freshness, "oldestComputedAt", "response.data.summary.freshness");
-  const newestComputedAt = nullableIsoDate(freshness, "newestComputedAt", "response.data.summary.freshness");
-  if (oldestComputedAt && newestComputedAt && Date.parse(oldestComputedAt) > Date.parse(newestComputedAt)) {
-    fail("response.data.summary.freshness oldestComputedAt must not follow newestComputedAt.");
-  }
-  if (requiredNumber(meta, "calculationVersion", "response.data.summary.meta") !== 1) {
-    fail("response.data.summary.meta.calculationVersion must be 1.");
-  }
-  return {
-    overview: {
-      totalDue: { amount, count: nonNegativeInteger(totalDue, "count", "response.data.summary.overview.totalDue"), exact: requiredBoolean(totalDue, "exact", "response.data.summary.overview.totalDue") },
-      staffCount: { count: nonNegativeInteger(staffCount, "count", "response.data.summary.overview.staffCount") },
-      pendingHours: { hours: nonNegativeNumber(pendingHours, "hours", "response.data.summary.overview.pendingHours") },
-      overtimeHours: { hours: nonNegativeNumber(overtimeHours, "hours", "response.data.summary.overview.overtimeHours") },
-      missingTimesheets: { count: nonNegativeInteger(missingTimesheets, "count", "response.data.summary.overview.missingTimesheets") },
-    },
-    coverage: parsedCoverage,
-    freshness: { oldestComputedAt, newestComputedAt },
-    meta: { evaluatedAt: requiredIsoDate(meta, "evaluatedAt", "response.data.summary.meta"), calculationVersion: 1, totalsExact: requiredBoolean(meta, "totalsExact", "response.data.summary.meta") },
-  };
-}
-
-function validatePayrollSummary(value: unknown, tab: PayrollNetworkBillingArgs["tab"]): NetworkBillingPayrollSummary {
-  if (tab === "due") return validateDuePayrollSummary(value);
-  const source = record(value, "response.data.summary");
-  onlyKeys(source, ["overview", "meta"], "response.data.summary");
-  const overview = record(source.overview, "response.data.summary.overview");
-  const meta = record(source.meta, "response.data.summary.meta");
-  onlyKeys(meta, ["evaluatedAt", "totalsExact"], "response.data.summary.meta");
-  onlyKeys(overview, ["savedInvoices"], "response.data.summary.overview");
-  const saved = record(overview.savedInvoices, "response.data.summary.overview.savedInvoices");
-  onlyKeys(saved, ["count", "exact"], "response.data.summary.overview.savedInvoices");
-  const validatedOverview = { savedInvoices: {
-    count: nonNegativeInteger(saved, "count", "response.data.summary.overview.savedInvoices"),
-    exact: requiredBoolean(saved, "exact", "response.data.summary.overview.savedInvoices"),
-  } };
-  return {
-    overview: validatedOverview,
-    meta: {
-      evaluatedAt: requiredString(meta, "evaluatedAt", "response.data.summary.meta"),
-      totalsExact: requiredBoolean(meta, "totalsExact", "response.data.summary.meta"),
-    },
-  };
-}
-
 function validateExpensesSummary(value: unknown): NetworkBillingExpensesSummary {
   const source = record(value, "response.data.summary");
   onlyKeys(source, ["overview", "expensesByStatus", "meta"], "response.data.summary");
@@ -841,21 +644,6 @@ function validateClaimsBootstrap(value: unknown): NetworkBillingPageResponse<Net
   const data = successfulData(value, false);
   onlyKeys(data, ["scope", "page", "summary"], "response.data");
   return { ...pageData(data, validateClaimRow), summary: validateClaimsSummary(data.summary) };
-}
-
-function validatePayrollPage(value: unknown): NetworkBillingPageResponse<NetworkBillingPayrollRow> {
-  const data = successfulData(value, true);
-  onlyKeys(data, ["scope", "page"], "response.data");
-  return pageData(data, validatePayrollRow);
-}
-
-function validatePayrollBootstrap(
-  value: unknown,
-  tab: PayrollNetworkBillingArgs["tab"],
-): NetworkBillingPageResponse<NetworkBillingPayrollRow, NetworkBillingPayrollSummary> {
-  const data = successfulData(value, true);
-  onlyKeys(data, ["scope", "page", "summary"], "response.data");
-  return { ...pageData(data, validatePayrollRow), summary: validatePayrollSummary(data.summary, tab) };
 }
 
 function branchMeta(value: unknown) {
@@ -1024,33 +812,6 @@ function validatePreparation(value: unknown): NetworkBillingPreparationResult {
   };
 }
 
-function validateNetworkPayrollRolloutStatus(value: unknown): NetworkPayrollRolloutStatus {
-  const data = successfulData(value, false);
-  const context = "response.data";
-  onlyKeys(data, [
-    "version", "enabled", "status", "days", "weekCount", "activeAgencyCount",
-    "expectedRollupCount", "verifiedRollupCount", "missingRollupCount", "invalidRollupCount",
-    "failedRollupCount", "enqueuedAt", "completedAt",
-  ], context);
-  if (nonNegativeInteger(data, "version", context) !== 1) fail(`${context}.version must be 1.`);
-  if (nonNegativeInteger(data, "days", context) !== 90) fail(`${context}.days must be 90.`);
-  return {
-    version: 1,
-    enabled: requiredBoolean(data, "enabled", context),
-    status: requiredString(data, "status", context),
-    days: 90,
-    weekCount: nonNegativeInteger(data, "weekCount", context),
-    activeAgencyCount: nonNegativeInteger(data, "activeAgencyCount", context),
-    expectedRollupCount: nonNegativeInteger(data, "expectedRollupCount", context),
-    verifiedRollupCount: nonNegativeInteger(data, "verifiedRollupCount", context),
-    missingRollupCount: nonNegativeInteger(data, "missingRollupCount", context),
-    invalidRollupCount: nonNegativeInteger(data, "invalidRollupCount", context),
-    failedRollupCount: nonNegativeInteger(data, "failedRollupCount", context),
-    enqueuedAt: nullableIsoDate(data, "enqueuedAt", context),
-    completedAt: nullableIsoDate(data, "completedAt", context),
-  };
-}
-
 function validateOptions(value: unknown): NetworkBillingOption[] {
   const envelope = record(value, "response");
   onlyKeys(envelope, ["success", "data"], "response");
@@ -1093,12 +854,6 @@ function claimsParams(args: ClaimsNetworkBillingArgs): QueryParams {
   const keys: (keyof RuntimeFilters | "tab")[] = ["startDate", "endDate", "tab", "limit", "cursor"];
   if (args.tab === "saved") keys.push("status", "sort", "clientId", "clientAgencyId");
   else keys.push("mode", "clientId", "clientAgencyId");
-  return params(args, keys);
-}
-
-function payrollParams(args: PayrollNetworkBillingArgs): QueryParams {
-  const keys: (keyof RuntimeFilters | "tab")[] = ["startDate", "endDate", "tab", "mode", "employeeId", "employeeAgencyId", "limit", "cursor"];
-  if (args.tab === "saved") keys.push("status");
   return params(args, keys);
 }
 
@@ -1182,7 +937,7 @@ function mutation<T, TArgs>(
   };
 }
 
-const tags = (domain: "Claims" | "Payroll" | "Expenses" | "Timesheets" | "Overview" | "Options") => [
+const tags = (domain: "Claims" | "Expenses" | "Timesheets" | "Overview" | "Options") => [
   { type: domain, id: "NETWORK" },
   { type: "NETWORK" as const, id: "NETWORK" },
 ] as const;
@@ -1190,7 +945,7 @@ const tags = (domain: "Claims" | "Payroll" | "Expenses" | "Timesheets" | "Overvi
 export const networkBillingApi = createApi({
   reducerPath: "networkBillingApi",
   baseQuery: fakeBaseQuery<NetworkBillingError>(),
-  tagTypes: ["NETWORK", "Claims", "Payroll", "Expenses", "Timesheets", "Overview", "Options"],
+  tagTypes: ["NETWORK", "Claims", "Expenses", "Timesheets", "Overview", "Options"],
   keepUnusedDataFor: NETWORK_BILLING_KEEP_UNUSED_DATA_FOR,
   endpoints: (build) => ({
     getOverviewBootstrap: build.query<NetworkBillingOverview, OverviewNetworkBillingArgs>({
@@ -1204,20 +959,8 @@ export const networkBillingApi = createApi({
         { type: "NETWORK", id: "NETWORK" },
         { type: "Overview", id: "NETWORK" },
         { type: "Claims", id: "NETWORK" },
-        { type: "Payroll", id: "NETWORK" },
         { type: "Expenses", id: "NETWORK" },
         { type: "Timesheets", id: "NETWORK" },
-      ],
-    }),
-    startNetworkPayrollRollupBackfill: build.mutation<NetworkPayrollRolloutStatus, NetworkPayrollRollupBackfillArgs>({
-      queryFn: mutation(
-        "/superAdminOperations/billing/payroll/rollups/backfill",
-        validateNetworkPayrollRolloutStatus,
-        ({ days, confirmProduction }) => ({ days, confirmProduction }),
-      ),
-      invalidatesTags: [
-        { type: "NETWORK", id: "NETWORK" },
-        { type: "Payroll", id: "NETWORK" },
       ],
     }),
     getClaimsBootstrap: build.query<NetworkBillingPageResponse<NetworkBillingClaimRow, NetworkBillingClaimsSummary>, ClaimsNetworkBillingArgs>({
@@ -1229,16 +972,6 @@ export const networkBillingApi = createApi({
       queryFn: query("/superAdminOperations/billing/claims", claimsParams, validateClaimsPage),
       serializeQueryArgs: ({ queryArgs }) => cacheArgs(queryArgs, claimsParams(queryArgs)),
       providesTags: tags("Claims"),
-    }),
-    getPayrollBootstrap: build.query<NetworkBillingPageResponse<NetworkBillingPayrollRow, NetworkBillingPayrollSummary>, PayrollNetworkBillingArgs>({
-      queryFn: query("/superAdminOperations/billing/payroll/bootstrap", payrollParams, (value, args) => validatePayrollBootstrap(value, args.tab)),
-      serializeQueryArgs: ({ queryArgs }) => cacheArgs(queryArgs, payrollParams(queryArgs)),
-      providesTags: tags("Payroll"),
-    }),
-    getPayrollPage: build.query<NetworkBillingPageResponse<NetworkBillingPayrollRow>, PayrollNetworkBillingArgs>({
-      queryFn: query("/superAdminOperations/billing/payroll", payrollParams, validatePayrollPage),
-      serializeQueryArgs: ({ queryArgs }) => cacheArgs(queryArgs, payrollParams(queryArgs)),
-      providesTags: tags("Payroll"),
     }),
     getExpensesBootstrap: build.query<NetworkBillingExpensesPageResponse<NetworkBillingExpenseRow, NetworkBillingExpensesSummary>, ExpensesNetworkBillingArgs>({
       queryFn: query("/superAdminOperations/billing/expenses/bootstrap", expensesParams, validateExpensesBootstrap),

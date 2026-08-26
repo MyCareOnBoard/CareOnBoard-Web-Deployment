@@ -3,22 +3,11 @@ import {Input} from "@/components/ui/input";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import React, {useEffect, useMemo, useRef, useState} from "react";
 import {cn} from "@/lib/utils";
+import { IANA_TIMEZONES, isIanaTimezone } from "@/lib/timezones";
 import {useGooglePlacesAutocomplete} from "@/hooks/useGooglePlacesAutocomplete";
 import { CompanySetupFields } from "@/features/payroll/forms/companySetupFields";
 
-const supportedTimezones = typeof Intl.supportedValuesOf === "function"
-    ? Intl.supportedValuesOf("timeZone")
-    : [];
-
-export const IANA_TIMEZONES = Object.freeze(
-    [...new Set(["UTC", ...supportedTimezones])].sort((left, right) => left.localeCompare(right))
-);
-
-const IANA_TIMEZONE_SET = new Set(IANA_TIMEZONES);
-
-export function isIanaTimezone(value: string): boolean {
-    return IANA_TIMEZONE_SET.has(value);
-}
+export { IANA_TIMEZONES, isIanaTimezone } from "@/lib/timezones";
 
 export default function Step1AgencyIdentity({formData, onChange, fieldsWithErrors}: any) {
     const addressInputRef = useRef<HTMLDivElement>(null);

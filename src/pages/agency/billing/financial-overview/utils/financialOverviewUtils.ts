@@ -10,14 +10,10 @@ import type {
   BillingClaimListItem,
   ClaimsDashboardSummary,
 } from "@/lib/api/claims";
-import type {
-  PayrollDashboardSummary,
-  PayrollInvoiceListItem,
-} from "@/lib/api/payroll";
-import { PAYROLL_STATUS_COLORS } from "@/pages/agency/billing/payroll/utils/payrollDashboardUtils";
-import type { PayrollStatusChartData } from "@/pages/agency/billing/payroll/utils/payrollDashboardUtils";
+import type { CursorPage, PayrollRun } from "@/features/payroll/runs/model/types";
 
 export const MAX_DATE_RANGE_DAYS = 90;
+export const MAX_PAYROLL_RUN_PAGES = 20;
 const TREND_CAP = 100;
 
 export type TrendBadge = {
@@ -32,7 +28,12 @@ export type FinancialOverviewStat = {
   trend?: TrendBadge;
 };
 
-export type FinancialPayrollChartData = PayrollStatusChartData;
+export type FinancialPayrollChartData = {
+  total: number;
+  centerLabel: string;
+  data: DonutSegment[];
+  legendData: DonutSegment[];
+};
 
 export function assertValidDateRange(range: DateRangeValues): string | null {
   if (!range.startDate || !range.endDate) {
@@ -164,28 +165,50 @@ export function mapDashboardToOverviewStats(
   });
 }
 
-export function mapDashboardToFinancialPayrollChart(
-  data: PayrollDashboardSummary | null,
+export function mapPayrollRunsToFinancialPayrollChart(
+  runs: readonly PayrollRun[],
 ): FinancialPayrollChartData {
-  const segments = data?.payrollByStatus.segments ?? [];
-  const paid = segments.find((segment) => segment.status === "paid")?.count ?? 0;
-  const pending = segments.find((segment) => segment.status === "pending")?.count ?? 0;
-  const overtimeCount = data?.overtimeAlerts.length ?? 0;
+  const counts = {
+    paid: 0,
+    partiallyPaid: 0,
+    failed: 0,
+    attention: 0,
+    inProgress: 0,
+  };
+  for (const run of runs) {
+    if (run.providerStatus === "paid") counts.paid += 1;
+    else if (run.providerStatus === "partially_paid") counts.partiallyPaid += 1;
+    else if (run.providerStatus === "failed") counts.failed += 1;
+    else if (run.workflowState === "needs_attention" || run.blockerCount > 0) counts.attention += 1;
+    else counts.inProgress += 1;
+  }
 
   const chartSegments: DonutSegment[] = [
-    { label: "Paid", value: paid, color: PAYROLL_STATUS_COLORS.paid },
-    { label: "Pending", value: pending, color: PAYROLL_STATUS_COLORS.pending },
-    { label: "Overtime", value: overtimeCount, color: "#f97316" },
+    { label: "Paid", value: counts.paid, color: "#0eaf52" },
+    { label: "Partially paid", value: counts.partiallyPaid, color: "#3b82f6" },
+    { label: "Failed", value: counts.failed, color: "#dc2626" },
+    { label: "Needs attention", value: counts.attention, color: "#f97316" },
+    { label: "In progress", value: counts.inProgress, color: "#ffb020" },
   ];
 
-  const total = paid + pending + overtimeCount;
+  const total = runs.length;
 
   return {
     total,
-    centerLabel: "Total staff",
+    centerLabel: "Payroll runs",
     data: chartSegments,
     legendData: chartSegments,
   };
+}
+
+export function shouldLoadNextPayrollRunPage(
+  page: CursorPage<PayrollRun>,
+  startDate: string,
+  pagesLoaded: number,
+): boolean {
+  if (!page.hasMore || !page.nextCursor || pagesLoaded >= MAX_PAYROLL_RUN_PAGES) return false;
+  const oldestRun = page.items.at(-1);
+  return !oldestRun || oldestRun.periodEnd >= startDate;
 }
 
 function claimActivityDescription(claim: BillingClaimListItem): string {
@@ -202,14 +225,12 @@ function claimActivityDescription(claim: BillingClaimListItem): string {
   return `Claim ${claim.claimNumber} rejected`;
 }
 
-function payrollActivityDescription(invoice: PayrollInvoiceListItem): string {
-  const name = invoice.employeeName ?? "Staff member";
-
-  if (invoice.status === "paid") {
-    return `Payroll for ${name} has been paid`;
-  }
-
-  return `Payroll for ${name} has been approved`;
+function payrollActivityDescription(run: PayrollRun): string {
+  if (run.providerStatus === "paid") return "Payroll run paid";
+  if (run.providerStatus === "partially_paid") return "Payroll run partially paid";
+  if (run.providerStatus === "failed") return "Payroll run failed";
+  if (run.workflowState === "needs_attention" || run.blockerCount > 0) return "Payroll run needs attention";
+  return "Payroll run in progress";
 }
 
 function formatActivityDate(isoDate: string): string {
@@ -218,7 +239,7 @@ function formatActivityDate(isoDate: string): string {
 
 export function buildRecentActivity(
   claims: BillingClaimListItem[],
-  invoices: PayrollInvoiceListItem[],
+  payrollRuns: PayrollRun[],
   options: { limit?: number } = {},
 ): RecentActivity[] {
   const limit = options.limit ?? 20;
@@ -235,21 +256,23 @@ export function buildRecentActivity(
     status: claim.status,
   }));
 
-  const invoiceRows: ActivityRow[] = invoices.map((invoice) => {
-    const activityDate = invoice.paidAt ?? invoice.createdAt;
+  const payrollRows: ActivityRow[] = payrollRuns.map((run) => {
+    const activityDate = run.payday;
 
     return {
-      id: `payroll-${invoice.id}`,
+      id: `payroll-${run.runId}`,
       sortKey: activityDate,
       date: formatActivityDate(activityDate),
       module: "Payroll",
-      description: payrollActivityDescription(invoice),
-      amount: invoice.grossAmount,
-      status: invoice.status,
+      description: payrollActivityDescription(run),
+      amount: run.totals.totalDueCents / 100,
+      status: run.providerStatus === "paid" || run.providerStatus === "partially_paid" || run.providerStatus === "failed"
+        ? run.providerStatus
+        : "pending",
     };
   });
 
-  return [...claimRows, ...invoiceRows]
+  return [...claimRows, ...payrollRows]
     .sort((left, right) => new Date(right.sortKey).getTime() - new Date(left.sortKey).getTime())
     .slice(0, limit)
     .map(({ sortKey: _sortKey, ...activity }) => activity);

@@ -16,7 +16,6 @@ export interface BillingManagementHeaderProps {
   onScopeChange: (scope: BillingWorkspaceScope) => void;
   onDateRangeChange: (range: BillingWorkspaceDateRange) => void;
   onModeChange: (mode: BillingProgramMode | null) => void;
-  onPayrollWeekChange: (weekStart: string) => void;
   initialAgencies?: OperationalAgencySummary[];
   onAgenciesDiscovered?: (agencies: OperationalAgencySummary[]) => void;
 }
@@ -40,7 +39,6 @@ export default function BillingManagementHeader({
   onScopeChange,
   onDateRangeChange,
   onModeChange,
-  onPayrollWeekChange,
   initialAgencies,
   onAgenciesDiscovered,
 }: BillingManagementHeaderProps) {

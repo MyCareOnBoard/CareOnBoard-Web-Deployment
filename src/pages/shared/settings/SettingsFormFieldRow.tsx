@@ -8,6 +8,7 @@ import {
 export type SettingsFormFieldRowProps = {
   title: ReactNode;
   description?: ReactNode;
+  descriptionId?: string;
   children: ReactNode;
   className?: string;
   fullWidth?: boolean;
@@ -18,6 +19,7 @@ export type SettingsFormFieldRowProps = {
 export const SettingsFormFieldRow = memo(function SettingsFormFieldRow({
   title,
   description,
+  descriptionId,
   children,
   className,
   fullWidth = false,
@@ -34,7 +36,7 @@ export const SettingsFormFieldRow = memo(function SettingsFormFieldRow({
     >
       <div className="min-w-0">
         <p className={settingsFieldLabelClass}>{title}</p>
-        {description ? <p className={settingsFieldDescriptionClass}>{description}</p> : null}
+        {description ? <p id={descriptionId} className={settingsFieldDescriptionClass}>{description}</p> : null}
       </div>
       <div
         className={cn(

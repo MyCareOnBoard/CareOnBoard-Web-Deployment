@@ -171,6 +171,7 @@ export interface UpdateAgencyProfileRequest {
     allowOverlappingVisits?: boolean;
     offerMileageReimbursements?: boolean;
     realtimeGpsTracking?: boolean;
+    timezone?: string;
 }
 
 /**

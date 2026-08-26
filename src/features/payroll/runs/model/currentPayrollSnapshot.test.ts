@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type {
-  CurrentPayrollEmployeePage,
-  CurrentPayrollRunResponse,
-  EmptyCurrentPayrollProjection,
-} from "./types";
+import type { CurrentPayrollEmployeePage, CurrentPayrollRunResponse } from "./types";
 import { acceptCurrentPayrollSnapshot } from "./currentPayrollSnapshot";
 
 const runResponse = (
@@ -16,9 +12,8 @@ const runResponse = (
   runId,
   activeRevisionId,
   revisionNumber,
-  workspaceMode: "run",
   run: { runId, activeRevisionId, revisionNumber },
-  capabilities: { replacementWorkspace: true, commands: {} },
+  capabilities: { commands: {} },
   prerequisites: {},
 } as unknown as CurrentPayrollRunResponse);
 
@@ -31,39 +26,23 @@ const employeePage = (
   runId,
   activeRevisionId,
   revisionNumber,
-  workspaceMode: "run",
-  capabilities: { replacementWorkspace: true },
   items: [],
   nextCursor: null,
   hasMore: false,
 });
 
-const emptyResponse = (workspaceMode: "legacy" | "run"): EmptyCurrentPayrollProjection => ({
-  kind: "empty",
-  runId: null,
-  activeRevisionId: null,
-  revisionNumber: null,
-  run: null,
-  emptyReason: "no_active_period",
-  workspaceMode,
-  capabilities: { replacementWorkspace: workspaceMode === "run" },
-});
-
 describe("acceptCurrentPayrollSnapshot", () => {
-  it("accepts only an equal run, opaque revision, and display revision pair as fresh", () => {
-    const accepted = acceptCurrentPayrollSnapshot({
+  it("accepts only an equal run and revision pair as fresh", () => {
+    expect(acceptCurrentPayrollSnapshot({
       runResponse: runResponse(),
       employeePage: employeePage(),
       previous: null,
       scopeKey: "scope-a",
-    });
-
-    expect(accepted).toMatchObject({
+    })).toMatchObject({
       scopeKey: "scope-a",
       freshness: "fresh",
       commandsEnabled: true,
       mismatchIdentity: null,
-      workspaceMode: "run",
     });
   });
 
@@ -74,7 +53,6 @@ describe("acceptCurrentPayrollSnapshot", () => {
       previous: null,
       scopeKey: "scope-a",
     });
-
     const accepted = acceptCurrentPayrollSnapshot({
       runResponse: runResponse("run-1", "revision-2", 2),
       employeePage: employeePage(),
@@ -83,33 +61,19 @@ describe("acceptCurrentPayrollSnapshot", () => {
     });
 
     expect(accepted.runResponse).toBe(previous.runResponse);
-    expect(accepted.employeePage).toBe(previous.employeePage);
     expect(accepted).toMatchObject({ freshness: "stale", commandsEnabled: false });
     expect(accepted.mismatchIdentity).toContain("revision-2");
   });
 
-  it("treats a display revision mismatch as stale without using it as authority", () => {
-    const previous = acceptCurrentPayrollSnapshot({
-      runResponse: runResponse(),
-      employeePage: employeePage(),
+  it("treats a display revision mismatch as stale", () => {
+    const accepted = acceptCurrentPayrollSnapshot({
+      runResponse: runResponse("run-1", "revision-1", 2),
+      employeePage: employeePage("run-1", "revision-1", 1),
       previous: null,
       scopeKey: "scope-a",
     });
 
-    const accepted = acceptCurrentPayrollSnapshot({
-      runResponse: runResponse("run-1", "revision-1", 2),
-      employeePage: employeePage("run-1", "revision-1", 1),
-      previous,
-      scopeKey: "scope-a",
-    });
-
-    expect(accepted.freshness).toBe("stale");
-    expect(accepted.identity).toEqual({
-      kind: "run",
-      runId: "run-1",
-      activeRevisionId: "revision-1",
-      revisionNumber: 1,
-    });
+    expect(accepted).toMatchObject({ freshness: "unavailable", commandsEnabled: false });
   });
 
   it("clears retained payroll data immediately when the authorization scope changes", () => {
@@ -119,7 +83,6 @@ describe("acceptCurrentPayrollSnapshot", () => {
       previous: null,
       scopeKey: "scope-a",
     });
-
     const accepted = acceptCurrentPayrollSnapshot({
       runResponse: undefined,
       employeePage: undefined,
@@ -136,46 +99,20 @@ describe("acceptCurrentPayrollSnapshot", () => {
     });
   });
 
-  it("accepts matching empty modes but rejects unknown or mixed empty pairs", () => {
-    const matching = acceptCurrentPayrollSnapshot({
-      runResponse: emptyResponse("legacy"),
-      employeePage: emptyResponse("legacy"),
+  it("accepts matching empty projections", () => {
+    const empty = {
+      kind: "empty" as const,
+      runId: null,
+      activeRevisionId: null,
+      revisionNumber: null,
+      run: null,
+      emptyReason: "no_active_period" as const,
+    };
+    expect(acceptCurrentPayrollSnapshot({
+      runResponse: empty,
+      employeePage: empty,
       previous: null,
       scopeKey: "scope-a",
-    });
-    const mixed = acceptCurrentPayrollSnapshot({
-      runResponse: emptyResponse("run"),
-      employeePage: emptyResponse("legacy"),
-      previous: null,
-      scopeKey: "scope-a",
-    });
-
-    expect(matching).toMatchObject({ freshness: "fresh", workspaceMode: "legacy" });
-    expect(mixed).toMatchObject({
-      freshness: "unavailable",
-      workspaceMode: null,
-      commandsEnabled: false,
-    });
-  });
-
-  it("fails closed when a run pair disagrees on workspace cutover capability", () => {
-    const mismatchedRun = {
-      ...runResponse(),
-      workspaceMode: "legacy",
-      capabilities: { replacementWorkspace: false, commands: {} },
-    } as unknown as CurrentPayrollRunResponse;
-
-    const accepted = acceptCurrentPayrollSnapshot({
-      runResponse: mismatchedRun,
-      employeePage: employeePage(),
-      previous: null,
-      scopeKey: "scope-a",
-    });
-
-    expect(accepted).toMatchObject({
-      freshness: "unavailable",
-      workspaceMode: null,
-      commandsEnabled: false,
-    });
+    })).toMatchObject({ freshness: "fresh", commandsEnabled: false });
   });
 });

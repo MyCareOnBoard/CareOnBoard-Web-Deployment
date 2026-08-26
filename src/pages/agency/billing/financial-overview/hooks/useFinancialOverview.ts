@@ -9,18 +9,21 @@ import {
   type ClaimsDashboardSummary,
 } from "@/lib/api/claims";
 import {
-  getPayrollDashboard,
-  listPayrollInvoices,
-  type PayrollDashboardSummary,
-  type PayrollInvoiceListItem,
-} from "@/lib/api/payroll";
+  useGetCurrentPayrollRunQuery,
+  useLazyListPayrollRunsQuery,
+  useListPayrollRunsQuery,
+} from "@/features/payroll/runs/api/payrollRunEndpoints";
+import type { PayrollRun } from "@/features/payroll/runs/model/types";
+import { useAuth } from "@/utils/auth";
 import { mapDashboardToStatusChart } from "@/pages/agency/billing/claims/utils/claimsDashboardUtils";
 import {
   assertValidDateRange,
   buildRecentActivity,
   getPreviousPeriodRange,
-  mapDashboardToFinancialPayrollChart,
+  mapPayrollRunsToFinancialPayrollChart,
   mapDashboardToOverviewStats,
+  MAX_PAYROLL_RUN_PAGES,
+  shouldLoadNextPayrollRunPage,
 } from "../utils/financialOverviewUtils";
 
 const LIST_LIMIT = 15;
@@ -32,9 +35,7 @@ function hasCompleteDateRange(dateRange: DateRangeValues) {
 
 type PrimaryFetchResult = {
   claimsDashboard: ClaimsDashboardSummary | null;
-  payrollDashboard: PayrollDashboardSummary | null;
   claims: BillingClaimListItem[];
-  invoices: PayrollInvoiceListItem[];
   partialErrors: string[];
   fatalError: string | null;
 };
@@ -51,12 +52,10 @@ async function fetchPrimaryBatch(
     ...(mode ? { mode } : {}),
   };
 
-  const [claimsDashboardResult, payrollDashboardResult, claimsListResult, invoicesListResult] =
+  const [claimsDashboardResult, claimsListResult] =
     await Promise.allSettled([
       getClaimsDashboard({ context: { agencyId }, query, signal }),
-      getPayrollDashboard({ context: { agencyId }, query, signal }),
       listBillingClaims({ context: { agencyId }, query: { ...query, limit: LIST_LIMIT }, signal }),
-      listPayrollInvoices({ context: { agencyId }, query: { ...query, limit: LIST_LIMIT }, signal }),
     ]);
 
   const partialErrors: string[] = [];
@@ -71,16 +70,6 @@ async function fetchPrimaryBatch(
     );
   }
 
-  const payrollDashboard =
-    payrollDashboardResult.status === "fulfilled" ? payrollDashboardResult.value : null;
-  if (payrollDashboardResult.status === "rejected") {
-    partialErrors.push(
-      payrollDashboardResult.reason instanceof Error
-        ? payrollDashboardResult.reason.message
-        : "Failed to load payroll dashboard",
-    );
-  }
-
   const claims =
     claimsListResult.status === "fulfilled" ? claimsListResult.value.claims : [];
   if (claimsListResult.status === "rejected") {
@@ -91,21 +80,9 @@ async function fetchPrimaryBatch(
     );
   }
 
-  const invoices =
-    invoicesListResult.status === "fulfilled" ? invoicesListResult.value.invoices : [];
-  if (invoicesListResult.status === "rejected") {
-    partialErrors.push(
-      invoicesListResult.reason instanceof Error
-        ? invoicesListResult.reason.message
-        : "Failed to load recent payroll invoices",
-    );
-  }
-
   const hasAnyData =
     claimsDashboard !== null ||
-    payrollDashboard !== null ||
-    claims.length > 0 ||
-    invoices.length > 0;
+    claims.length > 0;
 
   const fatalError = hasAnyData
     ? null
@@ -113,9 +90,7 @@ async function fetchPrimaryBatch(
 
   return {
     claimsDashboard,
-    payrollDashboard,
     claims,
-    invoices,
     partialErrors: hasAnyData ? partialErrors : [],
     fatalError,
   };
@@ -123,12 +98,22 @@ async function fetchPrimaryBatch(
 
 export function useFinancialOverview(dateRange: DateRangeValues) {
   const { agencyId, mode } = useOperationalAgency();
+  const { user } = useAuth();
+  const payrollScope = { audience: "agency" as const, actorUid: user?.uid ?? "", agencyId };
+  const currentPayroll = useGetCurrentPayrollRunQuery(payrollScope, { skip: !payrollScope.actorUid || !agencyId });
+  const payrollHistory = useListPayrollRunsQuery(payrollScope, { skip: !payrollScope.actorUid || !agencyId });
+  const [loadPayrollRunPage] = useLazyListPayrollRunsQuery();
+  const payrollRangeKey = JSON.stringify([payrollScope.actorUid, agencyId, dateRange.startDate, dateRange.endDate]);
+  const [payrollRange, setPayrollRange] = useState<{
+    key: string;
+    runs: PayrollRun[];
+    loading: boolean;
+    error: string | null;
+  }>({ key: payrollRangeKey, runs: [], loading: false, error: null });
   const [claimsDashboard, setClaimsDashboard] = useState<ClaimsDashboardSummary | null>(null);
   const [previousClaimsDashboard, setPreviousClaimsDashboard] =
     useState<ClaimsDashboardSummary | null>(null);
-  const [payrollDashboard, setPayrollDashboard] = useState<PayrollDashboardSummary | null>(null);
   const [claims, setClaims] = useState<BillingClaimListItem[]>([]);
-  const [invoices, setInvoices] = useState<PayrollInvoiceListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefetching, setIsRefetching] = useState(false);
   const [trendsLoading, setTrendsLoading] = useState(false);
@@ -190,9 +175,7 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
     hasLoadedOnceRef.current = false;
     setClaimsDashboard(null);
     setPreviousClaimsDashboard(null);
-    setPayrollDashboard(null);
     setClaims([]);
-    setInvoices([]);
     setLoading(Boolean(agencyId));
     setIsRefetching(false);
     setTrendsLoading(false);
@@ -200,13 +183,11 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
     setPartialErrors([]);
   }, [agencyId]);
 
-  const refetch = useCallback(async () => {
+  const refetchClaims = useCallback(async () => {
     if (!agencyId || !hasCompleteDateRange(dateRange)) {
       setClaimsDashboard(null);
       setPreviousClaimsDashboard(null);
-      setPayrollDashboard(null);
       setClaims([]);
-      setInvoices([]);
       setLoading(false);
       setIsRefetching(false);
       setTrendsLoading(false);
@@ -220,9 +201,7 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
     if (validationError) {
       setClaimsDashboard(null);
       setPreviousClaimsDashboard(null);
-      setPayrollDashboard(null);
       setClaims([]);
-      setInvoices([]);
       setLoading(false);
       setIsRefetching(false);
       setTrendsLoading(false);
@@ -257,9 +236,7 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
       if (result.fatalError) {
         if (!hasLoadedOnceRef.current) {
           setClaimsDashboard(null);
-          setPayrollDashboard(null);
           setClaims([]);
-          setInvoices([]);
         }
         setError(result.fatalError);
         setPartialErrors([]);
@@ -267,9 +244,7 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
       }
 
       setClaimsDashboard(result.claimsDashboard);
-      setPayrollDashboard(result.payrollDashboard);
       setClaims(result.claims);
-      setInvoices(result.invoices);
       setPartialErrors(result.partialErrors);
       hasLoadedOnceRef.current = true;
 
@@ -281,9 +256,7 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
 
       if (!hasLoadedOnceRef.current) {
         setClaimsDashboard(null);
-        setPayrollDashboard(null);
         setClaims([]);
-        setInvoices([]);
       }
 
       setError(
@@ -300,13 +273,74 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
   }, [agencyId, dateRange.endDate, dateRange.startDate, fetchTrends, mode]);
 
   useEffect(() => {
-    void refetch();
+    void refetchClaims();
     return () => {
       requestIdRef.current += 1;
       requestControllerRef.current?.abort();
       requestControllerRef.current = null;
     };
-  }, [refetch]);
+  }, [refetchClaims]);
+
+  useEffect(() => {
+    const firstPage = payrollHistory.data;
+    if (!payrollScope.actorUid || !agencyId || !firstPage) {
+      setPayrollRange({ key: payrollRangeKey, runs: [], loading: false, error: null });
+      return;
+    }
+
+    let cancelled = false;
+    let activeRequest: ReturnType<typeof loadPayrollRunPage> | null = null;
+    const initialLoading = shouldLoadNextPayrollRunPage(firstPage, dateRange.startDate, 1);
+    setPayrollRange({
+      key: payrollRangeKey,
+      runs: [...firstPage.items],
+      loading: initialLoading,
+      error: null,
+    });
+    if (!initialLoading) return;
+
+    void (async () => {
+      let page = firstPage;
+      let pagesLoaded = 1;
+      const runs = new Map(firstPage.items.map((run) => [run.runId, run]));
+      try {
+        while (shouldLoadNextPayrollRunPage(page, dateRange.startDate, pagesLoaded)) {
+          activeRequest = loadPayrollRunPage({
+            ...payrollScope,
+            cursor: page.nextCursor!,
+          }, true);
+          page = await activeRequest.unwrap();
+          pagesLoaded += 1;
+          for (const run of page.items) runs.set(run.runId, run);
+          if (cancelled) return;
+        }
+        if (cancelled) return;
+        const oldestPeriodEnd = page.items.at(-1)?.periodEnd;
+        const truncated = pagesLoaded >= MAX_PAYROLL_RUN_PAGES
+          && page.hasMore
+          && Boolean(oldestPeriodEnd && oldestPeriodEnd >= dateRange.startDate);
+        setPayrollRange({
+          key: payrollRangeKey,
+          runs: Array.from(runs.values()),
+          loading: false,
+          error: truncated ? "Check payroll history exceeds the supported date-range scan." : null,
+        });
+      } catch {
+        if (cancelled) return;
+        setPayrollRange({
+          key: payrollRangeKey,
+          runs: Array.from(runs.values()),
+          loading: false,
+          error: "Failed to load complete Check payroll history",
+        });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      activeRequest?.abort();
+    };
+  }, [agencyId, dateRange.startDate, loadPayrollRunPage, payrollHistory.data, payrollRangeKey, payrollScope.actorUid]);
 
   const overviewStats = useMemo(
     () => mapDashboardToOverviewStats(claimsDashboard, previousClaimsDashboard),
@@ -316,25 +350,43 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
     () => mapDashboardToStatusChart(claimsDashboard),
     [claimsDashboard],
   );
-  const payrollChart = useMemo(
-    () => mapDashboardToFinancialPayrollChart(payrollDashboard),
-    [payrollDashboard],
-  );
+  const payrollRuns = useMemo(() => {
+    const history = payrollRange.key === payrollRangeKey
+      ? payrollRange.runs
+      : payrollHistory.data?.items ?? [];
+    const current = currentPayroll.data?.kind === "run" ? currentPayroll.data.run : null;
+    const merged = current && !history.some((run) => run.runId === current.runId) ? [current, ...history] : history;
+    return merged.filter((run) => run.periodEnd >= dateRange.startDate && run.periodStart <= dateRange.endDate) as PayrollRun[];
+  }, [currentPayroll.data, dateRange.endDate, dateRange.startDate, payrollHistory.data, payrollRange, payrollRangeKey]);
+  const payrollChart = useMemo(() => mapPayrollRunsToFinancialPayrollChart(payrollRuns), [payrollRuns]);
   const recentActivity = useMemo(
-    () => buildRecentActivity(claims, invoices, { limit: ACTIVITY_LIMIT }),
-    [claims, invoices],
+    () => buildRecentActivity(claims, payrollRuns, { limit: ACTIVITY_LIMIT }),
+    [claims, payrollRuns],
   );
+  const combinedPartialErrors = useMemo(() => {
+    const payrollError = currentPayroll.error || payrollHistory.error
+      ? "Failed to load Check payroll runs"
+      : payrollRange.error;
+    return payrollError ? [...partialErrors, payrollError] : partialErrors;
+  }, [currentPayroll.error, partialErrors, payrollHistory.error, payrollRange.error]);
+  const refetch = useCallback(async () => {
+    await Promise.all([
+      refetchClaims(),
+      currentPayroll.refetch(),
+      payrollHistory.refetch(),
+    ]);
+  }, [currentPayroll, payrollHistory, refetchClaims]);
 
   return {
     overviewStats,
     claimsChart,
     payrollChart,
     recentActivity,
-    loading,
+    loading: loading || currentPayroll.isLoading || payrollHistory.isLoading || payrollRange.loading,
     isRefetching,
     trendsLoading,
     error,
-    partialErrors,
+    partialErrors: combinedPartialErrors,
     refetch,
   };
 }

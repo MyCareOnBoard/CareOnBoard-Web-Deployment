@@ -18,22 +18,22 @@ import type { PayrollRunCommandArgs } from "../api/payrollRunCommands";
 import type { OffCycleSubmissionRetention } from "../components/dialogs/CreateOffCyclePayrollDialog";
 import type { AgencyPayrollRunScope, PayrollRunCommandName, PayrollRunProjection } from "../model/types";
 
-const LegacyPayrollHistoryPanel = lazy(() => import("../components/tabs/LegacyPayrollHistoryPanel")
-  .then((module) => ({ default: module.LegacyPayrollHistoryPanel })));
 const PayrollAuditPanel = lazy(() => import("../components/tabs/PayrollAuditPanel")
   .then((module) => ({ default: module.PayrollAuditPanel })));
 const PayrollHistoryPanel = lazy(() => import("../components/tabs/PayrollHistoryPanel")
   .then((module) => ({ default: module.PayrollHistoryPanel })));
 const PayrollObligationsPanel = lazy(() => import("../components/tabs/PayrollObligationsPanel")
   .then((module) => ({ default: module.PayrollObligationsPanel })));
+const UpcomingPayrollPanel = lazy(() => import("../components/tabs/UpcomingPayrollPanel")
+  .then((module) => ({ default: module.UpcomingPayrollPanel })));
 
-type WorkspaceTab = "current" | "history" | "audit" | "obligations" | "legacy";
+type WorkspaceTab = "current" | "upcoming" | "history" | "audit" | "obligations";
 const tabs: ReadonlyArray<{ id: WorkspaceTab; label: string }> = [
   { id: "current", label: "Current" },
+  { id: "upcoming", label: "Upcoming" },
   { id: "history", label: "History" },
   { id: "audit", label: "Audit" },
   { id: "obligations", label: "Obligations" },
-  { id: "legacy", label: "Legacy" },
 ];
 
 const agencyPayrollSetupHref = "/agency/agency-settings?tab=payrollSetup";
@@ -42,7 +42,7 @@ function PayrollManagementHeader() {
   return (
     <BillingDashboardHeader
       title="Payroll management"
-      subtitle="Review the current pay period, resolve exceptions, and approve payroll."
+      subtitle="Review current and upcoming pay periods, resolve exceptions, and approve payroll."
     />
   );
 }
@@ -116,11 +116,6 @@ export function PayrollWorkspaceEmptyState(props: PayrollWorkspaceEmptyStateProp
 }
 
 const intentKey = () => crypto.randomUUID();
-const legacyRange = () => {
-  const now = new Date();
-  const year = now.getUTCFullYear();
-  return { startDate: `${year}-01-01`, endDate: now.toISOString().slice(0, 10) };
-};
 
 function CurrentPayrollControls({
   scope, workspace, projection, activeIntent, errorMessage, onAction, onApprove,
@@ -188,7 +183,6 @@ function AgencyPayrollRunsWorkspaceContent({ scope, workspace }: {
   }
   const commands = usePayrollRunCommand(scope, workspace.refetch);
   const projection = workspace.runResponse?.kind === "run" ? workspace.runResponse : null;
-  const range = legacyRange();
   const tab = tabState.key === scopeKey ? tabState.tab : "current";
 
   const selectTab = (next: WorkspaceTab) => {
@@ -310,7 +304,9 @@ function AgencyPayrollRunsWorkspaceContent({ scope, workspace }: {
             </div>
           ) : (
             <Suspense fallback={<p role="status" className="py-8 text-sm text-[#62686f]">Loading payroll section…</p>}>
-              {tab === "history" ? (
+              {tab === "upcoming" ? (
+                <UpcomingPayrollPanel scope={scope} />
+              ) : tab === "history" ? (
                 <PayrollHistoryPanel scope={scope} />
               ) : tab === "audit" ? (
                 projection ? <PayrollAuditPanel scope={scope} runId={projection.runId} activeRevisionId={projection.activeRevisionId} />
@@ -324,9 +320,7 @@ function AgencyPayrollRunsWorkspaceContent({ scope, workspace }: {
                   onRestore={() => Promise.reject(new Error("Restore is unavailable without a bound originating revision."))}
                   submissionRetention={offCycleSubmission}
                 />
-              ) : (
-                <LegacyPayrollHistoryPanel scope={scope} startDate={range.startDate} endDate={range.endDate} />
-              )}
+              ) : null}
             </Suspense>
           )}
         </div>

@@ -422,7 +422,7 @@ export default function ShiftDetailsModal({
       <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative flex min-h-[553px] w-[547px] max-w-[90vw] flex-col rounded-[20px] bg-white px-6 pt-6 pb-5 shadow-xl">
+      <div className="relative flex min-h-[min(553px,90dvh)] max-h-[90dvh] w-[547px] max-w-[90vw] flex-col overflow-hidden rounded-[20px] bg-white px-6 pt-6 pb-5 shadow-xl">
         <button
           type="button"
           onClick={onClose}
@@ -432,7 +432,7 @@ export default function ShiftDetailsModal({
           <X className="h-4 w-4 text-[#10141a]" />
         </button>
 
-        <div className="mb-4">
+        <div className="mb-4 shrink-0">
           <h2 className="text-[20px] leading-[1.6] font-medium text-[#10141a]">Update this shift</h2>
           <p className="text-[14px] leading-[1.4] font-medium text-[#808081]">
             {resolvedShift ? getShiftDateLabel(resolvedShift) : getShiftDateLabel(shift)}
@@ -452,6 +452,7 @@ export default function ShiftDetailsModal({
 
         {showBody && resolvedShift ? (
           <>
+            <div className="min-h-0 flex-1 overflow-y-auto">
             {anomalyCodes.length > 0 ? (
               <div className="mb-4 flex flex-wrap gap-1.5">
                 {anomalyCodes.map((code) => {
@@ -561,15 +562,15 @@ export default function ShiftDetailsModal({
                 <>
                   <div className="mt-3 flex items-center justify-between gap-3 border-t border-[rgba(0,0,0,0.06)] pt-3">
                     <div className="min-w-0">
-                      <p className="text-[14px] font-semibold text-[#10141a]">Approve for billing</p>
+                      <p className="text-[14px] font-semibold text-[#10141a]">Approve for billing and payroll</p>
                       <p className="text-[11px] text-[#808081]">
-                        Shows as Approved in Billing &amp; Approvals when you save.
+                        Makes this completed shift eligible for billing and the next payroll run.
                       </p>
                     </div>
                     <Switch
                       checked={draftApproved}
                       onCheckedChange={setDraftApproved}
-                      aria-label="Approve for billing"
+                      aria-label="Approve for billing and payroll"
                     />
                   </div>
                   <div className="mt-3 flex flex-col gap-2">
@@ -599,8 +600,9 @@ export default function ShiftDetailsModal({
                 </div>
               </div>
             ) : null}
+            </div>
 
-            <div className="mt-auto">
+            <div className="shrink-0 pt-4">
               <div className="mb-3">
                 <div className="mb-1 flex items-center justify-between">
                   <label className="text-[12px] font-medium text-[#808081]" htmlFor="shift-update-reason">

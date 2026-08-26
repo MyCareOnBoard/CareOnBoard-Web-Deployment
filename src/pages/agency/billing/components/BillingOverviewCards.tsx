@@ -3,15 +3,17 @@ import type { BillingOverviewStat } from "./types";
 type BillingOverviewCardsProps = {
   stats: BillingOverviewStat[];
   showCountBadge?: boolean;
+  heading?: string;
 };
 
 export default function BillingOverviewCards({
   stats,
   showCountBadge = false,
+  heading = "Overview",
 }: BillingOverviewCardsProps) {
   return (
     <section>
-      <h2 className="mb-4 text-[16px] font-semibold text-[#10141a]">Overview</h2>
+      <h2 className="mb-4 text-[16px] font-semibold text-[#10141a]">{heading}</h2>
       <div className="flex flex-wrap gap-6">
         {stats.map((stat) => (
           <div

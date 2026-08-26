@@ -20,6 +20,7 @@ import {
   parsePayrollRunEventPage,
   parsePayrollRunPage,
   parsePayrollRunProjectionResponse,
+  parseUpcomingPayrollResponse,
 } from "./payrollRunContracts";
 import type {
   AgencyPayrollRunScope,
@@ -38,6 +39,7 @@ export type PayrollEmployeeSort = "name_asc" | "gross_desc";
 export type PayrollObligationState = "open" | "attached" | "processing" | "satisfied" | "cancelled" | "operations_required";
 
 export type CurrentPayrollRunArgs = AgencyPayrollRunScope;
+export type UpcomingPayrollArgs = AgencyPayrollRunScope & { cursor?: string };
 export type CurrentPayrollEmployeesArgs = AgencyPayrollRunScope & {
   filter?: PayrollEmployeeFilter;
   sort?: PayrollEmployeeSort;
@@ -103,6 +105,58 @@ export type PayrollObligation = {
 };
 export type PayrollObligationPage = CursorPage<PayrollObligation>;
 
+export type UpcomingPayrollSourceCounts = {
+  shift: number;
+  staff_timesheet: number;
+};
+
+export type UpcomingPayrollEmployee = {
+  employeeId: string;
+  employmentType: "field" | "staff";
+  displayName: string;
+  regularHours: number;
+  overtimeHours: number;
+  grossEarningsCents: number;
+  sourceCount: number;
+  sourceCounts: UpcomingPayrollSourceCounts;
+  hasBlockers: boolean;
+  blockerCodes: string[];
+};
+
+export type UpcomingPayrollProjection = {
+  kind: "upcoming";
+  projectionRevision: number;
+  periodStart: string;
+  periodEnd: string;
+  payday: string;
+  totals: {
+    regularHours: number;
+    overtimeHours: number;
+    totalHours: number;
+    grossEarningsCents: number;
+  };
+  employeeCount: number;
+  blockerCount: number;
+  blockerCodes: string[];
+  sourceCounts: UpcomingPayrollSourceCounts;
+  items: UpcomingPayrollEmployee[];
+  nextCursor: string | null;
+  hasMore: boolean;
+  asOf: string;
+};
+
+export type EmptyUpcomingPayrollProjection = {
+  kind: "empty";
+  projectionRevision: number;
+  emptyReason: "no_upcoming_period" | "agency_timezone_required";
+  items: [];
+  nextCursor: null;
+  hasMore: false;
+  asOf: string;
+};
+
+export type UpcomingPayrollResponse = UpcomingPayrollProjection | EmptyUpcomingPayrollProjection;
+
 const authenticatedGet = (url: string) => ({ url, method: "GET" as const, requiresAuth: true });
 const optional = <T>(key: string, value: T | undefined) => value === undefined ? {} : { [key]: value };
 
@@ -111,6 +165,10 @@ export const payrollRunRequests = {
   currentEmployees: ({ filter, sort, cursor }: CurrentPayrollEmployeesArgs) => ({
     ...authenticatedGet("/checkPayrollAgency/payroll/agency/runs/current/employees"),
     params: { limit: 50, ...optional("filter", filter), ...optional("sort", sort), ...optional("cursor", cursor) },
+  }),
+  upcoming: ({ cursor }: UpcomingPayrollArgs) => ({
+    ...authenticatedGet("/checkPayrollAgency/payroll/agency/upcoming"),
+    params: { limit: 50, ...optional("cursor", cursor) },
   }),
   list: ({ runType, cursor }: PayrollRunListArgs) => ({
     ...authenticatedGet("/checkPayrollAgency/payroll/agency/runs"),
@@ -151,6 +209,7 @@ export const payrollRunCacheKeys = {
   currentEmployees: (args: CurrentPayrollEmployeesArgs) => cacheKey(
     "current-employees", args, args.filter, args.sort, args.cursor,
   ),
+  upcoming: (args: UpcomingPayrollArgs) => cacheKey("upcoming", args, args.cursor),
   list: (args: PayrollRunListArgs) => cacheKey("runs", args, args.runType, args.cursor),
   detail: (args: PayrollRunDetailArgs) => cacheKey("run", args, args.runId, args.activeRevisionId),
   employees: (args: PayrollRunEmployeesArgs) => cacheKey(
@@ -188,6 +247,12 @@ export const payrollRunApi = checkPayrollApi.injectEndpoints({
       providesTags: (result, _error, scope) => result?.kind === "run"
         ? payrollRunEmployeeQueryTags(scope, result.runId, result.activeRevisionId)
         : [payrollRunEmployeeTag(scope, "current", "current")],
+    }),
+    getUpcomingPayroll: build.query<UpcomingPayrollResponse, UpcomingPayrollArgs>({
+      query: payrollRunRequests.upcoming,
+      serializeQueryArgs: ({ queryArgs }) => payrollRunCacheKeys.upcoming(queryArgs),
+      transformResponse: parseUpcomingPayrollResponse,
+      providesTags: (_result, _error, scope) => [payrollRunTag(scope, "current", "current")],
     }),
     listPayrollRuns: build.query<PayrollRunPage, PayrollRunListArgs>({
       query: payrollRunRequests.list,
@@ -279,6 +344,8 @@ export const {
   useLazyGetCurrentPayrollRunQuery,
   useGetCurrentPayrollEmployeesQuery,
   useLazyGetCurrentPayrollEmployeesQuery,
+  useGetUpcomingPayrollQuery,
+  useLazyGetUpcomingPayrollQuery,
   useListPayrollRunsQuery,
   useLazyListPayrollRunsQuery,
   useGetPayrollRunQuery,

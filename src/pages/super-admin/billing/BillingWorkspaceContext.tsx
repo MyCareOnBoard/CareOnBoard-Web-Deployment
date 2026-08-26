@@ -1,20 +1,13 @@
 import { createContext, useContext, type ReactNode } from "react";
 import type {
   BillingWorkspaceDateRange,
-  BillingPayrollTab,
   BillingWorkspaceState,
 } from "./billingWorkspaceState";
-import { normalizeNetworkPayrollWeekStart } from "./network/networkPayrollWeek";
 
-type BillingWorkspaceContextState = Omit<BillingWorkspaceState, "payrollWeekStart" | "payrollTab">
-  & Partial<Pick<BillingWorkspaceState, "payrollWeekStart" | "payrollTab">>;
-
-export interface BillingWorkspaceContextValue extends BillingWorkspaceContextState {
+export interface BillingWorkspaceContextValue extends BillingWorkspaceState {
   actorUid: string;
   environment: string;
   onDateRangeChange: (range: BillingWorkspaceDateRange) => void;
-  onPayrollWeekChange?: (weekStart: string) => void;
-  onPayrollTabChange?: (tab: BillingPayrollTab) => void;
 }
 
 export type ResolvedBillingWorkspaceContextValue = BillingWorkspaceContextValue & BillingWorkspaceState;
@@ -28,17 +21,8 @@ export function BillingWorkspaceProvider({
   children: ReactNode;
   value: BillingWorkspaceContextValue;
 }) {
-  const resolvedValue: ResolvedBillingWorkspaceContextValue = {
-    ...value,
-    payrollWeekStart: value.payrollWeekStart
-      ?? normalizeNetworkPayrollWeekStart("", value.endDate),
-    payrollTab: value.payrollTab ?? "due",
-    onPayrollWeekChange: value.onPayrollWeekChange ?? (() => undefined),
-    onPayrollTabChange: value.onPayrollTabChange ?? (() => undefined),
-  };
-
   return (
-    <BillingWorkspaceContext.Provider value={resolvedValue}>
+    <BillingWorkspaceContext.Provider value={value}>
       {children}
     </BillingWorkspaceContext.Provider>
   );

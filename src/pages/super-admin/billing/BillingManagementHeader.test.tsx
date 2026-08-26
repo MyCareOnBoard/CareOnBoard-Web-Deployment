@@ -36,18 +36,11 @@ vi.mock("@/components/shifts/ShiftDateRangeControl", () => ({
   ),
 }));
 
-function renderHeader({
-  path = "/super-admin/billing/claims?scope=network&status=open",
-  payrollTab = "due" as const,
-}: {
-  path?: string;
-  payrollTab?: "due" | "saved";
-} = {}) {
+function renderHeader({ path = "/super-admin/billing/claims?scope=network&status=open" }: { path?: string } = {}) {
   cleanup();
   const onScopeChange = vi.fn();
   const onDateRangeChange = vi.fn();
   const onModeChange = vi.fn();
-  const onPayrollWeekChange = vi.fn();
   const router = createMemoryRouter([
     {
       path: "*",
@@ -59,19 +52,16 @@ function renderHeader({
               startDate: "2026-07-01",
               endDate: "2026-07-31",
               mode: null,
-              payrollWeekStart: "2026-07-27",
-              payrollTab,
             }}
             onScopeChange={onScopeChange}
             onDateRangeChange={onDateRangeChange}
             onModeChange={onModeChange}
-            onPayrollWeekChange={onPayrollWeekChange}
           />
       ),
     },
   ], { initialEntries: [path] });
   render(<RouterProvider router={router} />);
-  return { onScopeChange, onDateRangeChange, onModeChange, onPayrollWeekChange };
+  return { onScopeChange, onDateRangeChange, onModeChange };
 }
 
 describe("BillingManagementHeader", () => {
@@ -121,7 +111,7 @@ describe("BillingManagementHeader", () => {
 
   it("hides legacy date, payroll-week, and program controls on the payroll-run route", () => {
     renderHeader({
-      path: "/super-admin/billing/payroll-management?scope=network&payrollTab=due",
+      path: "/super-admin/billing/payroll-management?scope=network",
     });
 
     expect(screen.queryByLabelText("Payroll week")).not.toBeInTheDocument();

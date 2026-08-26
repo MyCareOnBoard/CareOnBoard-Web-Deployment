@@ -23,14 +23,6 @@ export type StaffTimesheetSignature = {
   signatureData: string;
 };
 
-export type StaffTimesheetPayPreview = {
-  /** Aggregate for this staff member's eligible timesheets in the billing-list response. */
-  billingType: "hourly" | "monthly";
-  billingRate: number;
-  totalHours: number;
-  grossAmount: number;
-};
-
 export type StaffTimesheet = {
   id: string;
   agencyId: string;
@@ -49,7 +41,6 @@ export type StaffTimesheet = {
   reviewedBy: string | null;
   reviewerNotes: string | null;
   payrollInvoiceId: string | null;
-  payPreview?: StaffTimesheetPayPreview;
   createdAt: string;
   updatedAt: string;
 };
@@ -72,7 +63,6 @@ export type ListStaffTimesheetsQuery = {
   mode?: AgencyMode;
   limit?: number;
   cursor?: string;
-  payroll?: boolean;
 };
 
 export type StaffTimesheetListPage = {
@@ -82,13 +72,6 @@ export type StaffTimesheetListPage = {
   total: number | null;
   nextCursor: string | null;
   truncated: boolean;
-};
-
-export type CreateStaffPayrollInvoicePayload = {
-  staffUid: string;
-  periodStart: string;
-  periodEnd: string;
-  staffTimesheetIds: string[];
 };
 
 type ListResponse = {
@@ -202,36 +185,11 @@ export async function reviewStaffTimesheet(
   }
 }
 
-export async function createStaffPayrollInvoice(
-  input: {
-    context: OperationalBillingRequestContext;
-    payload: CreateStaffPayrollInvoicePayload;
-    signal?: AbortSignal;
-  },
-): Promise<{ id: string }> {
-  const { context, payload, signal } = input;
-  const response = await axiosClient.post<{ success: boolean; data?: { id: string }; message?: string }>(
-    `${BASE}/payroll`,
-    withoutAgencyId(payload),
-    { params: { agencyId: operationalAgencyId(context) }, ...(signal ? { signal } : {}) },
-  );
-  if (!response.data.success || !response.data.data) {
-    throw new Error(response.data.message || "Failed to create payroll invoice");
-  }
-  return response.data.data;
-}
-
 export function getStaffTimesheetErrorMessage(error: unknown): string {
   const response =
     typeof error === "object" && error !== null && "response" in error
       ? (error as { response?: { data?: { error?: string; message?: string } } }).response?.data
       : undefined;
-  if (response?.error === "ITEM_ALREADY_INVOICED") {
-    return "One or more timesheets are already on a payroll invoice. Refresh and try again.";
-  }
-  if (response?.error === "STAFF_RATE_UNRESOLVED") {
-    return "This staff member has no pay rate set. Set it in User Levels and try again.";
-  }
   if (response?.message) return response.message;
   if (error instanceof Error && error.message) return error.message;
   return "Something went wrong. Please try again.";

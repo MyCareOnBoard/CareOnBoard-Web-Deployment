@@ -8,7 +8,6 @@ const api = vi.hoisted(() => ({
   overview: vi.fn(),
   refetch: vi.fn(),
   prepare: vi.fn(),
-  backfill: vi.fn(),
 }));
 const agencyOverview = vi.hoisted(() => vi.fn());
 
@@ -17,7 +16,6 @@ vi.mock("@/lib/api/network-billing", () => ({
   networkBillingApi: {
     useGetOverviewBootstrapQuery: api.overview,
     usePrepareNetworkBillingMutation: () => [api.prepare, { isLoading: false }],
-    useStartNetworkPayrollRollupBackfillMutation: () => [api.backfill, { isLoading: false }],
   },
 }));
 vi.mock("@/pages/agency/billing/financial-overview", () => ({
@@ -181,7 +179,7 @@ describe("NetworkFinancialOverview", () => {
     expect(screen.getByRole("button", { name: "Prepare network billing" })).toBeVisible();
   });
 
-  it("schedules the ninety-day payroll rollup backfill after preparation is ready", async () => {
+  it("closes the dialog after preparation is ready", async () => {
     const user = userEvent.setup();
     api.overview.mockReturnValue(queryResult({
       data: undefined,
@@ -191,22 +189,20 @@ describe("NetworkFinancialOverview", () => {
     api.prepare.mockReturnValue({
       unwrap: () => Promise.resolve({ ready: true, ownership: { deletedRecords: [] } }),
     });
-    api.backfill.mockReturnValue({ unwrap: () => Promise.resolve({ status: "pending" }) });
     renderWithWorkspace(<NetworkFinancialOverview />);
 
     await user.click(screen.getByRole("button", { name: "Prepare network billing" }));
     await user.click(screen.getByRole("button", { name: "Prepare billing now" }));
 
-    await waitFor(() => expect(api.backfill).toHaveBeenCalledWith({
+    await waitFor(() => expect(api.prepare).toHaveBeenCalledWith({
       actorUid: "super-1",
       environment: "staging",
       scope: { kind: "network" },
-      days: 90,
-      confirmProduction: false,
     }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
 
-  it("does not schedule payroll rollups when preparation is incomplete", async () => {
+  it("keeps the dialog open when preparation is incomplete", async () => {
     const user = userEvent.setup();
     api.overview.mockReturnValue(queryResult({
       data: undefined,
@@ -221,50 +217,8 @@ describe("NetworkFinancialOverview", () => {
     await user.click(screen.getByRole("button", { name: "Prepare network billing" }));
     await user.click(screen.getByRole("button", { name: "Prepare billing now" }));
 
-    expect(api.backfill).not.toHaveBeenCalled();
     expect(await screen.findByRole("alert")).toHaveTextContent("some billing records still need attention");
-  });
-
-  it("keeps the confirmation dialog open when payroll rollup scheduling fails", async () => {
-    const user = userEvent.setup();
-    api.overview.mockReturnValue(queryResult({
-      data: undefined,
-      isError: true,
-      error: { status: 503, data: { code: "NETWORK_BILLING_INDEX_NOT_READY" } },
-    }));
-    api.prepare.mockReturnValue({
-      unwrap: () => Promise.resolve({ ready: true, ownership: { deletedRecords: [] } }),
-    });
-    api.backfill.mockReturnValue({ unwrap: () => Promise.reject(new Error("queue unavailable")) });
-    renderWithWorkspace(<NetworkFinancialOverview />);
-
-    await user.click(screen.getByRole("button", { name: "Prepare network billing" }));
-    await user.click(screen.getByRole("button", { name: "Prepare billing now" }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent("scheduling the 90-day payroll rollup backfill failed");
     expect(screen.getByRole("alertdialog")).toBeVisible();
-  });
-
-  it("uses the confirmation to satisfy the production backfill guard", async () => {
-    const user = userEvent.setup();
-    api.overview.mockReturnValue(queryResult({
-      data: undefined,
-      isError: true,
-      error: { status: 503, data: { code: "NETWORK_BILLING_INDEX_NOT_READY" } },
-    }));
-    api.prepare.mockReturnValue({
-      unwrap: () => Promise.resolve({ ready: true, ownership: { deletedRecords: [] } }),
-    });
-    api.backfill.mockReturnValue({ unwrap: () => Promise.resolve({ status: "pending" }) });
-    renderWithWorkspace(<NetworkFinancialOverview />, workspace({ environment: "production" }));
-
-    await user.click(screen.getByRole("button", { name: "Prepare network billing" }));
-    await user.click(screen.getByRole("button", { name: "Prepare billing now" }));
-
-    await waitFor(() => expect(api.backfill).toHaveBeenCalledWith(expect.objectContaining({
-      days: 90,
-      confirmProduction: true,
-    })));
   });
 
   it("keeps successful rows and metrics visible while the overview refreshes", () => {

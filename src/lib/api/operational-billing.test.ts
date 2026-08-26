@@ -12,16 +12,6 @@ import {
   updateBillingClaimStatus,
 } from "@/lib/api/claims";
 import {
-  cancelPayrollInvoice,
-  createPayrollInvoice,
-  getPayrollDashboard,
-  getPayrollInvoiceById,
-  getPayrollInvoicePreview,
-  getStaffToPay,
-  listPayrollInvoices,
-  markPayrollInvoicePaid,
-} from "@/lib/api/payroll";
-import {
   cancelOutOfPocketInvoice,
   createOutOfPocketInvoice,
   getOutOfPocketInvoice,
@@ -30,7 +20,6 @@ import {
   sendOutOfPocketInvoice,
 } from "@/lib/api/out-of-pocket";
 import {
-  createStaffPayrollInvoice,
   createStaffTimesheet,
   getStaffTimesheet,
   listMyStaffTimesheets,
@@ -47,10 +36,6 @@ import {
   buildExpensesMutationRequest,
   serializeExpensesQueryArgs,
 } from "@/lib/api/billing-expenses";
-import {
-  invalidatePayrollData,
-  subscribePayrollInvalidation,
-} from "@/pages/agency/billing/shared/billingInvalidation";
 import {
   billingRecordTag,
   buildBillingRecordRequest,
@@ -236,106 +221,6 @@ describe("operational billing request context", () => {
     );
   });
 
-  it("scopes payroll reads, previews, creation, and status mutations", async () => {
-    mockedAxios.get.mockResolvedValue({ data: { success: true, data: { invoices: [] } } } as never);
-    mockedAxios.post.mockResolvedValue({ data: { success: true, data: { id: "payroll-1" } } } as never);
-    mockedAxios.patch.mockResolvedValue({ data: { success: true } } as never);
-    mockedAxios.delete.mockResolvedValue({ data: { success: true } } as never);
-    const context = { agencyId: "agency-a" };
-    const range = { startDate: "2026-07-01", endDate: "2026-07-31" };
-
-    await getPayrollDashboard({ context, query: range });
-    await getStaffToPay({ context, query: range });
-    await listPayrollInvoices({ context, query: range });
-    await getPayrollInvoiceById({ context, invoiceId: "payroll-1" });
-    await getPayrollInvoicePreview({
-      context,
-      query: { employeeId: "staff-1", periodStart: range.startDate, periodEnd: range.endDate },
-    });
-    await createPayrollInvoice({
-      context,
-      payload: {
-        employeeId: "staff-1",
-        periodStart: range.startDate,
-        periodEnd: range.endDate,
-        shiftIds: ["shift-1"],
-      },
-    });
-    await markPayrollInvoicePaid({ context, invoiceId: "payroll-1" });
-    await cancelPayrollInvoice({ context, invoiceId: "payroll-1" });
-
-    for (const call of mockedAxios.get.mock.calls) {
-      expect(call[1]).toMatchObject({ params: expect.objectContaining({ agencyId: "agency-a" }) });
-    }
-    expect(mockedAxios.post).toHaveBeenCalledWith(
-      "/billing/payroll/invoices",
-      expect.objectContaining({ employeeId: "staff-1", agencyId: "agency-a" }),
-      { params: { agencyId: "agency-a" } },
-    );
-    expect(mockedAxios.patch).toHaveBeenCalledWith(
-      "/billing/payroll/invoices/payroll-1/status",
-      { status: "paid" },
-      { params: { agencyId: "agency-a" } },
-    );
-    expect(mockedAxios.delete).toHaveBeenCalledWith("/billing/payroll/invoices/payroll-1", {
-      params: { agencyId: "agency-a" },
-    });
-  });
-
-  it("normalizes cursor-paginated payroll invoice history", async () => {
-    const invoice = { id: "payroll-1" };
-    mockedAxios.get.mockResolvedValue({
-      data: {
-        success: true,
-        data: { items: [invoice], nextCursor: null, hasMore: false },
-      },
-    } as never);
-
-    const result = await listPayrollInvoices({
-      context: { agencyId: "agency-a" },
-      query: { startDate: "2026-07-01", endDate: "2026-07-31" },
-    });
-
-    expect(result).toEqual({ invoices: [invoice], total: 1 });
-  });
-
-  it("overwrites forged agency IDs in payroll queries and create bodies", async () => {
-    mockedAxios.get.mockResolvedValue({ data: { success: true, data: { invoices: [] } } } as never);
-    mockedAxios.post.mockResolvedValue({ data: { success: true, data: { id: "payroll-1" } } } as never);
-
-    await listPayrollInvoices({
-      context: { agencyId: "agency-a" },
-      query: {
-        startDate: "2026-07-01",
-        endDate: "2026-07-31",
-        agencyId: "forged-agency",
-      } as never,
-    });
-    await createPayrollInvoice({
-      context: { agencyId: "agency-a" },
-      payload: {
-        employeeId: "staff-1",
-        periodStart: "2026-07-01",
-        periodEnd: "2026-07-31",
-        shiftIds: ["shift-1"],
-        agencyId: "forged-agency",
-      } as never,
-    });
-
-    expect(mockedAxios.get).toHaveBeenCalledWith("/billing/payroll/invoices", {
-      params: {
-        startDate: "2026-07-01",
-        endDate: "2026-07-31",
-        agencyId: "agency-a",
-      },
-    });
-    expect(mockedAxios.post).toHaveBeenCalledWith(
-      "/billing/payroll/invoices",
-      expect.objectContaining({ agencyId: "agency-a" }),
-      { params: { agencyId: "agency-a" } },
-    );
-  });
-
   it("scopes out-of-pocket reads and mutations without trusting a body agency", async () => {
     mockedAxios.get.mockResolvedValue({ data: { success: true, data: { rows: [], invoices: [] } } } as never);
     mockedAxios.post.mockResolvedValue({ data: { success: true, data: { id: "oop-1" } } } as never);
@@ -408,15 +293,6 @@ describe("operational billing request context", () => {
     await listStaffTimesheets({ context, query: { scope: "agency" } });
     await getStaffTimesheet({ context, timesheetId: "timesheet-1" });
     await reviewStaffTimesheet({ context, timesheetId: "timesheet-1", status: "approved" });
-    await createStaffPayrollInvoice({
-      context,
-      payload: {
-        staffUid: "staff-1",
-        periodStart: "2026-07-01",
-        periodEnd: "2026-07-31",
-        staffTimesheetIds: ["timesheet-1"],
-      },
-    });
 
     expect(mockedAxios.get).toHaveBeenNthCalledWith(1, "/agencyStaff/timesheets", {
       params: { scope: "agency", agencyId: "agency-a" },
@@ -429,12 +305,6 @@ describe("operational billing request context", () => {
       { status: "approved" },
       { params: { agencyId: "agency-a" } },
     );
-    expect(mockedAxios.post).toHaveBeenCalledWith(
-      "/agencyStaff/timesheets/payroll",
-      expect.objectContaining({ staffUid: "staff-1" }),
-      { params: { agencyId: "agency-a" } },
-    );
-
     vi.clearAllMocks();
     mockedAxios.post.mockResolvedValue({ data: { success: true, data: { id: "draft-1", status: "draft" } } } as never);
     mockedAxios.patch.mockResolvedValue({ data: { success: true, data: { id: "draft-1", status: "draft" } } } as never);
@@ -453,37 +323,16 @@ describe("operational billing request context", () => {
 
   it("separates employee-owned timesheet scope from operational agency mutations", async () => {
     mockedAxios.get.mockResolvedValue({ data: { success: true, data: { timesheets: [] } } } as never);
-    mockedAxios.post.mockResolvedValue({ data: { success: true, data: { id: "payroll-1" } } } as never);
 
     await listMyStaffTimesheets({
       scope: "agency",
       agencyId: "forged-agency",
       status: "draft",
     } as never);
-    await createStaffPayrollInvoice({
-      context: { agencyId: "agency-a" },
-      payload: {
-        staffUid: "staff-1",
-        periodStart: "2026-07-01",
-        periodEnd: "2026-07-31",
-        staffTimesheetIds: ["timesheet-1"],
-        agencyId: "forged-agency",
-      } as never,
-    });
 
     expect(mockedAxios.get).toHaveBeenCalledWith("/agencyStaff/timesheets", {
       params: { status: "draft", scope: "mine" },
     });
-    expect(mockedAxios.post).toHaveBeenCalledWith(
-      "/agencyStaff/timesheets/payroll",
-      {
-        staffUid: "staff-1",
-        periodStart: "2026-07-01",
-        periodEnd: "2026-07-31",
-        staffTimesheetIds: ["timesheet-1"],
-      },
-      { params: { agencyId: "agency-a" } },
-    );
   });
 
   it("scopes legacy billing records and generated reports", async () => {
@@ -583,22 +432,6 @@ describe("operational billing request context", () => {
         page: 1,
       })(store.getState()).data?.expenses,
     ).toEqual([{ id: "agency-b-page-1" }]);
-  });
-
-  it("invalidates payroll listeners only for the mutated agency", () => {
-    vi.useFakeTimers();
-    const agencyA = vi.fn();
-    const agencyB = vi.fn();
-    const unsubscribeA = subscribePayrollInvalidation("agency-a", agencyA);
-    const unsubscribeB = subscribePayrollInvalidation("agency-b", agencyB);
-
-    invalidatePayrollData("agency-a");
-    vi.advanceTimersByTime(300);
-
-    expect(agencyA).toHaveBeenCalledOnce();
-    expect(agencyB).not.toHaveBeenCalled();
-    unsubscribeA();
-    unsubscribeB();
   });
 
   it("scopes RTK billing records, reports, cache keys, and tags", () => {

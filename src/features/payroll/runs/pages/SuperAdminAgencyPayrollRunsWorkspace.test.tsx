@@ -24,7 +24,6 @@ const run = {
   runId: "run-1",
   activeRevisionId: "revision-1",
   revisionNumber: 1,
-  workspaceMode: "run",
   run: {
     runId: "run-1", runType: "regular", periodStart: "2026-07-20", periodEnd: "2026-08-02", payday: "2026-08-07",
     approvalDeadline: null, reopenDeadline: null, timezone: "America/New_York", workflowState: "ready_to_approve", providerStatus: "draft",
@@ -33,13 +32,13 @@ const run = {
     totals: { grossEarningsCents: 100_00, reimbursementCents: 0, adjustmentCents: 0, totalDueCents: 100_00 },
     preview: { status: "succeeded", revisionId: "revision-1", hash: "a".repeat(64), observedAt: "2026-08-03T00:00:00.000Z", totals: { grossCents: 100_00, reimbursementsCents: 0, employeeTaxesCents: 0, employeeDeductionsCents: 0, employerTaxesCents: 0, employerContributionsCents: 0, netPayCents: 100_00, expectedCashRequirementCents: 100_00 } }, asOf: "2026-08-03T00:00:00.000Z",
   },
-  capabilities: { replacementWorkspace: true, commands: { approve_payroll: { enabled: true, reasonCode: null } } },
+  capabilities: { commands: { approve_payroll: { enabled: true, reasonCode: null } } },
   prerequisites: {},
 } as unknown as CurrentPayrollRunResponse;
 
 const employees = {
-  kind: "run", runId: "run-1", activeRevisionId: "revision-1", revisionNumber: 1, workspaceMode: "run",
-  capabilities: { replacementWorkspace: true }, nextCursor: null, hasMore: false,
+  kind: "run", runId: "run-1", activeRevisionId: "revision-1", revisionNumber: 1,
+  nextCursor: null, hasMore: false,
   items: [{ employeeId: "employee-1", activeRevisionId: "revision-1", revisionId: "revision-1", employmentType: "staff", displayName: "Avery Nurse", disposition: "included", grossEarningsCents: 100_00, reimbursementCents: 0, adjustmentCents: 0, totalDueCents: 100_00, regularHours: 8, overtimeHours: 0, sourceCount: 1, sourceCounts: { timesheet: 1 }, hasBlockers: false, blockerCodes: [], warningCodes: [], obligationId: null, providerItemState: "pending" }],
 } as Extract<CurrentPayrollEmployeePage, { kind: "run" }>;
 

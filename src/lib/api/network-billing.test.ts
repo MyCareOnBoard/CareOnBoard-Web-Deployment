@@ -25,7 +25,6 @@ import {
   type ExpensesNetworkBillingArgs,
   type NetworkBillingOptionsArgs,
   type OverviewNetworkBillingArgs,
-  type PayrollNetworkBillingArgs,
   type TimesheetsNetworkBillingArgs,
 } from "./network-billing";
 import { networkBillingLogoutResetMiddleware } from "@/store/redux/store";
@@ -84,42 +83,6 @@ const claimsSummary = {
   rejectionReasons: { total: 0, segments: [] },
   meta: { atRiskDays: 14, evaluatedAt: "2026-08-02T00:00:00.000Z" },
 };
-const payrollRow = {
-  id: "payroll-1",
-  kind: "payrollInvoice",
-  agencyId: "agency-a",
-  agencyName: "Agency A",
-  staffKey: "agency-a:staff-a",
-  staffName: "Avery Nurse",
-  grossAmount: 50,
-  totalHours: 2,
-  mode: null,
-};
-const payrollSummary = {
-  overview: { savedInvoices: { count: 1, exact: true } },
-  meta: { evaluatedAt: "2026-08-02T00:00:00.000Z", totalsExact: true },
-};
-const duePayrollSummary = {
-  overview: {
-    totalDue: { amount: 350, count: 3, exact: false },
-    staffCount: { count: 3 },
-    pendingHours: { hours: 16 },
-    overtimeHours: { hours: 2 },
-    missingTimesheets: { count: 1 },
-  },
-  coverage: {
-    expectedAgencyCount: 2,
-    readyAgencyCount: 1,
-    pendingAgencyCount: 0,
-    staleAgencyCount: 1,
-    failedAgencyCount: 0,
-  },
-  freshness: {
-    oldestComputedAt: "2026-08-02T00:00:00.000Z",
-    newestComputedAt: "2026-08-03T00:00:00.000Z",
-  },
-  meta: { evaluatedAt: "2026-08-03T00:00:00.000Z", calculationVersion: 1, totalsExact: false },
-};
 const expenseRow = {
   id: "expense-1",
   agencyId: "agency-a",
@@ -150,9 +113,8 @@ const timesheetRow = {
   staffName: null,
   periodStart: null,
   periodEnd: null,
-  payrollInvoiceId: null,
   createdAt: null,
-  payPreview: null,
+  totalHours: 0,
 };
 const overviewData = {
   scope: { kind: "global", agencyCount: 1 },
@@ -179,8 +141,6 @@ const queryContext = {
   scope: { kind: "network" as const },
 };
 const claimsSavedArgs: ClaimsNetworkBillingArgs = { ...queryContext, startDate: "2026-07-01", endDate: "2026-07-31", tab: "saved", sort: "createdAt:desc", limit: 25 };
-const payrollSavedArgs: PayrollNetworkBillingArgs = { ...queryContext, startDate: "2026-07-01", endDate: "2026-07-31", tab: "saved", status: "pending", limit: 25 };
-const payrollDueArgs: PayrollNetworkBillingArgs = { ...queryContext, startDate: "2026-07-28", endDate: "2026-08-03", tab: "due", limit: 25 };
 const expensesPendingArgs: ExpensesNetworkBillingArgs = { ...queryContext, startDate: "2026-07-01", endDate: "2026-07-31", tab: "pending", status: "pending", limit: 25 };
 const timesheetsArgs: TimesheetsNetworkBillingArgs = { ...queryContext, startDate: "2026-07-01", endDate: "2026-07-31", tab: "list", status: "pending", limit: 25 };
 const overviewArgs: OverviewNetworkBillingArgs = { ...queryContext, startDate: "2026-07-01", endDate: "2026-07-31", tab: "overview" };
@@ -191,16 +151,12 @@ const optionsArgs: NetworkBillingOptionsArgs = { ...queryContext, kind: "client"
 const invalidClientOnly: ClaimsNetworkBillingArgs = { ...claimsSavedArgs, clientId: "client-a" };
 // @ts-expect-error clientAgencyId requires clientId
 const invalidClientAgencyOnly: ClaimsNetworkBillingArgs = { ...claimsSavedArgs, clientAgencyId: "agency-a" };
-// @ts-expect-error employeeId requires employeeAgencyId
-const invalidStaffOnly: PayrollNetworkBillingArgs = { ...payrollSavedArgs, employeeId: "staff-a" };
 // @ts-expect-error employeeAgencyId requires employeeId
 const invalidStaffAgencyOnly: TimesheetsNetworkBillingArgs = { ...timesheetsArgs, employeeAgencyId: "agency-a" };
 // @ts-expect-error saved claims do not accept mode
 const invalidSavedClaimsMode: ClaimsNetworkBillingArgs = { ...claimsSavedArgs, mode: "ddd" };
 // @ts-expect-error ready claims do not accept saved status
 const invalidReadyClaimsStatus: ClaimsNetworkBillingArgs = { ...queryContext, tab: "ready", status: "pending" };
-// @ts-expect-error due payroll does not accept status
-const invalidDuePayrollStatus: PayrollNetworkBillingArgs = { ...payrollSavedArgs, tab: "due", status: "paid" };
 // @ts-expect-error pending expenses cannot select a history status
 const invalidPendingExpenseStatus: ExpensesNetworkBillingArgs = { ...expensesPendingArgs, status: "approved" };
 // @ts-expect-error timesheets expose only the list tab
@@ -212,11 +168,9 @@ const invalidOptionKind: NetworkBillingOptionsArgs = { ...optionsArgs, kind: "ag
 void [
   invalidClientOnly,
   invalidClientAgencyOnly,
-  invalidStaffOnly,
   invalidStaffAgencyOnly,
   invalidSavedClaimsMode,
   invalidReadyClaimsStatus,
-  invalidDuePayrollStatus,
   invalidPendingExpenseStatus,
   invalidTimesheetTab,
   invalidOverviewEntity,
@@ -245,8 +199,6 @@ type NetworkTestStore = ReturnType<typeof createStore>;
 type MalformedEndpoint =
   | "claimsBootstrap"
   | "claimsPage"
-  | "payrollBootstrap"
-  | "payrollPage"
   | "expensesBootstrap"
   | "expensesPage"
   | "timesheetsPage"
@@ -257,8 +209,6 @@ function dispatchEndpoint(store: NetworkTestStore, endpoint: MalformedEndpoint):
   switch (endpoint) {
     case "claimsBootstrap": return store.dispatch(networkBillingApi.endpoints.getClaimsBootstrap.initiate(claimsSavedArgs)).unwrap();
     case "claimsPage": return store.dispatch(networkBillingApi.endpoints.getClaimsPage.initiate(claimsSavedArgs)).unwrap();
-    case "payrollBootstrap": return store.dispatch(networkBillingApi.endpoints.getPayrollBootstrap.initiate(payrollSavedArgs)).unwrap();
-    case "payrollPage": return store.dispatch(networkBillingApi.endpoints.getPayrollPage.initiate(payrollSavedArgs)).unwrap();
     case "expensesBootstrap": return store.dispatch(networkBillingApi.endpoints.getExpensesBootstrap.initiate(expensesPendingArgs)).unwrap();
     case "expensesPage": return store.dispatch(networkBillingApi.endpoints.getExpensesPage.initiate(expensesPendingArgs)).unwrap();
     case "timesheetsPage": return store.dispatch(networkBillingApi.endpoints.getTimesheetsPage.initiate(timesheetsArgs)).unwrap();
@@ -270,15 +220,6 @@ function dispatchEndpoint(store: NetworkTestStore, endpoint: MalformedEndpoint):
 const claimsBootstrapResponse = {
   success: true,
   data: { ...claimsPage.data, summary: claimsSummary },
-};
-const payrollPageResponse = {
-  success: true,
-  data: { scope: { kind: "global", agencyCount: 1 }, page: { ...emptyPage, rows: [payrollRow], total: 1 } },
-  meta: timingMeta,
-};
-const payrollBootstrapResponse = {
-  ...payrollPageResponse,
-  data: { ...payrollPageResponse.data, summary: payrollSummary },
 };
 const expensesPageResponse = {
   success: true,
@@ -308,18 +249,16 @@ const malformedResponses: Array<{ name: string; endpoint: MalformedEndpoint; res
   { name: "claims row with both discriminators", endpoint: "claimsPage", response: { ...claimsPage, data: { ...claimsPage.data, page: { ...claimsPage.data.page, rows: [{ ...savedClaim, sourceType: "shift" }] } } } },
   { name: "saved claim optional field with the wrong type", endpoint: "claimsPage", response: { ...claimsPage, data: { ...claimsPage.data, page: { ...claimsPage.data.page, rows: [{ ...savedClaim, claimNumber: 42 }] } } } },
   { name: "ready claim optional field with the wrong type", endpoint: "claimsPage", response: { ...claimsPage, data: { ...claimsPage.data, page: { ...claimsPage.data.page, rows: [{ ...readyClaim, coverage: 42 }] } } } },
-  { name: "payroll optional field with the wrong type", endpoint: "payrollPage", response: { ...payrollPageResponse, data: { ...payrollPageResponse.data, page: { ...payrollPageResponse.data.page, rows: [{ ...payrollRow, invoiceNumber: 42 }] } } } },
-  { name: "timesheet nested preview with the wrong type", endpoint: "timesheetsPage", response: { success: true, data: { scope: { kind: "global", agencyCount: 1 }, page: { ...emptyPage, rows: [{ ...timesheetRow, payPreview: { billingType: "hourly", billingRate: "20", totalHours: 2, grossAmount: 40 } }] } }, meta: timingMeta } },
+  { name: "timesheet total hours with the wrong type", endpoint: "timesheetsPage", response: { success: true, data: { scope: { kind: "global", agencyCount: 1 }, page: { ...emptyPage, rows: [{ ...timesheetRow, totalHours: "2" }] } }, meta: timingMeta } },
   { name: "expense optional field with the wrong type", endpoint: "expensesPage", response: { ...expensesPageResponse, data: { ...expensesPageResponse.data, page: { ...expensesPageResponse.data.page, rows: [{ ...expenseRow, employeeName: 42 }] } } } },
   { name: "page with an unsupported key", endpoint: "claimsPage", response: { ...claimsPage, data: { ...claimsPage.data, page: { ...claimsPage.data.page, private: true } } } },
   { name: "claims bootstrap summary missing metadata", endpoint: "claimsBootstrap", response: { ...claimsBootstrapResponse, data: { ...claimsBootstrapResponse.data, summary: { overview: claimsSummary.overview, claimsByStatus: claimsSummary.claimsByStatus, rejectionReasons: claimsSummary.rejectionReasons } } } },
-  { name: "payroll bootstrap malformed saved summary", endpoint: "payrollBootstrap", response: { ...payrollBootstrapResponse, data: { ...payrollBootstrapResponse.data, summary: { ...payrollSummary, overview: { savedInvoices: { count: "1", exact: true } } } } } },
   { name: "expenses bootstrap malformed metric", endpoint: "expensesBootstrap", response: { ...expensesBootstrapResponse, data: { ...expensesBootstrapResponse.data, summary: { ...expenseSummary, overview: { ...expenseSummary.overview, submitted: { count: 1, amount: Number.POSITIVE_INFINITY } } } } } },
   { name: "list response with unexpected summary", endpoint: "claimsPage", response: { ...claimsPage, data: { ...claimsPage.data, summary: claimsSummary } } },
   { name: "outer envelope with an extra key", endpoint: "claimsPage", response: { ...claimsPage, private: true } },
-  { name: "timed endpoint missing outer metadata", endpoint: "payrollPage", response: { success: true, data: payrollPageResponse.data } },
-  { name: "timing metadata with unsupported key", endpoint: "payrollPage", response: { ...payrollPageResponse, meta: { ...timingMeta, requestId: "secret" } } },
-  { name: "timing metadata with a negative result count", endpoint: "payrollPage", response: { ...payrollPageResponse, meta: { ...timingMeta, resultCount: -1 } } },
+  { name: "timed endpoint missing outer metadata", endpoint: "timesheetsPage", response: { success: true, data: { scope: { kind: "global", agencyCount: 1 }, page: emptyPage } } },
+  { name: "timing metadata with unsupported key", endpoint: "timesheetsPage", response: { success: true, data: { scope: { kind: "global", agencyCount: 1 }, page: emptyPage }, meta: { ...timingMeta, requestId: "secret" } } },
+  { name: "timing metadata with a negative result count", endpoint: "timesheetsPage", response: { success: true, data: { scope: { kind: "global", agencyCount: 1 }, page: emptyPage }, meta: { ...timingMeta, resultCount: -1 } } },
   { name: "overview missing previous period", endpoint: "overview", response: { ...overviewResponse, data: { ...overviewData, periods: { current: overviewData.periods.current } } } },
   { name: "overview amount domain with an extra key", endpoint: "overview", response: { ...overviewResponse, data: { ...overviewData, current: { ...overviewData.current, claims: { count: 1, amount: 25, private: true } } } } },
   { name: "overview activity with an extra field", endpoint: "overview", response: { ...overviewResponse, data: { ...overviewData, recentActivity: [{ id: "activity-1", kind: "claim", agencyId: "agency-a", agencyName: "Agency A", amount: 25, status: null, date: null, private: true }] } } },
@@ -378,49 +317,6 @@ describe("network billing API", () => {
     expect(NETWORK_BILLING_QUERY_OPTIONS).toEqual({ refetchOnMountOrArgChange: 30 });
   });
 
-  it("accepts the frozen due-payroll rollup contract", async () => {
-    const store = createStore();
-    respond({
-      success: true,
-      data: {
-        scope: { kind: "global", agencyCount: 2 },
-        page: emptyPage,
-        summary: duePayrollSummary,
-      },
-      meta: timingMeta,
-    });
-
-    await expect(store.dispatch(networkBillingApi.endpoints.getPayrollBootstrap.initiate(payrollDueArgs)).unwrap()).resolves.toMatchObject({
-      summary: duePayrollSummary,
-    });
-  });
-
-  it.each([
-    ["extra due-summary field", (summary: typeof duePayrollSummary) => ({ ...summary, private: true })],
-    ["negative metric", (summary: typeof duePayrollSummary) => ({ ...summary, overview: { ...summary.overview, pendingHours: { hours: -1 } } })],
-    ["non-finite metric", (summary: typeof duePayrollSummary) => ({ ...summary, overview: { ...summary.overview, overtimeHours: { hours: Number.POSITIVE_INFINITY } } })],
-    ["invalid freshness date", (summary: typeof duePayrollSummary) => ({ ...summary, freshness: { ...summary.freshness, oldestComputedAt: "not-a-date" } })],
-    ["impossible freshness date", (summary: typeof duePayrollSummary) => ({ ...summary, freshness: { ...summary.freshness, oldestComputedAt: "2026-02-30T00:00:00.000Z" } })],
-    ["wrong calculation version", (summary: typeof duePayrollSummary) => ({ ...summary, meta: { ...summary.meta, calculationVersion: 2 } })],
-    ["coverage mismatch", (summary: typeof duePayrollSummary) => ({ ...summary, coverage: { ...summary.coverage, failedAgencyCount: 1 } })],
-    ["null amount with usable rollup", (summary: typeof duePayrollSummary) => ({ ...summary, overview: { ...summary.overview, totalDue: { ...summary.overview.totalDue, amount: null } } })],
-  ])("rejects a due-payroll rollup with %s", async (_name, mutate) => {
-    const store = createStore();
-    respond({
-      success: true,
-      data: {
-        scope: { kind: "global", agencyCount: 2 },
-        page: emptyPage,
-        summary: mutate(duePayrollSummary),
-      },
-      meta: timingMeta,
-    });
-
-    await expect(store.dispatch(networkBillingApi.endpoints.getPayrollBootstrap.initiate(payrollDueArgs)).unwrap()).rejects.toMatchObject({
-      status: "PARSING_ERROR",
-    });
-  });
-
   it("preserves bounded unresolved ownership diagnostics from network preparation", async () => {
     const store = createStore();
     const diagnostic = {
@@ -455,50 +351,12 @@ describe("network billing API", () => {
     })).unwrap()).resolves.toMatchObject({ ownership: { unresolvedRecords: [diagnostic] } });
   });
 
-  it("sends the fixed backfill request body and validates its rollout status", async () => {
-    const store = createStore();
-    respond({
-      success: true,
-      data: {
-        version: 1,
-        enabled: false,
-        status: "pending",
-        days: 90,
-        weekCount: 13,
-        activeAgencyCount: 2,
-        expectedRollupCount: 78,
-        verifiedRollupCount: 0,
-        missingRollupCount: 0,
-        invalidRollupCount: 0,
-        failedRollupCount: 0,
-        enqueuedAt: "2026-08-04T00:00:00.000Z",
-        completedAt: null,
-      },
-    });
-
-    await expect(store.dispatch(networkBillingApi.endpoints.startNetworkPayrollRollupBackfill.initiate({
-      actorUid: "super-admin-a",
-      environment: "staging",
-      scope: { kind: "network" },
-      days: 90,
-      confirmProduction: false,
-    })).unwrap()).resolves.toMatchObject({ status: "pending", expectedRollupCount: 78 });
-
-    expect(axiosAdapter).toHaveBeenCalledWith(expect.objectContaining({
-      method: "post",
-      url: "/superAdminOperations/billing/payroll/rollups/backfill",
-      data: { days: 90, confirmProduction: false },
-    }));
-  });
-
-  it("uses endpoint-specific outbound parameter allowlists for all nine reads", async () => {
+  it("uses endpoint-specific outbound parameter allowlists for all seven reads", async () => {
     const store = createStore();
     const page = (rows: unknown[]) => ({ scope: { kind: "global", agencyCount: 1 }, page: { rows, total: null, nextCursor: null, hasMore: false } });
     const responses = [
       { success: true, data: { ...page([savedClaim]), summary: claimsSummary } },
       { success: true, data: page([savedClaim]) },
-      { success: true, data: { ...page([payrollRow]), summary: payrollSummary }, meta: timingMeta },
-      { success: true, data: page([payrollRow]), meta: timingMeta },
       { success: true, data: { ...page([expenseRow]), summary: expenseSummary, meta: { branchCount: 1 } }, meta: timingMeta },
       { success: true, data: { ...page([expenseRow]), meta: { branchCount: 1 } }, meta: timingMeta },
       { success: true, data: page([timesheetRow]), meta: timingMeta },
@@ -510,8 +368,6 @@ describe("network billing API", () => {
     await Promise.all([
       store.dispatch(networkBillingApi.endpoints.getClaimsBootstrap.initiate({ ...baseArgs, mode: "ddd", employeeId: "staff-a", employeeAgencyId: "agency-a" } as never)).unwrap(),
       store.dispatch(networkBillingApi.endpoints.getClaimsPage.initiate({ ...baseArgs, mode: "ddd", employeeId: "staff-a", employeeAgencyId: "agency-a" } as never)).unwrap(),
-      store.dispatch(networkBillingApi.endpoints.getPayrollBootstrap.initiate({ ...baseArgs, tab: "saved", status: "paid", clientId: "client-a", clientAgencyId: "agency-a" } as never)).unwrap(),
-      store.dispatch(networkBillingApi.endpoints.getPayrollPage.initiate({ ...baseArgs, tab: "due", mode: "ddd", employeeId: "staff-a", employeeAgencyId: "agency-a" } as never)).unwrap(),
       store.dispatch(networkBillingApi.endpoints.getExpensesBootstrap.initiate({ ...baseArgs, tab: "pending", status: "pending", mode: "ddd", employeeId: "staff-a", employeeAgencyId: "agency-a", clientId: "client-a" } as never)).unwrap(),
       store.dispatch(networkBillingApi.endpoints.getExpensesPage.initiate({ ...baseArgs, tab: "history", status: "approved", employeeId: "staff-a", employeeAgencyId: "agency-a" } as never)).unwrap(),
       store.dispatch(networkBillingApi.endpoints.getTimesheetsPage.initiate({ ...baseArgs, tab: "list", status: "approved", mode: "ddd", employeeId: "staff-a", employeeAgencyId: "agency-a", clientId: "client-a" } as never)).unwrap(),
@@ -522,8 +378,6 @@ describe("network billing API", () => {
     expect(axiosAdapter.mock.calls.map(([request]) => [request.url, request.params])).toEqual([
       ["/superAdminOperations/billing/claims/bootstrap", { startDate: "2026-07-01", endDate: "2026-07-31", tab: "saved", sort: "createdAt:desc", limit: 25 }],
       ["/superAdminOperations/billing/claims", { startDate: "2026-07-01", endDate: "2026-07-31", tab: "saved", sort: "createdAt:desc", limit: 25 }],
-      ["/superAdminOperations/billing/payroll/bootstrap", { startDate: "2026-07-01", endDate: "2026-07-31", tab: "saved", status: "paid", limit: 25 }],
-      ["/superAdminOperations/billing/payroll", { startDate: "2026-07-01", endDate: "2026-07-31", mode: "ddd", tab: "due", employeeId: "staff-a", employeeAgencyId: "agency-a", limit: 25 }],
       ["/superAdminOperations/billing/expenses/bootstrap", { startDate: "2026-07-01", endDate: "2026-07-31", mode: "ddd", tab: "pending", status: "pending", employeeId: "staff-a", employeeAgencyId: "agency-a", limit: 25 }],
       ["/superAdminOperations/billing/expenses", { startDate: "2026-07-01", endDate: "2026-07-31", tab: "history", status: "approved", employeeId: "staff-a", employeeAgencyId: "agency-a", limit: 25 }],
       ["/superAdminOperations/billing/timesheets", { startDate: "2026-07-01", endDate: "2026-07-31", mode: "ddd", tab: "list", status: "approved", employeeId: "staff-a", employeeAgencyId: "agency-a", limit: 25 }],
@@ -607,41 +461,14 @@ describe("network billing API", () => {
       isManual: true,
       clientAgreedRate: 1.5,
     };
-    const fullPayroll = {
-      ...payrollRow,
-      invoiceNumber: "PAY-1",
-      status: "pending",
-      employeeId: "staff-a",
-      employeeName: "Staff A",
-      periodStart: "2026-07-01",
-      periodEnd: "2026-07-15",
-      shiftCount: 2,
-      createdAt: "2026-07-16T00:00:00.000Z",
-      paidAt: null,
-    };
-    const duePayroll = {
-      id: "shift:shift-1",
-      sourceType: "shift",
-      sourceId: "shift-1",
-      agencyId: "agency-a",
-      agencyName: "Agency A",
-      employeeId: "staff-a",
-      staffKey: "agency-a:staff-a",
-      staffName: "Avery Nurse",
-      mode: "ddd",
-      grossAmount: 50,
-      totalHours: 2,
-      totalsExact: false,
-    };
     const fullTimesheet = {
       ...timesheetRow,
       staffUid: "staff-a",
       staffName: "Staff A",
       periodStart: "2026-07-01",
       periodEnd: "2026-07-15",
-      payrollInvoiceId: null,
       createdAt: "2026-07-16T00:00:00.000Z",
-      payPreview: { billingType: "hourly", billingRate: 25, totalHours: 2, grossAmount: 50 },
+      totalHours: 2,
     };
     const fullExpense = {
       ...expenseRow,
@@ -661,8 +488,6 @@ describe("network billing API", () => {
     const responses = [
       { success: true, data: page([fullClaim, fullInvoice], 2) },
       { success: true, data: page([fullShift, fullRide], null) },
-      { success: true, data: page([fullPayroll], 1), meta: timingMeta },
-      { success: true, data: page([duePayroll], null), meta: timingMeta },
       { success: true, data: page([fullTimesheet], null), meta: timingMeta },
       { success: true, data: { ...page([fullExpense], 1), meta: { branchCount: 1 } }, meta: timingMeta },
     ];
@@ -673,8 +498,6 @@ describe("network billing API", () => {
     const results = await Promise.all([
       store.dispatch(networkBillingApi.endpoints.getClaimsPage.initiate(claimsSavedArgs)).unwrap(),
       store.dispatch(networkBillingApi.endpoints.getClaimsPage.initiate({ ...queryContext, tab: "ready" })).unwrap(),
-      store.dispatch(networkBillingApi.endpoints.getPayrollPage.initiate(payrollSavedArgs)).unwrap(),
-      store.dispatch(networkBillingApi.endpoints.getPayrollPage.initiate({ ...queryContext, tab: "due" })).unwrap(),
       store.dispatch(networkBillingApi.endpoints.getTimesheetsPage.initiate(timesheetsArgs)).unwrap(),
       store.dispatch(networkBillingApi.endpoints.getExpensesPage.initiate(expensesPendingArgs)).unwrap(),
     ]);
@@ -682,8 +505,6 @@ describe("network billing API", () => {
     expect(results.map((result) => result.page.rows)).toEqual([
       [fullClaim, fullInvoice],
       [fullShift, fullRide],
-      [fullPayroll],
-      [duePayroll],
       [fullTimesheet],
       [fullExpense],
     ]);
@@ -771,7 +592,6 @@ describe("network billing API", () => {
     const store = createStore();
     const responseByPath: Record<string, unknown> = {
       "/superAdminOperations/billing/claims": claimsPage,
-      "/superAdminOperations/billing/payroll": payrollPageResponse,
       "/superAdminOperations/billing/expenses": expensesPageResponse,
       "/superAdminOperations/billing/timesheets": {
         success: true,
@@ -799,11 +619,6 @@ describe("network billing API", () => {
       store.dispatch(networkBillingApi.endpoints.getClaimsPage.initiate({ ...claimsSavedArgs, sort: "createdAt:asc" })).unwrap(),
       store.dispatch(networkBillingApi.endpoints.getClaimsPage.initiate({ ...claimsSavedArgs, clientId: "client-a", clientAgencyId: "agency-a" })).unwrap(),
       store.dispatch(networkBillingApi.endpoints.getClaimsPage.initiate({ ...queryContext, tab: "ready", mode: "ddd" })).unwrap(),
-      store.dispatch(networkBillingApi.endpoints.getPayrollPage.initiate(payrollSavedArgs)).unwrap(),
-      store.dispatch(networkBillingApi.endpoints.getPayrollPage.initiate({ ...payrollSavedArgs, status: "paid" })).unwrap(),
-      store.dispatch(networkBillingApi.endpoints.getPayrollPage.initiate({ ...payrollSavedArgs, mode: "ddd" })).unwrap(),
-      store.dispatch(networkBillingApi.endpoints.getPayrollPage.initiate({ ...payrollSavedArgs, employeeId: "staff-a", employeeAgencyId: "agency-a" })).unwrap(),
-      store.dispatch(networkBillingApi.endpoints.getPayrollPage.initiate({ ...queryContext, tab: "due", cursor: "cursorB" })).unwrap(),
       store.dispatch(networkBillingApi.endpoints.getExpensesPage.initiate(expensesPendingArgs)).unwrap(),
       store.dispatch(networkBillingApi.endpoints.getExpensesPage.initiate({ ...expensesPendingArgs, mode: "hha" })).unwrap(),
       store.dispatch(networkBillingApi.endpoints.getExpensesPage.initiate({ ...expensesPendingArgs, employeeId: "staff-a", employeeAgencyId: "agency-a" })).unwrap(),

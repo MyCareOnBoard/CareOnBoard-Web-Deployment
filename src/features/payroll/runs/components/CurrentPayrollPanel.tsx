@@ -92,7 +92,7 @@ export function CurrentPayrollPanel({ scope, workspace }: {
     return (
       <section className="border-y border-[#e5e5e6] py-12 text-center">
         <h2 className="text-2xl font-semibold text-[#10141a]">No active payroll period.</h2>
-        <p className="mt-2 text-sm text-[#62686f]">The next payroll will appear when its pay period becomes active.</p>
+        <p className="mt-2 text-sm text-[#62686f]">Check Upcoming for the next scheduled pay period.</p>
       </section>
     );
   }
