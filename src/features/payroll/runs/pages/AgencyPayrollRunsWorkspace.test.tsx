@@ -385,9 +385,47 @@ describe("AgencyPayrollRunsWorkspace", () => {
     api.employeesState = { data: undefined, currentData: undefined, isLoading: true, isFetching: true, refetch: vi.fn() };
     render(<AgencyPayrollRunsWorkspace scope={scope} />);
 
-    expect(screen.getByTestId("payroll-workspace-skeleton")).toHaveAttribute("aria-hidden", "true");
-    expect(screen.getByRole("status")).toHaveTextContent("Loading the current payroll…");
+    const skeleton = screen.getByTestId("payroll-tab-skeleton");
+    expect(skeleton).toHaveAttribute("role", "status");
+    expect(skeleton).toHaveAttribute("aria-busy", "true");
+    expect(skeleton).toHaveTextContent("Loading the current payroll…");
+    expect(screen.getByTestId("payroll-tab-skeleton-content")).toHaveAttribute("aria-hidden", "true");
     expect(screen.getByTestId("payroll-workspace")).toHaveAttribute("aria-busy", "true");
+  });
+
+  it("shows an accessible skeleton while the upcoming payroll is loading", () => {
+    api.upcomingState = {
+      data: undefined,
+      currentData: undefined,
+      isLoading: true,
+      isFetching: true,
+      isError: false,
+      refetch: vi.fn(),
+    };
+    render(<AgencyPayrollRunsWorkspace scope={scope} />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Upcoming" }));
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading upcoming payroll…");
+    const skeleton = screen.getByTestId("payroll-tab-skeleton");
+    expect(skeleton).toHaveAttribute("role", "status");
+    expect(skeleton).toHaveAttribute("aria-busy", "true");
+    expect(skeleton).toHaveTextContent("Loading upcoming payroll…");
+    expect(screen.getByTestId("payroll-tab-skeleton-content")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("keeps the audit tab in a loading state until the current payroll settles", () => {
+    api.currentState = { data: undefined, currentData: undefined, isLoading: true, isFetching: true, refetch: vi.fn() };
+    api.employeesState = { data: undefined, currentData: undefined, isLoading: true, isFetching: true, refetch: vi.fn() };
+    render(<AgencyPayrollRunsWorkspace scope={scope} />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Audit" }));
+
+    const skeleton = screen.getByTestId("payroll-tab-skeleton");
+    expect(skeleton).toHaveAttribute("role", "status");
+    expect(skeleton).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByTestId("payroll-tab-skeleton-content")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.queryByText("No active payroll is available for audit.")).not.toBeInTheDocument();
   });
 
   it("retains financial data as stale and never announces success for an in-flight refetch", async () => {

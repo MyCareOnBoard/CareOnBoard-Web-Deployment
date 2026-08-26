@@ -87,7 +87,10 @@ export function useClientSave() {
       }
     } catch (e: any) {
       console.error("Save client failed:", e);
-      const error = e?.message || "Failed to save client. Please try again.";
+      const error = e?.response?.data?.error
+        || e?.response?.data?.message
+        || e?.message
+        || "Failed to save client. Please try again.";
       setErrorMessage(error);
       setIsSaving(false);
       setShowSavingModal(false);

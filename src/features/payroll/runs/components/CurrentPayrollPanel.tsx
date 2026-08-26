@@ -5,15 +5,7 @@ import { PayrollEmployeeList } from "./PayrollEmployeeList";
 import { PayrollExceptionsPanel } from "./PayrollExceptionsPanel";
 import { PayrollFreshnessStatus } from "./PayrollFreshnessStatus";
 import { PayrollRunHeader } from "./PayrollRunHeader";
-
-function PayrollWorkspaceSkeleton() {
-  return (
-    <div data-testid="payroll-workspace-skeleton" aria-hidden="true" className="space-y-6">
-      <div className="h-24 animate-pulse rounded-2xl bg-[#eef4f5]" />
-      <div className="h-72 animate-pulse rounded-2xl bg-[#eef4f5]" />
-    </div>
-  );
-}
+import { PayrollTabSkeleton } from "./PayrollTabSkeleton";
 
 function CurrentPayrollRunPanel({ scope, workspace }: {
   scope: AgencyPayrollRunScope;
@@ -74,12 +66,7 @@ export function CurrentPayrollPanel({ scope, workspace }: {
   workspace: CurrentPayrollWorkspaceState;
 }) {
   if (workspace.freshness === "loading" && !workspace.runResponse) {
-    return (
-      <>
-        <p role="status" className="sr-only">Loading the current payroll…</p>
-        <PayrollWorkspaceSkeleton />
-      </>
-    );
+    return <PayrollTabSkeleton label="Loading the current payroll…" variant="summary" />;
   }
   if (!workspace.runResponse || !workspace.employeePage) {
     return (

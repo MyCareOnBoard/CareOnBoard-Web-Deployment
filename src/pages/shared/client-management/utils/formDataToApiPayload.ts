@@ -10,6 +10,7 @@ import {
 import { hasForm485Document } from "./form485GenerationEligibility";
 
 const toIso = (d?: Date) => (d ? d.toISOString() : undefined);
+const toCivilDate = (d?: Date) => (d ? d.toISOString().slice(0, 10) : undefined);
 
 function isRealIsoDate(value: string | undefined): value is string {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -351,8 +352,8 @@ export function formDataToApiPayload(
           serviceName: a.serviceName?.trim() || undefined,
           serviceCode: a.serviceCode?.trim() || undefined,
           approvedHours: a.approvedHours?.trim() || undefined,
-          startDate: toIso(a.startDate),
-          endDate: toIso(a.endDate),
+          startDate: toCivilDate(a.startDate),
+          endDate: toCivilDate(a.endDate),
           payerSource: a.payerSource?.trim() || undefined,
           rate: a.rate?.trim() || undefined,
           unitType: a.unitType?.trim() || undefined,

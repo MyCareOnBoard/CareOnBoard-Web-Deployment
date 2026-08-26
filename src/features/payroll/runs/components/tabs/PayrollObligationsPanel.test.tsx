@@ -103,4 +103,20 @@ describe("PayrollObligationsPanel", () => {
     expect(api.list).toHaveBeenCalledWith({ ...nextScope, state: "open" });
     expect(selectedCount(0)).toBeInTheDocument();
   });
+
+  it("shows an accessible open obligations skeleton while the first page loads", () => {
+    api.list.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isFetching: true,
+      isError: false,
+      refetch: api.refetch,
+    });
+
+    render(<PayrollObligationsPanel scope={scope} context={context} createOffCycleCapability restoreCapability onCreateOffCycle={vi.fn()} onRestore={vi.fn()} />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading open obligations…");
+    expect(screen.getByTestId("payroll-tab-skeleton")).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByTestId("payroll-tab-skeleton-content")).toHaveAttribute("aria-hidden", "true");
+  });
 });

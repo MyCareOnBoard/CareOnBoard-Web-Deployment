@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { useListPayrollRunEventsQuery } from "../../api/payrollRunEndpoints";
 import type { AgencyPayrollRunScope } from "../../model/types";
+import { PayrollTabSkeleton } from "../PayrollTabSkeleton";
 
 const instant = new Intl.DateTimeFormat("en-US", {
   month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "UTC", timeZoneName: "short",
@@ -24,6 +25,10 @@ export function PayrollAuditPanel({ scope, runId, activeRevisionId, expandedAudi
   const args = { ...scope, runId, activeRevisionId, ...(cursor ? { cursor } : {}) };
   const { data, isLoading, isFetching, isError, refetch } = useListPayrollRunEventsQuery(args);
 
+  if (isLoading && !data) {
+    return <PayrollTabSkeleton label="Loading audit timeline…" variant="timeline" />;
+  }
+
   return (
     <section aria-labelledby="payroll-audit-heading" className="space-y-4">
       <div>
@@ -35,7 +40,6 @@ export function PayrollAuditPanel({ scope, runId, activeRevisionId, expandedAudi
           Expanded audit context is enabled for this workspace.
         </aside>
       ) : null}
-      {isLoading && !data ? <p role="status" className="py-6 text-sm text-[#62686f]">Loading audit timeline…</p> : null}
       {isError && !data ? (
         <p role="alert" className="border-y border-[#efcaca] py-4 text-sm text-[#8d3131]">
           Audit timeline could not be loaded.

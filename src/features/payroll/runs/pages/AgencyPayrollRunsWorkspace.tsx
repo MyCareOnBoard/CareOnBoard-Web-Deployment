@@ -7,6 +7,7 @@ import PayrollOverviewCards, {
   mapPayrollRunToOverviewStats,
 } from "@/pages/agency/billing/payroll/components/PayrollOverviewCards";
 import { CurrentPayrollPanel } from "../components/CurrentPayrollPanel";
+import { PayrollTabSkeleton } from "../components/PayrollTabSkeleton";
 import { PayrollRunActions } from "../components/PayrollRunActions";
 import { PayrollApprovalDialog } from "../components/dialogs/PayrollApprovalDialog";
 import {
@@ -275,7 +276,7 @@ function AgencyPayrollRunsWorkspaceContent({ scope, workspace }: {
                   : (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
                 selectTab(tabs[nextIndex].id);
               }}
-              className={`min-h-11 shrink-0 rounded-full border px-5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2 ${tab === id ? "border-[#00b4b8] bg-[#00b4b8] text-white" : "border-[#e5e5e6] text-[#10141a] hover:border-[#00b4b8]/40 hover:bg-[#eef4f5]"}`}
+              className={`min-h-11 shrink-0 cursor-pointer rounded-full border px-5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2 ${tab === id ? "border-[#00b4b8] bg-[#00b4b8] text-white" : "border-[#e5e5e6] text-[#10141a] hover:border-[#00b4b8]/40 hover:bg-[#eef4f5]"}`}
             >
               {label}
             </button>
@@ -303,14 +304,25 @@ function AgencyPayrollRunsWorkspaceContent({ scope, workspace }: {
               ) : null}
             </div>
           ) : (
-            <Suspense fallback={<p role="status" className="py-8 text-sm text-[#62686f]">Loading payroll section…</p>}>
+            <Suspense fallback={(
+              <PayrollTabSkeleton
+                label={tab === "upcoming" ? "Loading upcoming payroll…"
+                  : tab === "history" ? "Loading payroll history…"
+                    : tab === "audit" ? "Loading audit timeline…"
+                      : "Loading open obligations…"}
+                variant={tab === "upcoming" ? "summary" : tab === "audit" ? "timeline" : "list"}
+              />
+            )}>
               {tab === "upcoming" ? (
                 <UpcomingPayrollPanel scope={scope} />
               ) : tab === "history" ? (
                 <PayrollHistoryPanel scope={scope} />
               ) : tab === "audit" ? (
-                projection ? <PayrollAuditPanel scope={scope} runId={projection.runId} activeRevisionId={projection.activeRevisionId} />
-                  : <p className="py-8 text-sm text-[#62686f]">No active payroll is available for audit.</p>
+                workspace.freshness === "loading" && !workspace.runResponse
+                  ? <PayrollTabSkeleton label="Loading audit timeline…" variant="timeline" />
+                  : projection
+                    ? <PayrollAuditPanel scope={scope} runId={projection.runId} activeRevisionId={projection.activeRevisionId} />
+                    : <p className="py-8 text-sm text-[#62686f]">No active payroll is available for audit.</p>
               ) : tab === "obligations" ? (
                 <PayrollObligationsPanel
                   scope={scope}

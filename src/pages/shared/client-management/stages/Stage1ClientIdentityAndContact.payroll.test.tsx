@@ -35,8 +35,12 @@ describe("Stage 1 payroll service locations", () => {
 
     expect(screen.getByRole("checkbox", { name: /services are delivered at this primary address/i })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: /services are delivered at this secondary address/i })).toBeChecked();
-    expect(screen.getByLabelText("Primary service effective date")).toHaveValue("2026-08-14");
-    expect(screen.getByLabelText("Secondary service effective date")).toHaveValue("2026-09-01");
+    expect(screen.getByRole("button", { name: /primary service effective date/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /secondary service effective date/i })).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Aug 14, 2026")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Sep 1, 2026")).toBeInTheDocument();
+    expect(screen.getByText("Primary Address")).toBeInTheDocument();
+    expect(screen.getByText("Secondary Address (Optional)")).toBeInTheDocument();
     expect(screen.getByText(/later address changes will not rewrite earlier payroll records/i)).toBeInTheDocument();
   });
 
@@ -58,7 +62,7 @@ describe("Stage 1 payroll service locations", () => {
     ];
     render(<Stage1ClientIdentityAndContact formData={formData} setFormData={vi.fn()} footer={null} />);
 
-    expect(screen.getByLabelText("Secondary service effective date")).toHaveAttribute("aria-describedby", "actual-secondary-service-location-effective-from-error");
+    expect(screen.getByRole("button", { name: /secondary service effective date/i })).toHaveAttribute("aria-describedby", "actual-secondary-service-location-effective-from-error");
     expect(screen.getByRole("alert")).toHaveTextContent(/choose an effective date before saving/i);
   });
 

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 
 import { useGetUpcomingPayrollQuery, type UpcomingPayrollEmployee } from "../../api/payrollRunEndpoints";
 import type { AgencyPayrollRunScope } from "../../model/types";
+import { PayrollTabSkeleton } from "../PayrollTabSkeleton";
 
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 const date = new Intl.DateTimeFormat("en-US", {
@@ -128,10 +129,8 @@ export function UpcomingPayrollPanel({ scope }: { scope: AgencyPayrollRunScope }
       <section
         data-testid="upcoming-payroll-panel"
         aria-busy="true"
-        className="min-h-48 border-y border-[#e5e5e6] py-8"
       >
-        <p role="status" className="text-sm text-[#62686f]">Loading upcoming payroll…</p>
-        <div aria-hidden="true" className="mt-5 h-24 animate-pulse rounded-xl bg-[#eef4f5]" />
+        <PayrollTabSkeleton label="Loading upcoming payroll…" variant="summary" />
       </section>
     );
   }
@@ -163,8 +162,8 @@ export function UpcomingPayrollPanel({ scope }: { scope: AgencyPayrollRunScope }
 
   if (!currentData) {
     return (
-      <section data-testid="upcoming-payroll-panel" aria-busy="true" className="border-y border-[#e5e5e6] py-8">
-        <p role="status" className="text-sm text-[#62686f]">Loading upcoming payroll…</p>
+      <section data-testid="upcoming-payroll-panel" aria-busy="true">
+        <PayrollTabSkeleton label="Loading upcoming payroll…" variant="summary" />
       </section>
     );
   }

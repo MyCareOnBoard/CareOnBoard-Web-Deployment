@@ -1093,7 +1093,7 @@ export async function updateClient(clientId: string, data: UpdateClientRequest, 
     return response.data.data;
   } catch (err: any) {
     console.error('updateClient error:', err);
-    throw new Error(err.message || 'Failed to update client');
+    throw err;
   }
 }
 

@@ -11,6 +11,7 @@ import {
   type OffCycleSubmission,
   type OffCycleSubmissionRetention,
 } from "../dialogs/CreateOffCyclePayrollDialog";
+import { PayrollTabSkeleton } from "../PayrollTabSkeleton";
 
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 const date = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
@@ -164,6 +165,10 @@ export function PayrollObligationsPanel({
     }
   };
 
+  if (isLoading && !data) {
+    return <PayrollTabSkeleton label="Loading open obligations…" variant="list" />;
+  }
+
   return (
     <section aria-labelledby="payroll-obligations-heading" className="space-y-4">
       <div className="flex flex-col gap-3 border-b border-[#dfe7e8] pb-4 sm:flex-row sm:items-end sm:justify-between">
@@ -184,7 +189,6 @@ export function PayrollObligationsPanel({
       </div>
       <p className="text-sm text-[#62686f]"><strong className="tabular-nums text-[#10141a]">{selected.size}</strong> selected</p>
       {error ? <p role="alert" className="border-y border-[#efcaca] py-3 text-sm text-[#8d3131]">{error}</p> : null}
-      {isLoading && !data ? <p role="status" className="py-8 text-sm text-[#62686f]">Loading open obligations…</p> : null}
       {isError && !data ? (
         <p role="alert" className="border-y border-[#efcaca] py-4 text-sm text-[#8d3131]">
           Open obligations could not be loaded.

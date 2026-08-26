@@ -26,6 +26,8 @@ describe("formDataToApiPayload HHA", () => {
         serviceName: "Personal Care Assistant",
         serviceCode: "T1019",
         approvedHours: "20",
+        startDate: new Date("2026-06-09T00:00:00.000Z"),
+        endDate: new Date("2026-06-30T00:00:00.000Z"),
         payerSource: "UHC",
         unitType: "15-min",
         rate: "6.67",
@@ -44,6 +46,8 @@ describe("formDataToApiPayload HHA", () => {
     expect(payload.referralInfo?.source).toBe("Hospital");
     expect(payload.hhaAuthorizations?.[0]?.serviceCode).toBe("T1019");
     expect(payload.hhaAuthorizations?.[0]?.serviceType).toBe("Personal Care");
+    expect(payload.hhaAuthorizations?.[0]?.startDate).toBe("2026-06-09");
+    expect(payload.hhaAuthorizations?.[0]?.endDate).toBe("2026-06-30");
     expect(payload.hhaAuthorizations?.[0]?.assignedDsps).toEqual([
       { id: "dsp-1", name: "Jamie Helper" },
     ]);

@@ -71,4 +71,20 @@ describe("PayrollHistoryPanel", () => {
     expect(api.list).toHaveBeenCalledWith({ ...scope, runType: "off_cycle" });
     expect(screen.getAllByText("Off-cycle")).toHaveLength(25);
   });
+
+  it("shows an accessible payroll history skeleton while the first page loads", () => {
+    api.list.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isFetching: true,
+      isError: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PayrollHistoryPanel scope={scope} />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading payroll history…");
+    expect(screen.getByTestId("payroll-tab-skeleton")).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByTestId("payroll-tab-skeleton-content")).toHaveAttribute("aria-hidden", "true");
+  });
 });

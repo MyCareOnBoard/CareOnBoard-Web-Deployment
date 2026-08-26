@@ -33,6 +33,15 @@ describe("client payroll API transport", () => {
     }, { params: undefined });
   });
 
+  it("preserves backend error details from failed updates", async () => {
+    const backendError = Object.assign(new Error("Request failed with status code 400"), {
+      response: { data: { error: "The workplace effective date is invalid." } },
+    });
+    put.mockRejectedValueOnce(backendError);
+
+    await expect(updateClient("client-1", {})).rejects.toBe(backendError);
+  });
+
   it("preserves an explicit empty service-location selection and an omitted selection distinctly", async () => {
     put.mockResolvedValue({ data: { success: true, data: { id: "client-1" } } });
     await updateClient("client-1", { payrollServiceLocations: [] });

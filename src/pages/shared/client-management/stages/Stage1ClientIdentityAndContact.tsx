@@ -4,7 +4,7 @@ import { useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";
 import { useAuth } from "@/utils/auth";
 import { UserType } from "@/utils/auth/types/user.types";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
@@ -23,6 +23,7 @@ import { Agency } from "@/lib/api/clients";
 import { fetchFirstPlaceDetailsForQuery, type AddressDetails } from "@/hooks/useGooglePlacesAutocomplete";
 import HhaBlankFormsCard from "@/pages/shared/client-management/components/HhaBlankFormsCard";
 import { AddressAutocompleteField } from "@/pages/shared/client-management/components/forms/AddressAutocompleteField";
+import { DatePickerField } from "@/pages/shared/client-management/components/forms/formControls";
 
 const SELECT_TRIGGER_CN =
   "w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white";
@@ -69,6 +70,8 @@ export function Stage1ClientIdentityAndContact({
     updateStage1({ ...patch, secondaryLine1: undefined, secondaryLine2: undefined, secondaryCity: undefined, secondaryState: undefined, secondaryPostalCode: undefined, secondaryCountry: undefined, payrollServiceLocations: clearServiceLocation("secondaryAddress") });
   const hasStructuredPrimaryAddress = Boolean(stage1.line1?.trim() && stage1.city?.trim() && stage1.state?.trim() && stage1.postalCode?.trim() && /^[A-Z]{2}$/.test(stage1.country?.trim() ?? ""));
   const hasStructuredSecondaryAddress = Boolean(stage1.secondaryLine1?.trim() && stage1.secondaryCity?.trim() && stage1.secondaryState?.trim() && stage1.secondaryPostalCode?.trim() && /^[A-Z]{2}$/.test(stage1.secondaryCountry?.trim() ?? ""));
+  const primaryServiceLocation = stage1.payrollServiceLocations?.find((location) => location.source === "primaryAddress");
+  const secondaryServiceLocation = stage1.payrollServiceLocations?.find((location) => location.source === "secondaryAddress");
   const normalizedIdentity = (value: string | null | undefined) => value?.trim().replace(/\s+/g, " ").toUpperCase() || null;
   const canonicalPrimaryDetails = (details: AddressDetails) => ({
     ...details,
@@ -569,6 +572,9 @@ const maskSSN = (value: string) => {
           </p>
         </div>
 
+        <p className="mb-4 text-[14px] font-semibold leading-[1.4] text-[#10141a]">
+          Primary Address
+        </p>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 xl:grid-cols-4">
           <div className="flex flex-col gap-1 lg:col-span-3 xl:col-span-4">
             <AddressAutocompleteField label="Primary / mailing address search" id="primary-mailing-address" value={stage1.address} required placeholder="Search for the primary address" onChange={(address) => clearPrimaryPayrollIdentity({ address, location: undefined })} onSelectDetails={handlePrimaryAddressDetails} />
@@ -604,15 +610,18 @@ const maskSSN = (value: string) => {
             />
             {!hasStructuredPrimaryAddress && <p id="actual-service-location-address-help" className="text-[12px] text-[#5d5d5f]">Enter a complete primary address before confirming it as a service location.</p>}
             <p className="text-[12px] text-[#5d5d5f]">Choose the first service date at this address. Later address changes will not rewrite earlier payroll records.</p>
-            {(stage1.payrollServiceLocations ?? []).find((location) => location.source === "primaryAddress") && (
+            {primaryServiceLocation && (
               <div className="flex max-w-[260px] flex-col gap-1">
-                <label className="text-[12px] font-normal text-[#10141a]" htmlFor="actual-service-location-effective-from">Primary service effective date</label>
-                <Input id="actual-service-location-effective-from" type="date" required value={(stage1.payrollServiceLocations ?? []).find((location) => location.source === "primaryAddress")?.effectiveFrom ?? ""}
-                  onChange={(event) => updateServiceLocationDate("primaryAddress", event.target.value)}
-                  aria-invalid={!(stage1.payrollServiceLocations ?? []).find((location) => location.source === "primaryAddress")?.effectiveFrom}
-                  aria-describedby={!(stage1.payrollServiceLocations ?? []).find((location) => location.source === "primaryAddress")?.effectiveFrom ? "actual-service-location-effective-from-error" : undefined}
-                  className="h-[44px] rounded-[12px] border-[#cccccd] bg-white" />
-                {!(stage1.payrollServiceLocations ?? []).find((location) => location.source === "primaryAddress")?.effectiveFrom && <p id="actual-service-location-effective-from-error" className="text-[12px] text-red-600" role="alert">Choose an effective date before saving.</p>}
+                <DatePickerField
+                  id="actual-service-location-effective-from"
+                  label="Primary service effective date"
+                  value={primaryServiceLocation.effectiveFrom ? parseISO(primaryServiceLocation.effectiveFrom) : undefined}
+                  onChange={(date) => updateServiceLocationDate("primaryAddress", date ? format(date, "yyyy-MM-dd") : "")}
+                  required
+                  ariaInvalid={!primaryServiceLocation.effectiveFrom}
+                  ariaDescribedBy={!primaryServiceLocation.effectiveFrom ? "actual-service-location-effective-from-error" : undefined}
+                />
+                {!primaryServiceLocation.effectiveFrom && <p id="actual-service-location-effective-from-error" className="text-[12px] text-red-600" role="alert">Choose an effective date before saving.</p>}
               </div>
             )}
           </div>
@@ -720,11 +729,18 @@ const maskSSN = (value: string) => {
                 labelClassName="text-[13px] font-normal"
               />
               {!hasStructuredSecondaryAddress && <p id="actual-secondary-service-location-address-help" className="text-[12px] text-[#5d5d5f]">Enter a complete secondary address before confirming it as a service location.</p>}
-              {(stage1.payrollServiceLocations ?? []).find((location) => location.source === "secondaryAddress") && (
+              {secondaryServiceLocation && (
                 <div className="mt-2 flex max-w-[260px] flex-col gap-1">
-                  <label className="text-[12px] font-normal text-[#10141a]" htmlFor="actual-secondary-service-location-effective-from">Secondary service effective date</label>
-                  <Input id="actual-secondary-service-location-effective-from" type="date" required value={(stage1.payrollServiceLocations ?? []).find((location) => location.source === "secondaryAddress")?.effectiveFrom ?? ""} onChange={(event) => updateServiceLocationDate("secondaryAddress", event.target.value)} aria-invalid={!(stage1.payrollServiceLocations ?? []).find((location) => location.source === "secondaryAddress")?.effectiveFrom} aria-describedby={!(stage1.payrollServiceLocations ?? []).find((location) => location.source === "secondaryAddress")?.effectiveFrom ? "actual-secondary-service-location-effective-from-error" : undefined} className="h-[44px] rounded-[12px] border-[#cccccd] bg-white" />
-                  {!(stage1.payrollServiceLocations ?? []).find((location) => location.source === "secondaryAddress")?.effectiveFrom && <p id="actual-secondary-service-location-effective-from-error" className="text-[12px] text-red-600" role="alert">Choose an effective date before saving.</p>}
+                  <DatePickerField
+                    id="actual-secondary-service-location-effective-from"
+                    label="Secondary service effective date"
+                    value={secondaryServiceLocation.effectiveFrom ? parseISO(secondaryServiceLocation.effectiveFrom) : undefined}
+                    onChange={(date) => updateServiceLocationDate("secondaryAddress", date ? format(date, "yyyy-MM-dd") : "")}
+                    required
+                    ariaInvalid={!secondaryServiceLocation.effectiveFrom}
+                    ariaDescribedBy={!secondaryServiceLocation.effectiveFrom ? "actual-secondary-service-location-effective-from-error" : undefined}
+                  />
+                  {!secondaryServiceLocation.effectiveFrom && <p id="actual-secondary-service-location-effective-from-error" className="text-[12px] text-red-600" role="alert">Choose an effective date before saving.</p>}
                 </div>
               )}
             </div>

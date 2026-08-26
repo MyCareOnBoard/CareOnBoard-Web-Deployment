@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useListPayrollRunsQuery } from "../../api/payrollRunEndpoints";
 import type { AgencyPayrollRunScope, PayrollRun, PayrollRunType } from "../../model/types";
 import { PayrollRunDetailDialog } from "../PayrollRunDetailDialog";
+import { PayrollTabSkeleton } from "../PayrollTabSkeleton";
 
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 const date = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
@@ -26,6 +27,10 @@ export function PayrollHistoryPanel({ scope, expandedAudit = false }: {
   const args = { ...scope, runType, ...(cursor ? { cursor } : {}) };
   const { data, isLoading, isFetching, isError, refetch } = useListPayrollRunsQuery(args);
 
+  if (isLoading && !data) {
+    return <PayrollTabSkeleton label="Loading payroll history…" variant="list" />;
+  }
+
   return (
     <section aria-labelledby="payroll-history-heading" className="space-y-4">
       <div className="flex flex-col gap-3 border-b border-[#dfe7e8] pb-4 sm:flex-row sm:items-end sm:justify-between">
@@ -48,7 +53,6 @@ export function PayrollHistoryPanel({ scope, expandedAudit = false }: {
         </div>
       </div>
 
-      {isLoading && !data ? <p role="status" className="py-8 text-sm text-[#62686f]">Loading payroll history…</p> : null}
       {isError && !data ? (
         <div role="alert" className="border-y border-[#efcaca] py-5 text-sm text-[#8d3131]">
           Payroll history could not be loaded.

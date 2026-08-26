@@ -45,4 +45,20 @@ describe("PayrollAuditPanel", () => {
     render(<PayrollAuditPanel scope={scope} {...identity} expandedAudit />);
     expect(screen.getByRole("region", { name: "Expanded audit" })).toBeInTheDocument();
   });
+
+  it("shows an accessible audit timeline skeleton while the first page loads", () => {
+    api.events.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isFetching: true,
+      isError: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PayrollAuditPanel scope={scope} {...identity} />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading audit timeline…");
+    expect(screen.getByTestId("payroll-tab-skeleton")).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByTestId("payroll-tab-skeleton-content")).toHaveAttribute("aria-hidden", "true");
+  });
 });
