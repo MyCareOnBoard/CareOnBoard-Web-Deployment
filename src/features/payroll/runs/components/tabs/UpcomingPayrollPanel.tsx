@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 
-import { useGetUpcomingPayrollQuery, type UpcomingPayrollEmployee } from "../../api/payrollRunEndpoints";
+import {
+  useGetUpcomingPayrollQuery,
+  type UpcomingPayrollEmployee,
+  type UpcomingPayrollSourceCounts,
+} from "../../api/payrollRunEndpoints";
 import type { AgencyPayrollRunScope } from "../../model/types";
 import { PayrollTabSkeleton } from "../PayrollTabSkeleton";
 
@@ -26,16 +30,26 @@ const codeLabel = (value: string) => value
   .map((part, index) => index === 0 ? part.charAt(0).toUpperCase() + part.slice(1) : part)
   .join(" ");
 
-function sourceLabel(employee: UpcomingPayrollEmployee): string {
+function sourceCountLabel(sourceCounts: UpcomingPayrollSourceCounts): string {
   const parts = [
-    employee.sourceCounts.shift > 0
-      ? countLabel(employee.sourceCounts.shift, "shift")
+    sourceCounts.shift > 0
+      ? countLabel(sourceCounts.shift, "shift")
       : null,
-    employee.sourceCounts.staff_timesheet > 0
-      ? countLabel(employee.sourceCounts.staff_timesheet, "staff timesheet")
+    sourceCounts.ride > 0
+      ? countLabel(sourceCounts.ride, "mileage reimbursement")
+      : null,
+    sourceCounts.expense > 0
+      ? countLabel(sourceCounts.expense, "expense")
+      : null,
+    sourceCounts.staff_timesheet > 0
+      ? countLabel(sourceCounts.staff_timesheet, "staff timesheet")
       : null,
   ].filter((part): part is string => part !== null);
-  return parts.length > 0 ? parts.join(" · ") : countLabel(employee.sourceCount, "source");
+  return parts.join(" · ");
+}
+
+function sourceLabel(employee: UpcomingPayrollEmployee): string {
+  return sourceCountLabel(employee.sourceCounts) || countLabel(employee.sourceCount, "source");
 }
 
 function UpcomingWorkerRow({ employee }: { employee: UpcomingPayrollEmployee }) {
@@ -59,7 +73,7 @@ function UpcomingWorkerRow({ employee }: { employee: UpcomingPayrollEmployee }) 
             ? "bg-[#f3f1eb] text-[#665c39]"
             : "bg-[#e9f6f6] text-[#006f73]"
         }`}>
-          {employee.hasBlockers ? "Not ready yet" : "Approved work ready"}
+          {employee.hasBlockers ? "Not ready yet" : "Ready for payroll"}
         </span>
         {employee.hasBlockers && employee.blockerCodes.length > 0 ? (
           <p className="mt-1.5 break-words text-xs leading-5 text-[#62686f]">
@@ -80,8 +94,11 @@ function UpcomingWorkerRow({ employee }: { employee: UpcomingPayrollEmployee }) 
       </div>
       <div>
         <p className="text-sm font-semibold tabular-nums text-[#10141a]">
-          <span className="mr-2 text-xs font-normal text-[#747a81] lg:hidden">Estimated earnings</span>
-          {moneyLabel(employee.grossEarningsCents)}
+          <span className="mr-2 text-xs font-normal text-[#747a81] lg:hidden">Estimated total due</span>
+          {moneyLabel(employee.totalDueCents)}
+        </p>
+        <p className="mt-1 text-xs tabular-nums text-[#62686f]">
+          {moneyLabel(employee.grossEarningsCents)} gross · {moneyLabel(employee.reimbursementCents)} reimbursements
         </p>
       </div>
       <div>
@@ -232,14 +249,16 @@ export function UpcomingPayrollPanel({ scope }: { scope: AgencyPayrollRunScope }
         </span>
       </header>
 
-      <dl className="grid overflow-hidden rounded-xl border border-[#dfe7e8] bg-white sm:grid-cols-2 xl:grid-cols-4">
+      <dl className="grid gap-px overflow-hidden rounded-xl border border-[#dfe7e8] bg-[#dfe7e8] sm:grid-cols-2 xl:grid-cols-3">
         {[
           ["Workers in period", countLabel(currentData.employeeCount, "worker")],
           ["Approved hours", `${hoursLabel(currentData.totals.totalHours)} hrs`],
-          ["Estimated earnings from approved work", moneyLabel(currentData.totals.grossEarningsCents)],
+          ["Gross earnings", moneyLabel(currentData.totals.grossEarningsCents)],
+          ["Reimbursements", moneyLabel(currentData.totals.reimbursementCents)],
+          ["Estimated total due", moneyLabel(currentData.totals.totalDueCents)],
           ["Not ready yet", countLabel(currentData.blockerCount, "worker")],
         ].map(([label, value]) => (
-          <div key={label} className="border-b border-[#e5e5e6] px-4 py-4 last:border-b-0 sm:[&:nth-child(odd)]:border-r sm:[&:nth-child(n+3)]:border-b-0 xl:border-b-0 xl:border-r xl:last:border-r-0">
+          <div key={label} className="bg-white px-4 py-4">
             <dt className="text-xs font-medium leading-5 text-[#62686f]">{label}</dt>
             <dd className="mt-1 text-lg font-semibold tabular-nums text-[#10141a]">{value}</dd>
           </div>
@@ -247,7 +266,7 @@ export function UpcomingPayrollPanel({ scope }: { scope: AgencyPayrollRunScope }
       </dl>
 
       <p className="text-xs leading-5 text-[#62686f]">
-        This estimate includes approved work only and does not include reimbursements or adjustments.
+        Includes approved earnings, expenses, and mileage reimbursements. Adjustments are added after the payroll run is created.
       </p>
 
       {projectionBlockerCodes.length > 0 ? (
@@ -261,7 +280,7 @@ export function UpcomingPayrollPanel({ scope }: { scope: AgencyPayrollRunScope }
 
       <div className="flex flex-col gap-1 text-xs text-[#62686f] sm:flex-row sm:items-center sm:justify-between">
         <p>
-          Approved sources: {countLabel(currentData.sourceCounts.shift, "shift")} · {countLabel(currentData.sourceCounts.staff_timesheet, "staff timesheet")}
+          Approved sources: {sourceCountLabel(currentData.sourceCounts) || "None"}
         </p>
         <p>{countLabel(currentData.items.length, "worker")} shown</p>
       </div>
@@ -272,7 +291,7 @@ export function UpcomingPayrollPanel({ scope }: { scope: AgencyPayrollRunScope }
             <span>Worker</span>
             <span>Status</span>
             <span>Hours</span>
-            <span>Estimated earnings</span>
+            <span>Estimated total due</span>
             <span>Approved sources</span>
           </div>
           <ul aria-label="Upcoming payroll workers" className="divide-y divide-[#e5e5e6]">
@@ -283,7 +302,7 @@ export function UpcomingPayrollPanel({ scope }: { scope: AgencyPayrollRunScope }
         </div>
       ) : (
         <p className="border-y border-[#e5e5e6] py-8 text-sm text-[#62686f]">
-          No approved work is queued for this period yet.
+          No approved payroll sources are queued for this period yet.
         </p>
       )}
 

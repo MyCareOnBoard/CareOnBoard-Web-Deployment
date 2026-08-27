@@ -180,11 +180,18 @@ describe("AgencyPayrollRunsWorkspace", () => {
       periodStart: "2026-08-24",
       periodEnd: "2026-09-06",
       payday: "2026-09-11",
-      totals: { regularHours: 40, overtimeHours: 4, totalHours: 44, grossEarningsCents: 88_000 },
+      totals: {
+        regularHours: 40,
+        overtimeHours: 4,
+        totalHours: 44,
+        grossEarningsCents: 88_000,
+        reimbursementCents: 5_000,
+        totalDueCents: 93_000,
+      },
       employeeCount: 1,
       blockerCount: 1,
       blockerCodes: ["SHIFT_AWAITING_APPROVAL"],
-      sourceCounts: { shift: 2, staff_timesheet: 0 },
+      sourceCounts: { shift: 2, ride: 0, expense: 1, staff_timesheet: 0 },
       items: [{
         employeeId: "upcoming-employee-1",
         employmentType: "field" as const,
@@ -192,8 +199,10 @@ describe("AgencyPayrollRunsWorkspace", () => {
         regularHours: 40,
         overtimeHours: 4,
         grossEarningsCents: 88_000,
-        sourceCount: 2,
-        sourceCounts: { shift: 2, staff_timesheet: 0 },
+        reimbursementCents: 5_000,
+        totalDueCents: 93_000,
+        sourceCount: 3,
+        sourceCounts: { shift: 2, ride: 0, expense: 1, staff_timesheet: 0 },
         hasBlockers: true,
         blockerCodes: ["SHIFT_AWAITING_APPROVAL"],
       }],
@@ -251,7 +260,11 @@ describe("AgencyPayrollRunsWorkspace", () => {
     await screen.findByRole("heading", { name: "Upcoming payroll" });
     expect(api.upcomingHook).toHaveBeenCalledWith(scope, { refetchOnMountOrArgChange: true });
     expect(screen.getByText("Alex Morgan")).toBeInTheDocument();
-    expect(screen.getAllByText("$880.00")).toHaveLength(2);
+    expect(screen.getByText("$880.00")).toBeInTheDocument();
+    expect(screen.getByText("$50.00")).toBeInTheDocument();
+    expect(screen.getAllByText("$930.00")).toHaveLength(2);
+    expect(screen.getByText("$880.00 gross · $50.00 reimbursements")).toBeInTheDocument();
+    expect(screen.getByText("2 shifts · 1 expense")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Current payroll" })).not.toBeInTheDocument();
     expect(api.historyHook).not.toHaveBeenCalled();
 

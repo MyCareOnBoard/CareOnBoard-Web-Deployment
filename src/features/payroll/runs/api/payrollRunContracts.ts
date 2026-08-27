@@ -552,8 +552,10 @@ function parseEmployeePage(value: unknown): CurrentPayrollEmployeePage {
 }
 
 function parseUpcomingSourceCounts(value: unknown, path: string): UpcomingPayrollSourceCounts {
-  const record = exactObject(value, path, ["shift", "staff_timesheet"]);
+  const record = exactObject(value, path, ["shift", "ride", "expense", "staff_timesheet"]);
   nonNegativeInteger(record.shift, `${path}.shift`);
+  nonNegativeInteger(record.ride, `${path}.ride`);
+  nonNegativeInteger(record.expense, `${path}.expense`);
   nonNegativeInteger(record.staff_timesheet, `${path}.staff_timesheet`);
   return record as UpcomingPayrollSourceCounts;
 }
@@ -566,6 +568,8 @@ function parseUpcomingEmployee(value: unknown, path: string): UpcomingPayrollEmp
     "regularHours",
     "overtimeHours",
     "grossEarningsCents",
+    "reimbursementCents",
+    "totalDueCents",
     "sourceCount",
     "sourceCounts",
     "hasBlockers",
@@ -576,10 +580,14 @@ function parseUpcomingEmployee(value: unknown, path: string): UpcomingPayrollEmp
   boundedText(record.displayName, `${path}.displayName`, MAX_ID_BYTES);
   nonNegativeNumber(record.regularHours, `${path}.regularHours`);
   nonNegativeNumber(record.overtimeHours, `${path}.overtimeHours`);
-  nonNegativeInteger(record.grossEarningsCents, `${path}.grossEarningsCents`);
+  const grossEarningsCents = nonNegativeInteger(record.grossEarningsCents, `${path}.grossEarningsCents`);
+  const reimbursementCents = nonNegativeInteger(record.reimbursementCents, `${path}.reimbursementCents`);
+  const totalDueCents = nonNegativeInteger(record.totalDueCents, `${path}.totalDueCents`);
+  if (totalDueCents !== grossEarningsCents + reimbursementCents) throw invalid(`${path}.totalDueCents`);
   const sourceCount = nonNegativeInteger(record.sourceCount, `${path}.sourceCount`);
   const sourceCounts = parseUpcomingSourceCounts(record.sourceCounts, `${path}.sourceCounts`);
-  if (sourceCount !== sourceCounts.shift + sourceCounts.staff_timesheet) {
+  if (sourceCount !== sourceCounts.shift + sourceCounts.ride
+    + sourceCounts.expense + sourceCounts.staff_timesheet) {
     throw invalid(`${path}.sourceCount`);
   }
   const hasBlockers = booleanValue(record.hasBlockers, `${path}.hasBlockers`);
@@ -616,6 +624,8 @@ function parseUpcoming(value: unknown): UpcomingPayrollResponse {
     "overtimeHours",
     "totalHours",
     "grossEarningsCents",
+    "reimbursementCents",
+    "totalDueCents",
   ]);
   const regularHours = nonNegativeNumber(totals.regularHours, "$.totals.regularHours");
   const overtimeHours = nonNegativeNumber(totals.overtimeHours, "$.totals.overtimeHours");
@@ -623,7 +633,10 @@ function parseUpcoming(value: unknown): UpcomingPayrollResponse {
   if (Math.abs(totalHours - (regularHours + overtimeHours)) > Number.EPSILON * 16) {
     throw invalid("$.totals.totalHours");
   }
-  nonNegativeInteger(totals.grossEarningsCents, "$.totals.grossEarningsCents");
+  const grossEarningsCents = nonNegativeInteger(totals.grossEarningsCents, "$.totals.grossEarningsCents");
+  const reimbursementCents = nonNegativeInteger(totals.reimbursementCents, "$.totals.reimbursementCents");
+  const totalDueCents = nonNegativeInteger(totals.totalDueCents, "$.totals.totalDueCents");
+  if (totalDueCents !== grossEarningsCents + reimbursementCents) throw invalid("$.totals.totalDueCents");
   const employeeCount = nonNegativeInteger(record.employeeCount, "$.employeeCount");
   const blockerCount = nonNegativeInteger(record.blockerCount, "$.blockerCount");
   if (blockerCount > employeeCount) throw invalid("$.blockerCount");

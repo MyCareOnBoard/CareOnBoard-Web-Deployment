@@ -107,6 +107,8 @@ export type PayrollObligationPage = CursorPage<PayrollObligation>;
 
 export type UpcomingPayrollSourceCounts = {
   shift: number;
+  ride: number;
+  expense: number;
   staff_timesheet: number;
 };
 
@@ -117,6 +119,8 @@ export type UpcomingPayrollEmployee = {
   regularHours: number;
   overtimeHours: number;
   grossEarningsCents: number;
+  reimbursementCents: number;
+  totalDueCents: number;
   sourceCount: number;
   sourceCounts: UpcomingPayrollSourceCounts;
   hasBlockers: boolean;
@@ -134,6 +138,8 @@ export type UpcomingPayrollProjection = {
     overtimeHours: number;
     totalHours: number;
     grossEarningsCents: number;
+    reimbursementCents: number;
+    totalDueCents: number;
   };
   employeeCount: number;
   blockerCount: number;

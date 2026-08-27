@@ -36,11 +36,13 @@ const validUpcomingResponse = () => ({
     overtimeHours: 4,
     totalHours: 76,
     grossEarningsCents: 152_000,
+    reimbursementCents: 5_000,
+    totalDueCents: 157_000,
   },
   employeeCount: 2,
   blockerCount: 1,
   blockerCodes: ["compensation_missing"],
-  sourceCounts: { shift: 8, staff_timesheet: 1 },
+  sourceCounts: { shift: 8, ride: 1, expense: 1, staff_timesheet: 1 },
   items: [{
     employeeId: "employee-a",
     employmentType: "field",
@@ -48,8 +50,10 @@ const validUpcomingResponse = () => ({
     regularHours: 40,
     overtimeHours: 4,
     grossEarningsCents: 88_000,
-    sourceCount: 5,
-    sourceCounts: { shift: 5, staff_timesheet: 0 },
+    reimbursementCents: 5_000,
+    totalDueCents: 93_000,
+    sourceCount: 7,
+    sourceCounts: { shift: 5, ride: 1, expense: 1, staff_timesheet: 0 },
     hasBlockers: true,
     blockerCodes: ["compensation_missing"],
   }],
@@ -492,7 +496,10 @@ describe("upcoming payroll runtime contract", () => {
     expect(() => parse({ ...upcoming, hasMore: false })).toThrow();
     expect(() => parse({
       ...upcoming,
-      items: [{ ...upcoming.items[0], sourceCounts: { shift: 5, expense: 1 } }],
+      items: [{
+        ...upcoming.items[0],
+        sourceCounts: { ...upcoming.items[0].sourceCounts, bonus: 1 },
+      }],
     })).toThrow();
     expect(() => parse({
       ...upcoming,
@@ -508,6 +515,10 @@ describe("upcoming payroll runtime contract", () => {
     expect(() => parse({
       ...upcoming,
       totals: { ...upcoming.totals, totalHours: 75 },
+    })).toThrow();
+    expect(() => parse({
+      ...upcoming,
+      totals: { ...upcoming.totals, totalDueCents: 156_000 },
     })).toThrow();
     expect(() => parse({
       ...upcoming,
