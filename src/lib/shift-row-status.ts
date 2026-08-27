@@ -95,7 +95,7 @@ export function isShiftMissed(shift: Shift): boolean {
 }
 
 /** Same rules as Scheduling “Recent shifts” status pill. */
-export function getShiftRowStatusInfo(shift: Shift, _approved?: boolean): ShiftRowStatusInfo {
+export function getShiftRowStatusInfo(shift: Shift, approved?: boolean): ShiftRowStatusInfo {
   const anomalyCode = detectShiftAnomalyCodes(shift)[0];
   if (anomalyCode) {
     return ANOMALY_ROW_STATUS[anomalyCode];
@@ -111,6 +111,10 @@ export function getShiftRowStatusInfo(shift: Shift, _approved?: boolean): ShiftR
       return { label: "Active", color: s.color, bgColor: s.bgColor };
     }
     case ShiftStatus.COMPLETED: {
+      if (approved) {
+        const s = SHIFT_ROW_PILL.active;
+        return { label: "Approved", color: s.color, bgColor: s.bgColor };
+      }
       const s = SHIFT_ROW_PILL.completed;
       return { label: "Completed", color: s.color, bgColor: s.bgColor };
     }
