@@ -266,12 +266,10 @@ describe("shared financial overview context", () => {
     expect(superAdminCurrentRequest.query).toEqual(agencyCurrentRequest.query);
     expect(billingApi.listBillingClaims).toHaveBeenCalledTimes(1);
     expect(payrollRunsApi.current).toHaveBeenCalledWith(
-      { audience: "agency", actorUid: "super-1", agencyId: "atlas" },
-      { skip: false },
+      { audience: "agency", actorUid: "super-1", agencyId: "atlas", mode: "ddd" },
     );
     expect(payrollRunsApi.history).toHaveBeenCalledWith(
-      { audience: "agency", actorUid: "super-1", agencyId: "atlas" },
-      { skip: false },
+      { audience: "agency", actorUid: "super-1", agencyId: "atlas", mode: "ddd" },
     );
   });
 
@@ -613,8 +611,7 @@ describe("SuperAdminBillingWorkspace", () => {
       query: expect.objectContaining({ startDate: "2026-07-01", endDate: "2026-07-31" }),
     }));
     expect(payrollRunsApi.history).toHaveBeenCalledWith(
-      { audience: "agency", actorUid: "super-1", agencyId: "atlas" },
-      { skip: false },
+      { audience: "agency", actorUid: "super-1", agencyId: "atlas", mode: "ddd" },
     );
 
     const expectedRange = {
