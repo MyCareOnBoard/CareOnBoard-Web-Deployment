@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, X } from "lucide-react";
+import { CircleHelp, Loader2, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { buildCheckPayrollProfilePayload, CHECK_ENTITY_TYPES, CHECK_INDUSTRIES, CHECK_PAY_FREQUENCIES, isUsTenDigitPayrollPhone, type CheckAddress, type CheckPayrollProfileFormValues, type CheckPayrollProfileRead, type CheckPayrollProfileWrite } from "@/lib/agency/agency-profile-payload";
 import { validateCompanySetup } from "@/features/payroll/forms/companySetupValidation";
 import { useToast } from "@/hooks/use-toast";
 import { AddressAutocompleteField } from "@/pages/shared/client-management/components/forms/AddressAutocompleteField";
-import { DatePickerField } from "@/pages/shared/client-management/components/forms/formControls";
+import { DatePickerField, FieldLabel } from "@/pages/shared/client-management/components/forms/formControls";
 import { AuthorizedSignerSelector, type SignerDesignation } from "@/features/payroll/components/AuthorizedSignerSelector";
 import type { PayrollScope, PayrollSignerCandidate } from "@/features/payroll/model/types";
 
@@ -96,8 +97,8 @@ export const AGENCY_PAYROLL_REQUIRED_FIELD_MAP: Record<RequiredFieldCode, FieldS
   "paySchedule.frequency": { group: "schedule", target: "payFrequency", satisfied: (f) => CHECK_PAY_FREQUENCIES.includes(f.payFrequency as typeof CHECK_PAY_FREQUENCIES[number]) },
   "paySchedule.firstPayday": { group: "schedule", target: "firstPayday", satisfied: (f) => present(f.firstPayday) },
   "paySchedule.secondPayday": { group: "schedule", target: "secondPayday", satisfied: (f) => f.payFrequency !== "semimonthly" || present(f.secondPayday) },
-  "paySchedule.firstPeriodEnd": { group: "schedule", target: "firstPeriodEnd", satisfied: (f) => present(f.firstPeriodEnd) && Boolean(f.firstPayday && f.firstPeriodEnd! < f.firstPayday) },
-  "paySchedule.payrollStartDate": { group: "schedule", target: "payrollStartDate", satisfied: (f) => present(f.payrollStartDate) && Boolean(f.firstPeriodEnd && f.payrollStartDate! <= f.firstPeriodEnd) },
+  "paySchedule.firstPeriodEnd": { group: "schedule", target: "firstPeriodEnd", satisfied: (f) => present(f.firstPeriodEnd) },
+  "paySchedule.payrollStartDate": { group: "schedule", target: "payrollStartDate", satisfied: (f) => present(f.payrollStartDate) },
   "expectedWorkerCounts.w2": { group: "workers", target: "expectedW2Workers", satisfied: (f) => Number.isInteger(Number(f.expectedW2Workers)) && Number(f.expectedW2Workers) >= 0 && present(f.expectedW2Workers) },
   "expectedWorkerCounts.contractor": { group: "workers", target: "expectedW2Workers", fixed: true, satisfied: () => true },
 };
@@ -118,7 +119,7 @@ export function validateAgencyPayrollBootstrapForm(form: CheckPayrollProfileForm
     .filter(isRequiredFieldCode)
     .filter((code) => !AGENCY_PAYROLL_REQUIRED_FIELD_MAP[code].fixed && !AGENCY_PAYROLL_REQUIRED_FIELD_MAP[code].satisfied(form))
     .map((code) => [AGENCY_PAYROLL_REQUIRED_FIELD_MAP[code].target, "This required payroll field is missing."]));
-  return { ...validationErrors, ...missingErrors };
+  return { ...missingErrors, ...validationErrors };
 }
 
 function Field({ label, value, onChange, type = "text", inputRef, readOnly = false, error, ein = false, id: explicitId, helperText, placeholder }: { label: string; value: string | number | undefined; onChange: (value: string) => void; type?: string; inputRef?: React.RefObject<HTMLInputElement | null>; readOnly?: boolean; error?: string; ein?: boolean; id?: string; helperText?: string; placeholder?: string }) {
@@ -153,9 +154,9 @@ function formatPayrollDate(date: Date | undefined): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-function PayrollDateField({ label, value, onChange, error }: { label: string; value: string | undefined; onChange: (value: string) => void; error?: string }) {
+function PayrollDateField({ label, tooltip, value, onChange, error }: { label: string; tooltip: string; value: string | undefined; onChange: (value: string) => void; error?: string }) {
   const id = `payroll-bootstrap-${label.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-")}`;
-  return <div><DatePickerField id={id} label={label} value={parsePayrollDate(value)} onChange={(date) => onChange(formatPayrollDate(date))} placeholder="Select date" required ariaInvalid={Boolean(error)} ariaDescribedBy={error ? `${id}-error` : undefined} />{error && <p id={`${id}-error`} role="alert" className="mt-1 text-xs text-[#8b2d2d]">{error}</p>}</div>;
+  return <div><div className="flex items-center gap-1.5"><FieldLabel htmlFor={id} required>{label}</FieldLabel><Tooltip><TooltipTrigger asChild><button type="button" aria-label={`About ${label.toLowerCase()}`} className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[#5d626b] hover:text-[#006f73] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8]/30"><CircleHelp aria-hidden="true" className="h-3.5 w-3.5" /></button></TooltipTrigger><TooltipContent side="top" sideOffset={6} className="max-w-72 border border-[#dce8e8] bg-white leading-relaxed text-[#10141a] shadow-lg [&>span]:hidden">{tooltip}</TooltipContent></Tooltip></div><DatePickerField id={id} value={parsePayrollDate(value)} onChange={(date) => onChange(formatPayrollDate(date))} placeholder="Select date" required ariaInvalid={Boolean(error)} ariaDescribedBy={error ? `${id}-error` : undefined} />{error && <p id={`${id}-error`} role="alert" className="mt-1 text-xs text-[#8b2d2d]">{error}</p>}</div>;
 }
 
 function addressSearchValue(address: CheckAddress): string {
@@ -183,6 +184,7 @@ export default function AgencyPayrollBootstrapModal({ open, values, missingField
   const validationErrors = useMemo(() => validateAgencyPayrollBootstrapForm(form, allFieldCodes), [form, allFieldCodes]);
   const hasValidationErrors = Object.keys(validationErrors).length > 0;
   const visibleEinError = fieldErrors.ein ?? (form.ein?.trim() ? validationErrors.ein : undefined);
+  const visibleDateError = (field: "firstPayday" | "secondPayday" | "firstPeriodEnd" | "payrollStartDate") => form[field] ? validationErrors[field] : fieldErrors[field];
 
   useEffect(() => {
     if (open && !wasOpen.current) {
@@ -205,16 +207,16 @@ export default function AgencyPayrollBootstrapModal({ open, values, missingField
     setFieldErrors((current) => ({ ...current, ...submissionErrors }));
   }, [submissionFieldCodes]);
 
-  const update = <K extends keyof CheckPayrollProfileFormValues>(key: K, value: CheckPayrollProfileFormValues[K]) => setForm((current) => ({ ...current, [key]: value }));
-  const updateEin = (ein: string) => {
+  const update = <K extends keyof CheckPayrollProfileFormValues>(key: K, value: CheckPayrollProfileFormValues[K]) => {
     setFieldErrors((current) => {
-      if (!current.ein) return current;
+      if (!current[key]) return current;
       const next = { ...current };
-      delete next.ein;
+      delete next[key];
       return next;
     });
-    update("ein", ein);
+    setForm((current) => ({ ...current, [key]: value }));
   };
+  const updateEin = (ein: string) => update("ein", ein);
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (Object.keys(validationErrors).length || (requireSignerConfirmation && !signerSelection)) { setFieldErrors(validationErrors); setError(requireSignerConfirmation && !signerSelection ? "Choose an authorized signer and confirm authority before creating payroll setup." : "Review the highlighted payroll details."); return; }
@@ -241,7 +243,7 @@ export default function AgencyPayrollBootstrapModal({ open, values, missingField
         {groups.has("workplace") && <><Field label="Primary workplace name" value={form.officeName} inputRef={firstGroup === "workplace" ? firstFieldRef : undefined} error={fieldErrors.officeName} onChange={(officeName) => update("officeName", officeName)} /><AddressFields label="Primary workplace address" value={form.officeAddress ?? emptyAddress()} searchValue={officeAddressSearch} onSearchChange={setOfficeAddressSearch} autocompleteId="payroll-bootstrap-primary-workplace-address-search" autocompleteLabel="Find primary workplace address" autocompletePlaceholder="Find primary workplace address" idPrefix="payroll-bootstrap-primary-workplace-address" error={fieldErrors.officeAddress} onChange={(officeAddress) => update("officeAddress", officeAddress)} /><div><label className="flex min-h-11 items-center gap-2 text-sm text-[#10141a]"><input type="checkbox" aria-invalid={Boolean(fieldErrors.actualWorkLocationAttested)} aria-describedby={fieldErrors.actualWorkLocationAttested ? "payroll-bootstrap-workplace-attestation-error" : undefined} checked={form.actualWorkLocationAttested === true} onChange={(event) => update("actualWorkLocationAttested", event.target.checked)} /> I confirm employees physically work at this location.</label>{fieldErrors.actualWorkLocationAttested && <p id="payroll-bootstrap-workplace-attestation-error" role="alert" className="mt-1 text-xs text-[#8b2d2d]">{fieldErrors.actualWorkLocationAttested}</p>}</div></>}
         {groups.has("contact") && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><Field label="Company website" value={form.website} inputRef={firstGroup === "contact" ? firstFieldRef : undefined} error={fieldErrors.website} onChange={(website) => update("website", website)} /><UsPayrollPhoneField label="Company phone number" value={form.phone} error={fieldErrors.phone} autoComplete="tel" onChange={(phone) => update("phone", phone)} /></div>}
         {groups.has("payrollContact") && <div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><Field label="Payroll contact’s full name" value={form.payrollContactName} inputRef={firstGroup === "payrollContact" ? firstFieldRef : undefined} error={fieldErrors.payrollContactName} onChange={(payrollContactName) => update("payrollContactName", payrollContactName)} /><Field label="Payroll contact’s email address" value={form.payrollContactEmail} type="email" error={fieldErrors.payrollContactEmail} onChange={(payrollContactEmail) => update("payrollContactEmail", payrollContactEmail)} /><UsPayrollPhoneField label="Payroll contact’s phone number" value={form.payrollContactPhone} error={fieldErrors.payrollContactPhone} autoComplete="tel-national" onChange={(payrollContactPhone) => update("payrollContactPhone", payrollContactPhone)} /></div>}
-        {groups.has("schedule") && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><EnumField label="How often employees are paid" placeholder="Select pay frequency" value={form.payFrequency} options={CHECK_PAY_FREQUENCIES} inputRef={firstGroup === "schedule" ? firstSelectRef : undefined} error={fieldErrors.payFrequency} onChange={(payFrequency) => setForm((current) => ({ ...current, payFrequency, secondPayday: payFrequency === "semimonthly" ? current.secondPayday : "" }))} /><PayrollDateField label="First scheduled payday" value={form.firstPayday} error={fieldErrors.firstPayday} onChange={(firstPayday) => update("firstPayday", firstPayday)} />{form.payFrequency === "semimonthly" && <PayrollDateField label="Second scheduled payday" value={form.secondPayday} error={fieldErrors.secondPayday} onChange={(secondPayday) => update("secondPayday", secondPayday)} />}<PayrollDateField label="First pay period end date" value={form.firstPeriodEnd} error={fieldErrors.firstPeriodEnd} onChange={(firstPeriodEnd) => update("firstPeriodEnd", firstPeriodEnd)} /><PayrollDateField label="Payroll tracking start date" value={form.payrollStartDate} error={fieldErrors.payrollStartDate} onChange={(payrollStartDate) => update("payrollStartDate", payrollStartDate)} /></div>}
+        {groups.has("schedule") && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><EnumField label="How often employees are paid" placeholder="Select pay frequency" value={form.payFrequency} options={CHECK_PAY_FREQUENCIES} inputRef={firstGroup === "schedule" ? firstSelectRef : undefined} error={fieldErrors.payFrequency} onChange={(payFrequency) => setForm((current) => ({ ...current, payFrequency, secondPayday: payFrequency === "semimonthly" ? current.secondPayday : "" }))} /><PayrollDateField label="Payroll tracking start date" tooltip="The first date CareOnBoard should include approved work and reimbursements in payroll tracking. It must be on or before the first pay period end date." value={form.payrollStartDate} error={visibleDateError("payrollStartDate")} onChange={(payrollStartDate) => update("payrollStartDate", payrollStartDate)} /><PayrollDateField label="First pay period end date" tooltip="The final work date included in your first payroll. It must be on or after the tracking start date and before the first scheduled payday." value={form.firstPeriodEnd} error={visibleDateError("firstPeriodEnd")} onChange={(firstPeriodEnd) => update("firstPeriodEnd", firstPeriodEnd)} /><PayrollDateField label="First scheduled payday" tooltip="The future banking day employees receive their first payroll through Check. Today, weekends, and U.S. Federal Reserve holidays are not accepted." value={form.firstPayday} error={visibleDateError("firstPayday")} onChange={(firstPayday) => update("firstPayday", firstPayday)} />{form.payFrequency === "semimonthly" && <PayrollDateField label="Second scheduled payday" tooltip="The banking day employees receive the second semimonthly payroll. It must follow the first payday and be within one calendar month." value={form.secondPayday} error={visibleDateError("secondPayday")} onChange={(secondPayday) => update("secondPayday", secondPayday)} />}</div>}
         {groups.has("workers") && <Field label="Estimated number of W-2 employees" value={form.expectedW2Workers} type="number" inputRef={firstGroup === "workers" ? firstFieldRef : undefined} error={fieldErrors.expectedW2Workers} helperText="Include employees you expect to pay through payroll. Do not include independent contractors." onChange={(expectedW2Workers) => update("expectedW2Workers", expectedW2Workers)} />}
         {requireSignerConfirmation && scope && <AuthorizedSignerSelector scope={scope} ownerCandidate={ownerCandidate} disabled={isSubmitting} onSelectionChange={setSignerSelection} />}
         {(error || submissionError) && <p role="alert" className="text-sm text-[#8b2d2d]">{error ?? submissionError}</p>}</fieldset></div>

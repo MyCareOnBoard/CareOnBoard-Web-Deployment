@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import AgencyPayrollBootstrapModal, {
@@ -58,6 +58,57 @@ describe("AgencyPayrollBootstrapModal", () => {
     expect(validateAgencyPayrollBootstrapForm(complete, [...requiredCodes])).toEqual({});
   });
 
+  it.each([
+    [
+      "first pay period end date",
+      { payFrequency: "weekly", firstPayday: "2026-09-04", firstPeriodEnd: "2026-09-04", payrollStartDate: "2026-08-28" },
+      "paySchedule.firstPeriodEnd",
+      "firstPeriodEnd",
+      "The first pay period must end before the first scheduled payday.",
+    ],
+    [
+      "payroll tracking start date",
+      { payFrequency: "weekly", firstPayday: "2026-09-04", firstPeriodEnd: "2026-09-03", payrollStartDate: "2026-09-04" },
+      "paySchedule.payrollStartDate",
+      "payrollStartDate",
+      "The payroll tracking start date must be on or before the first pay period end date.",
+    ],
+  ])("keeps the specific %s error instead of replacing it with a generic missing-field error", (_label, form, code, target, expected) => {
+    expect(validateAgencyPayrollBootstrapForm(form, [code])).toMatchObject({ [target]: expected });
+  });
+
+  it("validates the first payday before pay frequency is selected", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-28T12:00:00Z"));
+    try {
+      expect(validateAgencyPayrollBootstrapForm(
+        { firstPayday: "2026-08-28" },
+        ["paySchedule.frequency", "paySchedule.firstPayday"],
+      )).toMatchObject({
+        firstPayday: "Choose a future U.S. banking day. Today, weekends, and Federal Reserve holidays are not accepted.",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not mark an earlier schedule date missing while later dates are still empty", () => {
+    const requiredScheduleCodes = [
+      "paySchedule.firstPayday",
+      "paySchedule.firstPeriodEnd",
+      "paySchedule.payrollStartDate",
+    ];
+
+    expect(validateAgencyPayrollBootstrapForm(
+      { payrollStartDate: "2026-08-31" },
+      requiredScheduleCodes,
+    )).not.toHaveProperty("payrollStartDate");
+    expect(validateAgencyPayrollBootstrapForm(
+      { payrollStartDate: "2026-08-31", firstPeriodEnd: "2026-09-04" },
+      requiredScheduleCodes,
+    )).not.toHaveProperty("firstPeriodEnd");
+  });
+
   it("focuses the first missing interactive control when multiple groups are present", async () => {
     render(<AgencyPayrollBootstrapModal open values={{}} missingFieldCodes={["entityType", "website", "payrollContact.name"]} onOpenChange={vi.fn()} onSubmit={vi.fn()} />);
     await waitFor(() => expect(screen.getByRole("combobox", { name: "Business structure" })).toHaveFocus());
@@ -91,6 +142,86 @@ describe("AgencyPayrollBootstrapModal", () => {
     unmount();
     render(<AgencyPayrollBootstrapModal open values={{ paySchedule: { frequency: "semimonthly", firstPayday: "2026-09-04", secondPayday: "2026-09-18", firstPeriodEnd: "2026-09-03", payrollStartDate: "2026-08-28" } }} missingFieldCodes={["paySchedule.frequency", "paySchedule.secondPayday"]} onOpenChange={vi.fn()} onSubmit={vi.fn()} />);
     expect(screen.getByText("Second scheduled payday")).toBeInTheDocument();
+  });
+
+  it("orders payroll dates chronologically and explains each date from a focusable tooltip", async () => {
+    render(<AgencyPayrollBootstrapModal open values={{}} missingFieldCodes={[
+      "paySchedule.frequency", "paySchedule.firstPayday", "paySchedule.firstPeriodEnd", "paySchedule.payrollStartDate",
+    ]} onOpenChange={vi.fn()} onSubmit={vi.fn()} />);
+
+    const trackingStart = screen.getByRole("button", { name: "Payroll tracking start date" });
+    const periodEnd = screen.getByRole("button", { name: "First pay period end date" });
+    const firstPayday = screen.getByRole("button", { name: "First scheduled payday" });
+    expect(trackingStart.compareDocumentPosition(periodEnd) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(periodEnd.compareDocumentPosition(firstPayday) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+
+    const tooltipCases = [
+      ["About payroll tracking start date", /first date CareOnBoard should include approved work and reimbursements/i],
+      ["About first pay period end date", /final work date included in your first payroll/i],
+      ["About first scheduled payday", /banking day employees receive their first payroll through Check/i],
+    ] as const;
+    for (const [name, copy] of tooltipCases) {
+      const trigger = screen.getByRole("button", { name });
+      expect(trigger).not.toHaveAttribute("tabindex", "-1");
+      fireEvent.focus(trigger);
+      expect((await screen.findAllByText(copy)).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("shows why a prefilled scheduled payday is not accepted", () => {
+    render(<AgencyPayrollBootstrapModal
+      open
+      values={{ paySchedule: { frequency: "weekly", firstPayday: "2026-08-29", secondPayday: null, firstPeriodEnd: "2026-08-28", payrollStartDate: "2026-08-21" } }}
+      missingFieldCodes={["paySchedule.firstPayday", "paySchedule.firstPeriodEnd", "paySchedule.payrollStartDate"]}
+      onOpenChange={vi.fn()}
+      onSubmit={vi.fn()}
+    />);
+
+    expect(screen.getByRole("button", { name: "First scheduled payday" })).toHaveAccessibleDescription(/choose a U\.S\. banking day/i);
+  });
+
+  it("marks today's first payday with a red border and a small validation message", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-28T12:00:00Z"));
+    try {
+      render(<AgencyPayrollBootstrapModal
+        open
+      values={{ paySchedule: { frequency: "weekly", firstPayday: "2026-08-28", secondPayday: null, firstPeriodEnd: "2026-08-27", payrollStartDate: "2026-08-21" } }}
+      missingFieldCodes={["paySchedule.firstPayday", "paySchedule.firstPeriodEnd", "paySchedule.payrollStartDate"]}
+      submissionFieldCodes={["paySchedule.firstPayday"]}
+      onOpenChange={vi.fn()}
+        onSubmit={vi.fn()}
+      />);
+
+      const payday = screen.getByRole("button", { name: "First scheduled payday" });
+      expect(payday).toHaveAttribute("aria-invalid", "true");
+      expect(payday.firstElementChild).toHaveClass("border-[#dc2626]");
+      expect(payday).toHaveAccessibleDescription(/choose a future U\.S\. banking day/i);
+      expect(screen.getByRole("alert")).toHaveClass("text-xs");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("clears a generic submission error after a valid schedule date is selected", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-28T12:00:00Z"));
+    try {
+      render(<AgencyPayrollBootstrapModal
+        open
+        values={{ paySchedule: { frequency: "weekly", firstPayday: "2026-09-11", secondPayday: null, firstPeriodEnd: "2026-09-04", payrollStartDate: "2026-08-31" } }}
+        missingFieldCodes={["paySchedule.firstPayday", "paySchedule.firstPeriodEnd", "paySchedule.payrollStartDate"]}
+        submissionFieldCodes={["paySchedule.payrollStartDate"]}
+        onOpenChange={vi.fn()}
+        onSubmit={vi.fn()}
+      />);
+
+      const trackingStart = screen.getByRole("button", { name: "Payroll tracking start date" });
+      expect(trackingStart).not.toHaveAttribute("aria-invalid", "true");
+      expect(trackingStart).not.toHaveAccessibleDescription(/this required payroll field is missing/i);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("shows the expected EIN format in the empty input", () => {

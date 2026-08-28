@@ -226,7 +226,10 @@ export function DatePickerField({
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button type="button" id={id} aria-required={required || undefined} aria-invalid={ariaInvalid || undefined} aria-describedby={ariaDescribedBy} className="w-full focus:outline-none">
-            <InputGroup className="h-11 rounded-[10px] border border-[#cccccd] bg-white px-3">
+            <InputGroup className={cn(
+              "h-11 rounded-[10px] border border-[#cccccd] bg-white px-3",
+              ariaInvalid && "border-[#dc2626] ring-1 ring-[#dc2626]/20",
+            )}>
               <InputGroupInput
                 value={value ? format(value, "MMM d, yyyy") : ""}
                 placeholder={placeholder}

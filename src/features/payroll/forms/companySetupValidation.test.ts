@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { isCompanySetupComplete, validateCompanySetup } from "./companySetupValidation";
 
 const completeSetup = {
@@ -30,6 +30,63 @@ describe("validateCompanySetup", () => {
   it("enforces the semimonthly second-payday and W-2-only constraints", () => {
     expect(validateCompanySetup({ payFrequency: "semimonthly", firstPayday: "2026-01-31", secondPayday: "2026-01-30", firstPeriodEnd: "2026-01-30", payrollStartDate: "2026-01-01", expectedW2Workers: "-1" })).toMatchObject({ payrollSecondPayday: expect.any(String), expectedW2Workers: expect.any(String) });
     expect(validateCompanySetup({ payFrequency: "semimonthly", firstPayday: "2026-01-15", secondPayday: "2026-02-16", firstPeriodEnd: "2026-01-14", payrollStartDate: "2026-01-01" })).toMatchObject({ payrollSecondPayday: expect.any(String) });
+  });
+  it.each([
+    ["weekend", "2026-08-29"],
+    ["Federal Reserve holiday", "2026-09-07"],
+  ])("rejects a first payday on a %s", (_reason, firstPayday) => {
+    expect(validateCompanySetup({
+      payFrequency: "weekly",
+      firstPayday,
+      firstPeriodEnd: "2026-08-28",
+      payrollStartDate: "2026-08-21",
+    })).toMatchObject({
+      payrollFirstPayday: "Choose a U.S. banking day. Weekends and Federal Reserve holidays are not accepted.",
+    });
+  });
+  it("rejects today's date as the first scheduled payday", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-28T12:00:00Z"));
+    try {
+      expect(validateCompanySetup({
+        payFrequency: "weekly",
+        firstPayday: "2026-08-28",
+        firstPeriodEnd: "2026-08-27",
+        payrollStartDate: "2026-08-21",
+      })).toMatchObject({
+        payrollFirstPayday: "Choose a future U.S. banking day. Today, weekends, and Federal Reserve holidays are not accepted.",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("validates each populated schedule date before pay frequency is selected", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-28T12:00:00Z"));
+    try {
+      expect(validateCompanySetup({ firstPayday: "2026-08-28" })).toMatchObject({
+        payrollFirstPayday: "Choose a future U.S. banking day. Today, weekends, and Federal Reserve holidays are not accepted.",
+      });
+      expect(validateCompanySetup({ firstPeriodEnd: "2026-02-30" })).toMatchObject({
+        payrollFirstPeriodEnd: "Enter a valid first pay period end date.",
+      });
+      expect(validateCompanySetup({ payrollStartDate: "2026-02-30" })).toMatchObject({
+        payrollStartDate: "Enter a valid payroll tracking start date.",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("rejects a semimonthly second payday that is not a banking day", () => {
+    expect(validateCompanySetup({
+      payFrequency: "semimonthly",
+      firstPayday: "2026-08-31",
+      secondPayday: "2026-09-07",
+      firstPeriodEnd: "2026-08-28",
+      payrollStartDate: "2026-08-21",
+    })).toMatchObject({
+      payrollSecondPayday: "Choose a U.S. banking day. Weekends and Federal Reserve holidays are not accepted.",
+    });
   });
   it("uses the payroll setup terminology in user-facing validation errors", () => {
     expect(validateCompanySetup({
