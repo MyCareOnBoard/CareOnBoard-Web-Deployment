@@ -129,6 +129,7 @@ export type UpcomingPayrollEmployee = {
 
 export type UpcomingPayrollProjection = {
   kind: "upcoming";
+  mode: AgencyPayrollRunScope["mode"];
   projectionRevision: number;
   periodStart: string;
   periodEnd: string;
@@ -153,6 +154,7 @@ export type UpcomingPayrollProjection = {
 
 export type EmptyUpcomingPayrollProjection = {
   kind: "empty";
+  mode: AgencyPayrollRunScope["mode"];
   projectionRevision: number;
   emptyReason: "no_upcoming_period" | "agency_timezone_required";
   items: [];
@@ -167,40 +169,45 @@ const authenticatedGet = (url: string) => ({ url, method: "GET" as const, requir
 const optional = <T>(key: string, value: T | undefined) => value === undefined ? {} : { [key]: value };
 
 export const payrollRunRequests = {
-  current: (_args: CurrentPayrollRunArgs) => authenticatedGet("/checkPayrollAgency/payroll/agency/runs/current"),
-  currentEmployees: ({ filter, sort, cursor }: CurrentPayrollEmployeesArgs) => ({
+  current: ({ mode }: CurrentPayrollRunArgs) => ({
+    ...authenticatedGet("/checkPayrollAgency/payroll/agency/runs/current"),
+    params: { mode },
+  }),
+  currentEmployees: ({ mode, filter, sort, cursor }: CurrentPayrollEmployeesArgs) => ({
     ...authenticatedGet("/checkPayrollAgency/payroll/agency/runs/current/employees"),
-    params: { limit: 50, ...optional("filter", filter), ...optional("sort", sort), ...optional("cursor", cursor) },
+    params: { mode, limit: 50, ...optional("filter", filter), ...optional("sort", sort), ...optional("cursor", cursor) },
   }),
-  upcoming: ({ cursor }: UpcomingPayrollArgs) => ({
+  upcoming: ({ mode, cursor }: UpcomingPayrollArgs) => ({
     ...authenticatedGet("/checkPayrollAgency/payroll/agency/upcoming"),
-    params: { limit: 50, ...optional("cursor", cursor) },
+    params: { mode, limit: 50, ...optional("cursor", cursor) },
   }),
-  list: ({ runType, cursor }: PayrollRunListArgs) => ({
+  list: ({ mode, runType, cursor }: PayrollRunListArgs) => ({
     ...authenticatedGet("/checkPayrollAgency/payroll/agency/runs"),
-    params: { limit: 25, ...optional("runType", runType), ...optional("cursor", cursor) },
+    params: { mode, limit: 25, ...optional("runType", runType), ...optional("cursor", cursor) },
   }),
-  detail: ({ runId }: PayrollRunDetailArgs) => authenticatedGet(
-    `/checkPayrollAgency/payroll/agency/runs/${encodeURIComponent(runId)}`,
-  ),
-  employees: ({ runId, filter, sort, cursor }: PayrollRunEmployeesArgs) => ({
+  detail: ({ mode, runId }: PayrollRunDetailArgs) => ({
+    ...authenticatedGet(`/checkPayrollAgency/payroll/agency/runs/${encodeURIComponent(runId)}`),
+    params: { mode },
+  }),
+  employees: ({ mode, runId, filter, sort, cursor }: PayrollRunEmployeesArgs) => ({
     ...authenticatedGet(`/checkPayrollAgency/payroll/agency/runs/${encodeURIComponent(runId)}/employees`),
-    params: { limit: 50, ...optional("filter", filter), ...optional("sort", sort), ...optional("cursor", cursor) },
+    params: { mode, limit: 50, ...optional("filter", filter), ...optional("sort", sort), ...optional("cursor", cursor) },
   }),
-  employeeDetail: ({ runId, employeeId }: PayrollRunEmployeeArgs) => authenticatedGet(
-    `/checkPayrollAgency/payroll/agency/runs/${encodeURIComponent(runId)}/employees/${encodeURIComponent(employeeId)}`,
-  ),
-  sources: ({ runId, employeeId, cursor }: PayrollRunEmployeeSourcesArgs) => ({
+  employeeDetail: ({ mode, runId, employeeId }: PayrollRunEmployeeArgs) => ({
+    ...authenticatedGet(`/checkPayrollAgency/payroll/agency/runs/${encodeURIComponent(runId)}/employees/${encodeURIComponent(employeeId)}`),
+    params: { mode },
+  }),
+  sources: ({ mode, runId, employeeId, cursor }: PayrollRunEmployeeSourcesArgs) => ({
     ...authenticatedGet(`/checkPayrollAgency/payroll/agency/runs/${encodeURIComponent(runId)}/employees/${encodeURIComponent(employeeId)}/sources`),
-    params: { limit: 50, ...optional("cursor", cursor) },
+    params: { mode, limit: 50, ...optional("cursor", cursor) },
   }),
-  events: ({ runId, cursor }: PayrollRunEventsArgs) => ({
+  events: ({ mode, runId, cursor }: PayrollRunEventsArgs) => ({
     ...authenticatedGet(`/checkPayrollAgency/payroll/agency/runs/${encodeURIComponent(runId)}/events`),
-    params: { limit: 25, ...optional("cursor", cursor) },
+    params: { mode, limit: 25, ...optional("cursor", cursor) },
   }),
-  obligations: ({ state, cursor }: PayrollObligationsArgs) => ({
+  obligations: ({ mode, state, cursor }: PayrollObligationsArgs) => ({
     ...authenticatedGet("/checkPayrollAgency/payroll/agency/obligations"),
-    params: { limit: 25, ...optional("state", state), ...optional("cursor", cursor) },
+    params: { mode, limit: 25, ...optional("state", state), ...optional("cursor", cursor) },
   }),
 };
 
@@ -243,7 +250,7 @@ export const payrollRunApi = checkPayrollApi.injectEndpoints({
     getCurrentPayrollRun: build.query<CurrentPayrollRunResponse, CurrentPayrollRunArgs>({
       query: payrollRunRequests.current,
       serializeQueryArgs: ({ queryArgs }) => payrollRunCacheKeys.current(queryArgs),
-      transformResponse: parseCurrentPayrollRunResponse,
+      transformResponse: (value: unknown, _meta, args) => parseCurrentPayrollRunResponse(value, args.mode),
       providesTags: (result, _error, scope) => currentRunTags(result, scope),
     }),
     getCurrentPayrollEmployees: build.query<CurrentPayrollEmployeePage, CurrentPayrollEmployeesArgs>({
@@ -257,20 +264,20 @@ export const payrollRunApi = checkPayrollApi.injectEndpoints({
     getUpcomingPayroll: build.query<UpcomingPayrollResponse, UpcomingPayrollArgs>({
       query: payrollRunRequests.upcoming,
       serializeQueryArgs: ({ queryArgs }) => payrollRunCacheKeys.upcoming(queryArgs),
-      transformResponse: parseUpcomingPayrollResponse,
+      transformResponse: (value: unknown, _meta, args) => parseUpcomingPayrollResponse(value, args.mode),
       providesTags: (_result, _error, scope) => [payrollRunTag(scope, "current", "current")],
     }),
     listPayrollRuns: build.query<PayrollRunPage, PayrollRunListArgs>({
       query: payrollRunRequests.list,
       serializeQueryArgs: ({ queryArgs }) => payrollRunCacheKeys.list(queryArgs),
-      transformResponse: parsePayrollRunPage,
+      transformResponse: (value: unknown, _meta, args) => parsePayrollRunPage(value, args.mode),
       providesTags: (_result, _error, scope) => [payrollTag("PayrollHistory", scope)],
     }),
     getPayrollRun: build.query<PayrollRunProjection, PayrollRunDetailArgs>({
       query: payrollRunRequests.detail,
       serializeQueryArgs: ({ queryArgs }) => payrollRunCacheKeys.detail(queryArgs),
       transformResponse: (value: unknown, _meta, args) => {
-        const projection = parsePayrollRunProjectionResponse(value);
+        const projection = parsePayrollRunProjectionResponse(value, args.mode);
         assertPayrollRevisionIdentity(projection, args);
         return projection;
       },

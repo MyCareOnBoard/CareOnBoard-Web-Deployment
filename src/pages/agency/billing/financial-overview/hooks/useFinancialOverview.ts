@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { skipToken } from "@reduxjs/toolkit/query";
 import type { DateRangeValues } from "@/pages/agency/billing/shared/types";
 import type { AgencyMode } from "@/store/redux/agencyModeSlice";
 import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
@@ -99,11 +100,15 @@ async function fetchPrimaryBatch(
 export function useFinancialOverview(dateRange: DateRangeValues) {
   const { agencyId, mode } = useOperationalAgency();
   const { user } = useAuth();
-  const payrollScope = { audience: "agency" as const, actorUid: user?.uid ?? "", agencyId };
-  const currentPayroll = useGetCurrentPayrollRunQuery(payrollScope, { skip: !payrollScope.actorUid || !agencyId });
-  const payrollHistory = useListPayrollRunsQuery(payrollScope, { skip: !payrollScope.actorUid || !agencyId });
+  const actorUid = user?.uid ?? "";
+  const payrollScope = mode
+    ? { audience: "agency" as const, actorUid, agencyId, mode }
+    : null;
+  const payrollQueryScope = payrollScope?.actorUid && agencyId ? payrollScope : skipToken;
+  const currentPayroll = useGetCurrentPayrollRunQuery(payrollQueryScope);
+  const payrollHistory = useListPayrollRunsQuery(payrollQueryScope);
   const [loadPayrollRunPage] = useLazyListPayrollRunsQuery();
-  const payrollRangeKey = JSON.stringify([payrollScope.actorUid, agencyId, dateRange.startDate, dateRange.endDate]);
+  const payrollRangeKey = JSON.stringify([actorUid, agencyId, mode, dateRange.startDate, dateRange.endDate]);
   const [payrollRange, setPayrollRange] = useState<{
     key: string;
     runs: PayrollRun[];
@@ -283,7 +288,7 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
 
   useEffect(() => {
     const firstPage = payrollHistory.data;
-    if (!payrollScope.actorUid || !agencyId || !firstPage) {
+    if (!payrollScope?.actorUid || !agencyId || !firstPage) {
       setPayrollRange({ key: payrollRangeKey, runs: [], loading: false, error: null });
       return;
     }
@@ -340,7 +345,7 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
       cancelled = true;
       activeRequest?.abort();
     };
-  }, [agencyId, dateRange.startDate, loadPayrollRunPage, payrollHistory.data, payrollRangeKey, payrollScope.actorUid]);
+  }, [actorUid, agencyId, dateRange.startDate, loadPayrollRunPage, mode, payrollHistory.data, payrollRangeKey]);
 
   const overviewStats = useMemo(
     () => mapDashboardToOverviewStats(claimsDashboard, previousClaimsDashboard),
@@ -372,10 +377,11 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
   const refetch = useCallback(async () => {
     await Promise.all([
       refetchClaims(),
-      currentPayroll.refetch(),
-      payrollHistory.refetch(),
+      ...(payrollQueryScope === skipToken
+        ? []
+        : [currentPayroll.refetch(), payrollHistory.refetch()]),
     ]);
-  }, [currentPayroll, payrollHistory, refetchClaims]);
+  }, [currentPayroll, payrollHistory, payrollQueryScope, refetchClaims]);
 
   return {
     overviewStats,

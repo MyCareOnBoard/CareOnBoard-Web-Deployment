@@ -14,6 +14,7 @@ const scope = {
   audience: "agency" as const,
   actorUid: "actor-1",
   agencyId: "agency-1",
+  mode: "ddd" as const,
 };
 
 describe("payroll run read transport", () => {
@@ -36,6 +37,7 @@ describe("payroll run read transport", () => {
 
   it("accepts only agency-scoped arguments for agency payroll routes", () => {
     expectTypeOf<CurrentPayrollRunArgs["audience"]>().toEqualTypeOf<"agency">();
+    expectTypeOf<CurrentPayrollRunArgs["mode"]>().toEqualTypeOf<"ddd" | "hha">();
   });
 
   it("builds the singular routes without client-owned authority or query input", () => {
@@ -51,12 +53,13 @@ describe("payroll run read transport", () => {
     ];
 
     expect(requests).toEqual([
-      { url: "/checkPayrollAgency/payroll/agency/runs/current", method: "GET", requiresAuth: true },
-      { url: "/checkPayrollAgency/payroll/agency/runs/run%2Fa", method: "GET", requiresAuth: true },
+      { url: "/checkPayrollAgency/payroll/agency/runs/current", method: "GET", requiresAuth: true, params: { mode: "ddd" } },
+      { url: "/checkPayrollAgency/payroll/agency/runs/run%2Fa", method: "GET", requiresAuth: true, params: { mode: "ddd" } },
       {
         url: "/checkPayrollAgency/payroll/agency/runs/run%2Fa/employees/employee%2Fa",
         method: "GET",
         requiresAuth: true,
+        params: { mode: "ddd" },
       },
     ]);
     const serialized = JSON.stringify(requests);
@@ -75,7 +78,7 @@ describe("payroll run read transport", () => {
       url: "/checkPayrollAgency/payroll/agency/upcoming",
       method: "GET",
       requiresAuth: true,
-      params: { limit: 50, cursor: "upcoming-page" },
+      params: { mode: "ddd", limit: 50, cursor: "upcoming-page" },
     });
     expect(payrollRunRequests.currentEmployees({
       ...scope,
@@ -86,13 +89,13 @@ describe("payroll run read transport", () => {
       url: "/checkPayrollAgency/payroll/agency/runs/current/employees",
       method: "GET",
       requiresAuth: true,
-      params: { limit: 50, filter: "blocked", sort: "gross_desc", cursor: "employee-page" },
+      params: { mode: "ddd", limit: 50, filter: "blocked", sort: "gross_desc", cursor: "employee-page" },
     });
     expect(payrollRunRequests.list({ ...scope, runType: "off_cycle", cursor: "run-page" })).toEqual({
       url: "/checkPayrollAgency/payroll/agency/runs",
       method: "GET",
       requiresAuth: true,
-      params: { limit: 25, runType: "off_cycle", cursor: "run-page" },
+      params: { mode: "ddd", limit: 25, runType: "off_cycle", cursor: "run-page" },
     });
     expect(payrollRunRequests.employees({
       ...scope,
@@ -105,7 +108,7 @@ describe("payroll run read transport", () => {
       url: "/checkPayrollAgency/payroll/agency/runs/run-a/employees",
       method: "GET",
       requiresAuth: true,
-      params: { limit: 50, filter: "included", sort: "name_asc", cursor: "employee-page" },
+      params: { mode: "ddd", limit: 50, filter: "included", sort: "name_asc", cursor: "employee-page" },
     });
     expect(payrollRunRequests.sources({
       ...scope,
@@ -117,19 +120,19 @@ describe("payroll run read transport", () => {
       url: "/checkPayrollAgency/payroll/agency/runs/run-a/employees/employee-a/sources",
       method: "GET",
       requiresAuth: true,
-      params: { limit: 50, cursor: "source-page" },
+      params: { mode: "ddd", limit: 50, cursor: "source-page" },
     });
     expect(payrollRunRequests.events({ ...scope, runId: "run-a", activeRevisionId: "revision-a", cursor: "event-page" })).toEqual({
       url: "/checkPayrollAgency/payroll/agency/runs/run-a/events",
       method: "GET",
       requiresAuth: true,
-      params: { limit: 25, cursor: "event-page" },
+      params: { mode: "ddd", limit: 25, cursor: "event-page" },
     });
     expect(payrollRunRequests.obligations({ ...scope, state: "operations_required", cursor: "obligation-page" })).toEqual({
       url: "/checkPayrollAgency/payroll/agency/obligations",
       method: "GET",
       requiresAuth: true,
-      params: { limit: 25, state: "operations_required", cursor: "obligation-page" },
+      params: { mode: "ddd", limit: 25, state: "operations_required", cursor: "obligation-page" },
     });
   });
 
@@ -148,13 +151,13 @@ describe("payroll run read transport", () => {
       payrollRunRequests.obligations(scope),
     ];
     expect(requests.map((request) => request?.params)).toEqual([
-      { limit: 50 },
-      { limit: 50 },
-      { limit: 25 },
-      { limit: 50 },
-      { limit: 50 },
-      { limit: 25 },
-      { limit: 25 },
+      { mode: "ddd", limit: 50 },
+      { mode: "ddd", limit: 50 },
+      { mode: "ddd", limit: 25 },
+      { mode: "ddd", limit: 50 },
+      { mode: "ddd", limit: 50 },
+      { mode: "ddd", limit: 25 },
+      { mode: "ddd", limit: 25 },
     ]);
     expect(JSON.stringify(requests)).not.toContain("activeRevisionId");
   });
@@ -181,6 +184,7 @@ describe("payroll run read transport", () => {
     expect(upcoming).toBeTypeOf("function");
     expect(upcoming?.(scope)).not.toBe(upcoming?.({ ...scope, cursor: "upcoming-page" }));
     expect(upcoming?.(scope)).not.toBe(upcoming?.({ ...scope, agencyId: "agency-2" }));
+    expect(upcoming?.(scope)).not.toBe(upcoming?.({ ...scope, mode: "hha" }));
   });
 
   it("rejects malformed actionable detail instead of caching server capabilities", async () => {

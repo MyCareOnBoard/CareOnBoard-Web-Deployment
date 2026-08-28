@@ -48,6 +48,7 @@ function payrollRun(
 ): PayrollRun {
   return {
     runId,
+    mode: "ddd",
     runType: "regular",
     periodStart: "2026-04-28",
     periodEnd: "2026-05-04",

@@ -18,6 +18,7 @@ import type {
   PayrollRunProjection,
   PayrollTotals,
 } from "../model/types";
+import type { AgencyMode } from "../../model/types";
 import type {
   PayrollObligation,
   PayrollObligationPage,
@@ -45,6 +46,7 @@ const MAX_PUBLIC_OBJECT_KEYS = 64;
 const MAX_PUBLIC_TEXT_BYTES = 16 * 1_024;
 
 const RUN_TYPES = ["regular", "off_cycle"] as const;
+const PAYROLL_MODES = ["ddd", "hha"] as const;
 const WORKFLOW_STATES = [
   "preparing",
   "review",
@@ -164,6 +166,12 @@ function enumValue<const T extends readonly string[]>(
 ): T[number] {
   if (typeof value !== "string" || !allowed.includes(value)) throw invalid(path);
   return value as T[number];
+}
+
+function matchingPayrollMode(value: unknown, expectedMode: AgencyMode | undefined, path: string): AgencyMode {
+  const mode = enumValue(value, PAYROLL_MODES, path);
+  if (expectedMode !== undefined && mode !== expectedMode) throw invalid(path);
+  return mode;
 }
 
 function booleanValue(value: unknown, path: string): boolean {
@@ -294,9 +302,10 @@ function parsePreview(value: unknown, path: string): PayrollPreview {
   return record as PayrollPreview;
 }
 
-function parseRun(value: unknown, path: string): PayrollRun {
+function parseRun(value: unknown, path: string, expectedMode?: AgencyMode): PayrollRun {
   const record = exactObject(value, path, [
     "runId",
+    "mode",
     "runType",
     "periodStart",
     "periodEnd",
@@ -323,6 +332,7 @@ function parseRun(value: unknown, path: string): PayrollRun {
     "asOf",
   ]);
   opaqueId(record.runId, `${path}.runId`);
+  matchingPayrollMode(record.mode, expectedMode, `${path}.mode`);
   enumValue(record.runType, RUN_TYPES, `${path}.runType`);
   isoDate(record.periodStart, `${path}.periodStart`);
   isoDate(record.periodEnd, `${path}.periodEnd`);
@@ -421,7 +431,7 @@ function parseEmpty(value: unknown): EmptyCurrentPayrollProjection {
   return record as EmptyCurrentPayrollProjection;
 }
 
-function parseRunProjection(value: unknown): PayrollRunProjection {
+function parseRunProjection(value: unknown, expectedMode?: AgencyMode): PayrollRunProjection {
   const record = exactObject(value, "$", [
     "kind",
     "runId",
@@ -435,7 +445,7 @@ function parseRunProjection(value: unknown): PayrollRunProjection {
   const runId = opaqueId(record.runId, "$.runId");
   const activeRevisionId = opaqueId(record.activeRevisionId, "$.activeRevisionId");
   const revisionNumber = positiveInteger(record.revisionNumber, "$.revisionNumber");
-  const run = parseRun(record.run, "$.run");
+  const run = parseRun(record.run, "$.run", expectedMode);
   if (run.runId !== runId || run.activeRevisionId !== activeRevisionId
     || run.revisionNumber !== revisionNumber) {
     throw invalid("$.run");
@@ -596,9 +606,10 @@ function parseUpcomingEmployee(value: unknown, path: string): UpcomingPayrollEmp
   return record as UpcomingPayrollEmployee;
 }
 
-function parseUpcoming(value: unknown): UpcomingPayrollResponse {
+function parseUpcoming(value: unknown, expectedMode?: AgencyMode): UpcomingPayrollResponse {
   const record = exactObject(value, "$", [
     "kind",
+    "mode",
     "projectionRevision",
     "periodStart",
     "periodEnd",
@@ -614,6 +625,7 @@ function parseUpcoming(value: unknown): UpcomingPayrollResponse {
     "asOf",
   ]);
   if (record.kind !== "upcoming") throw invalid("$.kind");
+  matchingPayrollMode(record.mode, expectedMode, "$.mode");
   nonNegativeInteger(record.projectionRevision, "$.projectionRevision");
   const periodStart = isoDate(record.periodStart, "$.periodStart");
   const periodEnd = isoDate(record.periodEnd, "$.periodEnd");
@@ -663,9 +675,10 @@ function parseUpcoming(value: unknown): UpcomingPayrollResponse {
   return record as UpcomingPayrollResponse;
 }
 
-function parseEmptyUpcoming(value: unknown): UpcomingPayrollResponse {
+function parseEmptyUpcoming(value: unknown, expectedMode?: AgencyMode): UpcomingPayrollResponse {
   const record = exactObject(value, "$", [
     "kind",
+    "mode",
     "projectionRevision",
     "emptyReason",
     "items",
@@ -677,6 +690,7 @@ function parseEmptyUpcoming(value: unknown): UpcomingPayrollResponse {
     || record.hasMore !== false) {
     throw invalid("$");
   }
+  matchingPayrollMode(record.mode, expectedMode, "$.mode");
   enumValue(record.emptyReason, UPCOMING_EMPTY_REASONS, "$.emptyReason");
   nonNegativeInteger(record.projectionRevision, "$.projectionRevision");
   isoInstant(record.asOf, "$.asOf");
@@ -825,21 +839,27 @@ function parseObligation(value: unknown, path: string): PayrollObligation {
   return record as PayrollObligation;
 }
 
-export function parsePayrollRunPage(value: unknown): PayrollRunPage {
+export function parsePayrollRunPage(value: unknown, requestedMode?: unknown): PayrollRunPage {
   assertResponseSize(value);
-  return parseCursorPage(value, 25, parseRun) as PayrollRunPage;
+  const expectedMode = PAYROLL_MODES.includes(requestedMode as AgencyMode)
+    ? requestedMode as AgencyMode
+    : undefined;
+  return parseCursorPage(value, 25, (item, path) => parseRun(item, path, expectedMode)) as PayrollRunPage;
 }
 
-export function parseUpcomingPayrollResponse(value: unknown): UpcomingPayrollResponse {
+export function parseUpcomingPayrollResponse(value: unknown, requestedMode?: unknown): UpcomingPayrollResponse {
   assertResponseSize(value);
+  const expectedMode = PAYROLL_MODES.includes(requestedMode as AgencyMode)
+    ? requestedMode as AgencyMode
+    : undefined;
   const discriminator = exactObject(
     value,
     "$",
     [],
     value !== null && typeof value === "object" && !Array.isArray(value) ? Object.keys(value) : [],
   ).kind;
-  if (discriminator === "upcoming") return parseUpcoming(value);
-  if (discriminator === "empty") return parseEmptyUpcoming(value);
+  if (discriminator === "upcoming") return parseUpcoming(value, expectedMode);
+  if (discriminator === "empty") return parseEmptyUpcoming(value, expectedMode);
   throw invalid("$.kind");
 }
 
@@ -891,8 +911,11 @@ export function parsePayrollObligationPage(value: unknown): PayrollObligationPag
   return parseCursorPage(value, 25, parseObligation) as PayrollObligationPage;
 }
 
-export function parseCurrentPayrollRunResponse(value: unknown): CurrentPayrollRunResponse {
+export function parseCurrentPayrollRunResponse(value: unknown, requestedMode?: unknown): CurrentPayrollRunResponse {
   assertResponseSize(value);
+  const expectedMode = PAYROLL_MODES.includes(requestedMode as AgencyMode)
+    ? requestedMode as AgencyMode
+    : undefined;
   const discriminator = exactObject(
     value,
     "$",
@@ -900,12 +923,12 @@ export function parseCurrentPayrollRunResponse(value: unknown): CurrentPayrollRu
     value !== null && typeof value === "object" && !Array.isArray(value) ? Object.keys(value) : [],
   ).kind;
   if (discriminator === "empty") return parseEmpty(value);
-  if (discriminator === "run") return parseRunProjection(value);
+  if (discriminator === "run") return parseRunProjection(value, expectedMode);
   throw invalid("$.kind");
 }
 
-export function parsePayrollRunProjectionResponse(value: unknown): PayrollRunProjection {
-  const projection = parseCurrentPayrollRunResponse(value);
+export function parsePayrollRunProjectionResponse(value: unknown, requestedMode?: unknown): PayrollRunProjection {
+  const projection = parseCurrentPayrollRunResponse(value, requestedMode);
   if (projection.kind !== "run") throw invalid("$.kind");
   return projection;
 }
@@ -944,11 +967,12 @@ export function parseCurrentPayrollEmployeePage(value: unknown): CurrentPayrollE
 export function parseCurrentPayrollBootstrapPair(
   runResponseValue: unknown,
   employeePageValue: unknown,
+  requestedMode?: unknown,
 ): {
   runResponse: CurrentPayrollRunResponse;
   employeePage: CurrentPayrollEmployeePage;
 } {
-  const runResponse = parseCurrentPayrollRunResponse(runResponseValue);
+  const runResponse = parseCurrentPayrollRunResponse(runResponseValue, requestedMode);
   const employeePage = parseCurrentPayrollEmployeePage(employeePageValue);
   if (runResponse.kind !== employeePage.kind) throw invalid("$.kind");
   if (runResponse.kind === "run"

@@ -1,4 +1,5 @@
 import type { CheckPayrollProfileRead, CheckPayrollProfileWrite } from "@/lib/agency/agency-profile-payload";
+export type { AgencyMode } from "@/store/redux/agencyModeSlice";
 
 export type PayrollAudience = "agency" | "employee" | "superAdmin";
 export type PayrollScope = { audience: PayrollAudience; actorUid: string; agencyId: string };

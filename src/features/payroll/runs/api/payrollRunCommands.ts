@@ -101,6 +101,7 @@ export const payrollRunCommandRequest = (args: PayrollRunCommandArgs) => ({
   url: `/checkPayrollAgency/payroll/agency/runs/${encodeURIComponent(args.runId)}/commands`,
   method: "POST" as const,
   requiresAuth: true,
+  params: { mode: args.mode },
   headers: { "Idempotency-Key": args.idempotencyKey },
   data: {
     command: args.command,
@@ -116,6 +117,7 @@ export const createOffCyclePayrollRequest = (args: CreateOffCyclePayrollArgs) =>
   url: "/checkPayrollAgency/payroll/agency/off-cycle-runs",
   method: "POST" as const,
   requiresAuth: true,
+  params: { mode: args.mode },
   headers: { "Idempotency-Key": args.idempotencyKey },
   data: {
     obligations: args.obligations.map(({ obligationId, expectedVersion }) => ({ obligationId, expectedVersion })),

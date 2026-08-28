@@ -22,6 +22,7 @@ const base = {
   audience: "agency" as const,
   actorUid: "actor-1",
   agencyId: "agency-1",
+  mode: "ddd" as const,
   runId: "run/a",
   expectedProjectionRevision: 17,
   expectedActiveRevisionId: "revision-a",
@@ -44,6 +45,7 @@ describe("payroll run command transport", () => {
       url: "/checkPayrollAgency/payroll/agency/runs/run%2Fa/commands",
       method: "POST",
       requiresAuth: true,
+      params: { mode: "ddd" },
       headers: { "Idempotency-Key": base.idempotencyKey },
       data: {
         command,
@@ -59,6 +61,7 @@ describe("payroll run command transport", () => {
       audience: "agency",
       actorUid: "actor-1",
       agencyId: "agency-1",
+      mode: "ddd",
       runId: "run-a",
       command: "refresh_reconciliation",
       expectedProjectionRevision: 17,
@@ -172,6 +175,7 @@ describe("payroll run command transport", () => {
       audience: "agency",
       actorUid: "actor-1",
       agencyId: "agency-1",
+      mode: "ddd",
       idempotencyKey: base.idempotencyKey,
       obligations: [
         { obligationId: "obligation-b", expectedVersion: 2 },
@@ -183,6 +187,7 @@ describe("payroll run command transport", () => {
       url: "/checkPayrollAgency/payroll/agency/off-cycle-runs",
       method: "POST",
       requiresAuth: true,
+      params: { mode: "ddd" },
       headers: { "Idempotency-Key": base.idempotencyKey },
       data: {
         obligations: [
@@ -259,6 +264,7 @@ describe("payroll run command transport", () => {
       audience: "agency" as const,
       actorUid: "actor-1",
       agencyId: "agency-1",
+      mode: "ddd" as const,
       idempotencyKey: base.idempotencyKey,
       obligations: [{ obligationId: "obligation-a", expectedVersion: 1 }],
       requestedPayday: "2026-09-04",
@@ -281,6 +287,7 @@ describe("payroll run command transport", () => {
       audience: "agency" as const,
       actorUid: "actor-1",
       agencyId: "agency-1",
+      mode: "ddd" as const,
       runId: "run-a",
       command: "refresh_reconciliation" as const,
       expectedProjectionRevision: 17,

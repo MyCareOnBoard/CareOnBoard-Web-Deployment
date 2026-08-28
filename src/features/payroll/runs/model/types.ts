@@ -1,6 +1,9 @@
-import type { PayrollScope } from "../../model/types";
+import type { AgencyMode, PayrollScope } from "../../model/types";
 
-export type AgencyPayrollRunScope = Omit<PayrollScope, "audience"> & { audience: "agency" };
+export type AgencyPayrollRunScope = Omit<PayrollScope, "audience"> & {
+  audience: "agency";
+  mode: AgencyMode;
+};
 
 export type PayrollWorkflowState =
   | "preparing"
@@ -98,6 +101,7 @@ export type PayrollPreview = {
 
 export type PayrollRun = {
   runId: string;
+  mode: AgencyMode;
   runType: PayrollRunType;
   periodStart: string;
   periodEnd: string;

@@ -17,7 +17,7 @@ describe("payrollTag", () => {
   it("includes the audience, actor, and effective agency in every cache identity", () => {
     expect(payrollTag("AgencySetup", { audience: "agency", actorUid: "u1", agencyId: "a1" })).toEqual({
       type: "AgencySetup",
-      id: JSON.stringify(["agency", "u1", "a1", null]),
+      id: JSON.stringify(["agency", "u1", "a1", null, null]),
     });
   });
   it("defines every payroll cache family under the same scoped identity scheme", () => {
@@ -40,7 +40,7 @@ describe("payrollTag", () => {
   it("invalidates downstream attention and compliance caches without pre-terminal setup reads", () => { const scope = { audience: "agency" as const, actorUid: "u", agencyId: "a" }; expect(companyMutationTags(scope).map((tag) => tag.type)).toEqual(["Attention", "Compliance"]); });
 
   it("keys run, employee, and event tags by authorization scope and opaque revision", () => {
-    const scope = { audience: "agency" as const, actorUid: "actor-a", agencyId: "agency-a" };
+    const scope = { audience: "agency" as const, actorUid: "actor-a", agencyId: "agency-a", mode: "ddd" as const };
     expect(payrollRunTag(scope, "run-a", "revision-a")).not.toEqual(
       payrollRunTag(scope, "run-a", "revision-b"),
     );
@@ -51,8 +51,8 @@ describe("payrollTag", () => {
   });
 
   it("keeps obligation and legacy-history families in the same authorization scope", () => {
-    const scope = { audience: "agency" as const, actorUid: "actor-a", agencyId: "agency-a" };
-    const id = JSON.stringify(["agency", "actor-a", "agency-a", null]);
+    const scope = { audience: "agency" as const, actorUid: "actor-a", agencyId: "agency-a", mode: "ddd" as const };
+    const id = JSON.stringify(["agency", "actor-a", "agency-a", null, "ddd"]);
     expect(payrollObligationTag(scope)).toEqual({ type: "PayrollObligation", id });
     expect(payrollLegacyHistoryTag(scope)).toEqual({ type: "PayrollLegacyHistory", id });
   });
@@ -67,11 +67,21 @@ describe("payrollTag", () => {
   });
 
   it("gives employee detail caches both revision-wide and concrete identities", () => {
-    const scope = { audience: "agency" as const, actorUid: "actor-a", agencyId: "agency-a" };
+    const scope = { audience: "agency" as const, actorUid: "actor-a", agencyId: "agency-a", mode: "ddd" as const };
     expect(payrollRunEmployeeQueryTags(scope, "run-a", "revision-a", "employee-a")).toEqual([
       payrollRunEmployeeTag(scope, "run-a", PAYROLL_RUN_WIDE_REVISION_TAG),
       payrollRunEmployeeTag(scope, "run-a", "revision-a"),
       payrollRunEmployeeTag(scope, "run-a", "revision-a", "employee-a"),
     ]);
+  });
+
+  it("isolates DDD and HHA run-management cache identities", () => {
+    const scope = { audience: "agency" as const, actorUid: "actor-a", agencyId: "agency-a" };
+    expect(payrollScopeKey({ ...scope, mode: "ddd" })).not.toBe(
+      payrollScopeKey({ ...scope, mode: "hha" }),
+    );
+    expect(payrollRunTag({ ...scope, mode: "ddd" }, "run-a", "revision-a")).not.toEqual(
+      payrollRunTag({ ...scope, mode: "hha" }, "run-a", "revision-a"),
+    );
   });
 });

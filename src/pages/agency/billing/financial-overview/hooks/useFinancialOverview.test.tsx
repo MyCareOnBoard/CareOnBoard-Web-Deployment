@@ -1,13 +1,15 @@
 import { renderHook, waitFor } from "@testing-library/react";
+import { skipToken } from "@reduxjs/toolkit/query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useFinancialOverview } from "./useFinancialOverview";
 
 const claims = vi.hoisted(() => ({ dashboard: vi.fn(), list: vi.fn() }));
 const payroll = vi.hoisted(() => ({ current: vi.fn(), history: vi.fn(), loadPage: vi.fn() }));
+const operational = vi.hoisted(() => ({ agencyId: "agency-1", mode: "hha" as "ddd" | "hha" | null }));
 
 vi.mock("@/lib/operational-agency/OperationalAgencyProvider", () => ({
-  useOperationalAgency: () => ({ agencyId: "agency-1", mode: "hha" }),
+  useOperationalAgency: () => operational,
 }));
 vi.mock("@/utils/auth", () => ({ useAuth: () => ({ user: { uid: "actor-1" } }) }));
 vi.mock("@/lib/api/claims", () => ({
@@ -35,6 +37,8 @@ const claimsDashboard = {
 describe("useFinancialOverview", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    operational.agencyId = "agency-1";
+    operational.mode = "hha";
     claims.dashboard.mockResolvedValue(claimsDashboard);
     claims.list.mockResolvedValue({ claims: [] });
     payroll.current.mockReturnValue({
@@ -49,6 +53,40 @@ describe("useFinancialOverview", () => {
       error: undefined,
       refetch: vi.fn(),
     });
+  });
+
+  it("passes the operational mode into current and history payroll reads", async () => {
+    const { result } = renderHook(() => useFinancialOverview({
+      startDate: "2026-08-01",
+      endDate: "2026-08-07",
+    }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(payroll.current.mock.calls[0]?.[0]).toEqual({
+      audience: "agency",
+      actorUid: "actor-1",
+      agencyId: "agency-1",
+      mode: "hha",
+    });
+    expect(payroll.history.mock.calls[0]?.[0]).toEqual({
+      audience: "agency",
+      actorUid: "actor-1",
+      agencyId: "agency-1",
+      mode: "hha",
+    });
+  });
+
+  it("skips current and history payroll reads when no operational mode is selected", async () => {
+    operational.mode = null;
+
+    const { result } = renderHook(() => useFinancialOverview({
+      startDate: "2026-08-01",
+      endDate: "2026-08-07",
+    }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(payroll.current.mock.calls[0]?.[0]).toBe(skipToken);
+    expect(payroll.history.mock.calls[0]?.[0]).toBe(skipToken);
   });
 
   it("keeps combined partial errors referentially stable across unrelated rerenders", async () => {

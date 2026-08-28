@@ -1,4 +1,4 @@
-import type { EmployeePayrollScope, ManagedEmployeePrimaryWorkplaceScope, PayrollScope } from "../model/types";
+import type { AgencyMode, EmployeePayrollScope, ManagedEmployeePrimaryWorkplaceScope, PayrollScope } from "../model/types";
 
 export const payrollTagTypes = [
   "AgencySetup",
@@ -15,12 +15,14 @@ export const payrollTagTypes = [
   "PayrollLegacyHistory",
 ] as const;
 export type PayrollTagType = typeof payrollTagTypes[number];
-type PayrollCacheScope = PayrollScope | EmployeePayrollScope | ManagedEmployeePrimaryWorkplaceScope;
+type PayrollModeScope = PayrollScope & { mode: AgencyMode };
+type PayrollCacheScope = PayrollScope | PayrollModeScope | EmployeePayrollScope | ManagedEmployeePrimaryWorkplaceScope;
 const payrollScopeParts = (scope: PayrollCacheScope) => [
   scope.audience,
   scope.actorUid,
   scope.agencyId,
   "employmentId" in scope ? scope.employmentId : null,
+  "mode" in scope ? scope.mode : null,
 ] as const;
 export const payrollScopeKey = (scope: PayrollCacheScope) => JSON.stringify(payrollScopeParts(scope));
 export const PAYROLL_RUN_WIDE_REVISION_TAG = "__all_revisions__";

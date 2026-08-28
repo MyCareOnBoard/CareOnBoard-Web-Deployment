@@ -3,30 +3,43 @@ import { describe, expect, it } from "vitest";
 import * as payrollRunContracts from "./payrollRunContracts";
 import {
   assertPayrollRevisionIdentity,
-  parseCurrentPayrollBootstrapPair,
+  parseCurrentPayrollBootstrapPair as parseCurrentPayrollBootstrapPairContract,
   parseCurrentPayrollEmployeePage,
-  parseCurrentPayrollRunResponse,
+  parseCurrentPayrollRunResponse as parseCurrentPayrollRunResponseContract,
   parsePayrollEmployeePage,
   parsePayrollObligationPage,
   parsePayrollRunEmployeeDetail,
   parsePayrollRunEmployeeSourcePage,
   parsePayrollRunEventPage,
-  parsePayrollRunPage,
-  parsePayrollRunProjectionResponse,
+  parsePayrollRunPage as parsePayrollRunPageContract,
+  parsePayrollRunProjectionResponse as parsePayrollRunProjectionResponseContract,
 } from "./payrollRunContracts";
 
 type UpcomingParser = (value: unknown) => unknown;
+type ModeAwareUpcomingParser = (value: unknown, expectedMode: "ddd" | "hha") => unknown;
+
+const parseCurrentPayrollRunResponse = (value: unknown) => (
+  parseCurrentPayrollRunResponseContract(value, "ddd")
+);
+const parsePayrollRunProjectionResponse = (value: unknown) => (
+  parsePayrollRunProjectionResponseContract(value, "ddd")
+);
+const parsePayrollRunPage = (value: unknown) => parsePayrollRunPageContract(value, "ddd");
+const parseCurrentPayrollBootstrapPair = (run: unknown, employees: unknown) => (
+  parseCurrentPayrollBootstrapPairContract(run, employees, "ddd")
+);
 
 const upcomingParser = (): UpcomingParser => {
   const parser = (payrollRunContracts as typeof payrollRunContracts & {
     parseUpcomingPayrollResponse?: UpcomingParser;
   }).parseUpcomingPayrollResponse;
   expect(parser).toBeTypeOf("function");
-  return parser as UpcomingParser;
+  return (value: unknown) => (parser as ModeAwareUpcomingParser)(value, "ddd");
 };
 
 const validUpcomingResponse = () => ({
   kind: "upcoming",
+  mode: "ddd",
   projectionRevision: 4,
   periodStart: "2026-08-24",
   periodEnd: "2026-09-06",
@@ -72,6 +85,7 @@ function validRunResponse(): Record<string, unknown> {
     revisionNumber: 2,
     run: {
       runId: "run-a",
+      mode: "ddd",
       runType: "regular",
       periodStart: "2026-08-10",
       periodEnd: "2026-08-23",
@@ -201,6 +215,20 @@ function setPath(value: Record<string, unknown>, path: string, replacement: unkn
 }
 
 describe("current payroll runtime contracts", () => {
+  it("requires the server run mode to match the requested current and history mode", () => {
+    expect(parseCurrentPayrollRunResponseContract(validRunResponse(), "ddd")).toMatchObject({
+      run: { mode: "ddd" },
+    });
+    expect(() => parseCurrentPayrollRunResponseContract(validRunResponse(), "hha")).toThrow();
+
+    const run = structuredClone(validRunResponse().run);
+    const history = { items: [run], nextCursor: null, hasMore: false };
+    expect(parsePayrollRunPageContract(history, "ddd")).toMatchObject({
+      items: [{ mode: "ddd" }],
+    });
+    expect(() => parsePayrollRunPageContract(history, "hha")).toThrow();
+  });
+
   it("accepts exact run, employee-page, and explicit empty unions", () => {
     expect(parseCurrentPayrollRunResponse(validRunResponse()).kind).toBe("run");
     expect(parseCurrentPayrollEmployeePage(validEmployeePage()).kind).toBe("run");
@@ -456,11 +484,19 @@ describe("current payroll runtime contracts", () => {
 });
 
 describe("upcoming payroll runtime contract", () => {
+  it("requires the server projection mode to match the requested upcoming mode", () => {
+    expect(payrollRunContracts.parseUpcomingPayrollResponse(validUpcomingResponse(), "ddd")).toMatchObject({
+      mode: "ddd",
+    });
+    expect(() => payrollRunContracts.parseUpcomingPayrollResponse(validUpcomingResponse(), "hha")).toThrow();
+  });
+
   it("accepts the exact bounded upcoming worker page and empty response", () => {
     const parse = upcomingParser();
     const upcoming = validUpcomingResponse();
     const empty = {
       kind: "empty",
+      mode: "ddd",
       projectionRevision: 5,
       emptyReason: "no_upcoming_period",
       items: [],
@@ -477,6 +513,7 @@ describe("upcoming payroll runtime contract", () => {
     const parse = upcomingParser();
     const timezoneRequired = {
       kind: "empty",
+      mode: "ddd",
       projectionRevision: 5,
       emptyReason: "agency_timezone_required",
       items: [],
