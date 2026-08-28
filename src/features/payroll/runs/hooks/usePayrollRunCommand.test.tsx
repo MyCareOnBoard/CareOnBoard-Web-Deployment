@@ -210,4 +210,40 @@ describe("usePayrollRunCommand", () => {
     });
     expect(transport.run).toHaveBeenCalledOnce();
   });
+
+  it("never renders command state retained by another mode during a cache-warm round trip", async () => {
+    transport.run
+      .mockReturnValueOnce({ unwrap: () => new Promise<never>(() => undefined) })
+      .mockReturnValueOnce({ unwrap: vi.fn().mockRejectedValue({ status: 409, data: { code: "PROJECTION_STALE" } }) });
+    let mode: "ddd" | "hha" = "ddd";
+    const renders: Array<{ mode: "ddd" | "hha"; activeIntent: string | null; error: string | null }> = [];
+    const { result, rerender } = renderHook(() => {
+      const state = usePayrollRunCommand({ ...scope, mode });
+      renders.push({ mode, activeIntent: state.activeIntent, error: state.error?.code ?? null });
+      return state;
+    });
+
+    act(() => { void result.current.runCommand(command("intent-ddd")); });
+    expect(result.current.activeIntent).toBe("request_preview");
+
+    const hhaRenderStart = renders.length;
+    mode = "hha";
+    rerender();
+    expect(renders.slice(hhaRenderStart)).toEqual(expect.arrayContaining([
+      { mode: "hha", activeIntent: null, error: null },
+    ]));
+    expect(renders.slice(hhaRenderStart).every(({ activeIntent, error }) => activeIntent === null && error === null)).toBe(true);
+
+    await act(async () => {
+      await expect(result.current.runCommand({ ...command("intent-hha"), mode: "hha" })).rejects.toMatchObject({
+        code: "PROJECTION_STALE",
+      });
+    });
+    expect(result.current.error?.code).toBe("PROJECTION_STALE");
+
+    const dddRenderStart = renders.length;
+    mode = "ddd";
+    rerender();
+    expect(renders.slice(dddRenderStart).every(({ activeIntent, error }) => activeIntent === null && error === null)).toBe(true);
+  });
 });

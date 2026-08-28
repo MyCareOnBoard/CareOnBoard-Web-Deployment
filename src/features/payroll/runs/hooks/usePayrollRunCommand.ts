@@ -42,21 +42,24 @@ function normalizeError(value: unknown): PayrollRunCommandError {
 }
 
 type Flight = { key: string; promise: Promise<PayrollOperation> };
+type ScopedCommandState<T> = { key: string; value: T };
 
 export function usePayrollRunCommand(scope: AgencyPayrollRunScope, onAsyncTerminal?: () => unknown) {
   const [runMutation] = useRunPayrollRunCommandMutation();
   const [offCycleMutation] = useCreateOffCyclePayrollRunMutation();
   const [getOperation] = useLazyGetAgencyPayrollOperationQuery();
   const { watch } = usePayrollOperations();
-  const [activeIntent, setActiveIntent] = useState<PayrollRunCommandName | null>(null);
-  const [error, setError] = useState<PayrollRunCommandError | null>(null);
+  const scopeKey = `${scope.audience}:${scope.actorUid}:${scope.agencyId}:${scope.mode}`;
+  const [retainedActiveIntent, setRetainedActiveIntent] = useState<ScopedCommandState<PayrollRunCommandName | null>>({ key: scopeKey, value: null });
+  const [retainedError, setRetainedError] = useState<ScopedCommandState<PayrollRunCommandError | null>>({ key: scopeKey, value: null });
+  const activeIntent = retainedActiveIntent.key === scopeKey ? retainedActiveIntent.value : null;
+  const error = retainedError.key === scopeKey ? retainedError.value : null;
   const runFlight = useRef<Flight | null>(null);
   const offCycleFlight = useRef<Flight | null>(null);
   const stops = useRef(new Set<() => void>());
   const terminalRefreshFrames = useRef(new Set<number>());
   const asyncTerminalRef = useRef(onAsyncTerminal);
   asyncTerminalRef.current = onAsyncTerminal;
-  const scopeKey = `${scope.audience}:${scope.actorUid}:${scope.agencyId}:${scope.mode}`;
   const liveScopeKey = useRef(scopeKey);
   if (liveScopeKey.current !== scopeKey) {
     liveScopeKey.current = scopeKey;
@@ -65,8 +68,8 @@ export function usePayrollRunCommand(scope: AgencyPayrollRunScope, onAsyncTermin
   }
 
   useEffect(() => {
-    setActiveIntent(null);
-    setError(null);
+    setRetainedActiveIntent({ key: scopeKey, value: null });
+    setRetainedError({ key: scopeKey, value: null });
     return () => {
       stops.current.forEach((stop) => stop());
       stops.current.clear();
@@ -123,23 +126,25 @@ export function usePayrollRunCommand(scope: AgencyPayrollRunScope, onAsyncTermin
         ? current.promise
         : Promise.reject(new PayrollRunCommandError("OPERATION_IN_PROGRESS"));
     }
-    setError(null);
-    if (intent) setActiveIntent(intent);
+    setRetainedError({ key: scopeKey, value: null });
+    if (intent) setRetainedActiveIntent({ key: scopeKey, value: intent });
     const commandScopeKey = scopeKey;
     let watching = false;
     const promise = dispatch().then((operation) => {
       watching = beginWatching(operation, commandScopeKey, () => {
         if (flightRef.current?.promise === promise) flightRef.current = null;
-        if (intent) setActiveIntent(null);
+        if (intent) setRetainedActiveIntent({ key: commandScopeKey, value: null });
       });
       return operation;
     }).catch((value) => {
       const mapped = normalizeError(value);
-      if (liveScopeKey.current === commandScopeKey) setError(mapped);
+      if (liveScopeKey.current === commandScopeKey) setRetainedError({ key: commandScopeKey, value: mapped });
       throw mapped;
     }).finally(() => {
       if (!watching && flightRef.current?.promise === promise) flightRef.current = null;
-      if (!watching && intent && liveScopeKey.current === commandScopeKey) setActiveIntent(null);
+      if (!watching && intent && liveScopeKey.current === commandScopeKey) {
+        setRetainedActiveIntent({ key: commandScopeKey, value: null });
+      }
     });
     flightRef.current = { key, promise };
     return promise;
