@@ -2,6 +2,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { PayrollRun } from "@/features/payroll/runs/model/types";
 import { useFinancialOverview } from "./useFinancialOverview";
 
 const claims = vi.hoisted(() => ({ dashboard: vi.fn(), list: vi.fn() }));
@@ -33,6 +34,42 @@ const claimsDashboard = {
   claimsByStatus: { total: 0, segments: [] },
   rejectionReasons: { total: 0, segments: [] },
 };
+
+function payrollRun(runId: string, mode: PayrollRun["mode"]): PayrollRun {
+  return {
+    runId,
+    mode,
+    runType: "regular",
+    periodStart: "2026-08-01",
+    periodEnd: "2026-08-07",
+    payday: "2026-08-08",
+    approvalDeadline: null,
+    reopenDeadline: null,
+    timezone: "America/New_York",
+    workflowState: "review",
+    providerStatus: "draft",
+    projectionRevision: 1,
+    revisionNumber: 1,
+    activeRevisionId: `revision-${runId}`,
+    stale: false,
+    employeeCount: 1,
+    includedCount: 1,
+    deferredCount: 0,
+    zeroDueCount: 0,
+    blockerCount: 0,
+    warningCount: 0,
+    blockerCodes: [],
+    warningCodes: [],
+    totals: {
+      grossEarningsCents: 25_000,
+      reimbursementCents: 0,
+      adjustmentCents: 0,
+      totalDueCents: 25_000,
+    },
+    preview: { status: "none", revisionId: null, hash: null, observedAt: null, totals: null },
+    asOf: "2026-08-07T12:00:00.000Z",
+  };
+}
 
 describe("useFinancialOverview", () => {
   beforeEach(() => {
@@ -87,6 +124,56 @@ describe("useFinancialOverview", () => {
 
     expect(payroll.current.mock.calls[0]?.[0]).toBe(skipToken);
     expect(payroll.history.mock.calls[0]?.[0]).toBe(skipToken);
+  });
+
+  it("drops retained DDD rows and its cursor while the HHA queries are pending", async () => {
+    const currentRun = payrollRun("ddd-current", "ddd");
+    const historyRun = payrollRun("ddd-history", "ddd");
+    const currentResponse = { kind: "run" as const, run: currentRun };
+    const historyResponse = {
+      items: [historyRun],
+      nextCursor: "ddd-cursor",
+      hasMore: true,
+    };
+    const abort = vi.fn();
+    payroll.loadPage.mockReturnValue({
+      abort,
+      unwrap: () => new Promise<never>(() => undefined),
+    });
+    operational.mode = "ddd";
+    payroll.current.mockImplementation(() => ({
+      data: currentResponse,
+      currentData: operational.mode === "ddd" ? currentResponse : undefined,
+      isLoading: operational.mode !== "ddd",
+      error: undefined,
+      refetch: vi.fn(),
+    }));
+    payroll.history.mockImplementation(() => ({
+      data: historyResponse,
+      currentData: operational.mode === "ddd" ? historyResponse : undefined,
+      isLoading: operational.mode !== "ddd",
+      error: undefined,
+      refetch: vi.fn(),
+    }));
+
+    const { result, rerender } = renderHook(() => useFinancialOverview({
+      startDate: "2026-08-01",
+      endDate: "2026-08-31",
+    }));
+    await waitFor(() => expect(result.current.payrollChart.total).toBe(2));
+
+    operational.mode = "hha";
+    rerender();
+
+    await waitFor(() => expect(result.current.payrollChart.total).toBe(0));
+    expect(result.current.recentActivity).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "payroll-ddd-current" }),
+      expect.objectContaining({ id: "payroll-ddd-history" }),
+    ]));
+    expect(payroll.loadPage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ mode: "hha", cursor: "ddd-cursor" }),
+      true,
+    );
   });
 
   it("keeps combined partial errors referentially stable across unrelated rerenders", async () => {

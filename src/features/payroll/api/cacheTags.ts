@@ -17,13 +17,15 @@ export const payrollTagTypes = [
 export type PayrollTagType = typeof payrollTagTypes[number];
 type PayrollModeScope = PayrollScope & { mode: AgencyMode };
 type PayrollCacheScope = PayrollScope | PayrollModeScope | EmployeePayrollScope | ManagedEmployeePrimaryWorkplaceScope;
-const payrollScopeParts = (scope: PayrollCacheScope) => [
+const payrollScopeParts = (scope: PayrollCacheScope) => {
+  const parts = [
   scope.audience,
   scope.actorUid,
   scope.agencyId,
   "employmentId" in scope ? scope.employmentId : null,
-  "mode" in scope ? scope.mode : null,
-] as const;
+  ] as const;
+  return "mode" in scope ? [...parts, scope.mode] : parts;
+};
 export const payrollScopeKey = (scope: PayrollCacheScope) => JSON.stringify(payrollScopeParts(scope));
 export const PAYROLL_RUN_WIDE_REVISION_TAG = "__all_revisions__";
 export const payrollTag = (type: PayrollTagType, scope: PayrollCacheScope, employmentId?: string) => ({

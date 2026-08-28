@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   PAYROLL_RUN_WIDE_REVISION_TAG,
   companyMutationTags,
+  employeeSetupMutationTags,
   payrollLegacyHistoryTag,
   payrollObligationTag,
   payrollRunEmployeeTag,
@@ -17,8 +18,26 @@ describe("payrollTag", () => {
   it("includes the audience, actor, and effective agency in every cache identity", () => {
     expect(payrollTag("AgencySetup", { audience: "agency", actorUid: "u1", agencyId: "a1" })).toEqual({
       type: "AgencySetup",
-      id: JSON.stringify(["agency", "u1", "a1", null, null]),
+      id: JSON.stringify(["agency", "u1", "a1", null]),
     });
+  });
+
+  it("preserves mode-less setup and employee cache identities byte-for-byte", () => {
+    expect(payrollScopeKey({ audience: "agency", actorUid: "u1", agencyId: "a1" })).toBe(
+      JSON.stringify(["agency", "u1", "a1", null]),
+    );
+    expect(payrollScopeKey({
+      audience: "employee",
+      actorUid: "u1",
+      agencyId: "a1",
+      employmentId: "employment-1",
+    })).toBe(JSON.stringify(["employee", "u1", "a1", "employment-1"]));
+    expect(payrollScopeKey({
+      audience: "agency",
+      actorUid: "u1",
+      agencyId: "a1",
+      mode: "ddd",
+    })).toBe(JSON.stringify(["agency", "u1", "a1", null, "ddd"]));
   });
   it("defines every payroll cache family under the same scoped identity scheme", () => {
     expect(payrollTagTypes).toEqual([
@@ -37,7 +56,19 @@ describe("payrollTag", () => {
     ]);
   });
   it("keeps employee records distinct by employment identity", () => { const scope = { audience: "employee" as const, actorUid: "u", agencyId: "a" }; expect(payrollTag("EmployeeSetup", scope, "employment-a").id).not.toBe(payrollTag("EmployeeSetup", scope, "employment-b").id); });
-  it("invalidates downstream attention and compliance caches without pre-terminal setup reads", () => { const scope = { audience: "agency" as const, actorUid: "u", agencyId: "a" }; expect(companyMutationTags(scope).map((tag) => tag.type)).toEqual(["Attention", "Compliance"]); });
+  it("keeps mode-less company and employee mutation invalidation identities", () => {
+    const companyScope = { audience: "agency" as const, actorUid: "u", agencyId: "a" };
+    expect(companyMutationTags(companyScope)).toEqual([
+      { type: "Attention", id: JSON.stringify(["agency", "u", "a", null]) },
+      { type: "Compliance", id: JSON.stringify(["agency", "u", "a", null]) },
+    ]);
+    expect(employeeSetupMutationTags({
+      ...companyScope,
+      employmentId: "employment-1",
+    })).toEqual([
+      { type: "EmployeeSetup", id: JSON.stringify(["agency", "u", "a", "employment-1"]) },
+    ]);
+  });
 
   it("keys run, employee, and event tags by authorization scope and opaque revision", () => {
     const scope = { audience: "agency" as const, actorUid: "actor-a", agencyId: "agency-a", mode: "ddd" as const };

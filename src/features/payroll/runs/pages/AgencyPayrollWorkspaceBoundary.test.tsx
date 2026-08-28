@@ -1,20 +1,21 @@
-import { render, screen } from "@testing-library/react";
+import { configureStore } from "@reduxjs/toolkit";
+import { Provider } from "react-redux";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { checkPayrollApi } from "../../api/checkPayrollApi";
+import type { AgencyPayrollSetupProjection } from "../../model/types";
 import type { CurrentPayrollWorkspaceState } from "../hooks/useCurrentPayrollWorkspace";
 import { AgencyPayrollWorkspaceBoundary } from "./AgencyPayrollWorkspaceBoundary";
 
+const baseQuery = vi.hoisted(() => vi.fn());
 const state = vi.hoisted(() => ({
-  setup: {} as Record<string, unknown>,
   workspace: {} as CurrentPayrollWorkspaceState,
-  setupHook: vi.fn(),
   workspaceHook: vi.fn(),
 }));
 
-vi.mock("../../api/agencyPayrollEndpoints", () => ({
-  useGetAgencyPayrollSetupQuery: (...args: unknown[]) => state.setupHook(...args),
-}));
+vi.mock("@/lib/baseQuery", () => ({ customBaseQuery: baseQuery }));
 vi.mock("../hooks/useCurrentPayrollWorkspace", () => ({
   useCurrentPayrollWorkspace: (...args: unknown[]) => state.workspaceHook(...args),
 }));
@@ -25,13 +26,53 @@ vi.mock("./AgencyPayrollRunsWorkspace", () => ({
   ),
 }));
 
-const scope = { audience: "agency" as const, actorUid: "actor-1", agencyId: "agency-1" };
+const scope = {
+  audience: "agency" as const,
+  actorUid: "actor-1",
+  agencyId: "agency-1",
+  mode: "ddd" as const,
+};
+
+const setupProjection: AgencyPayrollSetupProjection = {
+  projectionRevision: 1,
+  integration: { state: "configured", environment: "sandbox" },
+  preflight: { values: {}, missingFieldCodes: [] },
+  readiness: { status: "ready", blockers: [], nextAction: null },
+  setup: {
+    companyOnboardRevision: null,
+    designatedSignerPresent: false,
+    signerCandidate: null,
+    designatedSigner: null,
+    companyLinked: true,
+    officeWorkplaceLinked: true,
+    payScheduleLinked: true,
+    enrollmentProfileLocked: true,
+    signatoryLinked: false,
+  },
+  capabilities: {
+    canView: true,
+    canManage: true,
+    canCreateIntegration: false,
+    canDesignateSigner: false,
+    createCompanyOnboardSession: false,
+    canSubmitCompanyImplementation: false,
+    canRetryCompanySync: false,
+    canRefreshCompanyReconciliation: false,
+  },
+};
+
+function createStore() {
+  return configureStore({
+    reducer: { [checkPayrollApi.reducerPath]: checkPayrollApi.reducer },
+    middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(checkPayrollApi.middleware),
+  });
+}
 
 describe("AgencyPayrollWorkspaceBoundary", () => {
   beforeEach(() => {
-    state.setupHook.mockReset();
+    baseQuery.mockReset();
+    baseQuery.mockResolvedValue({ data: setupProjection });
     state.workspaceHook.mockReset();
-    state.setupHook.mockReturnValue({ currentData: undefined, error: undefined, refetch: vi.fn() });
     state.workspace = {
       scopeKey: "scope-a",
       runResponse: null,
@@ -50,11 +91,41 @@ describe("AgencyPayrollWorkspaceBoundary", () => {
 
   it("offers a retry when the initial Check payroll pair is unavailable", async () => {
     const user = userEvent.setup();
-    render(<AgencyPayrollWorkspaceBoundary scope={scope} />);
+    const store = createStore();
+    render(
+      <Provider store={store}>
+        <AgencyPayrollWorkspaceBoundary scope={scope} />
+      </Provider>,
+    );
 
     await user.click(screen.getByRole("button", { name: "Try again" }));
 
     expect(state.workspace.refetch).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("Payroll workspace")).not.toBeInTheDocument();
+  });
+
+  it("reuses the mode-less setup request and cache when the run mode changes", async () => {
+    const store = createStore();
+    const { rerender } = render(
+      <Provider store={store}>
+        <AgencyPayrollWorkspaceBoundary scope={scope} setupAuthorized />
+      </Provider>,
+    );
+    await waitFor(() => expect(baseQuery).toHaveBeenCalledTimes(1));
+
+    rerender(
+      <Provider store={store}>
+        <AgencyPayrollWorkspaceBoundary scope={{ ...scope, mode: "hha" }} setupAuthorized />
+      </Provider>,
+    );
+
+    await waitFor(() => {
+      expect(Object.keys(store.getState().checkPayrollApi.queries)).toHaveLength(1);
+      expect(state.workspaceHook).toHaveBeenLastCalledWith(
+        { ...scope, mode: "hha" },
+        { skip: false },
+      );
+    });
+    expect(baseQuery).toHaveBeenCalledTimes(1);
   });
 });

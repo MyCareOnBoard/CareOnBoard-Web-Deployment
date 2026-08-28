@@ -287,7 +287,7 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
   }, [refetchClaims]);
 
   useEffect(() => {
-    const firstPage = payrollHistory.data;
+    const firstPage = payrollHistory.currentData;
     if (!payrollScope?.actorUid || !agencyId || !firstPage) {
       setPayrollRange({ key: payrollRangeKey, runs: [], loading: false, error: null });
       return;
@@ -345,7 +345,7 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
       cancelled = true;
       activeRequest?.abort();
     };
-  }, [actorUid, agencyId, dateRange.startDate, loadPayrollRunPage, mode, payrollHistory.data, payrollRangeKey]);
+  }, [actorUid, agencyId, dateRange.startDate, loadPayrollRunPage, mode, payrollHistory.currentData, payrollRangeKey]);
 
   const overviewStats = useMemo(
     () => mapDashboardToOverviewStats(claimsDashboard, previousClaimsDashboard),
@@ -358,11 +358,11 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
   const payrollRuns = useMemo(() => {
     const history = payrollRange.key === payrollRangeKey
       ? payrollRange.runs
-      : payrollHistory.data?.items ?? [];
-    const current = currentPayroll.data?.kind === "run" ? currentPayroll.data.run : null;
+      : payrollHistory.currentData?.items ?? [];
+    const current = currentPayroll.currentData?.kind === "run" ? currentPayroll.currentData.run : null;
     const merged = current && !history.some((run) => run.runId === current.runId) ? [current, ...history] : history;
     return merged.filter((run) => run.periodEnd >= dateRange.startDate && run.periodStart <= dateRange.endDate) as PayrollRun[];
-  }, [currentPayroll.data, dateRange.endDate, dateRange.startDate, payrollHistory.data, payrollRange, payrollRangeKey]);
+  }, [currentPayroll.currentData, dateRange.endDate, dateRange.startDate, payrollHistory.currentData, payrollRange, payrollRangeKey]);
   const payrollChart = useMemo(() => mapPayrollRunsToFinancialPayrollChart(payrollRuns), [payrollRuns]);
   const recentActivity = useMemo(
     () => buildRecentActivity(claims, payrollRuns, { limit: ACTIVITY_LIMIT }),

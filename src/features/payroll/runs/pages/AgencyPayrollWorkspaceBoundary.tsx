@@ -1,4 +1,5 @@
 import { useGetAgencyPayrollSetupQuery } from "../../api/agencyPayrollEndpoints";
+import type { PayrollScope } from "../../model/types";
 import { useCurrentPayrollWorkspace } from "../hooks/useCurrentPayrollWorkspace";
 import type { AgencyPayrollRunScope } from "../model/types";
 import {
@@ -13,7 +14,12 @@ export function AgencyPayrollWorkspaceBoundary({
   scope: AgencyPayrollRunScope;
   setupAuthorized?: boolean;
 }) {
-  const setup = useGetAgencyPayrollSetupQuery(scope, { skip: !setupAuthorized });
+  const setupScope: PayrollScope = {
+    audience: scope.audience,
+    actorUid: scope.actorUid,
+    agencyId: scope.agencyId,
+  };
+  const setup = useGetAgencyPayrollSetupQuery(setupScope, { skip: !setupAuthorized });
   const projection = setup.currentData;
   const setupRequired = projection?.integration.state === "not_configured";
   const setupIncomplete = projection?.integration.state === "configured"
