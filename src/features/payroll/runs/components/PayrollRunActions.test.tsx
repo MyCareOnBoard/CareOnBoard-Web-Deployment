@@ -9,7 +9,7 @@ function projection(): PayrollRunProjection {
   return {
     kind: "run", runId: "run-1", activeRevisionId: "revision-1", revisionNumber: 2,
     run: {
-      runId: "run-1", runType: "regular", periodStart: "2026-08-10", periodEnd: "2026-08-23",
+      runId: "run-1", mode: "ddd", runType: "regular", periodStart: "2026-08-10", periodEnd: "2026-08-23",
       payday: "2026-08-28", approvalDeadline: "2026-08-27T17:00:00.000Z",
       reopenDeadline: "2026-08-26T17:00:00.000Z", timezone: "America/New_York",
       workflowState: "ready_to_approve", providerStatus: "draft", projectionRevision: 9, revisionNumber: 2,

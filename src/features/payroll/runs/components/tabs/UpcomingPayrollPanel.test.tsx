@@ -17,15 +17,16 @@ vi.mock("react-router", () => ({
   useNavigate: () => navigation,
 }));
 
-const scope = { audience: "agency" as const, actorUid: "actor-1", agencyId: "agency-1" };
+const scope = { audience: "agency" as const, actorUid: "actor-1", agencyId: "agency-1", mode: "ddd" as const };
 
 const upcoming = (overrides: Record<string, unknown> = {}) => ({
   kind: "upcoming" as const,
+  mode: "ddd" as const,
   projectionRevision: 8,
   periodStart: "2026-08-24",
   periodEnd: "2026-09-06",
   payday: "2026-09-11",
-  totals: { regularHours: 40, overtimeHours: 4, totalHours: 44, grossEarningsCents: 88_000 },
+  totals: { regularHours: 40, overtimeHours: 4, totalHours: 44, grossEarningsCents: 88_000, reimbursementCents: 5_000, totalDueCents: 93_000 },
   employeeCount: 1,
   blockerCount: 1,
   blockerCodes: ["SHIFT_AWAITING_APPROVAL"],
@@ -37,6 +38,8 @@ const upcoming = (overrides: Record<string, unknown> = {}) => ({
     regularHours: 40,
     overtimeHours: 4,
     grossEarningsCents: 88_000,
+    reimbursementCents: 5_000,
+    totalDueCents: 93_000,
     sourceCount: 2,
     sourceCounts: { shift: 2, staff_timesheet: 0 },
     hasBlockers: true,
@@ -66,14 +69,15 @@ describe("UpcomingPayrollPanel", () => {
     api.hook.mockReturnValue(queryState(upcoming()));
   });
 
-  it("shows the approved-work estimate, neutral readiness, source detail, and one semantic worker row", () => {
+  it("shows the approved-work totals, neutral readiness, source detail, and one semantic worker row", () => {
     render(<UpcomingPayrollPanel scope={scope} />);
 
     expect(screen.getByRole("heading", { name: "Upcoming payroll" })).toBeInTheDocument();
     expect(screen.getByText("Scheduled")).toBeInTheDocument();
-    expect(screen.getByText("Estimated earnings from approved work")).toBeInTheDocument();
     expect(screen.getByText("Workers in period")).toBeInTheDocument();
-    expect(screen.getByText(/does not include reimbursements or adjustments/i)).toBeInTheDocument();
+    expect(screen.getByText("Reimbursements")).toBeInTheDocument();
+    expect(screen.getAllByText("Estimated total due").length).toBeGreaterThan(0);
+    expect(screen.getByText(/Includes approved earnings, expenses, and mileage reimbursements/i)).toBeInTheDocument();
     expect(screen.getByText(/Approved sources:/)).toBeInTheDocument();
     expect(screen.getAllByText("Not ready yet")).toHaveLength(2);
     expect(screen.getByText("Shift awaiting approval")).toBeInTheDocument();
@@ -194,6 +198,42 @@ describe("UpcomingPayrollPanel", () => {
       { ...scope, agencyId: "agency-2" },
       { refetchOnMountOrArgChange: true },
     );
+  });
+
+  it("resets to the first page and never retains DDD rows when mode changes", () => {
+    const firstPage = upcoming({
+      items: [{ ...upcoming().items[0], employeeId: "ddd-first", displayName: "DDD first page" }],
+      nextCursor: "page-2",
+      hasMore: true,
+    });
+    const secondPage = upcoming({
+      items: [{ ...upcoming().items[0], employeeId: "ddd-second", displayName: "DDD second page" }],
+      nextCursor: null,
+      hasMore: false,
+    });
+    const hhaPage = upcoming({
+      mode: "hha",
+      items: [{ ...upcoming().items[0], employeeId: "hha-first", displayName: "HHA first page" }],
+      nextCursor: null,
+      hasMore: false,
+    });
+    api.hook.mockImplementation((args: { mode: "ddd" | "hha"; cursor?: string }) => queryState(
+      args.mode === "hha" ? hhaPage : args.cursor ? secondPage : firstPage,
+    ));
+    const view = render(<UpcomingPayrollPanel scope={scope} />);
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(screen.getByText("DDD second page")).toBeInTheDocument();
+
+    api.hook.mockClear();
+    view.rerender(<UpcomingPayrollPanel scope={{ ...scope, mode: "hha" }} />);
+
+    expect(api.hook).toHaveBeenCalledOnce();
+    expect(api.hook).toHaveBeenCalledWith(
+      { ...scope, mode: "hha" },
+      { refetchOnMountOrArgChange: true },
+    );
+    expect(screen.getByText("HHA first page")).toBeInTheDocument();
+    expect(screen.queryByText("DDD second page")).not.toBeInTheDocument();
   });
 
   it("returns to the first page when a later cursor becomes stale", () => {

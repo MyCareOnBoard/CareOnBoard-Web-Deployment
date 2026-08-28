@@ -19,7 +19,7 @@ export type CurrentPayrollWorkspaceOptions = {
 };
 
 export function currentPayrollScopeKey(scope: AgencyPayrollRunScope): string {
-  return JSON.stringify([scope.audience, scope.actorUid, scope.agencyId]);
+  return JSON.stringify([scope.audience, scope.actorUid, scope.agencyId, scope.mode]);
 }
 
 export function useCurrentPayrollWorkspace(

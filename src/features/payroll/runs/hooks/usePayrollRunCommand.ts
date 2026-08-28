@@ -56,7 +56,7 @@ export function usePayrollRunCommand(scope: AgencyPayrollRunScope, onAsyncTermin
   const terminalRefreshFrames = useRef(new Set<number>());
   const asyncTerminalRef = useRef(onAsyncTerminal);
   asyncTerminalRef.current = onAsyncTerminal;
-  const scopeKey = `${scope.audience}:${scope.actorUid}:${scope.agencyId}`;
+  const scopeKey = `${scope.audience}:${scope.actorUid}:${scope.agencyId}:${scope.mode}`;
   const liveScopeKey = useRef(scopeKey);
   if (liveScopeKey.current !== scopeKey) {
     liveScopeKey.current = scopeKey;
@@ -146,7 +146,8 @@ export function usePayrollRunCommand(scope: AgencyPayrollRunScope, onAsyncTermin
   };
 
   const sameScope = (args: AgencyPayrollRunScope) => args.audience === scope.audience
-    && args.actorUid === scope.actorUid && args.agencyId === scope.agencyId;
+    && args.actorUid === scope.actorUid && args.agencyId === scope.agencyId
+    && args.mode === scope.mode;
 
   const runCommand = (args: PayrollRunCommandArgs): Promise<PayrollOperation> => sameScope(args)
     ? execute(runFlight, args.idempotencyKey, args.command, () => runMutation(args).unwrap())

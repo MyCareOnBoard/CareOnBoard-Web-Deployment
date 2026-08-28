@@ -19,7 +19,7 @@ vi.mock("../api/payrollRunEndpoints", () => ({
   useGetCurrentPayrollEmployeesQuery: (...args: unknown[]) => queryState.employeesHook(...args),
 }));
 
-const scope = { audience: "agency" as const, actorUid: "actor-1", agencyId: "agency-1" };
+const scope = { audience: "agency" as const, actorUid: "actor-1", agencyId: "agency-1", mode: "ddd" as const };
 
 const runResponse = (revision = "revision-1", number = 1): CurrentPayrollRunResponse => ({
   kind: "run",
@@ -142,7 +142,25 @@ describe("useCurrentPayrollWorkspace", () => {
       freshness: "loading",
       runResponse: null,
       employeePage: null,
-      scopeKey: JSON.stringify(["agency", "actor-1", "agency-2"]),
+      scopeKey: JSON.stringify(["agency", "actor-1", "agency-2", "ddd"]),
+    });
+  });
+
+  it("drops a DDD snapshot synchronously while the HHA current pair is loading", () => {
+    let activeScope: typeof scope | { audience: "agency"; actorUid: string; agencyId: string; mode: "hha" } = scope;
+    const { result, rerender } = renderHook(() => useCurrentPayrollWorkspace(activeScope));
+    expect(result.current.runResponse).not.toBeNull();
+
+    queryState.current = { ...queryState.current, currentData: undefined, isLoading: true, isFetching: true };
+    queryState.employees = { ...queryState.employees, currentData: undefined, isLoading: true, isFetching: true };
+    activeScope = { ...scope, mode: "hha" };
+    rerender();
+
+    expect(result.current).toMatchObject({
+      freshness: "loading",
+      runResponse: null,
+      employeePage: null,
+      scopeKey: JSON.stringify(["agency", "actor-1", "agency-1", "hha"]),
     });
   });
 

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useRef, useState } from "react";
+import { lazy, Suspense, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 
 import { PayrollOperationProvider } from "../../operations/PayrollOperationProvider";
@@ -134,7 +134,13 @@ function CurrentPayrollControls({
     acknowledgement: true;
   }) => Promise<unknown>;
 }) {
-  const approvalKey = JSON.stringify([scope.actorUid, scope.agencyId, projection.runId, projection.activeRevisionId]);
+  const approvalKey = JSON.stringify([
+    scope.actorUid,
+    scope.agencyId,
+    scope.mode,
+    projection.runId,
+    projection.activeRevisionId,
+  ]);
   const [approvalState, setApprovalState] = useState<{ key: string; open: boolean }>({ key: approvalKey, open: false });
   const approvalOpen = approvalState.key === approvalKey && approvalState.open;
 
@@ -173,21 +179,20 @@ function AgencyPayrollRunsWorkspaceContent({ scope, workspace }: {
   scope: AgencyPayrollRunScope;
   workspace: CurrentPayrollWorkspaceState;
 }) {
-  const scopeKey = JSON.stringify([scope.actorUid, scope.agencyId]);
-  const [tabState, setTabState] = useState<{ key: string; tab: WorkspaceTab }>({ key: scopeKey, tab: "current" });
+  const scopeKey = JSON.stringify([scope.actorUid, scope.agencyId, scope.mode]);
+  const tabScopeKey = JSON.stringify([scope.actorUid, scope.agencyId]);
+  const [tabState, setTabState] = useState<{ key: string; tab: WorkspaceTab }>({ key: tabScopeKey, tab: "current" });
   const tabRefs = useRef(new Map<WorkspaceTab, HTMLButtonElement>());
-  const offCycleSubmissions = useRef(new Map<string, OffCycleSubmissionRetention>());
-  let offCycleSubmission = offCycleSubmissions.current.get(scopeKey);
-  if (!offCycleSubmission) {
-    offCycleSubmission = { intent: null, flight: null };
-    offCycleSubmissions.current.set(scopeKey, offCycleSubmission);
-  }
+  const offCycleSubmission = useMemo<OffCycleSubmissionRetention>(
+    () => ({ intent: null, flight: null }),
+    [scopeKey],
+  );
   const commands = usePayrollRunCommand(scope, workspace.refetch);
   const projection = workspace.runResponse?.kind === "run" ? workspace.runResponse : null;
-  const tab = tabState.key === scopeKey ? tabState.tab : "current";
+  const tab = tabState.key === tabScopeKey ? tabState.tab : "current";
 
   const selectTab = (next: WorkspaceTab) => {
-    setTabState({ key: scopeKey, tab: next });
+    setTabState({ key: tabScopeKey, tab: next });
     tabRefs.current.get(next)?.focus();
   };
   const execute = async (args: PayrollRunCommandArgs) => {
@@ -290,9 +295,10 @@ function AgencyPayrollRunsWorkspaceContent({ scope, workspace }: {
         >
           {tab === "current" ? (
             <div className="space-y-6">
-              <CurrentPayrollPanel scope={scope} workspace={workspace} />
+              <CurrentPayrollPanel key={`current:${scopeKey}`} scope={scope} workspace={workspace} />
               {projection ? (
                 <CurrentPayrollControls
+                  key={`controls:${scopeKey}`}
                   scope={scope}
                   workspace={workspace}
                   projection={projection}
@@ -314,17 +320,18 @@ function AgencyPayrollRunsWorkspaceContent({ scope, workspace }: {
               />
             )}>
               {tab === "upcoming" ? (
-                <UpcomingPayrollPanel scope={scope} />
+                <UpcomingPayrollPanel key={`upcoming:${scopeKey}`} scope={scope} />
               ) : tab === "history" ? (
-                <PayrollHistoryPanel scope={scope} />
+                <PayrollHistoryPanel key={`history:${scopeKey}`} scope={scope} />
               ) : tab === "audit" ? (
                 workspace.freshness === "loading" && !workspace.runResponse
                   ? <PayrollTabSkeleton label="Loading audit timeline…" variant="timeline" />
                   : projection
-                    ? <PayrollAuditPanel scope={scope} runId={projection.runId} activeRevisionId={projection.activeRevisionId} />
+                    ? <PayrollAuditPanel key={`audit:${scopeKey}`} scope={scope} runId={projection.runId} activeRevisionId={projection.activeRevisionId} />
                     : <p className="py-8 text-sm text-[#62686f]">No active payroll is available for audit.</p>
               ) : tab === "obligations" ? (
                 <PayrollObligationsPanel
+                  key={`obligations:${scopeKey}`}
                   scope={scope}
                   createOffCycleCapability={false}
                   restoreCapability={false}

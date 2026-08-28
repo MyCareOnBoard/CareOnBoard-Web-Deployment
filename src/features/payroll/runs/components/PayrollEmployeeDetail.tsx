@@ -53,6 +53,7 @@ export function PayrollEmployeeDetail({ scope, identity, employeeId }: {
     scope.actorUid,
     scope.agencyId,
     scope.audience,
+    scope.mode,
   ]);
 
   const showSources = () => {

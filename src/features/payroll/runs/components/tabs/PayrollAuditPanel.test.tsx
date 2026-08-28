@@ -8,21 +8,18 @@ vi.mock("../../api/payrollRunEndpoints", () => ({
   useListPayrollRunEventsQuery: (...args: unknown[]) => api.events(...args),
 }));
 
-const scope = { audience: "agency" as const, actorUid: "actor-1", agencyId: "agency-1" };
+const scope = { audience: "agency" as const, actorUid: "actor-1", agencyId: "agency-1", mode: "ddd" as const };
 const identity = { runId: "run-1", activeRevisionId: "revision-1" };
 
 describe("PayrollAuditPanel", () => {
   beforeEach(() => {
     api.events.mockReset();
-    api.events.mockImplementation((args: { cursor?: string }) => ({
-      data: args.cursor
+    api.events.mockImplementation((args: { cursor?: string }) => {
+      const currentData = args.cursor
         ? { items: [{ eventId: "event-26", revisionId: "revision-1", type: "payroll_paid", occurredAt: "2026-08-24T12:00:00.000Z", data: { outcome: "paid" } }], nextCursor: null, hasMore: false }
-        : { items: Array.from({ length: 25 }, (_, index) => ({ eventId: `event-${index + 1}`, revisionId: "revision-1", type: "revision_published", occurredAt: "2026-08-24T12:00:00.000Z", data: { outcome: "published" } })), nextCursor: "events-2", hasMore: true },
-      isLoading: false,
-      isFetching: false,
-      isError: false,
-      refetch: vi.fn(),
-    }));
+        : { items: Array.from({ length: 25 }, (_, index) => ({ eventId: `event-${index + 1}`, revisionId: "revision-1", type: "revision_published", occurredAt: "2026-08-24T12:00:00.000Z", data: { outcome: "published" } })), nextCursor: "events-2", hasMore: true };
+      return { data: currentData, currentData, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() };
+    });
   });
 
   it("shows one immutable 25-event page and keeps expanded audit absent without capability", () => {
@@ -46,9 +43,22 @@ describe("PayrollAuditPanel", () => {
     expect(screen.getByRole("region", { name: "Expanded audit" })).toBeInTheDocument();
   });
 
+  it("returns to the first event page when mode changes", () => {
+    const view = render(<PayrollAuditPanel scope={scope} {...identity} />);
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    api.events.mockClear();
+
+    view.rerender(<PayrollAuditPanel scope={{ ...scope, mode: "hha" }} {...identity} />);
+
+    expect(api.events).toHaveBeenCalledOnce();
+    expect(api.events).toHaveBeenCalledWith({ ...scope, mode: "hha", ...identity });
+    expect(screen.getAllByRole("listitem")).toHaveLength(25);
+  });
+
   it("shows an accessible audit timeline skeleton while the first page loads", () => {
     api.events.mockReturnValue({
       data: undefined,
+      currentData: undefined,
       isLoading: true,
       isFetching: true,
       isError: false,

@@ -15,7 +15,7 @@ export function PayrollAuditPanel({ scope, runId, activeRevisionId, expandedAudi
   activeRevisionId: string;
   expandedAudit?: boolean;
 }) {
-  const paginationKey = JSON.stringify([scope.actorUid, scope.agencyId, runId, activeRevisionId]);
+  const paginationKey = JSON.stringify([scope.actorUid, scope.agencyId, scope.mode, runId, activeRevisionId]);
   const [pagination, setPagination] = useState<{ key: string; cursors: Array<string | undefined> }>({
     key: paginationKey,
     cursors: [undefined],
@@ -23,9 +23,9 @@ export function PayrollAuditPanel({ scope, runId, activeRevisionId, expandedAudi
   const cursors = pagination.key === paginationKey ? pagination.cursors : [undefined];
   const cursor = cursors.at(-1);
   const args = { ...scope, runId, activeRevisionId, ...(cursor ? { cursor } : {}) };
-  const { data, isLoading, isFetching, isError, refetch } = useListPayrollRunEventsQuery(args);
+  const { currentData, isLoading, isFetching, isError, refetch } = useListPayrollRunEventsQuery(args);
 
-  if (isLoading && !data) {
+  if ((isLoading || isFetching) && !currentData) {
     return <PayrollTabSkeleton label="Loading audit timeline…" variant="timeline" />;
   }
 
@@ -40,16 +40,16 @@ export function PayrollAuditPanel({ scope, runId, activeRevisionId, expandedAudi
           Expanded audit context is enabled for this workspace.
         </aside>
       ) : null}
-      {isError && !data ? (
+      {isError && !currentData ? (
         <p role="alert" className="border-y border-[#efcaca] py-4 text-sm text-[#8d3131]">
           Audit timeline could not be loaded.
           <button type="button" onClick={() => void refetch()} className="ml-2 font-semibold underline">Retry</button>
         </p>
       ) : null}
-      {data?.items.length === 0 ? <p className="py-6 text-sm text-[#62686f]">No audit events recorded.</p> : null}
-      {data?.items.length ? (
+      {currentData?.items.length === 0 ? <p className="py-6 text-sm text-[#62686f]">No audit events recorded.</p> : null}
+      {currentData?.items.length ? (
         <ol aria-busy={isFetching} className="divide-y divide-[#e5e5e6] border-y border-[#e5e5e6]">
-          {data.items.slice(0, 25).map((event) => (
+          {currentData.items.slice(0, 25).map((event) => (
             <li key={event.eventId} className="py-3">
               <p className="text-sm font-semibold text-[#10141a]">{eventLabel(event.type)}</p>
               <p className="mt-1 text-xs tabular-nums text-[#62686f]">{instant.format(new Date(event.occurredAt))}</p>
@@ -59,7 +59,7 @@ export function PayrollAuditPanel({ scope, runId, activeRevisionId, expandedAudi
       ) : null}
       <div className="flex justify-end gap-2">
         <button type="button" disabled={cursors.length === 1 || isFetching} onClick={() => setPagination({ key: paginationKey, cursors: cursors.slice(0, -1) })} className="min-h-11 rounded-lg border border-[#cfd9da] px-3 text-sm font-semibold disabled:opacity-50">Previous page</button>
-        <button type="button" disabled={!data?.nextCursor || isFetching} onClick={() => data?.nextCursor && setPagination({ key: paginationKey, cursors: [...cursors, data.nextCursor] })} className="min-h-11 rounded-lg border border-[#cfd9da] px-3 text-sm font-semibold disabled:opacity-50">Next page</button>
+        <button type="button" disabled={!currentData?.nextCursor || isFetching} onClick={() => currentData?.nextCursor && setPagination({ key: paginationKey, cursors: [...cursors, currentData.nextCursor] })} className="min-h-11 rounded-lg border border-[#cfd9da] px-3 text-sm font-semibold disabled:opacity-50">Next page</button>
       </div>
     </section>
   );

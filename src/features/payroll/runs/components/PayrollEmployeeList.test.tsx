@@ -15,7 +15,7 @@ vi.mock("../api/payrollRunEndpoints", () => ({
   useLazyListPayrollRunEmployeeSourcesQuery: () => [api.sourceTrigger, { isFetching: false }],
 }));
 
-const scope = { audience: "agency" as const, actorUid: "actor-1", agencyId: "agency-1" };
+const scope = { audience: "agency" as const, actorUid: "actor-1", agencyId: "agency-1", mode: "ddd" as const };
 const identity = {
   kind: "run" as const,
   runId: "run-1",
@@ -145,5 +145,34 @@ describe("PayrollEmployeeList", () => {
       identity,
       employee: { ...items[0], totalDueCents: items[0].totalDueCents + 100 },
     })).toBe(false);
+    expect(payrollEmployeeRowPropsEqual(previous, {
+      scope: { ...scope, mode: "hha" },
+      identity,
+      employee: items[0],
+    })).toBe(false);
+  });
+
+  it("collapses retained employee detail when program mode changes", () => {
+    const detailRequest = Object.assign(new Promise<never>(() => undefined), { abort: vi.fn() });
+    api.detailTrigger.mockReturnValue(detailRequest);
+    const view = renderList();
+    fireEvent.click(screen.getByRole("button", { name: "View payroll details for Employee 0" }));
+    expect(screen.getByRole("button", { name: "Hide payroll details for Employee 0" })).toBeInTheDocument();
+
+    view.rerender(
+      <PayrollEmployeeList
+        scope={{ ...scope, mode: "hha" }}
+        identity={identity}
+        items={items}
+        isBusy={false}
+        canPrevious={false}
+        canNext
+        onPrevious={vi.fn()}
+        onNext={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "View payroll details for Employee 0" })).toHaveAttribute("aria-expanded", "false");
+    expect(detailRequest.abort).toHaveBeenCalledOnce();
   });
 });

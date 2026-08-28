@@ -21,7 +21,7 @@ vi.mock("../../operations/PayrollOperationProvider", () => ({
   usePayrollOperations: () => ({ watch: transport.watch }),
 }));
 
-const scope = { audience: "agency" as const, actorUid: "actor-1", agencyId: "agency-1" };
+const scope = { audience: "agency" as const, actorUid: "actor-1", agencyId: "agency-1", mode: "ddd" as const };
 const command = (idempotencyKey: string) => ({
   ...scope,
   runId: "run-1",
@@ -187,5 +187,27 @@ describe("usePayrollRunCommand", () => {
     await act(async () => { resolve({ operationId: "op-old", state: "accepted", resourceType: "payroll_run", pollAfterMs: 250 }); await pending; });
     expect(transport.watch).not.toHaveBeenCalled();
     expect(result.current.activeIntent).toBeNull();
+  });
+
+  it("drops a late DDD operation and rejects DDD arguments after switching to HHA", async () => {
+    let resolve!: (value: unknown) => void;
+    transport.run.mockReturnValue({ unwrap: () => new Promise((done) => { resolve = done; }) });
+    let mode: "ddd" | "hha" = "ddd";
+    const { result, rerender } = renderHook(() => usePayrollRunCommand({ ...scope, mode }));
+    let pending!: Promise<unknown>;
+    act(() => { pending = result.current.runCommand(command("intent-old")); });
+
+    mode = "hha";
+    rerender();
+    await act(async () => {
+      resolve({ operationId: "op-old", state: "accepted", resourceType: "payroll_run", pollAfterMs: 250 });
+      await pending;
+    });
+    expect(transport.watch).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await expect(result.current.runCommand(command("intent-wrong-mode"))).rejects.toMatchObject({ code: "REQUEST_FAILED" });
+    });
+    expect(transport.run).toHaveBeenCalledOnce();
   });
 });

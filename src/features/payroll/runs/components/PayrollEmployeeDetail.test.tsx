@@ -15,7 +15,7 @@ vi.mock("../api/payrollRunEndpoints", () => ({
   useLazyListPayrollRunEmployeeSourcesQuery: () => [api.sourceTrigger, api.sourceState],
 }));
 
-const scope = { audience: "agency" as const, actorUid: "actor-1", agencyId: "agency-1" };
+const scope = { audience: "agency" as const, actorUid: "actor-1", agencyId: "agency-1", mode: "ddd" as const };
 const identity = {
   kind: "run" as const,
   runId: "run-1",
@@ -72,6 +72,28 @@ describe("PayrollEmployeeDetail", () => {
     expect(api.detailTrigger).toHaveBeenLastCalledWith(expect.objectContaining({
       activeRevisionId: "revision-2",
     }), false);
+  });
+
+  it("aborts DDD detail and reloads with HHA authority when mode changes", () => {
+    const first = pending();
+    const second = pending();
+    api.detailTrigger.mockReturnValueOnce(first).mockReturnValueOnce(second);
+    const view = render(
+      <PayrollEmployeeDetail scope={scope} identity={identity} employeeId="employee-1" />,
+    );
+
+    view.rerender(
+      <PayrollEmployeeDetail scope={{ ...scope, mode: "hha" }} identity={identity} employeeId="employee-1" />,
+    );
+
+    expect(first.abort).toHaveBeenCalledOnce();
+    expect(api.detailTrigger).toHaveBeenLastCalledWith({
+      ...scope,
+      mode: "hha",
+      runId: "run-1",
+      activeRevisionId: "revision-1",
+      employeeId: "employee-1",
+    }, false);
   });
 
   it("requests bounded sources only after explicit user intent", () => {

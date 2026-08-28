@@ -42,6 +42,7 @@ export function payrollEmployeeRowPropsEqual(
     && previous.scope.audience === next.scope.audience
     && previous.scope.actorUid === next.scope.actorUid
     && previous.scope.agencyId === next.scope.agencyId
+    && previous.scope.mode === next.scope.mode
     && previous.identity.runId === next.identity.runId
     && previous.identity.activeRevisionId === next.identity.activeRevisionId
     && previous.identity.revisionNumber === next.identity.revisionNumber;
@@ -52,7 +53,9 @@ function PayrollEmployeeRowComponent({
   identity,
   employee,
 }: PayrollEmployeeRowProps) {
-  const [expanded, setExpanded] = useState(false);
+  const expansionKey = JSON.stringify([scope.actorUid, scope.agencyId, scope.mode]);
+  const [expansion, setExpansion] = useState({ key: expansionKey, expanded: false });
+  const expanded = expansion.key === expansionKey && expansion.expanded;
   const detailId = useId();
 
   return (
@@ -88,7 +91,7 @@ function PayrollEmployeeRowComponent({
         </p>
         <button
           type="button"
-          onClick={() => setExpanded((value) => !value)}
+          onClick={() => setExpansion({ key: expansionKey, expanded: !expanded })}
           aria-expanded={expanded}
           aria-controls={detailId}
           aria-label={`${expanded ? "Hide" : "View"} payroll details for ${employee.displayName}`}

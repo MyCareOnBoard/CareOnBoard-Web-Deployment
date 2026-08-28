@@ -9,9 +9,10 @@ vi.mock("../../api/payrollRunEndpoints", () => ({
   useListPayrollRunsQuery: (...args: unknown[]) => api.list(...args),
 }));
 
-const scope = { audience: "agency" as const, actorUid: "actor-1", agencyId: "agency-1" };
+const scope = { audience: "agency" as const, actorUid: "actor-1", agencyId: "agency-1", mode: "ddd" as const };
 const run = (index: number, runType: PayrollRun["runType"] = "regular"): PayrollRun => ({
   runId: `run-${index}`,
+  mode: "ddd",
   runType,
   periodStart: "2026-08-01",
   periodEnd: "2026-08-14",
@@ -41,15 +42,12 @@ const run = (index: number, runType: PayrollRun["runType"] = "regular"): Payroll
 describe("PayrollHistoryPanel", () => {
   beforeEach(() => {
     api.list.mockReset();
-    api.list.mockImplementation((args: { cursor?: string; runType?: PayrollRun["runType"] }) => ({
-      data: args.cursor
+    api.list.mockImplementation((args: { cursor?: string; runType?: PayrollRun["runType"] }) => {
+      const currentData = args.cursor
         ? { items: [run(26, args.runType)], nextCursor: null, hasMore: false }
-        : { items: Array.from({ length: 25 }, (_, index) => run(index + 1, args.runType)), nextCursor: "page-2", hasMore: true },
-      isLoading: false,
-      isFetching: false,
-      isError: false,
-      refetch: vi.fn(),
-    }));
+        : { items: Array.from({ length: 25 }, (_, index) => run(index + 1, args.runType)), nextCursor: "page-2", hasMore: true };
+      return { data: currentData, currentData, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() };
+    });
   });
 
   it("mounts one bounded 25-row page and replaces it when the cursor advances", () => {
@@ -72,9 +70,24 @@ describe("PayrollHistoryPanel", () => {
     expect(screen.getAllByText("Off-cycle")).toHaveLength(25);
   });
 
+  it("returns to page one and closes selected detail when mode changes", () => {
+    const view = render(<PayrollHistoryPanel scope={scope} />);
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    fireEvent.click(screen.getByRole("button", { name: "View payroll" }));
+    expect(screen.getByRole("dialog", { name: "Immutable payroll detail" })).toBeInTheDocument();
+
+    api.list.mockClear();
+    view.rerender(<PayrollHistoryPanel scope={{ ...scope, mode: "hha" }} />);
+
+    expect(api.list).toHaveBeenCalledOnce();
+    expect(api.list).toHaveBeenCalledWith({ ...scope, mode: "hha", runType: "regular" });
+    expect(screen.queryByRole("dialog", { name: "Immutable payroll detail" })).not.toBeInTheDocument();
+  });
+
   it("shows an accessible payroll history skeleton while the first page loads", () => {
     api.list.mockReturnValue({
       data: undefined,
+      currentData: undefined,
       isLoading: true,
       isFetching: true,
       isError: false,

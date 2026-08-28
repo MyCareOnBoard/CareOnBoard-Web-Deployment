@@ -68,7 +68,7 @@ export function PayrollApprovalDialog({
       window.cancelAnimationFrame(secondFrame);
       if (request && requestRef.current === request) { request.abort?.(); requestRef.current = null; }
     };
-  }, [activeRevisionId, capability, loadDetail, open, runId, scope.actorUid, scope.agencyId, scope.audience]);
+  }, [activeRevisionId, capability, loadDetail, open, runId, scope.actorUid, scope.agencyId, scope.audience, scope.mode]);
 
   if (!capability) return null;
   const preview = detail?.run.preview;

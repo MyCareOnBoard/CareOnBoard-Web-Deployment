@@ -8,7 +8,7 @@ vi.mock("../../api/payrollRunEndpoints", () => ({
   useListPayrollObligationsQuery: (...args: unknown[]) => api.list(...args),
 }));
 
-const scope = { audience: "agency" as const, actorUid: "actor-1", agencyId: "agency-1" };
+const scope = { audience: "agency" as const, actorUid: "actor-1", agencyId: "agency-1", mode: "ddd" as const };
 const context = { agencyId: "agency-1", environment: "sandbox" as const, companyId: "company-1" };
 const obligation = (index: number, overrides: Record<string, unknown> = {}) => ({
   obligationId: `obligation-${index}`,
@@ -35,12 +35,12 @@ describe("PayrollObligationsPanel", () => {
   beforeEach(() => {
     second = obligation(26);
     api.list.mockReset(); api.refetch.mockReset();
-    api.list.mockImplementation((args: { cursor?: string }) => ({
-      data: args.cursor
+    api.list.mockImplementation((args: { cursor?: string }) => {
+      const currentData = args.cursor
         ? { items: [second], nextCursor: null, hasMore: false }
-        : { items: Array.from({ length: 25 }, (_, index) => obligation(index + 1)), nextCursor: "page-2", hasMore: true },
-      isLoading: false, isFetching: false, isError: false, refetch: api.refetch,
-    }));
+        : { items: Array.from({ length: 25 }, (_, index) => obligation(index + 1)), nextCursor: "page-2", hasMore: true };
+      return { data: currentData, currentData, isLoading: false, isFetching: false, isError: false, refetch: api.refetch };
+    });
   });
 
   it("retains compatible version-bound selections across pages without mounting more than one 25-row page", async () => {
@@ -104,9 +104,31 @@ describe("PayrollObligationsPanel", () => {
     expect(selectedCount(0)).toBeInTheDocument();
   });
 
+  it("closes the off-cycle dialog and drops DDD page and selection state when mode changes", () => {
+    const create = vi.fn();
+    const view = render(<PayrollObligationsPanel scope={scope} context={context} createOffCycleCapability restoreCapability onCreateOffCycle={create} onRestore={vi.fn()} />);
+    fireEvent.click(screen.getByRole("checkbox", { name: /select obligation for employee-1$/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Create off-cycle payroll" }));
+    expect(screen.getByRole("dialog", { name: "Create off-cycle payroll" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Keep selecting" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /select obligation for employee-26/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Create off-cycle payroll" }));
+    expect(screen.getByRole("dialog", { name: "Create off-cycle payroll" })).toBeInTheDocument();
+
+    api.list.mockClear();
+    view.rerender(<PayrollObligationsPanel scope={{ ...scope, mode: "hha" }} context={context} createOffCycleCapability restoreCapability onCreateOffCycle={create} onRestore={vi.fn()} />);
+
+    expect(api.list).toHaveBeenCalledOnce();
+    expect(api.list).toHaveBeenCalledWith({ ...scope, mode: "hha", state: "open" });
+    expect(selectedCount(0)).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Create off-cycle payroll" })).not.toBeInTheDocument();
+  });
+
   it("shows an accessible open obligations skeleton while the first page loads", () => {
     api.list.mockReturnValue({
       data: undefined,
+      currentData: undefined,
       isLoading: true,
       isFetching: true,
       isError: false,

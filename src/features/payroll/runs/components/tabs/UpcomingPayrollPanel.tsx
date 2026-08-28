@@ -115,7 +115,7 @@ export function UpcomingPayrollPanel({ scope }: { scope: AgencyPayrollRunScope }
   const navigate = useNavigate();
   const pageHeadingRef = useRef<HTMLHeadingElement>(null);
   const focusSettledPageRef = useRef(false);
-  const paginationKey = JSON.stringify([scope.actorUid, scope.agencyId]);
+  const paginationKey = JSON.stringify([scope.actorUid, scope.agencyId, scope.mode]);
   const [pagination, setPagination] = useState<{ key: string; cursors: Array<string | undefined> }>({
     key: paginationKey,
     cursors: [undefined],

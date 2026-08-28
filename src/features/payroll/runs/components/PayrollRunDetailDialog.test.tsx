@@ -9,9 +9,9 @@ vi.mock("../api/payrollRunEndpoints", () => ({
   useListPayrollRunEventsQuery: (...args: unknown[]) => api.events(...args),
 }));
 
-const scope = { audience: "agency" as const, actorUid: "actor-1", agencyId: "agency-1" };
+const scope = { audience: "agency" as const, actorUid: "actor-1", agencyId: "agency-1", mode: "ddd" as const };
 const run: PayrollRun = {
-  runId: "run-1", runType: "regular", periodStart: "2026-08-01", periodEnd: "2026-08-14", payday: "2026-08-21",
+  runId: "run-1", mode: "ddd", runType: "regular", periodStart: "2026-08-01", periodEnd: "2026-08-14", payday: "2026-08-21",
   approvalDeadline: null, reopenDeadline: null, timezone: "America/New_York", workflowState: "closed", providerStatus: "paid",
   projectionRevision: 4, revisionNumber: 2, activeRevisionId: "revision-1", stale: false, employeeCount: 1, includedCount: 1,
   deferredCount: 0, zeroDueCount: 0, blockerCount: 0, warningCount: 0, blockerCodes: [], warningCodes: [],
@@ -22,7 +22,8 @@ const run: PayrollRun = {
 
 describe("PayrollRunDetailDialog", () => {
   it("mounts overview first, supports tab keyboard navigation, and provides an explicit close action", () => {
-    api.events.mockReturnValue({ data: { items: [], nextCursor: null, hasMore: false }, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() });
+    const currentData = { items: [], nextCursor: null, hasMore: false };
+    api.events.mockReturnValue({ data: currentData, currentData, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() });
     const onOpenChange = vi.fn();
     render(<PayrollRunDetailDialog open onOpenChange={onOpenChange} scope={scope} run={run} expandedAudit={false} />);
     expect(screen.getByText("Immutable payroll detail")).toBeInTheDocument();

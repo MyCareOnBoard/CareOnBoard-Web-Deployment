@@ -6,7 +6,7 @@ import type {
   PayrollEmployeePage,
   PayrollEmployeeSummary,
 } from "../model/types";
-import { usePayrollCursorPage } from "./usePayrollCursorPage";
+import { usePayrollCursorPage, type PayrollCursorIdentity } from "./usePayrollCursorPage";
 
 const endpoint = vi.hoisted(() => ({ trigger: vi.fn(), isFetching: false }));
 
@@ -14,10 +14,11 @@ vi.mock("../api/payrollRunEndpoints", () => ({
   useLazyListPayrollRunEmployeesQuery: () => [endpoint.trigger, { isFetching: endpoint.isFetching }],
 }));
 
-const identity = {
+const identity: PayrollCursorIdentity = {
   audience: "agency" as const,
   actorUid: "actor-1",
   agencyId: "agency-1",
+  mode: "ddd" as const,
   kind: "run" as const,
   runId: "run-1",
   activeRevisionId: "revision-1",
@@ -66,6 +67,7 @@ describe("usePayrollCursorPage", () => {
     await act(() => result.current.next());
     expect(result.current.items.map(({ employeeId }) => employeeId)).toEqual(["next-0", "next-1"]);
     expect(endpoint.trigger).toHaveBeenCalledWith(expect.objectContaining({ cursor: "cursor-2" }), false);
+    expect(endpoint.trigger).toHaveBeenCalledWith(expect.objectContaining({ mode: "ddd" }), false);
 
     act(() => result.current.previous());
     expect(result.current.items).toHaveLength(50);
@@ -135,5 +137,26 @@ describe("usePayrollCursorPage", () => {
       disposition: "blocked",
       totalDueCents: 125_00,
     }));
+  });
+
+  it("aborts a lazy DDD page and resets to page one when identity changes to HHA", async () => {
+    const pending = new Promise<PayrollEmployeePage>(() => undefined);
+    const abort = vi.fn();
+    endpoint.trigger.mockReturnValueOnce(Object.assign(pending, { unwrap: () => pending, abort }));
+    let activeIdentity: PayrollCursorIdentity = identity;
+    const { result, rerender } = renderHook(() => usePayrollCursorPage({
+      identity: activeIdentity,
+      initialPage: page(employees("initial", 2), "cursor-2"),
+      filter: "all",
+      sort: "name_asc",
+    }));
+
+    void act(() => { void result.current.next(); });
+    activeIdentity = { ...identity, mode: "hha" };
+    rerender();
+
+    await waitFor(() => expect(abort).toHaveBeenCalledOnce());
+    expect(result.current.canPrevious).toBe(false);
+    expect(result.current.items[0]?.employeeId).toBe("initial-0");
   });
 });

@@ -13,7 +13,7 @@ vi.mock("../../api/payrollRunEndpoints", () => ({
   },
 }));
 
-const scope = { audience: "agency" as const, actorUid: "actor-1", agencyId: "agency-1" };
+const scope = { audience: "agency" as const, actorUid: "actor-1", agencyId: "agency-1", mode: "ddd" as const };
 function installFrameQueue() {
   let sequence = 0;
   const callbacks = new Map<number, FrameRequestCallback>();
@@ -36,7 +36,7 @@ function detail(): PayrollRunProjection {
   const enabled = { enabled: true as const, reasonCode: null };
   return {
     kind: "run", runId: "run-1", activeRevisionId: "revision-1", revisionNumber: 2,
-    run: { runId: "run-1", runType: "regular", periodStart: "2026-08-10", periodEnd: "2026-08-23", payday: "2026-08-28", approvalDeadline: "2026-08-27T17:00:00.000Z", reopenDeadline: "2026-08-26T17:00:00.000Z", timezone: "America/New_York", workflowState: "ready_to_approve", providerStatus: "draft", projectionRevision: 9, revisionNumber: 2, activeRevisionId: "revision-1", stale: false, employeeCount: 3, includedCount: 2, deferredCount: 1, zeroDueCount: 0, blockerCount: 0, warningCount: 0, blockerCodes: [], warningCodes: [], totals: { grossEarningsCents: 10_000, reimbursementCents: 200, adjustmentCents: 300, totalDueCents: 10_500 }, preview: { status: "succeeded", revisionId: "revision-1", hash: "a".repeat(64), observedAt: "2026-08-24T12:00:00.000Z", totals: { grossCents: 10_000, reimbursementsCents: 200, employeeTaxesCents: 1_000, employeeDeductionsCents: 300, employerTaxesCents: 500, employerContributionsCents: 100, netPayCents: 8_900, expectedCashRequirementCents: 11_100 } }, asOf: "2026-08-24T12:00:00.000Z" },
+    run: { runId: "run-1", mode: "ddd", runType: "regular", periodStart: "2026-08-10", periodEnd: "2026-08-23", payday: "2026-08-28", approvalDeadline: "2026-08-27T17:00:00.000Z", reopenDeadline: "2026-08-26T17:00:00.000Z", timezone: "America/New_York", workflowState: "ready_to_approve", providerStatus: "draft", projectionRevision: 9, revisionNumber: 2, activeRevisionId: "revision-1", stale: false, employeeCount: 3, includedCount: 2, deferredCount: 1, zeroDueCount: 0, blockerCount: 0, warningCount: 0, blockerCodes: [], warningCodes: [], totals: { grossEarningsCents: 10_000, reimbursementCents: 200, adjustmentCents: 300, totalDueCents: 10_500 }, preview: { status: "succeeded", revisionId: "revision-1", hash: "a".repeat(64), observedAt: "2026-08-24T12:00:00.000Z", totals: { grossCents: 10_000, reimbursementsCents: 200, employeeTaxesCents: 1_000, employeeDeductionsCents: 300, employerTaxesCents: 500, employerContributionsCents: 100, netPayCents: 8_900, expectedCashRequirementCents: 11_100 } }, asOf: "2026-08-24T12:00:00.000Z" },
     capabilities: { commands: { refresh_sources: enabled, add_adjustment: enabled, remove_adjustment: enabled, defer_employee: enabled, restore_employee: enabled, request_preview: enabled, approve_payroll: enabled, reopen_payroll: enabled, refresh_reconciliation: enabled } },
     prerequisites: { revisionReady: true, dispositionsComplete: true, noBlockers: true, providerSynchronized: true, previewReady: true },
     approvalChallenge: "fresh-challenge", approvalChallengeExpiresAt: "2099-08-24T12:05:00.000Z",
@@ -74,6 +74,23 @@ describe("PayrollApprovalDialog", () => {
     act(() => { frames.flush(); frames.flush(); });
     expect(api.trigger).not.toHaveBeenCalled();
     expect(window.cancelAnimationFrame).toHaveBeenCalled();
+  });
+
+  it("aborts DDD approval detail and reissues it with HHA authority on a mode change", () => {
+    const frames = installFrameQueue();
+    const firstAbort = vi.fn();
+    const secondAbort = vi.fn();
+    api.trigger
+      .mockReturnValueOnce({ abort: firstAbort, unwrap: () => new Promise<PayrollRunProjection>(() => undefined) })
+      .mockReturnValueOnce({ abort: secondAbort, unwrap: () => new Promise<PayrollRunProjection>(() => undefined) });
+    const view = render(<PayrollApprovalDialog open scope={scope} runId="run-1" activeRevisionId="revision-1" capability agencyName="Harbor Care" onOpenChange={vi.fn()} onSubmit={vi.fn()} />);
+    act(() => { frames.flush(); frames.flush(); });
+    expect(api.trigger).toHaveBeenLastCalledWith({ ...scope, runId: "run-1", activeRevisionId: "revision-1" }, false);
+
+    view.rerender(<PayrollApprovalDialog open scope={{ ...scope, mode: "hha" }} runId="run-1" activeRevisionId="revision-1" capability agencyName="Harbor Care" onOpenChange={vi.fn()} onSubmit={vi.fn()} />);
+    expect(firstAbort).toHaveBeenCalledOnce();
+    act(() => { frames.flush(); frames.flush(); });
+    expect(api.trigger).toHaveBeenLastCalledWith({ ...scope, mode: "hha", runId: "run-1", activeRevisionId: "revision-1" }, false);
   });
 
   it("shows all bound totals, masked funding, deadlines and revision, then requires acknowledgement", async () => {

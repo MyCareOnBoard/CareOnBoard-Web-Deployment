@@ -16,18 +16,20 @@ export function PayrollHistoryPanel({ scope, expandedAudit = false }: {
   expandedAudit?: boolean;
 }) {
   const [runType, setRunType] = useState<PayrollRunType>("regular");
-  const paginationKey = JSON.stringify([scope.actorUid, scope.agencyId, runType]);
+  const selectionKey = JSON.stringify([scope.actorUid, scope.agencyId, scope.mode]);
+  const paginationKey = JSON.stringify([scope.actorUid, scope.agencyId, scope.mode, runType]);
   const [pagination, setPagination] = useState<{ key: string; cursors: Array<string | undefined> }>({
     key: paginationKey,
     cursors: [undefined],
   });
-  const [selectedRun, setSelectedRun] = useState<PayrollRun | null>(null);
+  const [selectedRun, setSelectedRun] = useState<{ key: string; run: PayrollRun } | null>(null);
   const cursors = pagination.key === paginationKey ? pagination.cursors : [undefined];
+  const selected = selectedRun?.key === selectionKey ? selectedRun.run : null;
   const cursor = cursors.at(-1);
   const args = { ...scope, runType, ...(cursor ? { cursor } : {}) };
-  const { data, isLoading, isFetching, isError, refetch } = useListPayrollRunsQuery(args);
+  const { currentData, isLoading, isFetching, isError, refetch } = useListPayrollRunsQuery(args);
 
-  if (isLoading && !data) {
+  if ((isLoading || isFetching) && !currentData) {
     return <PayrollTabSkeleton label="Loading payroll history…" variant="list" />;
   }
 
@@ -53,16 +55,16 @@ export function PayrollHistoryPanel({ scope, expandedAudit = false }: {
         </div>
       </div>
 
-      {isError && !data ? (
+      {isError && !currentData ? (
         <div role="alert" className="border-y border-[#efcaca] py-5 text-sm text-[#8d3131]">
           Payroll history could not be loaded.
           <button type="button" onClick={() => void refetch()} className="ml-2 font-semibold underline">Retry</button>
         </div>
       ) : null}
-      {data?.items.length === 0 ? <p className="py-8 text-sm text-[#62686f]">No {runType === "regular" ? "regular" : "off-cycle"} payrolls yet.</p> : null}
-      {data?.items.length ? (
+      {currentData?.items.length === 0 ? <p className="py-8 text-sm text-[#62686f]">No {runType === "regular" ? "regular" : "off-cycle"} payrolls yet.</p> : null}
+      {currentData?.items.length ? (
         <ul aria-busy={isFetching} className="divide-y divide-[#e5e5e6] border-y border-[#e5e5e6]">
-          {data.items.slice(0, 25).map((run) => (
+          {currentData.items.slice(0, 25).map((run) => (
             <li key={run.runId} className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
               <div className="min-w-0">
                 <p className="font-semibold text-[#10141a]">{dateLabel(run.periodStart)} – {dateLabel(run.periodEnd)}</p>
@@ -70,17 +72,17 @@ export function PayrollHistoryPanel({ scope, expandedAudit = false }: {
                 {run.runType === "off_cycle" ? <span className="mt-2 inline-flex rounded-full bg-[#f1f3f4] px-2 py-1 text-xs font-semibold text-[#4d545b]">Off-cycle</span> : null}
               </div>
               <p className="text-sm font-semibold tabular-nums text-[#10141a]">{moneyLabel(run.totals.totalDueCents)}</p>
-              <button type="button" onClick={() => setSelectedRun(run)} className="min-h-11 rounded-lg border border-[#b8dfe0] px-3 text-sm font-semibold text-[#006f73] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8]">View payroll</button>
+              <button type="button" onClick={() => setSelectedRun({ key: selectionKey, run })} className="min-h-11 rounded-lg border border-[#b8dfe0] px-3 text-sm font-semibold text-[#006f73] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8]">View payroll</button>
             </li>
           ))}
         </ul>
       ) : null}
       <div className="flex items-center justify-end gap-2">
         <button type="button" disabled={cursors.length === 1 || isFetching} onClick={() => setPagination({ key: paginationKey, cursors: cursors.slice(0, -1) })} className="min-h-11 rounded-lg border border-[#cfd9da] px-3 text-sm font-semibold disabled:opacity-50">Previous page</button>
-        <button type="button" disabled={!data?.nextCursor || isFetching} onClick={() => data?.nextCursor && setPagination({ key: paginationKey, cursors: [...cursors, data.nextCursor] })} className="min-h-11 rounded-lg border border-[#cfd9da] px-3 text-sm font-semibold disabled:opacity-50">Next page</button>
+        <button type="button" disabled={!currentData?.nextCursor || isFetching} onClick={() => currentData?.nextCursor && setPagination({ key: paginationKey, cursors: [...cursors, currentData.nextCursor] })} className="min-h-11 rounded-lg border border-[#cfd9da] px-3 text-sm font-semibold disabled:opacity-50">Next page</button>
       </div>
-      {selectedRun ? (
-        <PayrollRunDetailDialog open onOpenChange={(open) => { if (!open) setSelectedRun(null); }} scope={scope} run={selectedRun} expandedAudit={expandedAudit} />
+      {selected ? (
+        <PayrollRunDetailDialog open onOpenChange={(open) => { if (!open) setSelectedRun(null); }} scope={scope} run={selected} expandedAudit={expandedAudit} />
       ) : null}
     </section>
   );

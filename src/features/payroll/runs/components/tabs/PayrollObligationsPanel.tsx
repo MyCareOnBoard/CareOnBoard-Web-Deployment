@@ -81,7 +81,7 @@ export function PayrollObligationsPanel({
   onRestore: (obligation: PayrollObligation) => Promise<void>;
   submissionRetention?: OffCycleSubmissionRetention;
 }) {
-  const scopeKey = JSON.stringify([scope.actorUid, scope.agencyId]);
+  const scopeKey = JSON.stringify([scope.actorUid, scope.agencyId, scope.mode]);
   const [pagination, setPagination] = useState<{ key: string; cursors: Array<string | undefined> }>({
     key: scopeKey,
     cursors: [undefined],
@@ -90,19 +90,20 @@ export function PayrollObligationsPanel({
     key: scopeKey,
     items: new Map(),
   });
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogState, setDialogState] = useState({ key: scopeKey, open: false });
   const [restoreSelection, setRestoreSelection] = useState<{ key: string; item: PayrollObligation } | null>(null);
   const [restoring, setRestoring] = useState<{ key: string; id: string } | null>(null);
   const [failure, setFailure] = useState<{ key: string; message: string } | null>(null);
   const cursors = pagination.key === scopeKey ? pagination.cursors : [undefined];
   const selected = selection.key === scopeKey ? selection.items : emptySelection;
+  const dialogOpen = dialogState.key === scopeKey && dialogState.open;
   const restoreTarget = restoreSelection?.key === scopeKey ? restoreSelection.item : null;
   const restoringId = restoring?.key === scopeKey ? restoring.id : null;
   const error = failure?.key === scopeKey ? failure.message : null;
   const cursor = cursors.at(-1);
   const args = { ...scope, state: "open" as const, ...(cursor ? { cursor } : {}) };
-  const { data, isLoading, isFetching, isError, refetch } = useListPayrollObligationsQuery(args);
-  const pageItems = data?.items.slice(0, 25) ?? [];
+  const { currentData, isLoading, isFetching, isError, refetch } = useListPayrollObligationsQuery(args);
+  const pageItems = currentData?.items.slice(0, 25) ?? [];
   const pageFingerprint = pageItems.map((item) => `${item.obligationId}:${item.version}:${item.state}:${item.attachedRunId ?? ""}`).join("|");
 
   useEffect(() => {
@@ -165,7 +166,7 @@ export function PayrollObligationsPanel({
     }
   };
 
-  if (isLoading && !data) {
+  if ((isLoading || isFetching) && !currentData) {
     return <PayrollTabSkeleton label="Loading open obligations…" variant="list" />;
   }
 
@@ -180,7 +181,7 @@ export function PayrollObligationsPanel({
           <button
             type="button"
             disabled={!selectionCompatible || isFetching}
-            onClick={() => setDialogOpen(true)}
+            onClick={() => setDialogState({ key: scopeKey, open: true })}
             className="min-h-11 rounded-lg bg-[#006f73] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             Create off-cycle payroll
@@ -189,13 +190,13 @@ export function PayrollObligationsPanel({
       </div>
       <p className="text-sm text-[#62686f]"><strong className="tabular-nums text-[#10141a]">{selected.size}</strong> selected</p>
       {error ? <p role="alert" className="border-y border-[#efcaca] py-3 text-sm text-[#8d3131]">{error}</p> : null}
-      {isError && !data ? (
+      {isError && !currentData ? (
         <p role="alert" className="border-y border-[#efcaca] py-4 text-sm text-[#8d3131]">
           Open obligations could not be loaded.
           <button type="button" onClick={() => void refetch()} className="ml-2 font-semibold underline">Retry</button>
         </p>
       ) : null}
-      {data?.items.length === 0 ? <p className="py-8 text-sm text-[#62686f]">No open off-cycle obligations.</p> : null}
+      {currentData?.items.length === 0 ? <p className="py-8 text-sm text-[#62686f]">No open off-cycle obligations.</p> : null}
       {pageItems.length ? (
         <ul aria-busy={isFetching} className="divide-y divide-[#e5e5e6] border-y border-[#e5e5e6]">
           {pageItems.map((item) => {
@@ -226,7 +227,7 @@ export function PayrollObligationsPanel({
       ) : null}
       <div className="flex justify-end gap-2">
         <button type="button" disabled={cursors.length === 1 || isFetching} onClick={() => setPagination({ key: scopeKey, cursors: cursors.slice(0, -1) })} className="min-h-11 rounded-lg border border-[#cfd9da] px-3 text-sm font-semibold disabled:opacity-50">Previous page</button>
-        <button type="button" disabled={!data?.nextCursor || isFetching} onClick={() => data?.nextCursor && setPagination({ key: scopeKey, cursors: [...cursors, data.nextCursor] })} className="min-h-11 rounded-lg border border-[#cfd9da] px-3 text-sm font-semibold disabled:opacity-50">Next page</button>
+        <button type="button" disabled={!currentData?.nextCursor || isFetching} onClick={() => currentData?.nextCursor && setPagination({ key: scopeKey, cursors: [...cursors, currentData.nextCursor] })} className="min-h-11 rounded-lg border border-[#cfd9da] px-3 text-sm font-semibold disabled:opacity-50">Next page</button>
       </div>
       {context ? (
         <CreateOffCyclePayrollDialog
@@ -235,7 +236,7 @@ export function PayrollObligationsPanel({
           context={context}
           obligations={selectedOptions}
           activeConflict={false}
-          onOpenChange={setDialogOpen}
+          onOpenChange={(open) => setDialogState({ key: scopeKey, open })}
           onSubmit={onCreateOffCycle}
           submissionRetention={submissionRetention}
         />

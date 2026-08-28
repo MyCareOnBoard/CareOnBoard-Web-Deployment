@@ -54,10 +54,11 @@ vi.mock("../hooks/usePayrollRunCommand", () => ({
   },
 }));
 
-const scope = { audience: "agency" as const, actorUid: "actor-1", agencyId: "agency-1" };
+const scope = { audience: "agency" as const, actorUid: "actor-1", agencyId: "agency-1", mode: "ddd" as const };
 
 const run = (workflowState: PayrollRun["workflowState"] = "review"): PayrollRun => ({
   runId: "run-1",
+  mode: "ddd",
   runType: "regular",
   periodStart: "2026-08-10",
   periodEnd: "2026-08-23",
@@ -221,7 +222,8 @@ describe("AgencyPayrollRunsWorkspace", () => {
     api.currentHook.mockImplementation(() => api.currentState);
     api.employeesHook.mockImplementation(() => api.employeesState);
     api.upcomingHook.mockImplementation(() => api.upcomingState);
-    const emptyPage = { data: { items: [], nextCursor: null, hasMore: false }, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() };
+    const emptyData = { items: [], nextCursor: null, hasMore: false };
+    const emptyPage = { data: emptyData, currentData: emptyData, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() };
     api.historyHook.mockReturnValue(emptyPage);
     api.eventsHook.mockReturnValue(emptyPage);
     api.obligationsHook.mockReturnValue(emptyPage);
@@ -292,6 +294,100 @@ describe("AgencyPayrollRunsWorkspace", () => {
     expect(api.obligationsHook).not.toHaveBeenCalled();
     expect(api.upcomingHook).toHaveBeenCalledTimes(1);
   }, 10_000);
+
+  it("preserves the selected tab but resets its page and hides prior-mode data when mode changes", async () => {
+    const dddFirst = {
+      ...api.upcomingState.currentData as Record<string, unknown>,
+      items: [{
+        ...(api.upcomingState.currentData as { items: Array<Record<string, unknown>> }).items[0],
+        employeeId: "ddd-first",
+        displayName: "DDD first page",
+      }],
+      nextCursor: "ddd-page-2",
+      hasMore: true,
+    };
+    const dddSecond = {
+      ...dddFirst,
+      items: [{
+        ...(dddFirst.items as Array<Record<string, unknown>>)[0],
+        employeeId: "ddd-second",
+        displayName: "DDD second page",
+      }],
+      nextCursor: null,
+      hasMore: false,
+    };
+    const hhaFirst = {
+      ...dddFirst,
+      items: [{
+        ...(dddFirst.items as Array<Record<string, unknown>>)[0],
+        employeeId: "hha-first",
+        displayName: "HHA first page",
+      }],
+      nextCursor: null,
+      hasMore: false,
+    };
+    api.upcomingHook.mockImplementation((args: { mode: "ddd" | "hha"; cursor?: string }) => ({
+      ...api.upcomingState,
+      data: args.mode === "hha" ? hhaFirst : args.cursor ? dddSecond : dddFirst,
+      currentData: args.mode === "hha" ? hhaFirst : args.cursor ? dddSecond : dddFirst,
+    }));
+    const view = render(<AgencyPayrollRunsWorkspace scope={scope} />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Upcoming" }));
+    await screen.findByText("DDD first page");
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(await screen.findByText("DDD second page")).toBeInTheDocument();
+
+    api.currentHook.mockClear();
+    api.employeesHook.mockClear();
+    api.upcomingHook.mockClear();
+    view.rerender(<AgencyPayrollRunsWorkspace scope={{ ...scope, mode: "hha" }} />);
+
+    expect(screen.getByRole("tab", { name: "Upcoming" })).toHaveAttribute("aria-selected", "true");
+    expect(await screen.findByText("HHA first page")).toBeInTheDocument();
+    expect(screen.queryByText("DDD second page")).not.toBeInTheDocument();
+    expect(api.currentHook).toHaveBeenCalledOnce();
+    expect(api.currentHook).toHaveBeenCalledWith({ ...scope, mode: "hha" }, { skip: false });
+    expect(api.employeesHook).toHaveBeenCalledOnce();
+    expect(api.employeesHook).toHaveBeenCalledWith({ ...scope, mode: "hha" }, { skip: false });
+    expect(api.upcomingHook).toHaveBeenCalledOnce();
+    expect(api.upcomingHook).toHaveBeenCalledWith(
+      { ...scope, mode: "hha" },
+      { refetchOnMountOrArgChange: true },
+    );
+    expect(api.historyHook).not.toHaveBeenCalled();
+    expect(api.eventsHook).not.toHaveBeenCalled();
+    expect(api.obligationsHook).not.toHaveBeenCalled();
+
+    view.rerender(<AgencyPayrollRunsWorkspace scope={scope} />);
+
+    expect(screen.getByRole("tab", { name: "Upcoming" })).toHaveAttribute("aria-selected", "true");
+    expect(await screen.findByText("DDD first page")).toBeInTheDocument();
+    expect(screen.queryByText("DDD second page")).not.toBeInTheDocument();
+  });
+
+  it("closes an open approval when the program mode changes", async () => {
+    const projection = current("ready_to_approve");
+    delete projection.activeOperation;
+    projection.prerequisites = { revisionReady: true, dispositionsComplete: true, noBlockers: true, providerSynchronized: true, previewReady: true };
+    projection.capabilities.commands.approve_payroll = { enabled: true, reasonCode: null };
+    projection.run.preview = {
+      status: "succeeded", revisionId: "revision-1", hash: "a".repeat(64), observedAt: "2026-08-24T12:00:00.000Z",
+      totals: { grossCents: 125_00, reimbursementsCents: 5_00, employeeTaxesCents: 10_00, employeeDeductionsCents: 0, employerTaxesCents: 10_00, employerContributionsCents: 0, netPayCents: 120_00, expectedCashRequirementCents: 140_00 },
+    };
+    api.currentState = { ...api.currentState, data: projection, currentData: projection };
+    const approvalRequest = { unwrap: () => new Promise<PayrollRunProjection>(() => undefined), abort: vi.fn() };
+    api.approvalDetailTrigger.mockReturnValue(approvalRequest);
+    const view = render(<AgencyPayrollRunsWorkspace scope={scope} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Approve payroll" }));
+    expect(await screen.findByRole("dialog", { name: "Approve payroll" })).toBeInTheDocument();
+    view.rerender(<AgencyPayrollRunsWorkspace scope={{ ...scope, mode: "hha" }} />);
+
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Approve payroll" })).not.toBeInTheDocument());
+    view.rerender(<AgencyPayrollRunsWorkspace scope={scope} />);
+    expect(screen.queryByRole("dialog", { name: "Approve payroll" })).not.toBeInTheDocument();
+  });
 
   it("hides employee-scoped actions and avoids a duplicate refresh after a terminal command", async () => {
     const projection = current();
