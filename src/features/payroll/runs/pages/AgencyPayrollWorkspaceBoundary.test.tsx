@@ -45,10 +45,11 @@ const setupProjection: AgencyPayrollSetupProjection = {
     designatedSigner: null,
     companyLinked: true,
     officeWorkplaceLinked: true,
-    payScheduleLinked: true,
     enrollmentProfileLocked: true,
     signatoryLinked: false,
   },
+  schedulePrerequisite: { state: "complete", recoveryAction: null, timeZone: "America/Chicago", frequency: "weekly", payrollStartDate: "2026-08-24", firstPeriodEnd: "2026-09-06", firstPayday: "2026-09-11", secondPayday: null, compatibilityCode: null, compatibilityMessage: null, nextPeriodStart: "2026-08-31", nextPeriodEnd: "2026-09-06", nextPayday: "2026-09-11", nextApprovalDeadline: "2026-09-08T17:00:00.000Z", lastReconciledAt: "2026-08-30T12:00:00.000Z" },
+  payrollActivation: { status: "ready", blocker: null },
   capabilities: {
     canView: true,
     canManage: true,

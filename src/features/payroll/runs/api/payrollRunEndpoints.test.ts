@@ -1,10 +1,12 @@
 import { configureStore } from "@reduxjs/toolkit";
 import { beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
+import { payrollRunEmployeeTag } from "../../api/cacheTags";
 import {
   payrollRunApi,
   payrollRunCacheKeys,
   payrollRunRequests,
   type CurrentPayrollRunArgs,
+  type ForceBuildStatusArgs,
 } from "./payrollRunEndpoints";
 
 const baseQuery = vi.hoisted(() => vi.fn());
@@ -17,14 +19,57 @@ const scope = {
   mode: "ddd" as const,
 };
 
+const validUpcomingResponse = () => ({
+  kind: "upcoming",
+  mode: "ddd",
+  projectionRevision: 4,
+  forceBuild: { enabled: true, reasonCode: null },
+  periodStart: "2026-08-24",
+  periodEnd: "2026-09-06",
+  payday: "2026-09-11",
+  totals: {
+    regularHours: 72,
+    overtimeHours: 4,
+    totalHours: 76,
+    grossEarningsCents: 152_000,
+    reimbursementCents: 5_000,
+    totalDueCents: 157_000,
+  },
+  employeeCount: 2,
+  blockerCount: 1,
+  blockerCodes: ["compensation_missing"],
+  sourceCounts: { shift: 8, ride: 1, expense: 1, staff_timesheet: 1 },
+  items: [{
+    employeeId: "employee-a",
+    employmentType: "field",
+    displayName: "Alex Morgan",
+    regularHours: 40,
+    overtimeHours: 4,
+    grossEarningsCents: 88_000,
+    reimbursementCents: 5_000,
+    totalDueCents: 93_000,
+    sourceCount: 7,
+    sourceCounts: { shift: 5, ride: 1, expense: 1, staff_timesheet: 0 },
+    hasBlockers: true,
+    blockerCodes: ["compensation_missing"],
+  }],
+  nextCursor: "upcoming-page-2",
+  hasMore: true,
+  asOf: "2026-08-25T12:00:00.000Z",
+});
+
+const validForceBuildStatus = (buildId = "build-a") => ({ buildId, state: "queued", pollAfterMs: 2000 });
+
 describe("payroll run read transport", () => {
   beforeEach(() => baseQuery.mockReset());
 
-  it("registers all ten authenticated agency read endpoints", () => {
+  it("registers authenticated agency payroll and force-build endpoints", () => {
     expect(Object.keys(payrollRunApi.endpoints)).toEqual(expect.arrayContaining([
       "getCurrentPayrollRun",
       "getCurrentPayrollEmployees",
       "getUpcomingPayroll",
+      "forceBuildUpcomingPayroll",
+      "getForceBuildStatus",
       "listPayrollRuns",
       "getPayrollRun",
       "listPayrollRunEmployees",
@@ -38,6 +83,158 @@ describe("payroll run read transport", () => {
   it("accepts only agency-scoped arguments for agency payroll routes", () => {
     expectTypeOf<CurrentPayrollRunArgs["audience"]>().toEqualTypeOf<"agency">();
     expectTypeOf<CurrentPayrollRunArgs["mode"]>().toEqualTypeOf<"ddd" | "hha">();
+    expectTypeOf<ForceBuildStatusArgs["audience"]>().toEqualTypeOf<"agency">();
+  });
+
+  it("sends only the approved upcoming-projection fence when force-building", () => {
+    expect(payrollRunRequests.forceBuild({
+      ...scope,
+      periodStart: "2026-08-31",
+      periodEnd: "2026-09-06",
+      payday: "2026-09-11",
+      expectedProjectionRevision: 27,
+    })).toEqual({
+      url: "/checkPayrollAgency/payroll/agency/upcoming/force-build",
+      method: "POST",
+      requiresAuth: true,
+      params: { mode: "ddd" },
+      data: {
+        periodStart: "2026-08-31",
+        periodEnd: "2026-09-06",
+        payday: "2026-09-11",
+        expectedProjectionRevision: 27,
+      },
+    });
+  });
+
+  it("encodes opaque force-build status IDs and sends only mode", () => {
+    expect(payrollRunRequests.forceBuildStatus({ ...scope, buildId: "build/a?private" })).toEqual({
+      url: "/checkPayrollAgency/payroll/agency/upcoming/force-build/build%2Fa%3Fprivate",
+      method: "GET",
+      requiresAuth: true,
+      params: { mode: "ddd" },
+    });
+  });
+
+  it("keys force-build status by trusted scope, mode, and opaque build ID", () => {
+    const args = { ...scope, buildId: "build-a" };
+    expect(payrollRunCacheKeys.forceBuildStatus(args)).not.toBe(payrollRunCacheKeys.forceBuildStatus({
+      ...args,
+      actorUid: "actor-2",
+    }));
+    expect(payrollRunCacheKeys.forceBuildStatus(args)).not.toBe(payrollRunCacheKeys.forceBuildStatus({
+      ...args,
+      mode: "hha",
+    }));
+    expect(payrollRunCacheKeys.forceBuildStatus(args)).not.toBe(payrollRunCacheKeys.forceBuildStatus({
+      ...args,
+      buildId: "build-b",
+    }));
+  });
+
+  it("parses independently keyed force-build status responses and removes unused cache entries", async () => {
+    vi.useFakeTimers();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const store = configureStore({
+      reducer: { [payrollRunApi.reducerPath]: payrollRunApi.reducer },
+      middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(payrollRunApi.middleware),
+    });
+    const first = { ...scope, buildId: "build-a" };
+    const second = { ...scope, buildId: "build-b" };
+    baseQuery.mockResolvedValueOnce({ data: validForceBuildStatus(first.buildId) });
+    baseQuery.mockResolvedValueOnce({ data: validForceBuildStatus(second.buildId) });
+
+    try {
+      const firstSubscription = store.dispatch(payrollRunApi.endpoints.getForceBuildStatus.initiate(first));
+      const secondSubscription = store.dispatch(payrollRunApi.endpoints.getForceBuildStatus.initiate(second));
+      await expect(firstSubscription.unwrap()).resolves.toEqual(validForceBuildStatus(first.buildId));
+      await expect(secondSubscription.unwrap()).resolves.toEqual(validForceBuildStatus(second.buildId));
+      expect(baseQuery).toHaveBeenCalledTimes(2);
+      expect(payrollRunApi.endpoints.getForceBuildStatus.select(first)(store.getState()).data).toEqual(
+        validForceBuildStatus(first.buildId),
+      );
+      expect(payrollRunApi.endpoints.getForceBuildStatus.select(second)(store.getState()).data).toEqual(
+        validForceBuildStatus(second.buildId),
+      );
+
+      firstSubscription.unsubscribe();
+      secondSubscription.unsubscribe();
+      await vi.runAllTimersAsync();
+      expect(payrollRunApi.endpoints.getForceBuildStatus.select(first)(store.getState()).data).toBeUndefined();
+      expect(payrollRunApi.endpoints.getForceBuildStatus.select(second)(store.getState()).data).toBeUndefined();
+    } finally {
+      consoleError.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  it("rejects malformed force-build status responses instead of caching them", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const store = configureStore({
+      reducer: { [payrollRunApi.reducerPath]: payrollRunApi.reducer },
+      middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(payrollRunApi.middleware),
+    });
+    const args = { ...scope, buildId: "build-a" };
+    baseQuery.mockResolvedValueOnce({ data: { buildId: "build-a", state: "queued", pollAfterMs: null } });
+
+    try {
+      await expect(store.dispatch(payrollRunApi.endpoints.getForceBuildStatus.initiate(args)).unwrap()).rejects.toBeDefined();
+      expect(payrollRunApi.endpoints.getForceBuildStatus.select(args)(store.getState()).data).toBeUndefined();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("does not invalidate an active upcoming projection when force-build is accepted", async () => {
+    const store = configureStore({
+      reducer: { [payrollRunApi.reducerPath]: payrollRunApi.reducer },
+      middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(payrollRunApi.middleware),
+    });
+    baseQuery.mockResolvedValueOnce({ data: validUpcomingResponse() });
+    baseQuery.mockResolvedValueOnce({ data: validForceBuildStatus() });
+    const upcomingSubscription = store.dispatch(payrollRunApi.endpoints.getUpcomingPayroll.initiate(scope));
+
+    await expect(upcomingSubscription.unwrap()).resolves.toEqual(validUpcomingResponse());
+    await expect(store.dispatch(payrollRunApi.endpoints.forceBuildUpcomingPayroll.initiate({
+      ...scope,
+      periodStart: "2026-08-31",
+      periodEnd: "2026-09-06",
+      payday: "2026-09-11",
+      expectedProjectionRevision: 27,
+    })).unwrap()).resolves.toEqual(validForceBuildStatus());
+    await Promise.resolve();
+
+    expect(baseQuery).toHaveBeenCalledTimes(2);
+    expect(payrollRunApi.endpoints.getUpcomingPayroll.select(scope)(store.getState()).data).toEqual(validUpcomingResponse());
+    upcomingSubscription.unsubscribe();
+  });
+
+  it("refetches a populated current employee page when the generic current-employee tag is invalidated", async () => {
+    const store = configureStore({
+      reducer: { [payrollRunApi.reducerPath]: payrollRunApi.reducer },
+      middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(payrollRunApi.middleware),
+    });
+    const response = {
+      kind: "run",
+      runId: "run-a",
+      activeRevisionId: "revision-a",
+      revisionNumber: 1,
+      items: [],
+      nextCursor: null,
+      hasMore: false,
+    };
+    baseQuery.mockResolvedValue({ data: response });
+    const subscription = store.dispatch(payrollRunApi.endpoints.getCurrentPayrollEmployees.initiate(scope));
+
+    await expect(subscription.unwrap()).resolves.toEqual(response);
+    expect(baseQuery).toHaveBeenCalledOnce();
+
+    store.dispatch(payrollRunApi.util.invalidateTags([
+      payrollRunEmployeeTag(scope, "current", "current"),
+    ]));
+
+    await vi.waitFor(() => expect(baseQuery).toHaveBeenCalledTimes(2));
+    subscription.unsubscribe();
   });
 
   it("builds the singular routes without client-owned authority or query input", () => {

@@ -13,7 +13,9 @@ const projection = (revision: number): AgencyPayrollSetupProjection => ({
   integration: { state: "configured", environment: "sandbox" },
   preflight: { values: {}, missingFieldCodes: [] },
   readiness: { status: "ready", blockers: [], nextAction: null },
-  setup: { companyOnboardRevision: null, designatedSignerPresent: false, signerCandidate: null, designatedSigner: null, companyLinked: true, officeWorkplaceLinked: true, payScheduleLinked: true, enrollmentProfileLocked: true, signatoryLinked: false },
+  setup: { companyOnboardRevision: null, designatedSignerPresent: false, signerCandidate: null, designatedSigner: null, companyLinked: true, officeWorkplaceLinked: true, enrollmentProfileLocked: true, signatoryLinked: false },
+  schedulePrerequisite: { state: "complete", recoveryAction: null, timeZone: "America/Chicago", frequency: "weekly", payrollStartDate: "2026-08-24", firstPeriodEnd: "2026-09-06", firstPayday: "2026-09-11", secondPayday: null, compatibilityCode: null, compatibilityMessage: null, nextPeriodStart: "2026-08-31", nextPeriodEnd: "2026-09-06", nextPayday: "2026-09-11", nextApprovalDeadline: "2026-09-08T17:00:00.000Z", lastReconciledAt: "2026-08-30T12:00:00.000Z" },
+  payrollActivation: { status: "ready", blocker: null },
   capabilities: { canView: true, canManage: true, canCreateIntegration: false, canDesignateSigner: false, createCompanyOnboardSession: false, canSubmitCompanyImplementation: false, canRetryCompanySync: false, canRefreshCompanyReconciliation: false },
 });
 
@@ -29,6 +31,7 @@ describe("agency payroll wire contracts", () => {
     expect(bootstrap()).toEqual({ url: "/checkPayrollAgency/payroll/agency/setup", method: "PUT", requiresAuth: true });
     expect(agencyPayrollPaths.signerCandidates).toBeTypeOf("function");
     expect(agencyPayrollPaths.signerCandidates()).toEqual({ url: "/checkPayrollAgency/payroll/agency/signer-candidates", method: "GET", requiresAuth: true });
+    expect((agencyPayrollPaths as Record<string, unknown>).schedule).toBeTypeOf("function");
   });
   it("creates a company Onboard session with only the stable company revision", () => {
     const request = agencyCompanyOnboardSessionRequest({ audience: "agency", actorUid: "actor-1", agencyId: "agency-1", expectedCompanyOnboardRevision: 19 });
@@ -99,6 +102,29 @@ describe("agency payroll wire contracts", () => {
       { type: "AgencySetup", id: JSON.stringify(["agency", "actor-1", "agency-1", null]) },
     ]);
   });
+  it("keys the lazy schedule GET by agency, actor, projection revision, and view", () => {
+    const request = (agencyEndpoints as Record<string, unknown>).agencyPayrollScheduleRequest;
+    const cacheKey = (agencyEndpoints as Record<string, unknown>).agencyPayrollScheduleCacheKey;
+    expect(request).toBeTypeOf("function");
+    expect(cacheKey).toBeTypeOf("function");
+    if (typeof request !== "function" || typeof cacheKey !== "function") return;
+    const args = { audience: "agency", agencyId: "agency-1", actorUid: "actor-1", projectionRevision: 4, view: "details" };
+    expect(request(args)).toEqual({
+      url: "/checkPayrollAgency/payroll/agency/setup/schedule",
+      method: "GET",
+      requiresAuth: true,
+      params: { view: "details" },
+    });
+    expect(JSON.stringify(request(args))).not.toContain("agencyId");
+    expect(new Set([
+      cacheKey(args),
+      cacheKey({ ...args, agencyId: "agency-2" }),
+      cacheKey({ ...args, actorUid: "actor-2" }),
+      cacheKey({ ...args, projectionRevision: 5 }),
+      cacheKey({ ...args, view: "options" }),
+    ]).size).toBe(5);
+    expect((agencyPayrollApi.endpoints as Record<string, unknown>).getAgencyPayrollSchedule).toBeDefined();
+  });
   it("replaces only the successful bootstrap scope without immediately refetching setup", async () => {
     const store = configureStore({
       reducer: { [agencyPayrollApi.reducerPath]: agencyPayrollApi.reducer },
@@ -133,6 +159,23 @@ describe("agency payroll wire contracts", () => {
   it("does not add employee primary-workplace commands to company requests", () => {
     const request = agencyPayrollCommandRequest({ audience: "agency", actorUid: "u", agencyId: "a", command: "retry_company_sync", projectionRevision: 3, idempotencyKey: "00000000-0000-4000-8000-000000000001" });
     expect(request.data).toEqual({ command: "retry_company_sync", expectedProjectionRevision: 3 });
+  });
+
+  it("sends exact create and correct pay schedule command bodies", () => {
+    const common = { audience: "agency" as const, actorUid: "u", agencyId: "a", projectionRevision: 9, idempotencyKey: "00000000-0000-4000-8000-000000000001" as const };
+    const create = agencyPayrollCommandRequest({
+      ...common,
+      command: "create_pay_schedule",
+      schedule: { frequency: "weekly", payrollStartDate: "2026-08-17", firstPeriodEnd: "2026-08-28", firstPayday: "2026-09-04", secondPayday: "" },
+    } as unknown as PayrollCommandArgs);
+    const correct = agencyPayrollCommandRequest({ ...common, command: "correct_pay_schedule", selectedFirstPayday: "2026-09-11" } as unknown as PayrollCommandArgs);
+
+    expect(create.data).toEqual({
+      command: "create_pay_schedule",
+      expectedProjectionRevision: 9,
+      schedule: { frequency: "weekly", payrollStartDate: "2026-08-17", firstPeriodEnd: "2026-08-28", firstPayday: "2026-09-04", secondPayday: null },
+    });
+    expect(correct.data).toEqual({ command: "correct_pay_schedule", expectedProjectionRevision: 9, selectedFirstPayday: "2026-09-11" });
   });
 
   it("sends review submission through the closed company command body", () => {

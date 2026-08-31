@@ -17,6 +17,9 @@ const api = vi.hoisted(() => ({
   detailTrigger: vi.fn(),
   sourceTrigger: vi.fn(),
   upcomingHook: vi.fn(),
+  forceBuildHook: vi.fn(),
+  forceBuild: vi.fn(),
+  statusHook: vi.fn(),
   historyHook: vi.fn(),
   eventsHook: vi.fn(),
   obligationsHook: vi.fn(),
@@ -24,6 +27,12 @@ const api = vi.hoisted(() => ({
   commandHook: vi.fn(),
   runCommand: vi.fn(),
   createOffCycleRun: vi.fn(),
+  invalidateTags: vi.fn(),
+  dispatch: vi.fn(),
+  currentRefetch: vi.fn(),
+  employeeRefetch: vi.fn(),
+  forceBuildState: { isLoading: false } as Record<string, unknown>,
+  statusState: { currentData: undefined, isError: false } as Record<string, unknown>,
   currentState: {} as Record<string, unknown>,
   employeesState: {} as Record<string, unknown>,
   upcomingState: {} as Record<string, unknown>,
@@ -36,10 +45,18 @@ vi.mock("../api/payrollRunEndpoints", () => ({
   useLazyGetPayrollRunEmployeeQuery: () => [api.detailTrigger, { isFetching: false }],
   useLazyListPayrollRunEmployeeSourcesQuery: () => [api.sourceTrigger, { isFetching: false }],
   useGetUpcomingPayrollQuery: (...args: unknown[]) => api.upcomingHook(...args),
+  useForceBuildUpcomingPayrollMutation: () => api.forceBuildHook(),
+  useGetForceBuildStatusQuery: (...args: unknown[]) => api.statusHook(...args),
   useListPayrollRunsQuery: (...args: unknown[]) => api.historyHook(...args),
   useListPayrollRunEventsQuery: (...args: unknown[]) => api.eventsHook(...args),
   useListPayrollObligationsQuery: (...args: unknown[]) => api.obligationsHook(...args),
   useLazyGetPayrollRunQuery: () => [api.approvalDetailTrigger, { isFetching: false }],
+  payrollRunApi: { util: { invalidateTags: (...args: unknown[]) => api.invalidateTags(...args) } },
+}));
+
+vi.mock("@/store/redux/hooks", async (importOriginal) => ({
+  ...await importOriginal<Record<string, unknown>>(),
+  useAppDispatch: () => api.dispatch,
 }));
 
 vi.mock("../hooks/usePayrollRunCommand", () => ({
@@ -164,6 +181,9 @@ describe("AgencyPayrollRunsWorkspace", () => {
     api.detailTrigger.mockReset();
     api.sourceTrigger.mockReset();
     api.upcomingHook.mockReset();
+    api.forceBuildHook.mockReset();
+    api.forceBuild.mockReset();
+    api.statusHook.mockReset();
     api.historyHook.mockReset();
     api.eventsHook.mockReset();
     api.obligationsHook.mockReset();
@@ -171,13 +191,21 @@ describe("AgencyPayrollRunsWorkspace", () => {
     api.commandHook.mockReset();
     api.runCommand.mockReset();
     api.createOffCycleRun.mockReset();
+    api.invalidateTags.mockReset();
+    api.dispatch.mockReset();
+    api.currentRefetch.mockReset();
+    api.employeeRefetch.mockReset();
+    api.forceBuildState = { isLoading: false };
+    api.statusState = { currentData: undefined, isError: false };
     const currentData = current();
     const employeeData = employees();
-    api.currentState = { data: currentData, currentData, isLoading: false, isFetching: false, refetch: vi.fn() };
-    api.employeesState = { data: employeeData, currentData: employeeData, isLoading: false, isFetching: false, refetch: vi.fn() };
+    api.currentState = { data: currentData, currentData, isLoading: false, isFetching: false, refetch: api.currentRefetch };
+    api.employeesState = { data: employeeData, currentData: employeeData, isLoading: false, isFetching: false, refetch: api.employeeRefetch };
     const upcomingData = {
       kind: "upcoming" as const,
+      mode: "ddd" as const,
       projectionRevision: 8,
+      forceBuild: { enabled: true as const, reasonCode: null },
       periodStart: "2026-08-24",
       periodEnd: "2026-09-06",
       payday: "2026-09-11",
@@ -222,6 +250,25 @@ describe("AgencyPayrollRunsWorkspace", () => {
     api.currentHook.mockImplementation(() => api.currentState);
     api.employeesHook.mockImplementation(() => api.employeesState);
     api.upcomingHook.mockImplementation(() => api.upcomingState);
+    api.forceBuild.mockReturnValue({
+      unwrap: () => Promise.resolve({ buildId: "build-1", state: "queued", pollAfterMs: 2000 }),
+    });
+    api.forceBuildHook.mockImplementation(() => [api.forceBuild, api.forceBuildState]);
+    api.statusHook.mockImplementation(() => api.statusState);
+    api.invalidateTags.mockImplementation((tags) => ({ type: "payroll/invalidate", payload: tags }));
+    api.dispatch.mockImplementation((action) => {
+      const tags = (action as { payload?: unknown }).payload;
+      if (!Array.isArray(tags)) return action;
+      if (tags.some((tag) => tag?.type === "PayrollRun"
+        && tag.id === '["agency","actor-1","agency-1",null,"ddd"]:["current","current"]')) {
+        api.currentRefetch();
+      }
+      if (tags.some((tag) => tag?.type === "PayrollRunEmployee"
+        && tag.id === '["agency","actor-1","agency-1",null,"ddd"]:["current","current","*"]')) {
+        api.employeeRefetch();
+      }
+      return action;
+    });
     const emptyData = { items: [], nextCursor: null, hasMore: false };
     const emptyPage = { data: emptyData, currentData: emptyData, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() };
     api.historyHook.mockReturnValue(emptyPage);
@@ -294,6 +341,58 @@ describe("AgencyPayrollRunsWorkspace", () => {
     expect(api.obligationsHook).not.toHaveBeenCalled();
     expect(api.upcomingHook).toHaveBeenCalledTimes(1);
   }, 10_000);
+
+  it("switches to Current, refreshes its caches, and focuses its heading only after build success", async () => {
+    const view = render(<AgencyPayrollRunsWorkspace scope={scope} />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Upcoming" }));
+    await screen.findByRole("heading", { name: "Upcoming payroll" });
+    fireEvent.click(screen.getByRole("button", { name: "Build test payrolls now" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Build test payrolls" }));
+    await waitFor(() => expect(api.statusHook).toHaveBeenLastCalledWith(
+      { ...scope, buildId: "build-1" },
+      { pollingInterval: 2000, refetchOnMountOrArgChange: true },
+    ));
+    expect(screen.getByRole("tab", { name: "Upcoming" })).toHaveAttribute("aria-selected", "true");
+
+    api.statusState = {
+      currentData: { buildId: "build-1", state: "succeeded", pollAfterMs: null },
+      isError: false,
+    };
+    view.rerender(<AgencyPayrollRunsWorkspace scope={scope} />);
+
+    await waitFor(() => expect(screen.getByRole("tab", { name: "Current" }))
+      .toHaveAttribute("aria-selected", "true"));
+    expect(api.currentRefetch).toHaveBeenCalledOnce();
+    expect(api.employeeRefetch).toHaveBeenCalledOnce();
+    expect(api.invalidateTags).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ type: "PayrollRun" }),
+      expect.objectContaining({ type: "PayrollRunEmployee" }),
+      expect.objectContaining({ type: "PayrollHistory" }),
+    ]));
+    expect(screen.getByRole("heading", { name: "Current payroll" })).toHaveFocus();
+  });
+
+  it("keeps Upcoming selected when the force build fails", async () => {
+    const view = render(<AgencyPayrollRunsWorkspace scope={scope} />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Upcoming" }));
+    await screen.findByRole("heading", { name: "Upcoming payroll" });
+    fireEvent.click(screen.getByRole("button", { name: "Build test payrolls now" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Build test payrolls" }));
+
+    api.statusState = {
+      currentData: { buildId: "build-1", state: "failed", pollAfterMs: null },
+      isError: false,
+    };
+    view.rerender(<AgencyPayrollRunsWorkspace scope={scope} />);
+
+    expect(await screen.findByText(/Nothing was moved to Current/)).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Upcoming" })).toHaveAttribute("aria-selected", "true");
+    expect(api.invalidateTags).not.toHaveBeenCalled();
+    expect(api.currentRefetch).not.toHaveBeenCalled();
+    expect(api.employeeRefetch).not.toHaveBeenCalled();
+  });
 
   it("preserves the selected tab but resets its page and hides prior-mode data when mode changes", async () => {
     const dddFirst = {

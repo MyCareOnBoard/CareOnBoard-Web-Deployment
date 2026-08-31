@@ -4,7 +4,7 @@ import type { PayrollOperation, PayrollScope } from "../model/types";
 
 type Context = { watch(scope: PayrollScope, operationId: string, poll: () => Promise<PayrollOperation>, onTerminal?: (operation: PayrollOperation) => void): () => void };
 const PayrollOperationContext = createContext<Context | null>(null);
-const terminal = new Set(["succeeded", "failed", "dead"]);
+const terminal = new Set(["succeeded", "needs_attention", "failed", "dead"]);
 const retryAfterMs = 1000;
 const maxRetryAfterMs = 30000;
 export function PayrollOperationProvider({ children }: { children: ReactNode }) {

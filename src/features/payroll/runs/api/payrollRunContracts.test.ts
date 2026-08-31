@@ -13,6 +13,7 @@ import {
   parsePayrollRunEventPage,
   parsePayrollRunPage as parsePayrollRunPageContract,
   parsePayrollRunProjectionResponse as parsePayrollRunProjectionResponseContract,
+  parseForceBuildStatus,
 } from "./payrollRunContracts";
 
 type UpcomingParser = (value: unknown) => unknown;
@@ -41,6 +42,7 @@ const validUpcomingResponse = () => ({
   kind: "upcoming",
   mode: "ddd",
   projectionRevision: 4,
+  forceBuild: { enabled: true, reasonCode: null },
   periodStart: "2026-08-24",
   periodEnd: "2026-09-06",
   payday: "2026-09-11",
@@ -73,6 +75,12 @@ const validUpcomingResponse = () => ({
   nextCursor: "upcoming-page-2",
   hasMore: true,
   asOf: "2026-08-25T12:00:00.000Z",
+});
+
+const validForceBuildStatus = () => ({
+  buildId: "build-a",
+  state: "queued",
+  pollAfterMs: 2000,
 });
 
 const disabled = { enabled: false, reasonCode: "capability_disabled" };
@@ -509,6 +517,25 @@ describe("upcoming payroll runtime contract", () => {
     expect(parse(empty)).toEqual(empty);
   });
 
+  it("requires an exact internally consistent force-build capability on actionable projections", () => {
+    const parse = upcomingParser();
+    const upcoming = validUpcomingResponse();
+
+    expect(parse(upcoming)).toEqual(upcoming);
+    expect(parse({ ...upcoming, forceBuild: { enabled: false, reasonCode: "sandbox_only" } })).toEqual({
+      ...upcoming,
+      forceBuild: { enabled: false, reasonCode: "sandbox_only" },
+    });
+    expect(parse({ ...upcoming, forceBuild: { enabled: false, reasonCode: "permission_required" } })).toEqual({
+      ...upcoming,
+      forceBuild: { enabled: false, reasonCode: "permission_required" },
+    });
+    expect(() => parse({ ...upcoming, forceBuild: { enabled: true, reasonCode: "sandbox_only" } })).toThrow();
+    expect(() => parse({ ...upcoming, forceBuild: { enabled: false, reasonCode: null } })).toThrow();
+    expect(() => parse({ ...upcoming, forceBuild: { enabled: false, reasonCode: "unknown" } })).toThrow();
+    expect(() => parse({ ...upcoming, forceBuild: { enabled: true, reasonCode: null, unexpected: true } })).toThrow();
+  });
+
   it("accepts an actionable empty projection when the agency timezone is missing", () => {
     const parse = upcomingParser();
     const timezoneRequired = {
@@ -584,5 +611,25 @@ describe("upcoming payroll runtime contract", () => {
     }));
 
     expect(parse(upcoming)).toEqual(upcoming);
+  });
+});
+
+describe("force-build status runtime contract", () => {
+  it("accepts only exact status replies with the required polling cadence", () => {
+    expect(parseForceBuildStatus(validForceBuildStatus())).toEqual(validForceBuildStatus());
+    expect(parseForceBuildStatus({ buildId: "build-a", state: "succeeded", pollAfterMs: null })).toEqual({
+      buildId: "build-a",
+      state: "succeeded",
+      pollAfterMs: null,
+    });
+  });
+
+  it("rejects malformed status replies instead of caching them", () => {
+    expect(() => parseForceBuildStatus({ ...validForceBuildStatus(), unexpected: true })).toThrow();
+    expect(() => parseForceBuildStatus({ ...validForceBuildStatus(), buildId: "build/a" })).toThrow();
+    expect(() => parseForceBuildStatus({ ...validForceBuildStatus(), state: "running" })).toThrow();
+    expect(() => parseForceBuildStatus({ buildId: "build-a", state: "succeeded", pollAfterMs: 2000 })).toThrow();
+    expect(() => parseForceBuildStatus({ buildId: "build-a", state: "failed", pollAfterMs: 500 })).toThrow();
+    expect(() => parseForceBuildStatus({ ...validForceBuildStatus(), pollAfterMs: null })).toThrow();
   });
 });

@@ -13,6 +13,7 @@ import {
   assertPayrollRevisionIdentity,
   parseCurrentPayrollEmployeePage,
   parseCurrentPayrollRunResponse,
+  parseForceBuildStatus,
   parsePayrollEmployeePage,
   parsePayrollObligationPage,
   parsePayrollRunEmployeeDetail,
@@ -33,6 +34,27 @@ import type {
   PayrollRunIdentity,
   PayrollRunProjection,
 } from "../model/types";
+
+export type ForceBuildCapability =
+  | { enabled: true; reasonCode: null }
+  | { enabled: false; reasonCode: "sandbox_only" | "permission_required" };
+
+export type ForceBuildState = "queued" | "building" | "succeeded" | "needs_attention" | "failed";
+
+export type ForceBuildUpcomingPayrollArgs = AgencyPayrollRunScope & {
+  periodStart: string;
+  periodEnd: string;
+  payday: string;
+  expectedProjectionRevision: number;
+};
+
+export type ForceBuildStatusArgs = AgencyPayrollRunScope & { buildId: string };
+
+export type ForceBuildStatus = {
+  buildId: string;
+  state: ForceBuildState;
+  pollAfterMs: 2000 | null;
+};
 
 export type PayrollEmployeeFilter = "all" | "blocked" | "included" | "zero_due" | "deferred";
 export type PayrollEmployeeSort = "name_asc" | "gross_desc";
@@ -131,6 +153,7 @@ export type UpcomingPayrollProjection = {
   kind: "upcoming";
   mode: AgencyPayrollRunScope["mode"];
   projectionRevision: number;
+  forceBuild: ForceBuildCapability;
   periodStart: string;
   periodEnd: string;
   payday: string;
@@ -181,6 +204,17 @@ export const payrollRunRequests = {
     ...authenticatedGet("/checkPayrollAgency/payroll/agency/upcoming"),
     params: { mode, limit: 50, ...optional("cursor", cursor) },
   }),
+  forceBuild: ({ mode, periodStart, periodEnd, payday, expectedProjectionRevision }: ForceBuildUpcomingPayrollArgs) => ({
+    url: "/checkPayrollAgency/payroll/agency/upcoming/force-build",
+    method: "POST" as const,
+    requiresAuth: true,
+    params: { mode },
+    data: { periodStart, periodEnd, payday, expectedProjectionRevision },
+  }),
+  forceBuildStatus: ({ mode, buildId }: ForceBuildStatusArgs) => ({
+    ...authenticatedGet(`/checkPayrollAgency/payroll/agency/upcoming/force-build/${encodeURIComponent(buildId)}`),
+    params: { mode },
+  }),
   list: ({ mode, runType, cursor }: PayrollRunListArgs) => ({
     ...authenticatedGet("/checkPayrollAgency/payroll/agency/runs"),
     params: { mode, limit: 25, ...optional("runType", runType), ...optional("cursor", cursor) },
@@ -223,6 +257,7 @@ export const payrollRunCacheKeys = {
     "current-employees", args, args.filter, args.sort, args.cursor,
   ),
   upcoming: (args: UpcomingPayrollArgs) => cacheKey("upcoming", args, args.cursor),
+  forceBuildStatus: (args: ForceBuildStatusArgs) => cacheKey("force-build-status", args, args.buildId),
   list: (args: PayrollRunListArgs) => cacheKey("runs", args, args.runType, args.cursor),
   detail: (args: PayrollRunDetailArgs) => cacheKey("run", args, args.runId, args.activeRevisionId),
   employees: (args: PayrollRunEmployeesArgs) => cacheKey(
@@ -257,15 +292,28 @@ export const payrollRunApi = checkPayrollApi.injectEndpoints({
       query: payrollRunRequests.currentEmployees,
       serializeQueryArgs: ({ queryArgs }) => payrollRunCacheKeys.currentEmployees(queryArgs),
       transformResponse: parseCurrentPayrollEmployeePage,
-      providesTags: (result, _error, scope) => result?.kind === "run"
-        ? payrollRunEmployeeQueryTags(scope, result.runId, result.activeRevisionId)
-        : [payrollRunEmployeeTag(scope, "current", "current")],
+      providesTags: (result, _error, scope) => [
+        payrollRunEmployeeTag(scope, "current", "current"),
+        ...(result?.kind === "run"
+          ? payrollRunEmployeeQueryTags(scope, result.runId, result.activeRevisionId)
+          : []),
+      ],
     }),
     getUpcomingPayroll: build.query<UpcomingPayrollResponse, UpcomingPayrollArgs>({
       query: payrollRunRequests.upcoming,
       serializeQueryArgs: ({ queryArgs }) => payrollRunCacheKeys.upcoming(queryArgs),
       transformResponse: (value: unknown, _meta, args) => parseUpcomingPayrollResponse(value, args.mode),
       providesTags: (_result, _error, scope) => [payrollRunTag(scope, "current", "current")],
+    }),
+    forceBuildUpcomingPayroll: build.mutation<ForceBuildStatus, ForceBuildUpcomingPayrollArgs>({
+      query: payrollRunRequests.forceBuild,
+      transformResponse: parseForceBuildStatus,
+    }),
+    getForceBuildStatus: build.query<ForceBuildStatus, ForceBuildStatusArgs>({
+      query: payrollRunRequests.forceBuildStatus,
+      serializeQueryArgs: ({ queryArgs }) => cacheKey("force-build-status", queryArgs, queryArgs.buildId),
+      transformResponse: parseForceBuildStatus,
+      keepUnusedDataFor: 0,
     }),
     listPayrollRuns: build.query<PayrollRunPage, PayrollRunListArgs>({
       query: payrollRunRequests.list,
@@ -359,6 +407,8 @@ export const {
   useLazyGetCurrentPayrollEmployeesQuery,
   useGetUpcomingPayrollQuery,
   useLazyGetUpcomingPayrollQuery,
+  useForceBuildUpcomingPayrollMutation,
+  useGetForceBuildStatusQuery,
   useListPayrollRunsQuery,
   useLazyListPayrollRunsQuery,
   useGetPayrollRunQuery,

@@ -1,3 +1,5 @@
+import type { Ref } from "react";
+
 import type { PayrollActiveOperation, PayrollRun } from "../model/types";
 
 const date = new Intl.DateTimeFormat("en-US", {
@@ -29,9 +31,10 @@ function operationLabel(operation: PayrollActiveOperation): string {
   return labels[operation.command] ?? "Updating payroll…";
 }
 
-export function PayrollRunHeader({ run, activeOperation }: {
+export function PayrollRunHeader({ run, activeOperation, headingRef }: {
   run: PayrollRun;
   activeOperation?: PayrollActiveOperation;
+  headingRef?: Ref<HTMLHeadingElement>;
 }) {
   return (
     <header className="flex flex-col gap-4 border-b border-[#e5e5e6] pb-5 sm:flex-row sm:items-end sm:justify-between">
@@ -39,7 +42,7 @@ export function PayrollRunHeader({ run, activeOperation }: {
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#007f83]">
           Payroll management
         </p>
-        <h2 className="mt-1 text-2xl font-semibold tracking-[-0.02em] text-[#10141a]">
+        <h2 ref={headingRef} tabIndex={-1} className="mt-1 rounded text-2xl font-semibold tracking-[-0.02em] text-[#10141a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2">
           Current payroll
         </h2>
         <p className="mt-2 text-sm text-[#62686f]">

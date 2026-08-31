@@ -1,8 +1,21 @@
 import { useEffect, useRef, useState } from "react";
+import { skipToken } from "@reduxjs/toolkit/query";
 import { useNavigate } from "react-router";
 
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  useForceBuildUpcomingPayrollMutation,
+  useGetForceBuildStatusQuery,
   useGetUpcomingPayrollQuery,
+  type ForceBuildState,
+  type ForceBuildStatus,
   type UpcomingPayrollEmployee,
   type UpcomingPayrollSourceCounts,
 } from "../../api/payrollRunEndpoints";
@@ -21,6 +34,7 @@ const hours = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 const moneyLabel = (cents: number) => currency.format(cents / 100);
 const dateLabel = (value: string) => date.format(new Date(`${value}T00:00:00.000Z`));
 const hoursLabel = (value: number) => hours.format(value);
+const terminalBuildStates = new Set<ForceBuildState>(["succeeded", "needs_attention", "failed"]);
 const countLabel = (value: number, singular: string, plural = `${singular}s`) => (
   `${value} ${value === 1 ? singular : plural}`
 );
@@ -111,16 +125,51 @@ function UpcomingWorkerRow({ employee }: { employee: UpcomingPayrollEmployee }) 
   );
 }
 
-export function UpcomingPayrollPanel({ scope }: { scope: AgencyPayrollRunScope }) {
+export function UpcomingPayrollPanel({ scope, onBuildSucceeded }: {
+  scope: AgencyPayrollRunScope;
+  onBuildSucceeded?: () => void;
+}) {
   const navigate = useNavigate();
   const pageHeadingRef = useRef<HTMLHeadingElement>(null);
   const focusSettledPageRef = useRef(false);
+  const handledSuccessBuildIds = useRef(new Set<string>());
   const paginationKey = JSON.stringify([scope.actorUid, scope.agencyId, scope.mode]);
+  const scopeEpochRef = useRef({ key: paginationKey, value: 0 });
+  if (scopeEpochRef.current.key !== paginationKey) {
+    scopeEpochRef.current = { key: paginationKey, value: scopeEpochRef.current.value + 1 };
+    handledSuccessBuildIds.current.clear();
+  }
+  const scopeEpoch = scopeEpochRef.current.value;
   const [pagination, setPagination] = useState<{ key: string; cursors: Array<string | undefined> }>({
     key: paginationKey,
     cursors: [undefined],
   });
+  const [dialogState, setDialogState] = useState({ key: paginationKey, epoch: scopeEpoch, open: false });
+  const [buildState, setBuildState] = useState<{ key: string; epoch: number; build: ForceBuildStatus | null }>({
+    key: paginationKey,
+    epoch: scopeEpoch,
+    build: null,
+  });
+  const [startErrorState, setStartErrorState] = useState<{ key: string; epoch: number; visible: boolean }>({
+    key: paginationKey,
+    epoch: scopeEpoch,
+    visible: false,
+  });
   const cursors = pagination.key === paginationKey ? pagination.cursors : [undefined];
+  const dialogOpen = dialogState.key === paginationKey && dialogState.epoch === scopeEpoch && dialogState.open;
+  const activeBuild = buildState.key === paginationKey && buildState.epoch === scopeEpoch ? buildState.build : null;
+  const startError = startErrorState.key === paginationKey
+    && startErrorState.epoch === scopeEpoch
+    && startErrorState.visible;
+  const buildInProgress = activeBuild !== null && !terminalBuildStates.has(activeBuild.state);
+  const [forceBuild, forceBuildRequest] = useForceBuildUpcomingPayrollMutation();
+  const status = useGetForceBuildStatusQuery(
+    activeBuild ? { ...scope, buildId: activeBuild.buildId } : skipToken,
+    {
+      pollingInterval: activeBuild && !terminalBuildStates.has(activeBuild.state) ? 2000 : 0,
+      refetchOnMountOrArgChange: true,
+    },
+  );
   const cursor = cursors.at(-1);
   const resetPagination = () => {
     focusSettledPageRef.current = true;
@@ -134,6 +183,18 @@ export function UpcomingPayrollPanel({ scope }: { scope: AgencyPayrollRunScope }
     isError,
     refetch,
   } = useGetUpcomingPayrollQuery(args, { refetchOnMountOrArgChange: true });
+
+  useEffect(() => {
+    if (!status.currentData || status.currentData.buildId !== activeBuild?.buildId) return;
+    setBuildState({ key: paginationKey, epoch: scopeEpoch, build: status.currentData });
+  }, [activeBuild?.buildId, paginationKey, scopeEpoch, status.currentData]);
+
+  useEffect(() => {
+    if (activeBuild?.state !== "succeeded"
+      || handledSuccessBuildIds.current.has(activeBuild.buildId)) return;
+    handledSuccessBuildIds.current.add(activeBuild.buildId);
+    onBuildSucceeded?.();
+  }, [activeBuild, onBuildSucceeded]);
 
   useEffect(() => {
     if (!focusSettledPageRef.current || isFetching || !currentData) return;
@@ -226,6 +287,30 @@ export function UpcomingPayrollPanel({ scope }: { scope: AgencyPayrollRunScope }
   };
   const itemBlockerCodes = new Set(currentData.items.flatMap(({ blockerCodes }) => blockerCodes));
   const projectionBlockerCodes = currentData.blockerCodes.filter((code) => !itemBlockerCodes.has(code));
+  const startBuild = async () => {
+    const requestScopeKey = paginationKey;
+    const requestScopeEpoch = scopeEpoch;
+    setStartErrorState({ key: requestScopeKey, epoch: requestScopeEpoch, visible: false });
+    try {
+      const build = await forceBuild({
+        ...scope,
+        periodStart: currentData.periodStart,
+        periodEnd: currentData.periodEnd,
+        payday: currentData.payday,
+        expectedProjectionRevision: currentData.projectionRevision,
+      }).unwrap();
+      if (scopeEpochRef.current.key !== requestScopeKey
+        || scopeEpochRef.current.value !== requestScopeEpoch) return;
+      setBuildState({ key: requestScopeKey, epoch: requestScopeEpoch, build });
+      setDialogState({ key: requestScopeKey, epoch: requestScopeEpoch, open: false });
+    } catch {
+      if (scopeEpochRef.current.key !== requestScopeKey
+        || scopeEpochRef.current.value !== requestScopeEpoch) return;
+      setBuildState({ key: requestScopeKey, epoch: requestScopeEpoch, build: null });
+      setDialogState({ key: requestScopeKey, epoch: requestScopeEpoch, open: false });
+      setStartErrorState({ key: requestScopeKey, epoch: requestScopeEpoch, visible: true });
+    }
+  };
 
   return (
     <section
@@ -244,10 +329,55 @@ export function UpcomingPayrollPanel({ scope }: { scope: AgencyPayrollRunScope }
             {dateLabel(currentData.periodStart)} – {dateLabel(currentData.periodEnd)} · Payday {dateLabel(currentData.payday)}
           </p>
         </div>
-        <span className="self-start rounded-full bg-[#e9f6f6] px-3 py-1.5 text-xs font-semibold text-[#006f73] sm:self-auto">
-          Scheduled
-        </span>
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <span className="rounded-full bg-[#e9f6f6] px-3 py-1.5 text-xs font-semibold text-[#006f73]">
+            Scheduled
+          </span>
+          {currentData.forceBuild.enabled ? (
+            <button
+              type="button"
+              disabled={forceBuildRequest.isLoading || buildInProgress}
+              onClick={() => setDialogState({ key: paginationKey, epoch: scopeEpoch, open: true })}
+              className="min-h-11 cursor-pointer rounded-full border border-[#00b4b8] bg-white px-4 text-sm font-semibold text-[#006f73] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2"
+            >
+              Build test payrolls now
+            </button>
+          ) : null}
+        </div>
       </header>
+
+      {buildInProgress ? (
+        <div
+          role="status"
+          aria-label="Test payroll build status"
+          className="rounded-xl border border-[#b8dfe0] bg-[#eefafa] px-4 py-3 text-sm font-medium text-[#006f73]"
+        >
+          Building test payrolls in Check... This can take a few minutes.
+        </div>
+      ) : activeBuild?.state === "needs_attention" ? (
+        <div role="status" aria-label="Test payroll build status" className="rounded-xl border border-[#ded5b4] bg-[#faf8f1] px-4 py-3 text-sm text-[#665c39]">
+          <p>Payroll build needs attention. Refresh the upcoming payroll and review any blockers before continuing.</p>
+          <button type="button" onClick={() => void refetch()} className="mt-2 font-semibold underline">
+            Refresh upcoming payroll
+          </button>
+        </div>
+      ) : activeBuild?.state === "failed" ? (
+        <p role="alert" className="rounded-xl border border-[#efcaca] bg-[#fff1f1] px-4 py-3 text-sm text-[#8d3131]">
+          Test payrolls could not be built. Nothing was moved to Current. Refresh the page to review the latest payroll state.
+        </p>
+      ) : null}
+
+      {startError ? (
+        <p role="alert" className="rounded-xl border border-[#efcaca] bg-[#fff1f1] px-4 py-3 text-sm text-[#8d3131]">
+          Test payroll build could not be started. Refresh the upcoming payroll and try again.
+        </p>
+      ) : null}
+
+      {buildInProgress && status.isError ? (
+        <p role="alert" className="text-sm text-[#8d3131]">
+          Build status could not be refreshed. We’ll keep checking while this page is open.
+        </p>
+      ) : null}
 
       <dl className="grid gap-px overflow-hidden rounded-xl border border-[#dfe7e8] bg-[#dfe7e8] sm:grid-cols-2 xl:grid-cols-3">
         {[
@@ -344,6 +474,41 @@ export function UpcomingPayrollPanel({ scope }: { scope: AgencyPayrollRunScope }
           ? "Updating upcoming payroll data."
           : `${countLabel(currentData.items.length, "worker")} shown on page ${cursors.length}.`}
       </p>
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          if (!forceBuildRequest.isLoading && !buildInProgress) {
+            setDialogState({ key: paginationKey, epoch: scopeEpoch, open });
+          }
+        }}
+      >
+        <DialogContent showCloseButton={!forceBuildRequest.isLoading} className="w-[min(94vw,34rem)] border border-[#dfe7e8] p-6">
+          <DialogHeader className="items-start gap-2 text-left">
+            <DialogTitle>Build test payrolls early?</DialogTitle>
+            <DialogDescription>
+              This starts the real sandbox payroll build for {dateLabel(currentData.periodStart)} – {dateLabel(currentData.periodEnd)} now instead of after the period closes. It creates Check sandbox drafts for eligible HHA and DDD payrolls and consumes this test period.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              disabled={forceBuildRequest.isLoading}
+              onClick={() => setDialogState({ key: paginationKey, epoch: scopeEpoch, open: false })}
+              className="min-h-11 cursor-pointer rounded-full border border-[#cfd9da] bg-white px-5 text-sm font-semibold text-[#40464d] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={forceBuildRequest.isLoading || buildInProgress}
+              onClick={() => void startBuild()}
+              className="min-h-11 cursor-pointer rounded-full bg-[#00b4b8] px-5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Build test payrolls
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

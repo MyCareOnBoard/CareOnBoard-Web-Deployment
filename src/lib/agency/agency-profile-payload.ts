@@ -8,6 +8,7 @@ import {
 export const CHECK_ENTITY_TYPES = ["sole_proprietorship", "partnership", "c_corporation", "s_corporation", "llc"] as const;
 export const CHECK_INDUSTRIES = ["auto_or_machine_sales", "auto_or_machine_repair", "arts_or_entertainment_or_recreation", "cleaning_services", "consulting_services", "educational_services", "family_care_services", "financial_services", "food_and_beverage_retail_or_wholesale", "general_construction_or_general_contracting", "health_care", "hospitality_or_accommodation", "hvac_or_plumbing_or_electrical_contracting", "legal_services", "non_food_retail_or_wholesale", "other", "personal_care_services", "real_estate", "restaurant", "scientific_or_technical_services", "security_services", "tobacco_or_alcohol_sales", "transportation"] as const;
 export const CHECK_PAY_FREQUENCIES = ["weekly", "biweekly", "semimonthly", "monthly", "quarterly", "annually"] as const;
+export type CheckPayFrequency = typeof CHECK_PAY_FREQUENCIES[number];
 
 export type CheckAddress = { line1: string; line2?: string | null; city: string; state: string; postalCode: string; country: "US" };
 export type CheckPayrollProfileWrite = {
@@ -15,7 +16,7 @@ export type CheckPayrollProfileWrite = {
   entityType?: typeof CHECK_ENTITY_TYPES[number]; industry?: typeof CHECK_INDUSTRIES[number]; legalAddress?: CheckAddress;
   officeWorkplace?: { name: string; address: CheckAddress; actualWorkLocationAttested: true }; website?: string; phone?: string;
   payrollContact?: { name: string; email: string; phone: string };
-  paySchedule?: { frequency: typeof CHECK_PAY_FREQUENCIES[number]; firstPayday: string; secondPayday: string | null; firstPeriodEnd: string; payrollStartDate: string };
+  payrollIntent?: { frequency: CheckPayFrequency; firstPayday: string };
   expectedWorkerCounts?: { w2: number; contractor: 0 };
 };
 export type CheckPayrollProfileRead = Omit<CheckPayrollProfileWrite, "einChange"> & { einStatus?: { present: boolean; last4?: string } };
@@ -24,8 +25,16 @@ export type CheckPayrollProfileFormValues = {
   legalName?: string; ein?: string; einPresent?: boolean; entityType?: string; industry?: string; legalAddress?: CheckAddress;
   officeName?: string; officeAddress?: CheckAddress; actualWorkLocationAttested?: boolean; website?: string; phone?: string;
   payrollContactName?: string; payrollContactEmail?: string; payrollContactPhone?: string; payFrequency?: string;
-  firstPayday?: string; secondPayday?: string; firstPeriodEnd?: string; payrollStartDate?: string;
+  firstPayday?: string;
   expectedW2Workers?: string | number;
+};
+
+export type PayScheduleFormValues = {
+  frequency: CheckPayFrequency | "";
+  payrollStartDate: string;
+  firstPeriodEnd: string;
+  firstPayday: string;
+  secondPayday: string;
 };
 
 const trim = (value: string | undefined) => value?.trim() ?? "";
@@ -49,7 +58,7 @@ export function buildCheckPayrollProfilePayload(values: CheckPayrollProfileFormV
   const payrollContactPhone = toCanonicalUsPayrollPhone(values.payrollContactPhone);
   if (phone) payload.phone = phone;
   if (trim(values.payrollContactName) && trim(values.payrollContactEmail) && payrollContactPhone) payload.payrollContact = { name: trim(values.payrollContactName), email: trim(values.payrollContactEmail), phone: payrollContactPhone };
-  if (CHECK_PAY_FREQUENCIES.includes(values.payFrequency as typeof CHECK_PAY_FREQUENCIES[number]) && trim(values.firstPayday) && trim(values.firstPeriodEnd) && trim(values.payrollStartDate)) payload.paySchedule = { frequency: values.payFrequency as typeof CHECK_PAY_FREQUENCIES[number], firstPayday: trim(values.firstPayday), secondPayday: values.payFrequency === "semimonthly" ? trim(values.secondPayday) : null, firstPeriodEnd: trim(values.firstPeriodEnd), payrollStartDate: trim(values.payrollStartDate) };
+  if (CHECK_PAY_FREQUENCIES.includes(values.payFrequency as CheckPayFrequency) && trim(values.firstPayday)) payload.payrollIntent = { frequency: values.payFrequency as CheckPayFrequency, firstPayday: trim(values.firstPayday) };
   if (values.expectedW2Workers !== undefined && trim(String(values.expectedW2Workers)) !== "") payload.expectedWorkerCounts = { w2: Number(values.expectedW2Workers), contractor: 0 };
   return payload;
 }

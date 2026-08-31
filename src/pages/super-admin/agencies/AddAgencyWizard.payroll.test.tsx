@@ -64,7 +64,6 @@ vi.mock("@/pages/super-admin/agencies/components/StepOne", async () => {
           payrollOfficeAddress: { line1: "2 Work Street", line2: "", city: "Austin", state: "TX", postalCode: "78702", country: "US" },
           payrollActualWorkLocationAttested: true, payrollContactName: "Pay Roll", payrollContactEmail: "payroll@able.example",
           payrollContactPhone: "5125550124", payrollFrequency: "weekly", payrollFirstPayday: "2026-09-04",
-          payrollSecondPayday: "", payrollFirstPeriodEnd: "2026-09-03", payrollStartDate: "2026-08-28",
           expectedW2Workers: "3",
         };
         Object.entries(values).forEach(([key, value]) => onChange(key, value));
@@ -98,7 +97,7 @@ const expectedPayrollWrite = {
   website: "https://able.example",
   phone: "+15125550123",
   payrollContact: { name: "Pay Roll", email: "payroll@able.example", phone: "+15125550124" },
-  paySchedule: { frequency: "weekly", firstPayday: "2026-09-04", secondPayday: null, firstPeriodEnd: "2026-09-03", payrollStartDate: "2026-08-28" },
+  payrollIntent: { frequency: "weekly", firstPayday: "2026-09-04" },
   expectedWorkerCounts: { w2: 3, contractor: 0 },
 };
 

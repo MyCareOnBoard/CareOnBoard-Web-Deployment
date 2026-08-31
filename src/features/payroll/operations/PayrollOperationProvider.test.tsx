@@ -3,6 +3,18 @@ import { renderHook, act } from "@testing-library/react";
 import { PayrollOperationProvider, usePayrollOperations } from "./PayrollOperationProvider";
 import type { PayrollOperation } from "../model/types";
 describe("PayrollOperationProvider", () => {
+  it("stops immediately when a company operation needs attention", async () => {
+    const operation = { operationId: "op", state: "needs_attention", resourceType: "company", pollAfterMs: null } as PayrollOperation;
+    const poll = vi.fn().mockResolvedValue(operation);
+    const settled = vi.fn();
+    const wrapper = ({ children }: { children: React.ReactNode }) => <PayrollOperationProvider>{children}</PayrollOperationProvider>;
+    const { result } = renderHook(() => usePayrollOperations(), { wrapper });
+    act(() => { result.current.watch({ audience: "agency", actorUid: "u", agencyId: "a" }, "op", poll, settled); });
+    await act(async () => { await Promise.resolve(); });
+    expect(poll).toHaveBeenCalledOnce();
+    expect(settled).toHaveBeenCalledWith(operation);
+  });
+
   it("waits for an authoritative terminal state after three running polls", async () => {
     vi.useFakeTimers();
     const poll = vi.fn()

@@ -113,9 +113,6 @@ describe("buildCheckPayrollProfilePayload", () => {
       payrollContactPhone: "+15125550124",
       payFrequency: "weekly",
       firstPayday: "2026-09-04",
-      secondPayday: "",
-      firstPeriodEnd: "2026-09-03",
-      payrollStartDate: "2026-08-28",
       expectedW2Workers: "1",
       einPresent: false,
     });
@@ -123,10 +120,11 @@ describe("buildCheckPayrollProfilePayload", () => {
     expect(payload).toMatchObject({
       einChange: { mode: "replace", value: "12-3456789" },
       expectedWorkerCounts: { w2: 1, contractor: 0 },
-      paySchedule: expect.objectContaining({ firstPayday: "2026-09-04", payrollStartDate: "2026-08-28", secondPayday: null }),
+      payrollIntent: { frequency: "weekly", firstPayday: "2026-09-04" },
     });
     expect(JSON.stringify(payload)).not.toContain('"ein":');
     expect(JSON.stringify(payload)).not.toContain("payrollSchedule");
+    expect(JSON.stringify(payload)).not.toContain("paySchedule");
     expect(JSON.stringify(payload)).not.toContain("designatedSignerUserUid");
   });
 

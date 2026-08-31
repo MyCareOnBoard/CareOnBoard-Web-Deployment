@@ -32,17 +32,17 @@ export function PayrollJourneyStep({ title, status, state, icon, last = false, d
   const active = state === "current" || state === "waiting" || state === "attention" || state === "blocked";
   const expanded = showDetails || (state !== "complete" && state !== "upcoming");
   const details = Children.toArray(children);
-  const role = state === "attention" || state === "blocked" ? "alert" : undefined;
+  const alert = state === "attention" || state === "blocked";
 
   return (
-    <li role={role} aria-current={active ? "step" : undefined} className="flex gap-3 py-4 first:pt-0 last:pb-0 sm:gap-4">
+    <li aria-current={active ? "step" : undefined} className="flex gap-3 py-4 first:pt-0 last:pb-0 sm:gap-4">
       <div aria-hidden="true" className="flex w-9 shrink-0 flex-col items-center self-stretch">
         <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ring-1 ${tone.marker}`}>
           {state === "complete" ? <Check className="h-4 w-4" strokeWidth={2.5} /> : state === "attention" ? <CircleAlert className="h-4 w-4" /> : state === "blocked" ? <CircleX className="h-4 w-4" /> : icon}
         </span>
         {!last ? <span className="mt-1 min-h-6 w-px flex-1 bg-[#e3e7e9]" /> : null}
       </div>
-      <div className="min-w-0 flex-1 pt-1">
+      <div role={alert ? "alert" : undefined} className="min-w-0 flex-1 pt-1">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h3 className="text-sm font-semibold text-[#10141a] sm:text-[15px]">{title}</h3>
           <span className={`w-fit rounded-full px-2.5 py-1 text-[11px] font-semibold ${tone.status}`}>{status}</span>

@@ -1,6 +1,6 @@
 import { checkPayrollApi } from "./checkPayrollApi";
 import { companyMutationTags, payrollTag, payrollScopeKey } from "./cacheTags";
-import type { AgencyPayrollBootstrapArgs, AgencyPayrollSetupProjection, AgencyPayrollSignerCandidates, AgencyPayrollSignerCandidatesArgs, ManagedEmployeePrimaryWorkplaceProjection, ManagedEmployeePrimaryWorkplaceScope, PayrollOperation, PayrollScope } from "../model/types";
+import type { AgencyPayrollBootstrapArgs, AgencyPayrollScheduleArgs, AgencyPayrollScheduleRead, AgencyPayrollSetupProjection, AgencyPayrollSignerCandidates, AgencyPayrollSignerCandidatesArgs, ManagedEmployeePrimaryWorkplaceProjection, ManagedEmployeePrimaryWorkplaceScope, PayrollOperation, PayrollScope } from "../model/types";
 
 export type AgencyCompanyOnboardSessionArgs = PayrollScope & {
   expectedCompanyOnboardRevision: number;
@@ -12,6 +12,7 @@ export const agencyPayrollPaths = {
   bootstrap: () => ({ url: "/checkPayrollAgency/payroll/agency/setup", method: "PUT" as const, requiresAuth: true }),
   companyOnboardSession: () => ({ url: "/checkPayrollOnboard/payroll/agency/setup/onboard-session", method: "POST" as const, requiresAuth: true }),
   signerCandidates: () => ({ url: "/checkPayrollAgency/payroll/agency/signer-candidates", method: "GET" as const, requiresAuth: true }),
+  schedule: (view: "details" | "options") => ({ url: "/checkPayrollAgency/payroll/agency/setup/schedule", method: "GET" as const, requiresAuth: true, params: { view } }),
   overview: () => ({ url: "/checkPayrollAgency/payroll/agency/overview", method: "GET" as const, requiresAuth: true }),
   operation: (operationId: string) => ({ url: `/checkPayrollOperations/payroll/operations/${encodeURIComponent(operationId)}`, method: "GET" as const, requiresAuth: true }),
   managedPrimaryWorkplace: (employmentId: string) => ({ url: `/checkPayrollAgency/payroll/agency/employees/${encodeURIComponent(employmentId)}/primary-workplace`, method: "GET" as const, requiresAuth: true }),
@@ -35,6 +36,8 @@ export const agencyPayrollBootstrapInvalidationTags = (error: unknown, args: Age
   error ? [] : companyMutationTags(args)
 );
 export const agencyPayrollSetupTags = (scope: PayrollScope) => [payrollTag("AgencySetup", scope)];
+export const agencyPayrollScheduleRequest = ({ view }: AgencyPayrollScheduleArgs) => agencyPayrollPaths.schedule(view);
+export const agencyPayrollScheduleCacheKey = ({ agencyId, actorUid, projectionRevision, view }: AgencyPayrollScheduleArgs) => `agency-schedule:${agencyId}:${actorUid}:${projectionRevision}:${view}`;
 
 export const agencyPayrollApi = checkPayrollApi.injectEndpoints({
   endpoints: (build) => ({
@@ -63,6 +66,10 @@ export const agencyPayrollApi = checkPayrollApi.injectEndpoints({
       query: ({ q }) => ({ ...agencyPayrollPaths.signerCandidates(), ...(q ? { params: { q } } : {}) }),
       serializeQueryArgs: ({ queryArgs }) => `signer-candidates:${payrollScopeKey(queryArgs)}:${queryArgs.q ?? ""}`,
     }),
+    getAgencyPayrollSchedule: build.query<AgencyPayrollScheduleRead, AgencyPayrollScheduleArgs>({
+      query: agencyPayrollScheduleRequest,
+      serializeQueryArgs: ({ queryArgs }) => agencyPayrollScheduleCacheKey(queryArgs),
+    }),
     getAgencyPayrollOverview: build.query<AgencyPayrollSetupProjection, PayrollScope>({
       query: () => agencyPayrollPaths.overview(),
       serializeQueryArgs: ({ queryArgs }) => `overview:${payrollScopeKey(queryArgs)}`,
@@ -79,4 +86,4 @@ export const agencyPayrollApi = checkPayrollApi.injectEndpoints({
     }),
   }),
 });
-export const { useGetAgencyPayrollSetupQuery, useLazyGetAgencyPayrollSetupQuery, useBootstrapAgencyPayrollSetupMutation, useCreateCompanyOnboardSessionMutation, useGetAgencyPayrollSignerCandidatesQuery, useLazyGetAgencyPayrollSignerCandidatesQuery, useGetAgencyPayrollOverviewQuery, useLazyGetAgencyPayrollOverviewQuery, useLazyGetAgencyPayrollOperationQuery, useGetManagedEmployeePrimaryWorkplaceQuery, useLazyGetManagedEmployeePrimaryWorkplaceQuery } = agencyPayrollApi;
+export const { useGetAgencyPayrollSetupQuery, useLazyGetAgencyPayrollSetupQuery, useBootstrapAgencyPayrollSetupMutation, useCreateCompanyOnboardSessionMutation, useGetAgencyPayrollSignerCandidatesQuery, useLazyGetAgencyPayrollSignerCandidatesQuery, useLazyGetAgencyPayrollScheduleQuery, useGetAgencyPayrollOverviewQuery, useLazyGetAgencyPayrollOverviewQuery, useLazyGetAgencyPayrollOperationQuery, useGetManagedEmployeePrimaryWorkplaceQuery, useLazyGetManagedEmployeePrimaryWorkplaceQuery } = agencyPayrollApi;

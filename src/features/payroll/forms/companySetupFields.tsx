@@ -45,7 +45,7 @@ export function CompanySetupFields({ formData, onChange, fieldsWithErrors = [] }
       {addressField("payrollOfficeAddress", "Actual workplace address", formData, onChange, error("payrollOfficeAddress"))}
       {field("Payroll contact name", "payrollContactName", formData, onChange, "text", error("payrollContactName"))}{field("Payroll contact email", "payrollContactEmail", formData, onChange, "email", error("payrollContactEmail"))}{usPhoneField("Payroll contact phone", "payrollContactPhone", formData, onChange, error("payrollContactPhone"))}
       {selectField("Pay frequency", "payrollFrequency", CHECK_PAY_FREQUENCIES)}
-      {field("First payday", "payrollFirstPayday", formData, onChange, "date", error("payrollFirstPayday"))}{formData.payrollFrequency === "semimonthly" && field("Second payday", "payrollSecondPayday", formData, onChange, "date", error("payrollSecondPayday"))}{field("First period end", "payrollFirstPeriodEnd", formData, onChange, "date", error("payrollFirstPeriodEnd"))}{field("Local payroll start date", "payrollStartDate", formData, onChange, "date", error("payrollStartDate"))}{field("Expected W-2 workers", "expectedW2Workers", formData, onChange, "number", error("expectedW2Workers"))}
+      {field("First payday", "payrollFirstPayday", formData, onChange, "date", error("payrollFirstPayday"))}{field("Expected W-2 workers", "expectedW2Workers", formData, onChange, "number", error("expectedW2Workers"))}
     </div>
     <p className="text-sm text-muted-foreground">Local agency creation is not rolled back if later payroll setup is asynchronous.</p>
   </fieldset>;

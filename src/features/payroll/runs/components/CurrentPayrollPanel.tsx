@@ -1,3 +1,5 @@
+import type { Ref } from "react";
+
 import type { CurrentPayrollWorkspaceState } from "../hooks/useCurrentPayrollWorkspace";
 import { usePayrollCursorPage } from "../hooks/usePayrollCursorPage";
 import type { AgencyPayrollRunScope } from "../model/types";
@@ -7,8 +9,9 @@ import { PayrollFreshnessStatus } from "./PayrollFreshnessStatus";
 import { PayrollRunHeader } from "./PayrollRunHeader";
 import { PayrollTabSkeleton } from "./PayrollTabSkeleton";
 
-function CurrentPayrollRunPanel({ scope, workspace }: {
+function CurrentPayrollRunPanel({ scope, workspace, headingRef }: {
   scope: AgencyPayrollRunScope;
+  headingRef?: Ref<HTMLHeadingElement>;
   workspace: CurrentPayrollWorkspaceState & {
     runResponse: Extract<NonNullable<CurrentPayrollWorkspaceState["runResponse"]>, { kind: "run" }>;
     employeePage: Extract<NonNullable<CurrentPayrollWorkspaceState["employeePage"]>, { kind: "run" }>;
@@ -28,14 +31,14 @@ function CurrentPayrollRunPanel({ scope, workspace }: {
   return (
     <div className="space-y-6">
       <PayrollFreshnessStatus freshness={workspace.freshness} error={workspace.error} />
-      <PayrollRunHeader run={runResponse.run} activeOperation={runResponse.activeOperation} />
+      <PayrollRunHeader run={runResponse.run} activeOperation={runResponse.activeOperation} headingRef={headingRef} />
       <PayrollExceptionsPanel
         blockerCodes={runResponse.run.blockerCodes}
         warningCodes={runResponse.run.warningCodes}
       />
       {runResponse.run.workflowState === "nothing_to_pay" ? (
         <section className="py-10 text-center">
-          <h2 className="text-lg font-semibold text-[#10141a]">Nothing to pay for this period.</h2>
+          <h2 ref={headingRef} tabIndex={-1} className="rounded text-lg font-semibold text-[#10141a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2">Nothing to pay for this period.</h2>
           <p className="mt-2 text-sm text-[#62686f]">No included earnings are due in the current payroll.</p>
         </section>
       ) : (
@@ -61,9 +64,10 @@ function CurrentPayrollRunPanel({ scope, workspace }: {
   );
 }
 
-export function CurrentPayrollPanel({ scope, workspace }: {
+export function CurrentPayrollPanel({ scope, workspace, headingRef }: {
   scope: AgencyPayrollRunScope;
   workspace: CurrentPayrollWorkspaceState;
+  headingRef?: Ref<HTMLHeadingElement>;
 }) {
   if (workspace.freshness === "loading" && !workspace.runResponse) {
     return <PayrollTabSkeleton label="Loading the current payroll…" variant="summary" />;
@@ -78,7 +82,7 @@ export function CurrentPayrollPanel({ scope, workspace }: {
   if (workspace.runResponse.kind === "empty" && workspace.employeePage.kind === "empty") {
     return (
       <section className="border-y border-[#e5e5e6] py-12 text-center">
-        <h2 className="text-2xl font-semibold text-[#10141a]">No active payroll period.</h2>
+        <h2 ref={headingRef} tabIndex={-1} className="rounded text-2xl font-semibold text-[#10141a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2">No active payroll period.</h2>
         <p className="mt-2 text-sm text-[#62686f]">Check Upcoming for the next scheduled pay period.</p>
       </section>
     );
@@ -90,6 +94,7 @@ export function CurrentPayrollPanel({ scope, workspace }: {
   return (
     <CurrentPayrollRunPanel
       scope={scope}
+      headingRef={headingRef}
       workspace={workspace as Parameters<typeof CurrentPayrollRunPanel>[0]["workspace"]}
     />
   );

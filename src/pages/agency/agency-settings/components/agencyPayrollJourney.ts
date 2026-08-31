@@ -2,11 +2,37 @@ import type { PayrollJourneyState } from "@/features/payroll/components/PayrollJ
 import type { AgencyPayrollSetupProjection } from "@/features/payroll/model/types";
 
 export type AgencyPayrollJourneyStep = {
-  id: "company-connection" | "authorized-signer" | "company-onboarding" | "check-review";
+  id: "company-connection" | "authorized-signer" | "payroll-schedule" | "company-onboarding" | "check-review";
   title: string;
   status: string;
   state: PayrollJourneyState;
   description: string;
+};
+
+const scheduleStepByState: Record<
+  AgencyPayrollSetupProjection["schedulePrerequisite"]["state"],
+  Pick<AgencyPayrollJourneyStep, "status" | "state" | "description">
+> = {
+  waiting_for_company: {
+    status: "Upcoming",
+    state: "upcoming",
+    description: "Connect the payroll company before creating its payroll schedule.",
+  },
+  setup_required: {
+    status: "Current",
+    state: "current",
+    description: "Choose the first payroll period and paydays.",
+  },
+  needs_attention: {
+    status: "Needs attention",
+    state: "attention",
+    description: "Review and correct the payroll schedule before payroll can begin.",
+  },
+  complete: {
+    status: "Complete",
+    state: "complete",
+    description: "The payroll schedule is active and ready for payroll.",
+  },
 };
 
 const knownReadinessStatuses = new Set(["needs_information", "ready_to_sync", "needs_attention", "ready"]);
@@ -33,6 +59,7 @@ export function deriveAgencyPayrollJourney(projection: AgencyPayrollSetupProject
   steps: AgencyPayrollJourneyStep[];
   guidanceStepId: AgencyPayrollJourneyStep["id"];
 } {
+  const scheduleStep = scheduleStepByState[projection.schedulePrerequisite.state];
   const readinessUnknown = unknownReadiness(projection);
   const configured = projection.integration.state === "configured";
   const companyComplete = configured && projection.setup.companyLinked;
@@ -43,6 +70,8 @@ export function deriveAgencyPayrollJourney(projection: AgencyPayrollSetupProject
   const reviewWaiting = projection.readiness.nextAction === "await_implementation_review";
   const reviewCurrent = projection.capabilities.canSubmitCompanyImplementation
     || projection.readiness.nextAction === "submit_company_implementation";
+  const reviewAttention = projection.readiness.status === "needs_attention"
+    && projection.readiness.nextAction === "submit_company_implementation";
   const onboardingComplete = reviewComplete || reviewWaiting || reviewCurrent;
   const onboardingCurrent = !onboardingComplete && (
     projection.readiness.nextAction === "complete_company_onboard"
@@ -50,8 +79,10 @@ export function deriveAgencyPayrollJourney(projection: AgencyPayrollSetupProject
     || projection.capabilities.canRefreshCompanyReconciliation
   );
   const onboardingAttention = readinessUnknown
-    || projection.readiness.status === "needs_attention"
-    || projection.capabilities.canRetryCompanySync;
+    || (!onboardingComplete && (
+      projection.readiness.status === "needs_attention"
+      || projection.capabilities.canRetryCompanySync
+    ));
 
   const steps: AgencyPayrollJourneyStep[] = [
     {
@@ -77,6 +108,11 @@ export function deriveAgencyPayrollJourney(projection: AgencyPayrollSetupProject
           : "Select and confirm an authorized payroll signer.",
     },
     {
+      id: "payroll-schedule",
+      title: "Payroll schedule",
+      ...scheduleStep,
+    },
+    {
       id: "company-onboarding",
       title: "Company onboarding",
       status: readinessUnknown || onboardingAttention ? "Needs attention" : onboardingCurrent ? "Current" : onboardingComplete ? "Complete" : "Upcoming",
@@ -92,8 +128,8 @@ export function deriveAgencyPayrollJourney(projection: AgencyPayrollSetupProject
     {
       id: "check-review",
       title: "Check review",
-      status: readinessUnknown ? "Needs attention" : reviewWaiting ? "Waiting" : reviewCurrent ? "Current" : reviewComplete ? "Complete" : "Upcoming",
-      state: readinessUnknown ? "attention" : reviewWaiting ? "waiting" : reviewCurrent ? "current" : reviewComplete ? "complete" : "upcoming",
+      status: readinessUnknown || reviewAttention ? "Needs attention" : reviewWaiting ? "Waiting" : reviewCurrent ? "Current" : reviewComplete ? "Complete" : "Upcoming",
+      state: readinessUnknown || reviewAttention ? "attention" : reviewWaiting ? "waiting" : reviewCurrent ? "current" : reviewComplete ? "complete" : "upcoming",
       description: readinessUnknown
         ? "The latest provider status needs review before setup can continue."
         : reviewWaiting

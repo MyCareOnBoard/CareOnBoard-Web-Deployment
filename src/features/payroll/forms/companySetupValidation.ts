@@ -1,4 +1,4 @@
-import { CHECK_ENTITY_TYPES, CHECK_INDUSTRIES, CHECK_PAY_FREQUENCIES, isUsTenDigitPayrollPhone, type CheckPayrollProfileFormValues } from "@/lib/agency/agency-profile-payload";
+import { CHECK_ENTITY_TYPES, CHECK_INDUSTRIES, CHECK_PAY_FREQUENCIES, isUsTenDigitPayrollPhone, type CheckPayrollProfileFormValues, type PayScheduleFormValues } from "@/lib/agency/agency-profile-payload";
 
 const isoDate = (value?: string) => Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(new Date(`${value}T00:00:00Z`).getTime()) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value);
 const iso = (date: Date) => date.toISOString().slice(0, 10);
@@ -13,8 +13,11 @@ const lastWeekday = (year: number, month: number, weekday: number) => {
 const observedFixedHoliday = (year: number, month: number, day: number) => {
   const holiday = new Date(Date.UTC(year, month, day));
   if (holiday.getUTCDay() === 0) holiday.setUTCDate(holiday.getUTCDate() + 1);
+  else if (holiday.getUTCDay() === 6) holiday.setUTCDate(holiday.getUTCDate() - 1);
   return iso(holiday);
 };
+
+export const localIsoDate = (date: Date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 
 /** Federal Reserve closure dates used by Check payday validation. */
 export function isUsBankingDay(value?: string): boolean {
@@ -34,6 +37,7 @@ export function isUsBankingDay(value?: string): boolean {
     observedFixedHoliday(year, 10, 11),
     nthWeekday(year, 10, 4, 4),
     observedFixedHoliday(year, 11, 25),
+    observedFixedHoliday(year + 1, 0, 1),
   ]);
   return !holidays.has(value!);
 }
@@ -71,24 +75,32 @@ export function validateCompanySetup(values: CheckPayrollProfileFormValues): Rec
   if (values.payFrequency && !CHECK_PAY_FREQUENCIES.includes(values.payFrequency as typeof CHECK_PAY_FREQUENCIES[number])) errors.payrollFrequency = "Select a supported pay frequency.";
 
   const firstPaydayValid = isoDate(values.firstPayday);
-  const firstPeriodEndValid = isoDate(values.firstPeriodEnd);
-  const payrollStartDateValid = isoDate(values.payrollStartDate);
   if (values.payFrequency || values.firstPayday) {
     if (!firstPaydayValid) errors.payrollFirstPayday = "Enter a valid first scheduled payday.";
-    else if (values.firstPayday! <= new Date().toISOString().slice(0, 10)) errors.payrollFirstPayday = FUTURE_BANKING_DAY_ERROR;
+    else if (values.firstPayday! <= localIsoDate()) errors.payrollFirstPayday = FUTURE_BANKING_DAY_ERROR;
     else if (!isUsBankingDay(values.firstPayday)) errors.payrollFirstPayday = BANKING_DAY_ERROR;
   }
-  if ((values.payFrequency || values.firstPeriodEnd) && !firstPeriodEndValid) errors.payrollFirstPeriodEnd = "Enter a valid first pay period end date.";
-  if ((values.payFrequency || values.payrollStartDate) && !payrollStartDateValid) errors.payrollStartDate = "Enter a valid payroll tracking start date.";
-  if (firstPaydayValid && firstPeriodEndValid && values.firstPeriodEnd! >= values.firstPayday!) errors.payrollFirstPeriodEnd = "The first pay period must end before the first scheduled payday.";
-  if (payrollStartDateValid && firstPeriodEndValid && values.payrollStartDate! > values.firstPeriodEnd!) errors.payrollStartDate = "The payroll tracking start date must be on or before the first pay period end date.";
+  return errors;
+}
 
-  const secondPaydayValid = isoDate(values.secondPayday);
-  if (values.payFrequency === "semimonthly" || values.secondPayday) {
-    if (!secondPaydayValid) errors.payrollSecondPayday = "Enter a valid second scheduled payday.";
-    else if (!isUsBankingDay(values.secondPayday)) errors.payrollSecondPayday = BANKING_DAY_ERROR;
-    else if (values.payFrequency !== "semimonthly") errors.payrollSecondPayday = "Only semimonthly schedules have a second scheduled payday.";
-    else if (firstPaydayValid && (values.secondPayday! <= values.firstPayday! || new Date(`${values.secondPayday!}T00:00:00Z`) > addOneCalendarMonthClamped(values.firstPayday!))) errors.payrollSecondPayday = "The second scheduled payday must be later than the first and within one calendar month.";
+export function validatePaySchedule(values: PayScheduleFormValues, today: string): Record<string, string> {
+  const errors: Record<string, string> = {};
+  const startValid = isoDate(values.payrollStartDate);
+  const periodEndValid = isoDate(values.firstPeriodEnd);
+  const firstPaydayValid = isoDate(values.firstPayday);
+  if (!CHECK_PAY_FREQUENCIES.includes(values.frequency as typeof CHECK_PAY_FREQUENCIES[number])) errors.frequency = "Select a supported pay frequency.";
+  if (!startValid) errors.payrollStartDate = "Enter a valid payroll tracking start date.";
+  if (!periodEndValid) errors.firstPeriodEnd = "Enter a valid first pay period end date.";
+  if (!firstPaydayValid) errors.firstPayday = "Enter a valid first scheduled payday.";
+  else if (values.firstPayday <= today) errors.firstPayday = FUTURE_BANKING_DAY_ERROR;
+  else if (!isUsBankingDay(values.firstPayday)) errors.firstPayday = BANKING_DAY_ERROR;
+  if (startValid && periodEndValid && values.payrollStartDate > values.firstPeriodEnd) errors.payrollStartDate = "The payroll tracking start date must be on or before the first pay period end date.";
+  if (periodEndValid && firstPaydayValid && values.firstPeriodEnd >= values.firstPayday) errors.firstPeriodEnd = "The first pay period must end before the first scheduled payday.";
+  if (values.frequency === "semimonthly") {
+    const secondValid = isoDate(values.secondPayday);
+    if (!secondValid) errors.secondPayday = "Enter a valid second scheduled payday.";
+    else if (!isUsBankingDay(values.secondPayday)) errors.secondPayday = BANKING_DAY_ERROR;
+    else if (firstPaydayValid && (values.secondPayday <= values.firstPayday || new Date(`${values.secondPayday}T00:00:00Z`) > addOneCalendarMonthClamped(values.firstPayday))) errors.secondPayday = "The second scheduled payday must be later than the first and within one calendar month.";
   }
   return errors;
 }
@@ -114,9 +126,6 @@ export function isCompanySetupComplete(values: CheckPayrollProfileFormValues): b
     && present(values.payrollContactPhone)
     && CHECK_PAY_FREQUENCIES.includes(values.payFrequency as typeof CHECK_PAY_FREQUENCIES[number])
     && isoDate(values.firstPayday)
-    && isoDate(values.firstPeriodEnd)
-    && isoDate(values.payrollStartDate)
-    && (values.payFrequency !== "semimonthly" || isoDate(values.secondPayday))
     && values.expectedW2Workers !== undefined
     && Number.isInteger(Number(values.expectedW2Workers))
     && Number(values.expectedW2Workers) >= 0;

@@ -1,7 +1,9 @@
-import { lazy, Suspense, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 
+import { useAppDispatch } from "@/store/redux/hooks";
 import { PayrollOperationProvider } from "../../operations/PayrollOperationProvider";
+import { payrollRunEmployeeTag, payrollRunTag, payrollTag } from "../../api/cacheTags";
 import BillingDashboardHeader from "@/pages/agency/billing/components/BillingDashboardHeader";
 import PayrollOverviewCards, {
   mapPayrollRunToOverviewStats,
@@ -16,6 +18,7 @@ import {
 } from "../hooks/useCurrentPayrollWorkspace";
 import { usePayrollRunCommand } from "../hooks/usePayrollRunCommand";
 import type { PayrollRunCommandArgs } from "../api/payrollRunCommands";
+import { payrollRunApi } from "../api/payrollRunEndpoints";
 import type { OffCycleSubmissionRetention } from "../components/dialogs/CreateOffCyclePayrollDialog";
 import type { AgencyPayrollRunScope, PayrollRunCommandName, PayrollRunProjection } from "../model/types";
 
@@ -179,10 +182,13 @@ function AgencyPayrollRunsWorkspaceContent({ scope, workspace }: {
   scope: AgencyPayrollRunScope;
   workspace: CurrentPayrollWorkspaceState;
 }) {
+  const dispatch = useAppDispatch();
   const scopeKey = JSON.stringify([scope.actorUid, scope.agencyId, scope.mode]);
   const tabScopeKey = JSON.stringify([scope.actorUid, scope.agencyId]);
   const [tabState, setTabState] = useState<{ key: string; tab: WorkspaceTab }>({ key: tabScopeKey, tab: "current" });
   const tabRefs = useRef(new Map<WorkspaceTab, HTMLButtonElement>());
+  const currentHeadingRef = useRef<HTMLHeadingElement>(null);
+  const focusCurrentAfterBuild = useRef(false);
   const offCycleSubmission = useMemo<OffCycleSubmissionRetention>(
     () => ({ intent: null, flight: null }),
     [scopeKey],
@@ -195,6 +201,21 @@ function AgencyPayrollRunsWorkspaceContent({ scope, workspace }: {
     setTabState({ key: tabScopeKey, tab: next });
     tabRefs.current.get(next)?.focus();
   };
+  const showCompletedBuild = () => {
+    focusCurrentAfterBuild.current = true;
+    dispatch(payrollRunApi.util.invalidateTags([
+      payrollRunTag(scope, "current", "current"),
+      payrollRunEmployeeTag(scope, "current", "current"),
+      payrollTag("PayrollHistory", scope),
+    ]));
+    setTabState({ key: tabScopeKey, tab: "current" });
+  };
+
+  useEffect(() => {
+    if (tab !== "current" || !focusCurrentAfterBuild.current || !currentHeadingRef.current) return;
+    currentHeadingRef.current.focus();
+    focusCurrentAfterBuild.current = false;
+  }, [tab, workspace.runResponse, workspace.employeePage]);
   const execute = async (args: PayrollRunCommandArgs) => {
     try {
       await commands.runCommand(args);
@@ -295,7 +316,7 @@ function AgencyPayrollRunsWorkspaceContent({ scope, workspace }: {
         >
           {tab === "current" ? (
             <div className="space-y-6">
-              <CurrentPayrollPanel key={`current:${scopeKey}`} scope={scope} workspace={workspace} />
+              <CurrentPayrollPanel key={`current:${scopeKey}`} scope={scope} workspace={workspace} headingRef={currentHeadingRef} />
               {projection ? (
                 <CurrentPayrollControls
                   key={`controls:${scopeKey}`}
@@ -320,7 +341,7 @@ function AgencyPayrollRunsWorkspaceContent({ scope, workspace }: {
               />
             )}>
               {tab === "upcoming" ? (
-                <UpcomingPayrollPanel key={`upcoming:${scopeKey}`} scope={scope} />
+                <UpcomingPayrollPanel key={`upcoming:${scopeKey}`} scope={scope} onBuildSucceeded={showCompletedBuild} />
               ) : tab === "history" ? (
                 <PayrollHistoryPanel key={`history:${scopeKey}`} scope={scope} />
               ) : tab === "audit" ? (

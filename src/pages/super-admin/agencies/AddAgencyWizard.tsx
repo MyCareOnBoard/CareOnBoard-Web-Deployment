@@ -54,9 +54,6 @@ export interface AgencyFormData {
     payrollContactPhone: string;
     payrollFrequency: string;
     payrollFirstPayday: string;
-    payrollSecondPayday: string;
-    payrollFirstPeriodEnd: string;
-    payrollStartDate: string;
     expectedW2Workers: string;
     npi: string;
     providerId: string;
@@ -296,7 +293,7 @@ export default function AddAgencyWizard() {
         payrollOfficeAddress: { line1: "", line2: "", city: "", state: "", postalCode: "", country: "US" },
         payrollActualWorkLocationAttested: false,
         payrollContactName: "", payrollContactEmail: "", payrollContactPhone: "",
-        payrollFrequency: "", payrollFirstPayday: "", payrollSecondPayday: "", payrollFirstPeriodEnd: "", payrollStartDate: "",
+        payrollFrequency: "", payrollFirstPayday: "",
         expectedW2Workers: "",
         npi: "",
         providerId: "",
@@ -404,11 +401,8 @@ export default function AddAgencyWizard() {
             payrollContactName: responseData.agencyData?.checkPayrollProfile?.payrollContact?.name || "",
             payrollContactEmail: responseData.agencyData?.checkPayrollProfile?.payrollContact?.email || "",
             payrollContactPhone: hydrateUsNationalPhone(responseData.agencyData?.checkPayrollProfile?.payrollContact?.phone),
-            payrollFrequency: responseData.agencyData?.checkPayrollProfile?.paySchedule?.frequency || "",
-            payrollFirstPayday: responseData.agencyData?.checkPayrollProfile?.paySchedule?.firstPayday || "",
-            payrollSecondPayday: responseData.agencyData?.checkPayrollProfile?.paySchedule?.secondPayday || "",
-            payrollFirstPeriodEnd: responseData.agencyData?.checkPayrollProfile?.paySchedule?.firstPeriodEnd || "",
-            payrollStartDate: responseData.agencyData?.checkPayrollProfile?.paySchedule?.payrollStartDate || "",
+            payrollFrequency: responseData.agencyData?.checkPayrollProfile?.payrollIntent?.frequency || "",
+            payrollFirstPayday: responseData.agencyData?.checkPayrollProfile?.payrollIntent?.firstPayday || "",
             expectedW2Workers: responseData.agencyData?.checkPayrollProfile?.expectedWorkerCounts?.w2?.toString() || "",
             npi: responseData.agencyData?.npi || "",
             providerId: responseData.agencyData?.providerId ?? "",
@@ -553,8 +547,7 @@ export default function AddAgencyWizard() {
         officeName: formData.payrollOfficeName, officeAddress: formData.payrollOfficeAddress, actualWorkLocationAttested: formData.payrollActualWorkLocationAttested,
         website: formData.websiteUrl, phone: formData.mainPhone, payrollContactName: formData.payrollContactName,
         payrollContactEmail: formData.payrollContactEmail, payrollContactPhone: formData.payrollContactPhone, payFrequency: formData.payrollFrequency,
-        firstPayday: formData.payrollFirstPayday, secondPayday: formData.payrollSecondPayday, firstPeriodEnd: formData.payrollFirstPeriodEnd,
-        payrollStartDate: formData.payrollStartDate, expectedW2Workers: formData.expectedW2Workers,
+        firstPayday: formData.payrollFirstPayday, expectedW2Workers: formData.expectedW2Workers,
     });
 
     const buildAgencyPayload = (
@@ -676,15 +669,9 @@ export default function AddAgencyWizard() {
             ...(
                 isEditFieldDirty("payrollFrequency")
                 || isEditFieldDirty("payrollFirstPayday")
-                || isEditFieldDirty("payrollSecondPayday")
-                || isEditFieldDirty("payrollFirstPeriodEnd")
-                || isEditFieldDirty("payrollStartDate")
                     ? {
                         payFrequency: values.payFrequency,
                         firstPayday: values.firstPayday,
-                        secondPayday: values.secondPayday,
-                        firstPeriodEnd: values.firstPeriodEnd,
-                        payrollStartDate: values.payrollStartDate,
                     }
                     : {}
             ),
@@ -725,13 +712,10 @@ export default function AddAgencyWizard() {
         );
         requireEmitted(
             isEditFieldDirty("payrollFrequency")
-            || isEditFieldDirty("payrollFirstPayday")
-            || isEditFieldDirty("payrollSecondPayday")
-            || isEditFieldDirty("payrollFirstPeriodEnd")
-            || isEditFieldDirty("payrollStartDate"),
-            "paySchedule",
+            || isEditFieldDirty("payrollFirstPayday"),
+            "payrollIntent",
             "payrollFrequency",
-            "Complete the pay schedule before saving.",
+            "Complete the payroll intent before saving.",
         );
         requireEmitted(isEditFieldDirty("expectedW2Workers"), "expectedWorkerCounts", "expectedW2Workers", "Enter a whole number of W-2 employees, 0 or more.");
         return {payload, values: sparseValues, emissionErrors};

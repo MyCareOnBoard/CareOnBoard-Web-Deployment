@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { BadgeCheck, Building2, ClipboardCheck, Loader2, UserRound } from "lucide-react";
+import { BadgeCheck, Building2, CalendarDays, ClipboardCheck, Loader2, UserRound } from "lucide-react";
 import SettingsSectionCard from "@/pages/shared/settings/SettingsSectionCard";
 import { CompanySetupChecklist } from "@/features/payroll/components/CompanySetupChecklist";
 import { SignerSetupCard } from "@/features/payroll/components/SignerSetupCard";
@@ -11,31 +11,37 @@ import { PayrollOperationProvider, usePayrollOperations } from "@/features/payro
 import type { AgencyPayrollSetupProjection, PayrollOperation, PayrollScope } from "@/features/payroll/model/types";
 import type { CheckOnboardLoadingDialogConfig } from "@/features/payroll/onboard/CheckOnboardModal";
 import AgencyPayrollBootstrapModal, { buildAgencyPayrollBootstrapPayload } from "./AgencyPayrollBootstrapModal";
+import PayrollSchedulePrerequisite, { type PayrollSchedulePrerequisiteCommand } from "./PayrollSchedulePrerequisite";
 import { deriveAgencyPayrollJourney, type AgencyPayrollJourneyStep } from "./agencyPayrollJourney";
 import SettingsTabSkeleton from "./SettingsTabSkeleton";
+import type { PayScheduleFormValues } from "@/lib/agency/agency-profile-payload";
 
-type AgencyPayrollCommand = "designate_signer" | "clear_signer" | "retry_company_sync" | "refresh_company_reconciliation" | "submit_company_implementation";
+type AgencyPayrollCommand = "designate_signer" | "clear_signer" | "retry_company_sync" | "refresh_company_reconciliation" | "submit_company_implementation" | "create_pay_schedule" | "correct_pay_schedule";
 type ActivationToken = { sequence: number; scopeKey: string; phase: "awaiting_projection" | "awaiting_acceptance" | "consumed" };
 type CommandFlight =
   | { scopeKey: string; phase: "awaiting_acceptance"; operationId: null }
   | { scopeKey: string; phase: "accepted" | "terminal_hydration_pending"; operationId: string };
 type BootstrapContinuation = { scopeKey: string; signerUserUid: string; reconciliationAttempted: boolean };
 type AutoOnboardIntent = { key: string; scopeKey: string; signerUserUid: string; companyOnboardRevision: number };
-type AfterTerminal = (projection: AgencyPayrollSetupProjection | null) => void | Promise<void>;
+type AfterTerminal = (projection: AgencyPayrollSetupProjection | null, operation: PayrollOperation) => void | Promise<void>;
 
 export type AgencyPayrollSetupTabProps = { scope: PayrollScope; active?: boolean };
 
-const terminalOperationStates = new Set(["succeeded", "failed", "dead"]);
+const terminalOperationStates = new Set(["succeeded", "needs_attention", "failed", "dead"]);
+const scheduleCorrectionFailureMessage = "The payroll schedule correction could not be confirmed. Review compatible paydays before trying again.";
 const commandStatusLabels: Record<AgencyPayrollCommand, string> = {
   designate_signer: "Designating payroll signer",
   clear_signer: "Clearing payroll signer",
   retry_company_sync: "Retrying company sync",
   refresh_company_reconciliation: "Refreshing payroll status",
   submit_company_implementation: "Submitting company for Check review",
+  create_pay_schedule: "Creating payroll schedule",
+  correct_pay_schedule: "Correcting payroll schedule",
 };
 const journeyIcons: Record<AgencyPayrollJourneyStep["id"], ReactNode> = {
   "company-connection": <Building2 className="h-4 w-4" />,
   "authorized-signer": <UserRound className="h-4 w-4" />,
+  "payroll-schedule": <CalendarDays className="h-4 w-4" />,
   "company-onboarding": <ClipboardCheck className="h-4 w-4" />,
   "check-review": <BadgeCheck className="h-4 w-4" />,
 };
@@ -85,6 +91,7 @@ function AgencyPayrollSetupContent({ scope, active }: { scope: PayrollScope; act
   const scopeKey = useMemo(() => JSON.stringify([scope.actorUid, scope.agencyId]), [scope.actorUid, scope.agencyId]);
 
   const [commandError, setCommandError] = useState<string | null>(null);
+  const [scheduleCommandError, setScheduleCommandError] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [awaitingConfigured, setAwaitingConfigured] = useState(false);
@@ -107,6 +114,7 @@ function AgencyPayrollSetupContent({ scope, active }: { scope: PayrollScope; act
   const activePayrollCommandRef = useRef<AgencyPayrollCommand | null>(null);
   const cancelOperation = useRef<(() => void) | null>(null);
   const terminalContinuationRef = useRef<AfterTerminal | null>(null);
+  const terminalOperationRef = useRef<PayrollOperation | null>(null);
   const configuredSignerIntent = useRef<string | null>(null);
   const autoIntentSequenceRef = useRef(0);
   const launchGeneration = useRef(0);
@@ -125,6 +133,7 @@ function AgencyPayrollSetupContent({ scope, active }: { scope: PayrollScope; act
     if (commandFlightRef.current?.scopeKey !== scopeKey) return;
     commandFlightRef.current = null;
     terminalContinuationRef.current = null;
+    terminalOperationRef.current = null;
     activePayrollCommandRef.current = null;
     cancelOperation.current = null;
     setActivePayrollCommand(null);
@@ -151,18 +160,21 @@ function AgencyPayrollSetupContent({ scope, active }: { scope: PayrollScope; act
     return projection;
   };
 
-  const finishTerminal = async () => {
+  const finishTerminal = async (operation = terminalOperationRef.current) => {
+    if (!operation || !terminalOperationStates.has(operation.state)) return;
+    terminalOperationRef.current = operation;
     const continuation = terminalContinuationRef.current;
     try {
       const projection = await hydrateTerminal();
       if (!currentScopeIsActive()) return;
       clearCommandFlight();
-      await continuation?.(projection);
+      await continuation?.(projection, operation);
     } catch {
       if (!currentScopeIsActive()) return;
       setStatusRefreshRequired(true);
       setIsRetryingStatusRefresh(false);
       setCommandError("Payroll status refresh is required before another command can be started.");
+      await continuation?.(null, operation);
     }
   };
 
@@ -177,7 +189,7 @@ function AgencyPayrollSetupContent({ scope, active }: { scope: PayrollScope; act
       scope,
       operation.operationId,
       async () => getOperation({ ...scope, operationId: operation.operationId }).unwrap(),
-      () => { if (currentScopeIsActive() && commandFlightRef.current?.operationId === operation.operationId) void finishTerminal(); },
+      (terminalOperation) => { if (currentScopeIsActive() && commandFlightRef.current?.operationId === operation.operationId) void finishTerminal(terminalOperation); },
     );
   };
 
@@ -191,6 +203,8 @@ function AgencyPayrollSetupContent({ scope, active }: { scope: PayrollScope; act
   const runCompanyCommand = async (command: AgencyPayrollCommand, options: {
     projection?: AgencyPayrollSetupProjection;
     selectedSigner?: SignerDesignation["candidate"] | null;
+    schedule?: PayScheduleFormValues;
+    selectedFirstPayday?: string;
     idempotencyKey?: ReturnType<typeof newIdempotencyKey>;
     afterTerminal?: AfterTerminal;
     suppressError?: boolean;
@@ -211,28 +225,35 @@ function AgencyPayrollSetupContent({ scope, active }: { scope: PayrollScope; act
     try {
       const operation = command === "designate_signer"
         ? await runCommand({ ...scope, command, projectionRevision: projection.projectionRevision, designatedSignerUserUid: options.selectedSigner!.userUid, designatedSignerIdentityVersion: options.selectedSigner!.identityVersion, authorityAttested: true, idempotencyKey }).unwrap()
-        : await runCommand({ ...scope, command, projectionRevision: projection.projectionRevision, idempotencyKey }).unwrap();
+        : command === "create_pay_schedule"
+          ? await runCommand({ ...scope, command, projectionRevision: projection.projectionRevision, schedule: options.schedule!, idempotencyKey }).unwrap()
+          : command === "correct_pay_schedule"
+            ? await runCommand({ ...scope, command, projectionRevision: projection.projectionRevision, selectedFirstPayday: options.selectedFirstPayday!, idempotencyKey }).unwrap()
+            : await runCommand({ ...scope, command, projectionRevision: projection.projectionRevision, idempotencyKey }).unwrap();
       if (!currentScopeIsMounted() || commandFlightRef.current?.phase !== "awaiting_acceptance") return { accepted: false };
       if (!activeRef.current) {
+        terminalOperationRef.current = terminalOperationStates.has(operation.state) ? operation : null;
         commandFlightRef.current = { scopeKey, phase: terminalOperationStates.has(operation.state) ? "terminal_hydration_pending" : "accepted", operationId: operation.operationId };
         return { accepted: true };
       }
       const token = activationRef.current;
       if (token?.scopeKey === scopeKey && token.phase === "awaiting_acceptance") token.phase = "consumed";
       if (terminalOperationStates.has(operation.state)) {
+        terminalOperationRef.current = operation;
         commandFlightRef.current = { scopeKey, phase: "terminal_hydration_pending", operationId: operation.operationId };
         const continuation = terminalContinuationRef.current;
         try {
           const terminalProjection = await hydrateTerminal();
           if (!currentScopeIsActive()) return { accepted: false };
           clearCommandFlight();
-          await continuation?.(terminalProjection);
+          await continuation?.(terminalProjection, operation);
           return { accepted: true, terminalProjection };
         } catch (terminalRefreshError: unknown) {
           if (currentScopeIsActive()) {
             setStatusRefreshRequired(true);
             setIsRetryingStatusRefresh(false);
             setCommandError("Payroll status refresh is required before another command can be started.");
+            await continuation?.(null, operation);
           }
           return { accepted: true, error: terminalRefreshError };
         }
@@ -338,12 +359,14 @@ function AgencyPayrollSetupContent({ scope, active }: { scope: PayrollScope; act
   useEffect(() => {
     mounted.current = true;
     activeScopeKey.current = scopeKey;
+    setScheduleCommandError(null);
     return () => {
       mounted.current = false;
       activeRef.current = false;
       activationRef.current = null;
       bootstrapContinuationRef.current = null;
       terminalContinuationRef.current = null;
+      terminalOperationRef.current = null;
       launchGeneration.current += 1;
       requestGeneration.current += 1;
       cancelOperation.current?.();
@@ -505,16 +528,47 @@ function AgencyPayrollSetupContent({ scope, active }: { scope: PayrollScope; act
     }
   };
 
+  const submitScheduleCommand = async (input: PayrollSchedulePrerequisiteCommand) => {
+    if (input.command === "create_pay_schedule") {
+      const result = await runCompanyCommand(input.command, { schedule: input.schedule });
+      return result.accepted;
+    }
+    setScheduleCommandError(null);
+    const result = await runCompanyCommand(input.command, {
+      selectedFirstPayday: input.selectedFirstPayday,
+      suppressError: true,
+      afterTerminal: (_projection, operation) => {
+        if (currentScopeIsActive()) setScheduleCommandError(operation.state === "succeeded" ? null : scheduleCorrectionFailureMessage);
+      },
+    });
+    if (!result.accepted && currentScopeIsActive()) setScheduleCommandError(scheduleCorrectionFailureMessage);
+    return result.accepted;
+  };
+
+  const reconcileScheduleBeforeOptions = () => new Promise<boolean>((resolve) => {
+    setScheduleCommandError(null);
+    let settled = false;
+    const finish = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    void reconcileCompany((projection, operation) => finish(Boolean(projection) && operation.state === "succeeded")).then((accepted) => {
+      if (!accepted) finish(false);
+    });
+  });
+
   const retryStatusRefresh = async () => {
     if (!statusRefreshRequired || isRetryingStatusRefresh || commandFlightRef.current?.scopeKey !== scopeKey) return;
     setIsRetryingStatusRefresh(true);
     setCommandError(null);
     const continuation = terminalContinuationRef.current;
+    const terminalOperation = terminalOperationRef.current;
     try {
       const projection = await hydrateTerminal();
       if (!currentScopeIsActive()) return;
       clearCommandFlight();
-      await continuation?.(projection);
+      if (terminalOperation) await continuation?.(projection, terminalOperation);
     } catch {
       if (currentScopeIsActive()) {
         setIsRetryingStatusRefresh(false);
@@ -529,8 +583,15 @@ function AgencyPayrollSetupContent({ scope, active }: { scope: PayrollScope; act
 
   const { steps, guidanceStepId } = deriveAgencyPayrollJourney(displayedData);
   const completedCount = steps.filter((step) => step.state === "complete").length;
+  const totalSteps = steps.length;
   const guidance = steps.find((step) => step.id === guidanceStepId) ?? steps[0];
-  const overallStatus = completedCount === 4 ? "Complete" : guidance.state === "attention" || guidance.state === "blocked" ? "Needs attention" : guidance.state === "waiting" ? "Waiting" : "In progress";
+  const overallStatus = completedCount === totalSteps
+    ? "Complete"
+    : guidance.state === "attention" || guidance.state === "blocked"
+      ? "Needs attention"
+      : guidance.state === "waiting"
+        ? "Waiting"
+        : "In progress";
   const overallTone = overallStatus === "Needs attention" || overallStatus === "Waiting" ? "bg-amber-50 text-amber-800" : "bg-[#e8fafa] text-[#006f73]";
   const payrollCommandActive = activePayrollCommand !== null || statusRefreshRequired;
   const pendingCommandLabel = activePayrollCommand ? commandStatusLabels[activePayrollCommand] : "";
@@ -539,20 +600,21 @@ function AgencyPayrollSetupContent({ scope, active }: { scope: PayrollScope; act
 
   const stepContent = (step: AgencyPayrollJourneyStep) => {
     if (step.id === "company-connection") return <>{displayedData.integration.state === "not_configured" && displayedData.capabilities.canCreateIntegration ? <button type="button" disabled={isScanning || isCreating || awaitingConfigured || payrollCommandActive} aria-busy={isScanning || showInlineCreating} onClick={() => void scanAgency()} className="inline-flex min-h-11 w-full min-w-[14rem] items-center justify-center rounded-md bg-[#006f73] px-4 text-sm font-semibold text-white hover:bg-[#005b5e] disabled:opacity-60 sm:w-auto">{showInlineCreating ? <span role="status" className="inline-flex items-center gap-2"><Loader2 data-testid="agency-payroll-create-spinner" aria-hidden="true" className="h-4 w-4 motion-safe:animate-spin" />Creating payroll setup…</span> : isScanning ? <span role="status" className="inline-flex items-center gap-2"><Loader2 data-testid="agency-payroll-scan-spinner" aria-hidden="true" className="h-4 w-4 motion-safe:animate-spin" />Scanning agency details…</span> : "Create payroll setup"}</button> : null}</>;
+    if (step.id === "payroll-schedule") return <PayrollSchedulePrerequisite scope={scope} projection={displayedData} disabled={payrollCommandActive || !displayedData.capabilities.canManage} correctionPending={activePayrollCommand === "correct_pay_schedule"} correctionError={scheduleCommandError} onCommand={submitScheduleCommand} onReviewOptions={reconcileScheduleBeforeOptions} />;
     if (step.id === "authorized-signer") return <>{(guidanceStepId === step.id || canDesignateConfiguredSigner || displayedData.setup.designatedSignerPresent) ? <SignerSetupCard projection={displayedData} onAction={signerAction} hideDesignation disabled={payrollCommandActive} /> : null}{canDesignateConfiguredSigner && !displayedData.setup.designatedSignerPresent ? <div className="mt-4"><AuthorizedSignerSelector scope={scope} ownerCandidate={displayedData.setup.signerCandidate} disabled={payrollCommandActive} initialSelection={configuredSignerSelection} resetKey={signerSelectorResetKey} onSelectionChange={onConfiguredSignerSelectionChange} /><button type="button" disabled={payrollCommandActive || !configuredSignerSelection || !configuredSignerIdempotencyKey} aria-busy={payrollCommandActive} aria-describedby={payrollCommandActive ? "agency-payroll-command-status" : undefined} onClick={() => configuredSignerSelection && configuredSignerIdempotencyKey && void signerAction("designate_signer", true, configuredSignerSelection.candidate, configuredSignerIdempotencyKey)} className="mt-4 min-h-11 text-sm font-semibold text-[#006f73] underline disabled:opacity-50">Designate selected signer</button></div> : null}</>;
-    if (step.id === "company-onboarding") return <>{(guidanceStepId === step.id || displayedData.capabilities.canRetryCompanySync || displayedData.capabilities.canRefreshCompanyReconciliation || canRequestSession) ? <CompanySetupChecklist projection={displayedData} /> : null}<div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">{active && canRequestSession ? <Suspense fallback={<p role="status" className="min-h-11 py-2 text-sm text-[#5d626b]">Loading payroll onboarding…</p>}><div className="[&_button]:w-full sm:[&_button]:w-auto"><CheckOnboardModal disabled={payrollCommandActive} actionLabel="Complete payroll onboarding" openingLabel="Opening payroll onboarding..." loadingDialog={agencyOnboardLoadingDialog} requestSession={requestCompanyOnboardSession} onRefetch={ignoreOnboardProgress} onClosed={() => { void reconcileCompany(); }} autoStartKey={mayAutoStart && autoIntent ? autoIntent.key : undefined} onAutoStartConsumed={consumeAutoIntent} cancelPending={!documentVisible} /></div></Suspense> : null}{displayedData.capabilities.canRetryCompanySync ? <button type="button" disabled={payrollCommandActive} onClick={() => void signerAction("retry_company_sync")} className="min-h-11 rounded-lg border border-[#b8dfe0] px-4 text-sm font-semibold text-[#006f73] disabled:opacity-50">Retry company sync</button> : null}</div></>;
+    if (step.id === "company-onboarding") return <>{(guidanceStepId === step.id || (displayedData.readiness.status === "ready" && (displayedData.capabilities.canRetryCompanySync || displayedData.capabilities.canRefreshCompanyReconciliation || canRequestSession))) ? <CompanySetupChecklist projection={displayedData} /> : null}<div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">{active && canRequestSession ? <Suspense fallback={<p role="status" className="min-h-11 py-2 text-sm text-[#5d626b]">Loading payroll onboarding…</p>}><div className="[&_button]:w-full sm:[&_button]:w-auto"><CheckOnboardModal disabled={payrollCommandActive} actionLabel="Complete payroll onboarding" openingLabel="Opening payroll onboarding..." loadingDialog={agencyOnboardLoadingDialog} requestSession={requestCompanyOnboardSession} onRefetch={ignoreOnboardProgress} onClosed={() => { void reconcileCompany(); }} autoStartKey={mayAutoStart && autoIntent ? autoIntent.key : undefined} onAutoStartConsumed={consumeAutoIntent} cancelPending={!documentVisible} /></div></Suspense> : null}{displayedData.capabilities.canRetryCompanySync ? <button type="button" disabled={payrollCommandActive} onClick={() => void signerAction("retry_company_sync")} className="min-h-11 rounded-lg border border-[#b8dfe0] px-4 text-sm font-semibold text-[#006f73] disabled:opacity-50">Retry company sync</button> : null}</div></>;
     return <>{guidanceStepId === step.id ? <CompanySetupChecklist projection={displayedData} /> : null}{displayedData.capabilities.canSubmitCompanyImplementation ? <button type="button" disabled={payrollCommandActive} aria-busy={payrollCommandActive} aria-describedby={payrollCommandActive ? "agency-payroll-command-status" : undefined} onClick={() => void submitCompanyImplementation()} className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-[#006f73] px-4 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto">{activePayrollCommand === "submit_company_implementation" ? "Submitting for review…" : "Submit for Check review"}</button> : null}</>;
   };
 
   return <div className="flex flex-col gap-4"><SettingsSectionCard title="Agency Payroll Setup" subtitle="Follow your agency setup from company connection through Check approval." className="min-h-[420px]">
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-sm font-semibold text-[#10141a]">{completedCount} of 4 steps complete</p><p className="mt-1 max-w-xl text-sm leading-6 text-[#5d626b]">{guidance.description}</p></div><span aria-live="polite" aria-atomic="true" className={`w-fit shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${overallTone}`}>{overallStatus}</span></div>
-    <div aria-label={`${completedCount} of 4 payroll setup steps complete`} className="mt-4 grid grid-cols-4 gap-2">{steps.map((step) => <span key={step.id} className={`h-2 rounded-full ${step.state === "complete" ? "bg-[#00a7aa]" : step.state === "blocked" ? "bg-red-500" : step.state === "attention" || step.state === "waiting" ? "bg-amber-400" : "bg-[#e5e7eb]"}`} />)}</div>
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-sm font-semibold text-[#10141a]">{completedCount} of {totalSteps} steps complete</p><p className="mt-1 max-w-xl text-sm leading-6 text-[#5d626b]">{guidance.description}</p></div><span aria-live="polite" aria-atomic="true" className={`w-fit shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${overallTone}`}>{overallStatus}</span></div>
+    <div role="progressbar" aria-label={`${completedCount} of ${totalSteps} payroll setup steps complete`} aria-valuemin={0} aria-valuemax={totalSteps} aria-valuenow={completedCount} aria-valuetext={`${completedCount} of ${totalSteps} steps complete`} className="mt-4 grid grid-flow-col auto-cols-fr gap-2">{steps.map((step) => <span key={step.id} className={`h-2 rounded-full ${step.state === "complete" ? "bg-[#00a7aa]" : step.state === "blocked" ? "bg-red-500" : step.state === "attention" || step.state === "waiting" ? "bg-amber-400" : "bg-[#e5e7eb]"}`} />)}</div>
     {isFetching && !payrollCommandActive ? <p role="status" className="mt-4 flex items-center gap-2 text-sm text-[#5d626b]"><Loader2 data-testid="agency-payroll-refresh-spinner" aria-hidden="true" className="h-4 w-4 motion-safe:animate-spin" />Refreshing payroll setup…</p> : null}
     {error ? <div role="alert" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><span>Payroll setup could not be refreshed. The last available status is still shown.</span><button type="button" onClick={() => void refetch()} className="ml-2 min-h-11 font-semibold underline">Try again</button></div> : null}
     {active && autoIntent ? <p role="status" className="mt-4 text-sm text-[#5d626b]">Preparing payroll onboarding… Company provisioning will continue in the background.</p> : null}
     {activePayrollCommand || displayedData.capabilities.canRefreshCompanyReconciliation ? <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">{activePayrollCommand ? <p id="agency-payroll-command-status" role="status" aria-label={pendingCommandLabel} aria-live="polite" aria-busy="true" className="flex min-h-11 items-center gap-2 text-sm text-[#5d626b]"><Loader2 data-testid={activePayrollCommand === "submit_company_implementation" ? "agency-payroll-submit-spinner" : "agency-payroll-command-spinner"} aria-hidden="true" className="h-4 w-4 motion-safe:animate-spin" />{pendingCommandLabel}…</p> : null}{displayedData.capabilities.canRefreshCompanyReconciliation ? <button type="button" disabled={payrollCommandActive} onClick={() => void reconcileCompany()} className="min-h-11 w-full rounded-lg border border-[#b8dfe0] px-4 text-sm font-semibold text-[#006f73] disabled:opacity-50 sm:ml-auto sm:w-auto">Refresh payroll status</button> : null}</div> : null}
     {statusRefreshRequired ? <div role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-[#8b2d2d]"><p>Payroll status refresh is required before another command can be started.</p><button type="button" disabled={isRetryingStatusRefresh} onClick={() => void retryStatusRefresh()} className="mt-2 min-h-11 font-semibold underline disabled:opacity-50">Retry status refresh</button></div> : commandError ? <p role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-[#8b2d2d]">{commandError}</p> : null}
-    <ol aria-label="Agency payroll setup progress" className="mt-5 divide-y divide-[#edf0f1] border-y border-[#edf0f1] py-4">{steps.map((step, index) => <PayrollJourneyStep key={step.id} title={step.title} status={step.status} state={step.state} icon={journeyIcons[step.id]} last={index === steps.length - 1} showDetails={step.id === "company-onboarding" && step.state === "complete"}>{stepContent(step)}</PayrollJourneyStep>)}</ol>
+    <ol aria-label="Agency payroll setup progress" className="mt-5 divide-y divide-[#edf0f1] border-y border-[#edf0f1] py-4">{steps.map((step, index) => <PayrollJourneyStep key={step.id} title={step.title} status={step.status} state={step.state} icon={journeyIcons[step.id]} last={index === steps.length - 1} showDetails={step.id === "payroll-schedule" || (step.id === "company-onboarding" && step.state === "complete")}>{stepContent(step)}</PayrollJourneyStep>)}</ol>
     {bootstrapProjection ? <AgencyPayrollBootstrapModal open scope={scope} ownerCandidate={bootstrapProjection.setup.signerCandidate} requireSignerConfirmation={bootstrapProjection.capabilities.canDesignateSigner} values={bootstrapProjection.preflight.values} missingFieldCodes={bootstrapProjection.preflight.missingFieldCodes} isSubmitting={isCreating} submissionError={commandError} submissionFieldCodes={submissionFieldCodes} onOpenChange={(open) => { if (!open && !isCreating) { setBootstrapProjection(undefined); setSubmissionFieldCodes([]); setCommandError(null); } }} onSubmit={async (checkPayrollProfile, signerSelection) => {
       const generation = ++requestGeneration.current;
       const current = () => mounted.current && activeScopeKey.current === scopeKey && requestGeneration.current === generation;

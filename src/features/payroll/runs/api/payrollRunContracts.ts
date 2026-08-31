@@ -31,6 +31,8 @@ import type {
   UpcomingPayrollEmployee,
   UpcomingPayrollResponse,
   UpcomingPayrollSourceCounts,
+  ForceBuildCapability,
+  ForceBuildStatus,
 } from "./payrollRunEndpoints";
 
 const MAX_RESPONSE_BYTES = 500 * 1_024;
@@ -69,6 +71,8 @@ const PROVIDER_STATUSES = [
 const PREVIEW_STATUSES = ["none", "pending", "succeeded", "failed"] as const;
 const EMPLOYMENT_TYPES = ["field", "staff"] as const;
 const UPCOMING_EMPTY_REASONS = ["no_upcoming_period", "agency_timezone_required"] as const;
+const FORCE_BUILD_STATES = ["queued", "building", "succeeded", "needs_attention", "failed"] as const;
+const FORCE_BUILD_DISABLED_REASONS = ["sandbox_only", "permission_required"] as const;
 const EMPLOYEE_DISPOSITIONS = ["included", "zero_due", "blocked", "deferred"] as const;
 const PROVIDER_ITEM_STATES = ["pending", "none"] as const;
 const OBLIGATION_KINDS = ["deferral", "correction"] as const;
@@ -606,11 +610,23 @@ function parseUpcomingEmployee(value: unknown, path: string): UpcomingPayrollEmp
   return record as UpcomingPayrollEmployee;
 }
 
+function parseForceBuildCapability(value: unknown, path: string): ForceBuildCapability {
+  const record = exactObject(value, path, ["enabled", "reasonCode"]);
+  const enabled = booleanValue(record.enabled, `${path}.enabled`);
+  if (enabled) {
+    if (record.reasonCode !== null) throw invalid(`${path}.reasonCode`);
+  } else {
+    enumValue(record.reasonCode, FORCE_BUILD_DISABLED_REASONS, `${path}.reasonCode`);
+  }
+  return record as ForceBuildCapability;
+}
+
 function parseUpcoming(value: unknown, expectedMode?: AgencyMode): UpcomingPayrollResponse {
   const record = exactObject(value, "$", [
     "kind",
     "mode",
     "projectionRevision",
+    "forceBuild",
     "periodStart",
     "periodEnd",
     "payday",
@@ -627,6 +643,7 @@ function parseUpcoming(value: unknown, expectedMode?: AgencyMode): UpcomingPayro
   if (record.kind !== "upcoming") throw invalid("$.kind");
   matchingPayrollMode(record.mode, expectedMode, "$.mode");
   nonNegativeInteger(record.projectionRevision, "$.projectionRevision");
+  parseForceBuildCapability(record.forceBuild, "$.forceBuild");
   const periodStart = isoDate(record.periodStart, "$.periodStart");
   const periodEnd = isoDate(record.periodEnd, "$.periodEnd");
   const payday = isoDate(record.payday, "$.payday");
@@ -861,6 +878,18 @@ export function parseUpcomingPayrollResponse(value: unknown, requestedMode?: unk
   if (discriminator === "upcoming") return parseUpcoming(value, expectedMode);
   if (discriminator === "empty") return parseEmptyUpcoming(value, expectedMode);
   throw invalid("$.kind");
+}
+
+export function parseForceBuildStatus(value: unknown): ForceBuildStatus {
+  assertResponseSize(value);
+  const record = exactObject(value, "$", ["buildId", "state", "pollAfterMs"]);
+  opaqueId(record.buildId, "$.buildId");
+  const state = enumValue(record.state, FORCE_BUILD_STATES, "$.state");
+  const terminal = ["succeeded", "needs_attention", "failed"].includes(state);
+  if (terminal ? record.pollAfterMs !== null : record.pollAfterMs !== 2000) {
+    throw invalid("$.pollAfterMs");
+  }
+  return record as ForceBuildStatus;
 }
 
 export function parsePayrollEmployeePage(value: unknown): PayrollEmployeePage {

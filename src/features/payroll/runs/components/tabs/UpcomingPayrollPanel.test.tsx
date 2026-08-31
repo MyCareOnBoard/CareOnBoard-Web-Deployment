@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { UpcomingPayrollPanel } from "./UpcomingPayrollPanel";
@@ -6,11 +7,18 @@ import { UpcomingPayrollPanel } from "./UpcomingPayrollPanel";
 const api = vi.hoisted(() => ({
   hook: vi.fn(),
   refetch: vi.fn(),
+  forceBuildHook: vi.fn(),
+  forceBuild: vi.fn(),
+  statusHook: vi.fn(),
+  forceBuildState: { isLoading: false } as Record<string, unknown>,
+  statusState: { currentData: undefined, isError: false } as Record<string, unknown>,
 }));
 const navigation = vi.hoisted(() => vi.fn());
 
 vi.mock("../../api/payrollRunEndpoints", () => ({
   useGetUpcomingPayrollQuery: (...args: unknown[]) => api.hook(...args),
+  useForceBuildUpcomingPayrollMutation: () => api.forceBuildHook(),
+  useGetForceBuildStatusQuery: (...args: unknown[]) => api.statusHook(...args),
 }));
 
 vi.mock("react-router", () => ({
@@ -23,6 +31,7 @@ const upcoming = (overrides: Record<string, unknown> = {}) => ({
   kind: "upcoming" as const,
   mode: "ddd" as const,
   projectionRevision: 8,
+  forceBuild: { enabled: true as const, reasonCode: null },
   periodStart: "2026-08-24",
   periodEnd: "2026-09-06",
   payday: "2026-09-11",
@@ -65,8 +74,228 @@ describe("UpcomingPayrollPanel", () => {
   beforeEach(() => {
     api.hook.mockReset();
     api.refetch.mockReset();
+    api.forceBuildHook.mockReset();
+    api.forceBuild.mockReset();
+    api.statusHook.mockReset();
     navigation.mockReset();
+    api.forceBuildState = { isLoading: false };
+    api.statusState = { currentData: undefined, isError: false };
     api.hook.mockReturnValue(queryState(upcoming()));
+    api.forceBuild.mockReturnValue({
+      unwrap: () => Promise.resolve({ buildId: "build-1", state: "queued", pollAfterMs: 2000 }),
+    });
+    api.forceBuildHook.mockImplementation(() => [api.forceBuild, api.forceBuildState]);
+    api.statusHook.mockImplementation(() => api.statusState);
+  });
+
+  it("hides the test action when the server capability is disabled", () => {
+    api.hook.mockReturnValue(queryState(upcoming({
+      forceBuild: { enabled: false, reasonCode: "permission_required" },
+    })));
+
+    render(<UpcomingPayrollPanel scope={scope} />);
+
+    expect(screen.queryByRole("button", { name: "Build test payrolls now" })).not.toBeInTheDocument();
+  });
+
+  it("confirms the exact period before submitting the authoritative fence", async () => {
+    const user = userEvent.setup();
+    render(<UpcomingPayrollPanel scope={scope} />);
+
+    await user.click(screen.getByRole("button", { name: "Build test payrolls now" }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("Build test payrolls early?");
+    expect(screen.getByRole("dialog")).toHaveTextContent(
+      "This starts the real sandbox payroll build for Aug 24, 2026 – Sep 6, 2026 now instead of after the period closes. It creates Check sandbox drafts for eligible HHA and DDD payrolls and consumes this test period.",
+    );
+    await user.click(screen.getByRole("button", { name: "Build test payrolls" }));
+
+    expect(api.forceBuild).toHaveBeenCalledOnce();
+    expect(api.forceBuild).toHaveBeenCalledWith({
+      ...scope,
+      periodStart: "2026-08-24",
+      periodEnd: "2026-09-06",
+      payday: "2026-09-11",
+      expectedProjectionRevision: 8,
+    });
+  });
+
+  it("shows pointer affordances for enabled build controls and not-allowed affordances while submitting", async () => {
+    const user = userEvent.setup();
+    const view = render(<UpcomingPayrollPanel scope={scope} />);
+    const trigger = screen.getByRole("button", { name: "Build test payrolls now" });
+
+    expect(trigger).toHaveClass("cursor-pointer", "disabled:cursor-not-allowed");
+    await user.click(trigger);
+
+    const cancel = screen.getByRole("button", { name: "Cancel" });
+    const submit = screen.getByRole("button", { name: "Build test payrolls" });
+    expect(cancel).toHaveClass("cursor-pointer", "disabled:cursor-not-allowed");
+    expect(submit).toHaveClass("cursor-pointer", "disabled:cursor-not-allowed");
+
+    api.forceBuildState = { isLoading: true };
+    view.rerender(<UpcomingPayrollPanel scope={scope} />);
+
+    expect(trigger).toBeDisabled();
+    expect(cancel).toBeDisabled();
+    expect(submit).toBeDisabled();
+  });
+
+  it("closes the dialog and polls the returned queued or building build every two seconds", async () => {
+    const user = userEvent.setup();
+    const view = render(<UpcomingPayrollPanel scope={scope} />);
+
+    await user.click(screen.getByRole("button", { name: "Build test payrolls now" }));
+    await user.click(screen.getByRole("button", { name: "Build test payrolls" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Build test payrolls now" })).toBeDisabled();
+    expect(screen.getByRole("status", { name: "Test payroll build status" })).toHaveTextContent(
+      "Building test payrolls in Check... This can take a few minutes.",
+    );
+    expect(api.statusHook).toHaveBeenLastCalledWith(
+      { ...scope, buildId: "build-1" },
+      { pollingInterval: 2000, refetchOnMountOrArgChange: true },
+    );
+
+    api.statusState = {
+      currentData: { buildId: "build-1", state: "building", pollAfterMs: 2000 },
+      isError: false,
+    };
+    view.rerender(<UpcomingPayrollPanel scope={scope} />);
+
+    await waitFor(() => expect(api.statusHook).toHaveBeenLastCalledWith(
+      { ...scope, buildId: "build-1" },
+      { pollingInterval: 2000, refetchOnMountOrArgChange: true },
+    ));
+  });
+
+  it("clears dialog, build, errors, and callback guards when agency or mode changes", async () => {
+    const user = userEvent.setup();
+    const onBuildSucceeded = vi.fn();
+    const view = render(<UpcomingPayrollPanel scope={scope} onBuildSucceeded={onBuildSucceeded} />);
+
+    await user.click(screen.getByRole("button", { name: "Build test payrolls now" }));
+    view.rerender(<UpcomingPayrollPanel scope={{ ...scope, mode: "hha" }} onBuildSucceeded={onBuildSucceeded} />);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Build test payrolls now" }));
+    await user.click(screen.getByRole("button", { name: "Build test payrolls" }));
+    api.statusState = { currentData: undefined, isError: true };
+    view.rerender(<UpcomingPayrollPanel scope={{ ...scope, mode: "hha" }} onBuildSucceeded={onBuildSucceeded} />);
+    expect(await screen.findByText(/Build status could not be refreshed/)).toBeInTheDocument();
+
+    view.rerender(<UpcomingPayrollPanel scope={{ ...scope, agencyId: "agency-2" }} onBuildSucceeded={onBuildSucceeded} />);
+    await waitFor(() => expect(screen.queryByText(/Build status could not be refreshed/)).not.toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Build test payrolls now" })).toBeEnabled();
+
+    api.forceBuild.mockReturnValue({
+      unwrap: () => Promise.resolve({ buildId: "build-1", state: "succeeded", pollAfterMs: null }),
+    });
+    await user.click(screen.getByRole("button", { name: "Build test payrolls now" }));
+    await user.click(screen.getByRole("button", { name: "Build test payrolls" }));
+    await waitFor(() => expect(onBuildSucceeded).toHaveBeenCalledOnce());
+
+    view.rerender(<UpcomingPayrollPanel scope={{ ...scope, agencyId: "agency-3" }} onBuildSucceeded={onBuildSucceeded} />);
+    await user.click(screen.getByRole("button", { name: "Build test payrolls now" }));
+    await user.click(screen.getByRole("button", { name: "Build test payrolls" }));
+    await waitFor(() => expect(onBuildSucceeded).toHaveBeenCalledTimes(2));
+  });
+
+  it("stops polling and offers a projection refresh when the build needs attention", async () => {
+    const user = userEvent.setup();
+    const view = render(<UpcomingPayrollPanel scope={scope} />);
+    await user.click(screen.getByRole("button", { name: "Build test payrolls now" }));
+    await user.click(screen.getByRole("button", { name: "Build test payrolls" }));
+
+    api.statusState = {
+      currentData: { buildId: "build-1", state: "needs_attention", pollAfterMs: null },
+      isError: false,
+    };
+    view.rerender(<UpcomingPayrollPanel scope={scope} />);
+
+    expect(await screen.findByText(
+      "Payroll build needs attention. Refresh the upcoming payroll and review any blockers before continuing.",
+    )).toBeInTheDocument();
+    await waitFor(() => expect(api.statusHook).toHaveBeenLastCalledWith(
+      { ...scope, buildId: "build-1" },
+      { pollingInterval: 0, refetchOnMountOrArgChange: true },
+    ));
+    await user.click(screen.getByRole("button", { name: "Refresh upcoming payroll" }));
+    expect(api.refetch).toHaveBeenCalledOnce();
+    expect(screen.getByRole("heading", { name: "Upcoming payroll" })).toBeInTheDocument();
+  });
+
+  it("stops polling and remains Upcoming when the build fails", async () => {
+    const user = userEvent.setup();
+    const view = render(<UpcomingPayrollPanel scope={scope} />);
+    await user.click(screen.getByRole("button", { name: "Build test payrolls now" }));
+    await user.click(screen.getByRole("button", { name: "Build test payrolls" }));
+
+    api.statusState = {
+      currentData: { buildId: "build-1", state: "failed", pollAfterMs: null },
+      isError: false,
+    };
+    view.rerender(<UpcomingPayrollPanel scope={scope} />);
+
+    expect(await screen.findByText(
+      "Test payrolls could not be built. Nothing was moved to Current. Refresh the page to review the latest payroll state.",
+    )).toBeInTheDocument();
+    await waitFor(() => expect(api.statusHook).toHaveBeenLastCalledWith(
+      { ...scope, buildId: "build-1" },
+      { pollingInterval: 0, refetchOnMountOrArgChange: true },
+    ));
+    expect(screen.getByRole("heading", { name: "Upcoming payroll" })).toBeInTheDocument();
+  });
+
+  it("restores the action after the build cannot be started", async () => {
+    const user = userEvent.setup();
+    api.forceBuild.mockReturnValue({ unwrap: () => Promise.reject(new Error("unavailable")) });
+    render(<UpcomingPayrollPanel scope={scope} />);
+
+    await user.click(screen.getByRole("button", { name: "Build test payrolls now" }));
+    await user.click(screen.getByRole("button", { name: "Build test payrolls" }));
+
+    expect(await screen.findByText(
+      "Test payroll build could not be started. Refresh the upcoming payroll and try again.",
+    )).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Build test payrolls now" })).toBeEnabled();
+  });
+
+  it("keeps polling after a transient status read failure", async () => {
+    const user = userEvent.setup();
+    const view = render(<UpcomingPayrollPanel scope={scope} />);
+    await user.click(screen.getByRole("button", { name: "Build test payrolls now" }));
+    await user.click(screen.getByRole("button", { name: "Build test payrolls" }));
+
+    api.statusState = { currentData: undefined, isError: true };
+    view.rerender(<UpcomingPayrollPanel scope={scope} />);
+
+    expect(await screen.findByText(
+      "Build status could not be refreshed. We’ll keep checking while this page is open.",
+    )).toBeInTheDocument();
+    expect(api.statusHook).toHaveBeenLastCalledWith(
+      { ...scope, buildId: "build-1" },
+      { pollingInterval: 2000, refetchOnMountOrArgChange: true },
+    );
+  });
+
+  it("reports a succeeded build exactly once without rendering failure copy", async () => {
+    const user = userEvent.setup();
+    const onBuildSucceeded = vi.fn();
+    const view = render(<UpcomingPayrollPanel scope={scope} onBuildSucceeded={onBuildSucceeded} />);
+    await user.click(screen.getByRole("button", { name: "Build test payrolls now" }));
+    await user.click(screen.getByRole("button", { name: "Build test payrolls" }));
+
+    api.statusState = {
+      currentData: { buildId: "build-1", state: "succeeded", pollAfterMs: null },
+      isError: false,
+    };
+    view.rerender(<UpcomingPayrollPanel scope={scope} onBuildSucceeded={onBuildSucceeded} />);
+
+    await waitFor(() => expect(onBuildSucceeded).toHaveBeenCalledOnce());
+    view.rerender(<UpcomingPayrollPanel scope={scope} onBuildSucceeded={onBuildSucceeded} />);
+    expect(onBuildSucceeded).toHaveBeenCalledOnce();
+    expect(screen.queryByText(/could not be built|could not be started/)).not.toBeInTheDocument();
   });
 
   it("shows the approved-work totals, neutral readiness, source detail, and one semantic worker row", () => {
