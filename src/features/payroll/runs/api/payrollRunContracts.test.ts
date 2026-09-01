@@ -81,7 +81,22 @@ const validForceBuildStatus = () => ({
   buildId: "build-a",
   state: "queued",
   pollAfterMs: 2000,
+  attention: null,
 });
+
+const forceBuildAttentionPairs = [
+  ["period_snapshot_invalid", "Payroll period needs to be refreshed."],
+  ["schedule_not_ready", "Payroll schedule is not ready."],
+  ["approval_deadline_elapsed", "The approval deadline has passed."],
+  ["activation_identity_invalid", "Payroll setup needs to be refreshed."],
+  ["activation_unavailable", "Payroll activation is unavailable."],
+  ["prerequisites_not_ready", "Payroll prerequisites are not ready."],
+  ["approval_deadline_invalid", "Payroll approval timing needs attention."],
+  ["run_identity_conflict", "Payroll run needs attention."],
+  ["run_needs_attention", "Payroll run needs attention."],
+  ["check_operations_required", "Complete required Check operations."],
+  ["payroll_needs_attention", "Payroll needs attention."],
+] as const;
 
 const disabled = { enabled: false, reasonCode: "capability_disabled" };
 
@@ -617,11 +632,57 @@ describe("upcoming payroll runtime contract", () => {
 describe("force-build status runtime contract", () => {
   it("accepts only exact status replies with the required polling cadence", () => {
     expect(parseForceBuildStatus(validForceBuildStatus())).toEqual(validForceBuildStatus());
-    expect(parseForceBuildStatus({ buildId: "build-a", state: "succeeded", pollAfterMs: null })).toEqual({
+    expect(parseForceBuildStatus({ buildId: "build-a", state: "succeeded", pollAfterMs: null, attention: null })).toEqual({
       buildId: "build-a",
       state: "succeeded",
       pollAfterMs: null,
+      attention: null,
     });
+  });
+
+  it("accepts every backend-owned attention pair and rejects mismatched messages", () => {
+    for (const [code, message] of forceBuildAttentionPairs) {
+      const attention = { code, message };
+      expect(parseForceBuildStatus({
+        buildId: "build-a",
+        state: "needs_attention",
+        pollAfterMs: null,
+        attention,
+      })).toEqual({
+        buildId: "build-a",
+        state: "needs_attention",
+        pollAfterMs: null,
+        attention,
+      });
+      expect(() => parseForceBuildStatus({
+        buildId: "build-a",
+        state: "needs_attention",
+        pollAfterMs: null,
+        attention: { code, message: "Mismatched public message." },
+      })).toThrow();
+    }
+
+    expect(() => parseForceBuildStatus({
+      buildId: "build-a",
+      state: "needs_attention",
+      pollAfterMs: null,
+      attention: { code: "unknown", message: "Unknown." },
+    })).toThrow();
+    expect(() => parseForceBuildStatus({
+      buildId: "build-a",
+      state: "needs_attention",
+      pollAfterMs: null,
+      attention: null,
+    })).toThrow();
+    expect(() => parseForceBuildStatus({
+      buildId: "build-a",
+      state: "queued",
+      pollAfterMs: 2000,
+      attention: {
+        code: "approval_deadline_elapsed",
+        message: "The approval deadline has passed.",
+      },
+    })).toThrowError("Invalid payroll response at $.attention.");
   });
 
   it("rejects malformed status replies instead of caching them", () => {
@@ -631,5 +692,6 @@ describe("force-build status runtime contract", () => {
     expect(() => parseForceBuildStatus({ buildId: "build-a", state: "succeeded", pollAfterMs: 2000 })).toThrow();
     expect(() => parseForceBuildStatus({ buildId: "build-a", state: "failed", pollAfterMs: 500 })).toThrow();
     expect(() => parseForceBuildStatus({ ...validForceBuildStatus(), pollAfterMs: null })).toThrow();
+    expect(() => parseForceBuildStatus({ buildId: "build-a", state: "failed", pollAfterMs: null })).toThrow();
   });
 });

@@ -41,6 +41,24 @@ export type ForceBuildCapability =
 
 export type ForceBuildState = "queued" | "building" | "succeeded" | "needs_attention" | "failed";
 
+export type ForceBuildAttentionCode =
+  | "period_snapshot_invalid"
+  | "schedule_not_ready"
+  | "approval_deadline_elapsed"
+  | "activation_identity_invalid"
+  | "activation_unavailable"
+  | "prerequisites_not_ready"
+  | "approval_deadline_invalid"
+  | "run_identity_conflict"
+  | "run_needs_attention"
+  | "check_operations_required"
+  | "payroll_needs_attention";
+
+export type ForceBuildAttention = {
+  code: ForceBuildAttentionCode;
+  message: string;
+};
+
 export type ForceBuildUpcomingPayrollArgs = AgencyPayrollRunScope & {
   periodStart: string;
   periodEnd: string;
@@ -50,11 +68,25 @@ export type ForceBuildUpcomingPayrollArgs = AgencyPayrollRunScope & {
 
 export type ForceBuildStatusArgs = AgencyPayrollRunScope & { buildId: string };
 
-export type ForceBuildStatus = {
-  buildId: string;
-  state: ForceBuildState;
-  pollAfterMs: 2000 | null;
-};
+export type ForceBuildStatus =
+  | {
+    buildId: string;
+    state: "queued" | "building";
+    pollAfterMs: 2000;
+    attention: null;
+  }
+  | {
+    buildId: string;
+    state: "succeeded" | "failed";
+    pollAfterMs: null;
+    attention: null;
+  }
+  | {
+    buildId: string;
+    state: "needs_attention";
+    pollAfterMs: null;
+    attention: ForceBuildAttention;
+  };
 
 export type PayrollEmployeeFilter = "all" | "blocked" | "included" | "zero_due" | "deferred";
 export type PayrollEmployeeSort = "name_asc" | "gross_desc";

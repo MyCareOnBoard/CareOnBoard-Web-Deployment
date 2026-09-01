@@ -32,6 +32,7 @@ import type {
   UpcomingPayrollResponse,
   UpcomingPayrollSourceCounts,
   ForceBuildCapability,
+  ForceBuildAttentionCode,
   ForceBuildStatus,
 } from "./payrollRunEndpoints";
 
@@ -72,6 +73,22 @@ const PREVIEW_STATUSES = ["none", "pending", "succeeded", "failed"] as const;
 const EMPLOYMENT_TYPES = ["field", "staff"] as const;
 const UPCOMING_EMPTY_REASONS = ["no_upcoming_period", "agency_timezone_required"] as const;
 const FORCE_BUILD_STATES = ["queued", "building", "succeeded", "needs_attention", "failed"] as const;
+const FORCE_BUILD_ATTENTION_MESSAGES = {
+  period_snapshot_invalid: "Payroll period needs to be refreshed.",
+  schedule_not_ready: "Payroll schedule is not ready.",
+  approval_deadline_elapsed: "The approval deadline has passed.",
+  activation_identity_invalid: "Payroll setup needs to be refreshed.",
+  activation_unavailable: "Payroll activation is unavailable.",
+  prerequisites_not_ready: "Payroll prerequisites are not ready.",
+  approval_deadline_invalid: "Payroll approval timing needs attention.",
+  run_identity_conflict: "Payroll run needs attention.",
+  run_needs_attention: "Payroll run needs attention.",
+  check_operations_required: "Complete required Check operations.",
+  payroll_needs_attention: "Payroll needs attention.",
+} as const satisfies Record<ForceBuildAttentionCode, string>;
+const FORCE_BUILD_ATTENTION_CODES = Object.keys(
+  FORCE_BUILD_ATTENTION_MESSAGES,
+) as ForceBuildAttentionCode[];
 const FORCE_BUILD_DISABLED_REASONS = ["sandbox_only", "permission_required"] as const;
 const EMPLOYEE_DISPOSITIONS = ["included", "zero_due", "blocked", "deferred"] as const;
 const PROVIDER_ITEM_STATES = ["pending", "none"] as const;
@@ -882,12 +899,21 @@ export function parseUpcomingPayrollResponse(value: unknown, requestedMode?: unk
 
 export function parseForceBuildStatus(value: unknown): ForceBuildStatus {
   assertResponseSize(value);
-  const record = exactObject(value, "$", ["buildId", "state", "pollAfterMs"]);
+  const record = exactObject(value, "$", ["buildId", "state", "pollAfterMs", "attention"]);
   opaqueId(record.buildId, "$.buildId");
   const state = enumValue(record.state, FORCE_BUILD_STATES, "$.state");
   const terminal = ["succeeded", "needs_attention", "failed"].includes(state);
   if (terminal ? record.pollAfterMs !== null : record.pollAfterMs !== 2000) {
     throw invalid("$.pollAfterMs");
+  }
+  if (state === "needs_attention") {
+    const attention = exactObject(record.attention, "$.attention", ["code", "message"]);
+    const code = enumValue(attention.code, FORCE_BUILD_ATTENTION_CODES, "$.attention.code");
+    if (attention.message !== FORCE_BUILD_ATTENTION_MESSAGES[code]) {
+      throw invalid("$.attention.message");
+    }
+  } else if (record.attention !== null) {
+    throw invalid("$.attention");
   }
   return record as ForceBuildStatus;
 }

@@ -251,7 +251,7 @@ describe("AgencyPayrollRunsWorkspace", () => {
     api.employeesHook.mockImplementation(() => api.employeesState);
     api.upcomingHook.mockImplementation(() => api.upcomingState);
     api.forceBuild.mockReturnValue({
-      unwrap: () => Promise.resolve({ buildId: "build-1", state: "queued", pollAfterMs: 2000 }),
+      unwrap: () => Promise.resolve({ buildId: "build-1", state: "queued", pollAfterMs: 2000, attention: null }),
     });
     api.forceBuildHook.mockImplementation(() => [api.forceBuild, api.forceBuildState]);
     api.statusHook.mockImplementation(() => api.statusState);
@@ -356,7 +356,7 @@ describe("AgencyPayrollRunsWorkspace", () => {
     expect(screen.getByRole("tab", { name: "Upcoming" })).toHaveAttribute("aria-selected", "true");
 
     api.statusState = {
-      currentData: { buildId: "build-1", state: "succeeded", pollAfterMs: null },
+      currentData: { buildId: "build-1", state: "succeeded", pollAfterMs: null, attention: null },
       isError: false,
     };
     view.rerender(<AgencyPayrollRunsWorkspace scope={scope} />);
@@ -382,7 +382,7 @@ describe("AgencyPayrollRunsWorkspace", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Build test payrolls" }));
 
     api.statusState = {
-      currentData: { buildId: "build-1", state: "failed", pollAfterMs: null },
+      currentData: { buildId: "build-1", state: "failed", pollAfterMs: null, attention: null },
       isError: false,
     };
     view.rerender(<AgencyPayrollRunsWorkspace scope={scope} />);

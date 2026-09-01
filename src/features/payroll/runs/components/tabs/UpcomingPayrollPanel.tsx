@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
+import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router";
 
 import {
@@ -350,13 +351,14 @@ export function UpcomingPayrollPanel({ scope, onBuildSucceeded }: {
         <div
           role="status"
           aria-label="Test payroll build status"
-          className="rounded-xl border border-[#b8dfe0] bg-[#eefafa] px-4 py-3 text-sm font-medium text-[#006f73]"
+          className="flex items-center gap-2 rounded-xl border border-[#b8dfe0] bg-[#eefafa] px-4 py-3 text-sm font-medium text-[#006f73]"
         >
+          <Loader2 aria-hidden="true" className="size-4 motion-safe:animate-spin" />
           Building test payrolls in Check... This can take a few minutes.
         </div>
       ) : activeBuild?.state === "needs_attention" ? (
         <div role="status" aria-label="Test payroll build status" className="rounded-xl border border-[#ded5b4] bg-[#faf8f1] px-4 py-3 text-sm text-[#665c39]">
-          <p>Payroll build needs attention. Refresh the upcoming payroll and review any blockers before continuing.</p>
+          <p>{activeBuild.attention.message}</p>
           <button type="button" onClick={() => void refetch()} className="mt-2 font-semibold underline">
             Refresh upcoming payroll
           </button>
@@ -502,9 +504,15 @@ export function UpcomingPayrollPanel({ scope, onBuildSucceeded }: {
               type="button"
               disabled={forceBuildRequest.isLoading || buildInProgress}
               onClick={() => void startBuild()}
+              aria-busy={forceBuildRequest.isLoading}
               className="min-h-11 cursor-pointer rounded-full bg-[#00b4b8] px-5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Build test payrolls
+              {forceBuildRequest.isLoading ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 aria-hidden="true" className="size-4 motion-safe:animate-spin" />
+                  Starting test payroll build…
+                </span>
+              ) : "Build test payrolls"}
             </button>
           </DialogFooter>
         </DialogContent>

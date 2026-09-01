@@ -58,7 +58,12 @@ const validUpcomingResponse = () => ({
   asOf: "2026-08-25T12:00:00.000Z",
 });
 
-const validForceBuildStatus = (buildId = "build-a") => ({ buildId, state: "queued", pollAfterMs: 2000 });
+const validForceBuildStatus = (buildId = "build-a") => ({
+  buildId,
+  state: "queued",
+  pollAfterMs: 2000,
+  attention: null,
+});
 
 describe("payroll run read transport", () => {
   beforeEach(() => baseQuery.mockReset());

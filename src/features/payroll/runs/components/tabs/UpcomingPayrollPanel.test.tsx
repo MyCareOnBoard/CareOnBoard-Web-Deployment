@@ -82,7 +82,7 @@ describe("UpcomingPayrollPanel", () => {
     api.statusState = { currentData: undefined, isError: false };
     api.hook.mockReturnValue(queryState(upcoming()));
     api.forceBuild.mockReturnValue({
-      unwrap: () => Promise.resolve({ buildId: "build-1", state: "queued", pollAfterMs: 2000 }),
+      unwrap: () => Promise.resolve({ buildId: "build-1", state: "queued", pollAfterMs: 2000, attention: null }),
     });
     api.forceBuildHook.mockImplementation(() => [api.forceBuild, api.forceBuildState]);
     api.statusHook.mockImplementation(() => api.statusState);
@@ -140,6 +140,37 @@ describe("UpcomingPayrollPanel", () => {
     expect(submit).toBeDisabled();
   });
 
+  it("keeps the confirmation dialog locked with a busy spinner while the force-build request is pending", async () => {
+    const user = userEvent.setup();
+    const pendingBuild = new Promise<{
+      buildId: string;
+      state: "queued";
+      pollAfterMs: number;
+      attention: null;
+    }>(() => undefined);
+    api.forceBuild.mockReturnValue({ unwrap: () => pendingBuild });
+    const view = render(<UpcomingPayrollPanel scope={scope} />);
+
+    await user.click(screen.getByRole("button", { name: "Build test payrolls now" }));
+    await user.click(screen.getByRole("button", { name: "Build test payrolls" }));
+    api.forceBuildState = { isLoading: true };
+    view.rerender(<UpcomingPayrollPanel scope={scope} />);
+
+    const dialog = screen.getByRole("dialog");
+    const submit = screen.getByRole("button", { name: "Starting test payroll build…" });
+    expect(dialog).toBeInTheDocument();
+    expect(submit).toHaveAttribute("aria-busy", "true");
+    expect(submit.querySelector("svg")).toHaveClass("motion-safe:animate-spin");
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Close" })).not.toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    fireEvent.pointerDown(document.body);
+    fireEvent.pointerUp(document.body);
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
   it("closes the dialog and polls the returned queued or building build every two seconds", async () => {
     const user = userEvent.setup();
     const view = render(<UpcomingPayrollPanel scope={scope} />);
@@ -152,13 +183,15 @@ describe("UpcomingPayrollPanel", () => {
     expect(screen.getByRole("status", { name: "Test payroll build status" })).toHaveTextContent(
       "Building test payrolls in Check... This can take a few minutes.",
     );
+    expect(screen.getByRole("status", { name: "Test payroll build status" }).querySelector("svg"))
+      .toHaveClass("motion-safe:animate-spin");
     expect(api.statusHook).toHaveBeenLastCalledWith(
       { ...scope, buildId: "build-1" },
       { pollingInterval: 2000, refetchOnMountOrArgChange: true },
     );
 
     api.statusState = {
-      currentData: { buildId: "build-1", state: "building", pollAfterMs: 2000 },
+      currentData: { buildId: "build-1", state: "building", pollAfterMs: 2000, attention: null },
       isError: false,
     };
     view.rerender(<UpcomingPayrollPanel scope={scope} />);
@@ -189,7 +222,7 @@ describe("UpcomingPayrollPanel", () => {
     expect(screen.getByRole("button", { name: "Build test payrolls now" })).toBeEnabled();
 
     api.forceBuild.mockReturnValue({
-      unwrap: () => Promise.resolve({ buildId: "build-1", state: "succeeded", pollAfterMs: null }),
+      unwrap: () => Promise.resolve({ buildId: "build-1", state: "succeeded", pollAfterMs: null, attention: null }),
     });
     await user.click(screen.getByRole("button", { name: "Build test payrolls now" }));
     await user.click(screen.getByRole("button", { name: "Build test payrolls" }));
@@ -208,13 +241,21 @@ describe("UpcomingPayrollPanel", () => {
     await user.click(screen.getByRole("button", { name: "Build test payrolls" }));
 
     api.statusState = {
-      currentData: { buildId: "build-1", state: "needs_attention", pollAfterMs: null },
+      currentData: {
+        buildId: "build-1",
+        state: "needs_attention",
+        pollAfterMs: null,
+        attention: {
+          code: "approval_deadline_elapsed",
+          message: "The approval deadline has passed.",
+        },
+      },
       isError: false,
     };
     view.rerender(<UpcomingPayrollPanel scope={scope} />);
 
     expect(await screen.findByText(
-      "Payroll build needs attention. Refresh the upcoming payroll and review any blockers before continuing.",
+      "The approval deadline has passed.",
     )).toBeInTheDocument();
     await waitFor(() => expect(api.statusHook).toHaveBeenLastCalledWith(
       { ...scope, buildId: "build-1" },
@@ -232,7 +273,7 @@ describe("UpcomingPayrollPanel", () => {
     await user.click(screen.getByRole("button", { name: "Build test payrolls" }));
 
     api.statusState = {
-      currentData: { buildId: "build-1", state: "failed", pollAfterMs: null },
+      currentData: { buildId: "build-1", state: "failed", pollAfterMs: null, attention: null },
       isError: false,
     };
     view.rerender(<UpcomingPayrollPanel scope={scope} />);
@@ -287,7 +328,7 @@ describe("UpcomingPayrollPanel", () => {
     await user.click(screen.getByRole("button", { name: "Build test payrolls" }));
 
     api.statusState = {
-      currentData: { buildId: "build-1", state: "succeeded", pollAfterMs: null },
+      currentData: { buildId: "build-1", state: "succeeded", pollAfterMs: null, attention: null },
       isError: false,
     };
     view.rerender(<UpcomingPayrollPanel scope={scope} onBuildSucceeded={onBuildSucceeded} />);

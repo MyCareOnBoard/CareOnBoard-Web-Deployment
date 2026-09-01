@@ -26,7 +26,7 @@ describe("force-build Axios transport", () => {
       expectedProjectionRevision: 27,
     };
     clients.authenticated.mockResolvedValue({
-      data: { buildId: "build-a", state: "queued", pollAfterMs: 2000 },
+      data: { buildId: "build-a", state: "queued", pollAfterMs: 2000, attention: null },
     });
 
     await expect(store.dispatch(payrollRunApi.endpoints.forceBuildUpcomingPayroll.initiate({
@@ -35,7 +35,7 @@ describe("force-build Axios transport", () => {
       agencyId: "agency-1",
       mode: "ddd",
       ...fence,
-    })).unwrap()).resolves.toEqual({ buildId: "build-a", state: "queued", pollAfterMs: 2000 });
+    })).unwrap()).resolves.toEqual({ buildId: "build-a", state: "queued", pollAfterMs: 2000, attention: null });
 
     expect(clients.authenticated).toHaveBeenCalledOnce();
     expect(clients.authenticated).toHaveBeenCalledWith(expect.objectContaining({
