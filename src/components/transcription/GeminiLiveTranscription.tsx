@@ -124,13 +124,17 @@ export default function GeminiLiveTranscription({
           return;
         }
 
-        const { GoogleGenAI, Modality } = await import("@google/genai");
+        const { GoogleGenAI, Modality, AudioTranscriptionConfigMode } = await import("@google/genai");
         const client = new GoogleGenAI({ apiKey: connection.token });
         const session = (await client.live.connect({
           model: connection.model,
           config: {
             ...connection.config,
             responseModalities: [Modality.TEXT],
+            inputAudioTranscription: {
+              ...connection.config.inputAudioTranscription,
+              mode: AudioTranscriptionConfigMode.SMART,
+            },
           },
           callbacks: {
             onopen: () => {

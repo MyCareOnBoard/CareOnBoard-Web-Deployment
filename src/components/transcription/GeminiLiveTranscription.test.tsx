@@ -21,6 +21,7 @@ vi.mock("@/lib/api/gemini", () => ({
 }));
 
 vi.mock("@google/genai", () => ({
+  AudioTranscriptionConfigMode: { SMART: "SMART" },
   Modality: { TEXT: "TEXT" },
   GoogleGenAI: class {
     live = {
