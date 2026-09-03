@@ -20,6 +20,27 @@ interface TranslateToEnglishResponse {
   translatedText: string;
 }
 
+export interface GeminiLiveTranscriptionConnection {
+  token: string;
+  model: "gemini-3.5-transcribe-live";
+  config: {
+    responseModalities: ["TEXT"];
+    inputAudioTranscription: {
+      languageCodes: string[];
+      mode: "SMART";
+    };
+  };
+  expiresAt: string;
+  newSessionExpiresAt: string;
+}
+
+export async function getGeminiLiveTranscriptionToken(): Promise<GeminiLiveTranscriptionConnection> {
+  const response = await axiosClient.post<GeminiLiveTranscriptionConnection>(
+    "/gemini/live-transcription-token",
+  );
+  return response.data;
+}
+
 export async function translateToEnglishViaApi(
   text: string,
   sourceLanguage?: string | null,

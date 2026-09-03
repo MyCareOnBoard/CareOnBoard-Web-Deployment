@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import MicrophoneIcon from "@/assets/icons/microphone.svg?react";
 import { useVoiceRecording } from "@/contexts/VoiceRecordingContext";
-import AssemblyAITranscription from "@/components/transcription/AssemblyAITranscription";
+import GeminiLiveTranscription from "@/components/transcription/GeminiLiveTranscription";
 import {
   shouldTranslateToEnglish,
   translateToEnglish,
@@ -322,7 +322,7 @@ export default function VoiceInputButton({
 
   return (
     <>
-      <AssemblyAITranscription
+      <GeminiLiveTranscription
         isRecording={isRecording}
         onPartialTranscript={handlePartialTranscript}
         onCommittedTranscript={addCommittedTranscript}

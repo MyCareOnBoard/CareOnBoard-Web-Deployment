@@ -4,7 +4,7 @@ This directory contains transcription service implementations. The architecture 
 
 ## Current Implementation
 
-Currently using **ElevenLabs Scribe v2** for real-time speech-to-text transcription.
+Currently using **Gemini Live Transcribe** for real-time speech-to-text transcription.
 
 ## Architecture
 
@@ -146,21 +146,16 @@ To test a new service:
    - Stop/Cancel functionality
    - Accept functionality
 
-## Current Service: ElevenLabs
+## Current Service: Gemini Live Transcribe
 
-**File**: `ElevenLabsTranscription.tsx`
+**File**: `GeminiLiveTranscription.tsx`
 
 **Features**:
-- Real-time transcription with ultra-low latency
-- Voice Activity Detection (VAD)
-- Automatic language detection
+- Real-time transcription through Gemini Live
+- Ephemeral, one-use token authentication
+- Automatic language selection
 - Speech activity detection for animations
-- Token-based authentication
-
-**Configuration**:
-- VAD Threshold: 0.5
-- Silence Threshold: 1.0 seconds
-- Commit Strategy: VAD (auto-commits on silence)
+- Token-based browser connection
 
 ## Benefits of This Architecture
 
