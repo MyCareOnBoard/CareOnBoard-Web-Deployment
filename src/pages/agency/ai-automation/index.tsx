@@ -273,9 +273,7 @@ function AIAutomationContent() {
                 baseline: inputValue,
                 setValue: setInputValue,
               });
-              startRecording("message", "AI Automation", undefined, (transcript) =>
-                setInputValue((prev) => (prev ? `${prev} ${transcript}` : transcript))
-              );
+              startRecording("message", "AI Automation", undefined, setInputValue);
             }}
             isRecording={isRecording}
             recordingUi={recordingUi}

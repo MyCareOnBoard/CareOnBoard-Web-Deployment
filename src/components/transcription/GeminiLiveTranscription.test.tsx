@@ -129,13 +129,13 @@ describe("GeminiLiveTranscription", () => {
     });
 
     mocks.callbacks?.onmessage({
-      serverContent: { inputTranscription: { text: "partial", finished: false } },
+      serverContent: { interimInputTranscription: { text: "partial" } },
     });
     expect(callbacks.onPartialTranscript).toHaveBeenCalledWith("partial");
     expect(callbacks.onSpeechDetected).toHaveBeenCalledWith(true);
 
     mocks.callbacks?.onmessage({
-      serverContent: { inputTranscription: { text: "final transcript", finished: true } },
+      serverContent: { inputTranscription: { text: "final transcript" } },
     });
     expect(callbacks.onPartialTranscript).toHaveBeenLastCalledWith("");
     expect(callbacks.onCommittedTranscript).toHaveBeenCalledWith("final transcript");

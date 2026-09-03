@@ -144,16 +144,17 @@ export default function GeminiLiveTranscription({
                 return;
               }
 
-              const transcription = message.serverContent?.inputTranscription;
-              if (typeof transcription?.text === "string" && transcription.text.trim()) {
-                if (!transcription.finished) {
-                  onPartialTranscript(transcription.text);
-                  bumpSpeechActivity();
-                  return;
-                }
+              const content = message.serverContent;
+              const interim = content?.interimInputTranscription?.text?.trim();
+              if (interim) {
+                onPartialTranscript(interim);
+                bumpSpeechActivity();
+              }
 
+              const finalized = content?.inputTranscription?.text?.trim();
+              if (finalized) {
                 onPartialTranscript("");
-                onCommittedTranscript(transcription.text.trim());
+                onCommittedTranscript(finalized);
                 bumpSpeechActivity();
               }
             },
