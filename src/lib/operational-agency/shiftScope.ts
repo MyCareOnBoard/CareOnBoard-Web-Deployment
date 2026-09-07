@@ -9,7 +9,7 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 export function scopedShiftListParams(
   agencyId: string,
   search: string,
-  clientType?: "ddd" | "hha",
+  clientType?: "ddd" | "hha" | "sc",
 ): ListShiftsParams {
   const query = new URLSearchParams(search);
   const startDate = query.get("startDate")?.trim();

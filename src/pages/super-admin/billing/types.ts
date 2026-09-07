@@ -103,7 +103,7 @@ export type NetworkBillingClaimRow =
 export type NetworkBillingTimesheetRow = NetworkBillingRowBase & {
   staffKey: string;
   status: "pending" | "approved" | "rejected";
-  mode: "ddd" | "hha" | null;
+  mode: "ddd" | "hha" | "sc" | null;
   staffUid: string | null;
   staffName: string | null;
   periodStart: NetworkBillingJsonValue;
@@ -115,7 +115,7 @@ export type NetworkBillingTimesheetRow = NetworkBillingRowBase & {
 export type NetworkBillingExpenseRow = NetworkBillingRowBase & {
   staffKey: string;
   status: "pending" | "approved" | "rejected";
-  mode: "ddd" | "hha" | null;
+  mode: "ddd" | "hha" | "sc" | null;
   amount: number;
   employeeId?: string | null;
   employeeUid?: string | null;

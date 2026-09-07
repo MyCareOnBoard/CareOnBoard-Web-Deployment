@@ -31,6 +31,7 @@ import { agencyDirectoryRoutes } from "@/lib/operational-agency/routes";
 import type { RootState } from "@/store/redux/store";
 import { UserType } from "@/utils/auth/types/user.types";
 import StaffTimesheetsTable, { StaffTimesheetStatusPill } from "./StaffTimesheetsTable";
+import ApprovalsPage from "@/pages/agency/scheduling/approvals";
 
 
 // Shared column template (header/rows/skeleton) — full literal class string so Tailwind JIT
@@ -389,6 +390,7 @@ export function AgencyStaffTimesheetsApprovalPage() {
       directoryRoutes={agencyDirectoryRoutes}
       data={data}
     >
+      {mode === "sc" && <ApprovalsPage manualTimesheets />}
       <StaffTimesheetsApprovalPage />
     </OperationalAgencyProvider>
   );

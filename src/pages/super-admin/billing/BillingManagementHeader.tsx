@@ -113,6 +113,7 @@ export default function BillingManagementHeader({
                   <option value="">All programs</option>
                   <option value="ddd">DDD</option>
                   <option value="hha">HHA</option>
+                  <option value="sc">Support Coordination</option>
                 </select>
               </label>
             </> : null}

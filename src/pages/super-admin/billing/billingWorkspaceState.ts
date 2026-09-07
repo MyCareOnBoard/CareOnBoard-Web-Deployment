@@ -1,6 +1,6 @@
 import type { BillingWorkspaceScope } from "./types";
 
-export type BillingProgramMode = "ddd" | "hha";
+export type BillingProgramMode = "ddd" | "hha" | "sc";
 
 export interface BillingWorkspaceState {
   scope: BillingWorkspaceScope;
@@ -94,7 +94,7 @@ export function parseBillingWorkspace(search: string, now = new Date()): Billing
   return {
     scope: agencyId ? { kind: "agency", agencyId } : { kind: "network" },
     ...range,
-    mode: requestedMode === "ddd" || requestedMode === "hha" ? requestedMode : null,
+    mode: requestedMode === "ddd" || requestedMode === "hha" || requestedMode === "sc" ? requestedMode : null,
   };
 }
 

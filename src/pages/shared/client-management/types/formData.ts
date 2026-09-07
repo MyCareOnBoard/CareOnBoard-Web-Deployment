@@ -531,6 +531,7 @@ export type Stage7SystemAiAndAuditData = {
 export type AddClientFormData = {
     agencyId?: string;
     type: ClientType;
+    servicePrograms?: ("ddd" | "hha" | "sc")[];
     /**
      * Stage 1 should run Places autocomplete on imported primary address and clear after processing.
      * Not sent to APIs.

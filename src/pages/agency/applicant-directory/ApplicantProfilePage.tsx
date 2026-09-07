@@ -155,7 +155,7 @@ function ApplicantProfilePageContent() {
 
   // Resolve the applicant's document set from the shared config (default "dsp").
   const applicantType: ApplicantType =
-    applicant.applicantType === "hha" ? "hha" : "dsp";
+    applicant.applicantType === "support_coordinator" ? "support_coordinator" : applicant.applicantType === "hha" ? "hha" : "dsp";
   const applicantDocDefs = getApplicantDocs(applicantType);
 
   // Short, agency-facing display labels. Preserves the existing DSP wording;
@@ -346,7 +346,7 @@ function ApplicantProfilePageContent() {
         // Build the doc map from the shared config (single source of truth),
         // keyed by the applicant's resolved type (default "dsp").
         const fetchedApplicantType: ApplicantType =
-          (data as { applicantType?: string }).applicantType === "hha" ? "hha" : "dsp";
+          (data as { applicantType?: string }).applicantType === "support_coordinator" ? "support_coordinator" : (data as { applicantType?: string }).applicantType === "hha" ? "hha" : "dsp";
         const eligibilityRecord = eligibility as unknown as Record<string, DocumentFile | undefined>;
         const docMap: Record<string, { url?: DocumentFile; label: string }> = {};
         getApplicantDocs(fetchedApplicantType).forEach((def) => {

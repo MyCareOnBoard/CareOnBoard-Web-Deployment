@@ -28,7 +28,7 @@ export function createAgencyOperationalDataAdapter(agencyId: string): Operationa
     async searchClients(input = {}) {
       const clients = await listClients({
         agencyId,
-        type: input.mode ?? undefined,
+        ...(input.mode === "sc" ? { mode: input.mode } : { type: input.mode ?? undefined }),
         status: "active",
         search: input.search,
         limit: input.limit,
@@ -48,7 +48,7 @@ export function createAgencyOperationalDataAdapter(agencyId: string): Operationa
       const response = await listEmployees({
         agencyId,
         search: input.search,
-        role: input.mode === "hha" ? "hha" : input.mode === "ddd" ? "dsp" : undefined,
+        role: input.mode === "sc" ? "support_coordinator" : input.mode === "hha" ? "hha" : input.mode === "ddd" ? "dsp" : undefined,
         limit: input.limit,
         signal: input.signal,
       });

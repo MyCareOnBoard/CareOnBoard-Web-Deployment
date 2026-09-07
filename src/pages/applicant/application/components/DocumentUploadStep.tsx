@@ -59,7 +59,7 @@ const FORM_DOWNLOADS: Record<string, {
 
 export default function DocumentUploadStep({ onSuccess, onNext }: DocumentUploadStepProps) {
   const { user } = useAuth();
-  const applicantType: ApplicantType = user?.applicantType === "hha" ? "hha" : "dsp";
+  const applicantType: ApplicantType = user?.applicantType === "support_coordinator" ? "support_coordinator" : user?.applicantType === "hha" ? "hha" : "dsp";
 
   // All document definitions for this applicant type (single source of truth).
   const docDefs = getApplicantDocs(applicantType);

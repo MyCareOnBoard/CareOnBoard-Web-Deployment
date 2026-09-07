@@ -49,6 +49,15 @@ vi.mock("@/hooks/useSidebarCollapsed", () => ({
 }));
 
 describe("field staff header role", () => {
+  it("keeps SC timesheets while excluding scheduling and DDD attendance modules", () => {
+    state.user = { uid: "sc-user", userType: "employee", applicantType: "support_coordinator" };
+    render(<MemoryRouter><UserPanelDashboardLayout /></MemoryRouter>);
+    expect(screen.getByTestId("dashboard-header-role")).toHaveTextContent("Support Coordinator");
+    expect(screen.getByText("Timesheets")).toBeInTheDocument();
+    expect(screen.queryByText("Shift Management")).not.toBeInTheDocument();
+    expect(screen.queryByText("Community Inclusion")).not.toBeInTheDocument();
+    expect(screen.queryByText("Day Program")).not.toBeInTheDocument();
+  });
   beforeEach(() => {
     state.user = {
       uid: "field-user",

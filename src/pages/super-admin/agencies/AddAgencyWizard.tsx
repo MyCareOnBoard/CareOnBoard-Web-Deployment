@@ -74,7 +74,7 @@ export interface AgencyFormData {
     userPassword: string;
 
     // Supported client types (DDD / HHA)
-    supportedClientTypes: ("ddd" | "hha")[];
+    supportedClientTypes: ("ddd" | "hha" | "sc")[];
 
     // Step 4: Service Configuration
     services: string[];

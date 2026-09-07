@@ -180,7 +180,7 @@ interface AddScheduleModalProps {
   agencyId: string;
   agencyName: string;
   agencyMode: AgencyMode | null;
-  supportedClientTypes: readonly ("ddd" | "hha")[];
+  supportedClientTypes: readonly ("ddd" | "hha" | "sc")[];
   data: OperationalAgencyDataAdapter;
   onShiftsUpdated?: (shifts: Shift[]) => void;
   editData?: ScheduleFormData | null; // For edit mode
@@ -834,7 +834,7 @@ export default function AddScheduleModal({
   const isHhaClient = selectedClient?.type === "hha";
   const notesAutoResolved = isHhaClient || isHhaAgencyMode;
 
-  const effectiveClientType = agencyMode ?? selectedClient?.type;
+  const effectiveClientType = agencyMode === "sc" ? selectedClient?.type ?? "ddd" : agencyMode ?? selectedClient?.type;
   const noteTypes = useMemo(
     () => (effectiveClientType ? noteTypesForClientType(effectiveClientType) : []),
     [effectiveClientType],

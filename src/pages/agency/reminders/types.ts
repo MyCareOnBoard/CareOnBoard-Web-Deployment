@@ -1,7 +1,7 @@
 export type ReminderType = "normal" | "ai_prompt";
 export type ReminderStatus = "pending" | "sent" | "failed";
 export type ReminderRecurrence = "none" | "daily" | "weekly" | "biweekly" | "monthly";
-export type ReminderMode = "ddd" | "hha";
+export type ReminderMode = "ddd" | "hha" | "sc";
 
 export interface Reminder {
   id: string;

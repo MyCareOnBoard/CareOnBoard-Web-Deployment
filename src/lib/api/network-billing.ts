@@ -53,10 +53,10 @@ type ClientSelection =
 type StaffSelection =
   | { employeeId: string; employeeAgencyId: string }
   | { employeeId?: never; employeeAgencyId?: never };
-type ModeFilter = { mode?: "ddd" | "hha" };
+type ModeFilter = { mode?: "ddd" | "hha" | "sc" };
 
 export type ClaimsNetworkBillingArgs = DatePageContext & ClientSelection & (
-  | { tab: "ready"; mode?: "ddd" | "hha"; status?: never; sort?: never; employeeId?: never; employeeAgencyId?: never }
+  | { tab: "ready"; mode?: "ddd" | "hha" | "sc"; status?: never; sort?: never; employeeId?: never; employeeAgencyId?: never }
   | { tab: "saved"; status?: "pending" | "paid" | "rejected"; sort?: "createdAt:desc" | "createdAt:asc"; mode?: never; employeeId?: never; employeeAgencyId?: never }
 );
 
@@ -490,7 +490,7 @@ function validateTimesheetRow(value: unknown, context: string): NetworkBillingTi
     ...agencyFields(source, context),
     staffKey: requiredString(source, "staffKey", context),
     status: requiredEnum(source, "status", ["pending", "approved", "rejected"] as const, context),
-    mode: nullableEnum(source, "mode", ["ddd", "hha"] as const, context),
+    mode: nullableEnum(source, "mode", ["ddd", "hha", "sc"] as const, context),
     staffUid: nullableString(source, "staffUid", context),
     staffName: nullableString(source, "staffName", context),
     periodStart: jsonValue(source.periodStart, `${context}.periodStart`),
@@ -507,7 +507,7 @@ function validateExpenseRow(value: unknown, context: string): NetworkBillingExpe
     ...agencyFields(source, context),
     staffKey: requiredString(source, "staffKey", context),
     status: requiredEnum(source, "status", ["pending", "approved", "rejected"] as const, context),
-    mode: nullableEnum(source, "mode", ["ddd", "hha"] as const, context),
+    mode: nullableEnum(source, "mode", ["ddd", "hha", "sc"] as const, context),
     amount: requiredNumber(source, "amount", context),
     ...(has(source, "employeeId") ? { employeeId: nullableString(source, "employeeId", context) } : {}),
     ...(has(source, "employeeUid") ? { employeeUid: nullableString(source, "employeeUid", context) } : {}),
@@ -834,7 +834,7 @@ function validateOptions(value: unknown): NetworkBillingOption[] {
 type RuntimeFilters = {
   startDate?: string;
   endDate?: string;
-  mode?: "ddd" | "hha";
+  mode?: "ddd" | "hha" | "sc";
   status?: string;
   clientId?: string;
   clientAgencyId?: string;

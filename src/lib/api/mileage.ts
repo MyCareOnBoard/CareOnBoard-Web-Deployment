@@ -208,7 +208,7 @@ export const mileageApi = {
       approved?: boolean;
       unclaimed?: boolean;
       skipEnrichment?: boolean;
-      clientType?: 'hha' | 'ddd';
+      clientType?: 'hha' | 'ddd' | 'sc';
     },
     options?: { signal?: AbortSignal },
   ) => {

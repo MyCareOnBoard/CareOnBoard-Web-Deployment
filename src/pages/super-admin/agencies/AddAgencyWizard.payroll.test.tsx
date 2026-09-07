@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import AddAgencyWizard from "./AddAgencyWizard";
 
 const mocks = vi.hoisted(() => ({
@@ -102,6 +102,7 @@ const expectedPayrollWrite = {
 };
 
 beforeEach(() => {
+  vi.setSystemTime(new Date("2026-09-01T12:00:00Z"));
   vi.clearAllMocks();
   mocks.search = "";
   mocks.currentAgency = undefined;
@@ -468,3 +469,4 @@ describe("AddAgencyWizard payroll endpoint payloads", () => {
     expect(JSON.stringify(mocks.create.mock.calls[0][0])).not.toMatch(/einStatus|designatedSignerUserUid|payrollSchedule|nextPayoutDate|last4/);
   }, 15_000);
 });
+afterEach(() => vi.useRealTimers());

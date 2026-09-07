@@ -47,6 +47,7 @@ export default function SignUpPage() {
   // Default "dsp"; show a DSP/HHA selector only when the agency supports both.
   const [applicantType, setApplicantType] = useState<ApplicantType>("dsp")
   const [showApplicantTypeSelector, setShowApplicantTypeSelector] = useState(false)
+  const [applicantOptions, setApplicantOptions] = useState<ApplicantType[]>(["dsp", "hha"])
   // Agency load state — signup is gated on a successfully loaded agency.
   const [agencyInfo, setAgencyInfo] = useState<any | null>(null)
   const [agencyLoading, setAgencyLoading] = useState<boolean>(Boolean(agencyId))
@@ -77,26 +78,15 @@ export default function SignUpPage() {
         const supported: string[] =
           info?.agency?.supportedClientTypes ?? info?.supportedClientTypes ?? []
 
-        const supportsDdd = supported.includes("ddd")
-        const supportsHha = supported.includes("hha")
-
-        if (supportsDdd && supportsHha) {
-          // Both supported -> let the applicant choose.
-          setShowApplicantTypeSelector(true)
-          setApplicantType("dsp")
-        } else if (supportsHha) {
-          // HHA-only -> auto-set caregiver.
-          setShowApplicantTypeSelector(false)
-          setApplicantType("hha")
-        } else if (supportsDdd) {
-          // DDD-only -> auto-set DSP.
-          setShowApplicantTypeSelector(false)
-          setApplicantType("dsp")
-        } else {
-          // Missing/empty supportedClientTypes => treated as both (back-compat).
-          setShowApplicantTypeSelector(true)
-          setApplicantType("dsp")
-        }
+        const options: ApplicantType[] = []
+        if (supported.includes("ddd")) options.push("dsp")
+        if (supported.includes("hha")) options.push("hha")
+        if (supported.includes("sc")) options.push("support_coordinator")
+        if (!options.length) options.push("dsp", "hha")
+        setApplicantOptions(options)
+        setShowApplicantTypeSelector(options.length > 1)
+        const requested = new URLSearchParams(window.location.search).get("applicantType")
+        setApplicantType(options.find((option) => option === requested) ?? options[0])
       } finally {
         if (!cancelled) setAgencyLoading(false)
       }
@@ -378,31 +368,12 @@ export default function SignUpPage() {
             <Label className="text-sm font-medium text-gray-900">
               I am applying as
             </Label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setApplicantType("dsp")}
-                aria-pressed={applicantType === "dsp"}
-                className={`h-12 rounded-2xl border text-base font-semibold transition-all ${
-                  applicantType === "dsp"
-                    ? "border-[#17a2b8] bg-[#17a2b8]/10 text-[#17a2b8]"
-                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                }`}
-              >
-                DSP
-              </button>
-              <button
-                type="button"
-                onClick={() => setApplicantType("hha")}
-                aria-pressed={applicantType === "hha"}
-                className={`h-12 rounded-2xl border text-base font-semibold transition-all ${
-                  applicantType === "hha"
-                    ? "border-[#17a2b8] bg-[#17a2b8]/10 text-[#17a2b8]"
-                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                }`}
-              >
-                Caregiver
-              </button>
+            <div className="flex flex-wrap gap-3">
+              {applicantOptions.map((option) => <button key={option} type="button"
+                onClick={() => setApplicantType(option)} aria-pressed={applicantType === option}
+                className={`min-h-12 rounded-2xl border px-4 text-base font-semibold ${applicantType === option ? "border-[#17a2b8] bg-[#17a2b8]/10 text-[#17a2b8]" : "border-gray-200 bg-white text-gray-700"}`}>
+                {option === "support_coordinator" ? "Support Coordinator" : option === "hha" ? "Caregiver" : "DSP"}
+              </button>)}
             </div>
           </div>
         )}

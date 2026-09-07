@@ -80,7 +80,7 @@ function operationalAgency(value: unknown): OperationalAgencySummary | null {
     typeof agency.name !== "string" ||
     agency.status !== "active" ||
     !Array.isArray(supported) ||
-    !supported.every((mode) => mode === "ddd" || mode === "hha") ||
+    !supported.every((mode) => mode === "ddd" || mode === "hha" || mode === "sc") ||
     new Set(supported).size !== supported.length ||
     typeof agency.timezone !== "string"
   ) {

@@ -8,7 +8,7 @@ import { customBaseQuery } from "@/lib/baseQuery";
  */
 export interface Service {
   id: string;
-  program?: "ddd" | "hha";
+  program?: "ddd" | "hha" | "sc";
   type: string;
   name: string;
   code: string;
@@ -23,7 +23,7 @@ export interface Service {
  * List services query parameters
  */
 export interface ListServicesParams {
-  program?: "ddd" | "hha";
+  program?: "ddd" | "hha" | "sc";
   type?: string;
   search?: string;
   limit?: number;
@@ -50,7 +50,7 @@ export interface ListServicesResponse {
  */
 export interface CreateServiceRequest {
   id?: string;
-  program?: "ddd" | "hha";
+  program?: "ddd" | "hha" | "sc";
   type: string;
   name: string;
   code: string;
@@ -63,7 +63,7 @@ export interface CreateServiceRequest {
  * Update service request
  */
 export interface UpdateServiceRequest {
-  program?: "ddd" | "hha";
+  program?: "ddd" | "hha" | "sc";
   type?: string;
   name?: string;
   code?: string;

@@ -274,7 +274,7 @@ export interface ListShiftsParams {
     /** When true, attach billing claim summary for shifts with claimId */
     billingClaim?: boolean;
     /** Filter shifts by client type ('hha' or 'ddd'); requires client:true on backend */
-    clientType?: 'hha' | 'ddd';
+    clientType?: 'hha' | 'ddd' | 'sc';
 }
 
 export interface ShiftRequestOptions {
@@ -285,7 +285,7 @@ export interface ShiftRequestOptions {
 export interface CalendarShiftsParams {
     agencyId: string;
     month: string;
-    clientType?: "ddd" | "hha";
+    clientType?: "ddd" | "hha" | "sc";
     cursor?: string;
     limit?: number;
 }

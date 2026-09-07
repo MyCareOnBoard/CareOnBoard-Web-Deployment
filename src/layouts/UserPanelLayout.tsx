@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Navigate, Outlet, useNavigate } from "react-router";
+import { Navigate, Outlet, useNavigate, useLocation } from "react-router";
 import { useAuth } from "@/utils/auth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Routes } from "@/routes/constants";
@@ -57,6 +57,11 @@ const navItems: NavItem[] = [
 export default function UserPanelDashboardLayout({ children }: { children?: ReactNode }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isSc = user?.applicantType === "support_coordinator" || user?.profile?.role === "support_coordinator" || user?.role === "support_coordinator";
+  const excludedPaths = [Routes.userPanel.communityInclusion, Routes.userPanel.dayProgram];
+  const excludedPage = isSc && excludedPaths.some((path) => location.pathname === path || location.pathname.startsWith(`${path}/`));
+  const visibleNavItems = isSc ? navItems.filter((item) => !item.path || !excludedPaths.includes(item.path)).map((item) => item.path === Routes.userPanel.shiftManagement ? { ...item, label: "Timesheets", path: Routes.userPanel.manualShiftManagement } : item) : navItems;
   const [collapsed] = useSidebarCollapsed();
 
   const handleLogout = async () => {
@@ -78,10 +83,10 @@ export default function UserPanelDashboardLayout({ children }: { children?: Reac
         userType={user?.userType || UserType.APPLICANT}
         onLogout={handleLogout}
       />
-      <DashboardSidebar navItems={navItems} />
+      <DashboardSidebar navItems={visibleNavItems} />
       <main className={`ml-0 ${collapsed ? "md:ml-[112px]" : "md:ml-[240px]"} pt-[130px] pb-10 transition-[margin] duration-200`}>
         <AnnouncementBanner endpoint="/employeePortal/announcements" viewAllPath={Routes.userPanel.announcements} />
-        <div className="px-8">{children ?? <Outlet />}</div>
+        <div className="px-8">{excludedPage ? <Navigate to={Routes.userPanel.dashboard} replace /> : isSc && location.pathname === Routes.userPanel.shiftManagement ? <Navigate to={Routes.userPanel.manualShiftManagement} replace /> : children ?? <Outlet />}</div>
       </main>
     </div>}
     </ProtectedRoute>

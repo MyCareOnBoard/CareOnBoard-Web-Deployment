@@ -99,7 +99,7 @@ export interface Profile {
   roleTemplate?: RoleTemplateKey
   agencyScope?: AgencyScopeMode  // Canonical agency authorization mode
   agencyIds?: string[]  // Canonical selected agency IDs
-  supportedClientTypes?: ("ddd" | "hha")[]
+  supportedClientTypes?: ("ddd" | "hha" | "sc")[]
   // Agency staff HR fields (surfaced from the agencyStaff doc for the staff timesheet)
   role?: string
   employmentType?: "full_time" | "part_time"
@@ -114,7 +114,7 @@ export interface UserAgency {
   id?: string
   name?: string
   status?: "active" | "inactive" | "pending" | "suspended"
-  supportedClientTypes?: ("ddd" | "hha")[]
+  supportedClientTypes?: ("ddd" | "hha" | "sc")[]
 }
 
 

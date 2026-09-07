@@ -74,7 +74,7 @@ interface ApiResponse<T = unknown> {
 
 interface ListParams {
   tab?: "all" | "clearance" | "pending" | "approved" | "rejected";
-  applicantType?: "dsp" | "hha";
+  applicantType?: "dsp" | "hha" | "support_coordinator";
   dateFilter?: "today" | "week" | "month";
   search?: string;
   limit?: number;

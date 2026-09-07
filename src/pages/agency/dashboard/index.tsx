@@ -104,7 +104,7 @@ export default function AgencyDashboardPage() {
 
   const { data: shiftStatsData, isLoading: isLoadingShifts } = useGetShiftStatsQuery(
     { agencyId: user?.agencyId || "", range: "lastWeek" },
-    { skip: !user?.agencyId }
+    { skip: !user?.agencyId || !effectiveMode || effectiveMode === "sc" }
   );
   const shifts = shiftStatsData?.buckets || [];
 
@@ -146,7 +146,7 @@ export default function AgencyDashboardPage() {
 
   const copyToClipboard = async () => {
     const domain = window.location.origin;
-    const url = `${domain}/${user?.agencyId}`;
+    const url = `${domain}${Routes.auth.signup}?agencyId=${encodeURIComponent(user?.agencyId || "")}${effectiveMode === "sc" ? "&applicantType=support_coordinator" : ""}`;
     await navigator.clipboard.writeText(url);
     toast.success("Copied to clipboard!");
   };
@@ -595,14 +595,14 @@ export default function AgencyDashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-            <div className="print-card">
+            {effectiveMode !== "sc" && <div className="print-card">
               <OperationalEfficiency
                 metrics={summary ? buildOperationalMetrics(summary.operationalEfficiency) : undefined}
                 isLoading={isAnalyticsLoading}
                 startDate={dateRange.startDate || undefined}
                 endDate={dateRange.endDate || undefined}
               />
-            </div>
+            </div>}
 
             <div className="print-card">
               <BillingSummary

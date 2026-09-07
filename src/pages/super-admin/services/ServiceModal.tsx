@@ -42,7 +42,7 @@ function ServiceModalInner({
 }: ServiceModalProps) {
   const [name, setName] = useState(initialData?.name ?? "");
   const [code, setCode] = useState(initialData?.code ?? "");
-  const [program, setProgram] = useState<"ddd" | "hha">(initialData?.program ?? "ddd");
+  const [program, setProgram] = useState<"ddd" | "hha" | "sc">(initialData?.program ?? "ddd");
   const [type, setType] = useState(initialData?.type ?? "");
   const [unitType, setUnitType] = useState(initialData?.unitType ?? "");
   const [defaultRate, setDefaultRate] = useState(initialData?.defaultRate ?? "");
@@ -154,13 +154,14 @@ function ServiceModalInner({
             <Label className="text-[12px] font-normal leading-[normal] text-[#10141a]">
               Program
             </Label>
-            <Select value={program} onValueChange={(v) => setProgram(v as "ddd" | "hha")}>
+            <Select value={program} onValueChange={(v) => setProgram(v as "ddd" | "hha" | "sc")}>
               <SelectTrigger className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white px-[16px] text-[14px] font-normal text-black focus-visible:ring-1 focus-visible:ring-[#00b4b8]">
                 <SelectValue placeholder="Select program" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="ddd">DDD</SelectItem>
                 <SelectItem value="hha">HHA</SelectItem>
+                <SelectItem value="sc">Support Coordination</SelectItem>
               </SelectContent>
             </Select>
           </div>
