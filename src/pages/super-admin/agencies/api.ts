@@ -156,8 +156,8 @@ export const superAdminApi = createApi({
       }),
       invalidatesTags: ['Agencies']
     }),
-    uploadAgencyFile: builder.mutation<UploadFileResponse, { file: File; fileType: 'logo' | 'letterhead'; }>({
-      query: ({ file, fileType }) => {
+    uploadAgencyFile: builder.mutation<UploadFileResponse, { agencyId: string; file: File; fileType: 'logo' | 'letterhead'; }>({
+      query: ({ agencyId, file, fileType }) => {
         const formData = new FormData();
         formData.append('file', file);
 
@@ -170,6 +170,7 @@ export const superAdminApi = createApi({
           requiresAuth: true,
           headers: {
             'Content-Type': 'multipart/form-data',
+            'x-agency-id': agencyId,
           },
         };
       },

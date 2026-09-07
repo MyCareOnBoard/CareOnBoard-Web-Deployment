@@ -30,8 +30,8 @@ import {
     dismissAgencyAccessRefreshWarning,
     showAgencyAccessRefreshWarning,
 } from "./agencyAccessRefreshToast";
-import { buildCheckPayrollProfilePayload, toCanonicalUsPayrollPhone, type CheckAddress } from "@/lib/agency/agency-profile-payload";
-import { isCompanySetupComplete, validateCompanySetup } from "@/features/payroll/forms/companySetupValidation";
+import { toCanonicalUsPayrollPhone } from "@/lib/agency/agency-profile-payload";
+import { validateCompanySetup } from "@/features/payroll/forms/companySetupValidation";
 
 export interface AgencyFormData {
     // Step 1: Agency Identity Information
@@ -40,21 +40,6 @@ export interface AgencyFormData {
     dba: string;
     agencyType: string;
     timezone: string;
-    payrollEin: string;
-    payrollEinPresent: boolean;
-    payrollLegalName: string;
-    payrollEntityType: string;
-    payrollIndustry: string;
-    payrollLegalAddress: CheckAddress;
-    payrollOfficeName: string;
-    payrollOfficeAddress: CheckAddress;
-    payrollActualWorkLocationAttested: boolean;
-    payrollContactName: string;
-    payrollContactEmail: string;
-    payrollContactPhone: string;
-    payrollFrequency: string;
-    payrollFirstPayday: string;
-    expectedW2Workers: string;
     npi: string;
     providerId: string;
     medicaidProviderId: string;
@@ -271,7 +256,8 @@ export default function AddAgencyWizard() {
     const [updateAgency, {isLoading: isUpdating}] = useUpdateAgencyMutation();
     const {data: services} = useGetServicesQuery("shouldPopulate=false&return=name,code,program");
 
-    const isSaving = isCreating || isUploading || isSavingDraft || isUpdating;
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const isSaving = isSubmitting || isCreating || isUploading || isSavingDraft || isUpdating;
     const draftId = new URLSearchParams(location.search).get("draftId");
     const agencyId = new URLSearchParams(location.search).get("agencyId");
 
@@ -283,18 +269,6 @@ export default function AddAgencyWizard() {
         dba: "",
         agencyType: "",
         timezone: "",
-        payrollEin: "",
-        payrollEinPresent: false,
-        payrollLegalName: "",
-        payrollEntityType: "",
-        payrollIndustry: "",
-        payrollLegalAddress: { line1: "", line2: "", city: "", state: "", postalCode: "", country: "US" },
-        payrollOfficeName: "",
-        payrollOfficeAddress: { line1: "", line2: "", city: "", state: "", postalCode: "", country: "US" },
-        payrollActualWorkLocationAttested: false,
-        payrollContactName: "", payrollContactEmail: "", payrollContactPhone: "",
-        payrollFrequency: "", payrollFirstPayday: "",
-        expectedW2Workers: "",
         npi: "",
         providerId: "",
         medicaidProviderId: "",
@@ -389,21 +363,6 @@ export default function AddAgencyWizard() {
             dba: responseData.agencyData?.dba || "",
             agencyType: responseData.agencyData?.agencyType || "",
             timezone: responseData.agencyData?.timezone || "",
-            payrollEin: "",
-            payrollEinPresent: responseData.agencyData?.checkPayrollProfile?.einStatus?.present === true,
-            payrollLegalName: responseData.agencyData?.checkPayrollProfile?.legalName || "",
-            payrollEntityType: responseData.agencyData?.checkPayrollProfile?.entityType || "",
-            payrollIndustry: responseData.agencyData?.checkPayrollProfile?.industry || "",
-            payrollLegalAddress: responseData.agencyData?.checkPayrollProfile?.legalAddress || { line1: "", line2: "", city: "", state: "", postalCode: "", country: "US" },
-            payrollOfficeName: responseData.agencyData?.checkPayrollProfile?.officeWorkplace?.name || "",
-            payrollOfficeAddress: responseData.agencyData?.checkPayrollProfile?.officeWorkplace?.address || { line1: "", line2: "", city: "", state: "", postalCode: "", country: "US" },
-            payrollActualWorkLocationAttested: responseData.agencyData?.checkPayrollProfile?.officeWorkplace?.actualWorkLocationAttested === true,
-            payrollContactName: responseData.agencyData?.checkPayrollProfile?.payrollContact?.name || "",
-            payrollContactEmail: responseData.agencyData?.checkPayrollProfile?.payrollContact?.email || "",
-            payrollContactPhone: hydrateUsNationalPhone(responseData.agencyData?.checkPayrollProfile?.payrollContact?.phone),
-            payrollFrequency: responseData.agencyData?.checkPayrollProfile?.payrollIntent?.frequency || "",
-            payrollFirstPayday: responseData.agencyData?.checkPayrollProfile?.payrollIntent?.firstPayday || "",
-            expectedW2Workers: responseData.agencyData?.checkPayrollProfile?.expectedWorkerCounts?.w2?.toString() || "",
             npi: responseData.agencyData?.npi || "",
             providerId: responseData.agencyData?.providerId ?? "",
             medicaidProviderId: responseData.agencyData?.medicaidProviderId || "",
@@ -524,16 +483,16 @@ export default function AddAgencyWizard() {
     };
 
     // Upload logo/letterhead files (if newly selected) and return their URLs.
-    const uploadBrandingAssets = async (): Promise<{ logoUrl: string; letterheadUrl: string }> => {
+    const uploadBrandingAssets = async (targetAgencyId: string): Promise<{ logoUrl: string; letterheadUrl: string }> => {
         let logoUrl = formData.logo ? (typeof formData.logo === 'string' ? formData.logo : '') : '';
         if (formData.logo && typeof formData.logo !== 'string') {
-            const logoResult = await uploadFile({ file: formData.logo, fileType: 'logo' }).unwrap();
+            const logoResult = await uploadFile({ agencyId: targetAgencyId, file: formData.logo, fileType: 'logo' }).unwrap();
             logoUrl = logoResult.url;
         }
 
         let letterheadUrl = formData.letterhead ? (typeof formData.letterhead === 'string' ? formData.letterhead : '') : '';
         if (formData.letterhead && typeof formData.letterhead !== 'string') {
-            const letterheadResult = await uploadFile({ file: formData.letterhead, fileType: 'letterhead' }).unwrap();
+            const letterheadResult = await uploadFile({ agencyId: targetAgencyId, file: formData.letterhead, fileType: 'letterhead' }).unwrap();
             letterheadUrl = letterheadResult.url;
         }
 
@@ -541,13 +500,9 @@ export default function AddAgencyWizard() {
     };
 
     // Single source of truth for the agency payload built from the current form data.
-    const payrollFormValues = () => ({
-        legalName: formData.payrollLegalName, ein: formData.payrollEin, einPresent: formData.payrollEinPresent,
-        entityType: formData.payrollEntityType, industry: formData.payrollIndustry, legalAddress: formData.payrollLegalAddress,
-        officeName: formData.payrollOfficeName, officeAddress: formData.payrollOfficeAddress, actualWorkLocationAttested: formData.payrollActualWorkLocationAttested,
-        website: formData.websiteUrl, phone: formData.mainPhone, payrollContactName: formData.payrollContactName,
-        payrollContactEmail: formData.payrollContactEmail, payrollContactPhone: formData.payrollContactPhone, payFrequency: formData.payrollFrequency,
-        firstPayday: formData.payrollFirstPayday, expectedW2Workers: formData.expectedW2Workers,
+    const identityErrors = () => validateCompanySetup({
+        ...(!agencyId || isEditFieldDirty("mainPhone") ? {phone: formData.mainPhone} : {}),
+        ...(!agencyId || isEditFieldDirty("websiteUrl") ? {website: formData.websiteUrl} : {}),
     });
 
     const buildAgencyPayload = (
@@ -559,7 +514,6 @@ export default function AddAgencyWizard() {
         dba: formData.dba,
         agencyType: formData.agencyType,
         timezone: formData.timezone,
-        checkPayrollProfile: buildCheckPayrollProfilePayload(payrollFormValues()),
         npi: formData.npi,
         providerId: formData.providerId,
         medicaidProviderId: formData.medicaidProviderId,
@@ -633,93 +587,6 @@ export default function AddAgencyWizard() {
         phone: formData.userPhone,
         userType: UserType.AGENCY,
     });
-
-    const buildSparsePayrollPayload = () => {
-        const values = payrollFormValues();
-        const sparseValues = {
-            ...(isEditFieldDirty("payrollLegalName") ? {legalName: values.legalName} : {}),
-            ...(isEditFieldDirty("payrollEin") ? {ein: values.ein} : {}),
-            ...(isEditFieldDirty("payrollEntityType") ? {entityType: values.entityType} : {}),
-            ...(isEditFieldDirty("payrollIndustry") ? {industry: values.industry} : {}),
-            ...(isEditFieldDirty("payrollLegalAddress") ? {legalAddress: values.legalAddress} : {}),
-            ...(isEditFieldDirty("websiteUrl") ? {website: values.website} : {}),
-            ...(isEditFieldDirty("mainPhone") ? {phone: values.phone} : {}),
-            ...(
-                isEditFieldDirty("payrollOfficeName")
-                || isEditFieldDirty("payrollOfficeAddress")
-                || isEditFieldDirty("payrollActualWorkLocationAttested")
-                    ? {
-                        officeName: values.officeName,
-                        officeAddress: values.officeAddress,
-                        actualWorkLocationAttested: values.actualWorkLocationAttested,
-                    }
-                    : {}
-            ),
-            ...(
-                isEditFieldDirty("payrollContactName")
-                || isEditFieldDirty("payrollContactEmail")
-                || isEditFieldDirty("payrollContactPhone")
-                    ? {
-                        payrollContactName: values.payrollContactName,
-                        payrollContactEmail: values.payrollContactEmail,
-                        payrollContactPhone: values.payrollContactPhone,
-                    }
-                    : {}
-            ),
-            ...(
-                isEditFieldDirty("payrollFrequency")
-                || isEditFieldDirty("payrollFirstPayday")
-                    ? {
-                        payFrequency: values.payFrequency,
-                        firstPayday: values.firstPayday,
-                    }
-                    : {}
-            ),
-            ...(isEditFieldDirty("expectedW2Workers") ? {expectedW2Workers: values.expectedW2Workers} : {}),
-        };
-        const payload = buildCheckPayrollProfilePayload(sparseValues);
-        const emissionErrors: Record<string, string> = {};
-        const requireEmitted = (
-            dirty: boolean,
-            payloadField: keyof typeof payload,
-            formField: keyof AgencyFormData,
-            message: string,
-        ) => {
-            if (dirty && !Object.hasOwn(payload, payloadField)) emissionErrors[formField] = message;
-        };
-        requireEmitted(isEditFieldDirty("payrollLegalName"), "legalName", "payrollLegalName", "Enter the agency’s legal business name.");
-        requireEmitted(isEditFieldDirty("payrollEin"), "einChange", "payrollEin", "Enter a nine-digit federal tax ID.");
-        requireEmitted(isEditFieldDirty("payrollEntityType"), "entityType", "payrollEntityType", "Select a supported business structure.");
-        requireEmitted(isEditFieldDirty("payrollIndustry"), "industry", "payrollIndustry", "Select a supported industry.");
-        requireEmitted(isEditFieldDirty("payrollLegalAddress"), "legalAddress", "payrollLegalAddress", "Enter a complete U.S. legal business address.");
-        requireEmitted(isEditFieldDirty("websiteUrl"), "website", "websiteUrl", "Enter an http or https company website.");
-        requireEmitted(isEditFieldDirty("mainPhone"), "phone", "mainPhone", "Enter a valid US ten-digit company phone number.");
-        requireEmitted(
-            isEditFieldDirty("payrollOfficeName")
-            || isEditFieldDirty("payrollOfficeAddress")
-            || isEditFieldDirty("payrollActualWorkLocationAttested"),
-            "officeWorkplace",
-            "payrollOfficeName",
-            "Complete the primary workplace before saving.",
-        );
-        requireEmitted(
-            isEditFieldDirty("payrollContactName")
-            || isEditFieldDirty("payrollContactEmail")
-            || isEditFieldDirty("payrollContactPhone"),
-            "payrollContact",
-            "payrollContactName",
-            "Complete the payroll contact before saving.",
-        );
-        requireEmitted(
-            isEditFieldDirty("payrollFrequency")
-            || isEditFieldDirty("payrollFirstPayday"),
-            "payrollIntent",
-            "payrollFrequency",
-            "Complete the payroll intent before saving.",
-        );
-        requireEmitted(isEditFieldDirty("expectedW2Workers"), "expectedWorkerCounts", "expectedW2Workers", "Enter a whole number of W-2 employees, 0 or more.");
-        return {payload, values: sparseValues, emissionErrors};
-    };
 
     const buildSparseAgencyPayload = (branding: { logoUrl?: string; letterheadUrl?: string }) => {
         const agency: Partial<CreateAgencyWithUserPayloadAgency> = {};
@@ -814,28 +681,23 @@ export default function AddAgencyWizard() {
             toast({ title: "Agency timezone required", description: "Select a valid IANA timezone.", variant: "destructive" });
             return;
         }
-        const sparsePayroll = buildSparsePayrollPayload();
-        const payrollErrors = {
-            ...validateCompanySetup(sparsePayroll.values),
-            ...sparsePayroll.emissionErrors,
-        };
-        if (Object.keys(payrollErrors).length > 0) {
+        const contactErrors = identityErrors();
+        if (Object.keys(contactErrors).length > 0) {
             setCurrentStep(1);
-            setFieldsWithErrors(Object.keys(payrollErrors));
-            toast({ title: "Check payroll prerequisites", description: Object.values(payrollErrors)[0], variant: "destructive" });
+            setFieldsWithErrors(Object.keys(contactErrors));
+            toast({ title: "Check agency contact information", description: Object.values(contactErrors)[0], variant: "destructive" });
             return;
         }
         try {
             let branding: { logoUrl?: string; letterheadUrl?: string } = {};
             if (isEditFieldDirty("logo") || isEditFieldDirty("letterhead")) {
-                const uploaded = await uploadBrandingAssets();
+                const uploaded = await uploadBrandingAssets(agencyId);
                 branding = {
                     ...(isEditFieldDirty("logo") ? {logoUrl: uploaded.logoUrl} : {}),
                     ...(isEditFieldDirty("letterhead") ? {letterheadUrl: uploaded.letterheadUrl} : {}),
                 };
             }
             const agency = buildSparseAgencyPayload(branding);
-            if (Object.keys(sparsePayroll.payload).length > 0) agency.checkPayrollProfile = sparsePayroll.payload;
             const sparseUser = buildSparseUserPayload();
             if (Object.keys(agency).length === 0 && !sparseUser) return;
             await updateAgency({
@@ -860,16 +722,17 @@ export default function AddAgencyWizard() {
     };
 
     const handleSaveDraft = async (saveName: string) => {
-        const payrollErrors = validateCompanySetup(payrollFormValues());
-        if (Object.keys(payrollErrors).length > 0) {
+        const contactErrors = identityErrors();
+        if (Object.keys(contactErrors).length > 0) {
             setCurrentStep(1);
-            setFieldsWithErrors(Object.keys(payrollErrors));
-            toast({ title: "Check payroll prerequisites", description: Object.values(payrollErrors)[0], variant: "destructive" });
+            setFieldsWithErrors(Object.keys(contactErrors));
+            toast({ title: "Check agency contact information", description: Object.values(contactErrors)[0], variant: "destructive" });
             return;
         }
         try {
-            const { logoUrl, letterheadUrl } = await uploadBrandingAssets();
-
+            // Drafts have no agency ID. Upload new files only after creation.
+            const logoUrl = typeof formData.logo === 'string' ? formData.logo : '';
+            const letterheadUrl = typeof formData.letterhead === 'string' ? formData.letterhead : '';
             await createDraft({
                 agency: buildAgencyPayload(logoUrl, letterheadUrl),
                 user: buildUserPayload(),
@@ -879,7 +742,7 @@ export default function AddAgencyWizard() {
             setShowSaveModal(false);
             toast({
                 title: "Draft Saved",
-                description: `"${saveName}" has been saved successfully.`,
+                description: `"${saveName}" has been saved successfully.${formData.logo instanceof File || formData.letterhead instanceof File ? " Reselect new branding files when reopening this draft." : ""}`,
             });
         } catch (error) {
             toast({
@@ -917,13 +780,10 @@ export default function AddAgencyWizard() {
     };
 
     const handleNext = () => {
-        const sparsePayroll = agencyId ? buildSparsePayrollPayload() : null;
-        const payrollErrors = sparsePayroll
-            ? {...validateCompanySetup(sparsePayroll.values), ...sparsePayroll.emissionErrors}
-            : validateCompanySetup(payrollFormValues());
-        if (currentStep === 1 && Object.keys(payrollErrors).length > 0) {
-            setFieldsWithErrors(Object.keys(payrollErrors));
-            toast({ title: "Check payroll prerequisites", description: Object.values(payrollErrors)[0], variant: "destructive" });
+        const contactErrors = identityErrors();
+        if (currentStep === 1 && Object.keys(contactErrors).length > 0) {
+            setFieldsWithErrors(Object.keys(contactErrors));
+            toast({ title: "Check agency contact information", description: Object.values(contactErrors)[0], variant: "destructive" });
             return;
         }
         const { isValid, missingFields } = validateCurrentStep();
@@ -960,11 +820,11 @@ export default function AddAgencyWizard() {
             await handleSaveEdit();
             return;
         }
-        const payrollErrors = validateCompanySetup(payrollFormValues());
-        if (Object.keys(payrollErrors).length > 0) {
+        const contactErrors = identityErrors();
+        if (Object.keys(contactErrors).length > 0) {
             setCurrentStep(1);
-            setFieldsWithErrors(Object.keys(payrollErrors));
-            toast({ title: "Check payroll prerequisites", description: Object.values(payrollErrors)[0], variant: "destructive" });
+            setFieldsWithErrors(Object.keys(contactErrors));
+            toast({ title: "Check agency contact information", description: Object.values(contactErrors)[0], variant: "destructive" });
             return;
         }
         // Validate all steps before submission
@@ -1010,44 +870,53 @@ export default function AddAgencyWizard() {
             return;
         }
 
+        setIsSubmitting(true);
         try {
-            const { logoUrl, letterheadUrl } = await uploadBrandingAssets();
-
-            const requestPayload = {
-                agency: buildAgencyPayload(logoUrl, letterheadUrl),
+            const created = await createAgencyWithUser({
+                agency: buildAgencyPayload(
+                    typeof formData.logo === 'string' ? formData.logo : '',
+                    typeof formData.letterhead === 'string' ? formData.letterhead : '',
+                ),
                 user: buildUserPayload(),
-            };
-
-            if (!!agencyId) {
-                await updateAgency({agencyId, data: requestPayload}).unwrap();
-                toast({
-                    title: "Success",
-                    description: "Agency updated successfully",
-                });
-            } else {
-                await createAgencyWithUser(requestPayload).unwrap();
-                await finalizeAgencyCreation({
-                    isRestricted: user?.profile?.agencyScope === "selected",
-                    showSuccess: () => toast({
-                        title: "Success",
-                        description: "Agency created successfully",
-                    }),
-                    navigate: () => navigate(Routes.superAdmin.agencies),
-                    refreshProfile,
-                    resetCaches: () => resetSuperAdminCaches(dispatch),
-                    onRefreshFailure: () => showAgencyAccessRefreshWarning(refreshProfile, () => resetSuperAdminCaches(dispatch)),
-                    onRefreshSuccess: dismissAgencyAccessRefreshWarning,
-                });
-                return;
+            }).unwrap();
+            const createdId = created.agency.id;
+            let brandingFailed = false;
+            try {
+                if (formData.logo instanceof File || formData.letterhead instanceof File) {
+                    const { logoUrl, letterheadUrl } = await uploadBrandingAssets(createdId);
+                    await updateAgency({
+                        agencyId: createdId,
+                        data: { agency: { logo: logoUrl, letterhead: letterheadUrl } },
+                    }).unwrap();
+                }
+            } catch {
+                brandingFailed = true;
             }
-            navigate(Routes.superAdmin.agencies);
+            await finalizeAgencyCreation({
+                isRestricted: user?.profile?.agencyScope === "selected",
+                showSuccess: () => toast({
+                    title: brandingFailed ? "Agency created; branding needs attention" : "Success",
+                    description: brandingFailed
+                        ? "The agency was created, but its branding could not be saved. Reselect the files in Branding Setup and save changes."
+                        : "Agency created successfully",
+                    ...(brandingFailed ? { variant: "destructive" as const } : {}),
+                }),
+                navigate: () => navigate(brandingFailed
+                    ? location.pathname + "?agencyId=" + encodeURIComponent(createdId)
+                    : Routes.superAdmin.agencies, { replace: true }),
+                refreshProfile,
+                resetCaches: () => resetSuperAdminCaches(dispatch),
+                onRefreshFailure: () => showAgencyAccessRefreshWarning(refreshProfile, () => resetSuperAdminCaches(dispatch)),
+                onRefreshSuccess: dismissAgencyAccessRefreshWarning,
+            });
         } catch (error: any) {
-            console.log(error);
             toast({
                 title: "Error",
                 description: error?.data?.error || error?.message || "Failed to create agency",
                 variant: "destructive",
             });
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -1162,11 +1031,6 @@ export default function AddAgencyWizard() {
                                 I hereby declared that all the information are correct
                             </label>
                         </div>
-                        <p className="text-sm text-[#808081]" role="status">
-                            {!isCompanySetupComplete(payrollFormValues())
-                                ? "Payroll setup needs information and is saved for later. You can complete it after creating the agency."
-                                : "Payroll prerequisites are ready to continue setup; later asynchronous payroll setup does not roll back agency creation."}
-                        </p>
 
                         <div className="flex items-center gap-3">
                             <Button

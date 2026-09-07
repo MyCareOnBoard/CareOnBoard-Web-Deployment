@@ -57,17 +57,10 @@ vi.mock("@/pages/super-admin/agencies/components/StepOne", async () => {
           agencyName: "Able Care", agencyType: "provider", primaryAddress: "100 Agency Way",
           county_or_state: "TX", zipCode: "78701", mainPhone: "5125550123", supportEmail: "hello@able.example",
           timezone: "America/Chicago",
-          websiteUrl: "https://able.example", payrollLegalName: "Able Care LLC", payrollEin: "12-3456789",
-          payrollEntityType: "llc", payrollIndustry: "health_care",
-          payrollLegalAddress: { line1: "1 Legal Street", line2: "Suite 1", city: "Austin", state: "TX", postalCode: "78701", country: "US" },
-          payrollOfficeName: "Main office",
-          payrollOfficeAddress: { line1: "2 Work Street", line2: "", city: "Austin", state: "TX", postalCode: "78702", country: "US" },
-          payrollActualWorkLocationAttested: true, payrollContactName: "Pay Roll", payrollContactEmail: "payroll@able.example",
-          payrollContactPhone: "5125550124", payrollFrequency: "weekly", payrollFirstPayday: "2026-09-04",
-          expectedW2Workers: "3",
+          websiteUrl: "https://able.example",
         };
         Object.entries(values).forEach(([key, value]) => onChange(key, value));
-      }}>Fill identity and payroll</button>
+      }}>Fill identity</button>
     </div>,
   };
 });
@@ -83,23 +76,22 @@ vi.mock("@/pages/super-admin/agencies/components/StepFive", () => ({ default: ({
 vi.mock("@/pages/super-admin/agencies/components/StepSix", () => ({ default: ({ onChange }: any) => <button type="button" onClick={() => { onChange("billingFormat", "csv"); onChange("invoiceName", "Care invoice"); }}>Fill billing</button> }));
 vi.mock("@/pages/super-admin/agencies/components/StepSeven", () => ({ default: ({ onChange }: any) => <button type="button" onClick={() => { onChange("auditRetentionPeriodNumber", "12"); onChange("planStartDate", "2026-09-01"); }}>Fill subscription</button> }));
 
-const expectedPayrollWrite = {
-  legalName: "Able Care LLC",
-  einChange: { mode: "replace", value: "12-3456789" },
-  entityType: "llc",
-  industry: "health_care",
-  legalAddress: { line1: "1 Legal Street", line2: "Suite 1", city: "Austin", state: "TX", postalCode: "78701", country: "US" },
-  officeWorkplace: {
-    name: "Main office",
-    address: { line1: "2 Work Street", line2: "", city: "Austin", state: "TX", postalCode: "78702", country: "US" },
-    actualWorkLocationAttested: true,
-  },
-  website: "https://able.example",
-  phone: "+15125550123",
-  payrollContact: { name: "Pay Roll", email: "payroll@able.example", phone: "+15125550124" },
-  payrollIntent: { frequency: "weekly", firstPayday: "2026-09-04" },
-  expectedWorkerCounts: { w2: 3, contractor: 0 },
-};
+async function completeAgencyForm(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole("button", { name: "Fill identity" }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Fill leadership" }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Fill operations" }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Fill branding" }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Fill billing" }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Fill subscription" }));
+    await user.click(screen.getByLabelText(/all the information/i));
+    await user.click(screen.getByRole("button", { name: "Create Agency" }));
+}
 
 beforeEach(() => {
   vi.setSystemTime(new Date("2026-09-01T12:00:00Z"));
@@ -107,14 +99,14 @@ beforeEach(() => {
   mocks.search = "";
   mocks.currentAgency = undefined;
   mocks.currentDraft = undefined;
-  mocks.create.mockReturnValue(mutationResult({ success: true }));
+  mocks.create.mockReturnValue(mutationResult({ success: true, agency: { id: "created-agency" } }));
   mocks.draft.mockReturnValue(mutationResult());
   mocks.update.mockReturnValue(mutationResult());
   mocks.upload.mockReturnValue(mutationResult({ url: "https://files.example/logo.png" }));
   mocks.refreshProfile.mockResolvedValue(undefined);
 });
 
-describe("AddAgencyWizard payroll endpoint payloads", () => {
+describe("AddAgencyWizard agency onboarding", () => {
   it("starts with no browser-derived timezone and exposes a searchable IANA control", async () => {
     const user = userEvent.setup();
     render(<AddAgencyWizard />);
@@ -207,7 +199,7 @@ describe("AddAgencyWizard payroll endpoint payloads", () => {
   it("does not advance or submit with an empty or invalid timezone", async () => {
     const user = userEvent.setup();
     render(<AddAgencyWizard />);
-    await user.click(screen.getByRole("button", { name: "Fill identity and payroll" }));
+    await user.click(screen.getByRole("button", { name: "Fill identity" }));
     const timezone = screen.getByRole("combobox", { name: "Agency timezone" });
 
     fireEvent.change(timezone, { target: { value: "" } });
@@ -231,7 +223,7 @@ describe("AddAgencyWizard payroll endpoint payloads", () => {
     await user.click(within(dialog).getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(mocks.draft).toHaveBeenCalledTimes(1));
-    expect(mocks.draft.mock.calls[0][0].agency.checkPayrollProfile).toEqual({});
+    expect(mocks.draft.mock.calls[0][0].agency.checkPayrollProfile).toBeUndefined();
     expect(JSON.stringify(mocks.draft.mock.calls[0][0])).not.toMatch(/einStatus|designatedSignerUserUid|payrollSchedule|nextPayoutDate|last4/);
   }, 15_000);
 
@@ -253,9 +245,10 @@ describe("AddAgencyWizard payroll endpoint payloads", () => {
     const user = userEvent.setup();
     render(<AddAgencyWizard />);
 
-    await waitFor(() => expect(screen.getByLabelText("EIN")).toHaveAttribute("placeholder", "EIN on file"));
+    await screen.findByDisplayValue("America/Denver");
+    expect(screen.queryByLabelText("EIN")).not.toBeInTheDocument();
+    expect(screen.queryByText("Payroll prerequisites")).not.toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Agency timezone" })).toHaveValue("America/Denver");
-    expect(screen.getByLabelText("EIN")).toHaveValue("");
     expect(screen.queryByText("6789")).not.toBeInTheDocument();
     fireEvent.change(screen.getByRole("combobox", { name: "Agency timezone" }), { target: { value: "America/New_York" } });
     await user.click(screen.getByRole("button", { name: "Save Changes" }));
@@ -333,62 +326,7 @@ describe("AddAgencyWizard payroll endpoint payloads", () => {
     });
   });
 
-  it("sends only the changed payroll top-level field without resending locked profile data", async () => {
-    mocks.search = "?agencyId=agency-1";
-    mocks.currentAgency = {
-      agencyData: {
-        name: "Able Care", email: "hello@able.example", timezone: "America/Denver",
-        checkPayrollProfile: {
-          legalName: "Able Care LLC", einStatus: {present: true, last4: "6789"}, entityType: "llc",
-          payrollContact: {name: "Payroll Contact", email: "payroll@able.example", phone: "+15125550124"},
-        },
-      },
-      user: { fullName: "Agency Owner", email: "owner@able.example", phone: "+15125550125", userType: "agency" },
-    };
-    const user = userEvent.setup();
-    render(<AddAgencyWizard />);
-
-    const legalName = await screen.findByLabelText("Legal name");
-    await user.clear(legalName);
-    await user.type(legalName, "Renamed Care LLC");
-    await user.click(screen.getByRole("button", { name: "Save Changes" }));
-
-    await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
-    expect(mocks.update.mock.calls[0][0]).toEqual({
-      agencyId: "agency-1",
-      data: {agency: {checkPayrollProfile: {legalName: "Renamed Care LLC"}}},
-    });
-    expect(JSON.stringify(mocks.update.mock.calls[0][0])).not.toMatch(/einStatus|last4|entityType|payrollContact/);
-  });
-
-  it("rejects a cleared payroll legal name before saving another agency change", async () => {
-    mocks.search = "?agencyId=agency-1";
-    mocks.currentAgency = {
-      agencyData: {
-        name: "Able Care", email: "hello@able.example", timezone: "America/Denver",
-        checkPayrollProfile: { legalName: "Able Care LLC" },
-      },
-      user: { fullName: "Agency Owner", email: "owner@able.example", phone: "+15125550125", userType: "agency" },
-    };
-    const user = userEvent.setup();
-    render(<AddAgencyWizard />);
-
-    const legalName = await screen.findByLabelText("Legal name");
-    await user.clear(legalName);
-    const agencyName = screen.getByLabelText("Agency Name");
-    await user.clear(agencyName);
-    await user.type(agencyName, "Renamed Care");
-    await user.click(screen.getByRole("button", { name: "Save Changes" }));
-
-    expect(mocks.update).not.toHaveBeenCalled();
-    expect(mocks.toast).toHaveBeenCalledWith({
-      title: "Check payroll prerequisites",
-      description: "Enter the agency’s legal business name.",
-      variant: "destructive",
-    });
-  }, 15_000);
-
-  it("hydrates canonical payroll phones into fixed-prefix ten-digit controls", async () => {
+  it("hydrates the agency contact phone without payroll fields", async () => {
     mocks.search = "?agencyId=agency-1";
     mocks.currentAgency = {
       agencyData: {
@@ -401,9 +339,9 @@ describe("AddAgencyWizard payroll endpoint payloads", () => {
       user: { fullName: "Agency Owner", email: "owner@able.example", phone: "+15125550125", userType: "agency" },
     };
     render(<AddAgencyWizard />);
-    expect(await screen.findByLabelText("Payroll contact phone")).toHaveValue("5125550124");
+    expect(screen.queryByLabelText("Payroll contact phone")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Main Phone Number")).toHaveValue("5125550123");
-    expect(screen.getAllByText("+1")).toHaveLength(2);
+    expect(screen.getAllByText("+1")).toHaveLength(1);
   });
 
   it("retains a saved draft timezone when hydrating and saving again", async () => {
@@ -441,11 +379,54 @@ describe("AddAgencyWizard payroll endpoint payloads", () => {
     expect(phone).toHaveValue("+445125550123");
   });
 
-  it("sends the exact canonical full payroll write through the create endpoint", async () => {
+  it("creates the agency without payroll setup before uploading branding", async () => {
     const user = userEvent.setup();
     render(<AddAgencyWizard />);
 
-    await user.click(screen.getByRole("button", { name: "Fill identity and payroll" }));
+    await completeAgencyForm(user);
+
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({
+      agencyId: "created-agency",
+      data: { agency: { logo: "https://files.example/logo.png", letterhead: "" } },
+    }));
+    expect(mocks.create.mock.calls[0][0].agency.logo).toBe("");
+    expect(mocks.upload).toHaveBeenCalledWith({ agencyId: "created-agency", file: expect.any(File), fileType: "logo" });
+    expect(mocks.create.mock.invocationCallOrder[0]).toBeLessThan(mocks.upload.mock.invocationCallOrder[0]);
+    expect(mocks.upload.mock.invocationCallOrder[0]).toBeLessThan(mocks.update.mock.invocationCallOrder[0]);
+    expect(mocks.create.mock.calls[0][0].agency.timezone).toBe("America/Chicago");
+    expect(mocks.create.mock.calls[0][0].agency.checkPayrollProfile).toBeUndefined();
+    expect(mocks.create.mock.calls[0][0].user).toEqual({
+      fullName: "Agency Owner", email: "owner@able.example", password: "StrongPass1!", phone: "+15125550125", userType: "agency",
+    });
+    expect(JSON.stringify(mocks.create.mock.calls[0][0])).not.toMatch(/einStatus|designatedSignerUserUid|payrollSchedule|nextPayoutDate|last4/);
+  }, 15_000);
+  it.each(["upload", "update"] as const)("opens the created agency for repair when %s fails", async (failure) => {
+    mocks[failure].mockReturnValue({ unwrap: () => Promise.reject(new Error("Branding unavailable")) });
+    const user = userEvent.setup();
+    render(<AddAgencyWizard />);
+    await completeAgencyForm(user);
+    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith(
+      "/super-admin/agencies/add?agencyId=created-agency", { replace: true },
+    ));
+    expect(mocks.create).toHaveBeenCalledTimes(1);
+    expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({title: "Agency created; branding needs attention"}));
+  }, 15_000);
+
+  it("does not upload when creation fails", async () => {
+    mocks.create.mockReturnValue({ unwrap: () => Promise.reject(new Error("Creation failed")) });
+    const user = userEvent.setup();
+    render(<AddAgencyWizard />);
+    await completeAgencyForm(user);
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({description: "Creation failed"})));
+    expect(mocks.upload).not.toHaveBeenCalled();
+    expect(mocks.update).not.toHaveBeenCalled();
+  }, 15_000);
+
+  it("saves a draft without uploading its newly selected branding", async () => {
+    const user = userEvent.setup();
+    render(<AddAgencyWizard />);
+    await user.click(screen.getByRole("button", { name: "Fill identity" }));
     await user.click(screen.getByRole("button", { name: "Next" }));
     await user.click(screen.getByRole("button", { name: "Fill leadership" }));
     await user.click(screen.getByRole("button", { name: "Next" }));
@@ -453,20 +434,14 @@ describe("AddAgencyWizard payroll endpoint payloads", () => {
     await user.click(screen.getByRole("button", { name: "Next" }));
     await user.click(screen.getByRole("button", { name: "Next" }));
     await user.click(screen.getByRole("button", { name: "Fill branding" }));
-    await user.click(screen.getByRole("button", { name: "Next" }));
-    await user.click(screen.getByRole("button", { name: "Fill billing" }));
-    await user.click(screen.getByRole("button", { name: "Next" }));
-    await user.click(screen.getByRole("button", { name: "Fill subscription" }));
-    await user.click(screen.getByLabelText(/all the information/i));
-    await user.click(screen.getByRole("button", { name: "Create Agency" }));
-
-    await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1));
-    expect(mocks.create.mock.calls[0][0].agency.timezone).toBe("America/Chicago");
-    expect(mocks.create.mock.calls[0][0].agency.checkPayrollProfile).toEqual(expectedPayrollWrite);
-    expect(mocks.create.mock.calls[0][0].user).toEqual({
-      fullName: "Agency Owner", email: "owner@able.example", password: "StrongPass1!", phone: "+15125550125", userType: "agency",
-    });
-    expect(JSON.stringify(mocks.create.mock.calls[0][0])).not.toMatch(/einStatus|designatedSignerUserUid|payrollSchedule|nextPayoutDate|last4/);
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    const dialog = screen.getByRole("dialog");
+    await user.type(within(dialog).getByLabelText("Save Name"), "Branding draft");
+    await user.click(within(dialog).getByRole("button", {name: "Save"}));
+    await waitFor(() => expect(mocks.draft).toHaveBeenCalledTimes(1));
+    expect(mocks.draft.mock.calls[0][0].agency.logo).toBe("");
+    expect(mocks.upload).not.toHaveBeenCalled();
+    expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({description: expect.stringContaining("Reselect new branding files")}));
   }, 15_000);
 });
 afterEach(() => vi.useRealTimers());

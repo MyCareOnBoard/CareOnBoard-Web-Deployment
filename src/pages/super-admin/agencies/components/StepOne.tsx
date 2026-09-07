@@ -5,7 +5,6 @@ import React, {useEffect, useMemo, useRef, useState} from "react";
 import {cn} from "@/lib/utils";
 import { IANA_TIMEZONES, isIanaTimezone } from "@/lib/timezones";
 import {useGooglePlacesAutocomplete} from "@/hooks/useGooglePlacesAutocomplete";
-import { CompanySetupFields } from "@/features/payroll/forms/companySetupFields";
 
 export { IANA_TIMEZONES, isIanaTimezone } from "@/lib/timezones";
 
@@ -234,7 +233,7 @@ export default function Step1AgencyIdentity({formData, onChange, fieldsWithError
                         )}
                     />
                     <p id="agency-timezone-help" className="mt-1 text-xs text-[#808081]">
-                        Select the timezone used to close local payroll periods.
+                        Select the timezone used for agency dates and times.
                     </p>
                     {timezoneHasError && (
                         <p id="agency-timezone-error" role="alert" className="mt-1 text-sm text-red-500">
@@ -320,7 +319,6 @@ export default function Step1AgencyIdentity({formData, onChange, fieldsWithError
                     />
                 </div>
             </div>
-            <CompanySetupFields formData={formData} onChange={onChange} fieldsWithErrors={fieldsWithErrors} />
             <div className={"mt-10"}>
                 <div className="mt-2 mb-6">
                     <p className="text-[16px] font-semibold text-[#10141a]">
