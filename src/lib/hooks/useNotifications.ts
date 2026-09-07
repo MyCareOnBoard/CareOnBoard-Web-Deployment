@@ -67,6 +67,23 @@ function parseNotificationDoc(docId: string, data: Record<string, unknown>): Not
     };
 }
 
+/**
+ * Whether a notification document belongs in this app's list.
+ *
+ * Care-On-Board and Care Connect share the `notifications` collection — deliberately, so
+ * both get the email/push delivery trigger and one set of preference switches — and the
+ * same uid is routinely both: `applicant`, `employee` and `agency_staff` are all Care
+ * Connect account types. Without this, a DSP with a Care Connect profile sees booking
+ * requests and visit-record notices in their Care-On-Board bell.
+ *
+ * Excludes by the Care Connect value rather than requiring `care_on_board`, which is what
+ * makes this need no migration: every notification written before `surface` existed has no
+ * value at all, and all of them are Care-On-Board's.
+ */
+function belongsToCareOnBoard(data: { surface?: string } | undefined): boolean {
+    return data?.surface !== "care_connect";
+}
+
 export function useNotifications(): UseNotificationsReturn {
     const { user } = useAuth();
     const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -112,9 +129,17 @@ export function useNotifications(): UseNotificationsReturn {
         const unsubscribe = onSnapshot(
             q,
             (snapshot) => {
-                const newNotifications: Notification[] = snapshot.docs.map(doc =>
-                    parseNotificationDoc(doc.id, doc.data())
-                );
+                // Respect the user's in-app notification preference. The document is
+                // created even when in-app is off, because outbound email is delivered by
+                // an onDocumentCreated trigger on this very doc — so the switch has to be
+                // honoured on read. `deliveredVia.inApp` is set from the preference in
+                // createNotification; treat a missing flag as visible so docs written
+                // before the field existed still show.
+                const newNotifications: Notification[] = snapshot.docs
+                    .filter(doc => doc.data()?.deliveredVia?.inApp !== false)
+                    // Care Connect's notifications live in this collection too.
+                    .filter(doc => belongsToCareOnBoard(doc.data()))
+                    .map(doc => parseNotificationDoc(doc.id, doc.data()));
                 setNotifications(newNotifications);
                 setLoading(false);
             },
@@ -228,10 +253,15 @@ export function useNotifications(): UseNotificationsReturn {
             );
             const snapshot = await getDocs(clearQuery);
 
+            // Unlike markAllAsRead, this re-queries rather than working from the loaded
+            // list — so it has to exclude Care Connect's rows itself, or "clear all" here
+            // would silently clear the user's Care Connect notifications too.
+            const clearable = snapshot.docs.filter(docSnap => belongsToCareOnBoard(docSnap.data()));
+
             // writeBatch is capped at 500 ops, so commit in chunks
-            for (let i = 0; i < snapshot.docs.length; i += 500) {
+            for (let i = 0; i < clearable.length; i += 500) {
                 const batch = writeBatch(db);
-                snapshot.docs.slice(i, i + 500).forEach(docSnap => {
+                clearable.slice(i, i + 500).forEach(docSnap => {
                     batch.update(docSnap.ref, {
                         cleared: true,
                         clearedAt: serverTimestamp(),
