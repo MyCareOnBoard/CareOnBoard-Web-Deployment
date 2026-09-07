@@ -25,7 +25,7 @@ function useDebounce<T>(value: T, delay: number): T {
 
 export default function ServicesManagementPage() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [programFilter, setProgramFilter] = useState<"all" | "ddd" | "hha">("all");
+  const [programFilter, setProgramFilter] = useState<"all" | "ddd" | "hha" | "sc">("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -122,7 +122,7 @@ export default function ServicesManagementPage() {
     setTypeFilter(type);
     setCurrentPage(1);
   }, []);
-  const handleProgramFilter = useCallback((program: "all" | "ddd" | "hha") => {
+  const handleProgramFilter = useCallback((program: "all" | "ddd" | "hha" | "sc") => {
     setProgramFilter(program);
     setCurrentPage(1);
   }, []);
@@ -203,7 +203,7 @@ export default function ServicesManagementPage() {
 
           {/* Program Filter Pills */}
           <div className="flex flex-wrap items-center gap-2 mb-4">
-            {(["all", "ddd", "hha"] as const).map((program) => (
+            {(["all", "ddd", "hha", "sc"] as const).map((program) => (
               <button
                 key={program}
                 onClick={() => handleProgramFilter(program)}

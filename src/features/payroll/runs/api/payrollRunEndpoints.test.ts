@@ -87,7 +87,7 @@ describe("payroll run read transport", () => {
 
   it("accepts only agency-scoped arguments for agency payroll routes", () => {
     expectTypeOf<CurrentPayrollRunArgs["audience"]>().toEqualTypeOf<"agency">();
-    expectTypeOf<CurrentPayrollRunArgs["mode"]>().toEqualTypeOf<"ddd" | "hha">();
+    expectTypeOf<CurrentPayrollRunArgs["mode"]>().toEqualTypeOf<"ddd" | "hha" | "sc">();
     expectTypeOf<ForceBuildStatusArgs["audience"]>().toEqualTypeOf<"agency">();
   });
 

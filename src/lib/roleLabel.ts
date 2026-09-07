@@ -15,6 +15,7 @@ export function roleLabel(
 ): string {
   const applicantType = input?.applicantType?.toLowerCase();
   const role = input?.role?.toLowerCase();
+  if (role === "support_coordinator" || applicantType === "support_coordinator") return "Support Coordinator";
   const isHha =
     applicantType === "hha" || role === "hha" || role === "caregiver";
 
@@ -26,9 +27,10 @@ export function roleLabel(
  * Program/client-type code for an individual, for badge display.
  * HHA (caregiver) -> "HHA"; otherwise -> "DDD".
  */
-export function programLabel(input: { applicantType?: string; role?: string }): "DDD" | "HHA" {
+export function programLabel(input: { applicantType?: string; role?: string }): "DDD" | "HHA" | "SC" {
   const applicantType = input?.applicantType?.toLowerCase();
   const role = input?.role?.toLowerCase();
+  if (role === "support_coordinator" || applicantType === "support_coordinator") return "SC";
   const isHha =
     applicantType === "hha" || role === "hha" || role === "caregiver";
   return isHha ? "HHA" : "DDD";
@@ -37,7 +39,7 @@ export function programLabel(input: { applicantType?: string; role?: string }): 
 /** Field staff carry a program; agency/admin/super roles are shared across both. */
 export function isProgramScopedRole(role?: string): boolean {
   const r = (role || "").toLowerCase();
-  return r.includes("dsp") || r === "employee" || r === "hha" || r === "caregiver";
+  return r.includes("dsp") || r === "employee" || r === "hha" || r === "caregiver" || r === "support_coordinator";
 }
 
 /**
@@ -46,11 +48,11 @@ export function isProgramScopedRole(role?: string): boolean {
  */
 export function matchesAgencyMode(
   role: string | undefined,
-  mode: "ddd" | "hha" | null
+  mode: "ddd" | "hha" | "sc" | null
 ): boolean {
   if (!mode) return true;
-  if (!isProgramScopedRole(role)) return true;
-  return programLabel({ role }) === (mode === "hha" ? "HHA" : "DDD");
+  if (!isProgramScopedRole(role)) return mode !== "sc" || ["admin", "manager", "supervisor"].includes((role || "").toLowerCase());
+  return programLabel({ role }) === ({ ddd: "DDD", hha: "HHA", sc: "SC" })[mode];
 }
 
 /**
@@ -70,6 +72,12 @@ export function staffLabels(
   supportedClientTypes?: string[] | null
 ): { title: string; noun: string; nounPlural: string; plural: string } {
   const types = (supportedClientTypes ?? []).map((t) => t?.toLowerCase());
+  if (types.length === 1 && types[0] === "sc") {
+    return { title: "Support Coordinator", noun: "Support Coordinators", nounPlural: "Support Coordinators", plural: "support coordinators" };
+  }
+  if (types.includes("sc")) {
+    return { title: "Staff", noun: "Staff", nounPlural: "Staff", plural: "staff" };
+  }
   const ddd = types.includes("ddd");
   const hha = types.includes("hha");
 

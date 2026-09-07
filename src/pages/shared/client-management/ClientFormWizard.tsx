@@ -28,6 +28,8 @@ import {
 import type { GeneratePocPanelHandle } from "./components/GeneratePocPanel";
 import { scrollToPocUpload } from "./utils/pocUploadDom";
 import { ClientTypePicker } from "./components/ClientTypePicker";
+import { useAuth } from "@/utils/auth";
+import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 
 const ClientImportFromFilePanel = lazy(
   () => import("./components/ClientImportFromFilePanel"),
@@ -79,6 +81,8 @@ export function ClientFormWizard({
   } = useClientSave();
 
   const { toast } = useToast();
+  const { user } = useAuth();
+  const agencyMode = useEffectiveAgencyMode();
   const navigate = useNavigate();
 
   const [showSaveSuccess, setShowSaveSuccess] = React.useState(false);
@@ -135,7 +139,7 @@ export function ClientFormWizard({
 
   const runSave = useCallback(async (dataToSave: AddClientFormData = formData) => {
     const result = await saveClient(
-      dataToSave,
+      !isEditMode && agencyMode === "sc" && !dataToSave.servicePrograms ? { ...dataToSave, servicePrograms: ["sc"] } : dataToSave,
       isEditMode,
       clientId,
       config.showAgencySelection,
@@ -178,6 +182,7 @@ export function ClientFormWizard({
     setShowSaveSuccess(true);
   }, [
     formData,
+    agencyMode,
     isEditMode,
     clientId,
     config.showAgencySelection,
@@ -362,6 +367,16 @@ export function ClientFormWizard({
 
   return (
     <>
+      {stage === 1 && user?.agency?.supportedClientTypes?.includes("sc") && (
+        <label className="flex items-center gap-3 mb-5 text-sm">
+          <input type="checkbox" checked={formData.servicePrograms?.includes("sc") ?? (!isEditMode && agencyMode === "sc")}
+            disabled={agencyMode === "sc"}
+            onChange={(event) => setFormData((previous) => ({ ...previous, servicePrograms: event.target.checked
+              ? [...new Set([...(previous.servicePrograms ?? [previous.type]), "sc" as const])]
+              : (previous.servicePrograms ?? [previous.type]).filter((program) => program !== "sc") }))} />
+          Enroll this client in Support Coordination
+        </label>
+      )}
       {stageContent}
 
       <Dialog open={showSavingModal} onOpenChange={() => {}}>

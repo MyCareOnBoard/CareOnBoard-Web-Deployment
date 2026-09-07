@@ -24,7 +24,7 @@ export interface SuperAdminShiftsCalendarProps {
   employeeId?: string;
   lockAgency?: boolean;
   dateRange: ShiftDateRange;
-  mode: "ddd" | "hha";
+  mode: "ddd" | "hha" | "sc";
   category?: ShiftCategory | null;
   onSelectionChange: (selectedIds: string[]) => void;
   onOpenShift?: (shift: NormalizedCalendarShift) => void;

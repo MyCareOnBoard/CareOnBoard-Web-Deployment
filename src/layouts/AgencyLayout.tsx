@@ -41,8 +41,6 @@ import {
     Sun,
     Megaphone,
     ClipboardList,
-    Brain,
-    Heart,
     ShieldAlert,
     CalendarClock,
 } from "lucide-react";
@@ -85,7 +83,7 @@ function filterNavItemsByMode(items: AgencyNavItem[], mode: AgencyMode | null): 
 
 const allNavItems: AgencyNavItem[] = [
     { label: "Dashboard", path: Routes.agency.dashboard, icon: HomeIcon },
-    { label: "Shift Management", path: Routes.agency.scheduling, icon: SchedulingIcon, accessKey: SHIFT_MANAGEMENT_ACCESS_KEY },
+    { label: "Shift Management", path: Routes.agency.scheduling, icon: SchedulingIcon, accessKey: SHIFT_MANAGEMENT_ACCESS_KEY, programTypes: ["ddd", "hha"] },
     {
         label: "DSP Management",
         path: Routes.agency.dspManagement,
@@ -115,7 +113,7 @@ const allNavItems: AgencyNavItem[] = [
         ],
     },
     // { label: "Reports", path: Routes.agency.reports.index, icon: ReportIcon, accessKey: "Reports" },
-    { label: "Goals & Documents", path: Routes.agency.goalsAndDocuments.index, icon: GoaslAndDocumentsIcon, accessKey: "Goals & Documents", programTypes: ["ddd"] },
+    { label: "Goals & Documents", path: Routes.agency.goalsAndDocuments.index, icon: GoaslAndDocumentsIcon, accessKey: "Goals & Documents", programTypes: ["ddd", "sc"] },
     { label: "Trainings", path: Routes.agency.trainings, icon: Network, accessKey: "Trainings" },
     { label: "Mileage", path: Routes.agency.mileage, icon: MileageIcon, accessKey: "Mileage" },
     { label: "Incident", path: Routes.agency.incident, icon: IncidentIcon, accessKey: "Incident" },
@@ -127,95 +125,30 @@ const allNavItems: AgencyNavItem[] = [
 
 // ─── Mode Toggle ──────────────────────────────────────────────────────────────
 
-function AgencyModeToggle({ mode, onSelect }: { mode: AgencyMode; onSelect: (m: AgencyMode) => void }) {
-    return (
-        <div className="flex items-center gap-0.5 rounded-full bg-white/60 p-1 border border-white/40 backdrop-blur-sm shadow-sm">
-            <button
-                type="button"
-                onClick={() => onSelect("ddd")}
-                className={cn(
-                    "flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[13px] font-semibold transition-all duration-200",
-                    mode === "ddd"
-                        ? "bg-[#00b4b8] text-white shadow-sm"
-                        : "text-[#808081] hover:text-[#10141a]"
-                )}
-            >
-                <Brain className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">DDD</span>
-            </button>
-            <button
-                type="button"
-                onClick={() => onSelect("hha")}
-                className={cn(
-                    "flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[13px] font-semibold transition-all duration-200",
-                    mode === "hha"
-                        ? "bg-[#00b4b8] text-white shadow-sm"
-                        : "text-[#808081] hover:text-[#10141a]"
-                )}
-            >
-                <Heart className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">HHA</span>
-            </button>
-        </div>
-    );
+const programLabels: Record<AgencyMode, string> = { ddd: "DDD", hha: "HHA", sc: "Support Coordination" };
+
+function AgencyModeToggle({ mode, modes, onSelect }: { mode: AgencyMode; modes: AgencyMode[]; onSelect: (mode: AgencyMode) => void }) {
+    return <div className="flex flex-wrap gap-1 rounded-full bg-white/60 p-1" aria-label="Agency program">
+        {modes.map((value) => <button key={value} type="button" aria-pressed={mode === value}
+            onClick={() => onSelect(value)} className={cn("rounded-full px-4 py-2 text-sm font-semibold", mode === value ? "bg-[#00b4b8] text-white" : "text-[#808081]")}>
+            {programLabels[value]}
+        </button>)}
+    </div>;
 }
 
-// ─── Mode Selection Overlay ───────────────────────────────────────────────────
-
-function ModeSelectionScreen({ onSelect }: { onSelect: (mode: AgencyMode) => void }) {
-    return (
-        <div className="flex min-h-[calc(100vh-98px)] items-center justify-center mt-[98px]">
-            <div className="w-full max-w-2xl px-8 text-center">
-                <h1 className="text-[28px] font-bold text-[#10141a] mb-2">Select Your Care Program</h1>
-                <p className="text-[15px] text-[#808081] mb-10">
-                    Choose how you'd like to manage your agency. You can switch between programs at any time.
-                </p>
-                <div className="grid grid-cols-2 gap-6">
-                    {/* DDD Card */}
-                    <button
-                        type="button"
-                        onClick={() => onSelect("ddd")}
-                        className="group flex flex-col items-center gap-4 rounded-2xl bg-white border-2 border-transparent p-8 text-left shadow-sm transition-all duration-200 hover:border-[#00b4b8] hover:shadow-md cursor-pointer"
-                    >
-                        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#e6f8f8] group-hover:bg-[#00b4b8] transition-colors duration-200">
-                            <Brain className="h-8 w-8 text-[#00b4b8] group-hover:text-white transition-colors duration-200" />
-                        </div>
-                        <div className="text-center">
-                            <h2 className="text-[18px] font-bold text-[#10141a] mb-1">DDD Program</h2>
-                            <p className="text-[13px] text-[#808081] leading-relaxed">
-                                Manage Direct Support Professionals for individuals with developmental disabilities
-                            </p>
-                        </div>
-                        <span className="mt-1 inline-flex items-center rounded-full bg-[#e6f8f8] px-3 py-1 text-[12px] font-semibold text-[#00b4b8] group-hover:bg-[#00b4b8] group-hover:text-white transition-colors duration-200">
-                            DSP Management
-                        </span>
-                    </button>
-
-                    {/* HHA Card */}
-                    <button
-                        type="button"
-                        onClick={() => onSelect("hha")}
-                        className="group flex flex-col items-center gap-4 rounded-2xl bg-white border-2 border-transparent p-8 text-left shadow-sm transition-all duration-200 hover:border-[#00b4b8] hover:shadow-md cursor-pointer"
-                    >
-                        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#e6f8f8] group-hover:bg-[#00b4b8] transition-colors duration-200">
-                            <Heart className="h-8 w-8 text-[#00b4b8] group-hover:text-white transition-colors duration-200" />
-                        </div>
-                        <div className="text-center">
-                            <h2 className="text-[18px] font-bold text-[#10141a] mb-1">HHA Program</h2>
-                            <p className="text-[13px] text-[#808081] leading-relaxed">
-                                Manage Home Health Aides providing in-home care services to patients
-                            </p>
-                        </div>
-                        <span className="mt-1 inline-flex items-center rounded-full bg-[#e6f8f8] px-3 py-1 text-[12px] font-semibold text-[#00b4b8] group-hover:bg-[#00b4b8] group-hover:text-white transition-colors duration-200">
-                            Caregiver Management
-                        </span>
-                    </button>
-                </div>
-            </div>
+function ModeSelectionScreen({ modes, onSelect }: { modes: AgencyMode[]; onSelect: (mode: AgencyMode) => void }) {
+    return <div className="flex min-h-[calc(100vh-98px)] items-center justify-center mt-[98px]">
+        <div className="w-full max-w-2xl px-8 text-center">
+            <h1 className="text-[28px] font-bold mb-2">Select Your Care Program</h1>
+            {modes.length ? <div className="mt-8 flex flex-wrap justify-center gap-4">
+                {modes.map((mode) => <button key={mode} type="button" onClick={() => onSelect(mode)}
+                    className="rounded-2xl bg-white p-8 font-semibold shadow-sm focus-visible:ring-2 focus-visible:ring-[#00b4b8]">
+                    {programLabels[mode]}
+                </button>)}
+            </div> : <p>You do not have access to an agency program. Contact your agency administrator.</p>}
         </div>
-    );
+    </div>;
 }
-
 // ─── Layout ───────────────────────────────────────────────────────────────────
 
 export default function AgencyDashboardLayout({ children }: { children?: ReactNode }) {
@@ -227,19 +160,20 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
 
     const agencyId = user?.agencyId || user?.agency?.id || "";
     const supportedTypes = user?.agency?.supportedClientTypes ?? [];
-    const supportsBoth = supportedTypes.includes("ddd") && supportedTypes.includes("hha");
+    const supportsBoth = supportedTypes.length > 1;
 
     // Effective mode: stored toggle, or auto-derived from the agency's single
     // supported type. Shared with the applicant directory's data fetch.
     const effectiveMode = useEffectiveAgencyMode();
 
-    const needsModeSelection = supportsBoth && !effectiveMode;
+    const needsModeSelection = !effectiveMode;
 
     const handleModeSelect = (mode: AgencyMode) => {
         if (agencyId) dispatch(setAgencyMode({ agencyId, mode }));
     };
 
     const handleModeToggle = (mode: AgencyMode) => {
+        if (/\/(add|edit|new)(\/|$)/.test(location.pathname) && !window.confirm("Switch program? Any unsaved changes on this page will be lost.")) return;
         if (agencyId) dispatch(setAgencyMode({ agencyId, mode }));
         // Redirect away from DDD-only pages when switching to HHA.
         const dddOnlyPaths = [
@@ -273,7 +207,7 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
     const navItems = useMemo(() => {
         const accessFiltered = filterNavItemsByAccess(allNavItems, user?.userType, user?.profile?.accessList);
         const modeFiltered = filterNavItemsByMode(accessFiltered, effectiveMode);
-        const expensesLabel = effectiveMode === "hha" ? "Caregiver expenses" : "DSP expenses";
+        const expensesLabel = effectiveMode === "sc" ? "Coordinator expenses" : effectiveMode === "hha" ? "Caregiver expenses" : "DSP expenses";
         return modeFiltered.map((item) => {
             if (item.path === Routes.agency.dspManagement) return { ...item, label: dspManagementLabel };
             if (item.children) {
@@ -296,7 +230,7 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
 
     const modeToggle =
         supportsBoth && effectiveMode ? (
-            <AgencyModeToggle mode={effectiveMode} onSelect={handleModeToggle} />
+            <AgencyModeToggle mode={effectiveMode} modes={supportedTypes} onSelect={handleModeToggle} />
         ) : null;
 
     const billingRoute = getAgencyBillingRouteAccess(location.pathname);
@@ -313,7 +247,9 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
         hasAgencyStaffAccess(user?.profile?.accessList ?? [], currentNavItem.accessKey)
         )
     );
-    const canRenderCurrentRoute = mayAccessBillingRoute && mayAccessNonBillingRoute;
+    const currentProgramTypes = allNavItems.find((item) => item.path === currentNavItem?.path)?.programTypes;
+    const mayAccessProgramRoute = !effectiveMode || !currentProgramTypes || currentProgramTypes.includes(effectiveMode);
+    const canRenderCurrentRoute = mayAccessBillingRoute && mayAccessNonBillingRoute && mayAccessProgramRoute;
 
     return (
         <ProtectedRoute>
@@ -329,13 +265,13 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
                 />
 
                 {needsModeSelection ? (
-                    <ModeSelectionScreen onSelect={handleModeSelect} />
+                    <ModeSelectionScreen modes={supportedTypes} onSelect={handleModeSelect} />
                 ) : (
                     <>
                         <DashboardSidebar navItems={navItems} />
                         <main className={`ml-0 ${collapsed ? "md:ml-[112px]" : "md:ml-[240px]"} pt-[130px] pb-10 transition-[margin] duration-200`}>
                             <AnnouncementBanner endpoint="/agencyAnnouncements/announcements/mine" viewAllPath={Routes.agency.announcements} className="mx-8 mb-4" />
-                            <div className="px-8">{children ?? <Outlet />}</div>
+                            <div key={`${agencyId}:${effectiveMode}`} className="px-8">{children ?? <Outlet />}</div>
                         </main>
                         <TooltipProvider>
                             <Tooltip>

@@ -18,7 +18,7 @@ export interface OperationalAgencySummary {
   id: string;
   name: string;
   status: "active" | string;
-  supportedClientTypes: readonly ("ddd" | "hha")[];
+  supportedClientTypes: readonly ("ddd" | "hha" | "sc")[];
   timezone: string;
 }
 

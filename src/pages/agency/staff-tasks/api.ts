@@ -19,7 +19,7 @@ export interface StaffTaskData {
   status: "Open" | "In Progress" | "Completed";
   activities: TaskActivity[];
   /** Program view the task was created in; absent = shows in both views. */
-  mode?: "ddd" | "hha";
+  mode?: "ddd" | "hha" | "sc";
 }
 
 interface TasksResponse {
@@ -39,7 +39,7 @@ interface CreateTaskInput {
   staffMember: string;
   dueDate: string;
   priority: "High" | "Medium" | "Low";
-  mode?: "ddd" | "hha" | null;
+  mode?: "ddd" | "hha" | "sc" | null;
 }
 
 interface UpdateTaskInput {

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { ChevronLeft, ChevronRight, Search, X, Loader2, CheckCircle, Check, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
-import { listShifts, Shift, updateShift, ShiftStatus, formatShiftLocation } from "@/lib/api/shifts";
+import { listShifts, Shift, updateShift, ShiftStatus, ShiftType, SubmissionStatus, formatShiftLocation } from "@/lib/api/shifts";
+import { useAuth } from "@/utils/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -30,9 +31,11 @@ const getInitialsFromName = (name: string) => {
   return `${first}${last}`.toUpperCase();
 };
 
-export default function ApprovalsPage() {
+export default function ApprovalsPage({ manualTimesheets = false }: { manualTimesheets?: boolean }) {
   const { toast } = useToast();
-  const { agencyId, agency } = useOperationalAgency();
+  const { user } = useAuth();
+  const canReview = !manualTimesheets || user?.userType === "agency" || user?.profile?.accessList?.includes("Timesheets Approval");
+  const { agencyId, agency, mode } = useOperationalAgency();
   const location = useLocation();
   const operationScopeRef = useRef(0);
   
@@ -68,7 +71,7 @@ export default function ApprovalsPage() {
         setLoading(true);
         const loadedShifts = await loadAllShiftPages(
           (params) => listShifts(params, { signal }),
-          scopedShiftListParams(agencyId, location.search),
+          { ...scopedShiftListParams(agencyId, location.search, mode ?? undefined), ...(manualTimesheets ? { type: ShiftType.MANUAL, submissionStatus: SubmissionStatus.SUBMITTED } : {}) },
         );
         if (signal?.aborted) return;
         // Get all completed shifts (we'll filter by approved status based on filterStatus)
@@ -87,7 +90,7 @@ export default function ApprovalsPage() {
       } finally {
         if (!signal?.aborted) setLoading(false);
       }
-  }, [agencyId, location.search, toast]);
+  }, [agencyId, location.search, toast, mode, manualTimesheets]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -323,7 +326,7 @@ export default function ApprovalsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
-          Approvals
+          {manualTimesheets ? "Submitted timesheets" : "Approvals"}
         </h1>
       </div>
 
@@ -337,7 +340,7 @@ export default function ApprovalsPage() {
                 Pending Approvals
               </h2>
               <p className="text-[14px] font-medium leading-[1.4] text-[#808081] capitalize">
-                Completed shifts awaiting approval.
+                {manualTimesheets ? "Review submitted Support Coordinator timesheets." : "Completed shifts awaiting approval."}
               </p>
             </div>
 
@@ -483,6 +486,7 @@ export default function ApprovalsPage() {
                         <Button
                           size="sm"
                           onClick={() => handleApprove(apiShift)}
+                          disabled={!canReview}
                           className="bg-[#0eaf52] hover:bg-[#0d9a47] text-white rounded-[60px] px-4 py-3 h-auto text-[12px] font-semibold flex items-center gap-1 backdrop-blur-[22px]"
                         >
                           <CheckCircle className="w-4 h-4" />
@@ -491,6 +495,7 @@ export default function ApprovalsPage() {
                         <Button
                           size="sm"
                           onClick={() => handleReject(apiShift)}
+                          disabled={!canReview}
                           className="bg-[#d53411] hover:bg-[#c02e0f] text-white rounded-[60px] px-4 py-3 h-auto text-[12px] font-semibold flex items-center gap-1 backdrop-blur-[22px]"
                         >
                           <X className="w-3 h-3" />

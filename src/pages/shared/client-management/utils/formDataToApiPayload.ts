@@ -176,6 +176,7 @@ export function formDataToApiPayload(
   const payload: CreateClientRequest = {
     ...(includeAgencyId && formData.agencyId ? { agencyId: formData.agencyId } : {}),
     type: formData.type || "ddd",
+    ...(formData.servicePrograms ? { servicePrograms: formData.servicePrograms } : {}),
     // Coverage drives per-line billing; billingDirection is deprecated (resolver falls back to it).
     ...(defaultCoverage ? { defaultCoverage } : {}),
     ...(defaultCoverage === "both"

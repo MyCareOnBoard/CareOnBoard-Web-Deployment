@@ -9,7 +9,7 @@ import { resolveEffectiveAgencyMode } from "./useEffectiveAgencyMode";
 describe("resolveEffectiveAgencyMode", () => {
   const cases: Array<{
     label: string;
-    supportedTypes: readonly ("ddd" | "hha")[];
+    supportedTypes: readonly ("ddd" | "hha" | "sc")[];
     storedMode: AgencyMode | null;
     expected: AgencyMode | null;
   }> = [
@@ -17,7 +17,9 @@ describe("resolveEffectiveAgencyMode", () => {
     { label: "HHA-only", supportedTypes: ["hha"] as const, storedMode: "ddd", expected: "hha" },
     { label: "dual with stored mode", supportedTypes: ["ddd", "hha"] as const, storedMode: "hha", expected: "hha" },
     { label: "dual without a stored mode", supportedTypes: ["ddd", "hha"] as const, storedMode: null, expected: null },
-    { label: "unsupported-type fallback", supportedTypes: [] as const, storedMode: null, expected: "ddd" },
+    { label: "no permitted modes", supportedTypes: [] as const, storedMode: null, expected: null },
+    { label: "SC-only", supportedTypes: ["sc"], storedMode: null, expected: "sc" },
+    { label: "stale selection", supportedTypes: ["ddd", "sc"], storedMode: "hha", expected: null },
   ];
 
   it.each(cases)("returns $expected for $label agencies", ({ supportedTypes, storedMode, expected }) => {

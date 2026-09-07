@@ -49,7 +49,7 @@ const MAX_PUBLIC_OBJECT_KEYS = 64;
 const MAX_PUBLIC_TEXT_BYTES = 16 * 1_024;
 
 const RUN_TYPES = ["regular", "off_cycle"] as const;
-const PAYROLL_MODES = ["ddd", "hha"] as const;
+const PAYROLL_MODES = ["ddd", "hha", "sc"] as const;
 const WORKFLOW_STATES = [
   "preparing",
   "review",

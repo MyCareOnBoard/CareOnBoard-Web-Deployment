@@ -22,7 +22,7 @@ export default function DayProgramPage() {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  if (mode === "hha") {
+  if (mode === "hha" || mode === "sc") {
     return <Navigate to={Routes.agency.dashboard} replace />;
   }
 

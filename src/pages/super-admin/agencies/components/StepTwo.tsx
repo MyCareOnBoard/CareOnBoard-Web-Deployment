@@ -43,17 +43,18 @@ export default function Step3Leadership({formData, onChange, services = [], fiel
         onChange("services", newServices);
     };
 
-    const CLIENT_TYPE_OPTIONS: { value: "ddd" | "hha"; label: string }[] = [
+    const CLIENT_TYPE_OPTIONS: { value: "ddd" | "hha" | "sc"; label: string }[] = [
         { value: "ddd", label: "DDD" },
         { value: "hha", label: "HHA" },
+        { value: "sc", label: "Support Coordination" },
     ];
 
     // A service's effective program; services default to "ddd" on the backend,
     // so treat any service missing `program` as DDD rather than hiding it.
-    const serviceProgram = (service: { program?: string }): "ddd" | "hha" =>
-        (service.program === "hha" ? "hha" : "ddd");
+    const serviceProgram = (service: { program?: string }): "ddd" | "hha" | "sc" =>
+        (service.program === "sc" ? "sc" : service.program === "hha" ? "hha" : "ddd");
 
-    const selectedClientTypes: ("ddd" | "hha")[] = formData.supportedClientTypes || [];
+    const selectedClientTypes: ("ddd" | "hha" | "sc")[] = formData.supportedClientTypes || [];
 
     // Services available for selection depend on the supported client types.
     // No client type selected -> no services to choose; once chosen, show only
@@ -63,8 +64,8 @@ export default function Step3Leadership({formData, onChange, services = [], fiel
             ? services.filter((s) => selectedClientTypes.includes(serviceProgram(s)))
             : [];
 
-    const toggleClientType = (clientType: "ddd" | "hha") => {
-        const currentTypes: ("ddd" | "hha")[] = formData.supportedClientTypes || [];
+    const toggleClientType = (clientType: "ddd" | "hha" | "sc") => {
+        const currentTypes: ("ddd" | "hha" | "sc")[] = formData.supportedClientTypes || [];
         const newTypes = currentTypes.includes(clientType)
             ? currentTypes.filter((t) => t !== clientType)
             : [...currentTypes, clientType];

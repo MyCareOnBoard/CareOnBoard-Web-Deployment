@@ -46,7 +46,7 @@ export default function ClientsPage() {
     {
       agencyId,
       search: debouncedSearchQuery.trim() || undefined,
-      type: selectedMode,
+      ...(selectedMode === "sc" ? { mode: selectedMode } : { type: selectedMode }),
       limit: 100,
     },
     { skip: !agencyId }

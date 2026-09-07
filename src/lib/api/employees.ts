@@ -86,7 +86,7 @@ export interface ListEmployeesParams {
     role?: string;
     workAvailability?: boolean;
     status?: 'active' | 'inactive' | 'pending' | 'suspended' | 'terminated';
-    applicantType?: 'hha' | 'dsp';
+    applicantType?: 'hha' | 'dsp' | 'support_coordinator';
     search?: string;
     limit?: number;
     cursor?: string;
@@ -330,7 +330,7 @@ export async function getEmployeeTrainings(
 export async function searchEmployees(
     query: string,
     agencyId?: string,
-    options?: { workAvailability?: boolean; role?: 'hha' | 'dsp' },
+    options?: { workAvailability?: boolean; role?: 'hha' | 'dsp' | 'support_coordinator' },
 ): Promise<Employee[]> {
     try {
         const response = await listEmployees({

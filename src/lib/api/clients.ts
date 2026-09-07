@@ -28,6 +28,7 @@ export interface ClientOutOfPocketPayer {
  * Represents a client/consumer in the care system
  */
 export interface Client {
+  servicePrograms?: ("ddd" | "hha" | "sc")[];
   // Core identifiers
   id: string;
   type?: ClientType;
@@ -589,6 +590,7 @@ export interface ClientStatsResponse {
 export interface ListClientsParams {
   agencyId?: string; // Required for employees
   type?: ClientType;
+  mode?: "ddd" | "hha" | "sc";
   status?: 'active' | 'inactive' | 'pending' | 'archived';
   service?: string;
   search?: string;
@@ -616,6 +618,7 @@ export interface ClientPayrollServiceLocation { source: "primaryAddress" | "seco
  * Create Client Request
  */
 export interface CreateClientRequest {
+  servicePrograms?: ("ddd" | "hha" | "sc")[];
   agencyId?: string;
   type?: ClientType;
   billingDirection?: ClientBillingDirection;
@@ -759,6 +762,7 @@ export interface CreateClientRequest {
  * Update Client Request
  */
 export interface UpdateClientRequest {
+  servicePrograms?: ("ddd" | "hha" | "sc")[];
   agencyId?: string;
   type?: ClientType;
   billingDirection?: ClientBillingDirection;
@@ -922,6 +926,7 @@ export async function listAgencyClients(params?: ListClientsParams): Promise<Cli
       params: {
         agencyId: params?.agencyId,
         type: params?.type,
+        mode: params?.mode,
         status: params?.status,
         service: params?.service,
         search: params?.search,
@@ -1130,11 +1135,11 @@ export async function deleteClient(clientId: string, agencyId?: string): Promise
 export async function searchClients(
   query: string,
   agencyId?: string,
-  type?: "ddd" | "hha",
+  type?: "ddd" | "hha" | "sc",
 ): Promise<Client[]> {
   try {
     const response = await axiosClient.get<{ success: boolean; clients: Client[] }>('/clients', {
-      params: { search: query, agencyId, type }
+      params: { search: query, agencyId, ...(type === "sc" ? { mode: type } : { type }) }
     });
 
     if (!response.data.success) {

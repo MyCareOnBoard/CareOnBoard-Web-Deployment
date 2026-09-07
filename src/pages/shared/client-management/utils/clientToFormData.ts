@@ -166,6 +166,7 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
     return {
         ...initial,
         type: clientType,
+        servicePrograms: client.servicePrograms,
         ...(includeAgencyId && client.agencyId ? { agencyId: String(client.agencyId) } : {}),
         stage1: {
             firstName: client.firstName || "",

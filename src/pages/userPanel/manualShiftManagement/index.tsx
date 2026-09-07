@@ -14,7 +14,6 @@ import { format, parse } from "date-fns";
 import { useSignDocumentMutation, useCheckSignatureStatusQuery } from "@/pages/applicant/application/api";
 import { searchClients, Client } from "@/lib/api/clients";
 import { useAuth } from "@/utils/auth";
-import { programLabel } from "@/lib/roleLabel";
 import { useGooglePlacesAutocomplete } from "@/hooks/useGooglePlacesAutocomplete";
 import { useReverseGeocode } from "@/hooks/useReverseGeocode";
 
@@ -157,8 +156,8 @@ export default function ManualShiftManagementPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   // Field staff carry one program; scope client search to it (DSP→ddd / Caregiver→hha).
-  const clientType = programLabel({ applicantType: user?.applicantType, role: user?.role })
-    .toLowerCase() as "ddd" | "hha";
+  const clientType = user?.applicantType === "support_coordinator" || user?.role === "support_coordinator"
+    ? "sc" : user?.applicantType === "hha" || user?.role === "hha" ? "hha" : "ddd";
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [saving, setSaving] = useState(false);

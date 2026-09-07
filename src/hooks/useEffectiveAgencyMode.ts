@@ -21,20 +21,19 @@ export function useEffectiveAgencyMode(): AgencyMode | null {
 
 /** Resolves a mode from an explicitly supplied agency summary and stored toggle. */
 export function resolveEffectiveAgencyMode(
-  supportedTypes: readonly ("ddd" | "hha")[],
+  supportedTypes: readonly AgencyMode[],
   storedMode: AgencyMode | null | undefined,
 ): AgencyMode | null {
-  const supportsBoth =
-    supportedTypes.includes("ddd") && supportedTypes.includes("hha");
-  if (supportsBoth) return storedMode ?? null;
-  if (supportedTypes.includes("hha")) return "hha";
-  return "ddd";
+  const modes = [...new Set(supportedTypes)].filter((mode) => ["ddd", "hha", "sc"].includes(mode));
+  if (modes.length === 1) return modes[0];
+  return storedMode && modes.includes(storedMode) ? storedMode : null;
 }
 
 /** Maps an agency mode to the applicant program type stored on user docs. */
 export function agencyModeToApplicantType(
   mode: AgencyMode | null
-): "dsp" | "hha" | undefined {
+): "dsp" | "hha" | "support_coordinator" | undefined {
+  if (mode === "sc") return "support_coordinator";
   if (mode === "hha") return "hha";
   if (mode === "ddd") return "dsp";
   return undefined;

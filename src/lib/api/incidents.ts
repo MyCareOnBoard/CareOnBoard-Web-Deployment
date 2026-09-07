@@ -96,7 +96,7 @@ export interface IncidentFilterParams {
     endDate?: string;
     employeeId?: string;
     clientId?: string;
-    clientType?: 'ddd' | 'hha';
+    clientType?: 'ddd' | 'hha' | 'sc';
 }
 
 /**

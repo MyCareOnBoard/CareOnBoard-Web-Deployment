@@ -62,7 +62,7 @@ export interface Agency {
     offerMileageReimbursements?: boolean;
     realtimeGpsTracking?: boolean;
     // Supported client types (DDD / HHA). Missing => treated as both.
-    supportedClientTypes?: ("ddd" | "hha")[];
+    supportedClientTypes?: ("ddd" | "hha" | "sc")[];
     timezone?: string;
     // Legacy
     taxId?: string;

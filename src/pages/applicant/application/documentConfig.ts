@@ -1,6 +1,6 @@
 import { DocumentTypes } from "./types";
 
-export type ApplicantType = "dsp" | "hha";
+export type ApplicantType = "dsp" | "hha" | "support_coordinator";
 
 export interface ApplicantDocDef {
   /** kebab id == upload fileType == agency-document-statuses key */
@@ -202,7 +202,7 @@ const HHA_DOCS: ApplicantDocDef[] = [
 ];
 
 export function getApplicantDocs(t: ApplicantType = "dsp"): ApplicantDocDef[] {
-  return ({ dsp: DSP_DOCS, hha: HHA_DOCS } as Record<ApplicantType, ApplicantDocDef[]>)[t] ?? DSP_DOCS;
+  return ({ dsp: DSP_DOCS, hha: HHA_DOCS, support_coordinator: DSP_DOCS } as Record<ApplicantType, ApplicantDocDef[]>)[t] ?? DSP_DOCS;
 }
 
 /** Dedup union of all doc defs, keyed by eligibility *Url field. */

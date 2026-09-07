@@ -1,6 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 
-export type AgencyMode = 'ddd' | 'hha'
+export type AgencyMode = 'ddd' | 'hha' | 'sc'
 
 interface AgencyModeState {
   modeByAgency: Record<string, AgencyMode>

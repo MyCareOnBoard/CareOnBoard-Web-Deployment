@@ -49,7 +49,7 @@ export interface StaffFormValues {
     password: string;
     phone?: string;
     accessList: string[];
-    agencyModes: ("ddd" | "hha")[];
+    agencyModes: ("ddd" | "hha" | "sc")[];
     role?: string;
     employmentType?: EmploymentType;
     employmentStartDate?: string;
@@ -69,7 +69,7 @@ export interface AgencyStaffMember {
     email: string;
     phone?: string;
     accessList: string[];
-    agencyModes?: ("ddd" | "hha")[];
+    agencyModes?: ("ddd" | "hha" | "sc")[];
     role?: string;
     employmentType?: EmploymentType;
     employmentStartDate?: string;
@@ -94,7 +94,7 @@ export interface CreateAgencyStaffRequest {
     password: string;
     phone?: string;
     accessList: string[];
-    agencyModes: ("ddd" | "hha")[];
+    agencyModes: ("ddd" | "hha" | "sc")[];
     role: string;
     employmentType: EmploymentType;
     employmentStartDate: string;
@@ -112,7 +112,7 @@ export interface UpdateAgencyStaffRequest {
     phone?: string;
     password?: string;
     accessList?: string[];
-    agencyModes?: ("ddd" | "hha")[];
+    agencyModes?: ("ddd" | "hha" | "sc")[];
     role?: string;
     employmentType?: EmploymentType;
     employmentStartDate?: string;

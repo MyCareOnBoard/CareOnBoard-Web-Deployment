@@ -9,7 +9,7 @@ import SubmittedNoteModal from "./SubmittedNoteModal";
 
 export interface NotesReviewWorkspaceProps {
   agencyId?: string;
-  clientType?: "ddd" | "hha";
+  clientType?: "ddd" | "hha" | "sc";
   startDate?: string;
   endDate?: string;
   readOnly: boolean;
@@ -39,7 +39,9 @@ export default function NotesReviewWorkspace({
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
   const filterScrollRef = useRef<HTMLDivElement>(null);
   const hasExplicitDateRange = Boolean(startDate || endDate);
-  const visibleNoteTypes = clientType ? noteTypesForClientType(clientType) : NOTE_TYPES;
+  const visibleNoteTypes = clientType === "sc"
+    ? noteTypesForClientType("ddd").filter((note) => !["community-inclusion", "day-habilitation"].includes(note.id))
+    : clientType ? noteTypesForClientType(clientType) : NOTE_TYPES;
 
   useEffect(() => {
     const timer = setTimeout(() => {

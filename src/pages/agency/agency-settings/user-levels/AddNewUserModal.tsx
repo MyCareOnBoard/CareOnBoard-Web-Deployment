@@ -38,7 +38,7 @@ interface AddNewUserModalProps {
     password: string;
     phone?: string;
     accessList: string[];
-    agencyModes?: ("ddd" | "hha")[];
+    agencyModes?: ("ddd" | "hha" | "sc")[];
     role?: string;
     employmentType?: EmploymentType;
     employmentStartDate?: string;
@@ -53,9 +53,10 @@ interface AddNewUserModalProps {
 const CREATE_DEFAULTS = ["Mileage"];
 
 // Program modes, mirroring the agency's supportedClientTypes (StepTwo pattern).
-const MODE_OPTIONS: { value: "ddd" | "hha"; label: string }[] = [
+const MODE_OPTIONS: { value: "ddd" | "hha" | "sc"; label: string }[] = [
   { value: "ddd", label: "DDD" },
   { value: "hha", label: "HHA" },
+  { value: "sc", label: "Support Coordination" },
 ];
 
 export default function AddNewUserModal({
@@ -69,7 +70,7 @@ export default function AddNewUserModal({
   const { labels } = useStaffLabels();
   const accessLabel = (key: string) =>
     key === "DSP Management" ? `${labels.title} Management` : key;
-  const agencyModeOptions: ("ddd" | "hha")[] = user?.agency?.supportedClientTypes ?? [];
+  const agencyModeOptions: ("ddd" | "hha" | "sc")[] = user?.agency?.supportedClientTypes ?? [];
   // Only make the admin pick when there's an actual choice (dual-program agency).
   const showModePicker = agencyModeOptions.length > 1;
 
@@ -80,7 +81,7 @@ export default function AddNewUserModal({
     initialData ? normalizeAgencyAccessListForUi(initialData.accessList) : (mode === "create" ? CREATE_DEFAULTS : [])
   );
   const [isAccessOpen, setIsAccessOpen] = useState(false);
-  const [agencyModes, setAgencyModes] = useState<("ddd" | "hha")[]>(
+  const [agencyModes, setAgencyModes] = useState<("ddd" | "hha" | "sc")[]>(
     initialData?.agencyModes?.length
       ? initialData.agencyModes
       : mode === "create" ? [] : agencyModeOptions
@@ -124,7 +125,7 @@ export default function AddNewUserModal({
 
   const toggleAccess = (access: string) => setAccessList((prev) => toggleAgencyAccess(prev, access));
 
-  const toggleMode = (m: "ddd" | "hha") => {
+  const toggleMode = (m: "ddd" | "hha" | "sc") => {
     setAgencyModes((prev) =>
       prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]
     );
