@@ -1,5 +1,7 @@
 import React, { useState } from "react";
-import { X, ChevronDown, Check, Eye, EyeOff } from "lucide-react";
+import { X, ChevronDown, Check, Eye, EyeOff, CalendarIcon } from "lucide-react";
+import { format, parseISO } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Dialog,
   DialogContent,
@@ -51,6 +53,33 @@ interface AddNewUserModalProps {
 }
 
 const CREATE_DEFAULTS = ["Mileage"];
+
+function StaffDateField({ value, onChange, ...props }: Omit<React.ComponentProps<typeof Button>, "value" | "onChange"> & {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = value ? parseISO(value) : undefined;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button {...props} type="button" variant="outline" className={`justify-start ${props.className ?? ""}`}>
+          <CalendarIcon aria-hidden="true" className="mr-2 h-4 w-4 shrink-0" />
+          {selected ? format(selected, "MMM d, yyyy") : "Select date"}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-auto bg-white p-0">
+        <Calendar mode="single" captionLayout="dropdown" selected={selected} defaultMonth={selected}
+          startMonth={new Date(1924, 0)} endMonth={new Date(new Date().getFullYear() + 20, 11)}
+          onSelect={(date) => { onChange(date ? format(date, "yyyy-MM-dd") : ""); setOpen(false); }}
+          autoFocus
+        />
+        <Button type="button" variant="ghost" className="w-full" disabled={!value}
+          onClick={() => { onChange(""); setOpen(false); }}>Clear date</Button>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 // Program modes, mirroring the agency's supportedClientTypes (StepTwo pattern).
 const MODE_OPTIONS: { value: "ddd" | "hha" | "sc"; label: string }[] = [
@@ -491,11 +520,10 @@ export default function AddNewUserModal({
               <Label htmlFor="employment-start-date" className="text-[12px] font-normal leading-[normal] text-[#10141a]">
                 Employment start date
               </Label>
-              <Input
+              <StaffDateField
                 id="employment-start-date"
-                type="date"
                 value={employmentStartDate}
-                onChange={(event) => setEmploymentStartDate(event.target.value)}
+                onChange={setEmploymentStartDate}
                 disabled={isSaving}
                 aria-invalid={mode === "create" && !employmentStartDate}
                 aria-describedby={mode === "create" && !employmentStartDate ? "employment-start-date-error" : undefined}
@@ -509,11 +537,10 @@ export default function AddNewUserModal({
               <Label htmlFor="employment-end-date" className="text-[12px] font-normal leading-[normal] text-[#10141a]">
                 Employment end date (optional)
               </Label>
-              <Input
+              <StaffDateField
                 id="employment-end-date"
-                type="date"
                 value={employmentEndDate}
-                onChange={(event) => setEmploymentEndDate(event.target.value)}
+                onChange={setEmploymentEndDate}
                 disabled={isSaving}
                 aria-invalid={employmentRangeInvalid}
                 aria-describedby={employmentRangeInvalid ? "employment-end-date-error" : undefined}
@@ -582,11 +609,10 @@ export default function AddNewUserModal({
             <Label htmlFor="compensation-effective-date" className="text-[12px] font-normal leading-[normal] text-[#10141a]">
               Compensation effective date
             </Label>
-            <Input
+            <StaffDateField
               id="compensation-effective-date"
-              type="date"
               value={compensationEffectiveDate}
-              onChange={(event) => setCompensationEffectiveDate(event.target.value)}
+              onChange={setCompensationEffectiveDate}
               disabled={isSaving}
               aria-invalid={(mode === "create" && !compensationEffectiveDate) || editCompensationTermsIncomplete}
               aria-describedby={(mode === "create" && !compensationEffectiveDate) || editCompensationTermsIncomplete ? "compensation-effective-date-error" : undefined}
