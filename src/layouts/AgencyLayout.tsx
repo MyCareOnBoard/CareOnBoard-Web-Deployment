@@ -43,6 +43,8 @@ import {
     ClipboardList,
     ShieldAlert,
     CalendarClock,
+    Brain,
+    Heart,
 } from "lucide-react";
 
 /** Canonical scope for the scheduling hub; legacy token "Scheduling" still honored in accessList. */
@@ -126,26 +128,52 @@ const allNavItems: AgencyNavItem[] = [
 // ─── Mode Toggle ──────────────────────────────────────────────────────────────
 
 const programLabels: Record<AgencyMode, string> = { ddd: "DDD", hha: "HHA", sc: "Support Coordination" };
+const programCards = {
+    ddd: { icon: Brain, title: "DDD Program", description: "Manage Direct Support Professionals for individuals with developmental disabilities", badge: "DSP Management" },
+    hha: { icon: Heart, title: "HHA Program", description: "Manage Home Health Aides providing in-home care services to patients", badge: "Caregiver Management" },
+    sc: { icon: Network, title: "Support Coordination", description: "Manage Support Coordinators helping individuals access services and supports", badge: "Coordinator Management" },
+};
 
 function AgencyModeToggle({ mode, modes, onSelect }: { mode: AgencyMode; modes: AgencyMode[]; onSelect: (mode: AgencyMode) => void }) {
-    return <div className="flex flex-wrap gap-1 rounded-full bg-white/60 p-1" aria-label="Agency program">
-        {modes.map((value) => <button key={value} type="button" aria-pressed={mode === value}
-            onClick={() => onSelect(value)} className={cn("rounded-full px-4 py-2 text-sm font-semibold", mode === value ? "bg-[#00b4b8] text-white" : "text-[#808081]")}>
-            {programLabels[value]}
-        </button>)}
+    return <div className="flex items-center gap-0.5 rounded-full bg-white/60 p-1 border border-white/40 backdrop-blur-sm shadow-sm" aria-label="Agency program">
+        {modes.map((value) => {
+            const Icon = programCards[value].icon;
+            return <button key={value} type="button" aria-label={programLabels[value]} aria-pressed={mode === value}
+                onClick={() => onSelect(value)} className={cn("flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[13px] font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8]", mode === value ? "bg-[#00b4b8] text-white shadow-sm" : "text-[#808081] hover:text-[#10141a]")}>
+                <Icon aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+                <span className="hidden sm:inline">{programLabels[value]}</span>
+            </button>;
+        })}
     </div>;
 }
 
 function ModeSelectionScreen({ modes, onSelect }: { modes: AgencyMode[]; onSelect: (mode: AgencyMode) => void }) {
     return <div className="flex min-h-[calc(100vh-98px)] items-center justify-center mt-[98px]">
-        <div className="w-full max-w-2xl px-8 text-center">
-            <h1 className="text-[28px] font-bold mb-2">Select Your Care Program</h1>
-            {modes.length ? <div className="mt-8 flex flex-wrap justify-center gap-4">
-                {modes.map((mode) => <button key={mode} type="button" onClick={() => onSelect(mode)}
-                    className="rounded-2xl bg-white p-8 font-semibold shadow-sm focus-visible:ring-2 focus-visible:ring-[#00b4b8]">
-                    {programLabels[mode]}
-                </button>)}
-            </div> : <p>You do not have access to an agency program. Contact your agency administrator.</p>}
+        <div className={cn("w-full px-6 py-10 text-center sm:px-8", modes.length > 2 ? "max-w-5xl" : "max-w-2xl")}>
+            <h1 className="text-[28px] font-bold text-[#10141a] mb-2">Select Your Care Program</h1>
+            {modes.length ? <>
+                <p className="text-[15px] text-[#808081] mb-10">
+                    Choose how you'd like to manage your agency. You can switch between programs at any time.
+                </p>
+                <div className={cn("grid gap-6", modes.length > 2 ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-2")}>
+                    {modes.map((mode) => {
+                        const { icon: Icon, title, description, badge } = programCards[mode];
+                        return <button key={mode} type="button" onClick={() => onSelect(mode)}
+                            className="group flex flex-col items-center gap-4 rounded-2xl bg-white border-2 border-transparent p-8 shadow-sm transition-all duration-200 hover:border-[#00b4b8] hover:shadow-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2">
+                            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#e6f8f8] group-hover:bg-[#00b4b8] transition-colors duration-200">
+                                <Icon aria-hidden="true" className="h-8 w-8 text-[#00b4b8] group-hover:text-white transition-colors duration-200" />
+                            </div>
+                            <div>
+                                <h2 className="text-[18px] font-bold text-[#10141a] mb-1">{title}</h2>
+                                <p className="text-[13px] text-[#808081] leading-relaxed">{description}</p>
+                            </div>
+                            <span className="mt-auto inline-flex items-center rounded-full bg-[#e6f8f8] px-3 py-1 text-[12px] font-semibold text-[#00b4b8] group-hover:bg-[#00b4b8] group-hover:text-white transition-colors duration-200">
+                                {badge}
+                            </span>
+                        </button>;
+                    })}
+                </div>
+            </> : <p>You do not have access to an agency program. Contact your agency administrator.</p>}
         </div>
     </div>;
 }

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import AddNewUserModal from "./AddNewUserModal";
@@ -42,16 +42,22 @@ describe("AddNewUserModal payroll prerequisites", () => {
     const save = screen.getByRole("button", { name: "Add staff member" });
     expect(save).toBeDisabled();
 
-    fireEvent.change(start, { target: { value: "2026-08-20" } });
-    fireEvent.change(end, { target: { value: "2026-08-19" } });
-    fireEvent.change(compensationEffective, { target: { value: "2026-08-20" } });
+    const selectAugustDate = async (trigger: HTMLElement, day: number) => {
+      await user.click(trigger);
+      await user.selectOptions(screen.getByRole("combobox", { name: "Choose the Year" }), "2026");
+      await user.selectOptions(screen.getByRole("combobox", { name: "Choose the Month" }), "7");
+      await user.click(screen.getByRole("button", { name: new RegExp(`August ${day}\\w*, 2026`) }));
+    };
+    await selectAugustDate(start, 20);
+    await selectAugustDate(end, 19);
+    await selectAugustDate(compensationEffective, 20);
     expect(save).toBeDisabled();
     const rangeError = screen.getByRole("alert");
     expect(rangeError).toHaveTextContent("Employment end date cannot be before the start date.");
     expect(end).toHaveAttribute("aria-invalid", "true");
     expect(end).toHaveAccessibleDescription("Employment end date cannot be before the start date.");
 
-    fireEvent.change(end, { target: { value: "2026-08-21" } });
+    await selectAugustDate(end, 21);
     expect(save).toBeEnabled();
     await user.click(save);
 
@@ -68,7 +74,7 @@ describe("AddNewUserModal payroll prerequisites", () => {
     });
     expect(payload).not.toHaveProperty("compensationHistory");
     expect(onClose).toHaveBeenCalledOnce();
-  });
+  }, 30000);
 
   it("sends null when an existing optional employment end date is cleared", async () => {
     const user = userEvent.setup();
@@ -97,13 +103,15 @@ describe("AddNewUserModal payroll prerequisites", () => {
     );
 
     const end = screen.getByLabelText("Employment end date (optional)");
-    expect(end).toHaveValue("2026-12-31");
-    await user.clear(end);
+    expect(end).toHaveTextContent("Dec 31, 2026");
+    await user.click(end);
+    await user.click(screen.getByRole("button", { name: "Clear date" }));
+    expect(end).toHaveTextContent("Select date");
     await user.click(screen.getByRole("button", { name: "Save changes" }));
 
     await waitFor(() => expect(onSave).toHaveBeenCalledOnce());
     expect(onSave.mock.calls[0][0]).toMatchObject({ employmentEndDate: null });
-  });
+  }, 15000);
 
   it("does not emit existing edit-mode pay terms without an effective date", () => {
     const onSave = vi.fn().mockResolvedValue(undefined);

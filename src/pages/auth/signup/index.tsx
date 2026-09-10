@@ -362,16 +362,16 @@ export default function SignUpPage() {
           )}
         </div>
 
-        {/* Applicant Type Selector (only when agency supports both DSP and HHA) */}
+        {/* Applicant Type Selector (only when agency supports multiple programs) */}
         {showApplicantTypeSelector && (
           <div className="space-y-2">
             <Label className="text-sm font-medium text-gray-900">
               I am applying as
             </Label>
-            <div className="flex flex-wrap gap-3">
+            <div className="grid grid-cols-2 gap-3">
               {applicantOptions.map((option) => <button key={option} type="button"
                 onClick={() => setApplicantType(option)} aria-pressed={applicantType === option}
-                className={`min-h-12 rounded-2xl border px-4 text-base font-semibold ${applicantType === option ? "border-[#17a2b8] bg-[#17a2b8]/10 text-[#17a2b8]" : "border-gray-200 bg-white text-gray-700"}`}>
+                className={`min-h-12 rounded-2xl border px-4 py-2 text-base font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#17a2b8] focus-visible:ring-offset-2 ${applicantType === option ? "border-[#17a2b8] bg-[#17a2b8]/10 text-[#17a2b8]" : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"}`}>
                 {option === "support_coordinator" ? "Support Coordinator" : option === "hha" ? "Caregiver" : "DSP"}
               </button>)}
             </div>
