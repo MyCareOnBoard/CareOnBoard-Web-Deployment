@@ -19,6 +19,7 @@ const baseValues: AgencyProfileFormValues = {
   phone: "",
   address: "",
   county: "",
+  catchmentArea: "",
   city: "",
   state: "",
   zipCode: "",
