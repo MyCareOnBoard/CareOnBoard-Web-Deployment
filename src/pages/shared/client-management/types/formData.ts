@@ -96,6 +96,10 @@ export type Stage1ClientIdentityAndContactData = {
     dddId: string;
     ssn: string;
     tier?: string;
+    /** MSRT roster: "Admission Date" — when the agency began serving this person. */
+    admissionDate?: Date;
+    /** MSRT roster: "Acuity?" — see ClientAcuity in the backend client schema. */
+    acuity?: string;
     address: string;
     location?: { lat: string; lon: string };
     countyState: string;
@@ -356,7 +360,9 @@ export type DocKey =
     | "assessmentForms"
     | "clinicalAssessment"
     | "form485"
-    | "hospitalDischarge";
+    | "hospitalDischarge"
+    | "ids"
+    | "aenf";
 
 /**
  * Compile-time guard: DocKey must stay identical to the API's ClientDocumentKey.
@@ -794,6 +800,8 @@ export function createInitialAddClientFormData(): AddClientFormData {
             gender: undefined,
             dob: undefined,
             medicaidId: "",
+            admissionDate: undefined,
+            acuity: "",
             dddId: "",
             ssn: "",
             tier: undefined,

@@ -19,17 +19,17 @@ import { requestEmployeeDocument, type EmployeeDocument, isExpiringSoon } from "
 import { useToast } from "@/hooks/use-toast";
 
 const DOCUMENT_TYPES = [
-	{ value: "id", label: "Photo ID (State ID, Passport)" },
+	{ value: "photo-id", label: "Photo ID (State ID, Passport)" },
 	{ value: "driver-license", label: "Driver's License" },
-	{ value: "social-security", label: "Social Security Card" },
-	{ value: "vaccination", label: "Hepatitis B vaccination series documents" },
-	{ value: "immunity", label: "Hepatitis B immunity (titer result)" },
-	{ value: "test", label: "Tb test result" },
-	{ value: "form", label: "I-9 Form" },
-	{ value: "tax", label: "W-4 Form" },
+	{ value: "social-security-card", label: "Social Security Card" },
+	{ value: "hepatitis-b-vaccination", label: "Hepatitis B vaccination series documents" },
+	{ value: "hepatitis-b-immunity", label: "Hepatitis B immunity (titer result)" },
+	{ value: "tb-test", label: "Tb test result" },
+	{ value: "i9-form", label: "I-9 Form" },
+	{ value: "w4-form", label: "W-4 Form" },
 	{ value: "background-check", label: "Background Check" },
-	{ value: "certification", label: "Certification / License" },
-	{ value: "general", label: "Other" },
+	{ value: "certifications", label: "Certification / License" },
+	{ value: "other", label: "Other" },
 ] as const;
 
 interface RequestDocumentModalProps {

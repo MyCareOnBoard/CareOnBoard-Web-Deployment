@@ -11,6 +11,8 @@ import GenericDetailCard from "./GenericDetailCard";
 import GenericActionCard from "./GenericActionCard";
 import TaskListCard from "./TaskListCard";
 import PdfDownloadCard from "./PdfDownloadCard";
+import ReportPreviewCard from "./ReportPreviewCard";
+import ReportDownloadCard from "./ReportDownloadCard";
 
 const STATIC_REGISTRY: Record<string, React.FC<{ data: unknown }>> = {
   "shift-list": ShiftListCard,
@@ -24,6 +26,10 @@ const STATIC_REGISTRY: Record<string, React.FC<{ data: unknown }>> = {
   "pdf-download": PdfDownloadCard,
   "excel-download": PdfDownloadCard,
   "word-download": PdfDownloadCard,
+  // Reports carry PHI, so their download is an authenticated fetch rather than a
+  // plain link — hence its own card instead of reusing PdfDownloadCard.
+  "report-preview": ReportPreviewCard,
+  "report-download": ReportDownloadCard,
 };
 
 const INTERACTIVE_REGISTRY = {

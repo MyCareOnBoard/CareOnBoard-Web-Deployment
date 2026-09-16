@@ -28,6 +28,8 @@ export interface Agency {
     phone?: string;
     address?: string;
     county?: string;
+    /** MSRT roster header "Catchment Area:"; falls back to county when unset. */
+    catchmentArea?: string;
     city?: string;
     state?: string;
     zipCode?: string;
@@ -139,6 +141,7 @@ export interface UpdateAgencyProfileRequest {
     phone?: string | null;
     address?: string | null;
     county?: string | null;
+    catchmentArea?: string | null;
     city?: string | null;
     state?: string | null;
     zipCode?: string | null;

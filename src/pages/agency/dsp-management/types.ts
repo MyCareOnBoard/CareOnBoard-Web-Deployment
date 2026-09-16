@@ -11,6 +11,15 @@ export interface DSP {
   dateOfBirth: string;
   workAvailability: boolean;
   hireDate: string;
+  /** Agency Compliance (MSRT) "Agency Employee" sheet columns. */
+  alternateLastName?: string;
+  /** Last four digits only — the full SSN is never stored on an employee. */
+  ssnLast4?: string;
+  /** Start date when it differs from the hire date. YYYY-MM-DD. */
+  serviceStartDate?: string;
+  drivesIndividuals?: boolean;
+  administersMedications?: boolean;
+  gender?: string;
   profilePicture: string;
   tagId: string;
   role: string;

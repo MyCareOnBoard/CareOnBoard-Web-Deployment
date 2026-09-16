@@ -75,6 +75,8 @@ export type AgencyProfileFormValues = {
   phone: string;
   address: string;
   county: string;
+  /** MSRT roster header "Catchment Area:"; the report falls back to county when blank. */
+  catchmentArea: string;
   city: string;
   state: string;
   zipCode: string;
@@ -103,6 +105,7 @@ const CONTACT_KEYS = [
   "phone",
   "address",
   "county",
+  "catchmentArea",
   "city",
   "state",
   "zipCode",
@@ -160,6 +163,7 @@ export function buildAgencyProfileUpdatePayload(
     payload.phone = nullable(values.phone);
     payload.address = nullable(values.address);
     payload.county = nullable(values.county);
+    payload.catchmentArea = nullable(values.catchmentArea);
     payload.city = nullable(values.city);
     payload.state = nullable(values.state);
     payload.zipCode = nullable(values.zipCode);

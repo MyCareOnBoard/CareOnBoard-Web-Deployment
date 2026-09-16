@@ -1,4 +1,4 @@
-import { ArrowRight, CalendarDays, CreditCard, ShieldCheck, ChevronRight } from "lucide-react";
+import { ArrowRight, CalendarDays, CreditCard, ShieldCheck, ChevronRight, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ReactNode } from "react";
 
@@ -16,6 +16,13 @@ const QUICK_ACTIONS = [
     actionLabel: "View risks",
     icon: <ShieldCheck className="w-5 h-5" />,
     payload: "Check compliance risks",
+  },
+  {
+    title: "Agency Compliance Report",
+    description: "Generate the MSRT monitoring workbook for a period.",
+    actionLabel: "Generate",
+    icon: <FileSpreadsheet className="w-5 h-5" />,
+    payload: "Generate the Agency Compliance Report for this quarter",
   },
   {
     title: "Review billing issues",
