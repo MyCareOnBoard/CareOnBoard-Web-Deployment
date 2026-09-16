@@ -56,26 +56,28 @@ function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
   const [alertingDocId, setAlertingDocId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (dsp.id) {
-      fetchDocuments();
-      fetchTrainings();
-    }
+    if (dsp.id) fetchDocuments();
   }, [dsp.id]);
 
-  const fetchTrainings = async () => {
-    try {
-      setTrainingsLoading(true);
-      const trainings = await getEmployeeTrainings(dsp.id, user?.agencyId);
-      setTotalCount(trainings.length);
-      setCompletedCount(trainings.filter((t) => t.status === 'completed').length);
-    } catch (error) {
-      console.error('Failed to fetch trainings:', error);
-      setTotalCount(0);
-      setCompletedCount(0);
-    } finally {
-      setTrainingsLoading(false);
-    }
-  };
+  useEffect(() => {
+    if (!dsp.id) return;
+    let active = true;
+    setTrainingsLoading(true);
+    getEmployeeTrainings(dsp.id, user?.agencyId, true, mode ?? undefined)
+      .then(trainings => {
+        if (!active) return;
+        setTotalCount(trainings.summary?.assigned ?? 0);
+        setCompletedCount(trainings.summary?.manualCompleted ?? 0);
+      })
+      .catch(error => {
+        if (!active) return;
+        console.error('Failed to fetch trainings:', error);
+        setTotalCount(0);
+        setCompletedCount(0);
+      })
+      .finally(() => { if (active) setTrainingsLoading(false); });
+    return () => { active = false; };
+  }, [dsp.id, user?.agencyId, mode]);
 
   const fetchDocuments = async () => {
     try {

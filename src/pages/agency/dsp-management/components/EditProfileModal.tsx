@@ -8,6 +8,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarDays } from "lucide-react";
+import { format, parseISO } from "date-fns";
 import { updateEmployee, type UpdateEmployeeRequest } from "@/lib/api/employees";
 import { useToast } from "@/hooks/use-toast";
 import type { DSP } from "../types";
@@ -27,21 +31,25 @@ export function EditProfileModal({
 }: EditProfileModalProps) {
 	const { toast } = useToast();
 	const [saving, setSaving] = useState(false);
+	const [hireDateOpen, setHireDateOpen] = useState(false);
 
 	const [form, setForm] = useState({
 		fullName: "",
 		phone: "",
 		address: "",
 		dateOfBirth: "",
+		hireDate: "",
 	});
 
 	/* Seed form when modal opens / dsp changes */
 	useEffect(() => {
 		if (open && dsp) {
+			setHireDateOpen(false);
 			setForm({
 				fullName: dsp.fullName ?? "",
 				phone: dsp.phoneNumber ?? "",
 				address: dsp.address ?? "",
+				hireDate: dsp.hireDate?.slice(0, 10) ?? "",
 				dateOfBirth: dsp.dateOfBirth
 					? dsp.dateOfBirth.slice(0, 10) // yyyy-mm-dd for <input type="date">
 					: "",
@@ -62,6 +70,8 @@ export function EditProfileModal({
 			if (form.address && form.address !== dsp.address) payload.address = form.address;
 			if (form.dateOfBirth && form.dateOfBirth !== dsp.dateOfBirth?.slice(0, 10))
 				payload.dateOfBirth = form.dateOfBirth;
+			if (form.hireDate && form.hireDate !== dsp.hireDate?.slice(0, 10))
+				payload.hireDate = form.hireDate;
 
 			if (Object.keys(payload).length === 0) {
 				toast({ title: "No changes", description: "Nothing to update." });
@@ -81,6 +91,7 @@ export function EditProfileModal({
 				phoneNumber: form.phone || dsp.phoneNumber,
 				address: form.address || dsp.address,
 				dateOfBirth: form.dateOfBirth || dsp.dateOfBirth,
+				hireDate: form.hireDate || dsp.hireDate,
 			});
 
 			onClose();
@@ -156,6 +167,26 @@ export function EditProfileModal({
 							value={form.dateOfBirth}
 							onChange={(e) => handleChange("dateOfBirth", e.target.value)}
 						/>
+					</div>
+					<div className="space-y-1.5">
+						<Label htmlFor="edit-hire-date" className="text-sm font-medium text-[#10141a]">Hire Date</Label>
+						<Popover open={hireDateOpen} onOpenChange={setHireDateOpen}>
+							<PopoverTrigger asChild>
+								<Button id="edit-hire-date" type="button" variant="outline" disabled={saving} className="w-full justify-between rounded-xl border-[var(--input-border)] bg-[var(--input-bg)] text-[#10141a]">
+									{form.hireDate || "Select hire date"}<CalendarDays className="h-4 w-4 text-[#808081]" />
+								</Button>
+							</PopoverTrigger>
+							<PopoverContent align="start" className="w-auto p-0">
+								<Calendar mode="single" captionLayout="dropdown" startMonth={new Date(1924, 0)} endMonth={new Date(new Date().getFullYear() + 10, 11)}
+									selected={form.hireDate ? parseISO(form.hireDate) : undefined}
+									defaultMonth={form.hireDate ? parseISO(form.hireDate) : new Date()}
+									onSelect={(date) => {
+										if (!date) return;
+										handleChange("hireDate", format(date, "yyyy-MM-dd"));
+										setHireDateOpen(false);
+									}} />
+							</PopoverContent>
+						</Popover>
 					</div>
 				</div>
 

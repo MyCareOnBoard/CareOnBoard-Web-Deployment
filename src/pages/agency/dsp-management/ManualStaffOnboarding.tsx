@@ -16,11 +16,14 @@ import { useToast } from "@/hooks/use-toast";
 import { Routes } from "@/routes/constants";
 import { AlertCircle, CalendarDays, CheckCircle2, Eye, EyeOff, Loader2 } from "lucide-react";
 import { SuccessDialog, SuccessDialogContent } from "@/components/ui/success-dialog";
-import { differenceInYears, subYears } from "date-fns";
+import { differenceInYears, format, isValid, parseISO, subYears } from "date-fns";
 import { checkEmailExists, uploadTempDocument, completeManualOnboarding } from "@/lib/api/manual-onboarding";
 import { useEffectiveAgencyMode, agencyModeToApplicantType } from "@/hooks/useEffectiveAgencyMode";
 
 const STORAGE_KEY = "agencyManualStaffOnboarding";
+
+const isHireDate = (value: unknown): value is string =>
+  typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && isValid(parseISO(value));
 
 const STEP_TITLES = [
   "Profile & Pre-Screening",
@@ -69,6 +72,7 @@ type ProfilePreScreeningData = {
   fullName: string;
   email: string;
   dateOfBirth: string;
+  hireDate: string;
   address: string;
   gender: "Male" | "Female" | "";
   booleanQuestions: Record<BooleanQuestionName, "Yes" | "No" | "">;
@@ -99,6 +103,7 @@ const defaultProfileData: ProfilePreScreeningData = {
   fullName: "",
   email: "",
   dateOfBirth: "",
+  hireDate: "",
   address: "",
   gender: "",
   booleanQuestions: {
@@ -245,7 +250,12 @@ export default function ManualStaffOnboarding() {
         const parsed = JSON.parse(saved);
         if (parsed.activeStep !== undefined) setActiveStep(parsed.activeStep);
         if (parsed.maxSavedStep !== undefined) setMaxSavedStep(parsed.maxSavedStep);
-        if (parsed.profileData) setProfileData(parsed.profileData);
+        if (parsed.profileData) setProfileData({ ...defaultProfileData, ...parsed.profileData,
+          hireDate: isHireDate(parsed.profileData.hireDate) ? parsed.profileData.hireDate : "" });
+        if (!isHireDate(parsed.profileData?.hireDate)) {
+          setActiveStep(0);
+          setMaxSavedStep(0);
+        }
         if (parsed.resumeUrl) setResumeUrl(parsed.resumeUrl);
         if (parsed.documentUploads) setDocumentUploads(parsed.documentUploads);
         if (parsed.i9FileName) setI9FileName(parsed.i9FileName);
@@ -392,6 +402,7 @@ export default function ManualStaffOnboarding() {
     if (emailCheckStatus === "checking") return "Please wait — verifying email availability";
     if (emailCheckStatus === "taken") return "An account with this email already exists";
     if (!profileData.dateOfBirth) return "Date of birth is required";
+    if (!isHireDate(profileData.hireDate)) return "Hire date is required";
     if (!profileData.address.trim()) return "Address is required";
     if (!profileData.gender) return "Gender is required";
     for (const q of BOOLEAN_QUESTIONS.slice(0, 4)) {
@@ -451,6 +462,12 @@ export default function ManualStaffOnboarding() {
       persistToStorage({ activeStep: 2, maxSavedStep: newMax });
       setActiveStep(2);
     } else if (activeStep === 2) {
+      if (!isHireDate(profileData.hireDate)) {
+        setActiveStep(0);
+        setMaxSavedStep(0);
+        toast({ title: "Hire date required", description: "Select the employee's hire date before completing onboarding.", variant: "destructive" });
+        return;
+      }
       if (!orientationDeclaration) {
         toast({ title: "Validation error", description: "Please confirm credentials have been shared with the new staff member", variant: "destructive" });
         return;
@@ -481,6 +498,7 @@ export default function ManualStaffOnboarding() {
             email: profileData.email.trim().toLowerCase(),
             password: generatedPassword,
             dateOfBirth: profileData.dateOfBirth,
+            hireDate: profileData.hireDate,
             address: profileData.address.trim(),
             gender: profileData.gender,
             preScreeningAnswers: profileData.booleanQuestions as Record<string, string>,
@@ -590,6 +608,27 @@ export default function ManualStaffOnboarding() {
                   caption_label: "rounded-md pl-2 pr-2 flex items-center gap-1 text-sm h-8 [&>svg]:hidden",
                 }}
                 autoFocus={true} />
+            </PopoverContent>
+          </Popover>
+        </div>
+        <div className="space-y-4">
+          <Label htmlFor="hire-date">Hire Date (required)</Label>
+          <Popover open={openDatePopoverId === "hire-date"} onOpenChange={(open) => setOpenDatePopoverId(open ? "hire-date" : null)}>
+            <PopoverTrigger asChild>
+              <button id="hire-date" type="button" aria-required="true" className="flex w-full items-center gap-3 rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-4 py-3 text-left">
+                <span className="text-sm text-[#10141a]">{profileData.hireDate || "Select hire date"}</span>
+                <CalendarDays className="ml-auto h-5 w-5 text-[#808081]" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-auto p-0">
+              <Calendar mode="single" captionLayout="dropdown" startMonth={new Date(1924, 0)} endMonth={tenYearsFromNow}
+                selected={profileData.hireDate ? parseISO(profileData.hireDate) : undefined}
+                defaultMonth={profileData.hireDate ? parseISO(profileData.hireDate) : new Date()}
+                onSelect={(date) => {
+                  if (!date) return;
+                  setProfileData((prev) => ({ ...prev, hireDate: format(date, "yyyy-MM-dd") }));
+                  setOpenDatePopoverId(null);
+                }} />
             </PopoverContent>
           </Popover>
         </div>

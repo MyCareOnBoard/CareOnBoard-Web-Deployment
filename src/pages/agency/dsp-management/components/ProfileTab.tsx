@@ -1,4 +1,5 @@
 import { lazy, Suspense, useState } from "react";
+import { isValid, parseISO } from "date-fns";
 import { DSP } from "../types";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog, ConfirmDialogContent } from "@/components/ui/confirm-dialog";
@@ -67,6 +68,7 @@ export function ProfileTab({ dsp, onDeactivate, onActivate }: ProfileTabProps) {
   };
 
   const isDeactivating = pendingAction === "deactivate";
+  const hireDate = parseISO(dsp.hireDate?.slice(0, 10) || "");
   const canManagePrimaryWorkplace = canManageEmployeePayroll(user?.userType, user?.profile?.accessList)
     && Boolean(user?.uid && user.agencyId && dsp.id);
 
@@ -138,14 +140,10 @@ export function ProfileTab({ dsp, onDeactivate, onActivate }: ProfileTabProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </div>
-            <p className="text-sm text-gray-600">Joining date</p>
+            <p className="text-sm text-gray-600">Hire date</p>
           </div>
           <p className="text-sm text-gray-900 font-normal">
-            {dsp.createdAt && dsp.createdAt !== '' 
-              ? new Date(dsp.createdAt).toLocaleDateString() 
-              : dsp.hireDate && dsp.hireDate !== ''
-              ? new Date(dsp.hireDate).toLocaleDateString()
-              : 'N/A'}
+            {isValid(hireDate) ? hireDate.toLocaleDateString() : 'Not set'}
           </p>
         </div>
 

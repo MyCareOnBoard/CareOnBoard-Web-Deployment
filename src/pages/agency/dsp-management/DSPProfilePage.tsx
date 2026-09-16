@@ -60,7 +60,7 @@ export default function DSPProfilePage() {
           bio: employee.bio || "",
           dateOfBirth: employee.dateOfBirth || "",
           workAvailability: employee.workAvailability || false,
-          hireDate: employee.hireDate || employee.createdAt || "",
+          hireDate: employee.hireDate || "",
           profilePicture: employee.profilePicture || "",
           tagId: employee.tagId || "",
           role: employee.role || "DSP",
