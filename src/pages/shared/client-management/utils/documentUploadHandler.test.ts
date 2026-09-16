@@ -3,6 +3,7 @@ import { uploadClientDocument, type Client } from "@/lib/api/clients";
 import { createInitialAddClientFormData } from "../types/formData";
 import { clientToFormData } from "./clientToFormData";
 import { handleDocumentUploads } from "./documentUploadHandler";
+import { DOCUMENT_TYPE_OPTIONS, DOC_KEY_TO_SERVER_TYPE } from "./documentTypeConstants";
 
 vi.mock("@/lib/api/clients", () => ({ uploadClientDocument: vi.fn() }));
 
@@ -15,6 +16,12 @@ function loaded() {
 
 describe("record-preserving document uploads", () => {
   beforeEach(() => vi.resetAllMocks());
+  it("keeps document picker options unique while retaining AENF and IDS mappings", () => {
+    const keys = DOCUMENT_TYPE_OPTIONS.map(option => option.value);
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(keys).toEqual(expect.arrayContaining(["aenf", "ids"]));
+    expect(DOC_KEY_TO_SERVER_TYPE).toMatchObject({ aenf: "aenf", ids: "ids" });
+  });
   it("uploads AENF with its canonical slug without reclassifying custom titles", async () => {
     const data = clientToFormData({ id: "one", documents: [{ key: "medicalDocs", title: "AENF", url: "https://example.test/custom" }] } as Client);
     const doc = data.stage3.docs.find(item => item.key === "aenf")!;

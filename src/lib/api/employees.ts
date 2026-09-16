@@ -26,6 +26,15 @@ export interface Employee {
     role?: string;
     workAvailability?: boolean; // Boolean field
     hireDate?: string; // Calendar date: YYYY-MM-DD (older records may contain an ISO timestamp)
+    /** Agency Compliance (MSRT) "Agency Employee" sheet columns. */
+    alternateLastName?: string;
+    /** Last four digits only — the full SSN is never stored on an employee. */
+    ssnLast4?: string;
+    /** Start date when it differs from the hire date. YYYY-MM-DD. */
+    serviceStartDate?: string;
+    drivesIndividuals?: boolean;
+    administersMedications?: boolean;
+    gender?: string;
     emergencyContact?: {
         name: string;
         relationship: string;
@@ -132,6 +141,15 @@ export interface UpdateEmployeeRequest {
     workAvailability?: boolean;
     profilePictureUrl?: string;
     bio?: string;
+    /** Agency Compliance (MSRT) "Agency Employee" sheet columns. */
+    alternateLastName?: string;
+    /** Last four digits only — the full SSN is never stored on an employee. */
+    ssnLast4?: string;
+    /** Start date when it differs from the hire date. YYYY-MM-DD. */
+    serviceStartDate?: string;
+    drivesIndividuals?: boolean;
+    administersMedications?: boolean;
+    gender?: string;
 }
 
 /**

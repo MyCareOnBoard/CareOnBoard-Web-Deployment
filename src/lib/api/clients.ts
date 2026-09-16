@@ -89,6 +89,10 @@ export interface Client {
   referralInfo?: ClientHhaReferralInfo;
   ssn?: string;
   tier?: string;
+  /** MSRT roster "Admission Date". Civil date, YYYY-MM-DD. */
+  admissionDate?: string;
+  /** MSRT roster "Acuity?": none | behavioral | medical | both. */
+  acuity?: string;
   billingRate?: string;
   /**
    * Flat list derived from `outcomes` on the server for each read. Omit from create/update payloads.
@@ -419,7 +423,9 @@ export type ClientDocumentKey =
   | "assessmentForms"
   | "clinicalAssessment"
   | "form485"
-  | "hospitalDischarge";
+  | "hospitalDischarge"
+  | "ids"
+  | "aenf";
 
 export interface ClientDocument {
   key: ClientDocumentKey;
@@ -674,6 +680,8 @@ export interface CreateClientRequest {
   referralInfo?: ClientHhaReferralInfo;
   ssn?: string;
   tier?: string;
+  admissionDate?: string;
+  acuity?: string;
   service?: string;
   serviceCode?: string;
   billingRate?: string;
@@ -816,6 +824,8 @@ export interface UpdateClientRequest {
   referralInfo?: ClientHhaReferralInfo | null;
   ssn?: string;
   tier?: string;
+  admissionDate?: string;
+  acuity?: string;
   service?: string;
   serviceCode?: string;
   billingRate?: string;

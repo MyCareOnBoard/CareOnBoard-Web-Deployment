@@ -39,6 +39,12 @@ export function EditProfileModal({
 		address: "",
 		dateOfBirth: "",
 		hireDate: "",
+		// Agency Compliance (MSRT) "Agency Employee" sheet columns.
+		alternateLastName: "",
+		ssnLast4: "",
+		serviceStartDate: "",
+		drivesIndividuals: false,
+		administersMedications: false,
 	});
 
 	/* Seed form when modal opens / dsp changes */
@@ -53,11 +59,16 @@ export function EditProfileModal({
 				dateOfBirth: dsp.dateOfBirth
 					? dsp.dateOfBirth.slice(0, 10) // yyyy-mm-dd for <input type="date">
 					: "",
+				alternateLastName: dsp.alternateLastName ?? "",
+				ssnLast4: dsp.ssnLast4 ?? "",
+				serviceStartDate: dsp.serviceStartDate ? dsp.serviceStartDate.slice(0, 10) : "",
+				drivesIndividuals: dsp.drivesIndividuals ?? false,
+				administersMedications: dsp.administersMedications ?? false,
 			});
 		}
 	}, [open, dsp]);
 
-	const handleChange = (field: keyof typeof form, value: string) => {
+	const handleChange = <K extends keyof typeof form>(field: K, value: (typeof form)[K]) => {
 		setForm((prev) => ({ ...prev, [field]: value }));
 	};
 
@@ -72,6 +83,19 @@ export function EditProfileModal({
 				payload.dateOfBirth = form.dateOfBirth;
 			if (form.hireDate && form.hireDate !== dsp.hireDate?.slice(0, 10))
 				payload.hireDate = form.hireDate;
+
+			// MSRT fields. Compared with !== rather than truthiness: clearing a value or
+			// setting a boolean to false must still be sent, and "" is a legitimate clear.
+			if (form.alternateLastName !== (dsp.alternateLastName ?? ""))
+				payload.alternateLastName = form.alternateLastName;
+			if (form.ssnLast4 !== (dsp.ssnLast4 ?? ""))
+				payload.ssnLast4 = form.ssnLast4;
+			if (form.serviceStartDate !== (dsp.serviceStartDate?.slice(0, 10) ?? ""))
+				payload.serviceStartDate = form.serviceStartDate;
+			if (form.drivesIndividuals !== (dsp.drivesIndividuals ?? false))
+				payload.drivesIndividuals = form.drivesIndividuals;
+			if (form.administersMedications !== (dsp.administersMedications ?? false))
+				payload.administersMedications = form.administersMedications;
 
 			if (Object.keys(payload).length === 0) {
 				toast({ title: "No changes", description: "Nothing to update." });
@@ -92,6 +116,11 @@ export function EditProfileModal({
 				address: form.address || dsp.address,
 				dateOfBirth: form.dateOfBirth || dsp.dateOfBirth,
 				hireDate: form.hireDate || dsp.hireDate,
+				alternateLastName: form.alternateLastName,
+				ssnLast4: form.ssnLast4,
+				serviceStartDate: form.serviceStartDate,
+				drivesIndividuals: form.drivesIndividuals,
+				administersMedications: form.administersMedications,
 			});
 
 			onClose();
@@ -188,6 +217,74 @@ export function EditProfileModal({
 							</PopoverContent>
 						</Popover>
 					</div>
+
+					{/* Agency Compliance (MSRT) report fields */}
+					<div className="pt-2 border-t border-gray-100">
+						<p className="text-sm font-semibold text-[#10141a]">Compliance reporting</p>
+						<p className="text-xs text-[var(--grey-200)] mt-0.5">
+							Columns on the Agency Compliance report.
+						</p>
+					</div>
+
+					<div className="space-y-1.5">
+						<Label className="text-sm font-medium text-[#10141a]">
+							Alternate last name
+						</Label>
+						<Input
+							value={form.alternateLastName}
+							placeholder="If applicable"
+							onChange={(e) => handleChange("alternateLastName", e.target.value)}
+						/>
+					</div>
+
+					<div className="space-y-1.5">
+						<Label className="text-sm font-medium text-[#10141a]">
+							Last 4 digits of SSN
+						</Label>
+						<Input
+							value={form.ssnLast4}
+							inputMode="numeric"
+							maxLength={4}
+							placeholder="1234"
+							onChange={(e) =>
+								handleChange("ssnLast4", e.target.value.replace(/\D/g, "").slice(0, 4))
+							}
+						/>
+						<p className="text-xs text-[var(--grey-200)]">
+							Last four digits only. The full number is never stored.
+						</p>
+					</div>
+
+					<div className="space-y-1.5">
+						<Label className="text-sm font-medium text-[#10141a]">
+							Start date (if different from hire date)
+						</Label>
+						<Input
+							type="date"
+							value={form.serviceStartDate}
+							onChange={(e) => handleChange("serviceStartDate", e.target.value)}
+						/>
+					</div>
+
+					<label className="flex items-center gap-2.5 cursor-pointer">
+						<input
+							type="checkbox"
+							className="h-4 w-4 accent-teal-500"
+							checked={form.drivesIndividuals}
+							onChange={(e) => handleChange("drivesIndividuals", e.target.checked)}
+						/>
+						<span className="text-sm text-[#10141a]">Drives individuals</span>
+					</label>
+
+					<label className="flex items-center gap-2.5 cursor-pointer">
+						<input
+							type="checkbox"
+							className="h-4 w-4 accent-teal-500"
+							checked={form.administersMedications}
+							onChange={(e) => handleChange("administersMedications", e.target.checked)}
+						/>
+						<span className="text-sm text-[#10141a]">Administers medications</span>
+					</label>
 				</div>
 
 				{/* Actions */}

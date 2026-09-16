@@ -70,6 +70,22 @@ describe("employee hire dates", () => {
     expect(updated).toHaveBeenCalledWith(expect.objectContaining({ hireDate: "2026-09-15" }));
   }, 30000);
 
+  it("saves a hire-date correction together with compliance field clears and false flags", async () => {
+    const user = userEvent.setup();
+    const updated = vi.fn();
+    render(<EditProfileModal open dsp={{ ...dsp, alternateLastName: "Previous", ssnLast4: "1234", serviceStartDate: "2026-09-17", drivesIndividuals: true, administersMedications: true }} onClose={vi.fn()} onUpdated={updated} />);
+    await user.click(screen.getByLabelText("Hire Date"));
+    await user.click(screen.getByRole("button", { name: /September 15th, 2026/ }));
+    await user.clear(screen.getByDisplayValue("Previous"));
+    await user.clear(screen.getByDisplayValue("1234"));
+    fireEvent.change(screen.getByDisplayValue("2026-09-17"), { target: { value: "" } });
+    await user.click(screen.getByRole("checkbox", { name: "Drives individuals" }));
+    await user.click(screen.getByRole("checkbox", { name: "Administers medications" }));
+    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+    const changes = { hireDate: "2026-09-15", alternateLastName: "", ssnLast4: "", serviceStartDate: "", drivesIndividuals: false, administersMedications: false };
+    await waitFor(() => expect(api.update).toHaveBeenCalledWith("employee-1", changes));
+    expect(updated).toHaveBeenCalledWith(expect.objectContaining(changes));
+  }, 30000);
   it("shows the hire date rather than record creation, and leaves unknown dates unset", () => {
     const { rerender } = render(<ProfileTab dsp={dsp} onActivate={vi.fn()} onDeactivate={vi.fn()} />);
     expect(screen.getByText(new Date(2026, 8, 16).toLocaleDateString())).toBeInTheDocument();

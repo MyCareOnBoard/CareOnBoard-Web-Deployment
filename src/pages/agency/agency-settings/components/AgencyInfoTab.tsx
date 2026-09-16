@@ -83,6 +83,7 @@ const EMPTY_VALUES: AgencyProfileFormValues = {
   phone: "",
   address: "",
   county: "",
+  catchmentArea: "",
   city: "",
   state: "",
   zipCode: "",
@@ -108,6 +109,7 @@ function agencyToFormValues(agency: Agency): AgencyProfileFormValues {
     phone: agency.phone ?? "",
     address: agency.address ?? "",
     county: agency.county ?? "",
+    catchmentArea: agency.catchmentArea ?? "",
     city: agency.city ?? "",
     state: agency.state ?? "",
     zipCode: agency.zipCode ?? "",
@@ -727,6 +729,24 @@ export default function AgencyInfoTab() {
                       <FormItem>
                         <FormControl>
                           <Input placeholder="Enter county" {...field} disabled={disabled} className={inputClassName} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </SettingsFormFieldRow>
+
+                <SettingsFormFieldRow
+                  title="Catchment area"
+                  description="Service area printed on the Agency Compliance report. Leave blank to use the county."
+                >
+                  <FormField
+                    control={form.control}
+                    name="catchmentArea"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Input placeholder="Enter catchment area" {...field} disabled={disabled} className={inputClassName} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

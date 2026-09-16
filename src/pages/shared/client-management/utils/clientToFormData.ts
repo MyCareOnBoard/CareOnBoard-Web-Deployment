@@ -181,6 +181,8 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
             dddId: client.dddId || "",
             ssn: client.ssn || "",
             tier: client.tier,
+            admissionDate: parseDate(client.admissionDate),
+            acuity: client.acuity || "",
             preferredName: client.preferredName || "",
             // Canonicalize stored values (e.g. legacy "Widowed") so the Stage 1 picker
             // matches; keep the raw value if it's an unrecognized variant rather than blanking it.
