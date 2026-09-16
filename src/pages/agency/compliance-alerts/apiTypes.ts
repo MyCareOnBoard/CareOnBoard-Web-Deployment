@@ -43,3 +43,41 @@ export interface UnsignedForm485Response {
   data: UnsignedForm485Client[];
   count: number;
 }
+
+export interface SourceRevision { seconds: number; nanoseconds: number; }
+export interface DocumentComplianceItem {
+  issueId: string; documentId: string; employeeId: string; employeeName: string;
+  employeeStatus: string; documentLabel: string; program: string;
+  expiryDateKey: string | null; timezone: string;
+  condition: 'current' | 'not_applicable' | 'expiring' | 'due_today' | 'expired' | 'needs_review';
+  milestone: string | null; reasonCode: string | null; evidenceStatus: string;
+  evaluatedAt: string | null; syncStatus: 'pending' | 'error' | 'ready';
+  observedSourceRevision: SourceRevision | null;
+  resolvedAt: string | null; resolutionReason: string | null;
+}
+export interface DocumentComplianceResponse {
+  pilotEnabled: boolean; items: DocumentComplianceItem[]; nextCursor: string | null;
+  evaluatedAt: string | null; syncStatus: string;
+  timezone: string | null; localDate: string | null;
+}
+export interface DocumentComplianceArgs {
+  viewerId?: string; agencyId?: string; employeeId?: string; mode?: string; condition?: string;
+  search?: string; employeeStatus?: string; cursor?: string; limit?: number;
+}
+export function complianceLabel(item?: DocumentComplianceItem): string {
+  if (!item) return 'Updating expiry status…';
+  if (item.syncStatus === 'error') return 'Expiry status unavailable';
+  return ({current: 'Current', not_applicable: 'Not applicable', expiring: 'Expiring',
+    due_today: 'Expires today', expired: 'Expired', needs_review: 'Needs review'})[item.condition];
+}
+export function civilDateLabel(key?: string | null): string {
+  if (!key) return '';
+  return new Date(key + 'T12:00:00Z').toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+export interface DocumentComplianceSettings {
+  state: 'disabled' | 'baselining' | 'active' | 'paused';
+  timezone: string | null;
+  canEnable: boolean;
+  message?: string;
+}

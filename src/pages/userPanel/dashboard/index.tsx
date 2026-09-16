@@ -1,5 +1,8 @@
+import type { SaveEmployeeDocumentResponse } from './types';
+import { useGetDocumentComplianceQuery, useComplianceDateRefresh } from '@/pages/agency/compliance-alerts/api';
+import { complianceLabel, civilDateLabel } from '@/pages/agency/compliance-alerts/apiTypes';
 import React, {useState, useCallback, useEffect} from "react";
-import {useNavigate} from "react-router";
+import {useNavigate, useSearchParams} from "react-router";
 import {Plus, X} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {auth} from "@/lib/firebase";
@@ -34,10 +37,47 @@ export default function UserPanelDashboardPage() {
     const [approvalStates, setApprovalStates] = useState<Record<string, boolean>>({});
     const itemsPerPage = 5;
 
+    const [searchParams] = useSearchParams();
+    const focusDocumentId = searchParams.get('documentId');
+    const [upload, setUpload] = useState<(SaveEmployeeDocumentResponse & {savedAt: number}) | null>(null);
+    const [withinUploadWindow, setWithinUploadWindow] = useState(false);
     const {data: employeeDocuments = []} = useGetEmployeeDocumentsQuery();
     const {data: trainings = [], isLoading: isTrainingLoading, refetch} = useGetEmployeeTrainingsQuery(undefined);
     const [updateEmployeeInfo] = useUpdateEmployeeInfoMutation();
     const [completeTraining] = useCompleteTrainingMutation();
+
+    const [pending, setPending] = useState(false);
+    const {data: compliance, isError: complianceError, refetch: refreshCompliance} = useGetDocumentComplianceQuery(
+        {viewerId: user?.uid, agencyId: user?.agencyId, condition: 'all', limit: 100},
+        {skip: !user?.uid, pollingInterval: pending && withinUploadWindow ? 5_000 : 0, skipPollingIfUnfocused: true, refetchOnFocus: true, refetchOnMountOrArgChange: true},
+    );
+    useComplianceDateRefresh(compliance?.timezone, refreshCompliance, compliance?.localDate);
+    useEffect(() => {
+        if (!upload) return;
+        const timeout = window.setTimeout(() => setWithinUploadWindow(false), Math.max(0, upload.savedAt + 60_000 - Date.now()));
+        return () => window.clearTimeout(timeout);
+    }, [upload]);
+    useEffect(() => {
+        const issue = compliance?.items.find(item => item.documentId === upload?.documentId);
+        const saved = upload?.sourceRevision;
+        const observed = issue?.observedSourceRevision;
+        const evaluatedSave = saved && observed && issue?.syncStatus === 'ready' &&
+            (observed.seconds > saved.seconds || (observed.seconds === saved.seconds && observed.nanoseconds >= saved.nanoseconds));
+        const waiting = Boolean(upload && compliance?.pilotEnabled !== false && !evaluatedSave);
+        const failed = complianceError || compliance?.syncStatus === 'error' || issue?.syncStatus === 'error';
+        setPending(waiting && !failed);
+        if (failed) setWithinUploadWindow(false);
+    }, [upload, compliance, complianceError]);
+    useEffect(() => {
+        const target = employeeDocuments.find(doc => doc.id === focusDocumentId || doc.documentId === focusDocumentId);
+        const index = userPanelDocumentTypes.findIndex(type => type.value === target?.documentType);
+        if (index >= 0) setCurrentPage(Math.floor(index / itemsPerPage) + 1);
+    }, [focusDocumentId, employeeDocuments]);
+    useEffect(() => {
+        if (!focusDocumentId) return;
+        const row = window.document.getElementById(`document-${focusDocumentId}`);
+        row?.focus(); row?.scrollIntoView?.({block: 'nearest'});
+    }, [focusDocumentId, currentPage, employeeDocuments]);
 
     const employeeInfo = user;
 
@@ -79,6 +119,10 @@ export default function UserPanelDashboardPage() {
             expiryDate: null
         };
 
+        const issue = compliance?.items.find(item => item.documentId === ('id' in employeeDocument ? employeeDocument.id : undefined) || item.documentId === ('documentId' in employeeDocument ? employeeDocument.documentId : undefined));
+        if (compliance?.pilotEnabled !== false) return {...employeeDocument,
+            status: complianceError || compliance?.syncStatus === 'error' ? 'Expiry status unavailable' : complianceLabel(issue),
+            expiryDateKey: issue?.expiryDateKey};
         let status = employeeDocument.status
 
         // get days until expiry (normalize both dates to midnight to avoid sub-day rounding issues)
@@ -98,10 +142,11 @@ export default function UserPanelDashboardPage() {
             status
         }
 
-    }, [employeeDocuments]);
+    }, [employeeDocuments, compliance, complianceError]);
 
     const getStatusColor = (status: string) => {
         switch (status.toLowerCase()) {
+            case "current":
             case "available":
                 return "bg-[#d4f4dd] text-[#0e6027] border-[#0e6027]/20";
             case "expired":
@@ -112,6 +157,8 @@ export default function UserPanelDashboardPage() {
                 return "bg-[#e5f7f7] text-[#00b4b8] border-[#00b4b8]/20";
             case "assigned":
                 return "bg-[#0EAF521A] text-[#0EAF52] border-[#0EAF52]";
+            case "expires today":
+            case "needs review":
             case "expiring":
                 return "bg-[#FF6C1017] text-[#FF6C10] border-[#FF6C10]"
             default:
@@ -130,7 +177,11 @@ export default function UserPanelDashboardPage() {
         return age;
     }
 
-    const handleDocumentUploaded = () => {
+    const handleDocumentUploaded = (result: SaveEmployeeDocumentResponse) => {
+        setUpload({...result, savedAt: Date.now()});
+        setWithinUploadWindow(true);
+        setPending(true);
+        void refreshCompliance();
         setIsDocumentUploadModalOpen(false);
         setSuccess(true);
         setTimeout(() => setSuccess(false), 3000);
@@ -361,6 +412,10 @@ export default function UserPanelDashboardPage() {
                         </Button>
                     </div>
 
+                    {(complianceError || compliance?.syncStatus === 'error') && <p role="alert" className="text-sm text-[#d53411]">We couldn't load document expiry status. Try again. Last checked: {compliance?.evaluatedAt ? new Date(compliance.evaluatedAt).toLocaleString() : 'Not yet checked'}. <button type="button" onClick={() => refreshCompliance()}>Retry</button></p>}
+                    {pending && <p role="status" className="text-sm text-[#808081]">Document saved. Updating expiry status…</p>}
+                    {(pending && !withinUploadWindow) && <p className="text-sm text-[#808081]">Last checked: {compliance?.evaluatedAt ? new Date(compliance.evaluatedAt).toLocaleString() : 'Not yet checked'}. <button type="button" onClick={() => refreshCompliance()}>Refresh</button></p>}
+                    {focusDocumentId && !employeeDocuments.some(doc => doc.id === focusDocumentId || doc.documentId === focusDocumentId) && <p role="status">This document is unavailable or you no longer have access. <button type="button" onClick={() => navigate(Routes.userPanel.dashboard)}>Back to documents</button></p>}
                     {/* Documents List */}
                     <div className="space-y-3">
                         {userPanelDocumentTypes
@@ -374,6 +429,10 @@ export default function UserPanelDashboardPage() {
                                 return (
                                     <div
                                         key={document.value}
+                                        id={`document-${'id' in documentData ? documentData.id : ''}`}
+                                        tabIndex={0}
+                                        role="button"
+                                        onKeyDown={event => {if (event.key === 'Enter' || event.key === ' ') {event.preventDefault(); handleOpenDocument(documentData.fileUrl);}}}
                                         onClick={() => handleOpenDocument(getDocument(document.value)?.fileUrl)}
                                         className="cursor-pointer flex items-center justify-between p-4 rounded-xl border border-[#e5e5e6] hover:border-[#00b4b8]/30 transition-colors"
                                     >
@@ -392,7 +451,7 @@ export default function UserPanelDashboardPage() {
                                                 documentData?.status || "pending"
                                             )}`}
                                         >
-                  {statusText || "Unavailable"}
+                  {statusText || 'Unavailable'}{'expiryDateKey' in documentData && documentData.expiryDateKey ? ` · ${civilDateLabel(documentData.expiryDateKey)}` : ''}
                 </span>
                                     </div>
                                 )

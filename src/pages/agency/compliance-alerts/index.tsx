@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ArrowLeft, ChevronLeft, ChevronRight, Search, ShieldCheck } from "lucide-react";
 import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Routes } from "@/routes/constants";
-import { useGetExpiredDocumentsQuery, useGetUnsignedForm485ClientsQuery } from "./api";
-import { ExpiredDocument } from "./apiTypes";
+import { useGetExpiredDocumentsQuery, useGetUnsignedForm485ClientsQuery, useGetDocumentComplianceQuery, useComplianceDateRefresh } from "./api";
+import { ExpiredDocument, complianceLabel, civilDateLabel } from "./apiTypes";
 import { useAuth } from "@/utils/auth";
 import { sendDocumentAlert } from "@/lib/api/employee-documents";
 import { useToast } from "@/hooks/use-toast";
@@ -54,17 +54,26 @@ export default function ComplianceAlertsPage() {
   const [filterStatus, setFilterStatus] = useState<StatusFilter>("all");
   const [alertingDocId, setAlertingDocId] = useState<string | null>(null);
   const itemsPerPage = 10;
+  const [pages, setPages] = useState<Array<{cursor?: string; exhausted: boolean; clientOffset: number}>>([{exhausted: false, clientOffset: 0}]);
+  const page = pages[currentPage - 1] || pages[0];
 
   const { user } = useAuth();
   const { toast } = useToast();
 
+  const {data: compliance, isFetching: complianceFetching, isError: complianceError, refetch: refetchCompliance} = useGetDocumentComplianceQuery(
+    {viewerId: user?.uid, agencyId: user?.agencyId, mode: mode ?? undefined, search: searchQuery.trim().slice(0, 100), employeeStatus: filterStatus, cursor: page.cursor, limit: itemsPerPage},
+    {skip: !user?.agencyId || page.exhausted, refetchOnFocus: true, refetchOnMountOrArgChange: true},
+  );
+  const resetPages = useCallback(() => {setCurrentPage(1); setPages([{exhausted: false, clientOffset: 0}]);}, []);
+  const refreshDate = useCallback(() => {resetPages(); if (!page.exhausted) void refetchCompliance();}, [resetPages, page.exhausted, refetchCompliance]);
+  useComplianceDateRefresh(compliance?.timezone, refreshDate, compliance?.localDate);
   // Fetch expired employee documents (backend scopes to the active DDD/HHA view).
   // refetchOnMountOrArgChange keeps the skeleton showing on every mode switch,
   // even when that mode's data is already cached.
   const { data: docsData, isFetching: docsFetching, isError: docsError, refetch: refetchDocs } =
     useGetExpiredDocumentsQuery(
       { agencyId: user?.agencyId ?? "", mode: mode ?? undefined },
-      { skip: !user?.agencyId, refetchOnMountOrArgChange: true }
+      { skip: !user?.agencyId || compliance?.pilotEnabled !== false, refetchOnMountOrArgChange: true }
     );
   const expiredDocuments = docsData?.data || [];
 
@@ -77,13 +86,13 @@ export default function ComplianceAlertsPage() {
   const unsignedClients = clientsData?.data || [];
 
   // isFetching (not isLoading) so the skeleton also shows on mode-change refetches.
-  const isLoading = docsFetching || clientsFetching;
+  const isLoading = docsFetching || clientsFetching || complianceFetching;
   // Only a hard error when BOTH sources fail; otherwise show whatever loaded.
-  const isError = docsError && clientsError;
+  const isError = complianceError || compliance?.syncStatus === 'error' || docsError || clientsError;
 
   // Combined compliance list: expired employee documents + unsigned-485 clients.
   // Both sources are already scoped to the active DDD/HHA view by the backend.
-  const documentAlerts = expiredDocuments
+  const legacyDocumentAlerts = expiredDocuments
     .map((doc) => ({
       kind: "document" as const,
       id: doc.id,
@@ -93,6 +102,12 @@ export default function ComplianceAlertsPage() {
       document: doc.documentType,
       issue: `Expired ${doc.daysExpired} day${doc.daysExpired !== 1 ? "s" : ""} ago`,
     }));
+
+  const documentAlerts = compliance?.pilotEnabled ? (page.exhausted ? [] : compliance.items).map(item => ({
+    kind: 'document' as const, id: item.documentId, name: item.employeeName,
+    role: item.program, status: item.employeeStatus === 'active' ? 'Active' : 'Inactive',
+    document: item.documentLabel, issue: `${complianceLabel(item)}${item.expiryDateKey ? ` · ${civilDateLabel(item.expiryDateKey)}` : ''}`,
+  })) : legacyDocumentAlerts;
 
   const clientAlerts = unsignedClients.map((c) => ({
     kind: "client485" as const,
@@ -114,8 +129,8 @@ export default function ComplianceAlertsPage() {
 
   // Reset to page 1 when filters change
   useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, filterStatus]);
+    resetPages();
+  }, [searchQuery, filterStatus, mode, user?.agencyId, resetPages]);
 
   const filteredAlerts = complianceAlerts.filter((alert) => {
     const matchesSearch =
@@ -127,7 +142,16 @@ export default function ComplianceAlertsPage() {
 
   const totalPages = Math.ceil(filteredAlerts.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const currentAlerts = filteredAlerts.slice(startIndex, startIndex + itemsPerPage);
+  const filteredClients = clientAlerts.filter(alert =>
+    (alert.name.toLowerCase().includes(searchQuery.trim().toLowerCase()) || alert.document.toLowerCase().includes(searchQuery.trim().toLowerCase())) &&
+    (filterStatus === 'all' || alert.status.toLowerCase() === filterStatus));
+  const clientSlots = compliance?.pilotEnabled && (page.exhausted || !compliance.nextCursor) ? Math.max(0, itemsPerPage - documentAlerts.length) : 0;
+  const currentAlerts = compliance?.pilotEnabled ? [...documentAlerts, ...filteredClients.slice(page.clientOffset, page.clientOffset + clientSlots)] : filteredAlerts.slice(startIndex, startIndex + itemsPerPage);
+  const hasNext = compliance?.pilotEnabled ? Boolean(!page.exhausted && compliance.nextCursor) || page.clientOffset + clientSlots < filteredClients.length : currentPage < totalPages;
+  const nextPage = () => {
+    if (compliance?.pilotEnabled) setPages(previous => [...previous.slice(0, currentPage), {cursor: compliance.nextCursor || undefined, exhausted: page.exhausted || !compliance.nextCursor, clientOffset: page.clientOffset + clientSlots}]);
+    setCurrentPage(previous => previous + 1);
+  };
 
   const handleSendAlert = async (doc: ExpiredDocument) => {
     try {
@@ -210,6 +234,7 @@ export default function ComplianceAlertsPage() {
           </div>
         </div>
 
+        {isError && currentAlerts.length > 0 && <p role="alert" className="px-4 py-3 text-[13px] text-[#d53411]">We couldn't load document expiry status. Try again. Last checked: {compliance?.evaluatedAt ? new Date(compliance.evaluatedAt).toLocaleString() : 'Not yet checked'}. <button type="button" className="text-[#00b4b8] underline" onClick={() => {if (!page.exhausted) void refetchCompliance(); else resetPages(); void refetchClients();}}>Retry</button></p>}
         {/* List */}
         {isLoading ? (
           <div className="overflow-x-auto">
@@ -222,13 +247,15 @@ export default function ComplianceAlertsPage() {
             </div>
             <AlertRowsSkeleton />
           </div>
-        ) : isError ? (
+        ) : isError && currentAlerts.length === 0 ? (
           <div className="p-8 text-center sm:p-12">
             <p className="text-[14px] font-semibold text-[#ef4444]">Couldn&apos;t load compliance alerts</p>
             <button
               type="button"
               onClick={() => {
-                refetchDocs();
+                if (compliance?.pilotEnabled === false) refetchDocs();
+                if (!page.exhausted) refetchCompliance();
+                else resetPages();
                 refetchClients();
               }}
               className="mt-2 text-[13px] text-[#00b4b8] underline"
@@ -236,17 +263,17 @@ export default function ComplianceAlertsPage() {
               Try again
             </button>
           </div>
-        ) : filteredAlerts.length === 0 ? (
+        ) : currentAlerts.length === 0 ? (
           <div className="p-8 text-center sm:p-12">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#ecfdf3]">
               <ShieldCheck className="h-7 w-7 text-[#12b76a]" />
             </div>
             <p className="text-[14px] font-semibold text-[#10141a]">
-              {complianceAlerts.length === 0 ? "All clear" : "No alerts match your filters"}
+              {compliance?.pilotEnabled ? "No document expiry issues match these filters." : complianceAlerts.length === 0 ? "All clear" : "No alerts match your filters"}
             </p>
             <p className="mt-1 text-[13px] text-[#6b7280]">
               {complianceAlerts.length === 0
-                ? "No expiring documents or clients needing a signed Form 485."
+                ? "No document expiry issues match these filters."
                 : "Try changing your search or status filter"}
             </p>
           </div>
@@ -265,11 +292,14 @@ export default function ComplianceAlertsPage() {
               const rowSending = alertingDocId === alert.id;
               return (
                 <div
-                  key={alert.id}
+                  key={`${alert.kind}-${alert.id}`}
                   className={`grid grid-cols-1 gap-3 border-b border-[#e5e5e6] px-4 py-4 transition-colors last:border-b-0 hover:bg-white/50 md:items-center ${GRID_COLS}`}
                 >
                   <div className="min-w-0">
-                    <div className="truncate text-[14px] font-semibold text-[#10141a]">{alert.name}</div>
+                    <button type="button" className="truncate text-[14px] font-semibold text-[#10141a]" onClick={() => {
+                      const item = compliance?.items.find(item => item.documentId === alert.id);
+                      if (alert.kind === 'document' && item) navigate(`/agency/dsp-management/${encodeURIComponent(item.employeeId)}?documentId=${encodeURIComponent(item.documentId)}`);
+                    }}>{alert.name}</button>
                     <div className="text-[12px] font-medium capitalize text-[#808081]">{alert.role}</div>
                   </div>
 
@@ -310,6 +340,10 @@ export default function ComplianceAlertsPage() {
                         onClick={() => {
                           const doc = expiredDocuments.find((d) => d.id === alert.id);
                           if (doc) handleSendAlert(doc);
+                          else {
+                            const item = compliance?.items.find(item => item.documentId === alert.id);
+                            if (item) handleSendAlert({id: item.documentId, employeeId: item.employeeId, employee: {fullName: item.employeeName}} as ExpiredDocument);
+                          }
                         }}
                         disabled={rowSending}
                         className="rounded-full border border-red-500 bg-red-500 px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
@@ -325,10 +359,10 @@ export default function ComplianceAlertsPage() {
         )}
 
         {/* Pagination */}
-        {filteredAlerts.length > itemsPerPage && (
+        {(hasNext || currentPage > 1) && (
           <div className="flex items-center justify-center gap-3 py-4">
             <span className="text-[14px] font-medium text-[#10141a]">
-              {currentPage}/<span className="text-[#808081]">{totalPages}</span>
+              Page {currentPage}
             </span>
             <button
               type="button"
@@ -341,8 +375,8 @@ export default function ComplianceAlertsPage() {
             </button>
             <button
               type="button"
-              disabled={currentPage >= totalPages}
-              onClick={() => currentPage < totalPages && setCurrentPage((prev) => prev + 1)}
+              disabled={!hasNext || isLoading}
+              onClick={nextPage}
               className="rounded-full bg-white p-2 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
               aria-label="Next page"
             >

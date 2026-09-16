@@ -1,3 +1,4 @@
+import type { SaveEmployeeDocumentResponse } from '../types';
 import React, {FormEvent, useState} from 'react';
 import {X} from 'lucide-react';
 import {Button} from "@/components/ui/button";
@@ -21,7 +22,7 @@ const UserPanelDocumentUpload = (
   {isOpen, setIsOpen, onComplete, onError}: {
     isOpen: boolean;
     setIsOpen: (value: boolean) => void;
-    onComplete: () => void;
+    onComplete: (result: SaveEmployeeDocumentResponse) => void;
     onError: () => void;
   }
 ) => {
@@ -62,13 +63,14 @@ const UserPanelDocumentUpload = (
         data: formDataInstance,
       }).unwrap();
       const fileUrl = response.data.url;
-      await saveDocument({
+      const saved = await saveDocument({
         documentType: formData.type,
         fileUrl: fileUrl,
-        expiryDate: formData.expiryDate ? formData.expiryDate.toDateString() : null,
+        expiryDate: null,
+        expiryDateKey: formData.expiryDate ? `${formData.expiryDate.getFullYear()}-${String(formData.expiryDate.getMonth() + 1).padStart(2, '0')}-${String(formData.expiryDate.getDate()).padStart(2, '0')}` : null,
       }).unwrap();
       setFormData({type: '', file: null, expiryDate: null});
-      onComplete();
+      onComplete(saved ?? {});
     } catch (error) {
       console.error("Error uploading file:", error);
       onError();

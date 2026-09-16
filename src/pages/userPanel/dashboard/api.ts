@@ -1,3 +1,4 @@
+import { complianceAlertsApi } from '@/pages/agency/compliance-alerts/api';
 import {createApi} from "@reduxjs/toolkit/query/react";
 import {customBaseQuery} from "@/lib/baseQuery";
 import {
@@ -7,7 +8,7 @@ import {
 import {
     GetEmployeeDocumentsResponse,
     GetEmployeeInfoResponse,
-    SaveEmployeeDocumentPayload, UpdateEmployeeInfoPayload
+    SaveEmployeeDocumentPayload, SaveEmployeeDocumentResponse, UpdateEmployeeInfoPayload
 } from "@/pages/userPanel/dashboard/types";
 import {TrainingData} from "@/pages/agency/trainings/trainingApi";
 
@@ -33,14 +34,17 @@ export const userPanelDashboardApi = createApi({
                 requiresAuth: true
             }),
         }),
-        saveDocument: builder.mutation<void, SaveEmployeeDocumentPayload>({
+        saveDocument: builder.mutation<SaveEmployeeDocumentResponse, SaveEmployeeDocumentPayload>({
             query: (data) => ({
                 url: `/documents`,
                 method: "PUT",
                 requiresAuth: true,
                 data
             }),
-            invalidatesTags: ['EmployeeDocuments']
+            invalidatesTags: ['EmployeeDocuments'],
+            async onQueryStarted(_, {dispatch, queryFulfilled}) {
+                try { await queryFulfilled; dispatch(complianceAlertsApi.util.invalidateTags(['DocumentCompliance'])); } catch { /* Save errors are shown by the upload form. */ }
+            }
         }),
         getEmployeeInfo: builder.query<GetEmployeeInfoResponse, string>({
             query: (employeeId: string) => ({

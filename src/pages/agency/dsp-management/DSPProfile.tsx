@@ -1,5 +1,7 @@
+import { useGetDocumentComplianceQuery, useComplianceDateRefresh } from '@/pages/agency/compliance-alerts/api';
+import { useEffectiveAgencyMode } from '@/hooks/useEffectiveAgencyMode';
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { ChevronLeft, MessageSquare } from "lucide-react";
 import { DSP } from "./types";
@@ -31,6 +33,15 @@ function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
   const { toast } = useToast();
   const { user } = useAuth();
   const messaging = useMessaging();
+  const mode = useEffectiveAgencyMode();
+  const [searchParams] = useSearchParams();
+  const focusDocumentId = searchParams.get('documentId');
+  useEffect(() => {if (focusDocumentId) setActiveTab('Activity');}, [focusDocumentId]);
+  const {data: compliance, isError: complianceError, refetch: refreshCompliance} = useGetDocumentComplianceQuery(
+    {viewerId: user?.uid, agencyId: user?.agencyId, employeeId: dsp.id, mode: mode ?? undefined, condition: 'all', limit: 100},
+    {skip: !dsp.id || activeTab !== 'Activity', refetchOnFocus: true, refetchOnMountOrArgChange: true},
+  );
+  useComplianceDateRefresh(activeTab === 'Activity' ? compliance?.timezone : null, refreshCompliance, compliance?.localDate);
 
   const navigate = useNavigate();
   const { shifts, isLoading: detailsLoading, refetch: refetchDspDetails } = useDSPDetails(dsp.id);
@@ -308,6 +319,10 @@ function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
           totalCount={totalCount}
           completedCount={completedCount}
           documents={documents}
+          compliance={compliance}
+          complianceError={complianceError}
+          refreshCompliance={refreshCompliance}
+          focusDocumentId={focusDocumentId}
           onRequestDocument={handleRequestDocument}
           getDocumentStatusColor={getDocumentStatusColor}
           getDocumentActionButton={getDocumentActionButton}
@@ -349,7 +364,7 @@ function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
         employeeId={currentDsp.id}
         employeeName={currentDsp.fullName}
         documents={documents}
-        onRequested={fetchDocuments}
+        onRequested={() => {void fetchDocuments(); void refreshCompliance();}}
       />
     </div>
   );

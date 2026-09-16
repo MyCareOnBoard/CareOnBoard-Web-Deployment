@@ -4,6 +4,14 @@ import type { EmployeeDocument } from "@/lib/api/employee-documents";
 import { DocumentsSection } from "./DocumentsSection";
 
 describe("DocumentsSection", () => {
+  it('shows unavailable server status on error and focuses the requested evidence', () => {
+    const document: EmployeeDocument = {id: 'target', employeeId: 'employee', documentType: 'cpr', documentName: 'CPR', status: 'available'};
+    render(<DocumentsSection documents={[document]} isLoading={false} onRequestDocument={vi.fn()} getDocumentStatusColor={() => ''} getDocumentActionButton={() => null} complianceError refreshCompliance={vi.fn()} focusDocumentId="target" />);
+    expect(screen.getByText('Expiry status unavailable')).toBeInTheDocument();
+    expect(screen.queryByText('available')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'View'})).not.toBeInTheDocument();
+    expect(window.document.activeElement?.id).toBe('document-target');
+  });
   it("shares one preview modal across viewable rows and preserves document actions", () => {
     const documents: EmployeeDocument[] = [
       {
