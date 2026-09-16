@@ -1,4 +1,4 @@
-import React, {useMemo, useState} from "react";
+import React, {useEffect, useState} from "react";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
 import {ChevronLeft, ChevronRight, Search} from "lucide-react";
@@ -7,44 +7,33 @@ import ReviewTrainingsModal from "@/pages/agency/trainings/reviewTrainingsModal"
 import {
   useGetTrainingsQuery,
   useSaveTrainingMutation,
-  TrainingData
+  TrainingStaff
 } from "@/pages/agency/trainings/trainingApi";
 import {useAuth} from "@/utils/auth";
 import {toast} from "sonner";
 import {AnimatePresence, motion} from "framer-motion";
 import {useStaffLabels} from "@/hooks/useStaffLabels";
+import {useEffectiveAgencyMode} from '@/hooks/useEffectiveAgencyMode';
 
 export default function AgencyTrainings() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [success, setSuccess] = useState<boolean>(false);
   const [isTrainingModalOpen, setIsTrainingModalOpen] = useState<boolean>(false);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState<boolean>(false);
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const [selectedEmployee, setSelectedEmployee] = useState<{
-    id: string;
-    fullName: string;
-    profilePictureUrl?: string;
-    trainings: TrainingData[];
-  } | null>(null);
+  const [cursor, setCursor] = useState<string>();
+  const [cursorHistory, setCursorHistory] = useState<(string | undefined)[]>([]);
+  const [selectedEmployee, setSelectedEmployee] = useState<TrainingStaff | null>(null);
 
   const { labels } = useStaffLabels();
   const staffLabel = labels.noun;
   const {user} = useAuth();
+  const mode = useEffectiveAgencyMode();
   const [saveTraining, {isLoading}] = useSaveTrainingMutation();
-  const {data: trainings, isLoading: trainingsLoading} = useGetTrainingsQuery(user?.agencyId!, {
+  const {currentData: trainings, isFetching: trainingsLoading, isError: trainingsError} = useGetTrainingsQuery({agencyId: user?.agencyId!, search: searchQuery || undefined, limit: 8, cursor, mode: mode ?? undefined}, {
     skip: !user?.agencyId,
     refetchOnMountOrArgChange: true
   });
-  const filteredTrainings = useMemo(() => {
-    if (!trainings) return [];
-    if (!searchQuery) return trainings;
-    return trainings.filter((training) => training.fullName.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [trainings, searchQuery]);
-
-  const itemsPerPage = 8;
-  const totalPages = Math.ceil(filteredTrainings.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedData = filteredTrainings.slice(startIndex, startIndex + itemsPerPage);
+  useEffect(() => { setCursor(undefined); setCursorHistory([]); }, [user?.agencyId, mode]);
 
   const handleSave = async (
     data: SaveTrainingData
@@ -59,9 +48,6 @@ export default function AgencyTrainings() {
           timeFrame: data.timeFrame,
           assignedDsp: data.dspId,
           trainingType: data.trainingType,
-          completedAt: null,
-          status: "Not Approved",
-          approved: false
         }
       }).unwrap();
       setIsTrainingModalOpen(false);
@@ -73,33 +59,13 @@ export default function AgencyTrainings() {
     }
   }
 
-  const handleTrainingModalOpen = (
-    dspId: string,
-    dspName: string,
-    profilePictureUrl: string,
-    trainings: TrainingData[]
-  ) => {
-    setSelectedEmployee({
-      id: dspId,
-      fullName: dspName,
-      profilePictureUrl,
-      trainings: trainings
-    });
+  const handleTrainingModalOpen = (employee: TrainingStaff) => {
+    setSelectedEmployee(employee);
     setIsTrainingModalOpen(true);
   }
 
-  const handleReviewModalOpen = (
-    dspId: string,
-    dspName: string,
-    profilePictureUrl: string,
-    trainings: TrainingData[]
-  ) => {
-    setSelectedEmployee({
-      id: dspId,
-      fullName: dspName,
-      profilePictureUrl,
-      trainings: trainings
-    });
+  const handleReviewModalOpen = (employee: TrainingStaff) => {
+    setSelectedEmployee(employee);
     setIsReviewModalOpen(true);
   }
 
@@ -126,7 +92,7 @@ export default function AgencyTrainings() {
                 type="text"
                 placeholder="Search"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => { setCursor(undefined); setCursorHistory([]); setSearchQuery(e.target.value); }}
                 className="w-full pl-10 pr-10 h-10 border-0 rounded-full bg-[#f8f9fa] focus-visible:ring-1 focus-visible:ring-[#2563eb] focus-visible:ring-offset-0"
               />
             </div>
@@ -135,9 +101,9 @@ export default function AgencyTrainings() {
 
         <div className="flex-1 mt-6 overflow-auto">
           <div className="space-y-4">
-            {!trainingsLoading && (
-              paginatedData.length > 0 ? (
-                paginatedData.map((item) => (
+            {!trainingsLoading && !trainingsError && (
+              (trainings?.items.length ?? 0) > 0 ? (
+                trainings!.items.map((item) => (
                   <div
                     key={item.id}
                     className="flex justify-between gap-4 backdrop-blur-[20px] bg-white/50 rounded-[20px] items-center p-4"
@@ -186,7 +152,7 @@ export default function AgencyTrainings() {
                         Training
                       </p>
                       <p className="text-[14px] font-medium text-black">
-                        {item.trainings.length}
+                        {item.assignedCount}
                       </p>
                     </div>
 
@@ -194,30 +160,20 @@ export default function AgencyTrainings() {
                     <div className="flex items-center flex-shrink-0 gap-2">
                       <Button
                         className="bg-[#B2B2B3] border border-[#B2B2B3] text-white hover:bg-[#00b4b8] rounded-[60px] px-4 py-2 text-[12px] font-semibold h-auto min-w-[84px]"
-                        onClick={() => handleReviewModalOpen(
-                          item.id,
-                          item.fullName,
-                          item.profilePictureUrl,
-                          item.trainings
-                        )}
+                        onClick={() => handleReviewModalOpen(item)}
                       >
                         Review Trainings
                       </Button>
                       <Button
                         className="bg-[#00b4b8] border border-[#00b4b8] text-white hover:bg-[#00b4b8] rounded-[60px] px-4 py-2 text-[12px] font-semibold h-auto min-w-[84px]"
-                        onClick={() => handleTrainingModalOpen(
-                          item.id,
-                          item.fullName,
-                          item.profilePictureUrl,
-                          item.trainings
-                        )}
+                        onClick={() => handleTrainingModalOpen(item)}
                       >
                         Assign Training
                       </Button>
                     </div>
                   </div>
                 ))
-              ) : (
+              ) : trainings?.nextCursor ? null : (
                 <div className="flex items-center justify-center py-20">
                   <p className="text-[16px] text-[#808081]">No data available</p>
                 </div>
@@ -228,24 +184,25 @@ export default function AgencyTrainings() {
                 <p className="text-[16px] text-[#808081]">Loading...</p>
               </div>
             )}
+            {trainingsError && !trainingsLoading && (
+              <div className="flex items-center justify-center py-20"><p className="text-[16px] text-[#808081]">Unable to load trainings</p></div>
+            )}
           </div>
         </div>
-        {totalPages > 1 && (
+        {(cursorHistory.length > 0 || trainings?.nextCursor) && (
           <div className="flex items-center justify-center gap-2 mt-8">
-            <p className="text-[16px] font-medium text-[#10141a]">
-              {currentPage}
-              <span className="text-[14px] text-[#808081]">/{totalPages}</span>
-            </p>
             <Button
-              onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
+              aria-label="Previous results"
+              onClick={() => { const previous = cursorHistory.at(-1); setCursorHistory(items => items.slice(0, -1)); setCursor(previous); }}
+              disabled={cursorHistory.length === 0}
               className="bg-white/50 backdrop-blur border border-white/30 p-[6px] rounded-full hover:bg-white/70 disabled:opacity-50 h-auto"
             >
               <ChevronLeft className="w-5 h-5 text-[#10141a]"/>
             </Button>
             <Button
-              onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-              disabled={currentPage === totalPages}
+              aria-label={trainings?.items.length ? 'Next results' : 'Load more results'}
+              onClick={() => { setCursorHistory(items => [...items, cursor]); setCursor(trainings?.nextCursor ?? undefined); }}
+              disabled={!trainings?.nextCursor}
               className="bg-white/50 backdrop-blur border border-white/30 p-[6px] rounded-full hover:bg-white/70 disabled:opacity-50 h-auto"
             >
               <ChevronRight className="w-5 h-5 text-[#10141a]"/>
@@ -276,7 +233,7 @@ export default function AgencyTrainings() {
           role: staffLabel,
           profilePictureUrl: selectedEmployee.profilePictureUrl
         } : null}
-        trainings={selectedEmployee?.trainings || []}
+        mode={mode ?? undefined}
         onApprovalChange={(trainingId, approved) => {
           console.log(`Training ${trainingId} approval changed to ${approved}`);
         }}

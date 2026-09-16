@@ -1,5 +1,8 @@
+import type { SaveEmployeeDocumentResponse } from './types';
+import { useGetDocumentComplianceQuery, useComplianceDateRefresh } from '@/pages/agency/compliance-alerts/api';
+import { complianceLabel, civilDateLabel } from '@/pages/agency/compliance-alerts/apiTypes';
 import React, {useState, useCallback, useEffect} from "react";
-import {useNavigate} from "react-router";
+import {useNavigate, useSearchParams} from "react-router";
 import {Plus, X} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {auth} from "@/lib/firebase";
@@ -11,7 +14,8 @@ import {
     useCompleteTrainingMutation,
     useGetEmployeeDocumentsQuery,
     useGetEmployeeTrainingsQuery,
-    useUpdateEmployeeInfoMutation
+    useUpdateEmployeeInfoMutation,
+    userPanelDashboardApi
 } from "@/pages/userPanel/dashboard/api";
 import {userPanelDocumentTypes} from "@/pages/userPanel/dashboard/constants";
 import {Routes} from "@/routes/constants";
@@ -19,6 +23,9 @@ import {setUser, useAuth} from "@/utils/auth";
 import {getUser} from "@/lib/api/users";
 import {useDispatch} from "react-redux";
 import {toast} from "sonner";
+import type {TrainingData} from '@/pages/agency/trainings/trainingApi';
+import TrainingCertificate from '@/pages/agency/trainings/TrainingCertificate';
+import {parseISO} from 'date-fns';
 
 
 export default function UserPanelDashboardPage() {
@@ -32,12 +39,54 @@ export default function UserPanelDashboardPage() {
     const [workAvailability, setWorkAvailability] = useState<boolean>(false);
     const [currentPage, setCurrentPage] = useState<number>(1);
     const [approvalStates, setApprovalStates] = useState<Record<string, boolean>>({});
+    const [trainingCursor, setTrainingCursor] = useState<string>();
+    const [trainings, setTrainings] = useState<TrainingData[]>([]);
+    const [pendingTraining, setPendingTraining] = useState<string | null>(null);
     const itemsPerPage = 5;
 
+    const [searchParams] = useSearchParams();
+    const focusDocumentId = searchParams.get('documentId');
+    const [upload, setUpload] = useState<(SaveEmployeeDocumentResponse & {savedAt: number}) | null>(null);
+    const [withinUploadWindow, setWithinUploadWindow] = useState(false);
     const {data: employeeDocuments = []} = useGetEmployeeDocumentsQuery();
-    const {data: trainings = [], isLoading: isTrainingLoading, refetch} = useGetEmployeeTrainingsQuery(undefined);
+    const {currentData: trainingPage, isFetching: isTrainingLoading, isError: trainingError} = useGetEmployeeTrainingsQuery(
+        {limit: 25, cursor: trainingCursor}, {refetchOnMountOrArgChange: true, refetchOnFocus: true});
     const [updateEmployeeInfo] = useUpdateEmployeeInfoMutation();
     const [completeTraining] = useCompleteTrainingMutation();
+
+    const [pending, setPending] = useState(false);
+    const {data: compliance, isError: complianceError, refetch: refreshCompliance} = useGetDocumentComplianceQuery(
+        {viewerId: user?.uid, agencyId: user?.agencyId, condition: 'all', limit: 100},
+        {skip: !user?.uid, pollingInterval: pending && withinUploadWindow ? 5_000 : 0, skipPollingIfUnfocused: true, refetchOnFocus: true, refetchOnMountOrArgChange: true},
+    );
+    useComplianceDateRefresh(compliance?.timezone, refreshCompliance, compliance?.localDate);
+    useEffect(() => { setTrainingCursor(undefined); setTrainings([]); setApprovalStates({}); }, [user?.uid]);
+    useEffect(() => {
+        if (!upload) return;
+        const timeout = window.setTimeout(() => setWithinUploadWindow(false), Math.max(0, upload.savedAt + 60_000 - Date.now()));
+        return () => window.clearTimeout(timeout);
+    }, [upload]);
+    useEffect(() => {
+        const issue = compliance?.items.find(item => item.documentId === upload?.documentId);
+        const saved = upload?.sourceRevision;
+        const observed = issue?.observedSourceRevision;
+        const evaluatedSave = saved && observed && issue?.syncStatus === 'ready' &&
+            (observed.seconds > saved.seconds || (observed.seconds === saved.seconds && observed.nanoseconds >= saved.nanoseconds));
+        const waiting = Boolean(upload && compliance?.pilotEnabled !== false && !evaluatedSave);
+        const failed = complianceError || compliance?.syncStatus === 'error' || issue?.syncStatus === 'error';
+        setPending(waiting && !failed);
+        if (failed) setWithinUploadWindow(false);
+    }, [upload, compliance, complianceError]);
+    useEffect(() => {
+        const target = employeeDocuments.find(doc => doc.id === focusDocumentId || doc.documentId === focusDocumentId);
+        const index = userPanelDocumentTypes.findIndex(type => type.value === target?.documentType);
+        if (index >= 0) setCurrentPage(Math.floor(index / itemsPerPage) + 1);
+    }, [focusDocumentId, employeeDocuments]);
+    useEffect(() => {
+        if (!focusDocumentId) return;
+        const row = window.document.getElementById(`document-${focusDocumentId}`);
+        row?.focus(); row?.scrollIntoView?.({block: 'nearest'});
+    }, [focusDocumentId, currentPage, employeeDocuments]);
 
     const employeeInfo = user;
 
@@ -58,7 +107,7 @@ export default function UserPanelDashboardPage() {
         } else if (value instanceof Date) {
             date = value;
         } else if (typeof value === "string" || typeof value === "number") {
-            date = new Date(value);
+            date = typeof value === 'string' ? parseISO(value) : new Date(value);
         } else {
             return "N/A";
         }
@@ -79,6 +128,10 @@ export default function UserPanelDashboardPage() {
             expiryDate: null
         };
 
+        const issue = compliance?.items.find(item => item.documentId === ('id' in employeeDocument ? employeeDocument.id : undefined) || item.documentId === ('documentId' in employeeDocument ? employeeDocument.documentId : undefined));
+        if (compliance?.pilotEnabled !== false) return {...employeeDocument,
+            status: complianceError || compliance?.syncStatus === 'error' ? 'Expiry status unavailable' : complianceLabel(issue),
+            expiryDateKey: issue?.expiryDateKey};
         let status = employeeDocument.status
 
         // get days until expiry (normalize both dates to midnight to avoid sub-day rounding issues)
@@ -98,13 +151,16 @@ export default function UserPanelDashboardPage() {
             status
         }
 
-    }, [employeeDocuments]);
+    }, [employeeDocuments, compliance, complianceError]);
 
     const getStatusColor = (status: string) => {
         switch (status.toLowerCase()) {
+            case "current":
             case "available":
+            case "completed":
                 return "bg-[#d4f4dd] text-[#0e6027] border-[#0e6027]/20";
             case "expired":
+            case "changes requested":
                 return "bg-[#ffd4cc] text-[#d53411] border-[#d53411]/20";
             case "pending soon":
                 return "bg-[#ffe8cc] text-[#cc6600] border-[#cc6600]/20";
@@ -112,6 +168,9 @@ export default function UserPanelDashboardPage() {
                 return "bg-[#e5f7f7] text-[#00b4b8] border-[#00b4b8]/20";
             case "assigned":
                 return "bg-[#0EAF521A] text-[#0EAF52] border-[#0EAF52]";
+            case "expires today":
+            case "awaiting review":
+            case "needs review":
             case "expiring":
                 return "bg-[#FF6C1017] text-[#FF6C10] border-[#FF6C10]"
             default:
@@ -130,7 +189,11 @@ export default function UserPanelDashboardPage() {
         return age;
     }
 
-    const handleDocumentUploaded = () => {
+    const handleDocumentUploaded = (result: SaveEmployeeDocumentResponse) => {
+        setUpload({...result, savedAt: Date.now()});
+        setWithinUploadWindow(true);
+        setPending(true);
+        void refreshCompliance();
         setIsDocumentUploadModalOpen(false);
         setSuccess(true);
         setTimeout(() => setSuccess(false), 3000);
@@ -166,18 +229,22 @@ export default function UserPanelDashboardPage() {
     }
 
     const handleToggle = async (trainingId: string) => {
+        if (pendingTraining) return;
         const newState = !approvalStates[trainingId];
-        setApprovalStates(prev => ({...prev, [trainingId]: newState}));
+        setPendingTraining(trainingId);
         try {
             const training = trainings.find(t => t.id === trainingId);
             await completeTraining({
                 trainingId,
                 isCompleted: newState
             }).unwrap();
+            setApprovalStates(prev => ({...prev, [trainingId]: newState}));
             toast.success(`Training ${training?.name} ${newState ? "completed" : "not completed"} marked as`);
-            refetch();
         } catch (error) {
             console.error(error);
+            toast.error('Failed to update training');
+        } finally {
+            setPendingTraining(null);
         }
     };
 
@@ -188,14 +255,20 @@ export default function UserPanelDashboardPage() {
     }, [employeeInfo])
 
     useEffect(() => {
-        if (trainings) {
-            setApprovalStates(
-                trainings.reduce((acc, training) => ({
+        if (trainingPage) {
+            setTrainings(current => {
+                if (!trainingCursor) return trainingPage.items;
+                const updates = new Map(trainingPage.items.map(item => [item.id, item]));
+                return [...current.map(item => updates.get(item.id) ?? item),
+                    ...trainingPage.items.filter(item => !current.some(existing => existing.id === item.id))];
+            });
+            setApprovalStates(previous => ({...previous,
+                ...trainingPage.items.reduce((acc, training) => ({
                     ...acc, [training?.id as any]: !!training.completedAt
                 }), {})
-            );
+            }));
         }
-    }, [trainings]);
+    }, [trainingPage, trainingCursor]);
 
     return (
         <div className="min-h-[calc(100vh-200px)]">
@@ -288,13 +361,13 @@ export default function UserPanelDashboardPage() {
 
                         {/* Training Items */}
                         <div className="space-y-3">
-                            {!isTrainingLoading && (
+                            {(trainings.length > 0 || !isTrainingLoading) && (
                                 trainings?.length > 0
                                 ? (
                                     trainings.map((training) => (
                                         <div
                                             key={training.id}
-                                            className="flex items-center justify-between p-3 rounded-xl transition-colors"
+                                            className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl transition-colors"
                                         >
                                             <div className="flex items-center gap-3">
                         <span className="text-[14px] font-semibold text-[#10141a]">
@@ -303,20 +376,30 @@ export default function UserPanelDashboardPage() {
                                             </div>
                                             <span
                                                 className={`text-[12px] font-semibold px-3 py-1 rounded-full border ${getStatusColor(
-                                                    "assigned"
+                                                    training.requiresCertificate ? training.status : "assigned"
                                                 )}`}
                                             >
-                        {"Take Training"}
+                        {training.requiresCertificate ? training.status : "Take Training"}
                       </span>
-                                            <span
+                                            {!training.requiresCertificate && <span
                                                 className={`text-[12px] font-semibold px-3 py-1 rounded-full border ${getStatusColor(
                                                     "assigned"
                                                 )}`}
                                             >
                         {"Assigned"}
-                      </span>
-                                            <button
+                      </span>}
+                                            {training.requiresCertificate && training.source !== 'policy' && <div className="w-full">
+                                                <TrainingCertificate training={training} onUploaded={certificate => {
+                                                    setTrainings(current => current.map(item => item.id === training.id
+                                                        ? {...item, ...certificate} : item));
+                                                    dispatch(userPanelDashboardApi.util.invalidateTags([{type: 'EmployeeTrainings', id: 'SELF'}]));
+                                                    toast.success(certificate.approved ? 'Certificate saved and approved' : 'Certificate saved');
+                                                }}/>
+                                            </div>}
+                                            {!training.requiresCertificate && training.source !== 'policy' && <button
                                                 onClick={() => handleToggle(training?.id || "")}
+                                                aria-label={`${approvalStates[training?.id as any] ? 'Mark incomplete' : 'Mark complete'} ${training.name}`}
+                                                disabled={pendingTraining !== null}
                                                 className={`relative w-[42px] h-[26px] rounded-full transition-colors ${
                                                     approvalStates[training?.id as any] ? 'bg-[#0EAF52]' : 'bg-[#E0E0E0]'
                                                 }`}
@@ -326,18 +409,25 @@ export default function UserPanelDashboardPage() {
                                                         approvalStates[training?.id as any] ? 'translate-x-[19px]' : 'translate-x-[3px]'
                                                     }`}
                                                 />
-                                            </button>
+                                            </button>}
                                         </div>
                                     ))
-                                ) : (
+                                ) : !trainingError ? (
                                     <p className="text-[14px] text-[#808081]">No trainings available</p>
-                                )
+                                ) : null
                             )}
                             {isTrainingLoading && (
                                 <div>
                                     <p className="text-[14px] text-[#808081]">Loading...</p>
                                 </div>
                             )}
+                            {trainingError && !isTrainingLoading && <p className="text-[14px] text-[#808081]">Unable to load trainings</p>}
+                            {!isTrainingLoading && trainingPage?.nextCursor && <Button
+                                type="button"
+                                variant="ghost"
+                                aria-label="Load more trainings"
+                                onClick={() => setTrainingCursor(trainingPage.nextCursor ?? undefined)}
+                            >Load more</Button>}
                         </div>
                     </div>
                 </div>
@@ -361,6 +451,10 @@ export default function UserPanelDashboardPage() {
                         </Button>
                     </div>
 
+                    {(complianceError || compliance?.syncStatus === 'error') && <p role="alert" className="text-sm text-[#d53411]">We couldn't load document expiry status. Try again. Last checked: {compliance?.evaluatedAt ? new Date(compliance.evaluatedAt).toLocaleString() : 'Not yet checked'}. <button type="button" onClick={() => refreshCompliance()}>Retry</button></p>}
+                    {pending && <p role="status" className="text-sm text-[#808081]">Document saved. Updating expiry status…</p>}
+                    {(pending && !withinUploadWindow) && <p className="text-sm text-[#808081]">Last checked: {compliance?.evaluatedAt ? new Date(compliance.evaluatedAt).toLocaleString() : 'Not yet checked'}. <button type="button" onClick={() => refreshCompliance()}>Refresh</button></p>}
+                    {focusDocumentId && !employeeDocuments.some(doc => doc.id === focusDocumentId || doc.documentId === focusDocumentId) && <p role="status">This document is unavailable or you no longer have access. <button type="button" onClick={() => navigate(Routes.userPanel.dashboard)}>Back to documents</button></p>}
                     {/* Documents List */}
                     <div className="space-y-3">
                         {userPanelDocumentTypes
@@ -374,6 +468,10 @@ export default function UserPanelDashboardPage() {
                                 return (
                                     <div
                                         key={document.value}
+                                        id={`document-${'id' in documentData ? documentData.id : ''}`}
+                                        tabIndex={0}
+                                        role="button"
+                                        onKeyDown={event => {if (event.key === 'Enter' || event.key === ' ') {event.preventDefault(); handleOpenDocument(documentData.fileUrl);}}}
                                         onClick={() => handleOpenDocument(getDocument(document.value)?.fileUrl)}
                                         className="cursor-pointer flex items-center justify-between p-4 rounded-xl border border-[#e5e5e6] hover:border-[#00b4b8]/30 transition-colors"
                                     >
@@ -392,7 +490,7 @@ export default function UserPanelDashboardPage() {
                                                 documentData?.status || "pending"
                                             )}`}
                                         >
-                  {statusText || "Unavailable"}
+                  {statusText || 'Unavailable'}{'expiryDateKey' in documentData && documentData.expiryDateKey ? ` · ${civilDateLabel(documentData.expiryDateKey)}` : ''}
                 </span>
                                     </div>
                                 )

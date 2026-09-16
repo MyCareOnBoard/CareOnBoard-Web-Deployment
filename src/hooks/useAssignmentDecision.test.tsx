@@ -1,0 +1,32 @@
+import {act, renderHook, waitFor} from '@testing-library/react';
+import {expect, it, vi} from 'vitest';
+import {useAssignmentDecision} from './useAssignmentDecision';
+import {getAssignmentDecision, type AssignmentDecision, type DecisionSelection} from '@/lib/api/assignment-decision';
+vi.mock('@/lib/api/assignment-decision', () => ({getAssignmentDecision: vi.fn(), CHECKS_UNAVAILABLE: 'Unavailable'}));
+const selection: DecisionSelection = {agencyId: 'a', clientId: 'c', input: {program: 'ddd', kind: 'service_roster', employeeId: 'e', serviceRowKey: 'row'}};
+const decision: AssignmentDecision = {state: 'inactive', policyRevision: 0, evaluatedAt: '2026-09-16T12:00:00Z', contextKey: 'pair', findings: [], hasRestrictedFindings: false, canAcknowledge: false};
+it('ignores previous responses, avoids previews on unrelated renders, adopts writes without GET and clears on scope change', async () => {
+  let oldResolve!: (value: AssignmentDecision) => void;
+  vi.mocked(getAssignmentDecision).mockImplementationOnce(() => new Promise(resolve => {oldResolve = resolve;})).mockResolvedValue(decision);
+  const {result, rerender} = renderHook(({scope, staff}) => useAssignmentDecision({...selection, input: {...selection.input, employeeId: staff}}, {enabled: true, scopeKey: scope}), {initialProps: {scope: 'owner', staff: 'e'}});
+  rerender({scope: 'owner', staff: 'next'});
+  await waitFor(() => expect(result.current.decision).toEqual(decision));
+  await act(async () => oldResolve({...decision, contextKey: 'old'}));
+  expect(result.current.decision?.contextKey).toBe('pair');
+  const count = vi.mocked(getAssignmentDecision).mock.calls.length;
+  rerender({scope: 'owner', staff: 'next'});
+  expect(getAssignmentDecision).toHaveBeenCalledTimes(count);
+  act(() => {result.current.acceptDecision({...decision, contextKey: 'committed'}, result.current.viewKey, true);});
+  expect(result.current.decision?.contextKey).toBe('committed');
+  expect(getAssignmentDecision).toHaveBeenCalledTimes(count);
+  rerender({scope: 'other', staff: 'next'});
+  expect(result.current.decision).toBeNull();
+  await waitFor(() => expect(getAssignmentDecision).toHaveBeenCalledTimes(count + 1));
+});
+it('does not prefetch an unsaved service row, but an explicit retry performs only a preview', async () => {
+  vi.mocked(getAssignmentDecision).mockClear().mockResolvedValue(decision);
+  const {result} = renderHook(() => useAssignmentDecision(selection, {enabled: true, previewEnabled: false, scopeKey: 'owner'}));
+  expect(getAssignmentDecision).not.toHaveBeenCalled();
+  await act(async () => {await result.current.refresh();});
+  expect(getAssignmentDecision).toHaveBeenCalledOnce();
+});

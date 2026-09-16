@@ -1,3 +1,4 @@
+import { setupListeners } from '@reduxjs/toolkit/query';
 import { combineReducers, configureStore, type Middleware, type UnknownAction } from "@reduxjs/toolkit";
 import {
     persistStore,
@@ -155,6 +156,8 @@ export const store = configureStore({
             .concat(checkPayrollApi.middleware),
     devTools: process.env.VITE_ENVIRONMENT !== 'production',
 });
+
+setupListeners(store.dispatch);
 
 export const persistor = persistStore(store);
 

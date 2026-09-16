@@ -14,6 +14,7 @@ export interface CompleteOnboardingPayload {
     email: string;
     password: string;
     dateOfBirth: string;
+    hireDate: string; // Calendar date: YYYY-MM-DD
     address: string;
     gender: string;
     preScreeningAnswers: Record<string, string>;

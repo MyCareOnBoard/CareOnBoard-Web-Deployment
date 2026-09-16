@@ -1,3 +1,4 @@
+import { RosterAssignmentReview, useRosterReviewSelection, type ReviewRosterRow } from "@/components/AssignmentReviewRoster";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ export type AssignedDsp = { id: string; name: string };
 
 export type ServiceAssignedDspsSectionProps = {
   isEditing: boolean;
+  reviewRow?: ReviewRosterRow;
   assignedDsps?: AssignedDsp[];
   onChange?: (assignedDsps: AssignedDsp[]) => void;
 };
@@ -20,15 +22,20 @@ function DspSearchSlotRow({
   assigned,
   onPick,
   onRemoveSlot,
+  agencyId: explicitAgencyId,
+  program,
 }: {
   assigned: { id: string }[];
   onPick: (emp: Employee) => void;
   onRemoveSlot: () => void;
+  agencyId?: string;
+  program?: 'ddd' | 'hha';
 }) {
   const { user } = useAuth();
   // Scope the staff search to the active program (DDD→dsp / HHA→hha) so caregiver
   // and DSP searches only surface employees for the current agency mode.
-  const role = agencyModeToApplicantType(useEffectiveAgencyMode());
+  const agencyMode = useEffectiveAgencyMode();
+  const role = agencyModeToApplicantType(program || agencyMode);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Employee[]>([]);
   const [open, setOpen] = useState(false);
@@ -44,7 +51,7 @@ function DspSearchSlotRow({
         setOpen(false);
         return;
       }
-      const agencyId = user?.agencyId || user?.uid;
+      const agencyId = explicitAgencyId || user?.agencyId || user?.uid;
       const assignedIds = new Set(assigned.map((d) => d.id));
       timeoutRef.current = setTimeout(async () => {
         try {
@@ -61,7 +68,7 @@ function DspSearchSlotRow({
         }
       }, 300);
     },
-    [user?.agencyId, user?.uid, assigned, role],
+    [explicitAgencyId, user?.agencyId, user?.uid, assigned, role],
   );
 
   useEffect(() => {
@@ -137,16 +144,20 @@ function DspSearchSlotRow({
 function ServiceAssignedDspsEditor({
   assignedDsps,
   onChange,
+  reviewRow,
 }: {
+  reviewRow?: ReviewRosterRow;
   assignedDsps: AssignedDsp[];
   onChange: (assignedDsps: AssignedDsp[]) => void;
 }) {
+  const review = useRosterReviewSelection(reviewRow);
   const [dspSearchSlotIds, setDspSearchSlotIds] = useState<string[]>([]);
 
   const addDspFromEmployee = useCallback(
     (emp: Employee) => {
       if (assignedDsps.some((d) => d.id === emp.id)) return;
       onChange([...assignedDsps, { id: emp.id, name: emp.fullName }]);
+      review.select(emp.id);
     },
     [assignedDsps, onChange],
   );
@@ -189,7 +200,7 @@ function ServiceAssignedDspsEditor({
               key={d.id}
               className="flex min-w-0 items-center justify-between rounded-[12px] border border-[#cccccd] bg-white px-3 py-2"
             >
-              <span className="min-w-0 flex-1 truncate text-[14px] text-[#10141a]">{d.name}</span>
+              {review.available ? <button type="button" onClick={() => review.select(d.id)} aria-pressed={review.selectedEmployee === d.id} className="min-w-0 flex-1 truncate text-left text-[14px] text-[#10141a]" aria-label={`Review assignment for ${d.name}`}>{d.name}</button> : <span className="min-w-0 flex-1 truncate text-[14px] text-[#10141a]">{d.name}</span>}
               <button
                 type="button"
                 className="shrink-0 rounded-md p-1 text-[#10141a] transition-colors hover:bg-gray-50"
@@ -206,6 +217,8 @@ function ServiceAssignedDspsEditor({
         {dspSearchSlotIds.map((slotId) => (
           <DspSearchSlotRow
             key={slotId}
+            agencyId={review.agencyId}
+            program={review.program}
             assigned={assignedDsps}
             onPick={(emp) => {
               addDspFromEmployee(emp);
@@ -224,6 +237,7 @@ function ServiceAssignedDspsEditor({
         <Plus className="mr-1 h-4 w-4" />
         Add Caregiver
       </Button>
+      {review.selectedEmployee && assignedDsps.some(d => d.id === review.selectedEmployee) && <div className="mt-4"><RosterAssignmentReview key={review.selectedEmployee} row={reviewRow} employeeId={review.selectedEmployee} employeeName={assignedDsps.find(d => d.id === review.selectedEmployee)!.name} /></div>}
     </div>
   );
 }
@@ -241,6 +255,7 @@ function ServiceAssignedDspsView({ assignedDsps }: { assignedDsps: AssignedDsp[]
 
 export function ServiceAssignedDspsSection({
   isEditing,
+  reviewRow,
   assignedDsps = [],
   onChange,
 }: ServiceAssignedDspsSectionProps) {
@@ -256,6 +271,7 @@ export function ServiceAssignedDspsSection({
   return (
     <div className="col-span-full mt-6 space-y-6 border-t border-[#cccccd]/60 pt-6">
       <ServiceAssignedDspsEditor
+        reviewRow={reviewRow}
         assignedDsps={assignedDsps}
         onChange={onChange ?? (() => {})}
       />

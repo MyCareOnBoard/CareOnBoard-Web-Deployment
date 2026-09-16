@@ -53,7 +53,7 @@ function transformEmployeeToDSP(employee: Employee): DSP {
         bio: employee.bio || "",
         dateOfBirth: employee.dateOfBirth || "",
         workAvailability: employee.workAvailability || false,
-        hireDate: employee.hireDate || employee.createdAt || "",
+        hireDate: employee.hireDate || "",
         profilePicture: employee.profilePicture || "",
         tagId: employee.tagId || "",
         role: employee.role || "DSP",

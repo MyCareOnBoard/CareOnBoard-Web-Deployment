@@ -1,3 +1,4 @@
+import { complianceAlertsApi } from '@/pages/agency/compliance-alerts/api';
 import {createApi} from "@reduxjs/toolkit/query/react";
 import {customBaseQuery} from "@/lib/baseQuery";
 import {
@@ -7,14 +8,14 @@ import {
 import {
     GetEmployeeDocumentsResponse,
     GetEmployeeInfoResponse,
-    SaveEmployeeDocumentPayload, UpdateEmployeeInfoPayload
+    SaveEmployeeDocumentPayload, SaveEmployeeDocumentResponse, UpdateEmployeeInfoPayload
 } from "@/pages/userPanel/dashboard/types";
-import {TrainingData} from "@/pages/agency/trainings/trainingApi";
+import {EmployeeTrainingQuery, TrainingPage} from "@/pages/agency/trainings/trainingApi";
 
 export const userPanelDashboardApi = createApi({
     reducerPath: "userPanelDashboardApi",
     baseQuery: customBaseQuery,
-    tagTypes: ['EmployeeDocuments', 'EmployeeInfo'],
+    tagTypes: ['EmployeeDocuments', 'EmployeeInfo', 'EmployeeTrainings'],
     keepUnusedDataFor: 300,
     endpoints: (builder) => ({
         getEmployeeDocuments: builder.query<GetEmployeeDocumentsResponse[], void>({
@@ -33,14 +34,17 @@ export const userPanelDashboardApi = createApi({
                 requiresAuth: true
             }),
         }),
-        saveDocument: builder.mutation<void, SaveEmployeeDocumentPayload>({
+        saveDocument: builder.mutation<SaveEmployeeDocumentResponse, SaveEmployeeDocumentPayload>({
             query: (data) => ({
                 url: `/documents`,
                 method: "PUT",
                 requiresAuth: true,
                 data
             }),
-            invalidatesTags: ['EmployeeDocuments']
+            invalidatesTags: ['EmployeeDocuments'],
+            async onQueryStarted(_, {dispatch, queryFulfilled}) {
+                try { await queryFulfilled; dispatch(complianceAlertsApi.util.invalidateTags(['DocumentCompliance'])); } catch { /* Save errors are shown by the upload form. */ }
+            }
         }),
         getEmployeeInfo: builder.query<GetEmployeeInfoResponse, string>({
             query: (employeeId: string) => ({
@@ -59,14 +63,14 @@ export const userPanelDashboardApi = createApi({
             }),
             invalidatesTags: ['EmployeeInfo']
         }),
-        getEmployeeTrainings: builder.query<TrainingData[], void>({
-            query: () => ({
+        getEmployeeTrainings: builder.query<TrainingPage, EmployeeTrainingQuery>({
+            query: (params) => ({
                 url: `/employees/trainings`,
                 method: "GET",
+                params,
                 requiresAuth: true,
             }),
-            transformResponse: (response: { success: boolean; trainings: TrainingData[] }) =>
-                response.trainings ?? [],
+            providesTags: [{type: 'EmployeeTrainings', id: 'SELF'}],
         }),
         completeTraining: builder.mutation<
             void,
@@ -78,6 +82,7 @@ export const userPanelDashboardApi = createApi({
                 data: {isCompleted},
                 requiresAuth: true,
             }),
+            invalidatesTags: [{type: 'EmployeeTrainings', id: 'SELF'}],
         }),
     }),
 });

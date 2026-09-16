@@ -1,8 +1,12 @@
+import { getAssignmentReview } from "@/lib/api/assignment-review";
+import { getAssignmentDecision } from "@/lib/api/assignment-decision";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OperationalAgencyDataAdapter } from "@/lib/operational-agency/types";
 import AddScheduleModal, { type ScheduleFormData } from "./AddScheduleModal";
 
+vi.mock("@/lib/api/assignment-review", async importOriginal => ({...await importOriginal<object>(), getAssignmentReview: vi.fn(() => new Promise(() => {}))}));
+vi.mock("@/lib/api/assignment-decision", async importOriginal => ({...await importOriginal<object>(), getAssignmentDecision: vi.fn()}));
 const toast = vi.hoisted(() => vi.fn());
 const shiftApi = vi.hoisted(() => ({
   updateShift: vi.fn(),
@@ -117,7 +121,10 @@ async function runClientSearch(query: string) {
 describe("AddScheduleModal operational data boundary", () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-10T12:00:00Z"));
     toast.mockReset();
+    vi.mocked(getAssignmentReview).mockClear();
+    vi.mocked(getAssignmentDecision).mockReset().mockResolvedValue({state: "inactive", policyRevision: 0, evaluatedAt: "2026-08-10T12:00:00Z", contextKey: "pair", findings: [], hasRestrictedFindings: false, canAcknowledge: false});
     shiftApi.updateShift.mockReset();
     shiftApi.listShifts.mockReset();
     shiftApi.listShifts.mockResolvedValue({ success: true, shifts: [] });
@@ -296,6 +303,7 @@ describe("AddScheduleModal operational data boundary", () => {
     );
     expect(changedDate).toBeDefined();
     fireEvent.click(changedDate as HTMLElement);
+    await act(async () => Promise.resolve());
 
     expect(screen.queryByText(/1 Old Main St/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("radio")).not.toBeInTheDocument();
@@ -656,4 +664,47 @@ describe("AddScheduleModal operational data boundary", () => {
     expect(onShiftsUpdated).not.toHaveBeenCalled();
     expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ title: "Changes Saved" }));
   });
-});
+  it("previews the selected agency and keeps Save enabled while review is pending", async () => {
+    const data = createDataAdapter();
+    vi.mocked(data.getClientSchedulingContext).mockResolvedValue({id: "client-1", type: "ddd", services: [{id: "service-1", code: "H2021", name: "Support"}]});
+    render(modalElement(data, {mode: "edit", editData: editableShift({serviceAuthorizationId: "service-1"})}));
+    await act(async () => Promise.resolve());
+    expect(getAssignmentReview).toHaveBeenCalledWith(expect.objectContaining({agencyId: "agency-b", clientId: "client-1", input: expect.objectContaining({employeeId: "staff-1", program: "ddd", kind: "shift", date: "2026-08-10", serviceAuthorizationId: "service-1"})}), expect.any(AbortSignal));
+    expect(screen.getByRole("button", {name: "Save"})).toBeEnabled();
+    expect(screen.getByText("Checking assignment records…")).toBeVisible();
+  });
+  it("binds the warning preview to the saved shift ID and does not preview or submit on consent edits", async () => {
+    const data = createDataAdapter();
+    vi.mocked(data.getClientSchedulingContext).mockResolvedValue({id: "client-1", type: "ddd", services: [{id: "service-1", code: "H2021", name: "Support"}]});
+    vi.mocked(getAssignmentDecision).mockResolvedValue({state: "ready", decision: "WARNING", fingerprint: "a".repeat(64), policyRevision: 1, evaluatedAt: "2026-08-10T12:00:00Z", contextKey: "pair", findings: [{ruleId: "synthetic", ruleVersion: 1, severity: "warning", code: "missing", message: "Review this requirement"}], hasRestrictedFindings: false, canAcknowledge: true});
+    render(modalElement(data, {mode: "edit", editData: editableShift({serviceAuthorizationId: "service-1"})}));
+    await act(async () => Promise.resolve());
+    expect(getAssignmentDecision).toHaveBeenCalledTimes(1);
+    expect(getAssignmentDecision).toHaveBeenCalledWith(expect.objectContaining({input: expect.objectContaining({shiftId: "shift-1"})}), expect.any(AbortSignal));
+    fireEvent.change(screen.getByLabelText("Reason for assigning with warnings"), {target: {value: "Reviewed requirement"}});
+    fireEvent.click(screen.getByLabelText("I reviewed these warnings"));
+    expect(getAssignmentDecision).toHaveBeenCalledTimes(1);
+    expect(shiftApi.updateShift).not.toHaveBeenCalled();
+  });
+  it("adopts saved review without issuing another preview or save", async () => {
+    const data = createDataAdapter();
+    vi.mocked(data.getClientSchedulingContext).mockResolvedValue({id: "client-1", type: "ddd", services: [{id: "service-1", code: "H2021", name: "Support"}], primaryAddress: {address: "1 Main St"}, payrollServiceLocations: [{source: "primaryAddress", attestedActualServiceLocation: true, effectiveFrom: "2026-01-01"}]});
+    const review = {version: 1, evaluatedAt: "2026-08-10T12:00:00Z", agencyDate: "2026-08-10", timezone: "UTC", context: {agencyId: "agency-b", clientId: "client-1", employeeId: "staff-1", program: "ddd", kind: "shift", serviceRowKey: "service-1", startDate: "2026-08-10", endDate: "2026-08-10", startTime: "09:00", endTime: "11:00", dateCoverage: "period"}, state: "information", coverage: {clientDocuments: "complete", employeeTraining: "complete"}, findings: [], retryable: false};
+    shiftApi.updateShift.mockResolvedValue({success: true, shift: {id: "shift-1"}, assignmentReviews: {pair: review}, reviewedPairCount: 1, unreviewedPairCount: 0, assignmentReviewCoverage: "complete"});
+    render(modalElement(data, {mode: "edit", editData: editableShift({serviceAuthorizationId: "service-1"})}));
+    await act(async () => Promise.resolve());
+    expect(getAssignmentReview).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", {name: "Save"}));
+    await act(async () => Promise.resolve());
+    expect(shiftApi.updateShift).toHaveBeenCalledTimes(1);
+    expect(getAssignmentReview).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Evidence on record")).toBeVisible();
+  });
+
+  it("uses the selected HHA program and authorization for review", async () => {
+    const data = createDataAdapter();
+    vi.mocked(data.getClientSchedulingContext).mockResolvedValue({id: "client-1", type: "hha", hhaAuthorizations: [{id: "service-1", serviceCode: "T1019", serviceName: "Personal care"}]});
+    render(modalElement(data, {agencyMode: "hha", supportedClientTypes: ["hha"], mode: "edit", editData: editableShift({serviceAuthorizationId: "service-1", serviceCode: "T1019"})}));
+    await act(async () => Promise.resolve());
+    expect(getAssignmentReview).toHaveBeenCalledWith(expect.objectContaining({agencyId: "agency-b", input: expect.objectContaining({program: "hha", serviceAuthorizationId: "service-1", serviceCode: "T1019"})}), expect.any(AbortSignal));
+  });});

@@ -15,6 +15,7 @@ export interface EmployeeDocument {
   status: 'available' | 'expired' | 'expiring-soon' | 'pending' | 'unavailable';
   uploadedAt?: string;
   expiryDate?: string;
+  expiryDateKey?: string;
   verifiedAt?: string;
   verifiedBy?: string;
   notes?: string;
@@ -32,6 +33,7 @@ export interface UploadEmployeeDocumentRequest {
   documentName: string;
   file: File;
   expiryDate?: string;
+  expiryDateKey?: string;
   notes?: string;
   agencyId?: string;
 }
@@ -70,7 +72,8 @@ export async function uploadEmployeeDocument(data: UploadEmployeeDocumentRequest
     formData.append('file', data.file);
     formData.append('documentType', data.documentType);
     formData.append('documentName', data.documentName);
-    if (data.expiryDate) formData.append('expiryDate', data.expiryDate);
+    if (data.expiryDateKey) formData.append('expiryDateKey', data.expiryDateKey);
+    else if (data.expiryDate) formData.append('expiryDate', data.expiryDate);
     if (data.notes) formData.append('notes', data.notes);
 
     const response = await axiosClient.post<UploadEmployeeDocumentResponse>(

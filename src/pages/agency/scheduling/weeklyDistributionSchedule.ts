@@ -418,7 +418,25 @@ export async function createShiftsCapAware<TRequest extends { clientId?: string;
   requests: TRequest[],
   createOne: (req: TRequest) => Promise<TResult>,
   distributionSnapshot: WeeklyDistributionSnapshot | null,
+  stopOnError?: (reason: unknown) => boolean,
 ): Promise<PromiseSettledResult<TResult>[]> {
+  // Assignment conflicts need an explicit review before later occurrences run.
+  if (stopOnError) {
+    const results: PromiseSettledResult<TResult>[] = [];
+    let stopped = false;
+    for (const request of requests) {
+      if (stopped) {
+        results.push({status: "rejected", reason: new Error("Not attempted. Review the interrupted assignment before retrying.")});
+        continue;
+      }
+      try { results.push({status: "fulfilled", value: await createOne(request)}); }
+      catch (reason) {
+        results.push({status: "rejected", reason});
+        if (stopOnError(reason)) stopped = true;
+      }
+    }
+    return results;
+  }
   const indexed = requests.map((req, index) => ({ req, index }));
   const groups = new Map<string, typeof indexed>();
 

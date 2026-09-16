@@ -1,5 +1,7 @@
+import { useGetDocumentComplianceQuery, useComplianceDateRefresh } from '@/pages/agency/compliance-alerts/api';
+import { useEffectiveAgencyMode } from '@/hooks/useEffectiveAgencyMode';
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { ChevronLeft, MessageSquare } from "lucide-react";
 import { DSP } from "./types";
@@ -31,6 +33,15 @@ function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
   const { toast } = useToast();
   const { user } = useAuth();
   const messaging = useMessaging();
+  const mode = useEffectiveAgencyMode();
+  const [searchParams] = useSearchParams();
+  const focusDocumentId = searchParams.get('documentId');
+  useEffect(() => {if (focusDocumentId) setActiveTab('Activity');}, [focusDocumentId]);
+  const {data: compliance, isError: complianceError, refetch: refreshCompliance} = useGetDocumentComplianceQuery(
+    {viewerId: user?.uid, agencyId: user?.agencyId, employeeId: dsp.id, mode: mode ?? undefined, condition: 'all', limit: 100},
+    {skip: !dsp.id || activeTab !== 'Activity', refetchOnFocus: true, refetchOnMountOrArgChange: true},
+  );
+  useComplianceDateRefresh(activeTab === 'Activity' ? compliance?.timezone : null, refreshCompliance, compliance?.localDate);
 
   const navigate = useNavigate();
   const { shifts, isLoading: detailsLoading, refetch: refetchDspDetails } = useDSPDetails(dsp.id);
@@ -45,26 +56,28 @@ function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
   const [alertingDocId, setAlertingDocId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (dsp.id) {
-      fetchDocuments();
-      fetchTrainings();
-    }
+    if (dsp.id) fetchDocuments();
   }, [dsp.id]);
 
-  const fetchTrainings = async () => {
-    try {
-      setTrainingsLoading(true);
-      const trainings = await getEmployeeTrainings(dsp.id, user?.agencyId);
-      setTotalCount(trainings.length);
-      setCompletedCount(trainings.filter((t) => t.status === 'completed').length);
-    } catch (error) {
-      console.error('Failed to fetch trainings:', error);
-      setTotalCount(0);
-      setCompletedCount(0);
-    } finally {
-      setTrainingsLoading(false);
-    }
-  };
+  useEffect(() => {
+    if (!dsp.id) return;
+    let active = true;
+    setTrainingsLoading(true);
+    getEmployeeTrainings(dsp.id, user?.agencyId, true, mode ?? undefined)
+      .then(trainings => {
+        if (!active) return;
+        setTotalCount(trainings.summary?.assigned ?? 0);
+        setCompletedCount(trainings.summary?.manualCompleted ?? 0);
+      })
+      .catch(error => {
+        if (!active) return;
+        console.error('Failed to fetch trainings:', error);
+        setTotalCount(0);
+        setCompletedCount(0);
+      })
+      .finally(() => { if (active) setTrainingsLoading(false); });
+    return () => { active = false; };
+  }, [dsp.id, user?.agencyId, mode]);
 
   const fetchDocuments = async () => {
     try {
@@ -308,6 +321,10 @@ function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
           totalCount={totalCount}
           completedCount={completedCount}
           documents={documents}
+          compliance={compliance}
+          complianceError={complianceError}
+          refreshCompliance={refreshCompliance}
+          focusDocumentId={focusDocumentId}
           onRequestDocument={handleRequestDocument}
           getDocumentStatusColor={getDocumentStatusColor}
           getDocumentActionButton={getDocumentActionButton}
@@ -349,7 +366,7 @@ function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
         employeeId={currentDsp.id}
         employeeName={currentDsp.fullName}
         documents={documents}
-        onRequested={fetchDocuments}
+        onRequested={() => {void fetchDocuments(); void refreshCompliance();}}
       />
     </div>
   );

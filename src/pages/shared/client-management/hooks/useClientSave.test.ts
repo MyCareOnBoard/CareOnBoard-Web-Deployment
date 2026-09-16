@@ -1,17 +1,23 @@
+import {updateClientWithReview} from "@/lib/api/clients";
+import { clientToFormData } from "../utils/clientToFormData";
+import { refreshClientDocumentBaseline } from "../utils/clientDocumentEdits";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useClientSave } from "./useClientSave";
-import { createClient, updateClient } from "@/lib/api/clients";
+import { createClient, updateClient, uploadClientDocument, type Client } from "@/lib/api/clients";
 import { createInitialAddClientFormData } from "../types/formData";
 
-vi.mock("@/lib/api/clients", () => ({
-  createClient: vi.fn().mockResolvedValue({ id: "client-1", firstName: "Jane", lastName: "Doe" }),
-  updateClient: vi.fn().mockResolvedValue(undefined),
-}));
+vi.mock("@/lib/api/clients", () => {
+  const createClient = vi.fn().mockResolvedValue({id: "client-1", firstName: "Jane", lastName: "Doe"});
+  const updateClient = vi.fn().mockResolvedValue(undefined);
+  return {createClient, updateClient,
+    createClientWithReview: vi.fn(async (data) => ({success: true, data: await createClient(data)})),
+    updateClientWithReview: vi.fn(async (id, data) => {await updateClient(id, data); return {success: true, data: {id}};}),
+    uploadClientDocument: vi.fn().mockResolvedValue({fileName: "new.pdf", url: "https://example.test/new"}),
+  };
+});
 
-vi.mock("../utils/documentUploadHandler", () => ({
-  handleDocumentUploads: vi.fn().mockResolvedValue([]),
-}));
+
 
 function formData() {
   const data = createInitialAddClientFormData();
@@ -90,7 +96,7 @@ describe("useClientSave", () => {
     expect(Object.keys(firstPayload.payrollServiceLocations![0])).toEqual(["source", "attestedActualServiceLocation", "effectiveFrom"]);
     expect(firstPayload).not.toHaveProperty("providerAssignmentId");
     expect(firstPayload).not.toHaveProperty("agencyId");
-    expect(updateClient).toHaveBeenLastCalledWith("client-1", { documents: [], status: "active" });
+    expect(updateClient).toHaveBeenLastCalledWith("client-1", { status: "active" });
   });
 
   it("sends the exact payroll attestation on update first pass but not its document/status pass", async () => {
@@ -106,7 +112,7 @@ describe("useClientSave", () => {
         effectiveFrom: "2026-08-14",
       }],
     }));
-    expect(updateClient).toHaveBeenNthCalledWith(2, "client-1", { documents: [] });
+    expect(updateClient).toHaveBeenCalledTimes(1);
   });
 
   it("does not call either API when the requested attestation has no effective date", async () => {
@@ -128,7 +134,7 @@ describe("useClientSave", () => {
     await act(async () => { await result.current.saveClient(data, true, "client-1", false, true, false); });
 
     expect(updateClient).toHaveBeenNthCalledWith(1, "client-1", expect.objectContaining({ payrollServiceLocations: [] }));
-    expect(updateClient).toHaveBeenNthCalledWith(2, "client-1", { documents: [] });
+    expect(updateClient).toHaveBeenCalledTimes(1);
   });
 
   it("omits an untouched payroll choice from the first update request", async () => {
@@ -139,4 +145,118 @@ describe("useClientSave", () => {
 
     expect(Object.hasOwn(vi.mocked(updateClient).mock.calls[0][1], "payrollServiceLocations")).toBe(false);
   });
+});
+
+describe("document save flow", () => {
+  beforeEach(() => vi.clearAllMocks());
+  function existing(documents: Client["documents"]) {
+    const data = formData();
+    data.stage3 = clientToFormData({ id: "client-1", type: "ddd", documents } as Client).stage3;
+    return data;
+  }
+  it("omits document writes for unrelated edits, including duplicates and absent signature", async () => {
+    const documents = [{ key: "isp" as const, url: "a", expiryDate: "2026-09-15T15:00:00.000Z" }, { key: "isp" as const, url: "b" }, { key: "form485" as const, url: "485" }];
+    const { result } = renderHook(() => useClientSave());
+    await act(async () => { expect(await result.current.saveClient(existing(documents), true, "client-1", false, true)).toMatchObject({ success: true, documents }); });
+    expect(updateClient).toHaveBeenCalledTimes(1);
+    expect(updateClient).toHaveBeenCalledWith("client-1", expect.not.objectContaining({ documents: expect.anything() }));
+    expect(uploadClientDocument).not.toHaveBeenCalled();
+  });
+  it("preflights ambiguous replacements and invalid dates before profile mutation or create", async () => {
+    const original = { key: "isp" as const, url: "a" };
+    const data = existing([original, original]);
+    data.stage3.docs[0].file = new File(["a"], "a.pdf");
+    const { result } = renderHook(() => useClientSave());
+    await act(async () => { expect(await result.current.saveClient(data, true, "client-1", false, true)).toMatchObject({ success: false }); });
+    const newData = formData();
+    newData.stage3.docs[0].issuedOnDate = new Date(NaN);
+    await act(async () => { expect(await result.current.saveClient(newData, false, undefined, false, true)).toMatchObject({ success: false }); });
+    expect(createClient).not.toHaveBeenCalled();
+    expect(updateClient).not.toHaveBeenCalled();
+    expect(uploadClientDocument).not.toHaveBeenCalled();
+  });
+  it("saves a date correction with no upload and preserves the sibling record", async () => {
+    const data = existing([{ key: "isp", url: "a" }, { key: "isp", url: "b" }]);
+    data.stage3.docs[0].expiryDate = new Date(2027, 8, 16);
+    data.stage3.docs[0].editedDates = { expiryDate: true };
+    const { result } = renderHook(() => useClientSave());
+    await act(async () => { await result.current.saveClient(data, true, "client-1", false, true); });
+    expect(updateClient).toHaveBeenLastCalledWith("client-1", { documents: [{ key: "isp", url: "a", expiryDate: "2027-09-16" }, { key: "isp", url: "b" }] });
+    expect(uploadClientDocument).not.toHaveBeenCalled();
+  });
+  it("progressive then final save does not upload a committed file twice", async () => {
+    const data = formData();
+    data.stage3.docs[0].file = new File(["a"], "a.pdf");
+    const { result } = renderHook(() => useClientSave());
+    await act(async () => {
+      const saved = await result.current.saveClient(data, false, undefined, false, true);
+      expect(saved.success).toBe(true);
+      data.stage3 = refreshClientDocumentBaseline(data.stage3, saved.documents!);
+      await result.current.saveClient(data, false, saved.clientId, false, false, true);
+    });
+    expect(uploadClientDocument).toHaveBeenCalledTimes(1);
+    expect(createClient).toHaveBeenCalledTimes(1);
+  });
+  it.each(["upload", "metadata"])("retains the created client ID and draft on %s failure for retry", async (failure) => {
+    const data = formData();
+    const file = new File(["a"], "a.pdf");
+    data.stage3.docs[0].file = file;
+    if (failure === "upload") vi.mocked(uploadClientDocument).mockRejectedValueOnce(new Error("upload failed"));
+    else vi.mocked(updateClient).mockRejectedValueOnce(new Error("metadata failed"));
+    const { result } = renderHook(() => useClientSave());
+    await act(async () => {
+      const saved = await result.current.saveClient(data, false, undefined, false, true);
+      expect(saved).toMatchObject({ success: false, clientId: "client-1" });
+      expect(saved.documents).toBeUndefined();
+      expect(data.stage3.docs[0].file).toBe(file);
+      expect(data.stage3.originalDocuments).toEqual([]);
+      expect((await result.current.saveClient(data, false, saved.clientId, false, true)).success).toBe(true);
+    });
+    expect(createClient).toHaveBeenCalledTimes(1);
+  });
+  it("still finalizes HHA status when no document changes were made", async () => {
+    const data = existing([null, { key: "form485", url: 123 }, { key: "form485", url: "https://example.test/485" }] as unknown as Client["documents"]);
+    data.type = "hha";
+    const { result } = renderHook(() => useClientSave());
+    await act(async () => { await result.current.saveClient(data, true, "client-1", false, false, true); });
+    expect(updateClient).toHaveBeenLastCalledWith("client-1", { status: "active" });
+    expect(vi.mocked(updateClient).mock.calls.every(([, body]) => !("documents" in body))).toBe(true);
+    expect(uploadClientDocument).not.toHaveBeenCalled();
+  });
+});
+
+
+it('retains the profile review across the later document mutation', async () => {
+  const metadata = {assignmentReviews: {}, reviewedPairCount: 0, unreviewedPairCount: 1, assignmentReviewCoverage: 'unavailable' as const};
+  vi.mocked(updateClientWithReview).mockResolvedValueOnce({success: true, data: {id: 'client-1'}, ...metadata});
+  const data = formData();
+  data.stage3.docs[0].file = new File(['document'], 'isp.pdf');
+  const {result} = renderHook(() => useClientSave());
+  await act(async () => {
+    const saved = await result.current.saveClient(data, true, 'client-1', false, true);
+    expect(saved).toMatchObject({success: true, assignmentReview: metadata, documentsChangedAfterReview: true});
+  });
+  expect(updateClient).toHaveBeenLastCalledWith('client-1', expect.objectContaining({documents: expect.any(Array)}));
+  expect(vi.mocked(updateClient).mock.lastCall?.[1]).not.toHaveProperty('assignmentReviews');
+});
+
+it('keeps a confirmed save successful when required decision metadata is malformed', async () => {
+  vi.mocked(updateClientWithReview).mockResolvedValueOnce({success: true, data: {id: 'client-1'}, assignmentDecisions: {pair: {state: 'ready', decision: 'CLEARED'}}} as unknown as Awaited<ReturnType<typeof updateClientWithReview>>);
+  const {result} = renderHook(() => useClientSave());
+  await act(async () => {
+    const saved = await result.current.saveClient(formData(), true, 'client-1', false, true);
+    expect(saved.success).toBe(true);
+    expect(saved.assignmentDecisions).toBeUndefined();
+  });
+});
+
+it('preserves save-client-first structured errors and never retries a writer automatically', async () => {
+  vi.mocked(updateClientWithReview).mockClear();
+  vi.mocked(updateClientWithReview).mockRejectedValueOnce({response: {status: 409, data: {code: 'ASSIGNMENT_ACKNOWLEDGMENT_REQUIRED', saveClientFirst: true, error: 'Save client first', assignmentDecisions: {}}}});
+  const {result} = renderHook(() => useClientSave());
+  await act(async () => {
+    const saved = await result.current.saveClient(formData(), true, 'client-1', false, true);
+    expect(saved).toMatchObject({success: false, assignmentError: {code: 'ASSIGNMENT_ACKNOWLEDGMENT_REQUIRED', saveClientFirst: true}});
+  });
+  expect(updateClientWithReview).toHaveBeenCalledOnce();
 });

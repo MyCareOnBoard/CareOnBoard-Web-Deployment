@@ -1,4 +1,4 @@
-import type { ClientDocumentKey } from "@/lib/api/clients";
+import type { ClientDocument, ClientDocumentKey } from "@/lib/api/clients";
 import type { Coverage, SplitMode } from "@/lib/coverage";
 import type { PlanOfCareFormData } from "./planOfCare";
 import type { ClinicalAssessmentFormData } from "./clinicalAssessment";
@@ -49,6 +49,8 @@ export type HhaServiceRequest = {
 };
 
 export type HhaAuthorization = {
+    /** Saved server row identity used only by assignment review; never sent in client payloads. */
+    reviewSourceRowKey?: string | null;
     id: string;
     authorizationNumber?: string;
     serviceId?: string;
@@ -226,6 +228,8 @@ export type ServiceSdrDetails = {
 export const SDR_DETAILS_LIST_MAX = 50;
 
 export type Service = {
+    /** Saved server row identity used only by assignment review; never sent in client payloads. */
+    reviewSourceRowKey?: string | null;
     id: string;
     name?: string;
     code?: string;
@@ -344,6 +348,7 @@ export type Stage2GuardianAndFundingData = {
 };
 
 export type DocKey =
+    | "aenf"
     | "isp"
     | "pcpt"
     | "poc"
@@ -373,6 +378,8 @@ export const DOC_KEY_MATCHES_API: _AssertExtends<DocKey, ClientDocumentKey> &
     _AssertExtends<ClientDocumentKey, DocKey> = true;
 
 export type DocState = {
+    originalDocument?: ClientDocument;
+    editedDates?: { issuedOnDate?: boolean; expiryDate?: boolean };
     key: DocKey;
     title: string;
     uploadLabel: string;
@@ -403,6 +410,7 @@ export type Stage3HealthcareAndDocumentsData = {
     communicationNeeds: string[];
     emergencyProtocols: string;
     docs: DocState[];
+    originalDocuments?: ClientDocument[];
     diagnosis?: string;
     healthHazards?: string;
     nutritionNotes?: string;
@@ -740,6 +748,7 @@ export function createInitialDocs(type: ClientType = "ddd"): DocState[] {
                 uploadLabel: "Upload hospital discharge papers",
                 autoReminder: true,
             },
+            { key: "aenf", title: "AENF", uploadLabel: "Upload AENF", autoReminder: false },
         ];
     }
 
@@ -786,6 +795,7 @@ export function createInitialDocs(type: ClientType = "ddd"): DocState[] {
             uploadLabel: "Upload Consents & Releases",
             autoReminder: true,
         },
+        { key: "aenf", title: "AENF", uploadLabel: "Upload AENF", autoReminder: false },
     ];
 }
 
@@ -885,6 +895,7 @@ export function createInitialAddClientFormData(): AddClientFormData {
             communicationNeeds: [],
             emergencyProtocols: "",
             docs: createInitialDocs(),
+            originalDocuments: [],
             diagnosis: undefined,
             healthHazards: undefined,
             nutritionNotes: undefined,

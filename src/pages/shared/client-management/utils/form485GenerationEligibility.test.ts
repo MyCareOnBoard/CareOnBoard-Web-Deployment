@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ClientDocument } from "@/lib/api/clients";
-import { hasSignedForm485, form485GraceInfo } from "./form485GenerationEligibility";
+import { hasUploadedForm485, hasSignedForm485, form485GraceInfo } from "./form485GenerationEligibility";
 
 const DAY = 24 * 60 * 60 * 1000;
 const url = "https://example.com/485.pdf";
@@ -71,4 +71,16 @@ describe("form485GraceInfo", () => {
     expect(info.state).toBe("unsigned-grace");
     expect(info.daysLeft).toBeUndefined();
   });
+});
+
+it("ignores malformed legacy records without changing signed or URL compatibility", () => {
+  for (const records of [null, {}, [null, 7, { key: "form485", url: 123 }, { key: "form485", url: "  " }]]) {
+    const documents = records as unknown as ClientDocument[];
+    expect(hasUploadedForm485(documents)).toBe(false);
+    expect(hasSignedForm485(documents)).toBe(false);
+  }
+  const records = [null, { key: "form485", url: 123 }, { key: "form485", url: "legacy-storage-reference" }] as unknown as ClientDocument[];
+  expect(hasUploadedForm485(records)).toBe(true);
+  expect(hasSignedForm485(records)).toBe(true);
+  expect(hasSignedForm485([{ key: "form485", url: "legacy-storage-reference", signed: false }])).toBe(false);
 });

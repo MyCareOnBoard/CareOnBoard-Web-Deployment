@@ -1,3 +1,4 @@
+import type { DocumentComplianceResponse } from '@/pages/agency/compliance-alerts/apiTypes';
 import { EmployeeDocument } from "@/lib/api/employee-documents";
 import { type Shift } from "@/lib/api/shifts";
 import { ShiftsChart } from "./ShiftsChart";
@@ -5,6 +6,10 @@ import { TrainingSection } from "./TrainingSection";
 import { DocumentsSection } from "./DocumentsSection";
 
 interface ActivityTabProps {
+  compliance?: DocumentComplianceResponse;
+  complianceError?: boolean;
+  refreshCompliance?: () => unknown;
+  focusDocumentId?: string | null;
   dspId: string;
   dspName: string;
   shifts: Shift[];
@@ -20,6 +25,7 @@ interface ActivityTabProps {
 }
 
 export function ActivityTab({
+  compliance, complianceError, refreshCompliance, focusDocumentId,
   dspName: _dspName,
   shifts,
   detailsLoading,
@@ -56,6 +62,10 @@ export function ActivityTab({
 
       {/* Documents Section - Full Width */}
       <DocumentsSection
+        compliance={compliance}
+        complianceError={complianceError}
+        refreshCompliance={refreshCompliance}
+        focusDocumentId={focusDocumentId}
         documents={documents}
         isLoading={documentsLoading}
         onRequestDocument={onRequestDocument}

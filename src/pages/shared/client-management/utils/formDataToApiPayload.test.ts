@@ -1,3 +1,5 @@
+import { clientToFormData } from "./clientToFormData";
+import type { Client } from "@/lib/api/clients";
 import { describe, expect, it } from "vitest";
 import { createInitialAddClientFormData } from "../types/formData";
 import { formDataToApiPayload } from "./formDataToApiPayload";
@@ -153,4 +155,20 @@ describe("formDataToApiPayload HHA", () => {
     expect(payload.insuranceInfo).toBeUndefined();
     expect(payload.hhaAuthorizations).toBeUndefined();
   });
+});
+
+it("preserves raw document metadata and serializes new calendar dates consistently", () => {
+  const original = { key: "form485" as const, url: "https://example.test/485", issuedOnDate: "2026-09-15T15:00:00.000Z" };
+  const data = clientToFormData({ id: "one", type: "hha", documents: [original] } as Client);
+  data.stage1.firstName = "Jane";
+  data.stage1.lastName = "Client";
+  data.stage1.address = "10 Main St";
+  data.stage1.location = { lat: "40.7", lon: "-74.0" };
+  const slot = data.stage3.docs.find(doc => doc.key === "form485")!;
+  const unchanged = formDataToApiPayload(data, false, true).documents!.find(doc => doc.key === "form485")!;
+  expect(unchanged).toEqual(original);
+  expect(unchanged).not.toHaveProperty("signed");
+  slot.expiryDate = new Date(2027, 8, 16);
+  slot.editedDates = { expiryDate: true };
+  expect(formDataToApiPayload(data, false, true).documents!.find(doc => doc.key === "form485")).toEqual({ ...original, expiryDate: "2027-09-16" });
 });

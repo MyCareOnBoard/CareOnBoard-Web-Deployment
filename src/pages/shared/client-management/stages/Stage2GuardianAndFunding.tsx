@@ -521,6 +521,7 @@ const ServiceAuthorizationFields = React.memo(function ServiceAuthorizationField
         </div>
       </div>
       <ServiceAssignedDspsSection
+        reviewRow={service}
         isEditing
         assignedDsps={service.assignedDsps ?? []}
         onChange={(assignedDsps) => update({ assignedDsps })}

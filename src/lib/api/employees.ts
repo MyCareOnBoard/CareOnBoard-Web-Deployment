@@ -25,7 +25,7 @@ export interface Employee {
     tagId?: string;
     role?: string;
     workAvailability?: boolean; // Boolean field
-    hireDate?: string; // ISO 8601 format: "YYYY-MM-DDTHH:mm:ss.sssZ"
+    hireDate?: string; // Calendar date: YYYY-MM-DD (older records may contain an ISO timestamp)
     /** Agency Compliance (MSRT) "Agency Employee" sheet columns. */
     alternateLastName?: string;
     /** Last four digits only — the full SSN is never stored on an employee. */
@@ -124,6 +124,7 @@ export interface CreateEmployeeRequest {
  * Matches PUT /employees/:employeeId body schema
  */
 export interface UpdateEmployeeRequest {
+    hireDate?: string; // Calendar date: YYYY-MM-DD
     fullName?: string;
     phoneNumber?: string;
     address?: string;
@@ -169,8 +170,16 @@ export interface EmployeeTraining {
  * Employee Trainings Response
  */
 export interface EmployeeTrainingsResponse {
-    success: boolean;
-    trainings: EmployeeTraining[];
+    items: Array<{
+        id: string;
+        name: string;
+        assignedDsp: string;
+        trainingType: string;
+        completedAt?: string | null;
+        status: string;
+    }>;
+    nextCursor: string | null;
+    summary: {assigned: number; manualCompleted: number; policyAwaitingReview: number; policyAccepted: number} | null;
 }
 
 // ==================== API Functions ====================
@@ -320,21 +329,18 @@ export async function deleteEmployee(employeeId: string): Promise<{ success: boo
 export async function getEmployeeTrainings(
     employeeId?: string,
     agencyId?: string,
-): Promise<EmployeeTraining[]> {
+    summaryOnly = false,
+    mode?: string,
+): Promise<EmployeeTrainingsResponse> {
     try {
         const params: Record<string, string> = {};
         if (employeeId) params.employeeId = employeeId;
         if (agencyId) params.agencyId = agencyId;
 
         const response = await axiosClient.get<EmployeeTrainingsResponse>('/employees/trainings', {
-            params: Object.keys(params).length > 0 ? params : undefined,
+            params: {...params, limit: 25, summaryOnly, mode},
         });
-
-        if (!response.data.success) {
-            throw new Error('Failed to fetch trainings');
-        }
-
-        return response.data.trainings;
+        return response.data;
     } catch (err: any) {
         console.error('getEmployeeTrainings error:', err);
         throw new Error(err.message || 'Failed to fetch trainings');

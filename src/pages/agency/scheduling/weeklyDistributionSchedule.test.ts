@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildWeeklyDistributionSnapshot,
   computeTotalScheduledHours,
+  createShiftsCapAware,
   describeWhyNoShiftsWouldBeBuilt,
   effectiveWeekdaySchedulesForShiftBuild,
   formatWeeklyDistributionDropdownLabel,
@@ -14,6 +15,21 @@ import {
 } from "./weeklyDistributionSchedule";
 
 describe("weeklyDistributionSchedule", () => {
+  it("stops recurring writes at a policy conflict and leaves later occurrences unattempted", async () => {
+    const attempted: string[] = [];
+    const conflict = {code: "ASSIGNMENT_ACKNOWLEDGMENT_REQUIRED"};
+    const requests = ["first", "warning", "later"].map((id, i) => ({id, clientId: id, date: `2026-10-0${i + 1}`}));
+    const results = await createShiftsCapAware(requests, async request => {
+      attempted.push(request.id);
+      if (request.id === "warning") throw conflict;
+      return request.id;
+    }, null, error => error === conflict);
+    expect(attempted).toEqual(["first", "warning"]);
+    expect(results.map(result => result.status)).toEqual(["fulfilled", "rejected", "rejected"]);
+    const retry = requests.filter((_, index) => results[index].status !== "fulfilled");
+    const retried = await createShiftsCapAware(retry, async request => request.id, null, () => true);
+    expect(retried).toEqual([{status: "fulfilled", value: "warning"}, {status: "fulfilled", value: "later"}]);
+  });
   it("formatWeeklyDistributionDropdownLabel includes authorized hours", () => {
     expect(
       formatWeeklyDistributionDropdownLabel({

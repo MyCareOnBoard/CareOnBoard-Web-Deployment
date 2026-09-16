@@ -142,7 +142,7 @@ export default function AgencySettingsPage() {
 
             <Suspense fallback={<SettingsTabSkeleton variant="form" cardCount={1} />}>
 
-              <NotificationsTab />
+              <NotificationsTab active={activeTab === "notification"} />
 
             </Suspense>
 

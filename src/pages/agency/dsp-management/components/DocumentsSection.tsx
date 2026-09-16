@@ -1,10 +1,15 @@
-import { useState } from "react";
+import { complianceLabel, civilDateLabel, type DocumentComplianceResponse } from '@/pages/agency/compliance-alerts/apiTypes';
+import { useState, useEffect } from "react";
 import { FileText, Plus } from "lucide-react";
 import { DocumentPreviewModal } from "@/components/documents/DocumentPreviewModal";
 import { Button } from "@/components/ui/button";
 import type { EmployeeDocument } from "@/lib/api/employee-documents";
 
 interface DocumentsSectionProps {
+  compliance?: DocumentComplianceResponse;
+  complianceError?: boolean;
+  refreshCompliance?: () => unknown;
+  focusDocumentId?: string | null;
   documents: EmployeeDocument[];
   isLoading: boolean;
   onRequestDocument: () => void;
@@ -13,6 +18,7 @@ interface DocumentsSectionProps {
 }
 
 export function DocumentsSection({
+  compliance, complianceError, refreshCompliance, focusDocumentId,
   documents,
   isLoading,
   onRequestDocument,
@@ -21,6 +27,11 @@ export function DocumentsSection({
 }: DocumentsSectionProps) {
   const [preview, setPreview] = useState<EmployeeDocument | null>(null);
 
+  useEffect(() => {
+    if (!focusDocumentId) return;
+    const row = document.getElementById(`document-${focusDocumentId}`);
+    row?.focus(); row?.scrollIntoView?.({block: 'nearest'});
+  }, [focusDocumentId, documents, isLoading]);
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -37,6 +48,8 @@ export function DocumentsSection({
         </button>
       </div>
 
+      {(complianceError || compliance?.syncStatus === 'error') && <p role="alert" className="text-sm text-red-700">We couldn't load document expiry status. Try again. Last checked: {compliance?.evaluatedAt ? new Date(compliance.evaluatedAt).toLocaleString() : 'Not yet checked'}. <button type="button" onClick={refreshCompliance}>Retry</button></p>}
+      {focusDocumentId && !isLoading && !documents.some(doc => doc.id === focusDocumentId) && <p role="status">This document is unavailable or you no longer have access. <a href="?">Back to documents</a></p>}
       <div className="space-y-2">
         {isLoading ? (
           <div className="flex items-center justify-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
@@ -50,8 +63,12 @@ export function DocumentsSection({
             </div>
           </div>
         ) : (
-          documents.map((doc) => (
-            <div key={doc.id} className="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-lg hover:bg-teal-50 transition-colors">
+          documents.map((doc) => {
+            const issue = compliance?.items.find(item => item.documentId === doc.id);
+            const pilot = compliance?.pilotEnabled !== false && Boolean(refreshCompliance);
+            const status = pilot ? (complianceError || compliance?.syncStatus === 'error' ? 'Expiry status unavailable' : complianceLabel(issue)) : doc.status;
+            return (
+            <div key={doc.id} id={`document-${doc.id}`} tabIndex={-1} className="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-lg hover:bg-teal-50 transition-colors">
               <div className="flex items-center gap-3 flex-1">
                 <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shrink-0">
                   <FileText className="w-5 h-5 text-gray-600" />
@@ -59,8 +76,8 @@ export function DocumentsSection({
                 <span className="text-sm text-gray-900">{doc.documentName}</span>
               </div>
               <div className="flex items-center gap-3">
-                <span className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getDocumentStatusColor(doc.status)}`}>
-                  {doc.status === 'expiring-soon' ? 'Expiring Soon' : doc.status === 'unavailable' ? 'Unavailable' : doc.status}
+                <span className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getDocumentStatusColor(pilot ? issue?.condition ?? 'pending' : doc.status)}`}>
+                  {status === 'expiring-soon' ? 'Expiring Soon' : status === 'unavailable' ? 'Unavailable' : status}{pilot && issue?.expiryDateKey ? ` · ${civilDateLabel(issue.expiryDateKey)}` : ''}
                 </span>
                 {getDocumentActionButton(doc.status, doc)}
                 {doc.fileUrl ? (
@@ -75,7 +92,7 @@ export function DocumentsSection({
                 ) : null}
               </div>
             </div>
-          ))
+          );})
         )}
       </div>
       <DocumentPreviewModal

@@ -8,6 +8,7 @@ import type { FieldConfidence } from "../types/clientExtraction";
 
 /** DocKey/ClientDocumentKey -> server document-type slug. */
 export const DOC_KEY_TO_SERVER_TYPE: Record<ClientDocumentKey, string> = {
+  aenf: "aenf",
   isp: "isp",
   pcpt: "pcpt",
   poc: "plan-of-care",
@@ -26,11 +27,11 @@ export const DOC_KEY_TO_SERVER_TYPE: Record<ClientDocumentKey, string> = {
   form485: "form-485",
   hospitalDischarge: "hospital-discharge-papers",
   ids: "ids",
-  aenf: "aenf",
 };
 
 /** Options for the client-details "upload document" type pickers. */
 export const DOCUMENT_TYPE_OPTIONS: Array<{ value: ClientDocumentKey; label: string }> = [
+  { value: "aenf", label: "AENF" },
   { value: "isp", label: "ISP (Individualized Service Plan)" },
   { value: "pcpt", label: "PCPT (Person-Centered Planning Tool)" },
   { value: "poc", label: "Plan of Care (POC)" },
@@ -49,11 +50,11 @@ export const DOCUMENT_TYPE_OPTIONS: Array<{ value: ClientDocumentKey; label: str
   { value: "form485", label: "Form 485" },
   { value: "hospitalDischarge", label: "Hospital Discharge Papers" },
   { value: "ids", label: "IDS (Individual Data Sheet)" },
-  { value: "aenf", label: "AENF (Acuity Eligibility Notification Form)" },
 ];
 
 /** Human label for an extraction's detectedDocumentType (incl. "unknown"). */
 export const DOCUMENT_TYPE_LABELS: Record<string, string> = {
+  aenf: "AENF",
   isp: "ISP (Individualized Service Plan)",
   poc: "Plan of Care",
   pcpt: "PCPT",
@@ -72,7 +73,6 @@ export const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   form485: "Form 485",
   hospitalDischarge: "Hospital Discharge Papers",
   ids: "IDS (Individual Data Sheet)",
-  aenf: "AENF (Acuity Eligibility Notification Form)",
   unknown: "Not detected",
 };
 

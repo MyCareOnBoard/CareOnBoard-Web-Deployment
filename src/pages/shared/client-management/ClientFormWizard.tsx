@@ -1,9 +1,17 @@
+import {AssignmentReviewRosterProvider, rosterAssignmentsChanged, rosterAcknowledgments, type RosterDecisionState, type SavedRosterReview} from "@/components/AssignmentReviewRoster";
+import {ClientNeedsPanel, type ClientNeedsDraft} from '@/pages/shared/client-details/components/ClientNeedsPanel';
+import {useAssignmentReviewScope} from '@/hooks/useAssignmentReview';
+import {getClientById} from '@/lib/api/clients';
+import {clientToFormData} from './utils/clientToFormData';
+import {assignmentSaveMessage, assignmentServiceRowKey} from "@/lib/api/assignment-review";
+import { hasClientDocumentEdit, refreshClientDocumentBaseline } from "./utils/clientDocumentEdits";
 import React, { useMemo, useCallback, useEffect, Suspense, lazy, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { AddClientFormData, createInitialDocs, type ClientType } from "./types/formData";
 import { ClientFormConfig } from "./types/config";
 import { useClientForm } from "./hooks/useClientForm";
-import { useClientSave } from "./hooks/useClientSave";
+import { useClientSave, withoutClientAssignments } from "./hooks/useClientSave";
+import {Button} from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
 import { StageFooter } from "./components/StageFooter";
 import { SaveClientSuccessModal } from "./components/SaveClientSuccessModal";
@@ -90,6 +98,30 @@ export function ClientFormWizard({
   const [pocGuardOpen, setPocGuardOpen] = useState(false);
   const [generatePocOpen, setGeneratePocOpen] = useState(false);
   const [typeSelected, setTypeSelected] = useState(isEditMode);
+  const savedClientIdRef = useRef<string | undefined>(clientId);
+  const reviewCaptureRef = useRef("");
+  const savedAssignmentFormRef = useRef(initialFormData);
+  const [savedReview, setSavedReview] = useState<SavedRosterReview>();
+  const [decisionState, setDecisionState] = useState<RosterDecisionState>({decisions: {}, drafts: {}});
+  const decisionCaptureRef = useRef('');
+  const [saveClientFirst, setSaveClientFirst] = useState(false);
+  const [assignmentsUnsaved, setAssignmentsUnsaved] = useState(false);
+  const [needsDraft, setNeedsDraft] = useState<ClientNeedsDraft>();
+  const needsActorScope = useAssignmentReviewScope();
+  const needsIdentity = JSON.stringify([needsActorScope, clientId ?? savedClientIdRef.current, formData.agencyId || user?.agencyId || '', formData.type]);
+  const currentNeedsIdentity = useRef(needsIdentity); currentNeedsIdentity.current = needsIdentity;
+  useEffect(() => {setDecisionState({decisions: {}, drafts: {}}); setSaveClientFirst(false);}, [needsActorScope, formData.agencyId, formData.type]);
+  useEffect(() => setNeedsDraft(previous => previous?.scopeKey === needsIdentity ? previous : undefined), [needsIdentity]);
+  const refreshNeedsDocuments = useCallback(async () => {
+    const savedId = clientId ?? savedClientIdRef.current;
+    if (!savedId) return;
+    const current = await getClientById(savedId, formData.agencyId || user?.agencyId, {mode: formData.type});
+    if (currentNeedsIdentity.current !== needsIdentity) return;
+    const fresh = clientToFormData(current).stage3;
+    setFormData(previous => ({...previous, stage3: {...previous.stage3, originalDocuments: fresh.originalDocuments,
+      docs: fresh.docs.map(doc => previous.stage3.docs.find(old => old.key === doc.key && hasClientDocumentEdit(old)) || doc)}}));
+  }, [clientId, formData.agencyId, formData.type, needsIdentity, setFormData, user?.agencyId]);
+  const rosterRows = (data?: AddClientFormData) => data?.type === "hha" ? data.stage2.hhaAuthorizations ?? [] : data?.stage2.outcomes.flatMap(outcome => outcome.services) ?? [];
   const pendingSuccessClientIdRef = useRef<string | undefined>(undefined);
   const handleTypeSelect = useCallback(
     (type: ClientType) => {
@@ -138,16 +170,44 @@ export function ClientFormWizard({
   const generatePocRef = useRef<GeneratePocPanelHandle>(null);
 
   const runSave = useCallback(async (dataToSave: AddClientFormData = formData) => {
+    const submittedViewKey = reviewCaptureRef.current;
+    const submittedDecisionKey = decisionCaptureRef.current;
+    const submittedIdentity = currentNeedsIdentity.current;
+    const assignmentsChanged = rosterAssignmentsChanged(rosterRows(savedAssignmentFormRef.current), rosterRows(dataToSave));
+    if (assignmentsChanged && decisionState.loading) return;
     const result = await saveClient(
       !isEditMode && agencyMode === "sc" && !dataToSave.servicePrograms ? { ...dataToSave, servicePrograms: ["sc"] } : dataToSave,
       isEditMode,
-      clientId,
+      clientId ?? savedClientIdRef.current,
       config.showAgencySelection,
       !isLast,
-      isLast
+      isLast,
+      rosterAcknowledgments(decisionState, rosterRows(savedAssignmentFormRef.current), rosterRows(dataToSave), dataToSave.type)
     );
 
-    if (!result.success) return;
+    if (currentNeedsIdentity.current !== submittedIdentity) return;
+    if (result.assignmentError || result.success && assignmentsChanged) {
+      setDecisionState(previous => ({...previous, decisions: {...previous.decisions, ...result.assignmentDecisions},
+        drafts: result.assignmentError ? Object.fromEntries(Object.entries(previous.drafts).map(([key, draft]) => [key, {...draft, consent: false}])) : previous.drafts,
+        submitted: {viewKey: submittedDecisionKey, decisions: result.assignmentDecisions || null, saved: result.success,
+          error: result.assignmentError?.code === 'ASSIGNMENT_DECISION_CHANGED' ? 'Requirements changed. Review the updated checks before assigning.' : undefined}}));
+      if (result.assignmentError?.status === 403) setDecisionState({decisions: {}, drafts: {}});
+    }
+    if (result.clientId) savedClientIdRef.current = result.clientId;
+    if (!result.success) {setSaveClientFirst(!!result.assignmentError?.saveClientFirst); if (result.assignmentError) setErrorMessage(undefined); return;}
+    setSaveClientFirst(false); setAssignmentsUnsaved(false);
+    if (assignmentsChanged && !result.assignmentDecisions) toast({title: 'Client saved.', description: 'Assignment checks are unavailable.'});
+    const reviewMessage = agencyMode === "sc" ? undefined : assignmentSaveMessage(result.assignmentReview, assignmentsChanged, true);
+    setSavedReview({metadata: result.assignmentReview, submittedViewKey, documentsChanged: !!result.documentsChangedAfterReview, assignmentChanged: assignmentsChanged});
+    savedAssignmentFormRef.current = {...dataToSave, stage2: {...dataToSave.stage2,
+      outcomes: dataToSave.stage2.outcomes.map(outcome => ({...outcome, services: outcome.services.map(row => ({...row, reviewSourceRowKey: assignmentServiceRowKey(row, "ddd")}))})),
+      hhaAuthorizations: dataToSave.stage2.hhaAuthorizations?.map(row => ({...row, reviewSourceRowKey: assignmentServiceRowKey(row, "hha")})),
+    }};
+    if (reviewMessage) toast({title: "Assignment review", description: reviewMessage});
+    if (result.documents) {
+      const baseline = refreshClientDocumentBaseline(dataToSave.stage3, result.documents);
+      setFormData(prev => ({ ...prev, stage3: { ...prev.stage3, docs: baseline.docs, originalDocuments: baseline.originalDocuments } }));
+    }
 
     const isProgressive = !isLast;
 
@@ -189,8 +249,27 @@ export function ClientFormWizard({
     isLast,
     onSuccess,
     saveClient,
+    setFormData,
     toast,
+    decisionState,
   ]);
+
+  const saveWithoutAssignments = async () => {
+    const submittedIdentity = currentNeedsIdentity.current;
+    const assignmentFree = withoutClientAssignments(formData);
+    setErrorMessage(undefined);
+    const result = await saveClient(assignmentFree, false, undefined, config.showAgencySelection, true, false);
+    if (currentNeedsIdentity.current !== submittedIdentity || !result.success || !result.clientId) return;
+    savedClientIdRef.current = result.clientId;
+    savedAssignmentFormRef.current = assignmentFree;
+    setSaveClientFirst(false); setAssignmentsUnsaved(true);
+    if (result.documents) {
+      const baseline = refreshClientDocumentBaseline(formData.stage3, result.documents);
+      setFormData(previous => ({...previous, stage3: {...previous.stage3, docs: baseline.docs, originalDocuments: baseline.originalDocuments}}));
+    }
+    goToStage(2);
+    toast({title: 'Client saved. Staff assignments still need review.'});
+  };
 
   const handleSave = useCallback(() => {
     if (!skipPocGuardRef.current && shouldShowPocSaveGuard(formData)) {
@@ -244,11 +323,12 @@ export function ClientFormWizard({
         onNext={goToNext}
         onSave={handleSave}
         primaryLoading={isSaving}
+        saveDisabled={!!decisionState.loading && rosterAssignmentsChanged(rosterRows(savedAssignmentFormRef.current), rosterRows(formData))}
         requireDeclaration={true}
-        saveButtonText={config.successMessage || "Save Progress"}
+        saveButtonText={Object.values(decisionState.decisions).some(d => d.decision === 'WARNING') ? 'Assign with warnings' : config.successMessage || "Save Progress"}
       />
     ),
-    [declared, isFirst, isLast, isSaving, config.successMessage, goToNext, goToPrev, handleSave]
+    [declared, isFirst, isLast, isSaving, config.successMessage, goToNext, goToPrev, handleSave, decisionState.decisions, decisionState.loading, formData]
   );
 
   const pageTitle = config.pageTitle || (isEditMode ? "Edit client" : "Add client");
@@ -295,12 +375,14 @@ export function ClientFormWizard({
       );
     if (stage === 2)
       return (
+        <AssignmentReviewRosterProvider enabled={agencyMode !== 'sc'} clientId={savedClientIdRef.current} agencyId={formData.agencyId} program={formData.type} savedRows={rosterRows(savedAssignmentFormRef.current)} captureRef={reviewCaptureRef} savedReview={savedReview} decisionState={decisionState} onDecisionState={setDecisionState} decisionCaptureRef={decisionCaptureRef} onViewNeeds={() => goToStage(3)}>
         <Stage2GuardianAndFunding
           footer={footer}
           formData={formData}
           setFormData={setFormData}
           pageTitle={pageTitle}
         />
+        </AssignmentReviewRosterProvider>
       );
     if (stage === 3)
       return (
@@ -309,7 +391,11 @@ export function ClientFormWizard({
           formData={formData}
           setFormData={setFormData}
           pageTitle={pageTitle}
-          clientId={clientId}
+          clientId={clientId ?? savedClientIdRef.current}
+          isSaving={isSaving}
+          needsPanel={agencyMode !== 'sc' ? <ClientNeedsPanel clientId={clientId ?? savedClientIdRef.current} agencyId={formData.agencyId || user?.agencyId || ''} program={formData.type}
+            documents={formData.stage3.originalDocuments} documentsDirty={formData.stage3.docs.some(doc => doc.key === 'aenf' && hasClientDocumentEdit(doc))}
+            documentsBusy={isSaving} draft={needsDraft} onDraftChange={setNeedsDraft} onRefreshDocuments={refreshNeedsDocuments} /> : undefined}
         />
       );
     if (stage === 4)
@@ -361,8 +447,16 @@ export function ClientFormWizard({
     handleTypeSelect,
     handlePickerBack,
     clientId,
+    isSaving,
+    needsDraft,
+    refreshNeedsDocuments,
+    agencyMode,
+    user?.agencyId,
     isDddClient,
     allowed,
+    decisionState,
+    savedReview,
+    assignmentsUnsaved,
   ]);
 
   return (
@@ -378,6 +472,9 @@ export function ClientFormWizard({
         </label>
       )}
       {stageContent}
+      {decisionState.submitted && !decisionState.submitted.saved && !saveClientFirst && <p role="alert" className="my-3 text-sm">{decisionState.submitted.error || 'Staff assignments still need review. Select the affected staff in Step 2 to review the current checks.'}</p>}
+      {assignmentsUnsaved && <p role="status" className="my-3 text-sm">Client saved. Staff assignments still need review. Selected staff are not yet assigned.</p>}
+      {saveClientFirst && <div className="my-3 space-y-3 rounded-xl border p-4"><p>Save the client without assignments first, then review and assign staff.</p><Button type="button" disabled={isSaving} onClick={() => void saveWithoutAssignments()}>Save client without assignments</Button></div>}
 
       <Dialog open={showSavingModal} onOpenChange={() => {}}>
         <DialogContent

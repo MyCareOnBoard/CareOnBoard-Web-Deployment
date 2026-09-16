@@ -236,14 +236,23 @@ export function Stage3HealthcareAndDocuments({
   setFormData,
   pageTitle = "Add client",
   clientId,
+  isSaving = false,
+  needsPanel,
 }: {
   footer: React.ReactNode;
   formData: AddClientFormData;
   setFormData: React.Dispatch<React.SetStateAction<AddClientFormData>>;
   pageTitle?: string;
   clientId?: string;
+  isSaving?: boolean;
+  needsPanel?: React.ReactNode;
 }) {
   const stage3 = formData.stage3;
+  const documentEditingDisabled = React.useRef(false);
+  documentEditingDisabled.current = isSaving || !Array.isArray(stage3.originalDocuments);
+  const setDocumentFormData: React.Dispatch<React.SetStateAction<AddClientFormData>> = (update) => {
+    if (!documentEditingDisabled.current) setFormData(update);
+  };
   const isHhaClient = formData.type === "hha";
   const [medicalConditionsOtherText, setMedicalConditionsOtherText] = useState<string | null>(null);
   const [allergiesOtherText, setAllergiesOtherText] = useState<string | null>(null);
@@ -263,6 +272,7 @@ export function Stage3HealthcareAndDocuments({
     }));
 
   const updateDoc = (key: DocKey, patch: Partial<DocState>) => {
+    if (documentEditingDisabled.current) return;
     updateStage3({
       docs: stage3.docs.map((d) => (d.key === key ? { ...d, ...patch } : d)),
     });
@@ -827,14 +837,16 @@ export function Stage3HealthcareAndDocuments({
       <div className="mb-10">
         <div className="mb-2">
           <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
-            6. Mandatory Document Uploads
+            6. Document Uploads
           </p>
           <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-            These are core documents that define care expectations and billing rules.
+            Core care documents and optional supporting evidence. Existing activation requirements still apply.
           </p>
         </div>
 
-        <div className="mt-6 space-y-8">
+        {needsPanel}
+        <fieldset disabled={isSaving || !Array.isArray(stage3.originalDocuments)} className="mt-6 min-w-0 space-y-8">
+          {!Array.isArray(stage3.originalDocuments) && <p role="alert">Reload the client and review its document records before changing files.</p>}
           {(() => {
             const allDocs = createInitialDocs(formData.type);
             return allDocs.map((defaultDoc) => {
@@ -842,6 +854,7 @@ export function Stage3HealthcareAndDocuments({
 
               return (
                 <div key={doc.key}>
+                  {doc.key === 'aenf' && <h3 className="mb-3 border-t border-border pt-6 text-sm font-semibold">Additional needs evidence (optional)</h3>}
                   <p className="text-[12px] font-normal text-[#10141a] mb-2">
                     {doc.title}
                   </p>
@@ -850,7 +863,7 @@ export function Stage3HealthcareAndDocuments({
                     <Suspense fallback={null}>
                       <GeneratePocPanel
                         formData={formData}
-                        setFormData={setFormData}
+                        setFormData={setDocumentFormData}
                         clientId={clientId}
                       />
                     </Suspense>
@@ -860,7 +873,7 @@ export function Stage3HealthcareAndDocuments({
                     <Suspense fallback={null}>
                       <GenerateForm485Panel
                         formData={formData}
-                        setFormData={setFormData}
+                        setFormData={setDocumentFormData}
                         clientId={clientId}
                       />
                     </Suspense>
@@ -942,7 +955,7 @@ export function Stage3HealthcareAndDocuments({
                       <label className="text-[12px] font-normal text-[#10141a]">Issued on date</label>
                       <DatePickerInput
                         value={doc.issuedOnDate}
-                        onChange={(d) => updateDoc(doc.key, { issuedOnDate: d })}
+                        onChange={(d) => updateDoc(doc.key, { issuedOnDate: d, editedDates: { ...doc.editedDates, issuedOnDate: true } })}
                         placeholder="Select date"
                       />
                     </div>
@@ -951,7 +964,7 @@ export function Stage3HealthcareAndDocuments({
                       <label className="text-[12px] font-normal text-[#10141a]">Expiry date</label>
                       <DatePickerInput
                         value={doc.expiryDate}
-                        onChange={(d) => updateDoc(doc.key, { expiryDate: d })}
+                        onChange={(d) => updateDoc(doc.key, { expiryDate: d, editedDates: { ...doc.editedDates, expiryDate: true } })}
                         placeholder="Select date"
                       />
                     </div>
@@ -968,7 +981,7 @@ export function Stage3HealthcareAndDocuments({
               );
             });
           })()}
-        </div>
+        </fieldset>
       </div>
 
       {footer}
