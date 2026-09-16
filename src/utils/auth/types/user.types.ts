@@ -69,6 +69,8 @@ export interface Employee {
 
 
 export interface Profile {
+  agencyModes?: ("ddd" | "hha" | "sc")[];
+  isActive?: boolean;
   id?: string
   uid?: string
   email?: string

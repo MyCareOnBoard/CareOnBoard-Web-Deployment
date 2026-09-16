@@ -11,6 +11,21 @@ import type { Coverage, SplitMode } from "@/lib/coverage";
 
 export type ClientType = "ddd" | "hha";
 
+export type ChecklistStatus = 'not_uploaded' | 'multiple_files' | 'needs_review' | 'expired' | 'expires_today' | 'on_file' | 'on_file_no_expiry';
+export type ChecklistReason = 'invalid_reference' | 'malformed_entry' | 'invalid_issued_date' | 'invalid_expiry_date' | 'ambiguous_issued_date' | 'ambiguous_expiry_date' | 'reversed_dates' | 'invalid_timezone';
+export type ChecklistEntry = {
+  documentIndex: number; issuedDate: string | null; expiryDate: string | null;
+  status: Exclude<ChecklistStatus, 'multiple_files'>; reasonCode: ChecklistReason | null; warningCode?: ChecklistReason;
+};
+export type ChecklistRow = {
+  key: 'isp' | 'pcpt' | 'sdr' | 'form485' | 'poc' | 'physicianOrders' | 'clinicalAssessment';
+  status: ChecklistStatus; reasonCode: ChecklistReason | null; entries: ChecklistEntry[];
+};
+export type Checklist = { evaluatedAt: string; timezone: string | null; localDate: string | null } & (
+  { state: 'ready'; warningCode?: 'malformed_entry'; groups: Array<{ program: 'ddd' | 'hha'; rows: ChecklistRow[] }> }
+  | { state: 'unavailable'; reasonCode: 'invalid_programs' | 'invalid_documents' | 'evaluation_failed'; groups: [] }
+);
+
 /** Whether a client's services bill the provider (claims) or the payer/family (out of pocket). */
 export type ClientBillingDirection = "claims" | "out-of-pocket";
 
@@ -28,6 +43,7 @@ export interface ClientOutOfPocketPayer {
  * Represents a client/consumer in the care system
  */
 export interface Client {
+  documentChecklist?: Checklist;
   servicePrograms?: ("ddd" | "hha" | "sc")[];
   // Core identifiers
   id: string;
@@ -985,9 +1001,9 @@ export async function uploadClientDocument(
  * Endpoint: GET /clientManagement/:clientId
  * Employees must supply agencyId via query parameter
  */
-export async function getAgencyClientById(clientId: string): Promise<Client> {
+export async function getAgencyClientById(clientId: string, options: { signal?: AbortSignal; mode?: 'ddd' | 'hha' | 'sc' | null } = {}): Promise<Client> {
   try {
-    const response = await axiosClient.get<ApiResponse<Client>>(`/clientManagement/${clientId}`);
+    const response = await axiosClient.get<ApiResponse<Client>>(`/clientManagement/${clientId}`, { signal: options.signal, params: { mode: options.mode || undefined } });
     return response.data.data;
   } catch (error) {
     console.error(`Failed to fetch client ${clientId}:`, error);
@@ -1060,11 +1076,11 @@ export async function getClients(page: number = 1, pageSize: number = 10): Promi
 export async function getClientById(
   clientId: string,
   agencyId?: string,
-  options: { signal?: AbortSignal } = {},
+  options: { signal?: AbortSignal; mode?: 'ddd' | 'hha' | 'sc' | null } = {},
 ): Promise<Client> {
   try {
     const response = await axiosClient.get<{ success: boolean; data: Client }>(`/clients/${clientId}`, {
-      params: agencyId ? { agencyId } : undefined,
+      params: { agencyId, mode: options.mode || undefined },
       signal: options.signal,
     });
 

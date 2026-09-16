@@ -1,3 +1,4 @@
+import { refreshClientDocumentBaseline } from "./utils/clientDocumentEdits";
 import React, { useMemo, useCallback, useEffect, Suspense, lazy, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { AddClientFormData, createInitialDocs, type ClientType } from "./types/formData";
@@ -90,6 +91,7 @@ export function ClientFormWizard({
   const [pocGuardOpen, setPocGuardOpen] = useState(false);
   const [generatePocOpen, setGeneratePocOpen] = useState(false);
   const [typeSelected, setTypeSelected] = useState(isEditMode);
+  const savedClientIdRef = useRef<string | undefined>(clientId);
   const pendingSuccessClientIdRef = useRef<string | undefined>(undefined);
   const handleTypeSelect = useCallback(
     (type: ClientType) => {
@@ -141,13 +143,18 @@ export function ClientFormWizard({
     const result = await saveClient(
       !isEditMode && agencyMode === "sc" && !dataToSave.servicePrograms ? { ...dataToSave, servicePrograms: ["sc"] } : dataToSave,
       isEditMode,
-      clientId,
+      clientId ?? savedClientIdRef.current,
       config.showAgencySelection,
       !isLast,
       isLast
     );
 
+    if (result.clientId) savedClientIdRef.current = result.clientId;
     if (!result.success) return;
+    if (result.documents) {
+      const baseline = refreshClientDocumentBaseline(dataToSave.stage3, result.documents);
+      setFormData(prev => ({ ...prev, stage3: { ...prev.stage3, docs: baseline.docs, originalDocuments: baseline.originalDocuments } }));
+    }
 
     const isProgressive = !isLast;
 
@@ -189,6 +196,7 @@ export function ClientFormWizard({
     isLast,
     onSuccess,
     saveClient,
+    setFormData,
     toast,
   ]);
 
@@ -309,7 +317,8 @@ export function ClientFormWizard({
           formData={formData}
           setFormData={setFormData}
           pageTitle={pageTitle}
-          clientId={clientId}
+          clientId={clientId ?? savedClientIdRef.current}
+          isSaving={isSaving}
         />
       );
     if (stage === 4)
@@ -361,6 +370,7 @@ export function ClientFormWizard({
     handleTypeSelect,
     handlePickerBack,
     clientId,
+    isSaving,
     isDddClient,
     allowed,
   ]);

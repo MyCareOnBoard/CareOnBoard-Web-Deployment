@@ -1,3 +1,4 @@
+import { mergeClientDocumentEdit, parseClientDocumentDate, serializeClientDocumentDate, validateClientDocumentDates } from "@/pages/shared/client-management/utils/clientDocumentEdits";
 import React, { FormEvent, useEffect, useState } from "react";
 import { X, CalendarDays, Loader2 } from "lucide-react";
 import { format } from "date-fns";
@@ -51,6 +52,7 @@ interface UploadClientDocumentModalProps {
   onComplete: (info?: { uploadedKey?: string }) => void;
   onError: (error: string) => void;
   documentToEdit?: ClientDocument;
+  initialDocumentKey?: ClientDocumentKey;
 }
 
 export function UploadClientDocumentModal({
@@ -60,6 +62,7 @@ export function UploadClientDocumentModal({
   onComplete,
   onError,
   documentToEdit,
+  initialDocumentKey,
 }: UploadClientDocumentModalProps) {
   const [formData, setFormData] = useState<FormData>({
     documentType: "",
@@ -73,9 +76,11 @@ export function UploadClientDocumentModal({
   const [isIssuedDateOpen, setIsIssuedDateOpen] = useState(false);
   const [isExpiryDateOpen, setIsExpiryDateOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [editedDates, setEditedDates] = useState({ issuedOnDate: false, expiryDate: false });
 
   // Preload form when editing a document
   useEffect(() => {
+    setEditedDates({ issuedOnDate: false, expiryDate: false });
     if (documentToEdit && isOpen) {
       // Check if it's a standard document type or "other"
       const standardDocType = documentTypes.find((dt) => dt.value === documentToEdit.key);
@@ -84,8 +89,8 @@ export function UploadClientDocumentModal({
       setFormData({
         documentType: isOther ? "other" : (documentToEdit.key as ClientDocumentKey | "other"),
         file: null, // Don't preload file
-        issuedOnDate: documentToEdit.issuedOnDate ? new Date(documentToEdit.issuedOnDate) : null,
-        expiryDate: documentToEdit.expiryDate ? new Date(documentToEdit.expiryDate) : null,
+        issuedOnDate: parseClientDocumentDate(documentToEdit.issuedOnDate) ?? null,
+        expiryDate: parseClientDocumentDate(documentToEdit.expiryDate) ?? null,
         autoReminder: documentToEdit.autoReminder ?? true,
         customName: isOther ? documentToEdit.key : "",
         customTitle: isOther ? (documentToEdit.title || "") : "",
@@ -93,7 +98,7 @@ export function UploadClientDocumentModal({
     } else if (!documentToEdit && isOpen) {
       // Reset form when opening for new document
       setFormData({
-        documentType: "",
+        documentType: initialDocumentKey ?? "",
         file: null,
         issuedOnDate: null,
         expiryDate: null,
@@ -102,9 +107,10 @@ export function UploadClientDocumentModal({
         customTitle: "",
       });
     }
-  }, [documentToEdit, isOpen]);
+  }, [documentToEdit, initialDocumentKey, isOpen]);
 
   const handleCancel = () => {
+    if (isUploading) return;
     setIsOpen(false);
     setFormData({
       documentType: "",
@@ -121,7 +127,7 @@ export function UploadClientDocumentModal({
 
   const handleFileUpload = async (files: FileList | null) => {
     try {
-      if (!files) return;
+      if (!files || isUploading) return;
       const file = files[0];
       setFormData({ ...formData, file });
     } catch (error) {
@@ -148,43 +154,33 @@ export function UploadClientDocumentModal({
       setIsUploading(true);
 
       const isOther = formData.documentType === "other";
-      const isEditing = !!documentToEdit;
-
-      // Upload the file
-      let documentType = isOther ? formData.customName : docKeyToType[formData.documentType];
-      const uploadResult = await uploadClientDocument(clientId, documentType as string, formData.file);
-
-      // Get existing client to fetch current documents
-      const existingClient = await getClientById(clientId);
-      const existingDocuments: ClientDocument[] = existingClient.documents || [];
-
-      // Create/update document entry
       const documentKey = (isOther ? formData.customName : formData.documentType) as ClientDocumentKey;
-      const updatedDocument: ClientDocument = {
-        key: documentKey,
-        title: isOther ? formData.customTitle : (documentTypes.find((dt) => dt.value === formData.documentType)?.label || ""),
-        fileName: uploadResult.fileName,
-        url: uploadResult.url,
-        issuedOnDate: formData.issuedOnDate ? formData.issuedOnDate.toISOString() : undefined,
-        expiryDate: formData.expiryDate ? formData.expiryDate.toISOString() : undefined,
-        autoReminder: formData.autoReminder,
-      };
-
-      // Update or append document
-      let updatedDocuments: ClientDocument[];
-      if (isEditing && documentToEdit) {
-        // Find and replace the document being edited
-        // Match by key and url (or fileName if url is not available) to uniquely identify the document
-        updatedDocuments = existingDocuments.map((doc) => {
-          const matchesKey = doc.key === documentToEdit.key;
-          const matchesUrl = documentToEdit.url ? doc.url === documentToEdit.url : doc.fileName === documentToEdit.fileName;
-          return matchesKey && matchesUrl ? updatedDocument : doc;
-        });
-      } else {
-        // Append new document
-        updatedDocuments = [...existingDocuments, updatedDocument];
+      const existingClient = await getClientById(clientId);
+      if (existingClient.documents != null && !Array.isArray(existingClient.documents)) {
+        throw new Error("Reload the client and review its document records before uploading.");
       }
+      const existingDocuments = existingClient.documents ?? [];
+      const updatedDocument: ClientDocument = {
+        ...documentToEdit,
+        key: documentKey,
+        title: isOther ? formData.customTitle : documentToEdit?.key === documentKey ? documentToEdit.title : documentTypes.find(dt => dt.value === documentKey)?.label,
 
+      };
+      if (documentKey !== "form485") delete updatedDocument.signed;
+      else if (documentToEdit?.key !== "form485") updatedDocument.signed = false;
+      for (const field of ["issuedOnDate", "expiryDate"] as const) {
+        const value = serializeClientDocumentDate({ key: documentKey, original: documentToEdit?.[field], selected: formData[field] ?? undefined, edited: editedDates[field] });
+        if (value === undefined) delete updatedDocument[field];
+        else updatedDocument[field] = value;
+      }
+      if (!documentToEdit || formData.autoReminder !== (documentToEdit.autoReminder ?? true)) updatedDocument.autoReminder = formData.autoReminder;
+      validateClientDocumentDates(updatedDocument, editedDates.issuedOnDate || editedDates.expiryDate);
+      // Validate the exact record before any blob is uploaded.
+      mergeClientDocumentEdit({ originalDocuments: existingDocuments, originalDocument: documentToEdit, replacement: updatedDocument });
+      const documentType = isOther ? formData.customName : docKeyToType[formData.documentType];
+      const uploadResult = await uploadClientDocument(clientId, documentType as string, formData.file);
+      const updatedDocuments = mergeClientDocumentEdit({ originalDocuments: existingDocuments, originalDocument: documentToEdit,
+        replacement: { ...updatedDocument, url: uploadResult.url, fileName: uploadResult.fileName } });
       // Update client with all documents
       await updateClient(clientId, {
         documents: updatedDocuments,
@@ -240,14 +236,14 @@ export function UploadClientDocumentModal({
             </button>
           </div>
 
-          <div className="mb-6 flex-1 overflow-y-auto">
+          <fieldset disabled={isUploading} className="mb-6 min-w-0 flex-1 overflow-y-auto">
             <div className="mb-6">
               <p className="text-sm mb-1">Document Type</p>
               <Select
                 value={formData.documentType}
                 onValueChange={(value) =>
-                  setFormData({ 
-                    ...formData, 
+                  value && !isUploading && setFormData({
+                    ...formData,
                     documentType: value as ClientDocumentKey | "other",
                     // Clear custom fields when switching away from "other"
                     customName: value === "other" ? formData.customName : "",
@@ -348,8 +344,9 @@ export function UploadClientDocumentModal({
                         "relative has-focus:ring-ring/50 has-focus:ring-[3px] rounded-md border-0 shadow-none",
                     }}
                     onSelect={(d) => {
-                      if (d) {
+                      if (d && !isUploading) {
                         setFormData({ ...formData, issuedOnDate: d });
+                        setEditedDates(previous => ({ ...previous, issuedOnDate: true }));
                         setIsIssuedDateOpen(false);
                       }
                     }}
@@ -395,8 +392,9 @@ export function UploadClientDocumentModal({
                         "relative has-focus:ring-ring/50 has-focus:ring-[3px] rounded-md border-0 shadow-none",
                     }}
                     onSelect={(d) => {
-                      if (d) {
+                      if (d && !isUploading) {
                         setFormData({ ...formData, expiryDate: d });
+                        setEditedDates(previous => ({ ...previous, expiryDate: true }));
                         setIsExpiryDateOpen(false);
                       }
                     }}
@@ -462,15 +460,15 @@ export function UploadClientDocumentModal({
                 onCheckedChange={(checked) => setFormData({ ...formData, autoReminder: checked })}
               />
             </div>
-          </div>
+          </fieldset>
 
           {/* Footer */}
           <div className="flex items-center p-3 w-full flex-shrink-0">
             <Button
               type="submit"
               disabled={
-                isUploading || 
-                !formData.file || 
+                isUploading ||
+                !formData.file ||
                 !formData.documentType ||
                 (formData.documentType === "other" && (!formData.customName || !formData.customTitle))
               }

@@ -1,3 +1,4 @@
+import { clientDocumentReplacement } from "./clientDocumentEdits";
 import {
   AddClientFormData,
   type HhaAuthorization,
@@ -402,16 +403,7 @@ export function formDataToApiPayload(
         : undefined,
     fallRisk: isHhaClient ? s3.fallRisk || undefined : undefined,
     specialPrecautions: isHhaClient ? s3.specialPrecautions?.trim() || undefined : undefined,
-    documents:
-      s3.docs?.map((d) => ({
-        key: d.key,
-        title: d.title,
-        fileName: d.fileName,
-        issuedOnDate: toIso(d.issuedOnDate),
-        expiryDate: toIso(d.expiryDate),
-        autoReminder: d.autoReminder,
-        ...(d.key === "form485" ? { signed: d.signed } : {}),
-      })) ?? [],
+    documents: s3.docs?.map(clientDocumentReplacement) ?? [],
     evvRequirement: s4.evvRequirement,
     primaryVisitLocationGps: s4.primaryVisitLocationGps,
     allowedSecondaryLocations: s4.allowedSecondaryLocations,

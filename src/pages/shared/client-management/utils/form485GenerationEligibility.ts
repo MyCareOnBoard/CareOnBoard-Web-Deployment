@@ -29,7 +29,7 @@ export function hasUploadedForm485(
   documents?: ClientDocument[] | null,
 ): boolean {
   return Boolean(
-    documents?.some((d) => d.key === "form485" && Boolean(d.url?.trim())),
+    Array.isArray(documents) && documents.some((d) => d?.key === "form485" && typeof d.url === "string" && Boolean(d.url.trim())),
   );
 }
 
@@ -42,8 +42,8 @@ export function hasSignedForm485(
   documents?: ClientDocument[] | null,
 ): boolean {
   return Boolean(
-    documents?.some(
-      (d) => d.key === "form485" && Boolean(d.url?.trim()) && d.signed !== false,
+    Array.isArray(documents) && documents.some(
+      (d) => d?.key === "form485" && typeof d.url === "string" && Boolean(d.url.trim()) && d.signed !== false,
     ),
   );
 }

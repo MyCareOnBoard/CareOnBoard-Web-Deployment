@@ -1,3 +1,4 @@
+import { parseClientDocumentDate } from "./clientDocumentEdits";
 import { Client } from "@/lib/api/clients";
 import {
     AddClientFormData,
@@ -519,22 +520,24 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
             },
             fallRisk: normalizeYesNo(client.fallRisk),
             specialPrecautions: client.specialPrecautions ?? "",
+            originalDocuments: client.documents == null ? [] : Array.isArray(client.documents) ? client.documents : undefined,
             docs: (() => {
                 const allDocs = createInitialDocs(clientType);
-                const existingDocs = client.documents || [];
+                const existingDocs = Array.isArray(client.documents) ? client.documents : [];
                 const knownKeys = new Set(allDocs.map((d) => d.key));
 
                 const mapped = allDocs.map((defaultDoc) => {
-                    const existingDoc = existingDocs.find((d) => d.key === defaultDoc.key);
+                    const existingDoc = existingDocs.find((d) => d?.key === defaultDoc.key);
                     if (existingDoc) {
                         return {
                             ...defaultDoc,
-                            url: existingDoc.url,
-                            fileName: existingDoc.fileName,
-                            issuedOnDate: existingDoc.issuedOnDate ? parseDate(existingDoc.issuedOnDate) : undefined,
-                            expiryDate: existingDoc.expiryDate ? parseDate(existingDoc.expiryDate) : undefined,
+                            originalDocument: existingDoc,
+                            url: typeof existingDoc.url === "string" ? existingDoc.url : undefined,
+                            fileName: typeof existingDoc.fileName === "string" ? existingDoc.fileName : undefined,
+                            issuedOnDate: existingDoc.issuedOnDate ? parseClientDocumentDate(existingDoc.issuedOnDate) : undefined,
+                            expiryDate: existingDoc.expiryDate ? parseClientDocumentDate(existingDoc.expiryDate) : undefined,
                             autoReminder: existingDoc.autoReminder ?? defaultDoc.autoReminder,
-                            signed: existingDoc.signed ?? defaultDoc.signed,
+                            signed: existingDoc.signed,
                         };
                     }
                     return defaultDoc;
@@ -544,15 +547,16 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
                 // set (e.g. a legacy HHA "assessmentForms" upload, now replaced by
                 // "clinicalAssessment") so existing files still display on edit.
                 const legacy = existingDocs
-                    .filter((d) => d.key && !knownKeys.has(d.key))
+                    .filter((d, index) => d?.key && !knownKeys.has(d.key) && existingDocs.findIndex(candidate => candidate?.key === d.key) === index)
                     .map((d) => ({
+                        originalDocument: d,
                         key: d.key,
-                        title: d.title || d.key,
+                        title: typeof d.title === "string" ? d.title : d.key,
                         uploadLabel: `Upload ${d.title || d.key}`,
-                        url: d.url,
-                        fileName: d.fileName,
-                        issuedOnDate: d.issuedOnDate ? parseDate(d.issuedOnDate) : undefined,
-                        expiryDate: d.expiryDate ? parseDate(d.expiryDate) : undefined,
+                        url: typeof d.url === "string" ? d.url : undefined,
+                        fileName: typeof d.fileName === "string" ? d.fileName : undefined,
+                        issuedOnDate: d.issuedOnDate ? parseClientDocumentDate(d.issuedOnDate) : undefined,
+                        expiryDate: d.expiryDate ? parseClientDocumentDate(d.expiryDate) : undefined,
                         autoReminder: d.autoReminder ?? true,
                         signed: d.signed,
                     }));

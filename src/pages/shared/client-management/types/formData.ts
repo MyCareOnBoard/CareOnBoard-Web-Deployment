@@ -1,4 +1,4 @@
-import type { ClientDocumentKey } from "@/lib/api/clients";
+import type { ClientDocument, ClientDocumentKey } from "@/lib/api/clients";
 import type { Coverage, SplitMode } from "@/lib/coverage";
 import type { PlanOfCareFormData } from "./planOfCare";
 import type { ClinicalAssessmentFormData } from "./clinicalAssessment";
@@ -367,6 +367,8 @@ export const DOC_KEY_MATCHES_API: _AssertExtends<DocKey, ClientDocumentKey> &
     _AssertExtends<ClientDocumentKey, DocKey> = true;
 
 export type DocState = {
+    originalDocument?: ClientDocument;
+    editedDates?: { issuedOnDate?: boolean; expiryDate?: boolean };
     key: DocKey;
     title: string;
     uploadLabel: string;
@@ -397,6 +399,7 @@ export type Stage3HealthcareAndDocumentsData = {
     communicationNeeds: string[];
     emergencyProtocols: string;
     docs: DocState[];
+    originalDocuments?: ClientDocument[];
     diagnosis?: string;
     healthHazards?: string;
     nutritionNotes?: string;
@@ -877,6 +880,7 @@ export function createInitialAddClientFormData(): AddClientFormData {
             communicationNeeds: [],
             emergencyProtocols: "",
             docs: createInitialDocs(),
+            originalDocuments: [],
             diagnosis: undefined,
             healthHazards: undefined,
             nutritionNotes: undefined,

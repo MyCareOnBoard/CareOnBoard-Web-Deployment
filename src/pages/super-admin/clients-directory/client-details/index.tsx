@@ -1,3 +1,6 @@
+import { useEffectiveAgencyMode } from '@/hooks/useEffectiveAgencyMode';
+import { useClientDocumentRefresh } from '@/pages/shared/client-details/hooks/useClientDocumentRefresh';
+import { showClientChecklist } from '@/pages/shared/client-details/components/ClientDocumentChecklist';
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Phone, Edit, ArrowLeft } from "lucide-react";
 import { useParams, useSearchParams, useNavigate } from "react-router";
@@ -21,12 +24,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { getClientById, updateClient, type Client, type ClientDocument } from "@/lib/api/clients";
+import { getClientById, updateClient, type Client, type ClientDocument, type ChecklistRow } from "@/lib/api/clients";
+
+import { useAuth } from "@/utils/auth";
 
 type ClientDetailsTab = "activity" | "profile" | "services" | "documents";
 
 export default function ClientDetailsPage() {
   const { clientId } = useParams();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -36,9 +42,17 @@ export default function ClientDetailsPage() {
     setActiveTab(tab);
     setSearchParams({ tab });
   };
-  const [client, setClient] = useState<Client | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const mode = useEffectiveAgencyMode();
+  const environment = import.meta.env.VITE_API_ENVIRONMENT || 'staging';
+  const scopeKey = JSON.stringify([user?.profile?.accessList, user?.profile?.agencyModes, user?.profile?.isActive, user?.profile?.agencyScope, user?.profile?.agencyIds, user?.profile?.status, user?.profile?.supportedClientTypes, user?.agency?.supportedClientTypes]);
+  const loadClient = useCallback((signal: AbortSignal) => getClientById(clientId!, undefined, { signal, mode }), [clientId, mode]);
+  const { client, loading: isLoading, refreshing, error, refresh } = useClientDocumentRefresh({
+    requestKey: JSON.stringify([environment, user?.uid, user?.userType, user?.agencyId, scopeKey, clientId, mode]),
+    enabled: Boolean(clientId && user?.uid), documentsActive: activeTab === 'documents', load: loadClient,
+  });
+  const fetchClient = useCallback(() => refresh(true), [refresh]);
+  const [initialDocumentKey, setInitialDocumentKey] = useState<ChecklistRow['key'] | undefined>();
+  const canUpload = false;
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [documentToEdit, setDocumentToEdit] = useState<ClientDocument | undefined>(undefined);
   const [activate485Open, setActivate485Open] = useState(false);
@@ -130,30 +144,10 @@ export default function ClientDetailsPage() {
     }
   }, []);
 
-  // Fetch client data
-  const fetchClient = useCallback(async () => {
-    if (!clientId) {
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setError(null);
-      const clientData = await getClientById(clientId);
-      setClient(clientData);
-    } catch (err: any) {
-      console.error("Failed to fetch client:", err);
-      setError(err.message || "Failed to load client details");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [clientId]);
-
   useEffect(() => {
-    fetchClient();
     window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
-  }, [fetchClient]);
+    setIsUploadModalOpen(false); setDocumentToEdit(undefined); setInitialDocumentKey(undefined); setActivate485Open(false);
+  }, [clientId, mode, user?.uid, environment, scopeKey]);
 
   // Activate the client after its Form 485 is uploaded (HHA clients are held
   // non-active until then). The backend gate now passes since the 485 exists.
@@ -182,7 +176,7 @@ export default function ClientDetailsPage() {
     [clientId, formatClientName, calculateAge, client?.profileImage]
   );
 
-  if (error || (!isLoading && !client)) {
+  if (!isLoading && !client) {
     return (
       <div className="min-h-[calc(100vh-200px)] flex items-center justify-center">
         <div className="text-center">
@@ -192,6 +186,7 @@ export default function ClientDetailsPage() {
           <p className="text-[14px] font-medium text-[#808081]">
             Please check the client ID and try again.
           </p>
+          <Button type="button" variant="outline" onClick={() => void fetchClient()}>Retry</Button>
         </div>
       </div>
     );
@@ -336,6 +331,7 @@ export default function ClientDetailsPage() {
         </div>
       </div>
 
+      {isLoading && activeTab === 'documents' && <div role="status" className="rounded-[20px] p-6">Loading document checklist…</div>}
       {/* Tab Content */}
       {!isLoading && client && activeTab === "activity" && (
         <SuperAdminClientActivityShifts
@@ -365,15 +361,13 @@ export default function ClientDetailsPage() {
         <DocumentsTab
           client={client}
           readOnly={true}
-          onOpenUploadModal={(document) => {
-            setDocumentToEdit(document);
-            setIsUploadModalOpen(true);
-          }}
+          showChecklist={showClientChecklist(client, user?.userType, mode)}
+          refreshing={refreshing} refreshError={error} onRefresh={() => void fetchClient()}
         />
       )}
 
       {/* Upload Document Modal */}
-      {clientId && (
+      {clientId && canUpload && (
         <UploadClientDocumentModal
           isOpen={isUploadModalOpen}
           setIsOpen={(open) => {
@@ -384,6 +378,7 @@ export default function ClientDetailsPage() {
           }}
           clientId={clientId}
           documentToEdit={documentToEdit}
+          initialDocumentKey={initialDocumentKey}
           onComplete={(info) => {
             setIsUploadModalOpen(false);
             setDocumentToEdit(undefined);
