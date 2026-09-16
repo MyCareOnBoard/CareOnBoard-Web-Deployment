@@ -1,3 +1,6 @@
+import { AssignmentReview } from "@/components/AssignmentReview";
+import { useAssignmentReview, useAssignmentReviewScope } from "@/hooks/useAssignmentReview";
+import { assignmentReviewMetadata, assignmentSaveMessage, type AssignmentReviewEnvelope } from "@/lib/api/assignment-review";
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { X, ChevronDown, Calendar, Upload, ChevronLeft, ChevronRight, FileText, Loader2, ExternalLink, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -1672,6 +1675,7 @@ export default function AddScheduleModal({
       return format(new Date(), "d MMMM");
     };
 
+    const submittedReviewKey = assignmentReview.viewKey;
     const operation = beginMutation();
     setIsSubmitting(true);
     try {
@@ -1701,11 +1705,12 @@ export default function AddScheduleModal({
             updatePayload.date = format(formData.date, "yyyy-MM-dd");
           }
 
-          await updateShift(formData.shiftId, updatePayload, {
+          const savedResponse = await updateShift(formData.shiftId, updatePayload, {
             agencyId,
             signal: operation.controller.signal,
           });
           if (!isCurrentMutation(operation.generation, operation.controller)) return;
+          reportSavedReviews([savedResponse], submittedReviewKey, assignmentChanged);
           if (!(await reconcileShiftActivityLog(formData.shiftId, operation))) return;
           if (!isCurrentMutation(operation.generation, operation.controller)) return;
 
@@ -1776,6 +1781,7 @@ export default function AddScheduleModal({
       );
       if (!isCurrentMutation(operation.generation, operation.controller)) return;
 
+      reportSavedReviews(results.flatMap(result => result.status === "fulfilled" && result.value.success ? [result.value] : []), submittedReviewKey, true);
       const failures = results.filter((r) => r.status === "rejected");
       const successes = results.filter((r) => r.status === "fulfilled");
 
@@ -1830,6 +1836,45 @@ export default function AddScheduleModal({
     }
   };
 
+  const reviewScope = useAssignmentReviewScope();
+  const [reviewOccurrence, setReviewOccurrence] = useState(0);
+  const reviewRequests = useMemo(() => {
+    if (!isOpen || !formData.clientId || selectedClient?.id !== formData.clientId || !formData.assignedDspId || !formData.serviceCode || !pickSelectedServiceRow(selectedClientServices, formData) || agencyMode === "sc") return [];
+    return buildShiftRequests(formData);
+  }, [isOpen, formData, selectedWeekdays, configuringWeekday, agencyId, agencyMode, selectedClientServices, selectedClient]);
+  const selectedReviewRequest = reviewRequests[Math.min(reviewOccurrence, Math.max(0, reviewRequests.length - 1))];
+  const reviewSelection = selectedReviewRequest?.date && selectedReviewRequest.startTime && agencyId ? {
+    agencyId, clientId: formData.clientId, input: {
+      program: (effectiveClientType === "hha" ? "hha" : "ddd") as "ddd" | "hha", kind: "shift" as const,
+      employeeId: formData.assignedDspId, date: selectedReviewRequest.date,
+      startTime: selectedReviewRequest.startTime, endTime: selectedReviewRequest.endTime,
+      serviceCode: selectedReviewRequest.serviceCode,
+      ...serviceAuthorizationFieldsForApi(selectedClientServices, formData),
+    },
+  } : null;
+  const assignmentReview = useAssignmentReview(reviewSelection, {enabled: isOpen && agencyMode !== "sc", scopeKey: reviewScope});
+  const reportSavedReviews = (responses: ShiftResponse[], submittedViewKey: string, changed: boolean) => {
+    if (agencyMode === "sc") return;
+    const metadata = responses.map(assignmentReviewMetadata);
+    let accepted = false;
+    for (const envelope of metadata) {
+      for (const review of Object.values(envelope?.assignmentReviews ?? {})) accepted = assignmentReview.acceptSavedReview(review, submittedViewKey) || accepted;
+    }
+    if (!accepted && changed && metadata.some(item => !item || item.unreviewedPairCount > 0)) assignmentReview.acceptSavedReview(undefined, submittedViewKey);
+    // Every existing occurrence response is counted, including missing metadata from older servers.
+    const aggregate: AssignmentReviewEnvelope = {
+      assignmentReviews: Object.fromEntries(metadata.flatMap((item, index) => Object.entries(item?.assignmentReviews ?? {}).map(([key, review]) => [`${index}:${key}`, review]))),
+      reviewedPairCount: metadata.reduce((total, item) => total + (item?.reviewedPairCount ?? 0), 0),
+      unreviewedPairCount: metadata.reduce((total, item) => total + (item?.unreviewedPairCount ?? 1), 0),
+      assignmentReviewCoverage: metadata.some(item => !item || item.assignmentReviewCoverage !== "complete") ? "partial" : "complete",
+    };
+    const message = assignmentSaveMessage(aggregate, changed);
+    if (message) toast({title: "Assignment review", description: message});
+  };
+  const assignmentChanged = mode !== "edit" || !editData || [
+    "assignedDspId", "clientId", "serviceCode", "serviceAuthorizationId", "clockInTime", "clockOutTime",
+  ].some(key => formData[key as keyof ScheduleFormData] !== editData[key as keyof ScheduleFormData])
+    || formData.date?.getTime() !== editData.date?.getTime();
   // Handle scheduling (submitting) shifts
   const handleSubmit = async () => {
     if (!agencyId) {
@@ -1856,6 +1901,7 @@ export default function AddScheduleModal({
       return;
     }
 
+    const submittedReviewKey = assignmentReview.viewKey;
     const operation = beginMutation();
     setIsSubmitting(true);
     try {
@@ -1909,12 +1955,13 @@ export default function AddScheduleModal({
           updatePayload.date = format(formData.date, "yyyy-MM-dd");
         }
 
-        await updateShift(formData.shiftId, updatePayload, {
+        const savedResponse = await updateShift(formData.shiftId, updatePayload, {
           agencyId,
           signal: operation.controller.signal,
         });
         if (!isCurrentMutation(operation.generation, operation.controller)) return;
-        if (!(await reconcileShiftActivityLog(formData.shiftId, operation))) return;
+        reportSavedReviews([savedResponse], submittedReviewKey, assignmentChanged);
+          if (!(await reconcileShiftActivityLog(formData.shiftId, operation))) return;
         if (!isCurrentMutation(operation.generation, operation.controller)) return;
 
         setUpdatedShiftInfo({
@@ -2086,6 +2133,7 @@ export default function AddScheduleModal({
         }
       }
 
+      reportSavedReviews(results.flatMap(result => result.status === "fulfilled" && result.value.success ? [result.value] : []), submittedReviewKey, true);
       const failures = results.filter((r) => r.status === "rejected");
       const successes = results.filter((r) => r.status === "fulfilled");
 
@@ -3144,6 +3192,14 @@ export default function AddScheduleModal({
               </div>
             </div>
 
+            {agencyMode !== "sc" && <div className="px-1 pb-4">
+              {reviewRequests.length > 1 && <label className="mb-2 flex flex-col gap-1 text-sm">Assignment to review
+                <select aria-label="Assignment to review" className="rounded-xl border border-[#cccccd] bg-white p-2" value={Math.min(reviewOccurrence, reviewRequests.length - 1)} onChange={event => setReviewOccurrence(Number(event.target.value))}>
+                  {reviewRequests.map((request, index) => <option key={`${request.date}:${index}`} value={index}>{request.date} · {request.startTime} – {request.endTime}</option>)}
+                </select>
+              </label>}
+              <AssignmentReview controller={assignmentReview} employeeName={formData.assignedDsp} />
+            </div>}
             {/* Action Buttons - Fixed (used for both create and edit) */}
             <div className="flex gap-3 p-5 pt-0 shrink-0">
               <Button

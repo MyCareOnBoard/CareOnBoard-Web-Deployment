@@ -3,7 +3,7 @@ import { useClientDocumentRefresh } from '@/pages/shared/client-details/hooks/us
 import { showClientChecklist } from '@/pages/shared/client-details/components/ClientDocumentChecklist';
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Phone, Edit, ArrowLeft } from "lucide-react";
-import { useParams, useNavigate } from "react-router";
+import { useParams, useNavigate, useSearchParams } from "react-router";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -34,7 +34,8 @@ export default function ClientDetailsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<ClientDetailsTab>("activity");
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<ClientDetailsTab>(searchParams.get("tab") === "documents" ? "documents" : "activity");
   const [currentPage, setCurrentPage] = useState(1);
   const mode = useEffectiveAgencyMode();
   const environment = import.meta.env.VITE_API_ENVIRONMENT || 'staging';
@@ -445,5 +446,3 @@ export default function ClientDetailsPage() {
     </div>
   );
 }
-
-

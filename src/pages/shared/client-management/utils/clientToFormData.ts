@@ -1,3 +1,4 @@
+import {assignmentServiceRowKey} from "@/lib/api/assignment-review";
 import { parseClientDocumentDate } from "./clientDocumentEdits";
 import { Client } from "@/lib/api/clients";
 import {
@@ -96,6 +97,7 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
 
     const apiServiceToWizard = (svc: import("@/lib/api/clients").ClientService) => ({
         id: svc.id,
+        reviewSourceRowKey: assignmentServiceRowKey(svc, "ddd"),
         name: svc.name || "",
         code: svc.code || "",
         hours: svc.hours || "",
@@ -453,6 +455,7 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
                 hhaAuthorizations:
                     client.hhaAuthorizations?.map((a) => ({
                         id: a.id ?? `hha-auth-${Math.random().toString(16).slice(2)}`,
+                        reviewSourceRowKey: assignmentServiceRowKey(a, "hha"),
                         authorizationNumber: a.authorizationNumber ?? "",
                         serviceId: a.serviceId,
                         serviceName: a.serviceName ?? "",

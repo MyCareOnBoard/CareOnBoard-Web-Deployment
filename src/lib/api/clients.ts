@@ -1,3 +1,4 @@
+import type { AssignmentReviewEnvelope } from "./assignment-review";
 /**
  * Clients and Services API Service
  * Handles all API calls related to clients assigned to the user
@@ -921,10 +922,14 @@ export interface SeedClientsRequest {
  * Agencies default to their own agencyId
  * Employees must supply agencyId
  */
+export type ClientMutationResponse = ApiResponse<Client> & Partial<AssignmentReviewEnvelope>;
 export async function createClient(data: CreateClientRequest): Promise<Client> {
+  return (await createClientWithReview(data)).data;
+}
+export async function createClientWithReview(data: CreateClientRequest): Promise<ClientMutationResponse> {
   try {
-    const response = await axiosClient.post<ApiResponse<Client>>('/clients', data);
-    return response.data.data;
+    const response = await axiosClient.post<ClientMutationResponse>('/clients', data);
+    return response.data;
   } catch (error) {
     console.error('Failed to create client for agency:', error);
     throw error;
@@ -1102,8 +1107,11 @@ export async function getClientById(
  * Employees must supply agencyId via query parameter
  */
 export async function updateClient(clientId: string, data: UpdateClientRequest, agencyId?: string): Promise<Client> {
+  return (await updateClientWithReview(clientId, data, agencyId)).data;
+}
+export async function updateClientWithReview(clientId: string, data: UpdateClientRequest, agencyId?: string): Promise<ClientMutationResponse> {
   try {
-    const response = await axiosClient.put<{ success: boolean; data: Client }>(`/clients/${clientId}`, data, {
+    const response = await axiosClient.put<ClientMutationResponse>(`/clients/${clientId}`, data, {
       params: agencyId ? { agencyId } : undefined
     });
 
@@ -1111,7 +1119,7 @@ export async function updateClient(clientId: string, data: UpdateClientRequest, 
       throw new Error('Failed to update client');
     }
 
-    return response.data.data;
+    return response.data;
   } catch (err: any) {
     console.error('updateClient error:', err);
     throw err;

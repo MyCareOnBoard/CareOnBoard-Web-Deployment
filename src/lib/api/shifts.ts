@@ -1,3 +1,4 @@
+import type { AssignmentReviewEnvelope } from "./assignment-review";
 /**
  * Shift Management API Service
  * Handles all API calls related to shift management
@@ -376,7 +377,7 @@ function compactCalendarShift(value: unknown, month: string): CompactCalendarShi
 /**
  * Shift API Response
  */
-export interface ShiftResponse {
+export interface ShiftResponse extends Partial<AssignmentReviewEnvelope> {
     success: boolean;
     message?: string;
     shift: Shift;
@@ -1119,4 +1120,3 @@ export const resetShifts = async (data: SeedShiftsRequest = {}): Promise<ResetSh
         throw error;
     }
 };
-

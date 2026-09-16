@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from "react";
 import { AddClientFormData } from "../types/formData";
-import { createClient, updateClient, type ClientDocument } from "@/lib/api/clients";
+import { createClientWithReview, updateClientWithReview, updateClient, type ClientDocument } from "@/lib/api/clients";
+import {assignmentReviewMetadata, type AssignmentReviewEnvelope} from '@/lib/api/assignment-review';
 import { formDataToApiPayload } from "../utils/formDataToApiPayload";
 import { handleDocumentUploads } from "../utils/documentUploadHandler";
 import { hasClientDocumentEdits, preflightClientDocumentEdits } from "../utils/clientDocumentEdits";
@@ -20,7 +21,7 @@ export function useClientSave() {
     includeAgencyId: boolean = false,
     progressive: boolean = false,
     markComplete: boolean = false
-  ): Promise<{ success: boolean; clientId?: string; clientName?: string; documents?: ClientDocument[]; error?: string }> => {
+  ): Promise<{ success: boolean; clientId?: string; clientName?: string; documents?: ClientDocument[]; error?: string; assignmentReview?: AssignmentReviewEnvelope; documentsChangedAfterReview?: boolean }> => {
     if (savingRef.current) return { success: false, error: "Save already in progress" };
     savingRef.current = true;
     setIsSaving(true);
@@ -34,8 +35,12 @@ export function useClientSave() {
       const documentsChanged = hasClientDocumentEdits(formData.stage3);
       const { documents: _documents, ...payload } = formDataToApiPayload(formData, includeAgencyId, progressive, markComplete);
       if (isEditMode && !savedClientId) throw new Error("Reload the client before saving.");
-      if (savedClientId) await updateClient(savedClientId, payload);
-      else savedClientId = (await createClient(payload)).id;
+      const profileResponse = savedClientId
+        ? await updateClientWithReview(savedClientId, payload, formData.agencyId)
+        : await createClientWithReview(payload);
+      savedClientId = profileResponse.data.id || savedClientId;
+      if (!savedClientId) throw new Error('Client save did not return an ID. Reload before trying again.');
+      const assignmentReview = assignmentReviewMetadata(profileResponse);
 
       setSaveStage(2);
       const finalDocuments = documentsChanged
@@ -49,10 +54,10 @@ export function useClientSave() {
         await updateClient(savedClientId, {
           ...(documentsChanged ? { documents: finalDocuments } : {}),
           ...(finalStatus ? { status: finalStatus } : {}),
-        });
+        }, ...(formData.agencyId ? [formData.agencyId] : []));
       }
       const clientName = `${formData.stage1.firstName || ""} ${formData.stage1.lastName || ""}`.trim() || "Client";
-      return { success: true, clientId: savedClientId, clientName, documents: finalDocuments };
+      return { success: true, clientId: savedClientId, clientName, documents: finalDocuments, assignmentReview, documentsChangedAfterReview: documentsChanged };
     } catch (e: any) {
       console.error("Save client failed:", e);
       const error = e?.response?.data?.error || e?.response?.data?.message || e?.message || "Failed to save client. Please try again.";

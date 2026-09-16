@@ -1,3 +1,4 @@
+import {updateClientWithReview} from "@/lib/api/clients";
 import { clientToFormData } from "../utils/clientToFormData";
 import { refreshClientDocumentBaseline } from "../utils/clientDocumentEdits";
 import { describe, expect, it, vi, beforeEach } from "vitest";
@@ -6,11 +7,15 @@ import { useClientSave } from "./useClientSave";
 import { createClient, updateClient, uploadClientDocument, type Client } from "@/lib/api/clients";
 import { createInitialAddClientFormData } from "../types/formData";
 
-vi.mock("@/lib/api/clients", () => ({
-  createClient: vi.fn().mockResolvedValue({ id: "client-1", firstName: "Jane", lastName: "Doe" }),
-  updateClient: vi.fn().mockResolvedValue(undefined),
-  uploadClientDocument: vi.fn().mockResolvedValue({ fileName: "new.pdf", url: "https://example.test/new" }),
-}));
+vi.mock("@/lib/api/clients", () => {
+  const createClient = vi.fn().mockResolvedValue({id: "client-1", firstName: "Jane", lastName: "Doe"});
+  const updateClient = vi.fn().mockResolvedValue(undefined);
+  return {createClient, updateClient,
+    createClientWithReview: vi.fn(async (data) => ({success: true, data: await createClient(data)})),
+    updateClientWithReview: vi.fn(async (id, data) => {await updateClient(id, data); return {success: true, data: {id}};}),
+    uploadClientDocument: vi.fn().mockResolvedValue({fileName: "new.pdf", url: "https://example.test/new"}),
+  };
+});
 
 
 
@@ -218,4 +223,19 @@ describe("document save flow", () => {
     expect(vi.mocked(updateClient).mock.calls.every(([, body]) => !("documents" in body))).toBe(true);
     expect(uploadClientDocument).not.toHaveBeenCalled();
   });
+});
+
+
+it('retains the profile review across the later document mutation', async () => {
+  const metadata = {assignmentReviews: {}, reviewedPairCount: 0, unreviewedPairCount: 1, assignmentReviewCoverage: 'unavailable' as const};
+  vi.mocked(updateClientWithReview).mockResolvedValueOnce({success: true, data: {id: 'client-1'}, ...metadata});
+  const data = formData();
+  data.stage3.docs[0].file = new File(['document'], 'isp.pdf');
+  const {result} = renderHook(() => useClientSave());
+  await act(async () => {
+    const saved = await result.current.saveClient(data, true, 'client-1', false, true);
+    expect(saved).toMatchObject({success: true, assignmentReview: metadata, documentsChangedAfterReview: true});
+  });
+  expect(updateClient).toHaveBeenLastCalledWith('client-1', expect.objectContaining({documents: expect.any(Array)}));
+  expect(vi.mocked(updateClient).mock.lastCall?.[1]).not.toHaveProperty('assignmentReviews');
 });

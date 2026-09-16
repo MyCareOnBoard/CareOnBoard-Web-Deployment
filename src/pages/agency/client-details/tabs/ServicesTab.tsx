@@ -1,3 +1,7 @@
+import {useEffectiveAgencyMode} from "@/hooks/useEffectiveAgencyMode";
+import {AssignmentReviewRosterProvider, rosterAssignmentsChanged} from "@/components/AssignmentReviewRoster";
+import {assignmentReviewMetadata, assignmentSaveMessage} from "@/lib/api/assignment-review";
+import {useToast} from "@/hooks/use-toast";
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router";
 import { Routes } from "@/routes/constants";
@@ -9,7 +13,7 @@ import {
   ClientOutcome,
   ClientService,
   ClientServiceSdrDetails,
-  updateClient,
+  updateClientWithReview,
 } from "@/lib/api/clients";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -658,6 +662,7 @@ function ServiceRow({
 
       {(isEditing || (service.assignedDsps?.length ?? 0) > 0) && (
         <ServiceAssignedDspsSection
+        reviewRow={service}
           isEditing={isEditing}
           assignedDsps={service.assignedDsps ?? []}
           onChange={(assignedDsps) => handleFieldChange("assignedDsps", assignedDsps)}
@@ -1363,6 +1368,7 @@ function ServiceRow({
 
 export function ServicesTab({ client, clientId, onServicesUpdated, readOnly = false }: ServicesTabProps) {
   const navigate = useNavigate();
+  const reviewMode = useEffectiveAgencyMode();
   const location = useLocation();
   const isSuperAdminContext = location.pathname.includes("/super-admin/");
   const editClientPath = isSuperAdminContext
@@ -1372,6 +1378,7 @@ export function ServicesTab({ client, clientId, onServicesUpdated, readOnly = fa
   const [outcomeGroups, setOutcomeGroups] = useState<EditableOutcomeGroup[]>(() =>
     mapClientOutcomesToEditable(client.outcomes),
   );
+  const {toast} = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -1482,9 +1489,11 @@ export function ServicesTab({ client, clientId, onServicesUpdated, readOnly = fa
       setIsSaving(true);
       setError(null);
 
-      await updateClient(clientId, {
+      const response = await updateClientWithReview(clientId, {
         outcomes: mapEditableOutcomesToApi(pruned),
-      });
+      }, client.agencyId);
+      const reviewMessage = assignmentSaveMessage(assignmentReviewMetadata(response), rosterAssignmentsChanged(mapClientOutcomesToEditable(client.outcomes).flatMap(group => group.services), pruned.flatMap(group => group.services)), true);
+      if (reviewMessage && reviewMode !== "sc") toast({title: "Assignment review", description: reviewMessage});
 
       onServicesUpdated?.();
       setIsEditing(false);
@@ -1611,6 +1620,7 @@ export function ServicesTab({ client, clientId, onServicesUpdated, readOnly = fa
   }
 
   return (
+    <AssignmentReviewRosterProvider enabled={reviewMode !== "sc"} clientId={clientId} agencyId={client.agencyId} program="ddd" savedRows={mapClientOutcomesToEditable(client.outcomes).flatMap(group => group.services)}>
     <div className="mt-4 backdrop-blur bg-[rgba(255,255,255,0.3)] border border-[rgba(255,255,255,0.3)] rounded-[30px] p-5 flex flex-col gap-4">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
@@ -1807,7 +1817,6 @@ export function ServicesTab({ client, clientId, onServicesUpdated, readOnly = fa
         </div>
       )}
     </div>
+    </AssignmentReviewRosterProvider>
   );
 }
-
-

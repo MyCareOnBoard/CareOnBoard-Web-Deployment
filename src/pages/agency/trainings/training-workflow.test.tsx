@@ -74,4 +74,12 @@ describe('agency training pagination', () => {
     await screen.findByText('Waiting for a completion certificate.');
     expect(screen.queryByRole('button', {name: 'Approve CPR'})).not.toBeInTheDocument();
   });
-});
+  it('opens assignment evidence in the selected agency without approval actions', async () => {
+    state.courses.items = [{id: 'training-1', name: 'CPR', requiresCertificate: true, certificateId: 'cert-1', status: 'Awaiting Review'}];
+    render(<ReviewTrainingsModal open onOpenChange={vi.fn()} employee={{id: 'employee-1', fullName: 'Ada', role: 'Staff'}} agencyId="selected-agency" mode="hha" readOnly />);
+    await screen.findByText('CPR');
+    expect(state.courseArgs[0]).toEqual({employeeId: 'employee-1', agencyId: 'selected-agency', mode: 'hha', limit: 25});
+    expect(screen.queryByRole('button', {name: 'Approve CPR'})).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {name: 'Request changes for CPR'})).not.toBeInTheDocument();
+    expect(state.approval).not.toHaveBeenCalled();
+  });});

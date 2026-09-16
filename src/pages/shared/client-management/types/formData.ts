@@ -49,6 +49,8 @@ export type HhaServiceRequest = {
 };
 
 export type HhaAuthorization = {
+    /** Saved server row identity used only by assignment review; never sent in client payloads. */
+    reviewSourceRowKey?: string | null;
     id: string;
     authorizationNumber?: string;
     serviceId?: string;
@@ -222,6 +224,8 @@ export type ServiceSdrDetails = {
 export const SDR_DETAILS_LIST_MAX = 50;
 
 export type Service = {
+    /** Saved server row identity used only by assignment review; never sent in client payloads. */
+    reviewSourceRowKey?: string | null;
     id: string;
     name?: string;
     code?: string;

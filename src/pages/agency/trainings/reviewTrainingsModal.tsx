@@ -22,6 +22,8 @@ interface ReviewTrainingsModalProps {
         profilePictureUrl?: string;
     } | null;
     mode?: string;
+    agencyId?: string;
+    readOnly?: boolean;
     onApprovalChange?: (trainingId: string, approved: boolean) => void;
 }
 
@@ -31,10 +33,13 @@ export default function ReviewTrainingsModal(
         onOpenChange,
         employee,
         onApprovalChange,
-        mode
+        mode,
+        agencyId: explicitAgencyId,
+        readOnly = false
     }: ReviewTrainingsModalProps
 ) {
     const {user} = useAuth();
+    const agencyId = explicitAgencyId ?? user?.agencyId;
     const [courses, setCourses] = useState<TrainingData[]>([]);
     const [nextCursor, setNextCursor] = useState<string | null>(null);
     const [loadError, setLoadError] = useState(false);
@@ -50,15 +55,15 @@ export default function ReviewTrainingsModal(
         setLoadError(false);
         let active = true;
         const generation = ++requestGeneration.current;
-        const request = loadTrainings({employeeId: employee.id, agencyId: user?.agencyId, limit: 25, mode});
+        const request = loadTrainings({employeeId: employee.id, agencyId: agencyId, limit: 25, mode});
         request.unwrap()
             .then(page => { if (active && generation === requestGeneration.current) { setCourses(page.items); setNextCursor(page.nextCursor); } })
             .catch(() => { if (active && generation === requestGeneration.current) { setLoadError(true); toast.error('Failed to load trainings'); } });
         return () => { active = false; requestGeneration.current++; request.abort?.(); };
-    }, [open, employee?.id, user?.agencyId, mode, loadTrainings]);
+    }, [open, employee?.id, agencyId, mode, loadTrainings]);
 
     const handleToggle = async (trainingId: string, approved?: boolean) => {
-        if (!employee || pendingApproval) return;
+        if (readOnly || !employee || pendingApproval) return;
         const training = courses.find(t => t.id === trainingId);
         if (!training || (training.requiresCertificate && !training.certificateId)) return;
         const newState = approved ?? !training.approved;
@@ -66,7 +71,7 @@ export default function ReviewTrainingsModal(
         setPendingApproval(trainingId);
         try {
             await approveTraining({
-                agencyId: user?.agencyId || "",
+                agencyId: agencyId || "",
                 employeeId: employee.id,
                 trainingId,
                 approved: newState,
@@ -176,20 +181,20 @@ export default function ReviewTrainingsModal(
                                     </p>}
                                     {training.requiresCertificate && <>
                                         <TrainingCertificate key={`${employee.id}-${training.id}-${open}`} training={training}/>
-                                        {training.certificateId ? <div className="flex flex-wrap gap-2">
+                                        {!readOnly && training.certificateId ? <div className="flex flex-wrap gap-2">
                                             <Button type="button" size="sm" disabled={pendingApproval !== null || training.approved}
                                                 className="rounded-full bg-[#00b4b8] text-white hover:bg-[#009da1]"
                                                 onClick={() => handleToggle(training.id!, true)} aria-label={`Approve ${training.name}`}>Approve</Button>
                                             <Button type="button" size="sm" variant="outline" className="rounded-full"
                                                 disabled={pendingApproval !== null || training.status === 'Changes Requested'}
                                                 onClick={() => handleToggle(training.id!, false)} aria-label={`Request changes for ${training.name}`}>Request changes</Button>
-                                        </div> : <p className="text-xs text-[#808081]">Waiting for a completion certificate.</p>}
+                                        </div> : !training.certificateId ? <p className="text-xs text-[#808081]">Waiting for a completion certificate.</p> : null}
                                     </>}
                                 </div>
                             </div>
 
                             {/* Approve Toggle */}
-                            {!training.requiresCertificate && training.source !== 'policy' && <div className="flex items-center gap-[12px] shrink-0">
+                            {!readOnly && !training.requiresCertificate && training.source !== 'policy' && <div className="flex items-center gap-[12px] shrink-0">
                                 <p className="text-[14px] font-normal leading-[normal] text-[#10141a]">
                                     Approve
                                 </p>
@@ -217,7 +222,7 @@ export default function ReviewTrainingsModal(
                     {nextCursor && <button disabled={isFetching} className="self-center text-[14px] font-semibold text-[#00b4b8] disabled:opacity-50" onClick={() => {
                         const generation = requestGeneration.current;
                         const employeeId = employee.id;
-                        loadTrainings({employeeId, agencyId: user?.agencyId, limit: 25, cursor: nextCursor, mode}).unwrap()
+                        loadTrainings({employeeId, agencyId: agencyId, limit: 25, cursor: nextCursor, mode}).unwrap()
                             .then(page => { if (generation === requestGeneration.current) { setCourses(current => [...current, ...page.items]); setNextCursor(page.nextCursor); } })
                             .catch(() => { if (generation === requestGeneration.current) toast.error('Failed to load trainings'); });
                     }}>Load more trainings</button>}

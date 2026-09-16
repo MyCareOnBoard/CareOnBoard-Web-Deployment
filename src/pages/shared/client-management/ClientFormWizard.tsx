@@ -1,3 +1,5 @@
+import {AssignmentReviewRosterProvider, rosterAssignmentsChanged, type SavedRosterReview} from "@/components/AssignmentReviewRoster";
+import {assignmentSaveMessage, assignmentServiceRowKey} from "@/lib/api/assignment-review";
 import { refreshClientDocumentBaseline } from "./utils/clientDocumentEdits";
 import React, { useMemo, useCallback, useEffect, Suspense, lazy, useRef, useState } from "react";
 import { useNavigate } from "react-router";
@@ -92,6 +94,10 @@ export function ClientFormWizard({
   const [generatePocOpen, setGeneratePocOpen] = useState(false);
   const [typeSelected, setTypeSelected] = useState(isEditMode);
   const savedClientIdRef = useRef<string | undefined>(clientId);
+  const reviewCaptureRef = useRef("");
+  const savedAssignmentFormRef = useRef(initialFormData);
+  const [savedReview, setSavedReview] = useState<SavedRosterReview>();
+  const rosterRows = (data?: AddClientFormData) => data?.type === "hha" ? data.stage2.hhaAuthorizations ?? [] : data?.stage2.outcomes.flatMap(outcome => outcome.services) ?? [];
   const pendingSuccessClientIdRef = useRef<string | undefined>(undefined);
   const handleTypeSelect = useCallback(
     (type: ClientType) => {
@@ -140,6 +146,8 @@ export function ClientFormWizard({
   const generatePocRef = useRef<GeneratePocPanelHandle>(null);
 
   const runSave = useCallback(async (dataToSave: AddClientFormData = formData) => {
+    const submittedViewKey = reviewCaptureRef.current;
+    const assignmentsChanged = rosterAssignmentsChanged(rosterRows(savedAssignmentFormRef.current), rosterRows(dataToSave));
     const result = await saveClient(
       !isEditMode && agencyMode === "sc" && !dataToSave.servicePrograms ? { ...dataToSave, servicePrograms: ["sc"] } : dataToSave,
       isEditMode,
@@ -151,6 +159,13 @@ export function ClientFormWizard({
 
     if (result.clientId) savedClientIdRef.current = result.clientId;
     if (!result.success) return;
+    const reviewMessage = agencyMode === "sc" ? undefined : assignmentSaveMessage(result.assignmentReview, assignmentsChanged, true);
+    setSavedReview({metadata: result.assignmentReview, submittedViewKey, documentsChanged: !!result.documentsChangedAfterReview, assignmentChanged: assignmentsChanged});
+    savedAssignmentFormRef.current = {...dataToSave, stage2: {...dataToSave.stage2,
+      outcomes: dataToSave.stage2.outcomes.map(outcome => ({...outcome, services: outcome.services.map(row => ({...row, reviewSourceRowKey: assignmentServiceRowKey(row, "ddd")}))})),
+      hhaAuthorizations: dataToSave.stage2.hhaAuthorizations?.map(row => ({...row, reviewSourceRowKey: assignmentServiceRowKey(row, "hha")})),
+    }};
+    if (reviewMessage) toast({title: "Assignment review", description: reviewMessage});
     if (result.documents) {
       const baseline = refreshClientDocumentBaseline(dataToSave.stage3, result.documents);
       setFormData(prev => ({ ...prev, stage3: { ...prev.stage3, docs: baseline.docs, originalDocuments: baseline.originalDocuments } }));
@@ -303,12 +318,14 @@ export function ClientFormWizard({
       );
     if (stage === 2)
       return (
+        <AssignmentReviewRosterProvider enabled={agencyMode !== 'sc'} clientId={savedClientIdRef.current} agencyId={formData.agencyId} program={formData.type} savedRows={rosterRows(savedAssignmentFormRef.current)} captureRef={reviewCaptureRef} savedReview={savedReview}>
         <Stage2GuardianAndFunding
           footer={footer}
           formData={formData}
           setFormData={setFormData}
           pageTitle={pageTitle}
         />
+        </AssignmentReviewRosterProvider>
       );
     if (stage === 3)
       return (
