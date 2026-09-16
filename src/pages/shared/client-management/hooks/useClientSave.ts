@@ -2,10 +2,18 @@ import { useState, useCallback, useRef } from "react";
 import { AddClientFormData } from "../types/formData";
 import { createClientWithReview, updateClientWithReview, updateClient, type ClientDocument } from "@/lib/api/clients";
 import {assignmentReviewMetadata, type AssignmentReviewEnvelope} from '@/lib/api/assignment-review';
+import {parseAssignmentDecisions, assignmentDecisionError, type AssignmentDecisionEnvelope, type AssignmentAcknowledgment} from '@/lib/api/assignment-decision';
 import { formDataToApiPayload } from "../utils/formDataToApiPayload";
 import { handleDocumentUploads } from "../utils/documentUploadHandler";
 import { hasClientDocumentEdits, preflightClientDocumentEdits } from "../utils/clientDocumentEdits";
 import { hasUploadedForm485 } from "../utils/form485GenerationEligibility";
+
+export function withoutClientAssignments(form: AddClientFormData): AddClientFormData {
+  return {...form, stage2: {...form.stage2,
+    outcomes: form.stage2.outcomes.map(outcome => ({...outcome, services: outcome.services.map(row => ({...row, assignedDsps: []}))})),
+    hhaAuthorizations: form.stage2.hhaAuthorizations?.map(row => ({...row, assignedDsps: []})),
+  }};
+}
 
 export function useClientSave() {
   const [isSaving, setIsSaving] = useState(false);
@@ -20,8 +28,9 @@ export function useClientSave() {
     clientId?: string,
     includeAgencyId: boolean = false,
     progressive: boolean = false,
-    markComplete: boolean = false
-  ): Promise<{ success: boolean; clientId?: string; clientName?: string; documents?: ClientDocument[]; error?: string; assignmentReview?: AssignmentReviewEnvelope; documentsChangedAfterReview?: boolean }> => {
+    markComplete: boolean = false,
+    assignmentAcknowledgments: AssignmentAcknowledgment[] = []
+  ): Promise<{ success: boolean; clientId?: string; clientName?: string; documents?: ClientDocument[]; error?: string; assignmentReview?: AssignmentReviewEnvelope; assignmentDecisions?: AssignmentDecisionEnvelope['assignmentDecisions']; assignmentError?: ReturnType<typeof assignmentDecisionError>; documentsChangedAfterReview?: boolean }> => {
     if (savingRef.current) return { success: false, error: "Save already in progress" };
     savingRef.current = true;
     setIsSaving(true);
@@ -36,8 +45,8 @@ export function useClientSave() {
       const { documents: _documents, ...payload } = formDataToApiPayload(formData, includeAgencyId, progressive, markComplete);
       if (isEditMode && !savedClientId) throw new Error("Reload the client before saving.");
       const profileResponse = savedClientId
-        ? await updateClientWithReview(savedClientId, payload, formData.agencyId)
-        : await createClientWithReview(payload);
+        ? await updateClientWithReview(savedClientId, payload, formData.agencyId, assignmentAcknowledgments)
+        : await createClientWithReview(payload, assignmentAcknowledgments);
       savedClientId = profileResponse.data.id || savedClientId;
       if (!savedClientId) throw new Error('Client save did not return an ID. Reload before trying again.');
       const assignmentReview = assignmentReviewMetadata(profileResponse);
@@ -57,12 +66,12 @@ export function useClientSave() {
         }, ...(formData.agencyId ? [formData.agencyId] : []));
       }
       const clientName = `${formData.stage1.firstName || ""} ${formData.stage1.lastName || ""}`.trim() || "Client";
-      return { success: true, clientId: savedClientId, clientName, documents: finalDocuments, assignmentReview, documentsChangedAfterReview: documentsChanged };
+      return { success: true, clientId: savedClientId, clientName, documents: finalDocuments, assignmentReview, ...parseAssignmentDecisions(profileResponse), documentsChangedAfterReview: documentsChanged };
     } catch (e: any) {
-      console.error("Save client failed:", e);
+      console.error("Save client failed.", {status: e?.response?.status, code: e?.response?.data?.code});
       const error = e?.response?.data?.error || e?.response?.data?.message || e?.message || "Failed to save client. Please try again.";
       setErrorMessage(error);
-      return { success: false, clientId: savedClientId, error };
+      return { success: false, clientId: savedClientId, error, assignmentError: assignmentDecisionError(e), ...parseAssignmentDecisions(e?.response?.data) };
     } finally {
       savingRef.current = false;
       setIsSaving(false);

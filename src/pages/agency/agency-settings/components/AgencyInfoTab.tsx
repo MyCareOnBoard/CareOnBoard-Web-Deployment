@@ -46,6 +46,7 @@ import {
   revokeBrandingPreview,
 } from "./branding-utils";
 import OperationalSettingsFields from "@/pages/shared/agency/OperationalSettingsFields";
+import AssignmentPolicySection from './AssignmentPolicySection';
 import {
   agencyOperationalToForm,
   OPERATIONAL_FIELD_KEYS,
@@ -1106,6 +1107,7 @@ export default function AgencyInfoTab() {
           )}
         </form>
       </Form>
+      {agencyId && <AssignmentPolicySection agencyId={agencyId} />}
     </div>
   );
 }

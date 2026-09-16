@@ -10,7 +10,7 @@ vi.mock('./hooks/useClientSave', () => ({useClientSave: () => ({saveClient: ordi
 vi.mock('@/utils/auth', () => ({useAuth: () => ({user: {uid: 'owner', userType: 'agency', agencyId: 'agency-a'}})}));
 vi.mock('@/hooks/useEffectiveAgencyMode', () => ({useEffectiveAgencyMode: () => 'ddd'}));
 vi.mock('@/lib/api/client-needs', () => ({getClientNeeds: vi.fn(), saveClientNeeds: vi.fn(), reviewClientAenf: vi.fn()}));
-vi.mock('@/components/AssignmentReviewRoster', () => ({AssignmentReviewRosterProvider: ({children}: {children: ReactNode}) => children, rosterAssignmentsChanged: () => false}));
+vi.mock('@/components/AssignmentReviewRoster', () => ({AssignmentReviewRosterProvider: ({children}: {children: ReactNode}) => children, rosterAssignmentsChanged: () => false, rosterAcknowledgments: () => []}));
 // Keep the real wizard, form-state hook, footer and needs panel; omit unrelated stage fields.
 vi.mock('./stages/Stage1ClientIdentityAndContact', () => ({Stage1ClientIdentityAndContact: ({footer}: {footer: ReactNode}) => footer}));
 vi.mock('./stages/Stage2GuardianAndFunding', () => ({Stage2GuardianAndFunding: ({footer}: {footer: ReactNode}) => footer}));

@@ -1,5 +1,7 @@
 import {useEffectiveAgencyMode} from "@/hooks/useEffectiveAgencyMode";
-import {AssignmentReviewRosterProvider, rosterAssignmentsChanged} from "@/components/AssignmentReviewRoster";
+import {AssignmentReviewRosterProvider, rosterAssignmentsChanged, rosterAcknowledgments, type RosterDecisionState} from "@/components/AssignmentReviewRoster";
+import {useAssignmentReviewScope} from '@/hooks/useAssignmentReview';
+import {assignmentDecisionError, parseAssignmentDecisions} from '@/lib/api/assignment-decision';
 import {assignmentReviewMetadata, assignmentSaveMessage} from "@/lib/api/assignment-review";
 import {useToast} from "@/hooks/use-toast";
 import React, { useEffect, useMemo, useState } from "react";
@@ -1383,6 +1385,11 @@ export function ServicesTab({ client, clientId, onServicesUpdated, readOnly = fa
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const decisionScope = JSON.stringify([useAssignmentReviewScope(), clientId, client.agencyId, reviewMode]);
+  const currentDecisionScope = React.useRef(decisionScope); currentDecisionScope.current = decisionScope;
+  const decisionCaptureRef = React.useRef('');
+  const [decisionState, setDecisionState] = useState<RosterDecisionState>({decisions: {}, drafts: {}});
+  useEffect(() => setDecisionState({decisions: {}, drafts: {}}), [decisionScope]);
 
   useEffect(() => {
     if (isEditing) return;
@@ -1459,6 +1466,9 @@ export function ServicesTab({ client, clientId, onServicesUpdated, readOnly = fa
   };
 
   const handleSave = async () => {
+    if (decisionState.loading && rosterAssignmentsChanged(mapClientOutcomesToEditable(client.outcomes).flatMap(group => group.services), outcomeGroups.flatMap(group => group.services))) return;
+    const submittedScope = currentDecisionScope.current;
+    const submittedKey = decisionCaptureRef.current;
     if (!clientId) return;
 
     const pruned = outcomeGroups
@@ -1491,14 +1501,26 @@ export function ServicesTab({ client, clientId, onServicesUpdated, readOnly = fa
 
       const response = await updateClientWithReview(clientId, {
         outcomes: mapEditableOutcomesToApi(pruned),
-      }, client.agencyId);
+      }, client.agencyId, rosterAcknowledgments(decisionState, mapClientOutcomesToEditable(client.outcomes).flatMap(group => group.services), pruned.flatMap(group => group.services), 'ddd'));
+      if (currentDecisionScope.current !== submittedScope) return;
+      const decisions = parseAssignmentDecisions(response)?.assignmentDecisions || null;
+      setDecisionState(previous => ({...previous, decisions: {...previous.decisions, ...decisions}, drafts: {}, submitted: {viewKey: submittedKey, decisions, saved: true}}));
+      if (!decisions && rosterAssignmentsChanged(mapClientOutcomesToEditable(client.outcomes).flatMap(group => group.services), pruned.flatMap(group => group.services))) toast({title: 'Client saved.', description: 'Assignment checks are unavailable.'});
       const reviewMessage = assignmentSaveMessage(assignmentReviewMetadata(response), rosterAssignmentsChanged(mapClientOutcomesToEditable(client.outcomes).flatMap(group => group.services), pruned.flatMap(group => group.services)), true);
       if (reviewMessage && reviewMode !== "sc") toast({title: "Assignment review", description: reviewMessage});
 
       onServicesUpdated?.();
       setIsEditing(false);
     } catch (err: unknown) {
-      console.error("Failed to update services:", err);
+      if (currentDecisionScope.current !== submittedScope) return;
+      const failure = assignmentDecisionError(err);
+      if (failure) {
+        setDecisionState(previous => failure.status === 403 ? {decisions: {}, drafts: {}} : ({...previous, decisions: {...previous.decisions, ...failure.assignmentDecisions},
+          drafts: Object.fromEntries(Object.entries(previous.drafts).map(([key, draft]) => [key, {...draft, consent: false}])),
+          submitted: {viewKey: submittedKey, decisions: failure.assignmentDecisions || null, saved: false,
+            error: failure.code === 'ASSIGNMENT_DECISION_CHANGED' ? 'Requirements changed. Review the updated checks before assigning.' : undefined}}));
+      }
+      console.error("Failed to update services.");
       setError(
         err instanceof Error ? err.message : "Failed to update services. Please try again.",
       );
@@ -1620,7 +1642,7 @@ export function ServicesTab({ client, clientId, onServicesUpdated, readOnly = fa
   }
 
   return (
-    <AssignmentReviewRosterProvider enabled={reviewMode !== "sc"} clientId={clientId} agencyId={client.agencyId} program="ddd" savedRows={mapClientOutcomesToEditable(client.outcomes).flatMap(group => group.services)}>
+    <AssignmentReviewRosterProvider enabled={reviewMode !== "sc"} clientId={clientId} agencyId={client.agencyId} program="ddd" savedRows={mapClientOutcomesToEditable(client.outcomes).flatMap(group => group.services)} decisionState={decisionState} onDecisionState={setDecisionState} decisionCaptureRef={decisionCaptureRef}>
     <div className="mt-4 backdrop-blur bg-[rgba(255,255,255,0.3)] border border-[rgba(255,255,255,0.3)] rounded-[30px] p-5 flex flex-col gap-4">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
@@ -1795,10 +1817,10 @@ export function ServicesTab({ client, clientId, onServicesUpdated, readOnly = fa
             type="button"
             className="h-10 rounded-[60px] px-6 bg-[#00b4b8] text-white hover:bg-[#00a0a4] flex items-center gap-2"
             onClick={handleSave}
-            disabled={isSaving}
+            disabled={isSaving || (!!decisionState.loading && rosterAssignmentsChanged(mapClientOutcomesToEditable(client.outcomes).flatMap(group => group.services), outcomeGroups.flatMap(group => group.services)))}
           >
             {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-            Save changes
+            {Object.values(decisionState.decisions).some(d => d.decision === 'WARNING') ? 'Assign with warnings' : 'Save changes'}
           </Button>
         </div>
       )}

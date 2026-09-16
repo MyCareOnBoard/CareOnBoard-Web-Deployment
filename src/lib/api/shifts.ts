@@ -1,4 +1,5 @@
 import type { AssignmentReviewEnvelope } from "./assignment-review";
+import type { AssignmentAcknowledgment, AssignmentDecisionEnvelope } from "./assignment-decision";
 /**
  * Shift Management API Service
  * Handles all API calls related to shift management
@@ -142,6 +143,8 @@ export interface Shift {
  * Create Shift Request Data
  */
 export interface CreateShiftRequest {
+    id?: string;
+    assignmentAcknowledgments?: AssignmentAcknowledgment[];
     employeeId: string;
     agencyId: string;
     clientId?: string;
@@ -183,6 +186,7 @@ export interface CreateShiftRequest {
  * Update Shift Request Data
  */
 export interface UpdateShiftRequest {
+    assignmentAcknowledgments?: AssignmentAcknowledgment[];
     date?: string;
     location?: ShiftLocation | string;
     startTime?: string;
@@ -377,7 +381,7 @@ function compactCalendarShift(value: unknown, month: string): CompactCalendarShi
 /**
  * Shift API Response
  */
-export interface ShiftResponse extends Partial<AssignmentReviewEnvelope> {
+export interface ShiftResponse extends Partial<AssignmentReviewEnvelope>, Partial<AssignmentDecisionEnvelope> {
     success: boolean;
     message?: string;
     shift: Shift;
@@ -597,7 +601,7 @@ export const createShift = async (
 
         return response.data;
     } catch (error) {
-        console.error('Failed to create shift:', error);
+        console.error('Failed to create shift.');
         throw error;
     }
 };
@@ -748,7 +752,7 @@ export const updateShift = async (
 
         return response.data;
     } catch (error) {
-        console.error('Failed to update shift:', error);
+        console.error('Failed to update shift.');
         throw error;
     }
 };

@@ -1,4 +1,7 @@
 import { AssignmentReview } from "@/components/AssignmentReview";
+import { AssignmentDecision, assignmentAcknowledgments, type AssignmentConsentDrafts } from "@/components/AssignmentDecision";
+import { useAssignmentDecision } from "@/hooks/useAssignmentDecision";
+import { assignmentDecisionError, parseAssignmentDecisions, type AssignmentDecision as Decision } from "@/lib/api/assignment-decision";
 import { useAssignmentReview, useAssignmentReviewScope } from "@/hooks/useAssignmentReview";
 import { assignmentReviewMetadata, assignmentSaveMessage, type AssignmentReviewEnvelope } from "@/lib/api/assignment-review";
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
@@ -532,6 +535,17 @@ export default function AddScheduleModal({
    * Handles both one-time and recurring schedules
    * For recurring schedules with selected weekdays, only creates shifts on those days
    */
+  const reviewScope = useAssignmentReviewScope();
+  const occurrenceIds = useRef(new Map<string, string>());
+  const committedOccurrences = useRef(new Set<string>());
+  const [decisionOverrides, setDecisionOverrides] = useState<Record<string, Decision>>({});
+  const [consentDrafts, setConsentDrafts] = useState<AssignmentConsentDrafts>({});
+  useEffect(() => {
+    if (!isOpen) occurrenceIds.current.clear();
+    committedOccurrences.current.clear();
+    setDecisionOverrides({});
+    setConsentDrafts({});
+  }, [reviewScope, agencyId, agencyMode, isOpen]);
   const buildShiftRequests = (data: ScheduleFormData): CreateShiftRequest[] => {
     if (!agencyId || !data.assignedDspId) return [];
 
@@ -651,7 +665,11 @@ export default function AddScheduleModal({
       requests.push(baseShiftData);
     }
 
-    return requests.map((r) => ({ ...r, ...coverageFields }));
+    return requests.map((r) => {
+      const key = JSON.stringify([reviewScope, agencyId, r.clientId, r.employeeId, r.serviceAuthorizationId, r.serviceCode, r.date, r.startTime, r.endTime]);
+      if (!occurrenceIds.current.has(key)) occurrenceIds.current.set(key, crypto.randomUUID());
+      return { ...r, ...coverageFields, id: mode === "edit" ? data.shiftId : occurrenceIds.current.get(key) };
+    }).filter(request => !request.id || !committedOccurrences.current.has(request.id));
   };
 
   // Search clients with debouncing
@@ -1676,7 +1694,9 @@ export default function AddScheduleModal({
     };
 
     const submittedReviewKey = assignmentReview.viewKey;
+    const submittedDecisionKey = assignmentDecision.viewKey;
     const operation = beginMutation();
+    let didCommit = false;
     setIsSubmitting(true);
     try {
       // Edit existing shift as draft
@@ -1705,11 +1725,13 @@ export default function AddScheduleModal({
             updatePayload.date = format(formData.date, "yyyy-MM-dd");
           }
 
-          const savedResponse = await updateShift(formData.shiftId, updatePayload, {
+          const savedResponse = await updateShift(formData.shiftId, {...updatePayload, assignmentAcknowledgments: assignmentChanged ? currentAcknowledgments : []}, {
             agencyId,
             signal: operation.controller.signal,
           });
           if (!isCurrentMutation(operation.generation, operation.controller)) return;
+          didCommit = savedResponse.success;
+          if (assignmentChanged) adoptDecision(formData.shiftId, savedResponse);
           reportSavedReviews([savedResponse], submittedReviewKey, assignmentChanged);
           if (!(await reconcileShiftActivityLog(formData.shiftId, operation))) return;
           if (!isCurrentMutation(operation.generation, operation.controller)) return;
@@ -1739,7 +1761,11 @@ export default function AddScheduleModal({
           });
         } catch (error: any) {
           if (!isCurrentMutation(operation.generation, operation.controller)) return;
-          console.error("Failed to save draft schedule:", error);
+          clearDeniedDecision(error);
+          if (didCommit) { toast({title: "Assignment saved", description: "Refresh schedules to see your saved changes."}); return; }
+          const conflict = assignmentDecisionError(error);
+          if (conflict) { adoptDecision(formData.shiftId, conflict); if (!Object.keys(conflict.assignmentDecisions || {}).length) assignmentDecision.acceptDecision(null, submittedDecisionKey); }
+          console.error("Failed to save draft schedule.");
           toast({
             title: error?.response?.data?.code || "Save Failed",
             description: error?.response?.data?.error || "Failed to save draft. Please try again.",
@@ -1773,14 +1799,13 @@ export default function AddScheduleModal({
 
       const results = await createShiftsCapAware(
         shiftRequests,
-        (request) => createShift(request, {
-          agencyId,
-          signal: operation.controller.signal,
-        }),
+        (request) => createReviewedShift(request, operation.controller.signal),
         selectedDistributionSnapshot,
+        error => !!assignmentDecisionError(error) || [401, 403, 409, 422, 503].includes((error as {response?: {status?: number}})?.response?.status || 0),
       );
       if (!isCurrentMutation(operation.generation, operation.controller)) return;
 
+      didCommit = results.some(result => result.status === "fulfilled" && result.value.success);
       reportSavedReviews(results.flatMap(result => result.status === "fulfilled" && result.value.success ? [result.value] : []), submittedReviewKey, true);
       const failures = results.filter((r) => r.status === "rejected");
       const successes = results.filter((r) => r.status === "fulfilled");
@@ -1789,7 +1814,7 @@ export default function AddScheduleModal({
         if (successes.length > 0) {
           toast({
             title: "Partial Save",
-            description: `Saved ${successes.length} of ${shiftRequests.length} schedule(s) as drafts.`,
+            description: `Saved ${successes.length} of ${shiftRequests.length} schedule(s) as drafts. Review the remaining assignments and retry; saved occurrences will not be repeated.`,
           });
         } else {
           toast({
@@ -1801,6 +1826,7 @@ export default function AddScheduleModal({
         }
       }
 
+      if (failures.length > 0) return;
       if (successes.length > 0) {
         setSavedShiftInfo({
           clientName: formData.client || "Client",
@@ -1823,7 +1849,8 @@ export default function AddScheduleModal({
       }
     } catch (error: any) {
       if (!isCurrentMutation(operation.generation, operation.controller)) return;
-      console.error("Failed to save draft schedule:", error);
+      if (didCommit) { toast({title: "Assignments saved", description: "Refresh schedules to see your saved changes."}); return; }
+      console.error("Failed to save draft schedule.");
       toast({
         title: error?.response?.data?.code || "Save Failed",
         description: error?.response?.data?.error || "Failed to save draft. Please try again.",
@@ -1836,7 +1863,6 @@ export default function AddScheduleModal({
     }
   };
 
-  const reviewScope = useAssignmentReviewScope();
   const [reviewOccurrence, setReviewOccurrence] = useState(0);
   const reviewRequests = useMemo(() => {
     if (!isOpen || !formData.clientId || selectedClient?.id !== formData.clientId || !formData.assignedDspId || !formData.serviceCode || !pickSelectedServiceRow(selectedClientServices, formData) || agencyMode === "sc") return [];
@@ -1853,6 +1879,59 @@ export default function AddScheduleModal({
     },
   } : null;
   const assignmentReview = useAssignmentReview(reviewSelection, {enabled: isOpen && agencyMode !== "sc", scopeKey: reviewScope});
+  const occurrenceId = selectedReviewRequest?.id;
+  const decisionKeyFor = (request: CreateShiftRequest) => JSON.stringify([reviewScope, effectiveClientType, request.id, request.agencyId, request.clientId, request.employeeId, request.serviceAuthorizationId, request.serviceCode, request.date, request.startTime, request.endTime]);
+  const selectedDecisionKey = selectedReviewRequest ? decisionKeyFor(selectedReviewRequest) : null;
+  const decisionOverride = selectedDecisionKey ? decisionOverrides[selectedDecisionKey] : undefined;
+  const decisionSelection = reviewSelection && occurrenceId ? {...reviewSelection, input: {...reviewSelection.input, shiftId: occurrenceId}} : null;
+  const assignmentDecision = useAssignmentDecision(decisionSelection, {enabled: isOpen && agencyMode !== "sc" && !decisionOverride, scopeKey: reviewScope});
+  useEffect(() => {
+    if (assignmentDecision.accessDenied) {setDecisionOverrides({}); setConsentDrafts({});}
+  }, [assignmentDecision.accessDenied]);
+  const clearDeniedDecision = (error: unknown) => {
+    if ([401, 403].includes((error as {response?: {status?: number}})?.response?.status || 0)) {
+      setDecisionOverrides({}); setConsentDrafts({});
+    }
+  };
+  const currentDecision = decisionOverride || assignmentDecision.decision;
+  const currentAcknowledgments = currentDecision ? assignmentAcknowledgments({[currentDecision.contextKey]: currentDecision}, consentDrafts) : [];
+  useEffect(() => {
+    setConsentDrafts(previous => Object.fromEntries(Object.entries(previous).map(([key, draft]) => [key, {...draft, consent: false}])));
+  }, [assignmentDecision.viewKey]);
+  const assignmentSubmissionBlocked = assignmentDecision.loading || !!assignmentDecision.error || currentDecision?.state === "unavailable"
+    || currentDecision?.decision === "BLOCKED" || (currentDecision?.decision === "WARNING" && currentAcknowledgments.length === 0);
+  const adoptDecision = (id: string | undefined, response: unknown) => {
+    const envelope = parseAssignmentDecisions(response);
+    const returned = Object.values(envelope?.assignmentDecisions || {})[0];
+    const request = reviewRequests.find(item => item.id === id);
+    const decision: Decision | undefined = returned || (request ? {state: "unavailable", policyRevision: null, evaluatedAt: new Date().toISOString(), contextKey: decisionKeyFor(request), findings: [], hasRestrictedFindings: false, canAcknowledge: false} : undefined);
+    if (request && decision) {
+      setDecisionOverrides(previous => ({...previous, [decisionKeyFor(request)]: decision}));
+      setConsentDrafts(previous => Object.fromEntries(Object.entries(previous).map(([key, draft]) => [key, {...draft, consent: false}])));
+    }
+  };
+  const createReviewedShift = async (request: CreateShiftRequest, signal: AbortSignal) => {
+    const decision = decisionOverrides[decisionKeyFor(request)] || (request.id === occurrenceId ? currentDecision : null);
+    const acknowledgments = decision ? assignmentAcknowledgments({[decision.contextKey]: decision}, consentDrafts) : [];
+    try {
+      const response = await createShift({...request, assignmentAcknowledgments: acknowledgments}, {agencyId, signal});
+      if (!signal.aborted && response.success) {
+        if (request.id) committedOccurrences.current.add(request.id);
+        adoptDecision(request.id, response);
+      }
+      return response;
+    } catch (error) {
+      if (!signal.aborted) clearDeniedDecision(error);
+      if (!signal.aborted && assignmentDecisionError(error)) {
+        const conflict = assignmentDecisionError(error);
+        adoptDecision(request.id, conflict);
+        if (request.id === occurrenceId && !Object.keys(conflict?.assignmentDecisions || {}).length) assignmentDecision.acceptDecision(null, assignmentDecision.viewKey);
+        const index = reviewRequests.findIndex(item => item.id === request.id);
+        if (index >= 0) setReviewOccurrence(index);
+      }
+      throw error;
+    }
+  };
   const reportSavedReviews = (responses: ShiftResponse[], submittedViewKey: string, changed: boolean) => {
     if (agencyMode === "sc") return;
     const metadata = responses.map(assignmentReviewMetadata);
@@ -1902,7 +1981,9 @@ export default function AddScheduleModal({
     }
 
     const submittedReviewKey = assignmentReview.viewKey;
+    const submittedDecisionKey = assignmentDecision.viewKey;
     const operation = beginMutation();
+    let didCommit = false;
     setIsSubmitting(true);
     try {
       const getDisplayDate = () => {
@@ -1955,11 +2036,13 @@ export default function AddScheduleModal({
           updatePayload.date = format(formData.date, "yyyy-MM-dd");
         }
 
-        const savedResponse = await updateShift(formData.shiftId, updatePayload, {
+        const savedResponse = await updateShift(formData.shiftId, {...updatePayload, assignmentAcknowledgments: assignmentChanged ? currentAcknowledgments : []}, {
           agencyId,
           signal: operation.controller.signal,
         });
         if (!isCurrentMutation(operation.generation, operation.controller)) return;
+        didCommit = savedResponse.success;
+        if (assignmentChanged) adoptDecision(formData.shiftId, savedResponse);
         reportSavedReviews([savedResponse], submittedReviewKey, assignmentChanged);
           if (!(await reconcileShiftActivityLog(formData.shiftId, operation))) return;
         if (!isCurrentMutation(operation.generation, operation.controller)) return;
@@ -2027,14 +2110,13 @@ export default function AddScheduleModal({
 
       const results = await createShiftsCapAware(
         finalShiftRequests,
-        (request) => createShift(request, {
-          agencyId,
-          signal: operation.controller.signal,
-        }),
+        (request) => createReviewedShift(request, operation.controller.signal),
         selectedDistributionSnapshot,
+        error => !!assignmentDecisionError(error) || [401, 403, 409, 422, 503].includes((error as {response?: {status?: number}})?.response?.status || 0),
       );
       if (!isCurrentMutation(operation.generation, operation.controller)) return;
 
+      didCommit = results.some(result => result.status === "fulfilled" && result.value.success);
       const activityLogPromises = results
         .map((result, index) => {
           if (result.status === "fulfilled" && result.value.success) {
@@ -2138,11 +2220,11 @@ export default function AddScheduleModal({
       const successes = results.filter((r) => r.status === "fulfilled");
 
       if (failures.length > 0) {
-        console.error("Failed to schedule some shifts:", failures);
+        console.error("Failed to schedule some shifts.");
         if (successes.length > 0) {
           toast({
             title: "Partial Submission",
-            description: `Successfully scheduled ${successes.length} of ${finalShiftRequests.length} shifts. ${failures.length} failed.`,
+            description: `Scheduled ${successes.length} of ${finalShiftRequests.length} shifts. ${failures.length} need review or were not attempted. Saved occurrences will not be repeated.`,
           });
         } else {
           toast({
@@ -2154,6 +2236,7 @@ export default function AddScheduleModal({
         }
       }
 
+      if (failures.length > 0) return;
       if (successes.length > 0) {
         setScheduledShiftInfo({
           clientName: formData.client || "Client",
@@ -2184,7 +2267,11 @@ export default function AddScheduleModal({
       }
     } catch (error: any) {
       if (!isCurrentMutation(operation.generation, operation.controller)) return;
-      console.error("Failed to create schedule:", error);
+      if (didCommit) { toast({title: "Assignments saved", description: "Refresh schedules to see your saved changes."}); return; }
+      const conflict = assignmentDecisionError(error);
+      if (conflict) { adoptDecision(formData.shiftId, conflict); if (!Object.keys(conflict.assignmentDecisions || {}).length) assignmentDecision.acceptDecision(null, submittedDecisionKey); }
+      console.error("Failed to create schedule.");
+      clearDeniedDecision(error);
       toast({
         title: error?.response?.data?.code || "Scheduling Failed",
         description: error?.response?.data?.error || "Failed to create schedule. Please try again.",
@@ -3199,20 +3286,24 @@ export default function AddScheduleModal({
                 </select>
               </label>}
               <AssignmentReview controller={assignmentReview} employeeName={formData.assignedDsp} />
+              <AssignmentDecision decision={currentDecision} loading={assignmentDecision.loading} error={assignmentDecision.error}
+                refresh={() => {if (selectedDecisionKey && decisionOverride) setDecisionOverrides(previous => {const next = {...previous}; delete next[selectedDecisionKey]; return next;}); else void assignmentDecision.refresh();}}
+                draft={currentDecision ? consentDrafts[currentDecision.contextKey] : undefined}
+                onChange={draft => {if (currentDecision) setConsentDrafts(previous => ({...previous, [currentDecision.contextKey]: draft}));}} />
             </div>}
             {/* Action Buttons - Fixed (used for both create and edit) */}
             <div className="flex gap-3 p-5 pt-0 shrink-0">
               <Button
                 onClick={handleSaveDraft}
-                disabled={isSubmitting}
+                disabled={isSubmitting || (assignmentChanged && assignmentSubmissionBlocked)}
                 variant="outline"
                 className="flex-1 border-[#00B5B8] text-[#00B5B8] rounded-full px-4 py-3 h-auto text-[14px] font-semibold hover:bg-[#00B5B8]/10 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Save
+                {currentAcknowledgments.length && assignmentChanged ? "Save with warnings" : "Save"}
               </Button>
               <Button
                 onClick={handleSubmit}
-                disabled={isSubmitting || !isFormValid || (mode === "edit" && formData.submissionStatus === SubmissionStatus.SUBMITTED)}
+                disabled={isSubmitting || !isFormValid || (assignmentChanged && assignmentSubmissionBlocked) || (mode === "edit" && formData.submissionStatus === SubmissionStatus.SUBMITTED)}
                 className="flex-1 bg-[#00B5B8] hover:bg-[#00A0A4] text-white rounded-full px-4 py-3 h-auto text-[14px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? (
@@ -3221,7 +3312,7 @@ export default function AddScheduleModal({
                     Scheduling...
                   </>
                 ) : (
-                  "Schedule"
+                  currentAcknowledgments.length ? "Assign with warnings" : "Schedule"
                 )}
               </Button>
             </div>

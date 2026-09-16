@@ -923,16 +923,16 @@ export interface SeedClientsRequest {
  * Agencies default to their own agencyId
  * Employees must supply agencyId
  */
-export type ClientMutationResponse = ApiResponse<Client> & Partial<AssignmentReviewEnvelope>;
+export type ClientMutationResponse = ApiResponse<Client> & Partial<AssignmentReviewEnvelope> & Partial<import('./assignment-decision').AssignmentDecisionEnvelope>;
 export async function createClient(data: CreateClientRequest): Promise<Client> {
   return (await createClientWithReview(data)).data;
 }
-export async function createClientWithReview(data: CreateClientRequest): Promise<ClientMutationResponse> {
+export async function createClientWithReview(data: CreateClientRequest, assignmentAcknowledgments?: import('./assignment-decision').AssignmentAcknowledgment[]): Promise<ClientMutationResponse> {
   try {
-    const response = await axiosClient.post<ClientMutationResponse>('/clients', data);
+    const response = await axiosClient.post<ClientMutationResponse>('/clients', {...data, ...(assignmentAcknowledgments?.length ? {assignmentAcknowledgments} : {})});
     return response.data;
   } catch (error) {
-    console.error('Failed to create client for agency:', error);
+    console.error('Failed to create client for agency.');
     throw error;
   }
 }
@@ -1110,9 +1110,9 @@ export async function getClientById(
 export async function updateClient(clientId: string, data: UpdateClientRequest, agencyId?: string): Promise<Client> {
   return (await updateClientWithReview(clientId, data, agencyId)).data;
 }
-export async function updateClientWithReview(clientId: string, data: UpdateClientRequest, agencyId?: string): Promise<ClientMutationResponse> {
+export async function updateClientWithReview(clientId: string, data: UpdateClientRequest, agencyId?: string, assignmentAcknowledgments?: import('./assignment-decision').AssignmentAcknowledgment[]): Promise<ClientMutationResponse> {
   try {
-    const response = await axiosClient.put<ClientMutationResponse>(`/clients/${clientId}`, data, {
+    const response = await axiosClient.put<ClientMutationResponse>(`/clients/${clientId}`, {...data, ...(assignmentAcknowledgments?.length ? {assignmentAcknowledgments} : {})}, {
       params: agencyId ? { agencyId } : undefined
     });
 
@@ -1122,7 +1122,7 @@ export async function updateClientWithReview(clientId: string, data: UpdateClien
 
     return response.data;
   } catch (err: any) {
-    console.error('updateClient error:', err);
+    console.error('Failed to update client.');
     throw err;
   }
 }

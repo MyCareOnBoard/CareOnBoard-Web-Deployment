@@ -1,10 +1,12 @@
 import { getAssignmentReview } from "@/lib/api/assignment-review";
+import { getAssignmentDecision } from "@/lib/api/assignment-decision";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OperationalAgencyDataAdapter } from "@/lib/operational-agency/types";
 import AddScheduleModal, { type ScheduleFormData } from "./AddScheduleModal";
 
 vi.mock("@/lib/api/assignment-review", async importOriginal => ({...await importOriginal<object>(), getAssignmentReview: vi.fn(() => new Promise(() => {}))}));
+vi.mock("@/lib/api/assignment-decision", async importOriginal => ({...await importOriginal<object>(), getAssignmentDecision: vi.fn()}));
 const toast = vi.hoisted(() => vi.fn());
 const shiftApi = vi.hoisted(() => ({
   updateShift: vi.fn(),
@@ -122,6 +124,7 @@ describe("AddScheduleModal operational data boundary", () => {
     vi.setSystemTime(new Date("2026-08-10T12:00:00Z"));
     toast.mockReset();
     vi.mocked(getAssignmentReview).mockClear();
+    vi.mocked(getAssignmentDecision).mockReset().mockResolvedValue({state: "inactive", policyRevision: 0, evaluatedAt: "2026-08-10T12:00:00Z", contextKey: "pair", findings: [], hasRestrictedFindings: false, canAcknowledge: false});
     shiftApi.updateShift.mockReset();
     shiftApi.listShifts.mockReset();
     shiftApi.listShifts.mockResolvedValue({ success: true, shifts: [] });
@@ -300,6 +303,7 @@ describe("AddScheduleModal operational data boundary", () => {
     );
     expect(changedDate).toBeDefined();
     fireEvent.click(changedDate as HTMLElement);
+    await act(async () => Promise.resolve());
 
     expect(screen.queryByText(/1 Old Main St/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("radio")).not.toBeInTheDocument();
@@ -668,6 +672,19 @@ describe("AddScheduleModal operational data boundary", () => {
     expect(getAssignmentReview).toHaveBeenCalledWith(expect.objectContaining({agencyId: "agency-b", clientId: "client-1", input: expect.objectContaining({employeeId: "staff-1", program: "ddd", kind: "shift", date: "2026-08-10", serviceAuthorizationId: "service-1"})}), expect.any(AbortSignal));
     expect(screen.getByRole("button", {name: "Save"})).toBeEnabled();
     expect(screen.getByText("Checking assignment records…")).toBeVisible();
+  });
+  it("binds the warning preview to the saved shift ID and does not preview or submit on consent edits", async () => {
+    const data = createDataAdapter();
+    vi.mocked(data.getClientSchedulingContext).mockResolvedValue({id: "client-1", type: "ddd", services: [{id: "service-1", code: "H2021", name: "Support"}]});
+    vi.mocked(getAssignmentDecision).mockResolvedValue({state: "ready", decision: "WARNING", fingerprint: "a".repeat(64), policyRevision: 1, evaluatedAt: "2026-08-10T12:00:00Z", contextKey: "pair", findings: [{ruleId: "synthetic", ruleVersion: 1, severity: "warning", code: "missing", message: "Review this requirement"}], hasRestrictedFindings: false, canAcknowledge: true});
+    render(modalElement(data, {mode: "edit", editData: editableShift({serviceAuthorizationId: "service-1"})}));
+    await act(async () => Promise.resolve());
+    expect(getAssignmentDecision).toHaveBeenCalledTimes(1);
+    expect(getAssignmentDecision).toHaveBeenCalledWith(expect.objectContaining({input: expect.objectContaining({shiftId: "shift-1"})}), expect.any(AbortSignal));
+    fireEvent.change(screen.getByLabelText("Reason for assigning with warnings"), {target: {value: "Reviewed requirement"}});
+    fireEvent.click(screen.getByLabelText("I reviewed these warnings"));
+    expect(getAssignmentDecision).toHaveBeenCalledTimes(1);
+    expect(shiftApi.updateShift).not.toHaveBeenCalled();
   });
   it("adopts saved review without issuing another preview or save", async () => {
     const data = createDataAdapter();

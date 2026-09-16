@@ -239,3 +239,24 @@ it('retains the profile review across the later document mutation', async () => 
   expect(updateClient).toHaveBeenLastCalledWith('client-1', expect.objectContaining({documents: expect.any(Array)}));
   expect(vi.mocked(updateClient).mock.lastCall?.[1]).not.toHaveProperty('assignmentReviews');
 });
+
+it('keeps a confirmed save successful when required decision metadata is malformed', async () => {
+  vi.mocked(updateClientWithReview).mockResolvedValueOnce({success: true, data: {id: 'client-1'}, assignmentDecisions: {pair: {state: 'ready', decision: 'CLEARED'}}} as unknown as Awaited<ReturnType<typeof updateClientWithReview>>);
+  const {result} = renderHook(() => useClientSave());
+  await act(async () => {
+    const saved = await result.current.saveClient(formData(), true, 'client-1', false, true);
+    expect(saved.success).toBe(true);
+    expect(saved.assignmentDecisions).toBeUndefined();
+  });
+});
+
+it('preserves save-client-first structured errors and never retries a writer automatically', async () => {
+  vi.mocked(updateClientWithReview).mockClear();
+  vi.mocked(updateClientWithReview).mockRejectedValueOnce({response: {status: 409, data: {code: 'ASSIGNMENT_ACKNOWLEDGMENT_REQUIRED', saveClientFirst: true, error: 'Save client first', assignmentDecisions: {}}}});
+  const {result} = renderHook(() => useClientSave());
+  await act(async () => {
+    const saved = await result.current.saveClient(formData(), true, 'client-1', false, true);
+    expect(saved).toMatchObject({success: false, assignmentError: {code: 'ASSIGNMENT_ACKNOWLEDGMENT_REQUIRED', saveClientFirst: true}});
+  });
+  expect(updateClientWithReview).toHaveBeenCalledOnce();
+});

@@ -14,6 +14,7 @@ export const StageFooter = memo(function StageFooter({
   primaryLoading = false,
   requireDeclaration = true,
   saveButtonText = "Save Progress",
+  saveDisabled = false,
 }: {
   declared: boolean;
   setDeclared: (next: boolean) => void;
@@ -25,6 +26,7 @@ export const StageFooter = memo(function StageFooter({
   primaryLoading?: boolean;
   requireDeclaration?: boolean;
   saveButtonText?: string;
+  saveDisabled?: boolean;
 }) {
   const nextDisabled = requireDeclaration ? !declared : false;
 
@@ -59,7 +61,7 @@ export const StageFooter = memo(function StageFooter({
           variant="outline"
           className="h-[44px] rounded-[60px] px-6 text-[14px] font-semibold border-[#00b4b8] text-[#00b4b8] hover:bg-[#00b4b8]/10"
           onClick={onSave}
-          disabled={nextDisabled || primaryLoading}
+          disabled={nextDisabled || primaryLoading || saveDisabled}
         >
           {primaryLoading ? (
             <Loader2 className="w-5 h-5 animate-spin" />
