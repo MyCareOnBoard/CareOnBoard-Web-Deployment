@@ -25,6 +25,8 @@ export const DOC_KEY_TO_SERVER_TYPE: Record<ClientDocumentKey, string> = {
   clinicalAssessment: "clinical-assessment",
   form485: "form-485",
   hospitalDischarge: "hospital-discharge-papers",
+  ids: "ids",
+  aenf: "aenf",
 };
 
 /** Options for the client-details "upload document" type pickers. */
@@ -46,6 +48,8 @@ export const DOCUMENT_TYPE_OPTIONS: Array<{ value: ClientDocumentKey; label: str
   { value: "clinicalAssessment", label: "Clinical Assessment" },
   { value: "form485", label: "Form 485" },
   { value: "hospitalDischarge", label: "Hospital Discharge Papers" },
+  { value: "ids", label: "IDS (Individual Data Sheet)" },
+  { value: "aenf", label: "AENF (Acuity Eligibility Notification Form)" },
 ];
 
 /** Human label for an extraction's detectedDocumentType (incl. "unknown"). */
@@ -67,6 +71,8 @@ export const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   clinicalAssessment: "Clinical Assessment",
   form485: "Form 485",
   hospitalDischarge: "Hospital Discharge Papers",
+  ids: "IDS (Individual Data Sheet)",
+  aenf: "AENF (Acuity Eligibility Notification Form)",
   unknown: "Not detected",
 };
 

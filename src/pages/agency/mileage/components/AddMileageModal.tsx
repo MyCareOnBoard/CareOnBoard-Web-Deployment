@@ -167,7 +167,7 @@ export default function AddMileageModal({
           return;
         }
         if (documents !== null) {
-          const license = documents.find((d) => d.documentType === "driverLicense");
+          const license = documents.find((d) => d.documentType === "driver-license");
           const hasValidLicense =
             !!license &&
             license.status !== "expired" &&

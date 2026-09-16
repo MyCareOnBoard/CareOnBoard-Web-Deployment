@@ -193,6 +193,10 @@ export function formDataToApiPayload(
     email: s1.email || undefined,
     phone: s1.phone || undefined,
     dateOfBirth: toIso(s1.dob),
+    // Civil date, not an ISO timestamp: the backend stores YYYY-MM-DD so a report
+    // cannot render an admission a day early once formatted in the agency timezone.
+    admissionDate: toCivilDate(s1.admissionDate),
+    acuity: s1.acuity || undefined,
     primaryAddress:
       primaryLocation?.lat && primaryLocation?.lon
         ? {

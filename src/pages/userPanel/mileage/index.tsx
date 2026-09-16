@@ -58,7 +58,7 @@ export default function MileagePage() {
   const { data: employeeDocuments = [] } = useGetEmployeeDocumentsQuery();
 
   const hasValidDriverLicense = useMemo(() => {
-    const doc = employeeDocuments.find((d) => d.documentType === "driverLicense");
+    const doc = employeeDocuments.find((d) => d.documentType === "driver-license");
     if (!doc) return false;
     if (doc.status === "expired") return false;
     if (doc.expiryDate && new Date(doc.expiryDate) < new Date()) return false;
