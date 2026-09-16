@@ -402,6 +402,7 @@ export interface ClientHealthcareSafety {
 }
 
 export type ClientDocumentKey =
+  | "aenf"
   | "isp"
   | "pcpt"
   | "poc"

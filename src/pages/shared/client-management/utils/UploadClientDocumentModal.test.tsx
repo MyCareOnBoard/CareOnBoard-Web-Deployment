@@ -53,13 +53,22 @@ for (const [name, Modal, load] of [["agency", AgencyModal, getAgencyClientById],
       await waitFor(() => expect(onComplete).toHaveBeenCalled());
       expect(vi.mocked(updateClient).mock.calls[0][1].documents).toMatchObject([{ key: "form485", signed: false }]);
     });
-    it.each(["isp", "form485"] as const)("uses missing-row %s preselection as append mode", async (key) => {
+    it("restores the usual reminder default when changing AENF to ISP", async () => {
+      const onComplete = vi.fn();
+      const view = render(<Modal isOpen setIsOpen={vi.fn()} clientId="one" onError={vi.fn()} onComplete={onComplete} initialDocumentKey="aenf" />);
+      fireEvent.change(view.container.querySelector("select")!, { target: { value: "isp" } });
+      fireEvent.change(view.container.querySelector('input[type="file"]')!, { target: { files: [new File(["new"], "new.pdf")] } });
+      fireEvent.submit(view.container.querySelector("form")!);
+      await waitFor(() => expect(onComplete).toHaveBeenCalled());
+      expect(vi.mocked(updateClient).mock.calls[0][1].documents?.at(-1)).toMatchObject({ key: "isp", autoReminder: true });
+    });
+    it.each(["isp", "form485", "aenf"] as const)("uses missing-row %s preselection as append mode", async (key) => {
       const onComplete = vi.fn();
       const view = render(<Modal isOpen setIsOpen={vi.fn()} clientId="one" onError={vi.fn()} onComplete={onComplete} initialDocumentKey={key} />);
       fireEvent.change(view.container.querySelector('input[type="file"]')!, { target: { files: [new File(["new"], "new.pdf")] } });
       fireEvent.submit(view.container.querySelector("form")!);
       await waitFor(() => expect(onComplete).toHaveBeenCalledWith({ uploadedKey: key }));
-      expect(vi.mocked(updateClient).mock.calls[0][1].documents).toMatchObject([original, sibling, { key, url: "https://example.test/new", ...(key === "form485" ? { signed: false } : {}) }]);
+      expect(vi.mocked(updateClient).mock.calls[0][1].documents).toMatchObject([original, sibling, { key, url: "https://example.test/new", ...(key === "form485" ? { signed: false } : {}), ...(key === "aenf" ? { autoReminder: false } : {}) }]);
     });
   });
 }

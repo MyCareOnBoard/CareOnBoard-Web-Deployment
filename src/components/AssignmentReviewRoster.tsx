@@ -4,10 +4,12 @@ import {useAuth} from '@/utils/auth';
 import {useAssignmentReview, useAssignmentReviewScope} from '@/hooks/useAssignmentReview';
 import {assignmentServiceRowKey, type AssignmentReviewEnvelope} from '@/lib/api/assignment-review';
 import {AssignmentReview} from './AssignmentReview';
+import {ClientCompetencyPanel} from '@/pages/shared/client-details/components/ClientCompetencyPanel';
+import {Routes} from '@/routes/constants';
 
 export type ReviewRosterRow = {id?: string; reviewSourceRowKey?: string | null; code?: string; serviceCode?: string; serviceId?: string; startAuthDate?: unknown; endAuthDate?: unknown; sdrStartDate?: unknown; sdrEndDate?: unknown; startDate?: unknown; endDate?: unknown};
 export type SavedRosterReview = {metadata?: AssignmentReviewEnvelope; submittedViewKey: string; documentsChanged: boolean; assignmentChanged?: boolean};
-type RosterScope = {clientId?: string; agencyId?: string; program: 'ddd' | 'hha'; savedRows: ReviewRosterRow[]; selected: string; select: (key: string) => void; captureRef?: MutableRefObject<string>; savedReview?: SavedRosterReview};
+type RosterScope = {clientId?: string; agencyId?: string; program: 'ddd' | 'hha'; savedRows: ReviewRosterRow[]; selected: string; select: (key: string) => void; captureRef?: MutableRefObject<string>; savedReview?: SavedRosterReview; onViewNeeds?: () => void};
 const RosterContext = createContext<RosterScope | null>(null);
 export function AssignmentReviewRosterProvider({children, enabled = true, ...scope}: Omit<RosterScope, 'selected' | 'select'> & {children: ReactNode; enabled?: boolean}) {
   const [selected, select] = useState('');
@@ -69,5 +71,10 @@ export function RosterAssignmentReview({row, employeeId, employeeName}: {row?: R
     }
     if (scope.savedReview.assignmentChanged && (scope.savedReview.metadata.unreviewedPairCount > 0 || scope.savedReview.metadata.assignmentReviewCoverage === 'unavailable')) controller.acceptSavedReview(undefined, scope.savedReview.submittedViewKey);
   }, [scope.savedReview, controller.acceptSavedReview]);
-  return <AssignmentReview controller={controller} employeeName={employeeName} unsaved={!saved && !controller.review} documentsChanged={controller.saved && scope.savedReview?.documentsChanged && scope.savedReview.submittedViewKey === controller.viewKey} />;
+  return <><AssignmentReview controller={controller} employeeName={employeeName} unsaved={!saved && !controller.review} documentsChanged={controller.saved && scope.savedReview?.documentsChanged && scope.savedReview.submittedViewKey === controller.viewKey} />
+    {scope.clientId && agencyId && <ClientCompetencyPanel clientId={scope.clientId} agencyId={agencyId} program={scope.program} employeeId={employeeId} employeeName={employeeName} onViewNeeds={scope.onViewNeeds || (() => {
+      const route = user?.userType === 'super_admin' ? Routes.superAdmin.clientDetails : Routes.agency.clientDetails;
+      window.location.assign(`${route.replace(':clientId', encodeURIComponent(scope.clientId!))}?tab=documents`);
+    })} />}
+  </>;
 }

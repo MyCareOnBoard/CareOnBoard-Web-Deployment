@@ -10,6 +10,21 @@ function loaded(documents: Client["documents"] = [original]) {
 }
 
 describe("client document edits", () => {
+  it.each(["ddd", "hha"] as const)("keeps AENF optional with reminders off and preserves evidence in %s", (type) => {
+    const first = { key: "aenf" as const, url: "https://example.test/aenf-a", issuedOnDate: "2026-09-15T15:00:00.000Z" };
+    const second = { ...first, url: "https://example.test/aenf-b" };
+    const data = clientToFormData({ id: "one", type, documents: [first, second, { key: "form485", url: "485", signed: true }] } as Client);
+    const doc = data.stage3.docs.find(item => item.key === "aenf")!;
+    expect(doc.autoReminder).toBe(false);
+    expect(hasClientDocumentEdits(data.stage3)).toBe(false);
+    expect(clientDocumentReplacement(doc)).toEqual(first);
+    doc.expiryDate = new Date(2027, 8, 16);
+    doc.editedDates = { expiryDate: true };
+    const documents = mergeClientDocumentEdit({ originalDocuments: data.stage3.originalDocuments!, originalDocument: first, replacement: clientDocumentReplacement(doc) });
+    expect(documents).toEqual([{ ...first, expiryDate: "2027-09-16" }, second, { key: "form485", url: "485", signed: true }]);
+    expect(hasClientDocumentEdits(refreshClientDocumentBaseline(data.stage3, documents))).toBe(false);
+    expect(clientToFormData({ id: "empty", type } as Client).stage3.docs.find(item => item.key === "aenf")?.autoReminder).toBe(false);
+  });
   it("preserves raw legacy instants and serializes explicitly selected local days", () => {
     expect(serializeClientDocumentDate({ key: "isp", original: original.issuedOnDate, selected: new Date(original.issuedOnDate), edited: false })).toBe(original.issuedOnDate);
     expect(serializeClientDocumentDate({ key: "isp", selected: new Date(2026, 8, 16), edited: true })).toBe("2026-09-16");

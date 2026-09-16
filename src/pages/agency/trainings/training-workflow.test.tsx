@@ -82,4 +82,16 @@ describe('agency training pagination', () => {
     expect(screen.queryByRole('button', {name: 'Approve CPR'})).not.toBeInTheDocument();
     expect(screen.queryByRole('button', {name: 'Request changes for CPR'})).not.toBeInTheDocument();
     expect(state.approval).not.toHaveBeenCalled();
-  });});
+  });
+  it('selects only accepted current certificates without approving trainings', async () => {
+    const accepted = {id: 'accepted', name: 'Accepted CPR', requiresCertificate: true, certificateId: 'a'.repeat(64), status: 'Completed', approved: true};
+    state.courses.items = [accepted, {...accepted, id: 'policy', name: 'Policy', source: 'policy'}, {...accepted, id: 'pending', name: 'Pending', approved: false}, {...accepted, id: 'legacy', name: 'Legacy', requiresCertificate: false}];
+    const selected = vi.fn();
+    render(<ReviewTrainingsModal open onOpenChange={vi.fn()} employee={{id: 'employee-1', fullName: 'Ada', role: 'Staff'}} readOnly onSelectCertificate={selected} />);
+    fireEvent.click(await screen.findByRole('button', {name: 'Select certificate for Accepted CPR'}));
+    expect(selected).toHaveBeenCalledWith({trainingId: 'accepted', certificateId: 'a'.repeat(64)});
+    expect(screen.getAllByRole('button', {name: /Select certificate for/})).toHaveLength(1);
+    expect(state.approval).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', {name: /Approve|Request changes/})).toBeNull();
+  });
+});

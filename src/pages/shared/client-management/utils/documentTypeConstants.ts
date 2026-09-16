@@ -8,6 +8,7 @@ import type { FieldConfidence } from "../types/clientExtraction";
 
 /** DocKey/ClientDocumentKey -> server document-type slug. */
 export const DOC_KEY_TO_SERVER_TYPE: Record<ClientDocumentKey, string> = {
+  aenf: "aenf",
   isp: "isp",
   pcpt: "pcpt",
   poc: "plan-of-care",
@@ -29,6 +30,7 @@ export const DOC_KEY_TO_SERVER_TYPE: Record<ClientDocumentKey, string> = {
 
 /** Options for the client-details "upload document" type pickers. */
 export const DOCUMENT_TYPE_OPTIONS: Array<{ value: ClientDocumentKey; label: string }> = [
+  { value: "aenf", label: "AENF" },
   { value: "isp", label: "ISP (Individualized Service Plan)" },
   { value: "pcpt", label: "PCPT (Person-Centered Planning Tool)" },
   { value: "poc", label: "Plan of Care (POC)" },
@@ -50,6 +52,7 @@ export const DOCUMENT_TYPE_OPTIONS: Array<{ value: ClientDocumentKey; label: str
 
 /** Human label for an extraction's detectedDocumentType (incl. "unknown"). */
 export const DOCUMENT_TYPE_LABELS: Record<string, string> = {
+  aenf: "AENF",
   isp: "ISP (Individualized Service Plan)",
   poc: "Plan of Care",
   pcpt: "PCPT",

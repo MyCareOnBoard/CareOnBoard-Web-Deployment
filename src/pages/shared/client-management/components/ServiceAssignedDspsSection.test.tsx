@@ -5,11 +5,13 @@ import {beforeEach, expect, it, vi} from 'vitest';
 import {ServiceAssignedDspsSection} from './ServiceAssignedDspsSection';
 import {AssignmentReviewRosterProvider} from '@/components/AssignmentReviewRoster';
 import {getAssignmentReview} from '@/lib/api/assignment-review';
+import {getClientCompetencies} from '@/lib/api/client-needs';
 
 vi.mock('@/utils/auth', () => ({useAuth: () => ({user: {uid: 'admin', userType: 'super_admin'}})}));
 vi.mock('@/hooks/useEffectiveAgencyMode', () => ({useEffectiveAgencyMode: () => 'ddd', agencyModeToApplicantType: (mode: string) => mode === 'hha' ? 'hha' : 'dsp'}));
 vi.mock('@/pages/agency/trainings/reviewTrainingsModal', () => ({default: () => null}));
 vi.mock('@/lib/api/assignment-review', async original => ({...await original<object>(), getAssignmentReview: vi.fn(() => new Promise(() => {}))}));
+vi.mock('@/lib/api/client-needs', () => ({getClientCompetencies: vi.fn(() => new Promise(() => {}))}));
 const row = {id: 'service', startDate: '2026-09-01', endDate: '2026-10-01'};
 const staff = [{id: 'staff-a', name: 'Ada'}, {id: 'staff-b', name: 'Grace'}];
 beforeEach(() => vi.clearAllMocks());
@@ -19,14 +21,19 @@ it.each(['ddd', 'hha'] as const)('reviews only the selected staff in the explici
     <ServiceAssignedDspsSection isEditing reviewRow={row} assignedDsps={staff} onChange={vi.fn()} />
   </AssignmentReviewRosterProvider>);
   expect(getAssignmentReview).not.toHaveBeenCalled();
+  expect(getClientCompetencies).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', {name: 'Review assignment for Ada'}));
   await waitFor(() => expect(getAssignmentReview).toHaveBeenCalledTimes(1));
+  expect(getClientCompetencies).toHaveBeenCalledTimes(1);
+  expect(getClientCompetencies).toHaveBeenLastCalledWith({agencyId: 'selected-agency', clientId: 'client', program}, 'staff-a', expect.any(AbortSignal));
   expect(getAssignmentReview).toHaveBeenLastCalledWith(expect.objectContaining({agencyId: 'selected-agency', clientId: 'client', input: {program, kind: 'service_roster', serviceRowKey: 'service', employeeId: 'staff-a'}}), expect.any(AbortSignal));
   fireEvent.click(screen.getByRole('button', {name: 'Add Caregiver'}));
   fireEvent.change(screen.getByPlaceholderText('Search staff by name (2+ characters)'), {target: {value: 'x'}});
   expect(getAssignmentReview).toHaveBeenCalledTimes(1);
   fireEvent.click(screen.getByRole('button', {name: 'Review assignment for Grace'}));
   await waitFor(() => expect(getAssignmentReview).toHaveBeenCalledTimes(2));
+  expect(getClientCompetencies).toHaveBeenCalledTimes(2);
+  expect(screen.getAllByRole('region', {name: 'Client competency'})).toHaveLength(1);
   expect(screen.getAllByRole('region', {name: 'Assignment review'})).toHaveLength(1);
 });
 

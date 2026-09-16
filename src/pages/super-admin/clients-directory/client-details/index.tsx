@@ -1,6 +1,7 @@
 import { useEffectiveAgencyMode } from '@/hooks/useEffectiveAgencyMode';
 import { useClientDocumentRefresh } from '@/pages/shared/client-details/hooks/useClientDocumentRefresh';
 import { showClientChecklist } from '@/pages/shared/client-details/components/ClientDocumentChecklist';
+import {ClientNeedsPanel} from '@/pages/shared/client-details/components/ClientNeedsPanel';
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Phone, Edit, ArrowLeft } from "lucide-react";
 import { useParams, useSearchParams, useNavigate } from "react-router";
@@ -50,7 +51,7 @@ export default function ClientDetailsPage() {
     requestKey: JSON.stringify([environment, user?.uid, user?.userType, user?.agencyId, scopeKey, clientId, mode]),
     enabled: Boolean(clientId && user?.uid), documentsActive: activeTab === 'documents', load: loadClient,
   });
-  const fetchClient = useCallback(() => refresh(true), [refresh]);
+  const fetchClient = useCallback(async () => { await refresh(true); }, [refresh]);
   const [initialDocumentKey, setInitialDocumentKey] = useState<ChecklistRow['key'] | undefined>();
   const canUpload = false;
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -358,12 +359,15 @@ export default function ClientDetailsPage() {
         />
       )}
       {!isLoading && client && activeTab === "documents" && (
+        <>
+        {mode !== 'sc' && <ClientNeedsPanel clientId={clientId} agencyId={client.agencyId || ''} program={mode === 'hha' ? 'hha' : 'ddd'} documents={client.documents} documentsBusy={refreshing} onRefreshDocuments={() => refresh(true)} />}
         <DocumentsTab
           client={client}
           readOnly={true}
           showChecklist={showClientChecklist(client, user?.userType, mode)}
           refreshing={refreshing} refreshError={error} onRefresh={() => void fetchClient()}
         />
+        </>
       )}
 
       {/* Upload Document Modal */}

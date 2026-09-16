@@ -344,6 +344,7 @@ export type Stage2GuardianAndFundingData = {
 };
 
 export type DocKey =
+    | "aenf"
     | "isp"
     | "pcpt"
     | "poc"
@@ -741,6 +742,7 @@ export function createInitialDocs(type: ClientType = "ddd"): DocState[] {
                 uploadLabel: "Upload hospital discharge papers",
                 autoReminder: true,
             },
+            { key: "aenf", title: "AENF", uploadLabel: "Upload AENF", autoReminder: false },
         ];
     }
 
@@ -787,6 +789,7 @@ export function createInitialDocs(type: ClientType = "ddd"): DocState[] {
             uploadLabel: "Upload Consents & Releases",
             autoReminder: true,
         },
+        { key: "aenf", title: "AENF", uploadLabel: "Upload AENF", autoReminder: false },
     ];
 }
 

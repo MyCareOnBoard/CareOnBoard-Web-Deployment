@@ -15,6 +15,15 @@ function loaded() {
 
 describe("record-preserving document uploads", () => {
   beforeEach(() => vi.resetAllMocks());
+  it("uploads AENF with its canonical slug without reclassifying custom titles", async () => {
+    const data = clientToFormData({ id: "one", documents: [{ key: "medicalDocs", title: "AENF", url: "https://example.test/custom" }] } as Client);
+    const doc = data.stage3.docs.find(item => item.key === "aenf")!;
+    expect(doc).toBeDefined();
+    doc.file = new File(["a"], "aenf.pdf");
+    vi.mocked(uploadClientDocument).mockResolvedValue({ ...uploadMetadata, fileName: "aenf.pdf", url: "https://example.test/aenf" });
+    expect(await handleDocumentUploads("one", data)).toMatchObject([{ key: "medicalDocs", title: "AENF" }, { key: "aenf", autoReminder: false }]);
+    expect(uploadClientDocument).toHaveBeenCalledWith("one", "aenf", doc.file);
+  });
   it("preserves duplicate records, raw dates and absent signatures without uploading", async () => {
     const data = loaded();
     expect(await handleDocumentUploads("one", data)).toEqual([first, second, { key: "form485", url: "https://example.test/485" }]);

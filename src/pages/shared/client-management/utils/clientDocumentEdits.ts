@@ -2,7 +2,7 @@ import { format, isValid, parseISO } from "date-fns";
 import type { ClientDocument, ClientDocumentKey } from "@/lib/api/clients";
 import type { DocState, Stage3HealthcareAndDocumentsData } from "../types/formData";
 
-const TRACKED_DOCUMENT_KEYS = new Set<ClientDocumentKey>(["isp", "pcpt", "sdr", "form485", "poc", "physicianOrders", "clinicalAssessment"]);
+const TRACKED_DOCUMENT_KEYS = new Set<ClientDocumentKey>(["isp", "pcpt", "sdr", "form485", "poc", "physicianOrders", "clinicalAssessment", "aenf"]);
 const RELOAD_MESSAGE = "Document records changed or could not be loaded. Reload the client and review the files before saving documents.";
 
 export function parseClientDocumentDate(raw?: string): Date | undefined {
@@ -28,7 +28,7 @@ function dateEdited(doc: DocState, field: "issuedOnDate" | "expiryDate"): boolea
 
 export function hasClientDocumentEdit(doc: DocState): boolean {
   return !!(doc.file || doc.files?.length || dateEdited(doc, "issuedOnDate") || dateEdited(doc, "expiryDate") ||
-    (doc.originalDocument && (doc.autoReminder !== (doc.originalDocument.autoReminder ?? true) || doc.signed !== doc.originalDocument.signed)));
+    (doc.originalDocument && (doc.autoReminder !== (doc.originalDocument.autoReminder ?? (doc.key !== "aenf")) || doc.signed !== doc.originalDocument.signed)));
 }
 
 export function hasClientDocumentEdits(stage3: Stage3HealthcareAndDocumentsData): boolean {
@@ -47,7 +47,7 @@ export function clientDocumentReplacement(doc: DocState): ClientDocument {
     else replacement[field] = value;
   }
   validateClientDocumentDates(replacement, issuedEdited || expiryEdited);
-  if (!original || doc.autoReminder !== (original.autoReminder ?? true)) replacement.autoReminder = doc.autoReminder;
+  if (!original || doc.autoReminder !== (original.autoReminder ?? (doc.key !== "aenf"))) replacement.autoReminder = doc.autoReminder;
   if (doc.key === "form485" && doc.signed !== original?.signed) replacement.signed = doc.signed;
   return replacement;
 }
@@ -87,6 +87,6 @@ export function refreshClientDocumentBaseline(stage3: Stage3HealthcareAndDocumen
     if (!saved) return doc;
     return { ...doc, originalDocument: saved, file: undefined, files: undefined, editedDates: undefined,
       url: saved.url, fileName: saved.fileName, issuedOnDate: parseClientDocumentDate(saved.issuedOnDate), expiryDate: parseClientDocumentDate(saved.expiryDate),
-      autoReminder: saved.autoReminder ?? true, signed: saved.signed };
+      autoReminder: saved.autoReminder ?? (saved.key !== "aenf"), signed: saved.signed };
   }) };
 }

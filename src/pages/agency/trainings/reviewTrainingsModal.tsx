@@ -25,6 +25,7 @@ interface ReviewTrainingsModalProps {
     agencyId?: string;
     readOnly?: boolean;
     onApprovalChange?: (trainingId: string, approved: boolean) => void;
+    onSelectCertificate?: (certificate: {trainingId: string; certificateId: string}) => void;
 }
 
 export default function ReviewTrainingsModal(
@@ -33,6 +34,7 @@ export default function ReviewTrainingsModal(
         onOpenChange,
         employee,
         onApprovalChange,
+        onSelectCertificate,
         mode,
         agencyId: explicitAgencyId,
         readOnly = false
@@ -109,7 +111,7 @@ export default function ReviewTrainingsModal(
                             Training
                         </DialogTitle>
                         <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-                            These are the trainings of this associated user
+                            {onSelectCertificate ? 'Select an accepted completion certificate for this client review.' : 'These are the trainings of this associated user'}
                         </p>
                     </div>
                     <button
@@ -181,6 +183,9 @@ export default function ReviewTrainingsModal(
                                     </p>}
                                     {training.requiresCertificate && <>
                                         <TrainingCertificate key={`${employee.id}-${training.id}-${open}`} training={training}/>
+                                        {onSelectCertificate && training.source !== 'policy' && training.requiresCertificate === true && training.approved === true && training.status === 'Completed' && training.id && /^[a-f0-9]{64}$/.test(training.certificateId || '') &&
+                                            <Button type="button" size="sm" variant="outline" className="rounded-full" aria-label={`Select certificate for ${training.name}`}
+                                                onClick={() => onSelectCertificate({trainingId: training.id!, certificateId: training.certificateId!})}>Select certificate</Button>}
                                         {!readOnly && training.certificateId ? <div className="flex flex-wrap gap-2">
                                             <Button type="button" size="sm" disabled={pendingApproval !== null || training.approved}
                                                 className="rounded-full bg-[#00b4b8] text-white hover:bg-[#009da1]"

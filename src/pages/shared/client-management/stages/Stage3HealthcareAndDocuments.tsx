@@ -237,6 +237,7 @@ export function Stage3HealthcareAndDocuments({
   pageTitle = "Add client",
   clientId,
   isSaving = false,
+  needsPanel,
 }: {
   footer: React.ReactNode;
   formData: AddClientFormData;
@@ -244,6 +245,7 @@ export function Stage3HealthcareAndDocuments({
   pageTitle?: string;
   clientId?: string;
   isSaving?: boolean;
+  needsPanel?: React.ReactNode;
 }) {
   const stage3 = formData.stage3;
   const documentEditingDisabled = React.useRef(false);
@@ -835,13 +837,14 @@ export function Stage3HealthcareAndDocuments({
       <div className="mb-10">
         <div className="mb-2">
           <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
-            6. Mandatory Document Uploads
+            6. Document Uploads
           </p>
           <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-            These are core documents that define care expectations and billing rules.
+            Core care documents and optional supporting evidence. Existing activation requirements still apply.
           </p>
         </div>
 
+        {needsPanel}
         <fieldset disabled={isSaving || !Array.isArray(stage3.originalDocuments)} className="mt-6 min-w-0 space-y-8">
           {!Array.isArray(stage3.originalDocuments) && <p role="alert">Reload the client and review its document records before changing files.</p>}
           {(() => {
@@ -851,6 +854,7 @@ export function Stage3HealthcareAndDocuments({
 
               return (
                 <div key={doc.key}>
+                  {doc.key === 'aenf' && <h3 className="mb-3 border-t border-border pt-6 text-sm font-semibold">Additional needs evidence (optional)</h3>}
                   <p className="text-[12px] font-normal text-[#10141a] mb-2">
                     {doc.title}
                   </p>

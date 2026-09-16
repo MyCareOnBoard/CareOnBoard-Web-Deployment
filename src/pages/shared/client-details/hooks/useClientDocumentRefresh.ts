@@ -10,12 +10,12 @@ export function useClientDocumentRefresh({ requestKey, enabled, documentsActive,
   const snapshot = useRef<Client | null>(null);
   const sequence = useRef(0);
   const lastSuccess = useRef<number | null>(null);
-  const inFlight = useRef<{ controller: AbortController; promise: Promise<void> } | null>(null);
+  const inFlight = useRef<{ controller: AbortController; promise: Promise<boolean> } | null>(null);
 
-  const refresh = useCallback((force = false): Promise<void> => {
-    if (!enabled || context.current !== requestKey) return Promise.resolve();
+  const refresh = useCallback((force = false): Promise<boolean> => {
+    if (!enabled || context.current !== requestKey) return Promise.resolve(false);
     if (!force && inFlight.current) return inFlight.current.promise;
-    if (!force && lastSuccess.current !== null && Date.now() - lastSuccess.current < 60000) return Promise.resolve();
+    if (!force && lastSuccess.current !== null && Date.now() - lastSuccess.current < 60000) return Promise.resolve(true);
     inFlight.current?.controller.abort();
     const controller = new AbortController(), seq = ++sequence.current;
     const current = () => seq === sequence.current && context.current === requestKey && !controller.signal.aborted;
@@ -23,17 +23,19 @@ export function useClientDocumentRefresh({ requestKey, enabled, documentsActive,
     const promise = (async () => {
       try {
         const client = await loadRef.current(controller.signal);
-        if (!current()) return;
+        if (!current()) return false;
         snapshot.current = client; lastSuccess.current = Date.now();
         setState({ key: requestKey, client, loading: false, refreshing: false, error: null });
+        return true;
       } catch (cause) {
-        if (!current()) return;
+        if (!current()) return false;
         const failure = cause as { response?: { status?: number }; status?: number; name?: string; code?: string };
-        if (failure?.name === 'AbortError' || failure?.code === 'ERR_CANCELED') return;
+        if (failure?.name === 'AbortError' || failure?.code === 'ERR_CANCELED') return false;
         const denied = [401, 403, 404].includes(failure?.response?.status ?? failure?.status ?? 0);
         if (denied) snapshot.current = null;
         setState({ key: requestKey, client: snapshot.current, loading: false, refreshing: false,
           error: denied ? 'Client details are no longer available.' : 'Could not load the checklist. Try again.' });
+        return false;
       } finally {
         if (current()) {
           inFlight.current = null;

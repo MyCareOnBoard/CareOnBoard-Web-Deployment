@@ -91,7 +91,7 @@ export function UploadClientDocumentModal({
         file: null, // Don't preload file
         issuedOnDate: parseClientDocumentDate(documentToEdit.issuedOnDate) ?? null,
         expiryDate: parseClientDocumentDate(documentToEdit.expiryDate) ?? null,
-        autoReminder: documentToEdit.autoReminder ?? true,
+        autoReminder: documentToEdit.autoReminder ?? (documentToEdit.key !== "aenf"),
         customName: isOther ? documentToEdit.key : "",
         customTitle: isOther ? (documentToEdit.title || "") : "",
       });
@@ -102,7 +102,7 @@ export function UploadClientDocumentModal({
         file: null,
         issuedOnDate: null,
         expiryDate: null,
-        autoReminder: true,
+        autoReminder: initialDocumentKey !== "aenf",
         customName: "",
         customTitle: "",
       });
@@ -173,7 +173,7 @@ export function UploadClientDocumentModal({
         if (value === undefined) delete updatedDocument[field];
         else updatedDocument[field] = value;
       }
-      if (!documentToEdit || formData.autoReminder !== (documentToEdit.autoReminder ?? true)) updatedDocument.autoReminder = formData.autoReminder;
+      if (!documentToEdit || formData.autoReminder !== (documentToEdit.autoReminder ?? (documentToEdit.key !== "aenf"))) updatedDocument.autoReminder = formData.autoReminder;
       validateClientDocumentDates(updatedDocument, editedDates.issuedOnDate || editedDates.expiryDate);
       // Validate the exact record before any blob is uploaded.
       mergeClientDocumentEdit({ originalDocuments: existingDocuments, originalDocument: documentToEdit, replacement: updatedDocument });
@@ -192,7 +192,7 @@ export function UploadClientDocumentModal({
         file: null,
         issuedOnDate: null,
         expiryDate: null,
-        autoReminder: true,
+        autoReminder: initialDocumentKey !== "aenf",
         customName: "",
         customTitle: "",
       });
@@ -245,6 +245,7 @@ export function UploadClientDocumentModal({
                   value && !isUploading && setFormData({
                     ...formData,
                     documentType: value as ClientDocumentKey | "other",
+                    autoReminder: value === "aenf" ? false : formData.documentType === "aenf" ? true : formData.autoReminder,
                     // Clear custom fields when switching away from "other"
                     customName: value === "other" ? formData.customName : "",
                     customTitle: value === "other" ? formData.customTitle : "",

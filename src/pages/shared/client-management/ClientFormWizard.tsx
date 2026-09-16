@@ -1,6 +1,10 @@
 import {AssignmentReviewRosterProvider, rosterAssignmentsChanged, type SavedRosterReview} from "@/components/AssignmentReviewRoster";
+import {ClientNeedsPanel, type ClientNeedsDraft} from '@/pages/shared/client-details/components/ClientNeedsPanel';
+import {useAssignmentReviewScope} from '@/hooks/useAssignmentReview';
+import {getClientById} from '@/lib/api/clients';
+import {clientToFormData} from './utils/clientToFormData';
 import {assignmentSaveMessage, assignmentServiceRowKey} from "@/lib/api/assignment-review";
-import { refreshClientDocumentBaseline } from "./utils/clientDocumentEdits";
+import { hasClientDocumentEdit, refreshClientDocumentBaseline } from "./utils/clientDocumentEdits";
 import React, { useMemo, useCallback, useEffect, Suspense, lazy, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { AddClientFormData, createInitialDocs, type ClientType } from "./types/formData";
@@ -97,6 +101,20 @@ export function ClientFormWizard({
   const reviewCaptureRef = useRef("");
   const savedAssignmentFormRef = useRef(initialFormData);
   const [savedReview, setSavedReview] = useState<SavedRosterReview>();
+  const [needsDraft, setNeedsDraft] = useState<ClientNeedsDraft>();
+  const needsActorScope = useAssignmentReviewScope();
+  const needsIdentity = JSON.stringify([needsActorScope, clientId ?? savedClientIdRef.current, formData.agencyId || user?.agencyId || '', formData.type]);
+  const currentNeedsIdentity = useRef(needsIdentity); currentNeedsIdentity.current = needsIdentity;
+  useEffect(() => setNeedsDraft(previous => previous?.scopeKey === needsIdentity ? previous : undefined), [needsIdentity]);
+  const refreshNeedsDocuments = useCallback(async () => {
+    const savedId = clientId ?? savedClientIdRef.current;
+    if (!savedId) return;
+    const current = await getClientById(savedId, formData.agencyId || user?.agencyId, {mode: formData.type});
+    if (currentNeedsIdentity.current !== needsIdentity) return;
+    const fresh = clientToFormData(current).stage3;
+    setFormData(previous => ({...previous, stage3: {...previous.stage3, originalDocuments: fresh.originalDocuments,
+      docs: fresh.docs.map(doc => previous.stage3.docs.find(old => old.key === doc.key && hasClientDocumentEdit(old)) || doc)}}));
+  }, [clientId, formData.agencyId, formData.type, needsIdentity, setFormData, user?.agencyId]);
   const rosterRows = (data?: AddClientFormData) => data?.type === "hha" ? data.stage2.hhaAuthorizations ?? [] : data?.stage2.outcomes.flatMap(outcome => outcome.services) ?? [];
   const pendingSuccessClientIdRef = useRef<string | undefined>(undefined);
   const handleTypeSelect = useCallback(
@@ -318,7 +336,7 @@ export function ClientFormWizard({
       );
     if (stage === 2)
       return (
-        <AssignmentReviewRosterProvider enabled={agencyMode !== 'sc'} clientId={savedClientIdRef.current} agencyId={formData.agencyId} program={formData.type} savedRows={rosterRows(savedAssignmentFormRef.current)} captureRef={reviewCaptureRef} savedReview={savedReview}>
+        <AssignmentReviewRosterProvider enabled={agencyMode !== 'sc'} clientId={savedClientIdRef.current} agencyId={formData.agencyId} program={formData.type} savedRows={rosterRows(savedAssignmentFormRef.current)} captureRef={reviewCaptureRef} savedReview={savedReview} onViewNeeds={() => goToStage(3)}>
         <Stage2GuardianAndFunding
           footer={footer}
           formData={formData}
@@ -336,6 +354,9 @@ export function ClientFormWizard({
           pageTitle={pageTitle}
           clientId={clientId ?? savedClientIdRef.current}
           isSaving={isSaving}
+          needsPanel={agencyMode !== 'sc' ? <ClientNeedsPanel clientId={clientId ?? savedClientIdRef.current} agencyId={formData.agencyId || user?.agencyId || ''} program={formData.type}
+            documents={formData.stage3.originalDocuments} documentsDirty={formData.stage3.docs.some(doc => doc.key === 'aenf' && hasClientDocumentEdit(doc))}
+            documentsBusy={isSaving} draft={needsDraft} onDraftChange={setNeedsDraft} onRefreshDocuments={refreshNeedsDocuments} /> : undefined}
         />
       );
     if (stage === 4)
@@ -388,6 +409,10 @@ export function ClientFormWizard({
     handlePickerBack,
     clientId,
     isSaving,
+    needsDraft,
+    refreshNeedsDocuments,
+    agencyMode,
+    user?.agencyId,
     isDddClient,
     allowed,
   ]);

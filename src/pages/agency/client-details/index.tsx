@@ -1,6 +1,7 @@
 import { useEffectiveAgencyMode } from '@/hooks/useEffectiveAgencyMode';
 import { useClientDocumentRefresh } from '@/pages/shared/client-details/hooks/useClientDocumentRefresh';
 import { showClientChecklist } from '@/pages/shared/client-details/components/ClientDocumentChecklist';
+import {ClientNeedsPanel} from '@/pages/shared/client-details/components/ClientNeedsPanel';
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Phone, Edit, ArrowLeft } from "lucide-react";
 import { useParams, useNavigate, useSearchParams } from "react-router";
@@ -24,7 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/utils/auth";
-import { getAgencyClientById, updateClient, type Client, type ClientDocument, type ChecklistRow } from "@/lib/api/clients";
+import { getAgencyClientById, updateClient, type Client, type ClientDocument, type ClientDocumentKey } from "@/lib/api/clients";
 import { Routes } from "@/routes/constants";
 
 type ClientDetailsTab = "activity" | "profile" | "services" | "documents" | "family-portal";
@@ -45,8 +46,8 @@ export default function ClientDetailsPage() {
     requestKey: JSON.stringify([environment, user?.uid, user?.userType, user?.agencyId, scopeKey, clientId, mode]),
     enabled: Boolean(clientId && user?.uid && user?.agencyId), documentsActive: activeTab === 'documents', load: loadClient,
   });
-  const fetchClient = useCallback(() => refresh(true), [refresh]);
-  const [initialDocumentKey, setInitialDocumentKey] = useState<ChecklistRow['key'] | undefined>();
+  const fetchClient = useCallback(async () => { await refresh(true); }, [refresh]);
+  const [initialDocumentKey, setInitialDocumentKey] = useState<ClientDocumentKey | undefined>();
   const canUpload = user?.userType === "agency";
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [documentToEdit, setDocumentToEdit] = useState<ClientDocument | undefined>(undefined);
@@ -363,6 +364,9 @@ export default function ClientDetailsPage() {
         />
       )}
       {activeTab === "documents" && (
+        <>
+        {mode !== 'sc' && <ClientNeedsPanel clientId={clientId} agencyId={client.agencyId || user?.agencyId || ''} program={mode === 'hha' ? 'hha' : 'ddd'} documents={client.documents}
+          documentsBusy={refreshing} onRefreshDocuments={() => refresh(true)} onUploadAenf={canUpload ? () => {setDocumentToEdit(undefined); setInitialDocumentKey('aenf'); setIsUploadModalOpen(true);} : undefined} />}
         <DocumentsTab
           client={client}
           showChecklist={showClientChecklist(client, user?.userType, mode)}
@@ -373,6 +377,7 @@ export default function ClientDetailsPage() {
           } : undefined}
           onActivateClient={canUpload ? handleActivateClient : undefined}
         />
+        </>
       )}
       {activeTab === "family-portal" && (
         <FamilyPortalTab
