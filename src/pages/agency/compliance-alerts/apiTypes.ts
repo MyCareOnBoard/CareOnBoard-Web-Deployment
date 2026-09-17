@@ -81,3 +81,23 @@ export interface DocumentComplianceSettings {
   canEnable: boolean;
   message?: string;
 }
+
+export type ShiftNoteState = 'not_due' | 'not_applicable' | 'needs_review' | 'missing' | 'draft' | 'needs_correction' | 'submitted' | 'approved';
+export type ShiftNoteAction = {type: 'start' | 'continue' | 'correct' | 'view' | 'review'; activityLogId?: string; submissionId?: string};
+export interface ShiftNoteComplianceItem {
+  shiftId: string; agencyId: string; employeeId: string; clientId: string; program: string; noteType: string;
+  state: ShiftNoteState; reasonCodes: string[]; fieldErrors: {noteId: string; field: string; code: string}[];
+  serviceDate: string | null; checkedAt: string | null; syncStatus: 'ready' | 'pending' | 'unavailable';
+  staffDueAt: string | null; adminDueAt: string | null; actions: ShiftNoteAction[]; employeeName: string; clientName: string;
+}
+export type ShiftNoteCoverage = 'disabled' | 'checking' | 'ready' | 'paused' | 'unavailable';
+export interface ShiftNoteComplianceResponse {items: ShiftNoteComplianceItem[]; nextCursor: string | null; coverage: ShiftNoteCoverage; timezone: string | null;}
+export interface ShiftNoteComplianceDetail extends ShiftNoteComplianceItem {coverage: ShiftNoteCoverage; timezone: string | null; activityLogId: string | null; submissionIds: string[]; approvalIds: string[];}
+export interface ShiftNoteComplianceArgs {
+  viewerId: string; agencyId: string; mode?: string; employeeId?: string;
+  stateGroup?: 'unresolved' | 'submitted' | 'approved' | 'inactive' | 'all'; startDate?: string; endDate?: string; limit?: number; cursor?: string;
+}
+export const shiftNoteLabels: Record<ShiftNoteState, string> = {
+  not_due: 'Not due', not_applicable: 'Not applicable', needs_review: 'Needs review', missing: 'Note missing',
+  draft: 'Draft not submitted', needs_correction: 'Needs correction', submitted: 'Submitted — awaiting review', approved: 'Approved',
+};

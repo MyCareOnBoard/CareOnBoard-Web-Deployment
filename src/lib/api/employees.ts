@@ -477,7 +477,7 @@ export interface ListActivityLogsResponse {
  * Endpoint: POST /employees/activity-logs
  */
 export async function createEmployeeActivityLog(
-    data: CreateActivityLogRequest,
+    data: CreateActivityLogRequest | {shiftId: string},
     options: { signal?: AbortSignal } = {},
 ): Promise<ActivityLogResponse> {
     try {

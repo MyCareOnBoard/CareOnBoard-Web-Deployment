@@ -1,3 +1,4 @@
+import { Routes } from '@/routes/constants';
 /**
  * Single source of truth for note (activity-log) types.
  *
@@ -109,4 +110,46 @@ export function getNoteShortLabel(id: string): string {
 
 export function noteTypesForClientType(clientType: NoteClientType): NoteTypeDef[] {
   return NOTE_TYPES.filter((noteType) => noteType.clientType === clientType);
+}
+
+export const NOTE_ROUTES: Record<NoteTypeId, string> = {
+  "community-based": Routes.userPanel.notes.communityBased,
+  "community-inclusion": Routes.userPanel.notes.communityInclusion,
+  "day-habilitation": Routes.userPanel.notes.dayHabilitation,
+  "prevocational-training": Routes.userPanel.notes.preVocationalTraining,
+  "supported-employment-intervention": Routes.userPanel.notes.supportedEmploymentIntervention,
+  "supported-employment-pre": Routes.userPanel.notes.supportedEmploymentPre,
+  "respite-log": Routes.userPanel.notes.respiteLog,
+  "hha-personal-care": Routes.userPanel.notes.hhaPersonalCare,
+  "hha-service-log": Routes.userPanel.notes.hhaServiceActivityLog,
+};
+
+/** Date-only note evidence includes the legacy exact UTC-midnight encoding. */
+export function noteServiceDate(value?: string | null): Date | undefined {
+  if (!value || !/^\d{4}-\d{2}-\d{2}(?:T00:00:00(?:\.000)?Z)?$/.test(value)) return undefined;
+  const key = value.slice(0, 10);
+  const date = new Date(key + 'T12:00:00');
+  return !Number.isNaN(date.getTime()) && date.getFullYear() === Number(key.slice(0, 4)) && date.getMonth() + 1 === Number(key.slice(5, 7)) && date.getDate() === Number(key.slice(8, 10)) ? date : undefined;
+}
+
+/** Naive times already belong to the agency; instants must be displayed there. */
+export function noteTimedFields(value: string, timezone?: string | null): {date: Date | undefined; time: string} {
+  const naive = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::00(?:\.000)?)?$/.exec(value);
+  if (naive) return {date: noteServiceDate(naive[1]), time: naive[2]};
+  if (timezone && /^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(value) && !Number.isNaN(Date.parse(value))) {
+    try {
+      const parts = new Intl.DateTimeFormat('en-US', {timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'}).formatToParts(new Date(value));
+      const part = (type: string) => parts.find(item => item.type === type)?.value ?? '';
+      return {date: noteServiceDate(`${part('year')}-${part('month')}-${part('day')}`), time: `${part('hour')}:${part('minute')}`};
+    } catch { /* Invalid agency timezone requires review, never a guessed date. */ }
+  }
+  return {date: undefined, time: ''};
+}
+
+/** Advance only within the server-confirmed overnight service dates. */
+export function noteEndDate(date: Date, start: string, end: string, serviceDates: string[] = []): string {
+  const key = (value: Date) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+  const startDate = key(date);
+  const next = new Date(date); next.setDate(next.getDate() + 1);
+  return start && end && end < start && serviceDates.includes(startDate) && serviceDates.includes(key(next)) ? key(next) : startDate;
 }

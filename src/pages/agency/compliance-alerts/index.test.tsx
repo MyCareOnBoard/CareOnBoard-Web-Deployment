@@ -1,3 +1,4 @@
+vi.mock('./ShiftNotesSection', () => ({default: () => null}));
 import {act, fireEvent, render, screen} from '@testing-library/react';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 const mocks = vi.hoisted(() => ({query: vi.fn(), mode: 'hha', navigate: vi.fn(), clients: [] as unknown[], refreshDate: () => {}}));

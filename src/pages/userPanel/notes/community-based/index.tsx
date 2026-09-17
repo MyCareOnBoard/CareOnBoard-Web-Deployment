@@ -1,4 +1,8 @@
-import React, {useEffect, useState} from "react";
+import { noteTimedFields, noteEndDate } from '@/lib/notes/noteTypes';
+import { useNoteOperation } from '@/lib/notes/useNoteOperation';
+import { NoteFieldErrors, focusNoteError } from '@/pages/shared/notes/NoteFieldErrors';
+import type { NoteFieldError } from '@/pages/userPanel/notes/apiTypes';
+import React, {useEffect, useState, useRef} from "react";
 import {Input} from "@/components/ui/input";
 import {Checkbox} from "@/components/ui/checkbox";
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
@@ -21,6 +25,9 @@ import {toast} from "sonner";
 import {useAuth} from "@/utils/auth";
 
 type ActivityRow = {
+  originalStartDate?: string;
+  originalEndDate?: string;
+  dateTimeEdited?: boolean;
   id: string;
   date: Date | undefined;
   startTime: string;
@@ -47,6 +54,11 @@ const initialActivities = [
 ]
 
 export default function CommunityBasedPage() {
+  const id = new URLSearchParams(useLocation().search).get("id");
+  return <CommunityBasedPageForm key={id} />;
+}
+
+function CommunityBasedPageForm() {
   const [openDatePopoverId, setOpenDatePopoverId] = useState<string | null>(null);
 
   const navigate = useNavigate();
@@ -56,11 +68,26 @@ export default function CommunityBasedPage() {
   const {data: activityLog, isLoading} = useGetSingleActivityLogQuery(activityLogId!, {
     skip: !activityLogId,
   });
+  const operation = useNoteOperation();
+  const submitting = useRef(false);
+  const [flushing, setFlushing] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<NoteFieldError[]>([]);
+  const hydrated = useRef(false);
+  const failedSaves = useRef(new Set<string>());
+  const saveChain = useRef<Promise<void>>(Promise.resolve());
+  const [submittedIds, setSubmittedIds] = useState<string[]>([]);
   const [mutateNote] = useCreateOrUpdateActivityLogMutation();
-  const [updateLog] = useUpdateActivityLogMutation();
+  const [updateLogMutation] = useUpdateActivityLogMutation();
+  const headerSave = useRef<Promise<unknown>>(Promise.resolve());
+  const updateLog = (payload: Parameters<typeof updateLogMutation>[0]) => ({unwrap: () => {
+    headerSave.current = headerSave.current.catch(() => {}).then(() => updateLogMutation(payload).unwrap());
+    return headerSave.current;
+  }});
   const [submitNotes, {isLoading: isSubmitting}] = useSubmitActivityLogNotesMutation();
 
   const [activities, setActivities] = useState<ActivityRow[]>(initialActivities);
+  const activitiesRef = useRef(activities);
+  activitiesRef.current = activities;
 
   const [serviceStrategies, setServiceStrategies] = useState<ServiceStrategy[]>([
     {
@@ -92,72 +119,38 @@ export default function CommunityBasedPage() {
 
   const currentDate = new Date().toLocaleDateString("en-US", {month: "long", day: "numeric"});
 
-  const updateActivity = async (
-    id: string,
-    index: number,
-    field: keyof ActivityRow,
-    value: any,
-  ) => {
-    setActivities(prevActivities => {
-      return prevActivities.map((act, activityIndex) => {
-        if ((id && act.id === id) || (index === activityIndex)) {
-          return {...act, [field]: value};
-        } else {
-          return act;
-        }
-      });
-    });
-
-    const currentActivities = activities;
-
-    let activity;
-    if (id) {
-      activity = currentActivities.find(activity => activity.id === id);
-    } else {
-      activity = currentActivities[index];
-    }
-
-    if (!activity) return;
-
-    const newActivity = {
-      ...activity,
-      [field]: value
-    };
-
-    const date = newActivity.date;
-    const startTime = field === "startTime" ? value : newActivity.startTime;
-    const endTime = field === "endTime" ? value : newActivity.endTime;
-
-    if (date && startTime && endTime && id === "") {
-      await mutateNote({
+  const lockedIds = new Set([...submittedIds, ...(activityLog?.submittedNotes ?? []).map(note => note.id), ...(activityLog?.approvedNotes ?? []).map(note => note.id)]);
+  const updateActivity = (_id: string, index: number, field: keyof ActivityRow, value: any) => {
+    if ((operation.pending || submitting.current) || lockedIds.has(activitiesRef.current[index].id)) return;
+    activitiesRef.current = activitiesRef.current.map((item, i) => i === index ? {...item, [field]: value, dateTimeEdited: item.dateTimeEdited || ["date", "startTime", "endTime"].includes(field)} : item);
+    setActivities(activitiesRef.current);
+    const saveKey = `activity:${index}`;
+    saveChain.current = saveChain.current.catch(() => {}).then(async () => {
+        failedSaves.current.add(saveKey);
+        const current = activitiesRef.current[index];
+        const date = current.date;
+        const startTime = current.startTime; const endTime = current.endTime;
+        if (!(date && startTime && endTime)) return;
+        const {data} = await mutateNote({
         activityLog: activityLogId!,
         data: {
-          id: id,
-          startDate: format(date, "yyyy-MM-dd") + "T" + startTime,
-          endDate: format(date, "yyyy-MM-dd") + "T" + endTime,
+          id: current.id,
+          startDate: !current.dateTimeEdited && current.originalStartDate ? current.originalStartDate : format(date, "yyyy-MM-dd") + "T" + startTime,
+          endDate: !current.dateTimeEdited && current.originalEndDate ? current.originalEndDate : noteEndDate(date, startTime, endTime, activityLog?.serviceDates) + "T" + endTime,
           metadata: {
-            activity: newActivity.activity,
-            description: newActivity.description,
+            activity: current.activity,
+            description: current.description,
           }
         }
       }).unwrap();
-    } else if (date && startTime && endTime && id !== "") {
-      await mutateNote({
-        activityLog: activityLogId!,
-        data: {
-          id: id,
-          startDate: format(date, "yyyy-MM-dd") + "T" + startTime,
-          endDate: format(date, "yyyy-MM-dd") + "T" + endTime,
-          metadata: {
-            activity: newActivity.activity,
-            description: newActivity.description,
-          }
+        failedSaves.current.delete(saveKey);
+        if (!current.id && data?.id) {
+          activitiesRef.current = activitiesRef.current.map((item, i) => i === index ? {...item, id: data.id} : item);
+          setActivities(activitiesRef.current);
         }
-      }).unwrap().catch(error => {
-        console.error('Failed to update activity:', error);
-      });
-    }
-  }
+    });
+    void saveChain.current.catch(() => toast.error('Your changes could not be saved. Try again before submitting.'));
+  };
 
   const formatDisplayDate = (date: Date | undefined) => {
     if (!date) {
@@ -187,57 +180,47 @@ export default function CommunityBasedPage() {
   };
 
   const handleSubmit = async () => {
+    if (submitting.current) return;
+    submitting.current = true; setFlushing(true);
     try {
-      await submitNotes({
-        activityLog: activityLogId!,
-        logNoteIds: activities.filter(
-            (activity) => !!activity.id
-        ).map((activity) => activity.id)
-      }).unwrap();
-      setActivities(initialActivities);
+      await saveChain.current.catch(() => {});
+      submitting.current = false;
+      for (const key of [...failedSaves.current]) {
+        const [kind, position] = key.split(':'); const index = Number(position);
+        if (kind === 'activity') updateActivity('', index, 'description', activitiesRef.current[index].description);
+      }
+      submitting.current = true;
+      await saveChain.current;
+      await headerSave.current;
+      if (failedSaves.current.size) throw new Error("Some rows have unsaved changes. Check their dates and try saving again before submitting.");
+      const logNoteIds = [...activitiesRef.current].filter(row => row.id && !lockedIds.has(row.id)).map(row => row.id);
+      if (!logNoteIds.length) { toast.error('Save a service row before submitting.'); return; }
+      await operation.run({action: 'submit', resourceId: activityLogId!, noteIds: logNoteIds}, operationId => submitNotes({activityLog: activityLogId!, logNoteIds, operationId}).unwrap());
+      setSubmittedIds(previous => [...previous, ...logNoteIds]);
+      setFieldErrors([]);
       toast.success('Note submitted successfully!');
     } catch (error: any) {
-      console.error('Error submitting activity log:', error);
-      toast.error(error?.data?.message || 'Failed to submit activity log.');
-    }
-  }
+      const errors = error?.data?.fieldErrors ?? [];
+      setFieldErrors(errors);
+      focusNoteError(errors);
+      toast.error(error?.data?.message || error?.message || 'Failed to submit activity log.');
+    } finally { submitting.current = false; setFlushing(false); }
+  };
 
   useEffect(() => {
-    if (!isLoading && activityLog && activityLog.notes.length > 0) {
-      if (activities.some((activity) => activity.id)) {
-        const newActivities = activities.map((activity, index) => {
-          if (!activity.id) {
-            if (activityLog.notes.length > index) {
-              activity.id = activityLog.notes[index].id;
-            }
-          }
-          return activity;
-        });
-        setActivities(newActivities);
-      } else {
-        const modifyActivityNotes = activityLog.notes.map((note) => ({
-          id: note.id,
-          date: note.startDate?.split("T")?.[0] ? new Date(note.startDate?.split("T")?.[0]) : undefined,
-          startTime: note.startDate ? new Date(note.startDate).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false
-          }) : "",
-          endTime: note.endDate ? new Date(note.endDate).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false
-          }) : "",
-          activity: note.metadata?.activity,
-          description: note.metadata?.description,
-        }));
-        setActivities([
-          ...modifyActivityNotes,
-          ...initialActivities.slice(modifyActivityNotes.length)
-        ]);
-      }
-    }
-
+    if (isLoading || !activityLog || hydrated.current) return;
+    hydrated.current = true;
+    const notes = [...activityLog.notes, ...(activityLog.submittedNotes ?? []), ...(activityLog.approvedNotes ?? [])];
+    const timezone = activityLog.timezone ?? (!activityLog.shiftId ? Intl.DateTimeFormat().resolvedOptions().timeZone : undefined);
+    const modifyActivityNotes = notes.map(note => {
+      const start = noteTimedFields(note.startDate, timezone);
+      const end = noteTimedFields(note.endDate, timezone);
+      return {id: note.id, date: start.date, startTime: start.time, endTime: end.time,
+        originalStartDate: note.startDate, originalEndDate: note.endDate,
+        activity: note.metadata?.activity ?? '', description: note.metadata?.description ?? ''};
+    });
+    activitiesRef.current = [...modifyActivityNotes, ...initialActivities.slice(modifyActivityNotes.length)];
+    setActivities(activitiesRef.current);
     if (!isLoading && activityLog && activityLog.metadata?.strategies?.length > 0) {
       setServiceStrategies((prevState) => prevState.map((strategy) => ({
         ...strategy,
@@ -261,6 +244,7 @@ export default function CommunityBasedPage() {
   return (
     <VoiceRecordingProvider pageTitle="Community Based/Individual – Activities Log">
       <div className="min-h-[calc(100vh-200px)] pb-20">
+        <NoteFieldErrors errors={fieldErrors} />
         {/* Page Header */}
         <div className="mb-8 flex justify-between items-center">
           <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a] font-['Urbanist',sans-serif]">
@@ -426,6 +410,7 @@ export default function CommunityBasedPage() {
                 {activities?.map((activity, index) => (
                   <div
                     key={index}
+                    data-note-id={activity.id}
                     className={`grid grid-cols-[112px_120px_120px_350px_1fr] gap-0 min-h-[71px] transition-colors ${
                       index < activities?.length - 1 ? 'border-b border-[#b2b2b3]' : ''
                     } hover:bg-white`}
@@ -434,10 +419,10 @@ export default function CommunityBasedPage() {
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
                       <Popover
                         open={openDatePopoverId === String(index)}
-                        onOpenChange={(open) => setOpenDatePopoverId(open ? String(index) : null)}
+                        onOpenChange={(open) => { if (!lockedIds.has(activity.id) && !operation.pending) setOpenDatePopoverId(open ? String(index) : null); }}
                       >
                         <PopoverTrigger asChild>
-                          <button
+                          <button data-note-field="startDate" disabled={lockedIds.has(activity.id) || flushing}
                             type="button"
                             className="w-full h-full flex items-center justify-center focus:outline-none cursor-pointer"
                           >
@@ -480,21 +465,22 @@ export default function CommunityBasedPage() {
                     </div>
                     {/* Start Time */}
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
-                      <TimePicker
+                      <TimePicker disabled={lockedIds.has(activity.id) || operation.pending || flushing}
                         value={activity.startTime}
                         onChange={(value) => updateActivity(activity.id, index, 'startTime', value)}
                       />
                     </div>
                     {/* End Time */}
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
-                      <TimePicker
+                      <TimePicker disabled={lockedIds.has(activity.id) || operation.pending || flushing}
                         value={activity.endTime}
                         onChange={(value) => updateActivity(activity.id, index, 'endTime', value)}
                       />
                     </div>
                     {/* Activity */}
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
-                      <ContentEditableCell
+                      <ContentEditableCell fieldKey="activity"
+                        readOnly={lockedIds.has(activity.id) || operation.pending || flushing}
                         value={activity.activity}
                         onChange={(value) => updateActivity(activity.id, index, 'activity', value)}
                         fieldName="Individualized Activity"
@@ -503,7 +489,8 @@ export default function CommunityBasedPage() {
                     </div>
                     {/* Description */}
                     <div className="px-4 py-3 flex items-center justify-center">
-                      <ContentEditableCell
+                      <ContentEditableCell fieldKey="description"
+                        readOnly={lockedIds.has(activity.id) || operation.pending || flushing}
                         value={activity.description}
                         onChange={(value) => updateActivity(activity.id, index, 'description', value)}
                         fieldName="Description"
@@ -538,7 +525,7 @@ export default function CommunityBasedPage() {
           <Button
             type={"button"}
             onClick={handleSubmit}
-            disabled={isSubmitting}
+            disabled={isSubmitting || operation.pending || flushing}
             className="flex items-center gap-2 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-6 py-3 h-auto font-semibold shadow-sm"
           >
             {isSubmitting ? "Submitting..." : "Submit"}

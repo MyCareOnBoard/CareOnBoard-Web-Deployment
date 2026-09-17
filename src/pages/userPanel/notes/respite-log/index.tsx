@@ -1,4 +1,9 @@
-import React, {useEffect, useState} from "react";
+import { noteServiceDate } from '@/lib/notes/noteTypes';
+import LockedNoteEvidence from '@/pages/shared/notes/LockedNoteEvidence';
+import { useNoteOperation } from '@/lib/notes/useNoteOperation';
+import { NoteFieldErrors, focusNoteError } from '@/pages/shared/notes/NoteFieldErrors';
+import type { NoteFieldError, ActivityLogNote } from '@/pages/userPanel/notes/apiTypes';
+import React, {useEffect, useState, useRef} from "react";
 import {Input} from "@/components/ui/input";
 import {Radio} from "@/components/ui/radio";
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
@@ -23,6 +28,11 @@ import {toast} from "sonner";
 type MealType = "breakfast" | "lunch" | "dinner";
 
 export default function RespiteLogPage() {
+  const id = new URLSearchParams(useLocation().search).get("id");
+  return <RespiteLogPageForm key={id} />;
+}
+
+function RespiteLogPageForm() {
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [isDateOpen, setIsDateOpen] = useState(false);
   const [medication, setMedication] = useState("");
@@ -36,6 +46,7 @@ export default function RespiteLogPage() {
   const [selectedActivity, setSelectedActivity] = useState<string>("");
 
   const toggleMeal = (meal: MealType) => {
+    if (locked || submitPending.current || retrySubmission) return;
     setSelectedMeals((prev) =>
       prev.includes(meal) ? prev.filter((m) => m !== meal) : [...prev, meal]
     );
@@ -43,21 +54,26 @@ export default function RespiteLogPage() {
 
   const navigate = useNavigate();
   const activityLogId = new URLSearchParams(useLocation().search).get("id");
+  const operation = useNoteOperation();
+  const submissionAttempt = useRef<string | null>(null);
+  const submitPending = useRef(false);
+  const [flushing, setFlushing] = useState(false);
+  const [retrySubmission, setRetrySubmission] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<NoteFieldError[]>([]);
+  const hydrated = useRef(false);
+  const noteId = useRef('');
+  const saveChain = useRef<Promise<string>>(Promise.resolve(''));
+  const [submitted, setSubmitted] = useState(false);
   const [mutateNote] = useCreateOrUpdateActivityLogMutation();
   const [submitNotes, {isLoading: isSubmitting}] = useSubmitActivityLogNotesMutation();
   const {data: activityLog, isLoading} = useGetSingleActivityLogQuery(activityLogId!, {
     skip: !activityLogId
   });
 
-  const handleSave = async () => {
-    if (!date) {
-      toast.error("Date is required.");
-      return;
-    }
-    try {
-      await mutateNote({
-        activityLog: activityLogId!,
-        data: {
+  const locked = submitted || Boolean(!activityLog?.notes?.length && ((activityLog?.submittedNotes?.length ?? 0) + (activityLog?.approvedNotes?.length ?? 0)));
+  const saveNow = () => {
+    if (!date) return Promise.reject(new Error('Date is required.'));
+    const payload = {
           id: selectedActivity,
           startDate: format(date, "yyyy-MM-dd"),
           endDate: format(date, "yyyy-MM-dd"),
@@ -71,62 +87,45 @@ export default function RespiteLogPage() {
             suppliesNeeded: suppliesNeeded,
             medicationTime: medicationTime
           }
-        }
-      }).unwrap();
-      toast.success("Respite Log saved successfully!");
-    } catch (error) {
-      console.error("Error saving activity log:", error);
-    }
+        };
+    saveChain.current = saveChain.current.catch(() => '').then(async () => {
+      const {data} = await mutateNote({activityLog: activityLogId!, data: {...payload, id: noteId.current}}).unwrap();
+      noteId.current = data.id; setSelectedActivity(data.id); return data.id;
+    });
+    return saveChain.current;
   };
-
+  const handleSave = async () => {
+    if (locked || operation.pending) return;
+    try { await saveNow(); toast.success('Respite Log saved successfully!'); }
+    catch { toast.error('Your changes could not be saved. Try again.'); }
+  };
   const handleSubmit = async () => {
-    if (!date) {
-      toast.error("Date is required.");
-      return;
-    }
+    if (submitPending.current) return;
+    submitPending.current = true; setFlushing(true);
+    if (locked || operation.pending) { submitPending.current = false; setFlushing(false); return; }
     try {
-      const {data} = await mutateNote({
-        activityLog: activityLogId!,
-        data: {
-          id: selectedActivity,
-          startDate: format(date, "yyyy-MM-dd"),
-          endDate: format(date, "yyyy-MM-dd"),
-          metadata: {
-            medication: medication,
-            meals: selectedMeals,
-            activities: activities,
-            comments: comments,
-            toileting: toileting,
-            healthConcerns: healthConcerns,
-            suppliesNeeded: suppliesNeeded,
-            medicationTime: medicationTime
-          }
-        }
-      }).unwrap();
-      await submitNotes({
-        activityLog: activityLogId!,
-        logNoteIds: [data.id]
-      }).unwrap();
-      toast.success("Respite Log submitted successfully!");
-      setDate(undefined);
-      setMedication("");
-      setMedicationTime("");
-      setSelectedMeals([]);
-      setActivities("");
-      setComments("");
-      setHealthConcerns("");
-      setSuppliesNeeded("");
-      setToileting("");
-      setSelectedActivity("");
-    } catch (error) {
-      console.error("Error saving activity log:", error);
-    }
+      const id = submissionAttempt.current ?? await saveNow();
+      submissionAttempt.current = id;
+      await operation.run({action: 'submit', resourceId: activityLogId!, noteIds: [id]}, operationId => submitNotes({activityLog: activityLogId!, logNoteIds: [id], operationId}).unwrap());
+      submissionAttempt.current = null; setRetrySubmission(false);
+      setSubmitted(true); setFieldErrors([]); toast.success('Respite Log submitted successfully!');
+    } catch (error: any) {
+      const definitive = typeof error?.status === 'number' && error.status >= 400 && error.status < 500 && error.status !== 408 && error.status !== 429;
+      if (definitive) submissionAttempt.current = null;
+      setRetrySubmission(Boolean(submissionAttempt.current));
+      setFieldErrors(error?.data?.fieldErrors ?? []); focusNoteError(error?.data?.fieldErrors ?? []);
+      toast.error(error?.data?.message || error?.message || 'Failed to submit note.');
+    } finally { submitPending.current = false; setFlushing(false); }
   };
 
   useEffect(() => {
-    if (activityLog && activityLog.notes.length > 0) {
-      const note = activityLog.notes[activityLog.notes.length - 1];
-      setDate(note?.startDate ? new Date(note.startDate) : undefined);
+    if (!activityLog || hydrated.current) return;
+    hydrated.current = true;
+    const notes = activityLog.notes.length ? activityLog.notes : [...(activityLog.submittedNotes ?? []), ...(activityLog.approvedNotes ?? [])];
+    if (notes.length) {
+      const note = notes[notes.length - 1];
+      noteId.current = note.id;
+      setDate(noteServiceDate(note.startDate));
       setMedication(note?.metadata?.medication ?? "");
       setMedicationTime(note?.metadata?.medicationTime ?? "");
       setSelectedMeals(note?.metadata?.meals ?? []);
@@ -151,9 +150,27 @@ export default function RespiteLogPage() {
     );
   }
 
+  const editDraft = async (note: ActivityLogNote) => {
+    if (operation.pending || submitPending.current || retrySubmission) return;
+    try {
+      if (!locked && date) await saveNow();
+      noteId.current = note.id; setSelectedActivity(note.id);
+      setDate(noteServiceDate(note.startDate));
+      setMedication(note.metadata?.medication ?? ''); setMedicationTime(note.metadata?.medicationTime ?? '');
+      setSelectedMeals(note.metadata?.meals ?? []); setActivities(note.metadata?.activities ?? '');
+      setComments(note.metadata?.comments ?? ''); setHealthConcerns(note.metadata?.healthConcerns ?? '');
+      setSuppliesNeeded(note.metadata?.suppliesNeeded ?? ''); setToileting(note.metadata?.toileting ?? '');
+      setSubmitted(false); setFieldErrors([]);
+    } catch { toast.error('Save the current draft before opening another row.'); }
+  };
+
+
   return (
     <VoiceRecordingProvider pageTitle="Respite Log">
-      <div className="min-h-[calc(100vh-200px)] pb-20">
+      <div className="min-h-[calc(100vh-200px)] pb-20" data-note-id={selectedActivity} >
+        <NoteFieldErrors errors={fieldErrors} />
+      <LockedNoteEvidence onEdit={note => void editDraft(note)} displayedId={selectedActivity} notes={[...(activityLog?.notes ?? []).map(note => ({...note, status: "active" as const})), ...(activityLog?.submittedNotes ?? []).map(note => ({...note, status: "submitted" as const})), ...(activityLog?.approvedNotes ?? []).map(note => ({...note, status: "approved" as const}))]} />
+      {retrySubmission ? <p role="status" className="text-sm">Submission could not be confirmed. Submit again to retry safely before editing.</p> : null}
         {/* Page Header */}
         <div className="mb-3 flex justify-between items-center">
           <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a] font-['Urbanist',sans-serif]">
@@ -203,7 +220,7 @@ export default function RespiteLogPage() {
               <label className="text-[12px] font-normal leading-[normal] text-[#10141a] font-['Urbanist',sans-serif]">
                 Toileting
               </label>
-              <Input
+              <Input disabled={locked || operation.pending || retrySubmission || flushing}
                 type="text"
                 value={toileting}
                 onChange={(e) => setToileting(e.target.value)}
@@ -218,7 +235,7 @@ export default function RespiteLogPage() {
               <label className="text-[12px] font-normal leading-[normal] text-[#10141a] font-['Urbanist',sans-serif]">
                 Date
               </label>
-              <Popover open={isDateOpen} onOpenChange={setIsDateOpen}>
+              <Popover open={isDateOpen} onOpenChange={open => {if (!locked && !retrySubmission) setIsDateOpen(open);}}>
                 <PopoverTrigger asChild>
                   <button type="button" className="w-full focus:outline-none">
                     <InputGroup className="h-11 bg-white border border-[#cccccd] rounded-xl px-4">
@@ -266,7 +283,7 @@ export default function RespiteLogPage() {
               <label className="text-[12px] font-normal leading-[normal] text-[#10141a] font-['Urbanist',sans-serif]">
                 Medication
               </label>
-              <Input
+              <Input disabled={locked || operation.pending || retrySubmission || flushing}
                 type="text"
                 value={medication}
                 onChange={(e) => setMedication(e.target.value)}
@@ -280,7 +297,7 @@ export default function RespiteLogPage() {
               </label>
               <div className="flex gap-[9px] items-center h-11">
                 <div className="flex gap-1 items-center">
-                  <Radio
+                  <Radio disabled={locked || operation.pending || retrySubmission || flushing}
                     name="medicationTime"
                     value="AM"
                     checked={medicationTime === "AM"}
@@ -291,7 +308,7 @@ export default function RespiteLogPage() {
                 </span>
                 </div>
                 <div className="flex gap-1 items-center">
-                  <Radio
+                  <Radio disabled={locked || operation.pending || retrySubmission || flushing}
                     name="medicationTime"
                     value="PM"
                     checked={medicationTime === "PM"}
@@ -358,14 +375,14 @@ export default function RespiteLogPage() {
             <label className="text-[12px] font-normal leading-[normal] text-[#10141a] font-['Urbanist',sans-serif]">
               Activities
             </label>
-            <VoiceEnabledTextarea
+            <div data-note-field="activities"><VoiceEnabledTextarea disabled={locked || retrySubmission}
               value={activities}
               onChange={setActivities}
               className="h-[143px] bg-white border border-[#cccccd] rounded-xl px-4 py-3 resize-none"
               placeholder=""
               fieldName="Activities"
               pageTitle="Respite Log"
-            />
+            /></div>
           </div>
 
           {/* Comments */}
@@ -373,7 +390,7 @@ export default function RespiteLogPage() {
             <label className="text-[12px] font-normal leading-[normal] text-[#10141a] font-['Urbanist',sans-serif]">
               Comments:
             </label>
-            <VoiceEnabledTextarea
+            <VoiceEnabledTextarea disabled={locked || retrySubmission}
               value={comments}
               onChange={setComments}
               className="h-[143px] bg-white border border-[#cccccd] rounded-xl px-4 py-3 resize-none"
@@ -388,7 +405,7 @@ export default function RespiteLogPage() {
             <label className="text-[12px] font-normal leading-[normal] text-[#10141a] font-['Urbanist',sans-serif]">
               Health Concerns:
             </label>
-            <VoiceEnabledTextarea
+            <VoiceEnabledTextarea disabled={locked || retrySubmission}
               value={healthConcerns}
               onChange={setHealthConcerns}
               className="h-[90px] bg-white border border-[#cccccd] rounded-xl px-4 py-3 resize-none"
@@ -403,7 +420,7 @@ export default function RespiteLogPage() {
             <label className="text-[12px] font-normal leading-[normal] text-[#10141a] font-['Urbanist',sans-serif]">
               Supplies Needed Soon:
             </label>
-            <VoiceEnabledTextarea
+            <VoiceEnabledTextarea disabled={locked || retrySubmission}
               value={suppliesNeeded}
               onChange={setSuppliesNeeded}
               className="h-[90px] bg-white border border-[#cccccd] rounded-xl px-4 py-3 resize-none"
@@ -417,6 +434,7 @@ export default function RespiteLogPage() {
           <div className="flex gap-[16px] items-center pt-[10px]">
             <button
               type="button"
+              disabled={locked || retrySubmission}
               onClick={handleSave}
               className="bg-[#b2b2b3] backdrop-blur-[22px] rounded-[60px] px-[8px] py-[8px] w-[71px] flex items-center justify-center"
             >
@@ -426,7 +444,7 @@ export default function RespiteLogPage() {
             </button>
             <button
               type="button"
-              disabled={isSubmitting}
+              disabled={locked || isSubmitting || operation.pending || flushing}
               onClick={handleSubmit}
               className="cursor-pointer bg-[#00b4b8] backdrop-blur-[22px] rounded-[60px] px-[8px] py-[8px] w-[71px] flex items-center justify-center"
             >

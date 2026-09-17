@@ -1,3 +1,4 @@
+import ShiftNotesSection from './ShiftNotesSection';
 import { useState, useEffect, useCallback } from "react";
 import { ArrowLeft, ChevronLeft, ChevronRight, Search, ShieldCheck } from "lucide-react";
 import { useNavigate } from "react-router";
@@ -385,6 +386,7 @@ export default function ComplianceAlertsPage() {
           </div>
         )}
       </div>
+      <ShiftNotesSection agencyId={user?.agencyId ?? ""} mode={mode ?? undefined} viewerId={user?.uid ?? ""} />
     </div>
   );
 }

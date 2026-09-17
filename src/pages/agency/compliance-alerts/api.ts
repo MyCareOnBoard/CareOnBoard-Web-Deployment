@@ -1,3 +1,4 @@
+import { ShiftNoteComplianceArgs, ShiftNoteComplianceResponse, ShiftNoteComplianceDetail } from './apiTypes';
 import { useEffect } from 'react';
 import {createApi} from "@reduxjs/toolkit/query/react";
 import {customBaseQuery} from "@/lib/baseQuery";
@@ -6,9 +7,17 @@ import {ExpiredDocumentsResponse, UnsignedForm485Response, DocumentComplianceArg
 export const complianceAlertsApi = createApi({
     reducerPath: "complianceAlertsApi",
     baseQuery: customBaseQuery,
-    tagTypes: ['ExpiredDocuments', 'UnsignedForm485', 'DocumentCompliance', 'DocumentComplianceSettings'],
+    tagTypes: ['ExpiredDocuments', 'UnsignedForm485', 'DocumentCompliance', 'DocumentComplianceSettings', 'ShiftNoteCompliance'],
     keepUnusedDataFor: 300,
     endpoints: (builder) => ({
+        getShiftNoteCompliance: builder.query<ShiftNoteComplianceResponse, ShiftNoteComplianceArgs>({
+            query: ({viewerId: _viewerId, limit = 25, ...params}) => ({url: '/shifts/note-compliance', method: 'GET', params: {...params, limit: Math.min(50, Math.max(1, limit))}, requiresAuth: true}),
+            providesTags: ['ShiftNoteCompliance'],
+        }),
+        getShiftNoteComplianceDetail: builder.query<ShiftNoteComplianceDetail, {shiftId: string; viewerId: string; agencyId: string; mode?: string; employeeId?: string}>({
+            query: ({shiftId, viewerId: _viewerId, ...params}) => ({url: `/shifts/${encodeURIComponent(shiftId)}/note-compliance`, method: 'GET', params, requiresAuth: true}),
+            providesTags: ['ShiftNoteCompliance'],
+        }),
         getDocumentComplianceSettings: builder.query<DocumentComplianceSettings, {viewerId: string; agencyId?: string}>({
             query: () => ({url: '/documents/compliance/settings', method: 'GET', requiresAuth: true}),
             providesTags: ['DocumentComplianceSettings'],
@@ -45,6 +54,8 @@ export const complianceAlertsApi = createApi({
 });
 
 export const {
+    useGetShiftNoteComplianceQuery,
+    useGetShiftNoteComplianceDetailQuery,
     useGetDocumentComplianceSettingsQuery,
     useUpdateDocumentComplianceSettingsMutation,
     useGetDocumentComplianceQuery,

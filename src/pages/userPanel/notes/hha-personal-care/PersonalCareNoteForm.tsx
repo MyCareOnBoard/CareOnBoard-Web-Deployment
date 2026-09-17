@@ -1,10 +1,14 @@
-import React, { useEffect, useMemo, useState } from "react";
+import LockedNoteEvidence from '@/pages/shared/notes/LockedNoteEvidence';
+import { useNoteOperation } from '@/lib/notes/useNoteOperation';
+import { NoteFieldErrors, focusNoteError } from '@/pages/shared/notes/NoteFieldErrors';
+import type { NoteFieldError, ActivityLogNote } from '@/pages/userPanel/notes/apiTypes';
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { format } from "date-fns";
 import { Check } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/utils/auth";
 import { CHHA_PERSONAL_CARE_ACTIVITIES } from "@/lib/notes/hhaPersonalCareActivities";
-import { getNoteTitle } from "@/lib/notes/noteTypes";
+import { getNoteTitle, noteServiceDate } from "@/lib/notes/noteTypes";
 import HhaNoteHeader, { HhaNoteInfoItem } from "@/pages/userPanel/notes/components/HhaNoteHeader";
 import {
   useCreateOrUpdateActivityLogMutation,
@@ -28,7 +32,11 @@ function infoItemsFromMetadata(metadata?: Record<string, any>): HhaNoteInfoItem[
  * fixed CHHA activities checklist, and completed-by/date. Shared by the DSP note
  * page and the clock-out modal so both render identically.
  */
-export default function PersonalCareNoteForm({
+export default function PersonalCareNoteForm(props: {activityLogId: string; onSubmitted?: () => void}) {
+  return <PersonalCareNoteContent key={props.activityLogId} {...props} />;
+}
+
+function PersonalCareNoteContent({
   activityLogId,
   onSubmitted,
 }: {
@@ -38,8 +46,18 @@ export default function PersonalCareNoteForm({
   const { user } = useAuth();
   const [checkedActivities, setCheckedActivities] = useState<string[]>([]);
   const [existingNoteId, setExistingNoteId] = useState<string>("");
+  const hydrated = useRef(false);
+  const saveChain = useRef<Promise<string>>(Promise.resolve(""));
+  const noteId = useRef("");
+  const [completion, setCompletion] = useState<{name: string; date?: string}>({name: ""});
   const [submitted, setSubmitted] = useState(false);
 
+  const operation = useNoteOperation();
+  const submissionAttempt = useRef<string | null>(null);
+  const submitPending = useRef(false);
+  const [flushing, setFlushing] = useState(false);
+  const [retrySubmission, setRetrySubmission] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<NoteFieldError[]>([]);
   const [mutateNote, { isLoading: isSaving }] = useCreateOrUpdateActivityLogMutation();
   const [submitNotes, { isLoading: isSubmitting }] = useSubmitActivityLogNotesMutation();
   const { data: activityLog, isLoading } = useGetSingleActivityLogQuery(activityLogId, {
@@ -52,27 +70,32 @@ export default function PersonalCareNoteForm({
   );
 
   useEffect(() => {
+    if (!activityLog || hydrated.current) return;
+    hydrated.current = true;
     // Prefer the active (editable) note; fall back to a submitted note so a
     // locked note still shows what was checked after a reload.
     const sourceNotes =
-      activityLog?.notes?.length ? activityLog.notes : activityLog?.submittedNotes ?? [];
+      activityLog?.notes?.length ? activityLog.notes : [...(activityLog?.submittedNotes ?? []), ...(activityLog?.approvedNotes ?? [])];
     if (sourceNotes.length > 0) {
       const note = sourceNotes[sourceNotes.length - 1];
-      setCheckedActivities(note?.metadata?.checkedActivities ?? []);
+      setCheckedActivities(Array.isArray(note?.metadata?.checkedActivities) ? note.metadata.checkedActivities : []);
       setExistingNoteId(note.id);
+      noteId.current = note.id;
+      setCompletion({name: typeof note.metadata?.completedBy === "string" ? note.metadata.completedBy : "", date: note.metadata?.completionDate});
     }
   }, [activityLog]);
 
   const toggleActivity = (activity: string) => {
+    if (retrySubmission || submitPending.current) return;
     setCheckedActivities((prev) =>
       prev.includes(activity) ? prev.filter((a) => a !== activity) : [...prev, activity],
     );
   };
 
   const buildPayload = () => ({
-    id: existingNoteId,
-    startDate: format(new Date(), "yyyy-MM-dd"),
-    endDate: format(new Date(), "yyyy-MM-dd"),
+    id: noteId.current,
+    startDate: activityLog?.serviceDate ?? format(new Date(), "yyyy-MM-dd"),
+    endDate: activityLog?.serviceDate ?? format(new Date(), "yyyy-MM-dd"),
     metadata: {
       checkedActivities,
       completedBy: user?.fullName ?? "",
@@ -80,32 +103,55 @@ export default function PersonalCareNoteForm({
     },
   });
 
+  const saveNow = () => {
+    if (activityLog?.shiftId && !activityLog.serviceDate) return Promise.reject(new Error("The linked service date is unavailable. Ask your agency to review this shift."));
+    const payload = buildPayload();
+    saveChain.current = saveChain.current.catch(() => '').then(async () => {
+      const {data} = await mutateNote({activityLog: activityLogId, data: {...payload, id: noteId.current}}).unwrap();
+      setCompletion({name: payload.metadata.completedBy, date: payload.metadata.completionDate});
+      noteId.current = data.id;
+      setExistingNoteId(data.id);
+      return data.id;
+    });
+    return saveChain.current;
+  };
   const handleSave = async () => {
     try {
-      const { data } = await mutateNote({ activityLog: activityLogId, data: buildPayload() }).unwrap();
-      setExistingNoteId(data.id);
+      await saveNow();
       toast.success("Personal Care Note saved.");
-    } catch (error) {
+    } catch (error: any) {
+      setFieldErrors(error?.data?.fieldErrors ?? []);
+      focusNoteError(error?.data?.fieldErrors ?? []);
       console.error("Error saving personal care note:", error);
       toast.error("Failed to save note.");
     }
   };
 
   const handleSubmit = async () => {
+    if (submitPending.current) return;
+    submitPending.current = true; setFlushing(true);
     if (checkedActivities.length === 0) {
+      submitPending.current = false; setFlushing(false);
       toast.error("Select at least one activity performed.");
       return;
     }
     try {
-      const { data } = await mutateNote({ activityLog: activityLogId, data: buildPayload() }).unwrap();
-      await submitNotes({ activityLog: activityLogId, logNoteIds: [data.id] }).unwrap();
+      const data = {id: submissionAttempt.current ?? await saveNow()};
+      submissionAttempt.current = data.id;
+      await operation.run({action: 'submit', resourceId: activityLogId!, noteIds: [data.id]}, operationId => submitNotes({ activityLog: activityLogId, logNoteIds: [data.id] , operationId}).unwrap());
+      submissionAttempt.current = null; setRetrySubmission(false);
       setSubmitted(true);
       toast.success("Personal Care Note submitted.");
       onSubmitted?.();
-    } catch (error) {
+    } catch (error: any) {
+      const definitive = typeof error?.status === 'number' && error.status >= 400 && error.status < 500 && error.status !== 408 && error.status !== 429;
+      if (definitive) submissionAttempt.current = null;
+      setRetrySubmission(Boolean(submissionAttempt.current));
+      setFieldErrors(error?.data?.fieldErrors ?? []);
+      focusNoteError(error?.data?.fieldErrors ?? []);
       console.error("Error submitting personal care note:", error);
       toast.error("Failed to submit note.");
-    }
+    } finally { submitPending.current = false; setFlushing(false); }
   };
 
   if (isLoading) {
@@ -119,10 +165,23 @@ export default function PersonalCareNoteForm({
   // Lock the form once the note is submitted: the log status stays "active"
   // server-side, so a local flag is the reliable signal in-session.
   const readOnly = Boolean(activityLog?.status && activityLog.status !== "active");
-  const locked = submitted || readOnly || Boolean(activityLog?.hasSubmittedNotes);
+  const locked = submitted || readOnly || Boolean(!activityLog?.notes?.length && ((activityLog?.submittedNotes?.length ?? 0) + (activityLog?.approvedNotes?.length ?? 0)));
+
+  const editDraft = async (note: ActivityLogNote) => {
+    if (operation.pending || submitPending.current || retrySubmission) return;
+    try {
+      if (!locked && checkedActivities.length) await saveNow();
+      noteId.current = note.id; setExistingNoteId(note.id); setCheckedActivities(Array.isArray(note.metadata?.checkedActivities) ? note.metadata.checkedActivities : []);
+      setSubmitted(false); setFieldErrors([]);
+    } catch { toast.error('Save the current draft before opening another row.'); }
+  };
+
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-note-id={existingNoteId}>
+      <NoteFieldErrors errors={fieldErrors} />
+      <LockedNoteEvidence onEdit={note => void editDraft(note)} displayedId={existingNoteId} notes={[...(activityLog?.notes ?? []).map(note => ({...note, status: "active" as const})), ...(activityLog?.submittedNotes ?? []).map(note => ({...note, status: "submitted" as const})), ...(activityLog?.approvedNotes ?? []).map(note => ({...note, status: "approved" as const}))]} />
+      {retrySubmission ? <p role="status" className="text-sm">Submission could not be confirmed. Submit again to retry safely before editing.</p> : null}
       <HhaNoteHeader
         agencyName={activityLog?.metadata?.agencyName ?? user?.agency?.name ?? ""}
         title={getNoteTitle("hha-personal-care")}
@@ -143,7 +202,7 @@ export default function PersonalCareNoteForm({
             {checkedActivities.length}/{CHHA_PERSONAL_CARE_ACTIVITIES.length}
           </span>
         </div>
-        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+        <div data-note-field="checkedActivities" className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
           {CHHA_PERSONAL_CARE_ACTIVITIES.map((activity) => {
             const checked = checkedActivities.includes(activity);
             return (
@@ -158,7 +217,7 @@ export default function PersonalCareNoteForm({
                 <input
                   type="checkbox"
                   checked={checked}
-                  disabled={locked}
+                  disabled={locked || operation.pending || retrySubmission || flushing}
                   onChange={() => toggleActivity(activity)}
                   className="sr-only"
                 />
@@ -181,10 +240,10 @@ export default function PersonalCareNoteForm({
       <div className="rounded-[20px] border border-white bg-[#FFFFFF4D] p-6 shadow-sm">
         <p className="mb-1.5 text-[12px] font-medium leading-[1.4] text-[#808081]">Completed by</p>
         <p className="text-[16px] font-semibold leading-[1.6] text-[#10141a]">
-          {user?.fullName ?? "—"}
+          {locked ? completion.name || "Not recorded" : user?.fullName ?? "Not recorded"}
         </p>
         <p className="mt-1 text-[13px] font-medium leading-[1.4] text-[#808081]">
-          {format(new Date(), "MMMM d, yyyy")}
+          {locked ? (noteServiceDate(completion.date) ? format(noteServiceDate(completion.date)!, "MMMM d, yyyy") : "Completion date not recorded") : format(new Date(), "MMMM d, yyyy")}
         </p>
       </div>
 
@@ -196,7 +255,7 @@ export default function PersonalCareNoteForm({
         <button
           type="button"
           onClick={handleSave}
-          disabled={locked || isSaving}
+          disabled={locked || isSaving || operation.pending || retrySubmission || flushing}
           className="rounded-full bg-[#b2b2b3] px-8 py-3 text-[14px] font-semibold text-white shadow-sm transition-colors hover:bg-[#9a9a9b] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isSaving ? "Saving..." : "Save"}
@@ -204,7 +263,7 @@ export default function PersonalCareNoteForm({
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={locked || isSubmitting}
+          disabled={locked || isSubmitting || operation.pending || flushing}
           className="rounded-full bg-[#00b4b8] px-8 py-3 text-[14px] font-semibold text-white shadow-sm transition-colors hover:bg-[#009da1] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {locked ? "Submitted" : isSubmitting ? "Submitting..." : "Submit"}

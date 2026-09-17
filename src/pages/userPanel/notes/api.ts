@@ -1,3 +1,4 @@
+import { complianceAlertsApi } from '@/pages/agency/compliance-alerts/api';
 import { createApi } from "@reduxjs/toolkit/query/react";
 import { customBaseQuery } from "@/lib/baseQuery";
 import {
@@ -47,13 +48,16 @@ export const userPanelNotesApi = createApi({
       }),
       invalidatesTags: ['SingleActivityLog']
     }),
-    submitActivityLogNotes: builder.mutation<void, { activityLog: string, logNoteIds: string[] }>({
-      query: ({ activityLog, logNoteIds }) => ({
+    submitActivityLogNotes: builder.mutation<void, { activityLog: string, logNoteIds: string[], operationId: string }>({
+      query: ({ activityLog, logNoteIds, operationId }) => ({
         url: `/employees/activity-logs/${activityLog}/notes/submit`,
         method: "POST",
         requiresAuth: true,
-        data: { logNoteIds }
+        data: { logNoteIds, operationId }
       }),
+      async onQueryStarted(_arg, {dispatch, queryFulfilled}) {
+        try { await queryFulfilled; dispatch(complianceAlertsApi.util.invalidateTags(['ShiftNoteCompliance'])); } catch { /* Keep the current checked status on failure. */ }
+      },
       invalidatesTags: ['SingleActivityLog']
     }),
     seedActivityLogs: builder.mutation<void, Record<string, any>[]>({

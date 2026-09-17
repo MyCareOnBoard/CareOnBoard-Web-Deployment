@@ -1,3 +1,4 @@
+import { useNoteOperation } from '@/lib/notes/useNoteOperation';
 import { CornerDownLeft } from "lucide-react";
 import { useApproveSubmittedNotesMutation, useRejectSubmittedNotesMutation } from "@/pages/agency/notes/api";
 
@@ -9,11 +10,12 @@ interface EditableNoteActionsProps {
 export default function EditableNoteActions({ submissionId, onEdit }: EditableNoteActionsProps) {
   const [approveNotes, { isLoading: isApproving }] = useApproveSubmittedNotesMutation();
   const [rejectNotes, { isLoading: isRejecting }] = useRejectSubmittedNotesMutation();
-  const isMutating = isApproving || isRejecting;
+  const operation = useNoteOperation();
+  const isMutating = operation.pending || isApproving || isRejecting;
 
   const approve = async () => {
     try {
-      await approveNotes(submissionId).unwrap();
+      await operation.run({action: 'approve', resourceId: submissionId}, operationId => approveNotes({submissionId, operationId}).unwrap());
     } catch (error) {
       console.error("Failed to approve notes:", error);
       alert("Failed to approve notes. Please try again.");
@@ -22,7 +24,7 @@ export default function EditableNoteActions({ submissionId, onEdit }: EditableNo
 
   const reject = async () => {
     try {
-      await rejectNotes(submissionId).unwrap();
+      await operation.run({action: 'return', resourceId: submissionId}, operationId => rejectNotes({submissionId, operationId}).unwrap());
     } catch (error) {
       console.error("Failed to return notes:", error);
       alert("Failed to return notes. Please try again.");
