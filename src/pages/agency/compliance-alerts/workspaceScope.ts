@@ -2,6 +2,7 @@ export type Source =
   | "document_expiry"
   | "training"
   | "client_documents"
+  | "manual_audits"
   | "unsigned_form485"
   | "shift_notes";
 export type Section = "staff" | "clients" | "shifts";
@@ -21,6 +22,8 @@ export interface ComplianceView {
   endDate?: string;
   cursor?: string;
   staffCursor?: string;
+  auditId?: string;
+  auditView?: "follow_up_needed" | "recorded" | "drafts" | "discarded";
 }
 export type ViewParseResult =
   | { ok: true; view: ComplianceView }
@@ -43,6 +46,7 @@ export const sourceSection: Record<Source, Section> = {
   document_expiry: "staff",
   training: "staff",
   client_documents: "clients",
+  manual_audits: "clients",
   unsigned_form485: "clients",
   shift_notes: "shifts",
 };
@@ -50,6 +54,7 @@ export const sourceLabels: Record<Source, string> = {
   document_expiry: "Document expiry",
   training: "Training assignments",
   client_documents: "Document checklist",
+  manual_audits: "Manual audits",
   unsigned_form485: "Unsigned Form 485",
   shift_notes: "Shift notes",
 };
@@ -71,10 +76,10 @@ export function getComplianceSources(
     return [];
   if (
     user.profile?.isActive === false ||
-    ["inactive", "suspended", "deleted", "disabled"].includes(
+    ["inactive", "suspended", "deleted", "disabled", "archived"].includes(
       user.profile?.status || "",
     ) ||
-    ["inactive", "suspended", "deleted", "disabled"].includes(
+    ["inactive", "suspended", "deleted", "disabled", "archived"].includes(
       user.agency?.status || "",
     )
   )
@@ -105,6 +110,7 @@ export function getComplianceSources(
   if (has("Trainings")) sources.push("training");
   if (mode !== "sc" && has("Client Management"))
     sources.push("client_documents");
+  if (mode !== "sc" && has("Client Management")) sources.push("manual_audits");
   if (mode === "hha" && has("Client Management"))
     sources.push("unsigned_form485");
   if (
@@ -154,6 +160,8 @@ export function parseComplianceView(params: URLSearchParams): ViewParseResult {
         ? ["employeeId", "search", "staffCursor"]
         : source === "client_documents"
           ? ["clientId", "search", "status"]
+          : source === "manual_audits"
+            ? ["clientId", "auditId", "auditView"]
           : source === "unsigned_form485"
             ? ["clientId"]
             : ["employeeId", "shiftId", "stateGroup", "startDate", "endDate"]),
@@ -162,7 +170,7 @@ export function parseComplianceView(params: URLSearchParams): ViewParseResult {
     return fail();
   if (raw.clientId && !raw.clientId.trim()) return fail();
   if (
-    ["employeeId", "clientId", "shiftId"].some(
+    ["employeeId", "clientId", "shiftId", "auditId"].some(
       (key) => raw[key] !== undefined && !validComplianceId(raw[key]),
     )
   )
@@ -214,8 +222,10 @@ export function parseComplianceView(params: URLSearchParams): ViewParseResult {
     return fail();
   if (source === "unsigned_form485" && raw.mode && raw.mode !== "hha")
     return fail();
+  if (raw.auditView && !["follow_up_needed", "recorded", "drafts", "discarded"].includes(raw.auditView)) return fail();
+  if (source === "manual_audits" && ((raw.auditId && !raw.clientId) || (raw.auditId && raw.cursor))) return fail();
   if (
-    raw.clientId &&
+    source !== "manual_audits" && raw.clientId &&
     ["cursor", "search", "status"].some((key) => raw[key] !== undefined)
   )
     return fail();

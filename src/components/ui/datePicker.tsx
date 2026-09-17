@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 
 export default function CustomDatePicker(
-    { date, setDate, className, inputClassName, iconClassName, iconVariant = "default", placeholder, startMonth, endMonth, align = "start" }: {
+    { date, setDate, className, inputClassName, iconClassName, iconVariant = "default", placeholder, startMonth, endMonth, align = "start", ariaLabel, disabled = false }: {
         date: Date | null,
         setDate: (date: Date | null) => void;
         className?: string;
@@ -20,6 +20,8 @@ export default function CustomDatePicker(
         startMonth?: Date;
         endMonth?: Date;
         align?: "center" | "start" | "end";
+        ariaLabel?: string;
+        disabled?: boolean;
     }
 ) {
     const [isDateOpen, setIsDateOpen] = useState(false);
@@ -32,9 +34,9 @@ export default function CustomDatePicker(
         );
 
     return (
-        <Popover open={isDateOpen} onOpenChange={setIsDateOpen}>
+        <Popover open={isDateOpen && !disabled} onOpenChange={(open) => { if (!disabled) setIsDateOpen(open); }}>
             <PopoverTrigger asChild>
-                <button type="button" className="w-full cursor-pointer focus:outline-none">
+                <button type="button" aria-label={ariaLabel} disabled={disabled} className="w-full cursor-pointer focus:outline-none disabled:cursor-not-allowed disabled:opacity-60">
                     <InputGroup
                         className={cn(
                             "h-[var(--cr-field-height,48px)] min-h-[var(--cr-field-height,48px)] cursor-pointer rounded-xl border border-[#cccccd] bg-white px-4",
@@ -66,7 +68,7 @@ export default function CustomDatePicker(
                     selected={date ?? undefined}
                     defaultMonth={date ?? new Date()}
                     onSelect={(selectedDate) => {
-                        if (selectedDate) {
+                        if (selectedDate && !disabled) {
                             setDate(selectedDate);
                             setIsDateOpen(false);
                         }

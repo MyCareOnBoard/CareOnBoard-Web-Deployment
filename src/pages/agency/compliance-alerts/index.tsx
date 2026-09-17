@@ -18,6 +18,7 @@ import {
 import StaffChecks from "./StaffChecks";
 import ClientChecks from "./ClientChecks";
 import ShiftNotesSection from "./ShiftNotesSection";
+import ManualAuditsSection from "./ManualAuditsSection";
 const restricted =
   "You do not have access to these records. Ask your agency administrator.";
 export default function ComplianceAlertsPage() {
@@ -67,6 +68,7 @@ export default function ComplianceAlertsPage() {
           "mode",
           "employeeId",
           "clientId",
+          "auditId",
           "shiftId",
           "cursor",
           "staffCursor",
@@ -290,6 +292,7 @@ function Workspace({
         {(source === "client_documents" || source === "unsigned_form485") && (
           <ClientChecks key={source} {...props} />
         )}
+        {source === "manual_audits" && <ManualAuditsSection key={source} {...props} />}
         {source === "shift_notes" && (
           <ShiftNotesSection key={source} {...props} />
         )}

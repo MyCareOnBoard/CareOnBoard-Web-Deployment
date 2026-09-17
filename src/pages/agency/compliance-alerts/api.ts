@@ -8,7 +8,7 @@ import {ExpiredDocumentsResponse, UnsignedForm485Response, DocumentComplianceArg
 export const complianceAlertsApi = createApi({
     reducerPath: "complianceAlertsApi",
     baseQuery: customBaseQuery,
-    tagTypes: ['ExpiredDocuments', 'UnsignedForm485', 'DocumentCompliance', 'DocumentComplianceSettings', 'ShiftNoteCompliance'],
+    tagTypes: ['ExpiredDocuments', 'UnsignedForm485', 'DocumentCompliance', 'DocumentComplianceSettings', 'ShiftNoteCompliance', 'ManualAudit'],
     keepUnusedDataFor: 300,
     endpoints: (builder) => ({
         getClientChecklistPage: builder.query<ClientCompliancePage<ClientChecklistItem>, ClientComplianceArgs>({
