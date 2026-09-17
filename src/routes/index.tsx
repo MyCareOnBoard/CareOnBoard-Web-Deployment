@@ -1,8 +1,11 @@
 import { lazy } from "react";
+const CareerReconciliationPage = lazy(() => import('@/pages/agency/goalsAndDocuments/CareerReconciliation'));
 import { createBrowserRouter } from "react-router";
 import { Routes } from "@/routes/constants";
 import { preloadDirectAgencyPayrollRoute } from "@/routes/preloadDirectPayrollRoute";
 import RouteErrorPage from "@/pages/error/RouteErrorPage";
+const CareerPlanningPage = lazy(() => import('@/pages/agency/goalsAndDocuments/CareerPlanning'));
+const CareerPlanningNotePage = lazy(() => import('@/pages/userPanel/notes/career-planning'));
 
 const SplashScreen = lazy(() => import("@/pages/splash"));
 const VerifyOTP = lazy(() => import("@/pages/onboarding/VerifyOTP"));
@@ -583,6 +586,12 @@ export const router = createBrowserRouter([
                 Component: GoalsAndDocumentsList,
             },
             {
+                path: Routes.agency.goalsAndDocuments.careerPlanning, Component: CareerPlanningPage,
+            },
+            {
+                path: Routes.agency.careerReconciliation, Component: CareerReconciliationPage,
+            },
+            {
                 path: Routes.agency.goalsAndDocuments.naturalSupportsTraining,
                 Component: NaturalSupportsTraining,
             },
@@ -702,6 +711,9 @@ export const router = createBrowserRouter([
             {
                 path: Routes.userPanel.notes.supportedEmploymentIntervention,
                 Component: SupportedEmploymentInterventionPage,
+            },
+            {
+                path: Routes.userPanel.notes.careerPlanning, Component: CareerPlanningNotePage,
             },
             {
                 path: Routes.userPanel.notes.supportedEmploymentPre,
@@ -911,6 +923,12 @@ export const router = createBrowserRouter([
             {
                 path: Routes.superAdmin.clientDirectory,
                 Component: ClientsDirectory,
+            },
+            {
+                path: Routes.superAdmin.careerPlanning, Component: CareerPlanningPage,
+            },
+            {
+                path: Routes.superAdmin.careerReconciliation, Component: CareerReconciliationPage,
             },
             {
                 path: Routes.superAdmin.clientDetails,

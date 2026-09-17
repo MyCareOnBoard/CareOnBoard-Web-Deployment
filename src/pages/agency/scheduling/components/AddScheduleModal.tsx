@@ -476,7 +476,7 @@ export default function AddScheduleModal({
                 client.id !== editData.clientId
               ) return;
               setSelectedClient(client);
-              setSelectedClientServices(getClientServicesForOperations(client));
+              setSelectedClientServices((client.type === "ddd" && client.outcomes?.length ? client.outcomes.flatMap(outcome=>outcome.services??[]) : getClientServicesForOperations(client)));
             })
             .catch((error) => {
               if (controller.signal.aborted || clientContextAbortRef.current !== controller) return;
@@ -823,7 +823,7 @@ export default function AddScheduleModal({
           };
         });
         setSelectedClient(client);
-        setSelectedClientServices(getClientServicesForOperations(client));
+        setSelectedClientServices((client.type === "ddd" && client.outcomes?.length ? client.outcomes.flatMap(outcome=>outcome.services??[]) : getClientServicesForOperations(client)));
       })
       .catch((error) => {
         if (
@@ -853,11 +853,15 @@ export default function AddScheduleModal({
   }, [currentMonth]);
 
   const isHhaClient = selectedClient?.type === "hha";
-  const notesAutoResolved = isHhaClient || isHhaAgencyMode;
+  const rawCareerServices=selectedClient?.outcomes?.length?selectedClient.outcomes.flatMap(outcome=>outcome.services??[]):selectedClient?.services??[];
+  const exactCareerRows=rawCareerServices.filter(row=>row.id===formData.serviceAuthorizationId);
+  const isCareerService=agencyMode!=='sc'&&selectedClient?.type==='ddd'&&exactCareerRows.length===1&&exactCareerRows[0].code==='H2023-CAREER';
+  const autoCareerType=isCareerService&&(mode!=='edit'||editData?.notesType==='career-planning');
+  const notesAutoResolved = isHhaClient || isHhaAgencyMode || autoCareerType;
 
   const effectiveClientType = agencyMode === "sc" ? selectedClient?.type ?? "ddd" : agencyMode ?? selectedClient?.type;
   const noteTypes = useMemo(
-    () => (effectiveClientType ? noteTypesForClientType(effectiveClientType) : []),
+    () => (effectiveClientType ? noteTypesForClientType(effectiveClientType).filter(type=>type.id!=="career-planning") : []),
     [effectiveClientType],
   );
   const goalsTypes = useMemo(
@@ -891,7 +895,11 @@ export default function AddScheduleModal({
   // Only clear a stale HHA type once a DDD client is actually loaded — guarding
   // against the async gap on edit, where selectedClient is briefly null.
   useEffect(() => {
-    if (isHhaClient) {
+    if (autoCareerType) {
+      setFormData(prev=>prev.notesType==='career-planning'?prev:{...prev,notesType:'career-planning'});
+    } else if (mode!=='edit' && !isCareerService && formData.notesType==='career-planning') {
+      setFormData(prev=>({...prev,notesType:''}));
+    } else if (isHhaClient) {
       setFormData((prev) =>
         prev.notesType === resolvedHhaNoteType
           ? prev
@@ -904,7 +912,7 @@ export default function AddScheduleModal({
           : prev,
       );
     }
-  }, [isHhaClient, resolvedHhaNoteType, selectedClient]);
+  }, [isHhaClient, resolvedHhaNoteType, selectedClient, autoCareerType, isCareerService, mode, formData.notesType]);
 
   const serviceTriggerLabel = useMemo(() => {
     if (selectedClientServices.length === 0) return "No services available";
@@ -1619,6 +1627,7 @@ export default function AddScheduleModal({
         agencyName,
         serviceYear: shiftDate.getFullYear(),
         serviceCode: formData.serviceCode || "",
+        serviceAuthorizationId: formData.serviceAuthorizationId || undefined,
         ISPOutcome: resolveIspOutcomeActivityLabel(selectedClient, selectedClientServices, formData),
         strategies: [],
         ...(isHhaClient

@@ -406,6 +406,7 @@ export interface CreateActivityLogRequest {
     agencyId: string;
     description?: string;
     metadata?: {
+        serviceAuthorizationId?: string;
         individual?: string;
         clientId?: string;
         serviceYear?: number;
@@ -435,6 +436,7 @@ export interface ActivityLog {
     employeeId: string;
     description?: string;
     metadata?: {
+        serviceAuthorizationId?: string;
         individual?: string;
         serviceYear?: number;
         serviceCode?: string;
@@ -477,7 +479,7 @@ export interface ListActivityLogsResponse {
  * Endpoint: POST /employees/activity-logs
  */
 export async function createEmployeeActivityLog(
-    data: CreateActivityLogRequest,
+    data: CreateActivityLogRequest | {shiftId: string},
     options: { signal?: AbortSignal } = {},
 ): Promise<ActivityLogResponse> {
     try {

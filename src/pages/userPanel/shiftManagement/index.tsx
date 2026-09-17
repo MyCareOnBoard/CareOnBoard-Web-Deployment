@@ -1,5 +1,6 @@
+import ShiftNoteStatus from '@/pages/shared/notes/ShiftNoteStatus';
 import { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { Clock, MapPin, Calendar, ChevronRight, Plus, Loader2, Database, Tornado } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Shift, ShiftStatus, ShiftActionStatus, formatShiftLocation, listShifts, categorizeShifts, clockIn as apiClockIn, clockOut as apiClockOut } from "@/lib/api/shifts";
@@ -163,6 +164,7 @@ interface ShiftCardProps {
   showDate?: boolean;
   showAction?: boolean;
   onActionClick?: (shiftId: string) => void;
+  onNoteClick?: (shiftId: string) => void;
   isLoading?: boolean;
 }
 
@@ -172,6 +174,7 @@ function ShiftCard({
   showDate = false,
   showAction = true,
   onActionClick,
+  onNoteClick,
   isLoading = false
 }: ShiftCardProps) {
   const [expiryTick, setExpiryTick] = useState(0);
@@ -560,6 +563,7 @@ function ShiftCard({
         </div>
 
       </div>
+      {panel === 'previous' && onNoteClick ? <Button variant="outline" className="mt-3 rounded-full" onClick={() => onNoteClick(shift.id)}>Shift note</Button> : null}
     </div>
   );
 }
@@ -577,6 +581,7 @@ interface ShiftSectionProps {
   maxVisibleShifts?: number;
   showAction?: boolean;
   onActionClick?: (shiftId: string) => void;
+  onNoteClick?: (shiftId: string) => void;
   isLoading?: boolean;
 }
 
@@ -593,6 +598,7 @@ function ShiftSection({
   maxVisibleShifts = 2,
   showAction = true,
   onActionClick,
+  onNoteClick,
   isLoading = false,
 }: ShiftSectionProps) {
   const [currentPage, setCurrentPage] = useState(1);
@@ -655,6 +661,7 @@ function ShiftSection({
               showDate={showDate}
               showAction={showAction}
               onActionClick={onActionClick}
+              onNoteClick={onNoteClick}
               isLoading={isLoading}
             />
           ))
@@ -698,6 +705,9 @@ export default function ShiftManagementPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [upcomingExpanded, setUpcomingExpanded] = useState(false);
+  const [noteSearchParams, setNoteSearchParams] = useSearchParams();
+  const selectedNoteShift = noteSearchParams.get('shiftId');
+  const openShiftNote = (shiftId: string) => setNoteSearchParams(previous => { const next = new URLSearchParams(previous); next.set('shiftId', shiftId); return next; });
   const [previousExpanded, setPreviousExpanded] = useState(false);
   const [todayShift, setTodayShift] = useState<Shift | null>(null);
   const [upcomingShifts, setUpcomingShifts] = useState<Shift[]>([]);
@@ -1126,6 +1136,7 @@ export default function ShiftManagementPage() {
               subtitle="These are your Previous shifts"
               shifts={previousShifts}
               panel="previous"
+              onNoteClick={openShiftNote}
               backgroundColor="bg-white/30"
               isExpanded={previousExpanded}
               onExpandToggle={() => setPreviousExpanded(!previousExpanded)}
@@ -1136,6 +1147,8 @@ export default function ShiftManagementPage() {
           )}
         </div>
       </div>
+
+      {selectedNoteShift && user?.agencyId && user?.uid ? <ShiftNoteStatus key={`${user.uid}:${user.agencyId}:${selectedNoteShift}`} shiftId={selectedNoteShift} agencyId={user.agencyId} viewerId={user.uid} employeeId={user.profile?.id} /> : null}
 
       <ClockOutModal
         isOpen={showClockOutModal}

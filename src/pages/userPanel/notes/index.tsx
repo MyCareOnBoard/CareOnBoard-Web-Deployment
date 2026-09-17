@@ -9,12 +9,12 @@ import ChatEllipsisIcon from "@/assets/icons/chat-ellipsis-heroicon.svg?react";
 import { useGetAllActivityLogsQuery } from "@/pages/userPanel/notes/api";
 import { useListClientsQuery, Client } from "@/lib/api/clients";
 import { ActivityLog } from "@/lib/api/employees";
-import { Routes } from "@/routes/constants";
+
 import { cn } from "@/lib/utils";
 import { ArrowLeft, Search, FileText, ChevronRight } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { getNoteShortLabel } from "@/lib/notes/noteTypes";
+import { getNoteShortLabel, NOTE_ROUTES } from "@/lib/notes/noteTypes";
 
 export type NoteCardType = {
   id: string;
@@ -27,68 +27,69 @@ export type NoteCardType = {
 };
 
 const noteTypes: NoteCardType[] = [
+  {id:"career-planning",icon:UserIcon,title:"Career Planning",description:"Record support and progress against the published Career Planning plan",path:NOTE_ROUTES["career-planning"]},
   {
     id: "community-based",
     icon: UserIcon,
     title: "Community Based / Individual Supports",
     description: "Step-by-step instructions for using key features of the dashboard, including viewing doctor schedules.",
-    path: Routes.userPanel.notes.communityBased,
+    path: NOTE_ROUTES["community-based"],
   },
   {
     id: "community-inclusion",
     icon: ChatBubbleIcon,
     title: "Community Inclusion Services – Activities Log",
     description: "Provides answers to common healthcare-related questions, such as how to schedule an appointment, doctor availability, and room booking.",
-    path: Routes.userPanel.notes.communityInclusion,
+    path: NOTE_ROUTES["community-inclusion"],
   },
   {
     id: "day-habilitation",
     icon: WrenchIcon,
     title: "Day Habilitation Services – Activities Log",
     description: "Solutions to common issues, such as errors in appointment booking, missing patient data, or login problems.",
-    path: Routes.userPanel.notes.dayHabilitation,
+    path: NOTE_ROUTES["day-habilitation"],
   },
   {
     id: "prevocational-training",
     icon: PhoneIcon,
     title: "Prevocational Training Services – Activities Log",
     description: "Information on how to reach the support team via chat, email, or phone.",
-    path: Routes.userPanel.notes.preVocationalTraining,
+    path: NOTE_ROUTES["prevocational-training"],
   },
   {
     id: "supported-employment-intervention",
     icon: PhoneIcon,
     title: "Supported Employment Services – Intervention Plan and Service Log",
     description: "Information on how to reach the support team via chat, email, or phone.",
-    path: Routes.userPanel.notes.supportedEmploymentIntervention,
+    path: NOTE_ROUTES["supported-employment-intervention"],
   },
   {
     id: "supported-employment-pre",
     icon: ShieldIcon,
     title: "Supported Employment Services – Pre‐Employment Service Log",
     description: "Explanation of how patient data is protected, privacy policies, and compliance with healthcare standards.",
-    path: Routes.userPanel.notes.supportedEmploymentPre,
+    path: NOTE_ROUTES["supported-employment-pre"],
   },
   {
     id: "respite-log",
     icon: ChatEllipsisIcon,
     title: "Respite Log",
     description: "A section where users can provide input on current features and suggest improvements.",
-    path: Routes.userPanel.notes.respiteLog,
+    path: NOTE_ROUTES["respite-log"],
   },
   {
     id: "hha-personal-care",
     icon: UserIcon,
     title: "Personal Care Service Note",
     description: "Record the personal care activities performed during a home-care shift.",
-    path: Routes.userPanel.notes.hhaPersonalCare,
+    path: NOTE_ROUTES["hha-personal-care"],
   },
   {
     id: "hha-service-log",
     icon: WrenchIcon,
     title: "HHA Service Activity Log",
     description: "Log the services and activities performed during a home-care shift.",
-    path: Routes.userPanel.notes.hhaServiceActivityLog,
+    path: NOTE_ROUTES["hha-service-log"],
   },
 ];
 

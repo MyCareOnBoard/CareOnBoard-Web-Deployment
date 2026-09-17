@@ -1,4 +1,8 @@
-import React, {useEffect, useState} from "react";
+import { noteServiceDate } from '@/lib/notes/noteTypes';
+import { useNoteOperation } from '@/lib/notes/useNoteOperation';
+import { NoteFieldErrors, focusNoteError } from '@/pages/shared/notes/NoteFieldErrors';
+import type { NoteFieldError } from '@/pages/userPanel/notes/apiTypes';
+import React, {useEffect, useState, useRef} from "react";
 import {Input} from "@/components/ui/input";
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
 import {Calendar} from "@/components/ui/calendar";
@@ -43,9 +47,16 @@ interface ActivitiesLogTemplateProps {
   title: string;
 }
 
-export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProps) {
+export default function ActivitiesLogTemplate(props: ActivitiesLogTemplateProps) {
+  const id = new URLSearchParams(useLocation().search).get("id");
+  return <ActivitiesLogForm key={id} {...props} />;
+}
+
+function ActivitiesLogForm({title}: ActivitiesLogTemplateProps) {
   const [openDatePopoverId, setOpenDatePopoverId] = useState<string | null>(null);
   const [activities, setActivities] = useState<ActivityRow[]>(initialActivities);
+  const activitiesRef = useRef(activities);
+  activitiesRef.current = activities;
   const {user} = useAuth();
 
   const navigate = useNavigate();
@@ -54,76 +65,48 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
   const {data: activityLog, isLoading} = useGetSingleActivityLogQuery(activityLogId!, {
     skip: !activityLogId
   });
+  const operation = useNoteOperation();
+  const submitting = useRef(false);
+  const [flushing, setFlushing] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<NoteFieldError[]>([]);
+  const hydrated = useRef(false);
+  const failedSaves = useRef(new Set<string>());
+  const saveChain = useRef<Promise<void>>(Promise.resolve());
+  const [submittedIds, setSubmittedIds] = useState<string[]>([]);
   const [mutateNote] = useCreateOrUpdateActivityLogMutation();
   const [submitNotes, {isLoading: isSubmitting}] = useSubmitActivityLogNotesMutation();
 
   const currentDate = new Date().toLocaleDateString("en-US", {month: "long", day: "numeric"});
 
-  const updateActivity = async (
-    id: string,
-    index: number,
-    field: keyof ActivityRow,
-    value: any,
-  ) => {
-    setActivities(prevActivities => {
-      return prevActivities.map((act, activityIndex) => {
-        if ((id && act.id === id) || (index === activityIndex)) {
-          return {...act, [field]: value};
-        } else {
-          return act;
-        }
-      });
-    });
-
-    const currentActivities = activities;
-
-    let activity;
-    if (id) {
-      activity = currentActivities.find(activity => activity.id === id);
-    } else {
-      activity = currentActivities[index];
-    }
-
-    if (!activity) return;
-
-    const newActivity = {
-      ...activity,
-      [field]: value
-    };
-
-    const date = newActivity.date;
-    const metadata = {
-      units: newActivity.units,
-      strategies: newActivity.strategies,
-      activities: newActivity.activities,
-      location: newActivity.location,
-      notes: newActivity.notes,
-    };
-
-    if (date && id === "") {
-      await mutateNote({
+  const lockedIds = new Set([...submittedIds, ...(activityLog?.submittedNotes ?? []).map(note => note.id), ...(activityLog?.approvedNotes ?? []).map(note => note.id)]);
+  const updateActivity = (_id: string, index: number, field: keyof ActivityRow, value: any) => {
+    if ((operation.pending || submitting.current) || lockedIds.has(activitiesRef.current[index].id)) return;
+    activitiesRef.current = activitiesRef.current.map((item, i) => i === index ? {...item, [field]: value} : item);
+    setActivities(activitiesRef.current);
+    const saveKey = `activity:${index}`;
+    saveChain.current = saveChain.current.catch(() => {}).then(async () => {
+        failedSaves.current.add(saveKey);
+        const current = activitiesRef.current[index];
+        const date = current.date;
+        const metadata = {units: current.units, strategies: current.strategies, activities: current.activities, location: current.location, notes: current.notes};
+        if (!(date)) return;
+        const {data} = await mutateNote({
         activityLog: activityLogId!,
         data: {
-          id: id,
+          id: current.id,
           startDate: format(date, "yyyy-MM-dd"),
           endDate: format(date, "yyyy-MM-dd"),
           metadata: metadata
         }
       }).unwrap();
-    } else if (date && id !== "") {
-      await mutateNote({
-        activityLog: activityLogId!,
-        data: {
-          id: id,
-          startDate: format(date, "yyyy-MM-dd"),
-          endDate: format(date, "yyyy-MM-dd"),
-          metadata: metadata
+        failedSaves.current.delete(saveKey);
+        if (!current.id && data?.id) {
+          activitiesRef.current = activitiesRef.current.map((item, i) => i === index ? {...item, id: data.id} : item);
+          setActivities(activitiesRef.current);
         }
-      }).unwrap().catch(error => {
-        console.error('Failed to update activity:', error);
-      });
-    }
-  }
+    });
+    void saveChain.current.catch(() => toast.error('Your changes could not be saved. Try again before submitting.'));
+  };
 
   const formatDisplayDate = (date: Date | undefined) => {
     if (!date) {
@@ -133,47 +116,47 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
   };
 
   const handleSubmit = async () => {
+    if (submitting.current) return;
+    submitting.current = true; setFlushing(true);
     try {
-      await submitNotes({
-        activityLog: activityLogId!,
-        logNoteIds: activities.filter((a) => !!a.id).map((activity) => activity.id)
-      }).unwrap();
-      setActivities(initialActivities);
+      await saveChain.current.catch(() => {});
+      submitting.current = false;
+      for (const key of [...failedSaves.current]) {
+        const [kind, position] = key.split(':'); const index = Number(position);
+        if (kind === 'activity') updateActivity('', index, 'date', activitiesRef.current[index].date);
+      }
+      submitting.current = true;
+      await saveChain.current;
+      if (failedSaves.current.size) throw new Error("Some rows have unsaved changes. Check their dates and try saving again before submitting.");
+      const logNoteIds = [...activitiesRef.current].filter(row => row.id && !lockedIds.has(row.id)).map(row => row.id);
+      if (!logNoteIds.length) { toast.error('Save a service row before submitting.'); return; }
+      await operation.run({action: 'submit', resourceId: activityLogId!, noteIds: logNoteIds}, operationId => submitNotes({activityLog: activityLogId!, logNoteIds, operationId}).unwrap());
+      setSubmittedIds(previous => [...previous, ...logNoteIds]);
+      setFieldErrors([]);
       toast.success('Note submitted successfully!');
     } catch (error: any) {
-      console.error('Error submitting activity log:', error);
-      toast.error(error?.data?.message || 'Failed to submit activity log.');
-    }
-  }
+      const errors = error?.data?.fieldErrors ?? [];
+      setFieldErrors(errors);
+      focusNoteError(errors);
+      toast.error(error?.data?.message || error?.message || 'Failed to submit activity log.');
+    } finally { submitting.current = false; setFlushing(false); }
+  };
 
   useEffect(() => {
-    if (!isLoading && activityLog && activityLog.notes.length > 0) {
-      if (activities.some((activity) => activity.id)) {
-        const newActivities = activities.map((activity, index) => {
-          if (!activity.id) {
-            if (activityLog.notes.length > index) {
-              activity.id = activityLog.notes[index].id;
-            }
-          }
-          return activity;
-        });
-        setActivities(newActivities);
-      } else {
-        const modifyActivityNotes = activityLog.notes.map((note) => ({
+    if (isLoading || !activityLog || hydrated.current) return;
+    hydrated.current = true;
+    const notes = [...activityLog.notes, ...(activityLog.submittedNotes ?? []), ...(activityLog.approvedNotes ?? [])];
+    const modifyActivityNotes = notes.map((note) => ({
           id: note.id,
-          date: note.startDate ? new Date(note.startDate) : undefined,
-          units: note.metadata?.units,
-          strategies: note.metadata?.strategies,
-          activities: note.metadata?.activities,
-          location: note.metadata?.location,
-          notes: note.metadata?.notes,
+          date: noteServiceDate(note.startDate),
+          units: note.metadata?.units ?? "",
+          strategies: note.metadata?.strategies ?? "",
+          activities: note.metadata?.activities ?? "",
+          location: note.metadata?.location ?? "",
+          notes: note.metadata?.notes ?? "",
         }));
-        setActivities([
-          ...modifyActivityNotes,
-          ...initialActivities.slice(modifyActivityNotes.length)
-        ]);
-      }
-    }
+    activitiesRef.current = [...modifyActivityNotes, ...initialActivities.slice(modifyActivityNotes.length)];
+    setActivities(activitiesRef.current);
   }, [isLoading, activityLog]);
 
   if (isLoading) {
@@ -324,6 +307,7 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
                 {activities.map((activity, index) => (
                   <div
                     key={index}
+                    data-note-id={activity.id}
                     className={`grid grid-cols-[112px_120px_160px_230px_140px_1fr] gap-0 min-h-[71px] transition-colors ${
                       index < activities.length - 1 ? 'border-b border-[#b2b2b3]' : ''
                     } hover:bg-white`}
@@ -332,10 +316,10 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
                       <Popover
                         open={openDatePopoverId === String(index)}
-                        onOpenChange={(open) => setOpenDatePopoverId(open ? String(index) : null)}
+                        onOpenChange={(open) => { if (!lockedIds.has(activity.id) && !operation.pending) setOpenDatePopoverId(open ? String(index) : null); }}
                       >
                         <PopoverTrigger asChild>
-                          <button
+                          <button data-note-field="startDate" disabled={lockedIds.has(activity.id) || flushing}
                             type="button"
                             className="w-full h-full flex items-center justify-center focus:outline-none cursor-pointer"
                           >
@@ -378,8 +362,9 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
                     </div>
                     {/* Units */}
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
-                      <Input
+                      <Input disabled={lockedIds.has(activity.id) || operation.pending || flushing}
                         type="number"
+                        aria-label="Units" data-note-field="units"
                         value={activity.units}
                         onChange={(e) => updateActivity(activity.id, index, 'units', e.target.value)}
                         className="h-auto p-0 border-0 bg-transparent text-center focus-visible:ring-0 text-[14px] w-full"
@@ -387,7 +372,8 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
                     </div>
                     {/* Strategies */}
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
-                      <ContentEditableCell
+                      <ContentEditableCell fieldKey="strategies"
+                        readOnly={lockedIds.has(activity.id) || operation.pending || flushing}
                         value={activity.strategies}
                         onChange={(value) => updateActivity(activity.id, index, 'strategies', value)}
                         fieldName="Strategies Addressed Today"
@@ -396,7 +382,8 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
                     </div>
                     {/* Activities */}
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
-                      <ContentEditableCell
+                      <ContentEditableCell fieldKey="activities"
+                        readOnly={lockedIds.has(activity.id) || operation.pending || flushing}
                         value={activity.activities}
                         onChange={(value) => updateActivity(activity.id, index, 'activities', value)}
                         fieldName="Today's Activities to Address Strategies"
@@ -405,7 +392,8 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
                     </div>
                     {/* Location */}
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
-                      <ContentEditableCell
+                      <ContentEditableCell fieldKey="location"
+                        readOnly={lockedIds.has(activity.id) || operation.pending || flushing}
                         value={activity.location}
                         onChange={(value) => updateActivity(activity.id, index, 'location', value)}
                         fieldName="Location of Activities"
@@ -414,7 +402,8 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
                     </div>
                     {/* Notes */}
                     <div className="px-4 py-3 flex items-center justify-center">
-                      <ContentEditableCell
+                      <ContentEditableCell fieldKey="notes"
+                        readOnly={lockedIds.has(activity.id) || operation.pending || flushing}
                         value={activity.notes}
                         onChange={(value) => updateActivity(activity.id, index, 'notes', value)}
                         fieldName="Notes Related to Today's Activities & Progress Toward Outcome(s)"
@@ -428,6 +417,7 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
           </div>
         </div>
 
+        <NoteFieldErrors errors={fieldErrors} />
         {/* Total Units Label - Positioned below Units column */}
         <div className="mt-4">
           <p className="text-[14px] font-semibold leading-[1.4] text-black font-['Urbanist',sans-serif]">
@@ -456,7 +446,7 @@ export default function ActivitiesLogTemplate({title}: ActivitiesLogTemplateProp
           <Button
             type={"button"}
             onClick={handleSubmit}
-            disabled={isSubmitting}
+            disabled={isSubmitting || operation.pending || flushing}
             className="flex items-center gap-2 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-6 py-3 h-auto font-semibold shadow-sm"
           >
             {isSubmitting ? "Submitting..." : "Submit"}

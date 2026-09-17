@@ -10,7 +10,13 @@ export interface GetActivityLogsResponse {
   message: string;
 }
 
+export interface NoteFieldError { noteId: string; field: string; code: string; }
+
 export interface ActivityLogNote {
+  contentVersion?: number;
+  status?: "active" | "submitted" | "approved";
+  returnedAt?: string;
+  returnOperationId?: string;
   id: string;
   startDate: string;
   endDate: string;
@@ -29,11 +35,17 @@ export interface GetActivityLogResponse {
   notes: ActivityLogNote[];
   /** Notes already submitted (excluded from `notes`); used to render a locked note. */
   submittedNotes?: ActivityLogNote[];
+  approvedNotes?: ActivityLogNote[];
+  serviceDate?: string | null;
+  timezone?: string | null;
+  serviceDates?: string[];
+  shiftId?: string;
   createdBy: string;
   createdAt: string;
 }
 
 export interface CreateActivityLogPayload {
+  expectedContentVersion?: number;
   id?: string;
   startDate: string;
   endDate: string;

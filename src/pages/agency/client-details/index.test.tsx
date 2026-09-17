@@ -1,21 +1,21 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-const api = vi.hoisted(() => ({ load: vi.fn(), user: { uid: 'owner', userType: 'agency', agencyId: 'agency-1', profile: { agencyScope: 'selected', agencyIds: ['agency-1'], status: 'active', agencyModes: ['ddd'], isActive: true } } }));
-vi.mock('react-router', () => ({ useParams: () => ({ clientId: 'client-1' }), useNavigate: () => vi.fn(), useSearchParams: () => [new URLSearchParams('tab=documents'), vi.fn()] }));
+const api = vi.hoisted(() => ({ search: 'tab=documents', setSearch: vi.fn(), load: vi.fn(), user: { uid: 'owner', userType: 'agency', agencyId: 'agency-1', profile: { agencyScope: 'selected', agencyIds: ['agency-1'], status: 'active', agencyModes: ['ddd'], isActive: true } } }));
+vi.mock('react-router', () => ({ useParams: () => ({ clientId: 'client-1' }), useNavigate: () => vi.fn(), useSearchParams: () => [new URLSearchParams(api.search), api.setSearch] }));
 vi.mock('@/utils/auth', () => ({ useAuth: () => ({ user: api.user }) }));
 vi.mock('@/hooks/useEffectiveAgencyMode', () => ({ useEffectiveAgencyMode: () => 'ddd' }));
 vi.mock('@/lib/api/clients', () => ({ getAgencyClientById: api.load, getClientById: api.load, updateClient: vi.fn() }));
 vi.mock('@/pages/shared/client-details/tabs/ActivityTab', () => ({ ActivityTab: () => null }));
 vi.mock('@/pages/shared/client-details/tabs/ProfileTab', () => ({ ProfileTab: () => null }));
-vi.mock('@/pages/agency/client-details/tabs/ServicesTab', () => ({ ServicesTab: () => null }));
+vi.mock('@/pages/agency/client-details/tabs/ServicesTab', () => ({ ServicesTab: () => <p>Saved assignment context</p> }));
 vi.mock('@/pages/agency/client-details/tabs/FamilyPortalTab', () => ({ FamilyPortalTab: () => null }));
 vi.mock('@/pages/super-admin/clients-directory/client-details/SuperAdminClientActivityShifts', () => ({ default: () => null }));
-vi.mock('@/pages/super-admin/clients-directory/client-details/tabs/ServicesTab', () => ({ ServicesTab: () => null }));
+vi.mock('@/pages/super-admin/clients-directory/client-details/tabs/ServicesTab', () => ({ ServicesTab: () => <p>Saved assignment context</p> }));
 vi.mock('@/pages/super-admin/clients-directory/client-details/components/UploadClientDocumentModal', () => ({ UploadClientDocumentModal: () => null }));
 vi.mock('@/pages/agency/client-details/components/UploadClientDocumentModal', () => ({ UploadClientDocumentModal: ({ isOpen, initialDocumentKey, onComplete }: { isOpen: boolean; initialDocumentKey?: string; onComplete: () => void }) => isOpen ? <button onClick={onComplete}>Save {initialDocumentKey}</button> : null }));
 import ClientDetailsPage from './index';
 import SuperAdminClientDetailsPage from '@/pages/super-admin/clients-directory/client-details';
-beforeEach(() => { api.load.mockReset(); api.user.userType = 'agency'; api.user.profile.agencyIds = ['agency-1']; api.user.profile.agencyModes = ['ddd']; vi.stubGlobal('scrollTo', vi.fn()); });
+beforeEach(() => { api.search = 'tab=documents'; api.setSearch.mockReset(); api.load.mockReset(); api.user.userType = 'agency'; api.user.profile.agencyIds = ['agency-1']; api.user.profile.agencyModes = ['ddd']; vi.stubGlobal('scrollTo', vi.fn()); });
 describe('client page document save', () => {
   it('uses the detail response once and forces a refresh only after metadata save completes', async () => {
     vi.stubGlobal('scrollTo', vi.fn());
@@ -48,4 +48,16 @@ describe('client page document save', () => {
     expect(screen.queryByText('Previous Client')).not.toBeInTheDocument();
     expect(api.load).toHaveBeenCalledTimes(2);
   });
+});
+
+it('restores an allowlisted services tab from navigation and reload', async () => {
+  api.load.mockResolvedValue({id:'client-1',type:'ddd',documents:[]});
+  const {rerender}=render(<ClientDetailsPage/>);
+  await screen.findByRole('button',{name:'Documents'});
+  api.search='tab=services';rerender(<ClientDetailsPage/>);
+  expect(await screen.findByText('Saved assignment context')).toBeInTheDocument();
+  api.search='tab=documents';rerender(<ClientDetailsPage/>);
+  expect(screen.queryByText('Saved assignment context')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button',{name:'Services'}));
+  expect(api.setSearch.mock.calls.at(-1)?.[0].get('tab')).toBe('services');
 });

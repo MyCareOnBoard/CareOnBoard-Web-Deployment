@@ -13,6 +13,7 @@ import {
 
 interface OperationReportHeaderProps {
   title?: string;
+  reportDisabled?: boolean;
 
   dateRange: {
     startDate: string;
@@ -40,6 +41,7 @@ const ACTIONS = [
 export default function OperationReportHeader({
   title = "AI Analytics & Operation report",
   dateRange,
+  reportDisabled = false,
   onOpenDateModal,
   onActionSelect,
 }: OperationReportHeaderProps) {
@@ -139,6 +141,7 @@ export default function OperationReportHeader({
                 return (
                   <button
                     key={action.label}
+                    disabled={reportDisabled && action.label === "Download report"}
                     onClick={() => {
                       onActionSelect?.(action.label);
                       setShowActionDropdown(false);

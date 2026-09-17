@@ -1,3 +1,6 @@
+import {useAssignmentReviewScope} from "@/hooks/useAssignmentReview";
+import {matchesReportScope,printParams} from "../analytics/analyticsScope";
+import CurrentRecordsLinks from "../analytics/components/CurrentRecordsLinks";
 import React, { useState } from "react";
 import { ChevronRight, ArrowUpRight, ChevronLeft, Clock3, WandSparkles, UserRoundCog } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -108,16 +111,22 @@ export default function AgencyDashboardPage() {
   );
   const shifts = shiftStatsData?.buckets || [];
 
-  const { data: analyticsResponse, isLoading: isLoadingAnalytics, isFetching: isFetchingAnalytics } = useGetAnalyticsSummaryQuery(
+
+  const scopeKey = JSON.stringify([useAssignmentReviewScope(),user?.agencyId || user?.agency?.id,user?.agency?.status,effectiveMode]);
+  const { currentData: analyticsResponse, isLoading: isLoadingAnalytics, isFetching: isFetchingAnalytics, isError: analyticsError, refetch: refreshAnalytics } = useGetAnalyticsSummaryQuery(
     {
       startDate: dateRange.startDate || undefined,
       endDate: dateRange.endDate || undefined,
       mode: effectiveMode ?? undefined,
+      scopeKey,
     },
     { refetchOnMountOrArgChange: true }
   );
 
-  const summary = analyticsResponse?.data;
+  const summary = !analyticsError && analyticsResponse?.success && matchesReportScope(analyticsResponse.data.reportScope,{mode:effectiveMode ?? undefined,startDate:dateRange.startDate || undefined,endDate:dateRange.endDate || undefined}) ? analyticsResponse.data : undefined;
+  const reportQuery = printParams(summary?.reportScope);
+  const reportDisabled = isLoadingAnalytics || isFetchingAnalytics || !summary || !reportQuery;
+  const widgetScope = JSON.stringify([scopeKey,dateRange,summary?.reportScope.checkedAt,summary?.complianceAvailability,summary?.currentRecordSources]);
 
   // Transform shifts data to dashboard format
   const transformedShifts = shifts.length > 0 ? shifts.map(bucket => {
@@ -159,7 +168,7 @@ export default function AgencyDashboardPage() {
   };
 
   const downloadPDF = () => {
-    window.open(Routes.agency.analyticsPrint, "_blank", "noopener,noreferrer");
+    if (!reportDisabled && reportQuery) window.open(`${Routes.agency.analyticsPrint}?${reportQuery}`, "_blank", "noopener,noreferrer");
   };
 
   const isAnalyticsLoading = isLoadingAnalytics || isFetchingAnalytics;
@@ -546,9 +555,9 @@ export default function AgencyDashboardPage() {
       <div className="space-y-6 ">
         {/* Analytics header */}
         <div className="no-print">
-          <OperationReportHeader
+          <OperationReportHeader reportDisabled={reportDisabled}
             title="Agency Operation Overview"
-            dateRange={dateRange}
+            dateRange={summary?.reportScope ?? dateRange}
             onOpenDateModal={() => setShowDateModal(true)}
             onActionSelect={(action) => {
               switch (action) {
@@ -566,29 +575,31 @@ export default function AgencyDashboardPage() {
         </div>
 
         {/* Analytics report */}
+        {analyticsError && <div role="alert" className="mb-4">Could not load this report. Your reporting dates have been kept. <button onClick={()=>refreshAnalytics()}>Retry</button></div>}
         <div id="analytics-report" className="space-y-6 print-container">
+        {summary && !reportDisabled && <CurrentRecordsLinks summary={summary} mode={effectiveMode} />}
           <div className="print-card">
-            <OverviewCards data={summary?.overview} isLoading={isAnalyticsLoading} />
+            <OverviewCards availability={summary?.complianceAvailability} populationTotal={summary?.populationTotal} data={summary?.overview} isLoading={isAnalyticsLoading} />
           </div>
 
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
             <div className="print-card">
-              <ComplianceInsights
-                total={summary?.complianceInsights.total}
-                data={summary?.complianceInsights.breakdown}
+              <ComplianceInsights key={widgetScope+"compliance"} scopeKey={scopeKey} availability={summary?.complianceAvailability.indicators}
+                total={summary?.complianceInsights?.total}
+                data={summary?.complianceInsights?.breakdown}
                 isLoading={isAnalyticsLoading}
-                startDate={dateRange.startDate || undefined}
-                endDate={dateRange.endDate || undefined}
+                startDate={summary?.reportScope.startDate}
+                endDate={summary?.reportScope.endDate}
                 mode={effectiveMode ?? undefined}
               />
             </div>
 
             <div className="print-card">
-              <RiskTrends
+              <RiskTrends key={widgetScope+"risk"} scopeKey={scopeKey}
                 data={summary?.riskTrends}
                 isLoading={isAnalyticsLoading}
-                startDate={dateRange.startDate || undefined}
-                endDate={dateRange.endDate || undefined}
+                startDate={summary?.reportScope.startDate}
+                endDate={summary?.reportScope.endDate}
                 mode={effectiveMode ?? undefined}
               />
             </div>
@@ -596,21 +607,21 @@ export default function AgencyDashboardPage() {
 
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
             {effectiveMode !== "sc" && <div className="print-card">
-              <OperationalEfficiency
+              <OperationalEfficiency key={widgetScope+"efficiency"} scopeKey={scopeKey} mode={effectiveMode ?? undefined}
                 metrics={summary ? buildOperationalMetrics(summary.operationalEfficiency) : undefined}
                 isLoading={isAnalyticsLoading}
-                startDate={dateRange.startDate || undefined}
-                endDate={dateRange.endDate || undefined}
+                startDate={summary?.reportScope.startDate}
+                endDate={summary?.reportScope.endDate}
               />
             </div>}
 
             <div className="print-card">
-              <BillingSummary
+              <BillingSummary key={widgetScope+"billing"} scopeKey={scopeKey} mode={effectiveMode ?? undefined}
                 total={summary?.billingSummary.total}
                 data={summary?.billingSummary.breakdown}
                 isLoading={isAnalyticsLoading}
-                startDate={dateRange.startDate || undefined}
-                endDate={dateRange.endDate || undefined}
+                startDate={summary?.reportScope.startDate}
+                endDate={summary?.reportScope.endDate}
               />
             </div>
           </div>

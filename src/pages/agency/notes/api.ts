@@ -1,3 +1,4 @@
+import { complianceAlertsApi } from '@/pages/agency/compliance-alerts/api';
 import {createApi} from "@reduxjs/toolkit/query/react";
 import {customBaseQuery} from "@/lib/baseQuery";
 import {SubmittedNotesResponse, SubmittedNotesQueryParams, SubmittedNoteDetails} from "./apiTypes";
@@ -30,25 +31,33 @@ export const agencyNotesApi = createApi({
       },
       providesTags: ['SubmittedNotes']
     }),
-    approveSubmittedNotes: builder.mutation<void, string>({
-      query: (submissionId) => ({
+    approveSubmittedNotes: builder.mutation<void, {submissionId: string; operationId: string}>({
+      query: ({submissionId, operationId}) => ({
+        data: {operationId},
         url: `/employees/submitted-notes/${submissionId}/approve`,
         method: "POST",
         requiresAuth: true
       }),
-      invalidatesTags: ['SubmittedNotes']
+      async onQueryStarted(_arg, {dispatch, queryFulfilled}) {
+        try { await queryFulfilled; dispatch(complianceAlertsApi.util.invalidateTags(['ShiftNoteCompliance'])); } catch { /* Retain checked status. */ }
+      },
+      invalidatesTags: (_result,error) => error ? [] : ['SubmittedNotes', 'SubmittedNoteDetails']
     }),
-    rejectSubmittedNotes: builder.mutation<void, string>({
-      query: (submissionId) => ({
+    rejectSubmittedNotes: builder.mutation<void, {submissionId: string; operationId: string}>({
+      query: ({submissionId, operationId}) => ({
+        data: {operationId},
         url: `/employees/submitted-notes/${submissionId}/reject`,
         method: "POST",
         requiresAuth: true
       }),
-      invalidatesTags: ['SubmittedNotes']
+      async onQueryStarted(_arg, {dispatch, queryFulfilled}) {
+        try { await queryFulfilled; dispatch(complianceAlertsApi.util.invalidateTags(['ShiftNoteCompliance'])); } catch { /* Retain checked status. */ }
+      },
+      invalidatesTags: (_result,error) => error ? [] : ['SubmittedNotes', 'SubmittedNoteDetails']
     }),
-    getSubmittedNoteDetails: builder.query<SubmittedNoteDetails, string>({
-      query: (submissionId) => ({
-        url: `/employees/submitted-notes/${submissionId}`,
+    getSubmittedNoteDetails: builder.query<SubmittedNoteDetails, string | {submissionId:string;scopeKey:string}>({
+      query: (selection) => ({
+        url: `/employees/submitted-notes/${encodeURIComponent(typeof selection === 'string' ? selection : selection.submissionId)}`,
         method: "GET",
         requiresAuth: true
       }),

@@ -1,3 +1,5 @@
+import {CareerSignedContent,CareerSignatureHistory} from './CareerPlanningNote';
+import EditableNoteActions from './EditableNoteActions';
 import { lazy, Suspense } from "react";
 import { Printer, X } from "lucide-react";
 import { useGetSubmittedNoteDetailsQuery } from "@/pages/agency/notes/api";
@@ -13,6 +15,7 @@ interface SubmittedNoteModalProps {
   isOpen: boolean;
   submissionId: string | null;
   readOnly: boolean;
+  scopeKey?: string;
   onClose: () => void;
 }
 
@@ -22,15 +25,21 @@ const TemplateLoadingState = () => (
   </div>
 );
 
-export default function SubmittedNoteModal({ isOpen, submissionId, readOnly, onClose }: SubmittedNoteModalProps) {
-  const { data: submittedNote, isLoading } = useGetSubmittedNoteDetailsQuery(submissionId!, { skip: !submissionId });
+export default function SubmittedNoteModal({ isOpen, submissionId, readOnly, scopeKey, onClose }: SubmittedNoteModalProps) {
+  const query = useGetSubmittedNoteDetailsQuery(scopeKey ? {submissionId:submissionId!,scopeKey} : submissionId!, { skip: !submissionId || !isOpen, refetchOnMountOrArgChange: Boolean(scopeKey) });
+  const {isLoading,isError}=query;
+  const loadedNote = scopeKey ? (query.isFetching || isError ? undefined : query.currentData) : query.data;
 
+  const submittedNote = loadedNote && (loadedNote.submissionId === submissionId || loadedNote.id === submissionId) ? loadedNote : undefined;
   if (!isOpen) return null;
 
   const template = !submittedNote ? null : (() => {
     const commonProps = { submissionId, isLoading, submittedNote, readOnly };
 
     switch (submittedNote.activityType) {
+      case "career-planning":
+        if (!submittedNote.snapshot || !submittedNote.signature) return <p role="alert">This signed note could not be verified. Close it and try again.</p>;
+        return <div className="space-y-5"><CareerSignedContent snapshot={submittedNote.snapshot} signature={submittedNote.signature}/>{submittedNote.approvedAt && <p>Approved: {submittedNote.approvedAt}</p>}{!readOnly && submittedNote.status==='submitted' && <><div className="flex gap-3"><EditableNoteActions submissionId={submissionId!} onEdit={()=>undefined} canEdit={false}/></div><p>Returned entries must be corrected and signed again by the employee.</p></>}{!scopeKey && <CareerSignatureHistory key={submittedNote.snapshot.context.activityLogId} activityLogId={submittedNote.snapshot.context.activityLogId}/>}</div>;
       case "community-based":
         return <CommunityBasedNote {...commonProps} />;
       case "community-inclusion":
@@ -64,7 +73,7 @@ export default function SubmittedNoteModal({ isOpen, submissionId, readOnly, onC
             <button onClick={onClose} className="flex items-center space-x-3 rounded-full bg-[#B2B2B3] px-4 py-3 text-white" aria-label="Close modal"><X className="h-6 w-6" /><span>Close</span></button>
           </div>
           <div className="flex-1 overflow-y-auto print:overflow-visible">
-            {isLoading ? <TemplateLoadingState /> : <Suspense fallback={<TemplateLoadingState />}>{template}</Suspense>}
+            {isError ? <p role="alert">Unable to load this submitted note. Close it and try again.</p> : isLoading || !submittedNote ? <TemplateLoadingState /> : <Suspense fallback={<TemplateLoadingState />}>{template}</Suspense>}
           </div>
         </div>
       </div>

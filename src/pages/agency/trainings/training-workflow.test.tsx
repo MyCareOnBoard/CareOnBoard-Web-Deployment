@@ -4,6 +4,8 @@ import AgencyTrainings from './index';
 import ReviewTrainingsModal from './reviewTrainingsModal';
 
 const state = vi.hoisted(() => ({
+  search: '',
+  setSearch: vi.fn(),
   staff: {items: [] as any[], nextCursor: null as string | null},
   courses: {items: [] as any[], nextCursor: null as string | null, summary: null, localDate: null},
   approval: vi.fn(),
@@ -11,6 +13,8 @@ const state = vi.hoisted(() => ({
   loadCourses: vi.fn(),
 }));
 
+vi.mock('react-router', () => ({useSearchParams: () => [new URLSearchParams(state.search), state.setSearch]}));
+vi.mock('@/hooks/useAssignmentReview', () => ({useAssignmentReviewScope: () => 'scope'}));
 vi.mock('@/utils/auth', () => ({useAuth: () => ({user: {agencyId: 'agency-1'}})}));
 vi.mock('@/hooks/useStaffLabels', () => ({useStaffLabels: () => ({labels: {noun: 'Staff'}})}));
 vi.mock('@/hooks/useEffectiveAgencyMode', () => ({useEffectiveAgencyMode: () => 'ddd'}));
@@ -27,6 +31,7 @@ vi.mock('./trainingApi', () => ({
 
 describe('agency training pagination', () => {
   beforeEach(() => {
+    state.search = '';
     state.staff = {items: [], nextCursor: null};
     state.courses = {items: [], nextCursor: null, summary: null, localDate: null};
     state.approval.mockReset();
@@ -34,7 +39,18 @@ describe('agency training pagination', () => {
     state.courseArgs.length = 0;
   });
 
+  it('opens a validated employee deep link without scanning staff pages', async () => {
+    state.search = 'employeeId=direct-employee';
+    render(<AgencyTrainings />);
+    await waitFor(() => expect(state.courseArgs[0]).toMatchObject({employeeId: 'direct-employee', agencyId: 'agency-1', limit: 25}));
+  });
+  it('rejects unsafe employee deep links', () => {
+    state.search = 'employeeId=a%2Fb'; render(<AgencyTrainings />);
+    expect(state.courseArgs).toHaveLength(0);
+    expect(screen.getByRole('alert')).toHaveTextContent('Invalid staff selection');
+  });
   it('offers continuation for an empty filtered page when the server returns a cursor', () => {
+    state.search = '';
     state.staff = {items: [], nextCursor: 'next-page'};
     render(<AgencyTrainings />);
     expect(screen.queryByText('No data available')).not.toBeInTheDocument();
@@ -42,11 +58,12 @@ describe('agency training pagination', () => {
   });
 
   it('loads employee courses only when review opens', async () => {
+    state.search = '';
     state.staff = {items: [{id: 'employee-1', fullName: 'Ada Lovelace', profilePictureUrl: '', status: 'Assigned', assignedCount: 2}], nextCursor: null};
     render(<AgencyTrainings />);
     expect(state.courseArgs).toHaveLength(0);
     fireEvent.click(screen.getByRole('button', {name: 'Review Trainings'}));
-    await waitFor(() => expect(state.courseArgs).toEqual([{employeeId: 'employee-1', agencyId: 'agency-1', limit: 25, mode: 'ddd'}]));
+    await waitFor(() => expect(state.courseArgs[0]).toMatchObject({employeeId: 'employee-1', agencyId: 'agency-1', limit: 25, mode: 'ddd'}));
   });
 
   it('keeps approval unchanged when the review mutation fails', async () => {

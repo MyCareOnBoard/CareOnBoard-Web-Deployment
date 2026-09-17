@@ -1,3 +1,5 @@
+import {canReviewCareer} from '@/lib/api/career-reconciliation';
+import {useAuth} from '@/utils/auth';
 import {useEffectiveAgencyMode} from "@/hooks/useEffectiveAgencyMode";
 import {AssignmentReviewRosterProvider, rosterAssignmentsChanged, rosterAcknowledgments, type RosterDecisionState} from "@/components/AssignmentReviewRoster";
 import {useAssignmentReviewScope} from '@/hooks/useAssignmentReview';
@@ -1369,6 +1371,12 @@ function ServiceRow({
 }
 
 export function ServicesTab({ client, clientId, onServicesUpdated, readOnly = false }: ServicesTabProps) {
+  const {user: careerUser}=useAuth();
+  const careerReadOnly=careerUser?.userType==='super_admin'&&Boolean(careerUser.profile?.accessList?.includes('Clients Directory'));
+  const careerAccess=careerReadOnly||careerUser?.userType==='agency'||(careerUser?.userType==='agency_staff'&&['Goals & Documents','Client Management'].every(p=>careerUser.profile?.accessList?.includes(p)));
+  const rawCareerRows=client.outcomes?.length?client.outcomes.flatMap(outcome=>outcome.services??[]):client.services??[];
+  const careerRows=rawCareerRows.filter(row=>row.id&&row.code==='H2023-CAREER'&&rawCareerRows.filter(other=>other.id===row.id).length===1);
+
   const navigate = useNavigate();
   const reviewMode = useEffectiveAgencyMode();
   const location = useLocation();
@@ -1644,6 +1652,8 @@ export function ServicesTab({ client, clientId, onServicesUpdated, readOnly = fa
   return (
     <AssignmentReviewRosterProvider enabled={reviewMode !== "sc"} clientId={clientId} agencyId={client.agencyId} program="ddd" savedRows={mapClientOutcomesToEditable(client.outcomes).flatMap(group => group.services)} decisionState={decisionState} onDecisionState={setDecisionState} decisionCaptureRef={decisionCaptureRef}>
     <div className="mt-4 backdrop-blur bg-[rgba(255,255,255,0.3)] border border-[rgba(255,255,255,0.3)] rounded-[30px] p-5 flex flex-col gap-4">
+      {canReviewCareer(careerUser) && reviewMode !== 'sc' && client.type==='ddd' && <Button variant="outline" onClick={()=>navigate((careerUser?.userType==='super_admin'?Routes.superAdmin.careerReconciliation:Routes.agency.careerReconciliation)+'?'+new URLSearchParams({clientId,...(client.agencyId?{agencyId:client.agencyId}:{})}))}>Usage &amp; reconciliation</Button>}
+      {careerAccess && (!readOnly||careerReadOnly) && reviewMode !== 'sc' && client.type==='ddd' && careerRows.map(row=><Button key={row.id} variant="outline" onClick={()=>navigate(`${careerReadOnly?Routes.superAdmin.careerPlanning:Routes.agency.goalsAndDocuments.careerPlanning}?agencyId=${encodeURIComponent(client.agencyId??'')}&clientId=${encodeURIComponent(clientId)}&serviceAuthorizationId=${encodeURIComponent(row.id)}`)}>Open Career Planning plan · {row.startAuthDate?.slice(0,10)??'Authorization'} – {row.endAuthDate?.slice(0,10)??''}</Button>)}
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">

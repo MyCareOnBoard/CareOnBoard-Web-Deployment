@@ -214,7 +214,12 @@ export interface KpiMetric {
     sparkline: SparklinePoint[];
 }
 
+export interface AnalyticsKpiMetric extends Omit<KpiMetric, "trend"> { trend?: number; }
+export type MetricAvailability = "available" | "empty" | "unavailable" | "restricted";
+export interface AnalyticsReportScope { startDate: string; endDate: string; mode: string | null; checkedAt: string; }
+
 export interface ComplianceBreakdownItem {
+    key?: string;
     label: string;
     value: number;
     color: string;
@@ -229,10 +234,10 @@ export interface BillingBreakdownItem {
 
 export interface RiskTrendPoint {
     month: string;
-    expired: number;
-    overtime: number;
-    missing: number;
-    unsignedForm485: number;
+    expired?: number;
+    overtime?: number;
+    missing?: number;
+    unsignedForm485?: number;
 }
 
 export interface OperationalMetricData {
@@ -243,12 +248,16 @@ export interface OperationalMetricData {
 
 export interface AnalyticsSummaryData {
     overview: {
-        complianceRate: KpiMetric;
-        totalIssues: KpiMetric;
+        complianceRate?: AnalyticsKpiMetric;
+        totalIssues?: AnalyticsKpiMetric;
         revenue: KpiMetric;
         shiftsBilled: KpiMetric;
     };
-    complianceInsights: {
+    complianceAvailability: { rate: MetricAvailability; flags: MetricAvailability; indicators: MetricAvailability };
+    populationTotal?: number;
+    reportScope: AnalyticsReportScope;
+    currentRecordSources: import("@/pages/agency/compliance-alerts/workspaceScope").Source[];
+    complianceInsights?: {
         total: number;
         breakdown: ComplianceBreakdownItem[];
     };
@@ -265,6 +274,8 @@ export interface AnalyticsSummaryData {
 }
 
 export interface AnalyticsFilters {
+    /** Cache identity only; never sent to the server. */
+    scopeKey?: string;
     startDate?: string;
     endDate?: string;
     mode?: string;
@@ -276,10 +287,10 @@ export interface AnalyticsInsightSection {
 }
 
 export interface AnalyticsInsights {
-    compliance: AnalyticsInsightSection;
-    risk: AnalyticsInsightSection;
-    efficiency: AnalyticsInsightSection;
-    billing: AnalyticsInsightSection;
+    compliance?: AnalyticsInsightSection;
+    risk?: AnalyticsInsightSection;
+    efficiency?: AnalyticsInsightSection;
+    billing?: AnalyticsInsightSection;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -660,7 +671,7 @@ export const reportsApi = createApi({
             query: (filters) => ({
                 url: "/reports/analytics/summary",
                 method: "GET",
-                params: filters,
+                params: { startDate: filters.startDate, endDate: filters.endDate, mode: filters.mode },
                 requiresAuth: true,
             }),
             providesTags: ["AnalyticsReport"],
@@ -669,13 +680,13 @@ export const reportsApi = createApi({
 
         // Analytics AI Insights
         getAnalyticsInsights: builder.query<
-            { success: boolean; data: AnalyticsInsights },
+            { success: boolean; data: AnalyticsInsights; reportScope: AnalyticsReportScope },
             AnalyticsFilters
         >({
             query: (filters) => ({
                 url: "/reports/analytics/insights",
                 method: "GET",
-                params: filters,
+                params: { startDate: filters.startDate, endDate: filters.endDate, mode: filters.mode },
                 requiresAuth: true,
             }),
             providesTags: ["AnalyticsReport"],

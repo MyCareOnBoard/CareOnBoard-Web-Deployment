@@ -12,46 +12,50 @@ import {
 } from "recharts";
 
 import type { RiskTrendPoint } from "@/lib/api/reports";
-import AIInsightsCard from "./AIInsightsCard";
-import { useLazyGetAnalyticsInsightsQuery } from "@/lib/api/reports";
+import AIInsightsCard, { useScopedAnalyticsInsights } from "./AIInsightsCard";
 
 interface RiskTrendsProps {
   data?: RiskTrendPoint[];
   isLoading?: boolean;
   startDate?: string;
   endDate?: string;
+  scopeKey?: string;
   mode?: string;
 }
 
-const FALLBACK_DATA: RiskTrendPoint[] = [
-  { month: "Jan", expired: 4, overtime: 7, missing: 0, unsignedForm485: 0 },
-  { month: "Feb", expired: 8, overtime: 12, missing: 4, unsignedForm485: 0 },
-  { month: "Mar", expired: 10, overtime: 13, missing: 9, unsignedForm485: 0 },
-  { month: "Apr", expired: 8, overtime: 12, missing: 10, unsignedForm485: 0 },
-  { month: "May", expired: 6, overtime: 10, missing: 4, unsignedForm485: 0 },
-  { month: "Jun", expired: 6, overtime: 9, missing: 4, unsignedForm485: 0 },
-  { month: "Jul", expired: 8, overtime: 7, missing: 4, unsignedForm485: 0 },
-  { month: "Aug", expired: 10, overtime: 6, missing: 4, unsignedForm485: 0 },
-];
-
-export default function RiskTrends({ data = FALLBACK_DATA, isLoading, startDate, endDate, mode }: RiskTrendsProps) {
+export default function RiskTrends({
+  data,
+  isLoading,
+  startDate,
+  endDate,
+  mode,
+  scopeKey,
+}: RiskTrendsProps) {
   const [showInsights, setShowInsights] = useState(false);
   const insightsBtnRef = useRef<HTMLDivElement>(null);
-  const [fetchInsights, { data: insightsData, isLoading: insightsLoading }] = useLazyGetAnalyticsInsightsQuery();
+  const { fetchInsights, insightsData, insightsLoading, insightsDisabled } =
+    useScopedAnalyticsInsights({ startDate, endDate, mode, scopeKey });
 
   useEffect(() => {
     if (!showInsights) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (insightsBtnRef.current && !insightsBtnRef.current.contains(e.target as Node)) {
+      if (
+        insightsBtnRef.current &&
+        !insightsBtnRef.current.contains(e.target as Node)
+      ) {
         setShowInsights(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showInsights]);
 
+  useEffect(() => {
+    setShowInsights(false);
+  }, [startDate, endDate, mode, scopeKey]);
+
   const handleInsightsClick = () => {
-    if (!showInsights) fetchInsights({ startDate, endDate, mode });
+    if (!showInsights) fetchInsights();
     setShowInsights((p) => !p);
   };
 
@@ -66,12 +70,36 @@ export default function RiskTrends({ data = FALLBACK_DATA, isLoading, startDate,
           <div className="h-10 w-28 rounded-full bg-gray-100" />
         </div>
         <div className="flex gap-6 mb-8">
-          {[1, 2, 3].map((i) => <div key={i} className="h-4 w-36 rounded bg-gray-100" />)}
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-4 w-36 rounded bg-gray-100" />
+          ))}
         </div>
         <div className="h-[320px] w-full rounded-2xl bg-gray-100" />
       </div>
     );
   }
+  const series = [
+    { key: "expired", label: "Expired Certification", color: "#E5390A" },
+    { key: "overtime", label: "Overtime risk", color: "#FF7A00" },
+    { key: "missing", label: "Missing document", color: "#3B82F6" },
+    { key: "unsignedForm485", label: "Unsigned Form 485", color: "#8B5CF6" },
+  ].filter(
+    (item) =>
+      data?.some(
+        (row) => typeof row[item.key as keyof RiskTrendPoint] === "number",
+      ) &&
+      (item.key !== "unsignedForm485" || mode !== "ddd"),
+  );
+  if (!data || !series.length)
+    return (
+      <div
+        role="status"
+        className="rounded-[32px] border border-[#E6EAEC] bg-[#FFFFFF66] p-6"
+      >
+        <h4 className="text-[20px] font-semibold">Risk trends</h4>
+        <p>{data ? "No permitted trend data" : "Unavailable"}</p>
+      </div>
+    );
   return (
     <div
       className="
@@ -88,12 +116,13 @@ export default function RiskTrends({ data = FALLBACK_DATA, isLoading, startDate,
           </h4>
 
           <p className="mt-1 text-[16px] text-[#6B7280]">
-            Risk over time
+            Selected risk indicators over time; categories may overlap.
           </p>
         </div>
 
         <div ref={insightsBtnRef} className="relative">
           <button
+            disabled={insightsDisabled}
             onClick={handleInsightsClick}
             className="
               inline-flex items-center gap-2
@@ -108,37 +137,25 @@ export default function RiskTrends({ data = FALLBACK_DATA, isLoading, startDate,
           </button>
           {showInsights && (
             <AIInsightsCard
+              limitedCoverage
               isLoading={insightsLoading}
-              insight={insightsData?.data.risk.insight ?? ""}
-              recommendation={insightsData?.data.risk.recommendation ?? ""}
+              insight={insightsData?.risk?.insight ?? ""}
+              recommendation={insightsData?.risk?.recommendation ?? ""}
             />
           )}
         </div>
       </div>
 
-      {/* Legends */}
       <div className="flex flex-wrap gap-6 mb-8">
-        <div className="flex items-center gap-2">
-          <div className="h-4 w-4 rounded-full bg-[#f33500]" />
-          <span className="text-[14px] text-[#111827]">Expired Certification</span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="h-4 w-4 rounded-full bg-[#FF7A00]" />
-          <span className="text-[14px] text-[#111827]">Overtime risk</span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="h-4 w-4 rounded-full bg-[#3B82F6]" />
-          <span className="text-[14px] text-[#111827]">Missing document</span>
-        </div>
-
-        {mode !== "ddd" && (
-          <div className="flex items-center gap-2">
-            <div className="h-4 w-4 rounded-full bg-[#8B5CF6]" />
-            <span className="text-[14px] text-[#111827]">Unsigned Form 485</span>
+        {series.map((item) => (
+          <div key={item.key} className="flex items-center gap-2">
+            <div
+              className="h-4 w-4 rounded-full"
+              style={{ backgroundColor: item.color }}
+            />
+            <span className="text-[14px] text-[#111827]">{item.label}</span>
           </div>
-        )}
+        ))}
       </div>
 
       {/* Graph */}
@@ -148,7 +165,11 @@ export default function RiskTrends({ data = FALLBACK_DATA, isLoading, startDate,
             data={data}
             margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
           >
-            <CartesianGrid vertical={false} stroke="#E5E7EB" strokeDasharray="0" />
+            <CartesianGrid
+              vertical={false}
+              stroke="#E5E7EB"
+              strokeDasharray="0"
+            />
 
             <XAxis
               dataKey="month"
@@ -171,12 +192,18 @@ export default function RiskTrends({ data = FALLBACK_DATA, isLoading, startDate,
               }}
             />
 
-            <Line type="monotone" dataKey="expired" stroke="#E5390A" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
-            <Line type="monotone" dataKey="overtime" stroke="#FF7A00" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
-            <Line type="monotone" dataKey="missing" stroke="#3B82F6" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
-            {mode !== "ddd" && (
-              <Line type="monotone" dataKey="unsignedForm485" stroke="#8B5CF6" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
-            )}
+            {series.map((item) => (
+              <Line
+                key={item.key}
+                type="monotone"
+                dataKey={item.key}
+                name={item.label}
+                stroke={item.color}
+                strokeWidth={3}
+                dot={false}
+                activeDot={{ r: 6 }}
+              />
+            ))}
           </LineChart>
         </ResponsiveContainer>
       </div>

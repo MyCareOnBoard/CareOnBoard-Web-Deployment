@@ -1,9 +1,12 @@
-import React, {useEffect, useState} from "react";
+import {useSearchParams} from 'react-router';
+import {useAssignmentReviewScope} from '@/hooks/useAssignmentReview';
+import {validComplianceId} from '@/pages/agency/compliance-alerts/workspaceScope';
+import React, {lazy, Suspense, useEffect, useState} from "react";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
 import {ChevronLeft, ChevronRight, Search} from "lucide-react";
 import AgencyAssignTrainingModal, {SaveTrainingData} from "@/pages/agency/trainings/assignTraining";
-import ReviewTrainingsModal from "@/pages/agency/trainings/reviewTrainingsModal";
+const ReviewTrainingsModal = lazy(() => import('./reviewTrainingsModal'));
 import {
   useGetTrainingsQuery,
   useSaveTrainingMutation,
@@ -16,6 +19,13 @@ import {useStaffLabels} from "@/hooks/useStaffLabels";
 import {useEffectiveAgencyMode} from '@/hooks/useEffectiveAgencyMode';
 
 export default function AgencyTrainings() {
+  const scopeKey = JSON.stringify([useAssignmentReviewScope(), useEffectiveAgencyMode()]);
+  return <AgencyTrainingsView key={scopeKey} scopeKey={scopeKey}/>;
+}
+function AgencyTrainingsView({scopeKey}: {scopeKey: string}) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const employeeId = searchParams.get('employeeId');
+  const validSelection = employeeId !== null && validComplianceId(employeeId);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [success, setSuccess] = useState<boolean>(false);
   const [isTrainingModalOpen, setIsTrainingModalOpen] = useState<boolean>(false);
@@ -29,12 +39,20 @@ export default function AgencyTrainings() {
   const {user} = useAuth();
   const mode = useEffectiveAgencyMode();
   const [saveTraining, {isLoading}] = useSaveTrainingMutation();
-  const {currentData: trainings, isFetching: trainingsLoading, isError: trainingsError} = useGetTrainingsQuery({agencyId: user?.agencyId!, search: searchQuery || undefined, limit: 8, cursor, mode: mode ?? undefined}, {
+  const {currentData: trainings, isFetching: trainingsLoading, isError: trainingsError} = useGetTrainingsQuery({scopeKey, agencyId: user?.agencyId!, search: searchQuery || undefined, limit: 8, cursor, mode: mode ?? undefined}, {
     skip: !user?.agencyId,
     refetchOnMountOrArgChange: true
   });
   useEffect(() => { setCursor(undefined); setCursorHistory([]); }, [user?.agencyId, mode]);
 
+  useEffect(() => {
+    if (validSelection) {setSelectedEmployee({id: employeeId!, fullName: '', profilePictureUrl: '', status: '', assignedCount: 0}); setIsReviewModalOpen(true);}
+    else {setSelectedEmployee(null); setIsReviewModalOpen(false);}
+  }, [employeeId, validSelection]);
+  const closeReview = (open: boolean) => {
+    setIsReviewModalOpen(open);
+    if (!open && employeeId !== null) {const next = new URLSearchParams(searchParams); next.delete('employeeId'); setSearchParams(next);}
+  };
   const handleSave = async (
     data: SaveTrainingData
   ) => {
@@ -71,6 +89,7 @@ export default function AgencyTrainings() {
 
   return (
     <div className="min-h-[calc(100vh-200px)] flex flex-col">
+      {employeeId !== null && !validSelection && <p role="alert">Invalid staff selection. Open a staff member from the list.</p>}
       <div className={"mb-8 flex items-center justify-between"}>
         <div>
           <h1 className="text-[40px] font-bold leading-[1.4] text-[#10141a]">
@@ -224,9 +243,10 @@ export default function AgencyTrainings() {
         onSave={handleSave}
         isLoading={isLoading}
       />
-      <ReviewTrainingsModal
+      {isReviewModalOpen && <Suspense fallback={<p role="status">Loading training review…</p>}><ReviewTrainingsModal
         open={isReviewModalOpen}
-        onOpenChange={setIsReviewModalOpen}
+        onOpenChange={closeReview}
+        scopeKey={scopeKey}
         employee={selectedEmployee ? {
           id: selectedEmployee.id,
           fullName: selectedEmployee.fullName,
@@ -238,6 +258,7 @@ export default function AgencyTrainings() {
           console.log(`Training ${trainingId} approval changed to ${approved}`);
         }}
       />
+      </Suspense>}
       <AnimatePresence>
         {success && (
           <motion.div

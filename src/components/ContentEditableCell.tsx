@@ -4,6 +4,8 @@ import { useVoiceRecording } from "@/contexts/VoiceRecordingContext";
 
 interface ContentEditableCellProps {
   value: string;
+  readOnly?: boolean;
+  fieldKey?: string;
   onChange: (value: string) => void;
   className?: string;
   style?: React.CSSProperties;
@@ -14,6 +16,8 @@ interface ContentEditableCellProps {
 
 const ContentEditableCell: React.FC<ContentEditableCellProps> = ({
   value,
+  readOnly = false,
+  fieldKey,
   onChange,
   className = "",
   style,
@@ -58,19 +62,23 @@ const ContentEditableCell: React.FC<ContentEditableCellProps> = ({
   return (
     <div 
       className="relative w-full"
+      data-note-field={fieldKey}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       <div
         ref={contentRef}
-        contentEditable
+        contentEditable={!readOnly}
+        aria-readonly={readOnly}
+        role="textbox"
+        aria-label={fieldName}
         suppressContentEditableWarning
         onInput={handleInput}
         style={style}
         className={`w-full min-h-[71px] border-0 bg-transparent text-center focus:outline-none text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif] py-6 ${className}`}
         data-placeholder={placeholder}
       />
-      {isHovered && (
+      {isHovered && !readOnly && (
         <button
           className="absolute bottom-2 right-2 bg-[#00b4b8] border border-[rgba(0,0,0,0.12)] rounded-full w-8 h-8 flex items-center justify-center shadow-md hover:bg-[#009da1] transition-colors z-10 cursor-pointer"
           aria-label="Voice input"

@@ -1,4 +1,8 @@
-import React, {useEffect, useState} from "react";
+import { noteServiceDate, noteEndDate } from '@/lib/notes/noteTypes';
+import { useNoteOperation } from '@/lib/notes/useNoteOperation';
+import { NoteFieldErrors, focusNoteError } from '@/pages/shared/notes/NoteFieldErrors';
+import type { NoteFieldError } from '@/pages/userPanel/notes/apiTypes';
+import React, {useEffect, useState, useRef} from "react";
 import {Input} from "@/components/ui/input";
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
 import {Calendar} from "@/components/ui/calendar";
@@ -79,6 +83,11 @@ const initialInterventions = [
 ]
 
 export default function SupportedEmploymentInterventionPage() {
+  const id = new URLSearchParams(useLocation().search).get("id");
+  return <SupportedEmploymentInterventionPageForm key={id} />;
+}
+
+function SupportedEmploymentInterventionPageForm() {
   const pageTitle = "Supported Employment Services – Intervention Plan and Service Log";
   const [isStartDateOpen, setIsStartDateOpen] = useState(false);
   const [isEndDateOpen, setIsEndDateOpen] = useState(false);
@@ -88,11 +97,28 @@ export default function SupportedEmploymentInterventionPage() {
   const navigate = useNavigate();
 
   const [interventions, setInterventions] = useState<InterventionRow[]>(initialInterventions);
+  const interventionsRef = useRef(interventions);
+  interventionsRef.current = interventions;
   const [services, setServices] = useState<ServiceRow[]>(initialServices);
+  const servicesRef = useRef(services);
+  servicesRef.current = services;
 
   const activityLogId = new URLSearchParams(useLocation().search).get("id");
+  const operation = useNoteOperation();
+  const submitting = useRef(false);
+  const [flushing, setFlushing] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<NoteFieldError[]>([]);
+  const hydrated = useRef(false);
+  const failedSaves = useRef(new Set<string>());
+  const saveChain = useRef<Promise<void>>(Promise.resolve());
+  const [submittedIds, setSubmittedIds] = useState<string[]>([]);
   const [mutateNote] = useCreateOrUpdateActivityLogMutation();
-  const [updateLog] = useUpdateActivityLogMutation();
+  const [updateLogMutation] = useUpdateActivityLogMutation();
+  const headerSave = useRef<Promise<unknown>>(Promise.resolve());
+  const updateLog = (payload: Parameters<typeof updateLogMutation>[0]) => ({unwrap: () => {
+    headerSave.current = headerSave.current.catch(() => {}).then(() => updateLogMutation(payload).unwrap());
+    return headerSave.current;
+  }});
   const [submitNotes, {isLoading: isSubmitting}] = useSubmitActivityLogNotesMutation();
   const {data: activityLog, isLoading} = useGetSingleActivityLogQuery(activityLogId!, {
     skip: !activityLogId
@@ -112,151 +138,77 @@ export default function SupportedEmploymentInterventionPage() {
     reportingEndDate: null,
   })
 
-  const updateIntervention = async (
-    id: string,
-    index: number,
-    field: keyof InterventionRow,
-    value: string
-  ) => {
-    setInterventions((prevInterventions) => {
-      return prevInterventions.map((intervention, activityIndex) => {
-        if ((id && intervention.id === id) || (index === activityIndex)) {
-          return {...intervention, [field]: value}
-        } else {
-          return intervention
-        }
-      })
-    });
-
-    const currentInterventions = interventions;
-
-    let intervention;
-    if (id) {
-      intervention = currentInterventions.find(intervention => intervention.id === id);
-    } else {
-      intervention = currentInterventions[index];
-    }
-
-    if (!intervention) return;
-
-    const newIntervention = {
-      ...intervention,
-      [field]: value
-    };
-
-    const training = newIntervention.training;
-
-    if (training && id === "") {
-      await mutateNote({
+  const lockedIds = new Set([...submittedIds, ...(activityLog?.submittedNotes ?? []).map(note => note.id), ...(activityLog?.approvedNotes ?? []).map(note => note.id)]);
+  const updateIntervention = (_id: string, index: number, field: keyof InterventionRow, value: any) => {
+    if ((operation.pending || submitting.current) || lockedIds.has(interventionsRef.current[index].id)) return;
+    interventionsRef.current = interventionsRef.current.map((item, i) => i === index ? {...item, [field]: value} : item);
+    setInterventions(interventionsRef.current);
+    const saveKey = `intervention:${index}`;
+    saveChain.current = saveChain.current.catch(() => {}).then(async () => {
+        failedSaves.current.add(saveKey);
+        const current = interventionsRef.current[index];
+        const {data} = await mutateNote({
         activityLog: activityLogId!,
         data: {
-          id: id,
-          startDate: format(new Date(), "yyyy-MM-dd"),
-          endDate: format(new Date(), "yyyy-MM-dd"),
+          id: current.id,
+          startDate: activityLog?.serviceDate ?? format(new Date(), "yyyy-MM-dd"),
+          endDate: activityLog?.serviceDate ?? format(new Date(), "yyyy-MM-dd"),
           metadata: {
-            training: newIntervention.training,
-            employerVision: newIntervention.employerVision,
-            achievementPlan: newIntervention.achievementPlan,
+            training: current.training,
+            employerVision: current.employerVision,
+            achievementPlan: current.achievementPlan,
             type: "intervention"
           },
           index
         }
       }).unwrap();
-    } else if (training && id !== "") {
-      await mutateNote({
-        activityLog: activityLogId!,
-        data: {
-          id: id,
-          startDate: format(new Date(), "yyyy-MM-dd"),
-          endDate: format(new Date(), "yyyy-MM-dd"),
-          metadata: {
-            training: newIntervention.training,
-            employerVision: newIntervention.employerVision,
-            achievementPlan: newIntervention.achievementPlan,
-            type: "intervention"
-          },
-          index
+        failedSaves.current.delete(saveKey);
+        if (!current.id && data?.id) {
+          interventionsRef.current = interventionsRef.current.map((item, i) => i === index ? {...item, id: data.id} : item);
+          setInterventions(interventionsRef.current);
         }
-      }).unwrap().catch(error => {
-        console.error('Failed to update activity:', error);
-      });
-    }
+    });
+    void saveChain.current.catch(() => toast.error('Your changes could not be saved. Try again before submitting.'));
   };
 
-  const updateService = async (
-    id: string,
-    index: number,
-    field: keyof ServiceRow,
-    value: any
-  ) => {
-    setServices((prevServices) => {
-      return prevServices.map((service, activityIndex) => {
-        if ((id && service.id === id) || (index === activityIndex)) {
-          return {...service, [field]: value}
-        } else {
-          return service
-        }
-      })
-    });
-
-
-    const currentServices = services;
-
-    let service;
-    if (id) {
-      service = currentServices.find(service => service.id === id);
-    } else {
-      service = currentServices[index];
-    }
-
-    if (!service) return;
-
-    const newService = {
-      ...service,
-      [field]: value
-    };
-
-    const date = newService.datesOfSeServices.date;
-
-    if (date && id === "") {
-      await mutateNote({
+  const updateService = (_id: string, index: number, field: keyof ServiceRow, value: any) => {
+    if ((operation.pending || submitting.current) || lockedIds.has(servicesRef.current[index].id)) return;
+    servicesRef.current = servicesRef.current.map((item, i) => i === index ? (() => {
+      const next = {...item, [field]: value};
+      next.noOfHours = {...next.noOfHours, total: calculateHoursDifference(next.noOfHours.start, next.noOfHours.end, next.datesOfSeServices.date)};
+      return next;
+    })() : item);
+    setServices(servicesRef.current);
+    const saveKey = `service:${index}`;
+    saveChain.current = saveChain.current.catch(() => {}).then(async () => {
+        failedSaves.current.add(saveKey);
+        const current = servicesRef.current[index];
+        const date = current.datesOfSeServices.date;
+        if (!(date)) return;
+        const {data} = await mutateNote({
         activityLog: activityLogId!,
         data: {
-          id: id,
+          id: current.id,
           startDate: format(date, "yyyy-MM-dd"),
-          endDate: format(date, "yyyy-MM-dd"),
+          endDate: noteEndDate(date, current.noOfHours.start, current.noOfHours.end, activityLog?.serviceDates),
           metadata: {
-            seProfessional: newService.datesOfSeServices.seProfessional,
-            noOfHoursStart: newService.noOfHours.start,
-            noOfHoursEnd: newService.noOfHours.end,
-            noOfHoursTotal: newService.noOfHours.total,
-            servicesProvided: newService.servicesProvided,
-            EmployeeProgress: newService.EmployeeProgress,
+            seProfessional: current.datesOfSeServices.seProfessional,
+            noOfHoursStart: current.noOfHours.start,
+            noOfHoursEnd: current.noOfHours.end,
+            noOfHoursTotal: current.noOfHours.total,
+            servicesProvided: current.servicesProvided,
+            EmployeeProgress: current.EmployeeProgress,
             type: "service"
           }
         }
       }).unwrap();
-    } else if (date && id !== "") {
-      await mutateNote({
-        activityLog: activityLogId!,
-        data: {
-          id: id,
-          startDate: format(date, "yyyy-MM-dd"),
-          endDate: format(date, "yyyy-MM-dd"),
-          metadata: {
-            seProfessional: newService.datesOfSeServices.seProfessional,
-            noOfHoursStart: newService.noOfHours.start,
-            noOfHoursEnd: newService.noOfHours.end,
-            noOfHoursTotal: newService.noOfHours.total,
-            servicesProvided: newService.servicesProvided,
-            EmployeeProgress: newService.EmployeeProgress,
-            type: "service"
-          }
+        failedSaves.current.delete(saveKey);
+        if (!current.id && data?.id) {
+          servicesRef.current = servicesRef.current.map((item, i) => i === index ? {...item, id: data.id} : item);
+          setServices(servicesRef.current);
         }
-      }).unwrap().catch(error => {
-        console.error('Failed to update activity:', error);
-      });
-    }
+    });
+    void saveChain.current.catch(() => toast.error('Your changes could not be saved. Try again before submitting.'));
   };
 
   const formatDisplayDate = (date: Date | undefined) => {
@@ -266,7 +218,7 @@ export default function SupportedEmploymentInterventionPage() {
     return format(date, "dd.MM.yy");
   };
 
-  const calculateHoursDifference = (startTime: string, endTime: string): string => {
+  const calculateHoursDifference = (startTime: string, endTime: string, serviceDate?: Date): string => {
     if (!startTime || !endTime) {
       return "";
     }
@@ -277,77 +229,45 @@ export default function SupportedEmploymentInterventionPage() {
     const startTotalMinutes = startHours * 60 + startMinutes;
     const endTotalMinutes = endHours * 60 + endMinutes;
 
-    const diffMinutes = endTotalMinutes - startTotalMinutes;
+    const overnight = serviceDate && noteEndDate(serviceDate, startTime, endTime, activityLog?.serviceDates) !== format(serviceDate, "yyyy-MM-dd");
+    const diffMinutes = endTotalMinutes - startTotalMinutes + (overnight ? 24 * 60 : 0);
     const hours = Math.floor(diffMinutes / 60);
     const minutes = diffMinutes % 60;
 
     if (minutes === 0) {
-      return `${hours}h`;
+      return String(hours);
     }
-    return `${hours}h ${minutes}m`;
+    return String(diffMinutes / 60);
   };
 
   const handleSubmit = async () => {
+    if (submitting.current) return;
+    submitting.current = true; setFlushing(true);
     try {
-      // Validate noteInfo fields
-      if (!noteInfo.jobType || !noteInfo.jobType.trim()) {
-        toast.error('Please fill in the "Type of job" field');
-        return;
+      await saveChain.current.catch(() => {});
+      submitting.current = false;
+      for (const key of [...failedSaves.current]) {
+        const [kind, position] = key.split(':'); const index = Number(position);
+        if (kind === 'service') updateService('', index, 'datesOfSeServices', servicesRef.current[index].datesOfSeServices);
+        if (kind === 'intervention') updateIntervention('', index, 'training', interventionsRef.current[index].training);
       }
-
-      if (!noteInfo.ISPOutcome || !noteInfo.ISPOutcome.trim()) {
-        toast.error('Please fill in the "Applicable ISP Outcome(s)" field');
-        return;
-      }
-
-      if (!noteInfo.totalHours || !noteInfo.totalHours.trim()) {
-        toast.error('Please fill in the "Total Hours of SE Services" field');
-        return;
-      }
-
-      if (!noteInfo.reportingStartDate) {
-        toast.error('Please select the "Reporting Period Start Date"');
-        return;
-      }
-
-      if (!noteInfo.reportingEndDate) {
-        toast.error('Please select the "Reporting Period End Date"');
-        return;
-      }
-
-      // Validate interventions
-      const interventionErrors = interventions.filter((intervention) => !intervention.id);
-      if (interventionErrors.length > 0) {
-        toast.error(`Please fill in all required fields for intervention rows ${interventionErrors.map((_, index) => index + 1).toString()}`);
-        return;
-      }
-
-      // Validate services
-      const serviceErrors = services.filter((service) => !service.id);
-      if (serviceErrors.length > 0) {
-        toast.error(`Please fill in all required fields for service dates ${serviceErrors.map(service => service.datesOfSeServices.date).toString()}`);
-        return;
-      }
-
-      // Combine all note IDs from both tables
-      const allNoteIds = [
-        ...interventions.filter((i) => !!i.id).map((intervention) => intervention.id),
-        ...services.filter((s) => !!s.id).map((service) => service.id)
-      ];
-
-      await submitNotes({
-        activityLog: activityLogId!,
-        logNoteIds: allNoteIds
-      }).unwrap();
-
-      setInterventions(initialInterventions);
-      setServices(initialServices);
-      toast.success('Intervention Plan and Service Log submitted successfully!');
+      submitting.current = true;
+      await saveChain.current;
+      await headerSave.current;
+      if (failedSaves.current.size) throw new Error("Some rows have unsaved changes. Check their dates and try saving again before submitting.");
+      const logNoteIds = [...interventionsRef.current, ...servicesRef.current].filter(row => row.id && !lockedIds.has(row.id)).map(row => row.id);
+      if (!logNoteIds.length) { toast.error('Save a service row before submitting.'); return; }
+      await operation.run({action: 'submit', resourceId: activityLogId!, noteIds: logNoteIds}, operationId => submitNotes({activityLog: activityLogId!, logNoteIds, operationId}).unwrap());
+      setSubmittedIds(previous => [...previous, ...logNoteIds]);
+      setFieldErrors([]);
+      toast.success('Note submitted successfully!');
     } catch (error: any) {
-      console.error('Error submitting activity log:', error);
-      toast.error(error?.data?.message || 'Failed to submit activity log.');
-    }
-  }
+      const errors = error?.data?.fieldErrors ?? [];
+      setFieldErrors(errors);
+      focusNoteError(errors);
+      toast.error(error?.data?.message || error?.message || 'Failed to submit activity log.');
+    } finally { submitting.current = false; setFlushing(false); }
+  };
 
   const handleNoteInfoChange = (name: string, value: any) => {
     setNoteInfo((prevState) => {
@@ -378,24 +298,21 @@ export default function SupportedEmploymentInterventionPage() {
   }
 
   useEffect(() => {
-    if (!isLoading && activityLog && activityLog.notes.length > 0) {
-      if (services.some((service) => service.id)) {
-        const serviceNotes = activityLog.notes.filter((note) => note.metadata?.type === "service");
-        const newServices = services.map((service, index) => {
-          if (!service.id) {
-            if (serviceNotes.length > index) {
-              service.id = serviceNotes[index].id;
-            }
-          }
-          return service;
-        });
-        setServices(newServices);
-      } else {
-        const serviceNotes = activityLog.notes.filter((note) => note.metadata?.type === "service");
-        const formattedServiceNotes = serviceNotes.map((note) => ({
+    if (isLoading || !activityLog || hydrated.current) return;
+    hydrated.current = true;
+    const notes = [...activityLog.notes, ...(activityLog.submittedNotes ?? []), ...(activityLog.approvedNotes ?? [])];
+    const formattedInterventionNotes = notes.filter(note => note.metadata?.type === "intervention").map((note) => ({
+          id: note.id,
+          training: note.metadata?.training || "",
+          employerVision: note.metadata?.employerVision || "",
+          achievementPlan: note.metadata?.achievementPlan || "",
+        }));
+    interventionsRef.current = [...formattedInterventionNotes, ...initialInterventions.slice(formattedInterventionNotes.length)];
+    setInterventions(interventionsRef.current);
+    const formattedServiceNotes = notes.filter(note => note.metadata?.type === "service").map((note) => ({
           id: note.id,
           datesOfSeServices: {
-            date: new Date(note.startDate),
+            date: noteServiceDate(note.startDate),
             seProfessional: note.metadata?.seProfessional || "",
           },
           noOfHours: {
@@ -406,38 +323,8 @@ export default function SupportedEmploymentInterventionPage() {
           servicesProvided: note.metadata?.servicesProvided || "",
           EmployeeProgress: note.metadata?.EmployeeProgress || "",
         }));
-        setServices([
-          ...formattedServiceNotes,
-          ...initialServices.slice(formattedServiceNotes.length)
-        ]);
-      }
-
-      if (interventions.some((intervention) => intervention.id)) {
-        const interventionNotes = activityLog.notes.filter((note) => note.metadata?.type === "intervention");
-        const newInterventions = interventions.map((intervention, index) => {
-          if (!intervention.id) {
-            if (interventionNotes.length > index) {
-              intervention.id = interventionNotes[index].id;
-            }
-          }
-          return intervention;
-        });
-        setInterventions(newInterventions);
-      } else {
-        const interventionNotes = activityLog.notes.filter((note) => note.metadata?.type === "intervention");
-        const formattedInterventionNotes = interventionNotes.map((note) => ({
-          id: note.id,
-          training: note.metadata?.training || "",
-          employerVision: note.metadata?.employerVision || "",
-          achievementPlan: note.metadata?.achievementPlan || "",
-        }));
-        setInterventions([
-          ...formattedInterventionNotes,
-          ...initialInterventions.slice(formattedInterventionNotes.length)
-        ]);
-      }
-    }
-
+    servicesRef.current = [...formattedServiceNotes, ...initialServices.slice(formattedServiceNotes.length)];
+    setServices(servicesRef.current);
     if (!isLoading && activityLog && Object.keys(activityLog?.metadata)?.length > 0) {
       setNoteInfo({
         reportingStartDate: activityLog.metadata?.reportingStartDate
@@ -451,7 +338,7 @@ export default function SupportedEmploymentInterventionPage() {
         totalHours: activityLog.metadata?.totalHours,
       })
     }
-  }, [isLoading, activityLog])
+  }, [isLoading, activityLog]);
 
   if (isLoading) {
     return (
@@ -468,6 +355,7 @@ export default function SupportedEmploymentInterventionPage() {
   return (
     <VoiceRecordingProvider pageTitle={pageTitle}>
       <div className="min-h-[calc(100vh-200px)] pb-20">
+        <NoteFieldErrors errors={fieldErrors} />
         {/* Page Header */}
         <div className="mb-8 flex justify-between items-center">
           <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a] font-['Urbanist',sans-serif]">
@@ -753,13 +641,15 @@ export default function SupportedEmploymentInterventionPage() {
                 {interventions.map((intervention, index) => (
                   <div
                     key={`intervention-${index}`}
+                    data-note-id={intervention.id}
                     className={`grid grid-cols-3 gap-0 min-h-[71px] transition-colors ${
                       index < interventions.length - 1 ? 'border-b border-[#b2b2b3]' : ''
                     } hover:bg-white`}
                   >
                     {/* Standard Required */}
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
-                      <ContentEditableCell
+                      <ContentEditableCell fieldKey="training"
+                        readOnly={lockedIds.has(intervention.id) || operation.pending || flushing}
                         value={intervention.training}
                         onChange={(value) => updateIntervention(intervention.id, index, 'training', value)}
                         fieldName="What is the standard required?"
@@ -768,7 +658,8 @@ export default function SupportedEmploymentInterventionPage() {
                     </div>
                     {/* Employee Performance */}
                     <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
-                      <ContentEditableCell
+                      <ContentEditableCell fieldKey="employerVision"
+                        readOnly={lockedIds.has(intervention.id) || operation.pending || flushing}
                         value={intervention.employerVision}
                         onChange={(value) => updateIntervention(intervention.id, index, 'employerVision', value)}
                         fieldName="How does the employee currently perform the tasks, actions, areas related to these standards?"
@@ -777,7 +668,8 @@ export default function SupportedEmploymentInterventionPage() {
                     </div>
                     {/* Addressing Issues */}
                     <div className="px-4 py-3 flex items-center justify-center">
-                      <ContentEditableCell
+                      <ContentEditableCell fieldKey="achievementPlan"
+                        readOnly={lockedIds.has(intervention.id) || operation.pending || flushing}
                         value={intervention.achievementPlan}
                         onChange={(value) => updateIntervention(intervention.id, index, 'achievementPlan', value)}
                         fieldName="What is being done to address the identified issues?"
@@ -839,7 +731,7 @@ export default function SupportedEmploymentInterventionPage() {
                 <tbody>
                 {services.map((service, index) => (
                   <React.Fragment key={`services-${index}`}>
-                    <tr className="hover:bg-white transition-colors grid grid-cols-4 gap-0 min-w-[1163px] h-full">
+                    <tr data-note-id={service.id} className="hover:bg-white transition-colors grid grid-cols-4 gap-0 min-w-[1163px] h-full">
                       <td className={`border-r ${index < services.length - 1 ? 'border-b' : ''} border-[#b2b2b3]  `}>
                         <tr className="flex flex-col min-h-[147px]">
                           <td className="border-b border-[#b2b2b3] flex">
@@ -847,10 +739,10 @@ export default function SupportedEmploymentInterventionPage() {
                             <div className="flex-1 flex items-center justify-center">
                               <Popover
                                 open={openServiceDateId === String(index)}
-                                onOpenChange={(open) => setOpenServiceDateId(open ? String(index) : null)}
+                                onOpenChange={(open) => { if (!lockedIds.has(service.id) && !operation.pending) setOpenServiceDateId(open ? String(index) : null); }}
                               >
                                 <PopoverTrigger asChild>
-                                  <button
+                                  <button data-note-field="startDate" disabled={lockedIds.has(service.id) || flushing}
                                     type="button"
                                     className="w-full h-full flex items-center justify-center focus:outline-none cursor-pointer"
                                   >
@@ -898,7 +790,8 @@ export default function SupportedEmploymentInterventionPage() {
                           </td>
                           <td>
                             <span className="pt-4 ps-5">SE Professional:</span>
-                            <ContentEditableCell
+                            <ContentEditableCell fieldKey="seProfessional"
+                        readOnly={lockedIds.has(service.id) || operation.pending || flushing}
                               value={service.datesOfSeServices.seProfessional}
                               onChange={(value) => updateService(service.id, index, 'datesOfSeServices', {
                                 ...service.datesOfSeServices,
@@ -911,22 +804,22 @@ export default function SupportedEmploymentInterventionPage() {
                       </td>
                       <td className={`border-r ${index < services.length - 1 ? 'border-b' : ''} border-[#b2b2b3]`}>
                         {Object.entries(service.noOfHours).map(([key, value]) => (
-                          <tr key={key} className="flex flex-col h-[49px]">
+                          <tr key={key} data-note-field={`noOfHours${key[0].toUpperCase()}${key.slice(1)}`} className="flex flex-col h-[49px]">
                             <td className="border-b border-[#b2b2b3] h-[49px] flex">
                               <div
                                 className="bg-[#D9D9D9] w-[80px] h-full flex items-center justify-end pe-5 capitalize">{key}:
                               </div>
                               <div className="flex-1 flex items-center justify-center">
                                 {key === 'start' || key === 'end' ? (
-                                  <TimePicker
+                                  <TimePicker disabled={lockedIds.has(service.id) || operation.pending || flushing}
                                     value={value}
                                     onChange={async (newValue) => {
                                       const updatedHours = {...service.noOfHours, [key]: newValue};
                                       // Auto-calculate total if both start and end are set
                                       if (key === 'start' && updatedHours.end) {
-                                        updatedHours.total = calculateHoursDifference(newValue, updatedHours.end);
+                                        updatedHours.total = calculateHoursDifference(newValue, updatedHours.end, service.datesOfSeServices.date);
                                       } else if (key === 'end' && updatedHours.start) {
-                                        updatedHours.total = calculateHoursDifference(updatedHours.start, newValue);
+                                        updatedHours.total = calculateHoursDifference(updatedHours.start, newValue, service.datesOfSeServices.date);
                                       }
                                       await updateService(service.id, index, 'noOfHours', updatedHours);
                                     }}
@@ -944,7 +837,7 @@ export default function SupportedEmploymentInterventionPage() {
                       </td>
                       <td className={`border-r ${index < services.length - 1 ? 'border-b' : ''} border-[#b2b2b3]`}>
                         <div className="flex items-center justify-center min-h-[147px]">
-                          <ContentEditableCell
+                          <ContentEditableCell fieldKey="servicesProvided" readOnly={lockedIds.has(service.id) || operation.pending || flushing}
                             value={service.servicesProvided}
                             onChange={(value) => updateService(service.id, index, 'servicesProvided', value)}
                             fieldName="What SE services were provided during this visit?"
@@ -954,7 +847,7 @@ export default function SupportedEmploymentInterventionPage() {
                       </td>
                       <td className={`border-r ${index < services.length - 1 ? 'border-b' : ''} border-[#b2b2b3]`}>
                         <div className="flex items-center justify-center min-h-[147px]">
-                          <ContentEditableCell
+                          <ContentEditableCell fieldKey="EmployeeProgress" readOnly={lockedIds.has(service.id) || operation.pending || flushing}
                             value={service.EmployeeProgress}
                             onChange={(value) => updateService(service.id, index, 'EmployeeProgress', value)}
                             fieldName="How is the employee progressing toward his/her outcomes and meeting the standards that have been identified above?"
@@ -984,7 +877,7 @@ export default function SupportedEmploymentInterventionPage() {
           <Button
             type={"button"}
             onClick={handleSubmit}
-            disabled={isSubmitting}
+            disabled={isSubmitting || operation.pending || flushing}
             className="flex items-center gap-2 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-6 py-3 h-auto font-semibold shadow-sm"
           >
             {isSubmitting ? "Submitting..." : "Submit Both Tables"}

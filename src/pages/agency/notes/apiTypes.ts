@@ -1,3 +1,4 @@
+import type {CareerSnapshot,CareerSignatureHeader,CareerRevision} from '@/lib/api/career-planning';
 export interface SubmittedNoteDetail {
   id: string;
   startDate: string | null;
@@ -47,6 +48,10 @@ export interface SubmittedNotesQueryParams {
 }
 
 export interface SubmittedNoteDetails {
+  snapshot?: CareerSnapshot;
+  signature?: CareerSignatureHeader;
+  careerRevision?: CareerRevision;
+  activityLogId?: string;
   id: string;
   activityType: string;
   description: string;

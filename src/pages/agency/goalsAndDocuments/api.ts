@@ -1,3 +1,5 @@
+import type {ReviewOverview, ClaimReview, CareerOverviewArgs, CareerClaimArgs} from '@/lib/api/career-reconciliation';
+import type {CareerEnvelope, CareerPlanList, CareerPlanScope, CareerPlanDetail, CareerPlanDraft, CareerRevision, CareerRevisionSummary, CareerPage} from '@/lib/api/career-planning';
 import { createApi } from "@reduxjs/toolkit/query/react";
 import { customBaseQuery } from "@/lib/baseQuery";
 import {
@@ -16,9 +18,47 @@ import {
 export const goalsAndDocumentsApi = createApi({
   reducerPath: "goalsAndDocumentsApi",
   baseQuery: customBaseQuery,
-  tagTypes: [],
+  tagTypes: ['CareerPlan'],
   keepUnusedDataFor: 300,
   endpoints: (builder) => ({
+    getCareerReconciliation: builder.query<ReviewOverview,CareerOverviewArgs>({
+      query: ({scopeKey: _scopeKey,...params})=>({url:'/goalsAndDocuments/career-reconciliation',method:'GET',requiresAuth:true,params}),
+      transformResponse:(response:CareerEnvelope<ReviewOverview>)=>response.data,
+      keepUnusedDataFor:0,
+    }),
+    getCareerClaimReconciliation: builder.query<ClaimReview,CareerClaimArgs>({
+      query: ({scopeKey: _scopeKey,claimId,...params})=>({url:'/goalsAndDocuments/career-reconciliation/claims/'+encodeURIComponent(claimId),method:'GET',requiresAuth:true,params}),
+      transformResponse:(response:CareerEnvelope<ClaimReview>)=>response.data,
+      keepUnusedDataFor:0,
+    }),
+    getCareerPlans: builder.query<CareerPlanList, CareerPlanScope>({
+      query: params => ({url:'/goalsAndDocuments/career-plans', method:'GET', requiresAuth:true, params}),
+      transformResponse:(response:CareerEnvelope<CareerPlanList>)=>response.data,
+      providesTags:(_result,_error,arg)=>[{type:'CareerPlan',id:`list:${arg.agencyId ?? ''}:${arg.clientId ?? ''}`}],
+    }),
+    getCareerPlan: builder.query<CareerPlanDetail,string>({
+      query:id=>({url:`/goalsAndDocuments/career-plans/${id}`,method:'GET',requiresAuth:true}),
+      transformResponse:(response:CareerEnvelope<CareerPlanDetail>)=>response.data,
+      providesTags:(_result,_error,id)=>[{type:'CareerPlan',id}],
+    }),
+    saveCareerPlan: builder.mutation<CareerPlanDetail,{agencyId?:string;clientId:string;serviceAuthorizationId:string;expectedVersion:number;draft:CareerPlanDraft}>({
+      query:data=>({url:'/goalsAndDocuments/career-plans/draft',method:'PUT',requiresAuth:true,data}),
+      transformResponse:(response:CareerEnvelope<CareerPlanDetail>)=>response.data,
+      invalidatesTags:(result,error,arg)=>error?[]:[{type:'CareerPlan',id:result?.id},{type:'CareerPlan',id:`list:${arg.agencyId ?? ''}:${arg.clientId}`}],
+    }),
+    publishCareerPlan: builder.mutation<{revisionId:string;revisionNumber:number;version:number},{planId:string;expectedVersion:number;operationId:string;changeReason:string}>({
+      query:({planId,...data})=>({url:`/goalsAndDocuments/career-plans/${planId}/publish`,method:'POST',requiresAuth:true,data}),
+      transformResponse:(response:CareerEnvelope<{revisionId:string;revisionNumber:number;version:number}>)=>response.data,
+      invalidatesTags:(_result,error,arg)=>error?[]:[{type:'CareerPlan',id:arg.planId}],
+    }),
+    getCareerRevisions: builder.query<CareerPage<CareerRevisionSummary>,{planId:string;cursor?:string}>({
+      query:({planId,...params})=>({url:`/goalsAndDocuments/career-plans/${planId}/revisions`,method:'GET',requiresAuth:true,params}),
+      transformResponse:(response:CareerEnvelope<CareerPage<CareerRevisionSummary>>)=>response.data,
+    }),
+    getCareerRevision: builder.query<CareerRevision,{planId:string;revisionId:string}>({
+      query:({planId,revisionId})=>({url:`/goalsAndDocuments/career-plans/${planId}/revisions/${revisionId}`,method:'GET',requiresAuth:true}),
+      transformResponse:(response:CareerEnvelope<CareerRevision>)=>response.data,
+    }),
     getAllGoalDocuments: builder.query<ListGoalDocumentsResponse, ListGoalDocumentsParams | void>({
       query: (params) => ({
         url: `/goalsAndDocuments`,
@@ -106,6 +146,8 @@ export const goalsAndDocumentsApi = createApi({
 });
 
 export const {
+  useGetCareerReconciliationQuery, useLazyGetCareerReconciliationQuery, useGetCareerClaimReconciliationQuery, useLazyGetCareerClaimReconciliationQuery,
+  useGetCareerPlansQuery, useGetCareerPlanQuery, useLazyGetCareerPlanQuery, useSaveCareerPlanMutation, usePublishCareerPlanMutation, useGetCareerRevisionsQuery, useGetCareerRevisionQuery,
   useGetAllGoalDocumentsQuery,
   useGetSingleGoalDocumentQuery,
   useGetGoalDocumentByFirebaseIdQuery,

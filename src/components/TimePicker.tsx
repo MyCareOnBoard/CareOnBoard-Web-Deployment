@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 
 interface TimePickerProps {
   value: string;
+  disabled?: boolean;
   onChange: (value: string) => void;
   children?: React.ReactNode;
 }
@@ -130,7 +131,7 @@ function SwipeColumn({
   );
 }
 
-export default function TimePicker({ value, onChange, children }: TimePickerProps) {
+export default function TimePicker({ value, onChange, children, disabled = false }: TimePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [hours, setHours] = useState("12");
   const [minutes, setMinutes] = useState("00");
@@ -252,8 +253,8 @@ export default function TimePicker({ value, onChange, children }: TimePickerProp
   };
 
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <PopoverTrigger asChild>
+    <Popover open={isOpen && !disabled} onOpenChange={open => { if (!disabled) setIsOpen(open); }}>
+      <PopoverTrigger asChild disabled={disabled}>
         {children || (
           <button
             type="button"

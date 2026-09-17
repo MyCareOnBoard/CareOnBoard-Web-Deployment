@@ -14,8 +14,7 @@ import {
   WandSparkles,
 } from "lucide-react";
 
-import AIInsightsCard from "./AIInsightsCard";
-import { useLazyGetAnalyticsInsightsQuery } from "@/lib/api/reports";
+import AIInsightsCard, {useScopedAnalyticsInsights} from "./AIInsightsCard";
 import { useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";
 
@@ -39,6 +38,8 @@ interface OperationalEfficiencyProps {
   isLoading?: boolean;
   startDate?: string;
   endDate?: string;
+  scopeKey?: string;
+  mode?: string;
 }
 
 const FALLBACK_METRICS: OperationalMetric[] = [
@@ -151,10 +152,12 @@ export default function OperationalEfficiency({
   isLoading,
   startDate,
   endDate,
+  scopeKey,
+  mode,
 }: OperationalEfficiencyProps) {
   const [showInsights, setShowInsights] = useState(false);
   const insightsBtnRef = useRef<HTMLDivElement>(null);
-  const [fetchInsights, { data: insightsData, isLoading: insightsLoading }] = useLazyGetAnalyticsInsightsQuery();
+  const {fetchInsights, insightsData, insightsLoading, insightsDisabled} = useScopedAnalyticsInsights({startDate,endDate,mode,scopeKey});
  const navigate = useNavigate();
  
   useEffect(() => {
@@ -168,8 +171,10 @@ export default function OperationalEfficiency({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showInsights]);
 
+  useEffect(() => { setShowInsights(false); }, [startDate, endDate, mode, scopeKey]);
+
   const handleInsightsClick = () => {
-    if (!showInsights) fetchInsights({ startDate, endDate });
+    if (!showInsights) fetchInsights();
     setShowInsights((p) => !p);
   };
 
@@ -213,6 +218,7 @@ export default function OperationalEfficiency({
 
         <div ref={insightsBtnRef} className="relative">
           <button
+            disabled={insightsDisabled}
             onClick={handleInsightsClick}
             className="
               inline-flex items-center gap-2
@@ -228,8 +234,8 @@ export default function OperationalEfficiency({
           {showInsights && (
             <AIInsightsCard
               isLoading={insightsLoading}
-              insight={insightsData?.data.efficiency.insight ?? ""}
-              recommendation={insightsData?.data.efficiency.recommendation ?? ""}
+              insight={insightsData?.efficiency?.insight ?? ""}
+              recommendation={insightsData?.efficiency?.recommendation ?? ""}
             />
           )}
         </div>
