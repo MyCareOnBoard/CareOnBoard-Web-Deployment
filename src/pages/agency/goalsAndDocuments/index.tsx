@@ -19,6 +19,7 @@ export default function GoalsAndDocumentsPage() {
     }
 
     const documentCards: NoteCardType[] = [
+        ...(mode === "ddd" ? [{id:"career-planning",title:"Career Planning",description:"Manage published plans and individualized Career Planning goals",path:Routes.agency.goalsAndDocuments.careerPlanning,icon:UserIcon}] : []),
         {
             id: "community-inclusion-individualized-goals",
             title: "Community Inclusion Services – Individualized Goals",

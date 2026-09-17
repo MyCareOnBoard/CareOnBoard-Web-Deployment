@@ -27,6 +27,7 @@ export type NoteCardType = {
 };
 
 const noteTypes: NoteCardType[] = [
+  {id:"career-planning",icon:UserIcon,title:"Career Planning",description:"Record support and progress against the published Career Planning plan",path:NOTE_ROUTES["career-planning"]},
   {
     id: "community-based",
     icon: UserIcon,

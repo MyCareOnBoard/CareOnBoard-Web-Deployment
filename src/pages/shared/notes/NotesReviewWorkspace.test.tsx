@@ -97,3 +97,5 @@ describe("NotesReviewWorkspace", () => {
     }));
   });
 });
+
+it('keeps Career Planning review actions but hides in-place editing',()=>{queryHook.mockReturnValue({...result,data:{...result.data,data:[{...result.data.data[0],activityType:'career-planning'}]}});render(<NotesReviewWorkspace agencyId="agency-1" readOnly={false}/>);expect(screen.queryByRole('button',{name:'Edit'})).not.toBeInTheDocument();expect(screen.getByRole('button',{name:'Approve'})).toBeEnabled();expect(screen.getByRole('button',{name:'Return for correction'})).toBeEnabled();});

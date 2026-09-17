@@ -10,6 +10,7 @@ import { Routes } from '@/routes/constants';
 export type NoteClientType = "ddd" | "hha";
 
 export type NoteTypeId =
+  | "career-planning"
   | "community-based"
   | "community-inclusion"
   | "day-habilitation"
@@ -33,6 +34,7 @@ export const HHA_PERSONAL_CARE: NoteTypeId = "hha-personal-care";
 export const HHA_SERVICE_LOG: NoteTypeId = "hha-service-log";
 
 export const NOTE_TYPES: NoteTypeDef[] = [
+  {id:"career-planning",title:"Career Planning",shortLabel:"Career Planning",clientType:"ddd"},
   {
     id: "community-based",
     title: "Community Based / Individual Supports",
@@ -113,6 +115,7 @@ export function noteTypesForClientType(clientType: NoteClientType): NoteTypeDef[
 }
 
 export const NOTE_ROUTES: Record<NoteTypeId, string> = {
+  "career-planning": Routes.userPanel.notes.careerPlanning,
   "community-based": Routes.userPanel.notes.communityBased,
   "community-inclusion": Routes.userPanel.notes.communityInclusion,
   "day-habilitation": Routes.userPanel.notes.dayHabilitation,

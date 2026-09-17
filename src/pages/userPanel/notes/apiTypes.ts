@@ -13,6 +13,7 @@ export interface GetActivityLogsResponse {
 export interface NoteFieldError { noteId: string; field: string; code: string; }
 
 export interface ActivityLogNote {
+  contentVersion?: number;
   status?: "active" | "submitted" | "approved";
   returnedAt?: string;
   returnOperationId?: string;
@@ -44,6 +45,7 @@ export interface GetActivityLogResponse {
 }
 
 export interface CreateActivityLogPayload {
+  expectedContentVersion?: number;
   id?: string;
   startDate: string;
   endDate: string;

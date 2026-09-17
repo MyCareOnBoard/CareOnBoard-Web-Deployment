@@ -44,7 +44,7 @@ export default function ShiftNoteStatus(props: {shiftId: string; agencyId: strin
     {isError || item?.syncStatus === 'unavailable' || item?.coverage === 'unavailable' ? <p role="alert">We couldn’t check these notes. Try again. <Button variant="outline" onClick={() => void refetch()}>Retry</Button></p> : null}
     {item?.coverage === 'disabled' ? <p>Shift-note monitoring is not enabled for this agency.</p> : item ? <>
       <p className="mt-2 font-medium">{shiftNoteLabels[item.state]}</p>
-      <p className="text-sm">{item.reasonCodes?.includes('returned_note') ? 'Your agency returned this note for correction.' : descriptions[item.state]}</p>
+      <p className="text-sm">{item.reasonCodes?.includes('career_plan_selection_required') ? 'Select a published plan to link these entries to its goals.' : item.reasonCodes?.some(code=>['career_plan_missing','career_plan_dates','career_plan_reference_invalid','career_authorization_invalid'].includes(code)) ? 'Your agency needs to review the Career Planning plan for this service. You can save a draft.' : item.reasonCodes?.includes('returned_note') ? 'Your agency returned this note for correction.' : descriptions[item.state]}</p>
       {item.checkedAt ? <p className="mt-1 text-xs text-[#808081]">Checked {new Date(item.checkedAt).toLocaleString()}{isError ? ' — last checked result' : ''}</p> : null}
       {item.syncStatus === 'pending' ? <p className="text-sm">Your change is saved. The list status is updating.</p> : null}
       {item.coverage === 'checking' ? <p>We’re checking shifts. More notes may appear.</p> : null}

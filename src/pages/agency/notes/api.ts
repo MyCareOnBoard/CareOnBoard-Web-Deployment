@@ -41,7 +41,7 @@ export const agencyNotesApi = createApi({
       async onQueryStarted(_arg, {dispatch, queryFulfilled}) {
         try { await queryFulfilled; dispatch(complianceAlertsApi.util.invalidateTags(['ShiftNoteCompliance'])); } catch { /* Retain checked status. */ }
       },
-      invalidatesTags: ['SubmittedNotes', 'SubmittedNoteDetails']
+      invalidatesTags: (_result,error) => error ? [] : ['SubmittedNotes', 'SubmittedNoteDetails']
     }),
     rejectSubmittedNotes: builder.mutation<void, {submissionId: string; operationId: string}>({
       query: ({submissionId, operationId}) => ({
@@ -53,7 +53,7 @@ export const agencyNotesApi = createApi({
       async onQueryStarted(_arg, {dispatch, queryFulfilled}) {
         try { await queryFulfilled; dispatch(complianceAlertsApi.util.invalidateTags(['ShiftNoteCompliance'])); } catch { /* Retain checked status. */ }
       },
-      invalidatesTags: ['SubmittedNotes', 'SubmittedNoteDetails']
+      invalidatesTags: (_result,error) => error ? [] : ['SubmittedNotes', 'SubmittedNoteDetails']
     }),
     getSubmittedNoteDetails: builder.query<SubmittedNoteDetails, string>({
       query: (submissionId) => ({

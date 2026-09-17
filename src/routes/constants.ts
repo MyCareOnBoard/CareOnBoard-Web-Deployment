@@ -87,6 +87,7 @@ export const Routes = {
             community_inclusions: "/agency/reports/community-inclusions",
         },
         goalsAndDocuments: {
+            careerPlanning: "/agency/goals-and-documents/career-planning",
             index: "/agency/goals-and-documents",
             naturalSupportsTraining: "/agency/goals-and-documents/natural-supports-training",
             communityInclusionServices: "/agency/goals-and-documents/community-inclusion-services",
@@ -105,6 +106,7 @@ export const Routes = {
         clientsAndServices: "/user-panel/clients-and-services",
         planOfCare: "/user-panel/plan-of-care",
         notes: {
+            careerPlanning: "/user-panel/notes/career-planning",
             index: "/user-panel/notes",
             communityBased: "/user-panel/notes/community-based",
             communityInclusion: "/user-panel/notes/community-inclusion",
@@ -172,6 +174,7 @@ export const Routes = {
             staffTimesheets: "/super-admin/billing/staff-timesheets",
         },
         clientDirectory: "/super-admin/clients",
+        careerPlanning: "/super-admin/clients/career-planning",
         clientDetails: "/super-admin/clients/:clientId",
         editClient: "/super-admin/clients/edit/:clientId",
         addClient: "/super-admin/clients/add",

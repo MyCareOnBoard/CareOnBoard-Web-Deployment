@@ -707,4 +707,18 @@ describe("AddScheduleModal operational data boundary", () => {
     render(modalElement(data, {agencyMode: "hha", supportedClientTypes: ["hha"], mode: "edit", editData: editableShift({serviceAuthorizationId: "service-1", serviceCode: "T1019"})}));
     await act(async () => Promise.resolve());
     expect(getAssignmentReview).toHaveBeenCalledWith(expect.objectContaining({agencyId: "agency-b", input: expect.objectContaining({program: "hha", serviceAuthorizationId: "service-1", serviceCode: "T1019"})}), expect.any(AbortSignal));
-  });});
+    });
+  it('uses the exact raw Career Planning authorization rather than a merged projection',async()=>{
+    const data=createDataAdapter();
+    vi.mocked(data.searchClients).mockResolvedValue({items:[{id:'client-1',name:'Jamie Client',mode:'ddd'}],truncated:false,scanLimit:null});
+    vi.mocked(data.getClientSchedulingContext).mockResolvedValue({id:'client-1',type:'ddd',firstName:'Jamie',lastName:'Client',services:[{id:'merged',name:'Merged Career',code:'H2023-CAREER'}],outcomes:[{id:'outcome',statement:'Explore work',services:[{id:'raw-career',name:'Career Planning',code:'H2023-CAREER'}]}]});
+    renderModal(data);await runClientSearch('Jam');fireEvent.click(screen.getByRole('button',{name:/Jamie Client/i}));await act(async()=>Promise.resolve());
+    fireEvent.click(screen.getByRole('button',{name:'Select service'}));expect(screen.queryByText(/Merged Career/)).not.toBeInTheDocument();fireEvent.click(screen.getByText('Career Planning — H2023-CAREER'));await act(async()=>Promise.resolve());
+    expect(screen.getByRole('button',{name:'Career Planning'})).toBeDisabled();
+  });
+  it('preserves historical note types while editing a Career Planning service',async()=>{
+    const data=createDataAdapter();vi.mocked(data.getClientSchedulingContext).mockResolvedValue({id:'client-1',type:'ddd',services:[{id:'career',name:'Career Planning',code:'H2023-CAREER'}]});
+    render(modalElement(data,{mode:'edit',editData:editableShift({serviceAuthorizationId:'career',serviceCode:'H2023-CAREER',notesType:'supported-employment-pre'})}));await act(async()=>Promise.resolve());
+    expect(screen.getByRole('button',{name:/Supported Employment Services/})).toBeEnabled();expect(screen.queryByRole('button',{name:'Career Planning'})).not.toBeInTheDocument();
+  });
+});

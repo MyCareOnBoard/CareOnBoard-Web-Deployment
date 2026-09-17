@@ -24,3 +24,5 @@ it('never offers Start for ambiguous evidence', () => {
   expect(screen.getByText('This note needs agency review. You cannot edit it here.')).toBeInTheDocument();
   expect(screen.queryByRole('button', {name: 'Start note'})).not.toBeInTheDocument();
 });
+
+it('routes Career Planning recovery to the dedicated note form',async()=>{mocks.query.mockReturnValue({currentData:{shiftId:'shift',noteType:'career-planning',state:'draft',syncStatus:'ready',coverage:'ready',reasonCodes:['career_plan_selection_required'],actions:[{type:'continue',activityLogId:'career-log'}]},refetch:vi.fn()});render(<ShiftNoteStatus shiftId="shift" agencyId="agency" viewerId="viewer"/>);expect(screen.getByText('Select a published plan to link these entries to its goals.')).toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'Continue note'}));await waitFor(()=>expect(mocks.navigate).toHaveBeenCalledWith('/user-panel/notes/career-planning?id=career-log'));});

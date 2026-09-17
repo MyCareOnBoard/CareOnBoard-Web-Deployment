@@ -183,3 +183,12 @@ it('preserves exact timed instants when a narrative autosave fails and Submit re
   expect(mocks.save).toHaveBeenCalledTimes(2);
   expect(mocks.save.mock.calls[1][0].data).toMatchObject({...dates, metadata: {activity: 'Preserved narrative'}});
 });
+it('includes preview content in the operation identity', async () => {
+ const {result}=renderHook(useNoteOperation);
+ const intent={action:'submit' as const,resourceId:'log',noteIds:['row'],contentKey:'preview-1'};
+ const failed=vi.fn(async (_id:string)=>{throw {status:'FETCH_ERROR'};});
+ await act(async()=>{await result.current.run(intent,failed).catch(()=>undefined);});
+ const retry=vi.fn(async (_id:string)=>undefined);
+ await act(async()=>{await result.current.run({...intent,contentKey:'preview-2'},retry);});
+ expect(retry.mock.calls[0][0]).not.toBe(failed.mock.calls[0][0]);
+});
