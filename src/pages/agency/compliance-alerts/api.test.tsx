@@ -86,3 +86,22 @@ describe('shift-note request bounds and invalidation', () => {
     store.dispatch(userPanelNotesApi.util.resetApiState());
   });
 });
+
+import {employeeTrainingsApi} from '../trainings/trainingApi';
+describe('workspace request serialization and cache identity', () => {
+  it('uses bounded client routes and keeps scope identity out of HTTP params', async () => {
+    vi.useRealTimers(); queryMock.mockReset(); queryMock.mockResolvedValue({data:{items:[],nextCursor:null}});
+    const store=configureStore({reducer:{[complianceAlertsApi.reducerPath]:complianceAlertsApi.reducer,[employeeTrainingsApi.reducerPath]:employeeTrainingsApi.reducer},middleware:getDefault=>getDefault().concat(complianceAlertsApi.middleware,employeeTrainingsApi.middleware)});
+    await store.dispatch(complianceAlertsApi.endpoints.getClientChecklistPage.initiate({scopeKey:'actor-db-mode-permissions',agencyId:'agency',mode:'ddd',limit:200}));
+    await store.dispatch(complianceAlertsApi.endpoints.getUnsignedForm485Page.initiate({scopeKey:'scope',agencyId:'agency',mode:'hha'}));
+    await store.dispatch(employeeTrainingsApi.endpoints.getTrainings.initiate({scopeKey:'one',agencyId:'agency',mode:'ddd',workspace:true,limit:8}));
+    await store.dispatch(employeeTrainingsApi.endpoints.getTrainings.initiate({scopeKey:'two',agencyId:'agency',mode:'ddd',workspace:true,limit:8}));
+    await store.dispatch(employeeTrainingsApi.endpoints.getEmployeeTrainings.initiate({scopeKey:'one',agencyId:'agency',mode:'ddd',workspace:true,employeeId:'employee',limit:25}));
+    expect(queryMock).toHaveBeenCalledTimes(5);
+    expect(queryMock.mock.calls[0][0]).toMatchObject({url:'/clients/compliance/document-checklist',params:{limit:25}});
+    expect(queryMock.mock.calls[1][0]).toMatchObject({url:'/clients/compliance/unsigned-form485-page'});
+    for(const call of queryMock.mock.calls) expect((call[0] as any).params).not.toHaveProperty('scopeKey');
+    expect(queryMock.mock.calls[4][0]).toMatchObject({params:{workspace:true,employeeId:'employee',limit:25}});
+    store.dispatch(complianceAlertsApi.util.resetApiState());store.dispatch(employeeTrainingsApi.util.resetApiState());
+  });
+});

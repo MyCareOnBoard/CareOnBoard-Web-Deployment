@@ -1,3 +1,4 @@
+import {getComplianceSources, parseComplianceView} from '@/pages/agency/compliance-alerts/workspaceScope';
 import type { ReactNode } from "react";
 import { useEffect, useMemo } from "react";
 import { Navigate, Outlet, useNavigate, useLocation, Link } from "react-router";
@@ -194,7 +195,16 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
     // supported type. Shared with the applicant directory's data fetch.
     const effectiveMode = useEffectiveAgencyMode();
 
-    const needsModeSelection = !effectiveMode;
+    // A permitted URL program must reach the page before its mode-store dispatch.
+    const complianceView = location.pathname === Routes.agency.complianceAlerts
+        ? parseComplianceView(new URLSearchParams(location.search)) : null;
+    const requestedComplianceMode = complianceView?.ok ? complianceView.view.mode : undefined;
+    const requestedSources = requestedComplianceMode ? getComplianceSources(user, requestedComplianceMode) : [];
+    const complianceUrlMode = requestedComplianceMode && requestedSources.length &&
+        (complianceView?.ok && (!complianceView.view.source || requestedSources.includes(complianceView.view.source)))
+        ? requestedComplianceMode : undefined;
+    const complianceEntryMode = complianceUrlMode ?? effectiveMode;
+    const needsModeSelection = !effectiveMode && !complianceUrlMode;
 
     const handleModeSelect = (mode: AgencyMode) => {
         if (agencyId) dispatch(setAgencyMode({ agencyId, mode }));
@@ -234,7 +244,7 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
     // Build filtered nav items.
     const navItems = useMemo(() => {
         const accessFiltered = filterNavItemsByAccess(allNavItems, user?.userType, user?.profile?.accessList);
-        const modeFiltered = filterNavItemsByMode(accessFiltered, effectiveMode);
+        const modeFiltered = filterNavItemsByMode(accessFiltered, effectiveMode).filter(item => item.path !== Routes.agency.complianceAlerts || getComplianceSources(user, complianceEntryMode).length > 0);
         const expensesLabel = effectiveMode === "sc" ? "Coordinator expenses" : effectiveMode === "hha" ? "Caregiver expenses" : "DSP expenses";
         return modeFiltered.map((item) => {
             if (item.path === Routes.agency.dspManagement) return { ...item, label: dspManagementLabel };
@@ -248,7 +258,7 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
             }
             return item;
         });
-    }, [user?.userType, user?.profile?.accessList, effectiveMode, dspManagementLabel]);
+    }, [user, effectiveMode, complianceEntryMode, dspManagementLabel]);
 
     useEffect(() => {
         if (!user || (user?.userType !== UserType.AGENCY && user?.userType !== UserType.AGENCY_STAFF)) {
@@ -277,7 +287,7 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
     );
     const currentProgramTypes = allNavItems.find((item) => item.path === currentNavItem?.path)?.programTypes;
     const mayAccessProgramRoute = !effectiveMode || !currentProgramTypes || currentProgramTypes.includes(effectiveMode);
-    const canRenderCurrentRoute = mayAccessBillingRoute && mayAccessNonBillingRoute && mayAccessProgramRoute;
+    const canRenderCurrentRoute = mayAccessBillingRoute && mayAccessNonBillingRoute && mayAccessProgramRoute && (currentNavItem?.path !== Routes.agency.complianceAlerts || getComplianceSources(user, complianceEntryMode).length > 0 || (!effectiveMode && Array.isArray(supportedTypes) && supportedTypes.some(mode => getComplianceSources(user, mode).length > 0)));
 
     return (
         <ProtectedRoute>

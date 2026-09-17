@@ -1,27 +1,105 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
+import { Link, useSearchParams } from "react-router";
+import { useAssignmentReviewScope } from "@/hooks/useAssignmentReview";
+import { useAuth } from "@/utils/auth";
+import { Routes } from "@/routes/constants";
+import {
+  parsePrintFilters,
+  matchesReportScope,
+  rateState,
+  RATE_HELPER,
+  FLAGS_HELPER,
+  INDICATORS_HELPER,
+} from "./analyticsScope";
 import { useGetAnalyticsSummaryQuery } from "@/lib/api/reports";
 
 export default function AnalyticsPrintPage() {
-  const { data: res, isLoading } = useGetAnalyticsSummaryQuery({});
-  const d = res?.data;
-
+  const [params] = useSearchParams();
+  const filters = parsePrintFilters(params);
+  const { user } = useAuth();
+  const scopeKey = JSON.stringify([
+    useAssignmentReviewScope(),
+    user?.agencyId || user?.agency?.id,
+    user?.agency?.status,
+  ]);
+  const {
+    currentData: res,
+    isLoading,
+    isFetching,
+    isError,
+    refetch,
+    requestId,
+  } = useGetAnalyticsSummaryQuery(
+    { ...filters, scopeKey },
+    { skip: !filters, refetchOnMountOrArgChange: true },
+  );
+  const d = res?.success && !isError ? res.data : undefined;
+  const matched = !!filters && matchesReportScope(d?.reportScope, filters);
+  const rate = d ? rateState(d) : "unavailable";
+  const unavailable =
+    !!d &&
+    (!d.complianceAvailability ||
+      rate === "unavailable" ||
+      Object.values(d.complianceAvailability).includes("unavailable") ||
+      (d.complianceAvailability.flags === "available" &&
+        !Number.isFinite(d.overview.totalIssues?.value)) ||
+      (d.complianceAvailability.indicators === "available" &&
+        !d.complianceInsights));
+  const ready =
+    !!d && matched && !unavailable && !isLoading && !isFetching && !isError;
+  const printKey = JSON.stringify([
+    scopeKey,
+    params.toString(),
+    requestId || d?.reportScope.checkedAt,
+  ]);
+  const printed = useRef<string | null>(null);
   useEffect(() => {
-    if (!isLoading && d) {
-      // Give the browser a frame to lay out before opening the print dialog
-      const t = setTimeout(() => window.print(), 300);
-      return () => clearTimeout(t);
-    }
-  }, [isLoading, d]);
-
-  if (isLoading || !d) {
+    if (!ready || printed.current === printKey) return;
+    const timer = setTimeout(() => {
+      printed.current = printKey;
+      window.print();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [ready, printKey]);
+  if (!filters || (!isLoading && !isFetching && d && !matched))
     return (
-      <div style={{ fontFamily: "sans-serif", padding: 40, color: "#111" }}>
+      <div role="alert" className="p-10">
+        <p>
+          This report link is incomplete or invalid. Open Analytics and choose
+          the reporting dates again.
+        </p>
+        <Link to={Routes.agency.analytics}>Return to Analytics</Link>
+      </div>
+    );
+  if (isError || (!isLoading && !isFetching && (!d || unavailable)))
+    return (
+      <div role="alert" className="p-10">
+        <p>
+          {unavailable
+            ? "Some report figures are unavailable. Refresh the report before printing."
+            : "Could not load this report. Your reporting dates have been kept."}
+        </p>
+        <button onClick={() => refetch()}>Retry</button>{" "}
+        <Link to={Routes.agency.analytics}>Return to Analytics</Link>
+      </div>
+    );
+  if (!ready || !d)
+    return (
+      <div
+        role="status"
+        style={{ fontFamily: "sans-serif", padding: 40, color: "#111" }}
+      >
         Loading report…
       </div>
     );
-  }
 
-  const { overview, complianceInsights, billingSummary, riskTrends, operationalEfficiency } = d;
+  const {
+    overview,
+    complianceInsights,
+    billingSummary,
+    riskTrends,
+    operationalEfficiency,
+  } = d;
 
   const tableStyle: React.CSSProperties = {
     width: "100%",
@@ -112,7 +190,10 @@ export default function AnalyticsPrintPage() {
           AI Analytics &amp; Operations Report
         </h1>
         <p style={{ color: "#555", fontSize: 12, marginTop: 4 }}>
-          Generated {new Date().toLocaleDateString("en-US", { dateStyle: "long" })}
+          Reporting dates: {d.reportScope.startDate} – {d.reportScope.endDate}.
+          Program: {d.reportScope.mode?.toUpperCase() || "All programs"}.
+          Checked at {d.reportScope.checkedAt}. A later report may differ as
+          records change.
         </p>
 
         {/* Overview */}
@@ -127,44 +208,100 @@ export default function AnalyticsPrintPage() {
           </thead>
           <tbody>
             {[
-              { label: "Compliance Rate", m: overview.complianceRate, fmt: (v: number) => `${v}%` },
-              { label: "Total Issues", m: overview.totalIssues, fmt: (v: number) => `${v}` },
-              { label: "Revenue Generated", m: overview.revenue, fmt: (v: number) => v >= 1000 ? `$${(v / 1000).toFixed(1)}K` : `$${v}` },
-              { label: "Shifts Billed", m: overview.shiftsBilled, fmt: (v: number) => `${v}` },
-            ].map(({ label, m, fmt }) => (
+              ...(rate === "restricted"
+                ? []
+                : [
+                    {
+                      label: "No expiry/signature flags",
+                      m:
+                        rate === "available"
+                          ? overview.complianceRate
+                          : undefined,
+                      fmt: (v: number) => `${v}%`,
+                      empty:
+                        rate === "empty"
+                          ? "No records to assess"
+                          : "Unavailable",
+                    },
+                  ]),
+              ...(d.complianceAvailability.flags === "restricted"
+                ? []
+                : [
+                    {
+                      label: "Document & incident flags",
+                      m: overview.totalIssues,
+                      fmt: (v: number) => `${v}`,
+                      empty: "Unavailable",
+                    },
+                  ]),
+              {
+                label: "Revenue Generated",
+                m: overview.revenue,
+                empty: "Unavailable",
+                fmt: (v: number) =>
+                  v >= 1000 ? `$${(v / 1000).toFixed(1)}K` : `$${v}`,
+              },
+              {
+                label: "Shifts Billed",
+                m: overview.shiftsBilled,
+                empty: "Unavailable",
+                fmt: (v: number) => `${v}`,
+              },
+            ].map(({ label, m, fmt, empty }) => (
               <tr key={label}>
                 <td style={tdStyle}>{label}</td>
-                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600 }}>{fmt(m.value)}</td>
+                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600 }}>
+                  {m ? fmt(m.value) : empty}
+                </td>
                 <td style={{ ...tdStyle, textAlign: "right" }}>
-                  {m.trend >= 0 ? "+" : ""}{m.trend}%
+                  {typeof m?.trend === "number" && Number.isFinite(m.trend)
+                    ? `${m.trend >= 0 ? "+" : ""}${m.trend}%`
+                    : "—"}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
 
+        {rate !== "restricted" && <p style={{ fontSize: 12 }}>{RATE_HELPER}</p>}
+        {d.complianceAvailability.flags !== "restricted" && (
+          <p style={{ fontSize: 12 }}>{FLAGS_HELPER}</p>
+        )}
         {/* Compliance Insights */}
-        <p style={sectionTitle}>Compliance Insights</p>
-        <p style={{ fontSize: 13, marginBottom: 8 }}>
-          Total issues: <strong>{complianceInsights.total}</strong>
-        </p>
-        <table style={tableStyle}>
-          <thead>
-            <tr>
-              <th style={thStyle}>Category</th>
-              <th style={{ ...thStyle, textAlign: "right" }}>Count</th>
-            </tr>
-          </thead>
-          <tbody>
-            {complianceInsights.breakdown.map((row) => (
-              <tr key={row.label}>
-                <td style={tdStyle}>{row.label}</td>
-                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600 }}>{row.value}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
+        {d.complianceAvailability.indicators === "available" &&
+          complianceInsights && (
+            <>
+              <p style={sectionTitle}>Selected risk indicators</p>
+              <p style={{ fontSize: 12 }}>{INDICATORS_HELPER}</p>
+              <p style={{ fontSize: 13, marginBottom: 8 }}>
+                Indicator findings: <strong>{complianceInsights.total}</strong>
+              </p>
+              <table style={tableStyle}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>Category</th>
+                    <th style={{ ...thStyle, textAlign: "right" }}>Count</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {complianceInsights.breakdown.map((row) => (
+                    <tr key={row.label}>
+                      <td style={tdStyle}>{row.label}</td>
+                      <td
+                        style={{
+                          ...tdStyle,
+                          textAlign: "right",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {row.value}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
         {/* Billing Summary */}
         <p style={sectionTitle}>Billing Summary</p>
         <p style={{ fontSize: 13, marginBottom: 8 }}>
@@ -181,7 +318,9 @@ export default function AnalyticsPrintPage() {
             {billingSummary.breakdown.map((row) => (
               <tr key={row.label}>
                 <td style={tdStyle}>{row.label}</td>
-                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600 }}>{row.value}</td>
+                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600 }}>
+                  {row.value}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -193,18 +332,39 @@ export default function AnalyticsPrintPage() {
           <thead>
             <tr>
               <th style={thStyle}>Month</th>
-              <th style={{ ...thStyle, textAlign: "right" }}>Expired Certs</th>
-              <th style={{ ...thStyle, textAlign: "right" }}>Overtime Risk</th>
-              <th style={{ ...thStyle, textAlign: "right" }}>Missing Docs</th>
+              {(["expired", "overtime", "missing", "unsignedForm485"] as const)
+                .filter((key) =>
+                  riskTrends.some((row) => typeof row[key] === "number"),
+                )
+                .map((key) => (
+                  <th key={key} style={{ ...thStyle, textAlign: "right" }}>
+                    {
+                      {
+                        expired: "Expired Certification",
+                        overtime: "Overtime risk",
+                        missing: "Missing document",
+                        unsignedForm485: "Unsigned Form 485",
+                      }[key]
+                    }
+                  </th>
+                ))}
             </tr>
           </thead>
           <tbody>
             {riskTrends.map((row) => (
               <tr key={row.month}>
                 <td style={tdStyle}>{row.month}</td>
-                <td style={{ ...tdStyle, textAlign: "right" }}>{row.expired}</td>
-                <td style={{ ...tdStyle, textAlign: "right" }}>{row.overtime}</td>
-                <td style={{ ...tdStyle, textAlign: "right" }}>{row.missing}</td>
+                {(
+                  ["expired", "overtime", "missing", "unsignedForm485"] as const
+                )
+                  .filter((key) =>
+                    riskTrends.some((point) => typeof point[key] === "number"),
+                  )
+                  .map((key) => (
+                    <td key={key} style={{ ...tdStyle, textAlign: "right" }}>
+                      {row[key] ?? "—"}
+                    </td>
+                  ))}
               </tr>
             ))}
           </tbody>
@@ -222,15 +382,27 @@ export default function AnalyticsPrintPage() {
           </thead>
           <tbody>
             {[
-              { label: "Shift Completion Rate", m: operationalEfficiency.completionRate },
-              { label: "On-time Start Rate", m: operationalEfficiency.onTimeRate },
-              { label: "Manual Interventions", m: operationalEfficiency.manualRate },
+              {
+                label: "Shift Completion Rate",
+                m: operationalEfficiency.completionRate,
+              },
+              {
+                label: "On-time Start Rate",
+                m: operationalEfficiency.onTimeRate,
+              },
+              {
+                label: "Manual Interventions",
+                m: operationalEfficiency.manualRate,
+              },
             ].map(({ label, m }) => (
               <tr key={label}>
                 <td style={tdStyle}>{label}</td>
-                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600 }}>{m.value}</td>
+                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600 }}>
+                  {m.value}
+                </td>
                 <td style={{ ...tdStyle, textAlign: "right" }}>
-                  {m.trend >= 0 ? "+" : ""}{m.trend}%
+                  {m.trend >= 0 ? "+" : ""}
+                  {m.trend}%
                 </td>
               </tr>
             ))}

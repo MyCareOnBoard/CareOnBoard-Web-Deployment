@@ -1,11 +1,11 @@
+import {CareerPlanDate} from './CareerPlanDate';
+export {CareerPlanDate} from './CareerPlanDate';
+import {canReviewCareer} from '@/lib/api/career-reconciliation';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useBlocker, useSearchParams } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { format } from 'date-fns';
 import { useAuth } from '@/utils/auth';
 import { useEffectiveAgencyMode } from '@/hooks/useEffectiveAgencyMode';
 import { searchClients, type Client } from '@/lib/api/clients';
@@ -28,44 +28,6 @@ import {
   useGetCareerRevisionQuery,
 } from './api';
 
-export function CareerPlanDate({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value?: string;
-  onChange: (value: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="space-y-1">
-      <span className="text-sm">{label}</span>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button type="button" variant="outline" aria-label={label} className="w-full justify-start">
-            {value || 'Select date'}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0">
-          <Calendar
-            mode="single"
-            captionLayout="dropdown"
-            startMonth={new Date(2000, 0)}
-            endMonth={new Date(new Date().getFullYear() + 10, 11)}
-            selected={value ? new Date(value + 'T12:00:00') : undefined}
-            onSelect={(date) => {
-              if (date) {
-                onChange(format(date, 'yyyy-MM-dd'));
-                setOpen(false);
-              }
-            }}
-          />
-        </PopoverContent>
-      </Popover>
-    </div>
-  );
-}
 export function CareerPlanReadOnly({ revision }: { revision: CareerRevision }) {
   const c = revision.content;
   return (
@@ -557,6 +519,7 @@ export default function CareerPlanningPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Career Planning</h1>
+      {clientId && canReviewCareer(user) && <Button variant="outline" asChild><Link to={(user?.userType==='super_admin'?Routes.superAdmin.careerReconciliation:Routes.agency.careerReconciliation)+'?'+new URLSearchParams({clientId,...(agencyId?{agencyId}:{})})}>Usage &amp; reconciliation</Link></Button>}
       {pageNotice && <p role="status">{pageNotice}</p>}
       <label className="block">
         Find client

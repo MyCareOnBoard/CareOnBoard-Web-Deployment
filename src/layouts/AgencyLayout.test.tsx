@@ -209,3 +209,19 @@ describe("AgencyDashboardLayout billing authorization", () => {
     },
   );
 });
+
+describe('Compliance Alerts source entry', () => {
+  it.each([
+    [['Compliance Alerts','Trainings'],true],
+    [['Compliance Alerts','Client Management'],true],
+    [['Compliance Alerts','Notes','Scheduling'],true],
+    [['Compliance Alerts'],false],
+    [['Trainings'],false],
+  ])('gates both sidebar and route with %j', (accessList,allowed) => {
+    routing.pathname='/agency/compliance-alerts';
+    state.user={uid:'staff',userType:'agency_staff',profile:{accessList},agency:{supportedClientTypes:['ddd']}};
+    render(<MemoryRouter><AgencyDashboardLayout><p>Workspace child</p></AgencyDashboardLayout></MemoryRouter>);
+    expect(!!screen.queryByText('Workspace child')).toBe(allowed);
+    expect(!!screen.queryByText('Compliance Alerts')).toBe(allowed);
+  });
+});

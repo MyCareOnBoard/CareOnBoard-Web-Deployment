@@ -1,392 +1,299 @@
-import ShiftNotesSection from './ShiftNotesSection';
-import { useState, useEffect, useCallback } from "react";
-import { ArrowLeft, ChevronLeft, ChevronRight, Search, ShieldCheck } from "lucide-react";
-import { useNavigate } from "react-router";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { useSearchParams } from "react-router";
+import { useDispatch } from "react-redux";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Routes } from "@/routes/constants";
-import { useGetExpiredDocumentsQuery, useGetUnsignedForm485ClientsQuery, useGetDocumentComplianceQuery, useComplianceDateRefresh } from "./api";
-import { ExpiredDocument, complianceLabel, civilDateLabel } from "./apiTypes";
+
 import { useAuth } from "@/utils/auth";
-import { sendDocumentAlert } from "@/lib/api/employee-documents";
-import { useToast } from "@/hooks/use-toast";
 import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
-
-type StatusFilter = "all" | "active" | "inactive";
-
-const STATUS_FILTERS: Array<{ value: StatusFilter; label: string }> = [
-  { value: "all", label: "All" },
-  { value: "active", label: "Active" },
-  { value: "inactive", label: "Inactive" },
-];
-
-// Shared grid template so the header, rows, and skeleton stay aligned.
-const GRID_COLS =
-  "md:grid-cols-[minmax(140px,2fr)_100px_minmax(95px,1fr)_minmax(140px,1.6fr)_120px]";
-const HEADERS = ["Name", "Status", "Document", "Issue", "Action"];
-
-function AlertRowsSkeleton() {
+import { useAssignmentReviewScope } from "@/hooks/useAssignmentReview";
+import { setAgencyMode } from "@/store/redux/agencyModeSlice";
+import {
+  getComplianceSources,
+  parseComplianceView,
+  sourceSection,
+  sourceLabels,
+  type Source,
+  type ComplianceView,
+} from "./workspaceScope";
+import StaffChecks from "./StaffChecks";
+import ClientChecks from "./ClientChecks";
+import ShiftNotesSection from "./ShiftNotesSection";
+const restricted =
+  "You do not have access to these records. Ask your agency administrator.";
+export default function ComplianceAlertsPage() {
+  const { user } = useAuth();
+  const mode = useEffectiveAgencyMode();
+  const dispatch = useDispatch();
+  const [params, setParams] = useSearchParams();
+  const parsed = parseComplianceView(params);
+  const agencyId = user?.agencyId || user?.agency?.id || "";
+  const scopeKey = JSON.stringify([useAssignmentReviewScope(), agencyId, mode]);
+  const [lastScope, setLastScope] = useState(scopeKey);
+  const pendingMode = useRef<string | null>(null);
+  const setView = useCallback(
+    (next: ComplianceView) => {
+      const search = new URLSearchParams();
+      for (const [key, value] of Object.entries(next))
+        if (value) search.set(key, value);
+      setParams(search);
+    },
+    [setParams],
+  );
+  const lastUrl = useRef<string | null>(null);
+  const requestedMode = parsed.ok ? parsed.view.mode : undefined;
+  const modeSources = requestedMode
+    ? getComplianceSources(user, requestedMode)
+    : [];
+  const modeAllowed =
+    !requestedMode ||
+    (modeSources.length > 0 &&
+      (!parsed.ok ||
+        !parsed.view.source ||
+        modeSources.includes(parsed.view.source)));
+  const urlChanged = lastUrl.current !== params.toString();
+  useEffect(() => {
+    const changed = lastUrl.current !== params.toString();
+    lastUrl.current = params.toString();
+    if (changed && requestedMode && requestedMode !== mode && modeAllowed) {
+      pendingMode.current = requestedMode;
+      dispatch(setAgencyMode({ agencyId, mode: requestedMode }));
+      return;
+    }
+    if (lastScope !== scopeKey) {
+      setLastScope(scopeKey);
+      if (!changed && pendingMode.current !== mode) {
+        const next = new URLSearchParams(params);
+        for (const key of [
+          "mode",
+          "employeeId",
+          "clientId",
+          "shiftId",
+          "cursor",
+          "staffCursor",
+        ])
+          next.delete(key);
+        setParams(next, { replace: true });
+      }
+      pendingMode.current = null;
+    }
+  }, [
+    scopeKey,
+    lastScope,
+    params,
+    requestedMode,
+    mode,
+    modeAllowed,
+    dispatch,
+    agencyId,
+    setParams,
+  ]);
+  if (
+    (urlChanged && requestedMode && requestedMode !== mode && modeAllowed) ||
+    lastScope !== scopeKey
+  )
+    return null;
+  const sources = getComplianceSources(user, mode);
+  const reset = () => setParams({});
   return (
-    <div>
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div
-          key={i}
-          className={`grid grid-cols-1 gap-3 border-b border-[#e5e5e6] px-4 py-4 last:border-b-0 md:items-center ${GRID_COLS}`}
-        >
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-32" />
-            <Skeleton className="h-3 w-20" />
-          </div>
-          <Skeleton className="h-6 w-16 rounded-full" />
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-4 w-28" />
-          <Skeleton className="h-9 w-28 rounded-full" />
+    <div className="min-h-[calc(100vh-200px)] px-4 sm:px-6 lg:px-0">
+      <h1 className="mb-6 text-[28px] font-bold text-[#10141a] sm:text-[40px]">
+        Compliance Alerts
+      </h1>
+      {!parsed.ok ? (
+        <div role="alert">
+          {parsed.message}{" "}
+          <Button variant="outline" onClick={reset}>
+            Reset view
+          </Button>
         </div>
-      ))}
+      ) : !modeAllowed ||
+        !sources.length ||
+        (parsed.view.source && !sources.includes(parsed.view.source)) ? (
+        <p role="alert">{restricted}</p>
+      ) : (
+        <Workspace
+          key={scopeKey}
+          scopeKey={scopeKey}
+          agencyId={agencyId}
+          viewerId={user?.uid || ""}
+          mode={mode!}
+          sources={sources}
+          view={parsed.view}
+          setView={setView}
+        />
+      )}
     </div>
   );
 }
-
-export default function ComplianceAlertsPage() {
-  const navigate = useNavigate();
-  const mode = useEffectiveAgencyMode();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [filterStatus, setFilterStatus] = useState<StatusFilter>("all");
-  const [alertingDocId, setAlertingDocId] = useState<string | null>(null);
-  const itemsPerPage = 10;
-  const [pages, setPages] = useState<Array<{cursor?: string; exhausted: boolean; clientOffset: number}>>([{exhausted: false, clientOffset: 0}]);
-  const page = pages[currentPage - 1] || pages[0];
-
-  const { user } = useAuth();
-  const { toast } = useToast();
-
-  const {data: compliance, isFetching: complianceFetching, isError: complianceError, refetch: refetchCompliance} = useGetDocumentComplianceQuery(
-    {viewerId: user?.uid, agencyId: user?.agencyId, mode: mode ?? undefined, search: searchQuery.trim().slice(0, 100), employeeStatus: filterStatus, cursor: page.cursor, limit: itemsPerPage},
-    {skip: !user?.agencyId || page.exhausted, refetchOnFocus: true, refetchOnMountOrArgChange: true},
+function Workspace({
+  scopeKey,
+  agencyId,
+  viewerId,
+  mode,
+  sources,
+  view: incoming,
+  setView,
+}: {
+  scopeKey: string;
+  agencyId: string;
+  viewerId: string;
+  mode: string;
+  sources: Source[];
+  view: ComplianceView;
+  setView: (view: ComplianceView) => void;
+}) {
+  const source = incoming.source || sources[0];
+  const view = { ...incoming, source, section: sourceSection[source] };
+  const lastSource = useRef<Partial<Record<string, Source>>>({});
+  lastSource.current[view.section] = source;
+  const saved = useRef<Partial<Record<Source, ComplianceView>>>({});
+  saved.current[source] = view;
+  const histories = useRef(new Map<string, Map<string, string | undefined>>());
+  const selectSource = (next: Source) =>
+    setView(
+      saved.current[next] || {
+        source: next,
+        section: sourceSection[next],
+        ...(mode === "ddd" || mode === "hha" ? { mode } : {}),
+      },
+    );
+  const onApply = (filters: Partial<ComplianceView>) => {
+    setView({
+      ...view,
+      ...filters,
+      search: filters.search?.trim() || undefined,
+      cursor: undefined,
+      staffCursor: undefined,
+    });
+  };
+  const onSelect = (selection: Partial<ComplianceView>) => {
+    setView({ ...view, ...selection });
+  };
+  const onPage = useCallback(
+    (cursor?: string, staff = false) => {
+      const key = source + (staff ? ":staff" : "");
+      const field = staff ? "staffCursor" : "cursor";
+      if (cursor) {
+        const history =
+          histories.current.get(key) ?? new Map<string, string | undefined>();
+        history.set(cursor, view[field]);
+        histories.current.set(key, history);
+      }
+      setView({ ...view, [field]: cursor });
+    },
+    [source, JSON.stringify(view), setView],
   );
-  const resetPages = useCallback(() => {setCurrentPage(1); setPages([{exhausted: false, clientOffset: 0}]);}, []);
-  const refreshDate = useCallback(() => {resetPages(); if (!page.exhausted) void refetchCompliance();}, [resetPages, page.exhausted, refetchCompliance]);
-  useComplianceDateRefresh(compliance?.timezone, refreshDate, compliance?.localDate);
-  // Fetch expired employee documents (backend scopes to the active DDD/HHA view).
-  // refetchOnMountOrArgChange keeps the skeleton showing on every mode switch,
-  // even when that mode's data is already cached.
-  const { data: docsData, isFetching: docsFetching, isError: docsError, refetch: refetchDocs } =
-    useGetExpiredDocumentsQuery(
-      { agencyId: user?.agencyId ?? "", mode: mode ?? undefined },
-      { skip: !user?.agencyId || compliance?.pilotEnabled !== false, refetchOnMountOrArgChange: true }
-    );
-  const expiredDocuments = docsData?.data || [];
-
-  // Fetch clients currently on an unsigned Form 485 (backend returns none in DDD view).
-  const { data: clientsData, isFetching: clientsFetching, isError: clientsError, refetch: refetchClients } =
-    useGetUnsignedForm485ClientsQuery(
-      { agencyId: user?.agencyId ?? "", mode: mode ?? undefined },
-      { skip: !user?.agencyId, refetchOnMountOrArgChange: true }
-    );
-  const unsignedClients = clientsData?.data || [];
-
-  // isFetching (not isLoading) so the skeleton also shows on mode-change refetches.
-  const isLoading = docsFetching || clientsFetching || complianceFetching;
-  // Only a hard error when BOTH sources fail; otherwise show whatever loaded.
-  const isError = complianceError || compliance?.syncStatus === 'error' || docsError || clientsError;
-
-  // Combined compliance list: expired employee documents + unsigned-485 clients.
-  // Both sources are already scoped to the active DDD/HHA view by the backend.
-  const legacyDocumentAlerts = expiredDocuments
-    .map((doc) => ({
-      kind: "document" as const,
-      id: doc.id,
-      name: doc.employee.fullName,
-      role: doc.employee.role,
-      status: doc.employee.status.charAt(0).toUpperCase() + doc.employee.status.slice(1),
-      document: doc.documentType,
-      issue: `Expired ${doc.daysExpired} day${doc.daysExpired !== 1 ? "s" : ""} ago`,
-    }));
-
-  const documentAlerts = compliance?.pilotEnabled ? (page.exhausted ? [] : compliance.items).map(item => ({
-    kind: 'document' as const, id: item.documentId, name: item.employeeName,
-    role: item.program, status: item.employeeStatus === 'active' ? 'Active' : 'Inactive',
-    document: item.documentLabel, issue: `${complianceLabel(item)}${item.expiryDateKey ? ` · ${civilDateLabel(item.expiryDateKey)}` : ''}`,
-  })) : legacyDocumentAlerts;
-
-  const clientAlerts = unsignedClients.map((c) => ({
-    kind: "client485" as const,
-    id: c.id,
-    name: c.name,
-    role: "Client",
-    status: c.status === "active" ? "Active" : "Inactive",
-    document: "Form 485",
-    issue: c.deactivated
-      ? "Deactivated — signed 485 overdue"
-      : c.daysLeft == null
-        ? "Unsigned"
-        : c.daysLeft <= 0
-          ? "Unsigned — overdue"
-          : `Unsigned — ${c.daysLeft} day${c.daysLeft !== 1 ? "s" : ""} left`,
-  }));
-
-  const complianceAlerts = [...documentAlerts, ...clientAlerts];
-
-  // Reset to page 1 when filters change
-  useEffect(() => {
-    resetPages();
-  }, [searchQuery, filterStatus, mode, user?.agencyId, resetPages]);
-
-  const filteredAlerts = complianceAlerts.filter((alert) => {
-    const matchesSearch =
-      alert.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      alert.document.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = filterStatus === "all" || alert.status.toLowerCase() === filterStatus;
-    return matchesSearch && matchesFilter;
-  });
-
-  const totalPages = Math.ceil(filteredAlerts.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const filteredClients = clientAlerts.filter(alert =>
-    (alert.name.toLowerCase().includes(searchQuery.trim().toLowerCase()) || alert.document.toLowerCase().includes(searchQuery.trim().toLowerCase())) &&
-    (filterStatus === 'all' || alert.status.toLowerCase() === filterStatus));
-  const clientSlots = compliance?.pilotEnabled && (page.exhausted || !compliance.nextCursor) ? Math.max(0, itemsPerPage - documentAlerts.length) : 0;
-  const currentAlerts = compliance?.pilotEnabled ? [...documentAlerts, ...filteredClients.slice(page.clientOffset, page.clientOffset + clientSlots)] : filteredAlerts.slice(startIndex, startIndex + itemsPerPage);
-  const hasNext = compliance?.pilotEnabled ? Boolean(!page.exhausted && compliance.nextCursor) || page.clientOffset + clientSlots < filteredClients.length : currentPage < totalPages;
-  const nextPage = () => {
-    if (compliance?.pilotEnabled) setPages(previous => [...previous.slice(0, currentPage), {cursor: compliance.nextCursor || undefined, exhausted: page.exhausted || !compliance.nextCursor, clientOffset: page.clientOffset + clientSlots}]);
-    setCurrentPage(previous => previous + 1);
+  const onPrevious = (staff = false) => {
+    const key = source + (staff ? ":staff" : "");
+    // Browser Back/Forward changes the current URL; it must not consume page history.
+    const cursor = histories.current
+      .get(key)
+      ?.get(view[staff ? "staffCursor" : "cursor"] || "");
+    setView({ ...view, [staff ? "staffCursor" : "cursor"]: cursor });
   };
-
-  const handleSendAlert = async (doc: ExpiredDocument) => {
-    try {
-      setAlertingDocId(doc.id);
-      await sendDocumentAlert(doc.employeeId, doc.id);
-      toast({
-        title: "Alert sent",
-        description: `An alert has been sent to ${doc.employee.fullName} about their expired document.`,
-      });
-    } catch (error) {
-      console.error("Failed to send document alert:", error);
-      toast({
-        title: "Couldn't send alert",
-        description: "Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setAlertingDocId(null);
-    }
+  const props = {
+    view,
+    scopeKey,
+    agencyId,
+    viewerId,
+    mode,
+    onApply,
+    onSelect,
+    onPage,
+    onPrevious,
   };
-
+  const sections = [...new Set(sources.map((item) => sourceSection[item]))];
   return (
-    <div className="min-h-[calc(100vh-200px)] px-4 sm:px-6 lg:px-0">
-      <div className="mb-4 flex flex-wrap items-center gap-2 sm:mb-6">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => navigate(Routes.agency.dashboard)}
-          className="flex cursor-pointer items-center justify-center rounded-full border-0 bg-white backdrop-blur-sm transition-colors hover:bg-[#f0fbfb]"
-        >
-          <ArrowLeft className="h-6 w-6" />
-        </Button>
-        <h1 className="text-[28px] font-bold leading-[1.4] text-[#10141a] sm:text-[32px] lg:text-[40px]">
-          Compliance Alerts
-        </h1>
-      </div>
-
-      <div className="min-w-0 overflow-hidden rounded-xl border border-white bg-[#FFFFFF4D] shadow-sm sm:rounded-2xl">
-        {/* Header + search + filters */}
-        <div className="border-b border-[#e5e7eb] p-4 sm:p-6">
-          <div>
-            <div>
-              <h2 className="text-[18px] font-bold leading-[1.4] text-[#10141a] sm:text-[20px]">
-                Compliance Alerts
-              </h2>
-              <p className="mt-1 text-[13px] font-medium text-[#808081] sm:text-[14px]">
-                Expiring documents and clients needing a signed Form 485
-              </p>
-            </div>
-
-            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="relative flex-1 sm:w-[240px] sm:flex-none">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#808081]" />
-                <input
-                  type="search"
-                  placeholder="Search name or document"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-full border border-[#e5e5e6] bg-white py-2 pl-10 pr-4 text-[14px] outline-none transition-colors placeholder:text-[#808081] focus:border-[#00b4b8]"
-                />
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                {STATUS_FILTERS.map((filter) => (
-                  <button
-                    key={filter.value}
-                    type="button"
-                    onClick={() => setFilterStatus(filter.value)}
-                    className={`rounded-full px-4 py-2 text-[13px] font-semibold transition-colors ${
-                      filterStatus === filter.value
-                        ? "bg-[#00b4b8] text-white"
-                        : "border border-[#e5e5e6] bg-white text-[#10141a] hover:border-[#00b4b8]"
-                    }`}
-                  >
-                    {filter.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {isError && currentAlerts.length > 0 && <p role="alert" className="px-4 py-3 text-[13px] text-[#d53411]">We couldn't load document expiry status. Try again. Last checked: {compliance?.evaluatedAt ? new Date(compliance.evaluatedAt).toLocaleString() : 'Not yet checked'}. <button type="button" className="text-[#00b4b8] underline" onClick={() => {if (!page.exhausted) void refetchCompliance(); else resetPages(); void refetchClients();}}>Retry</button></p>}
-        {/* List */}
-        {isLoading ? (
-          <div className="overflow-x-auto">
-            <div className={`hidden gap-3 border-b border-[#e5e5e6] bg-[#f9fafb] px-4 py-3 md:grid ${GRID_COLS}`}>
-              {HEADERS.map((label) => (
-                <div key={label} className="text-[12px] font-semibold uppercase text-[#808081]">
-                  {label}
-                </div>
-              ))}
-            </div>
-            <AlertRowsSkeleton />
-          </div>
-        ) : isError && currentAlerts.length === 0 ? (
-          <div className="p-8 text-center sm:p-12">
-            <p className="text-[14px] font-semibold text-[#ef4444]">Couldn&apos;t load compliance alerts</p>
-            <button
-              type="button"
-              onClick={() => {
-                if (compliance?.pilotEnabled === false) refetchDocs();
-                if (!page.exhausted) refetchCompliance();
-                else resetPages();
-                refetchClients();
-              }}
-              className="mt-2 text-[13px] text-[#00b4b8] underline"
-            >
-              Try again
-            </button>
-          </div>
-        ) : currentAlerts.length === 0 ? (
-          <div className="p-8 text-center sm:p-12">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#ecfdf3]">
-              <ShieldCheck className="h-7 w-7 text-[#12b76a]" />
-            </div>
-            <p className="text-[14px] font-semibold text-[#10141a]">
-              {compliance?.pilotEnabled ? "No document expiry issues match these filters." : complianceAlerts.length === 0 ? "All clear" : "No alerts match your filters"}
-            </p>
-            <p className="mt-1 text-[13px] text-[#6b7280]">
-              {complianceAlerts.length === 0
-                ? "No document expiry issues match these filters."
-                : "Try changing your search or status filter"}
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            {/* Desktop column headers */}
-            <div className={`hidden gap-3 border-b border-[#e5e5e6] bg-[#f9fafb] px-4 py-3 md:grid ${GRID_COLS}`}>
-              {HEADERS.map((label) => (
-                <div key={label} className="text-[12px] font-semibold uppercase text-[#808081]">
-                  {label}
-                </div>
-              ))}
-            </div>
-
-            {currentAlerts.map((alert) => {
-              const rowSending = alertingDocId === alert.id;
-              return (
-                <div
-                  key={`${alert.kind}-${alert.id}`}
-                  className={`grid grid-cols-1 gap-3 border-b border-[#e5e5e6] px-4 py-4 transition-colors last:border-b-0 hover:bg-white/50 md:items-center ${GRID_COLS}`}
-                >
-                  <div className="min-w-0">
-                    <button type="button" className="truncate text-[14px] font-semibold text-[#10141a]" onClick={() => {
-                      const item = compliance?.items.find(item => item.documentId === alert.id);
-                      if (alert.kind === 'document' && item) navigate(`/agency/dsp-management/${encodeURIComponent(item.employeeId)}?documentId=${encodeURIComponent(item.documentId)}`);
-                    }}>{alert.name}</button>
-                    <div className="text-[12px] font-medium capitalize text-[#808081]">{alert.role}</div>
-                  </div>
-
-                  <div>
-                    <span
-                      className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold ${
-                        alert.status === "Active"
-                          ? "border-[#0EAF52] bg-[#0EAF521A] text-[#0EAF52]"
-                          : "border-[#808081] bg-[#8080801A] text-[#808081]"
-                      }`}
-                    >
-                      {alert.status}
-                    </span>
-                  </div>
-
-                  <div className="text-[14px] font-medium text-[#10141a]">
-                    <span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] md:hidden">Document</span>
-                    {alert.document}
-                  </div>
-
-                  <div className="text-[14px] font-medium text-[#d53411]">
-                    <span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] md:hidden">Issue</span>
-                    {alert.issue}
-                  </div>
-
-                  <div className="md:justify-self-start">
-                    {alert.kind === "client485" ? (
-                      <button
-                        type="button"
-                        onClick={() => navigate(Routes.agency.clientDetails.replace(":clientId", alert.id))}
-                        className="rounded-full border border-[#00b4b8] bg-[#00b4b8] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[#009da1]"
-                      >
-                        View Client
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const doc = expiredDocuments.find((d) => d.id === alert.id);
-                          if (doc) handleSendAlert(doc);
-                          else {
-                            const item = compliance?.items.find(item => item.documentId === alert.id);
-                            if (item) handleSendAlert({id: item.documentId, employeeId: item.employeeId, employee: {fullName: item.employeeName}} as ExpiredDocument);
-                          }
-                        }}
-                        disabled={rowSending}
-                        className="rounded-full border border-red-500 bg-red-500 px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {rowSending ? "Sending…" : "Send Alert"}
-                      </button>
-                    )}
-                  </div>
-                </div>
+    <>
+      <div
+        role="tablist"
+        aria-label="Compliance sections"
+        className="mb-4 flex flex-wrap gap-2"
+      >
+        {sections.map((section, index) => (
+          <button
+            key={section}
+            type="button"
+            role="tab"
+            id={`compliance-tab-${section}`}
+            aria-controls={`compliance-panel-${section}`}
+            aria-selected={view.section === section}
+            tabIndex={view.section === section ? 0 : -1}
+            onKeyDown={(event) => {
+              if (
+                !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)
+              )
+                return;
+              event.preventDefault();
+              const next =
+                event.key === "Home"
+                  ? 0
+                  : event.key === "End"
+                    ? sections.length - 1
+                    : (index +
+                        (event.key === "ArrowRight"
+                          ? 1
+                          : sections.length - 1)) %
+                      sections.length;
+              (
+                event.currentTarget.parentElement?.children[next] as HTMLElement
+              )?.focus();
+              selectSource(
+                lastSource.current[sections[next]] ||
+                  sources.find(
+                    (item) => sourceSection[item] === sections[next],
+                  )!,
               );
-            })}
-          </div>
+            }}
+            onClick={() =>
+              selectSource(
+                lastSource.current[section] ||
+                  sources.find((item) => sourceSection[item] === section)!,
+              )
+            }
+            className={`rounded-full border px-5 py-2 text-sm font-medium ${view.section === section ? "border-[#00b4b8] bg-[#00b4b8] text-white" : "border-[#e5e5e6] text-[#10141a] hover:bg-[#eef4f5]"}`}
+          >
+            {section[0].toUpperCase() + section.slice(1)}
+          </button>
+        ))}
+      </div>
+      {mode === "sc" && (
+        <p className="mb-4 text-sm text-[#808081]">
+          Client checklist and shift-note checks are available in DDD and HHA
+          only.
+        </p>
+      )}
+      <div
+        role="tabpanel"
+        id={`compliance-panel-${view.section}`}
+        aria-labelledby={`compliance-tab-${view.section}`}
+        className="overflow-hidden rounded-2xl border border-white bg-[#FFFFFF4D] shadow-sm"
+      >
+        <div className="flex flex-wrap gap-2 border-b border-[#e5e7eb] p-4">
+          {sources
+            .filter((item) => sourceSection[item] === view.section)
+            .map((item) => (
+              <Button
+                key={item}
+                variant={item === source ? "default" : "outline"}
+                aria-pressed={item === source}
+                className="rounded-full"
+                onClick={() => selectSource(item)}
+              >
+                {sourceLabels[item]}
+              </Button>
+            ))}
+        </div>
+        {(source === "document_expiry" || source === "training") && (
+          <StaffChecks key={source} {...props} />
         )}
-
-        {/* Pagination */}
-        {(hasNext || currentPage > 1) && (
-          <div className="flex items-center justify-center gap-3 py-4">
-            <span className="text-[14px] font-medium text-[#10141a]">
-              Page {currentPage}
-            </span>
-            <button
-              type="button"
-              disabled={currentPage === 1}
-              onClick={() => currentPage > 1 && setCurrentPage((prev) => prev - 1)}
-              className="rounded-full bg-white p-2 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-              aria-label="Previous page"
-            >
-              <ChevronLeft size={16} className="text-[#10141a]" />
-            </button>
-            <button
-              type="button"
-              disabled={!hasNext || isLoading}
-              onClick={nextPage}
-              className="rounded-full bg-white p-2 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-              aria-label="Next page"
-            >
-              <ChevronRight size={16} className="text-[#10141a]" />
-            </button>
-          </div>
+        {(source === "client_documents" || source === "unsigned_form485") && (
+          <ClientChecks key={source} {...props} />
+        )}
+        {source === "shift_notes" && (
+          <ShiftNotesSection key={source} {...props} />
         )}
       </div>
-      <ShiftNotesSection agencyId={user?.agencyId ?? ""} mode={mode ?? undefined} viewerId={user?.uid ?? ""} />
-    </div>
+    </>
   );
 }

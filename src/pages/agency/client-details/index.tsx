@@ -35,8 +35,10 @@ export default function ClientDetailsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [searchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState<ClientDetailsTab>(searchParams.get("tab") === "documents" ? "documents" : "activity");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = searchParams.get("tab");
+  const activeTab: ClientDetailsTab = ["activity", "profile", "services", "documents", "family-portal"].includes(requestedTab || "") ? requestedTab as ClientDetailsTab : "activity";
+  const setActiveTab = (tab: ClientDetailsTab) => {const next = new URLSearchParams(searchParams); next.set('tab', tab); setSearchParams(next);};
   const [currentPage, setCurrentPage] = useState(1);
   const mode = useEffectiveAgencyMode();
   const environment = import.meta.env.VITE_API_ENVIRONMENT || 'staging';

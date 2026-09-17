@@ -11,6 +11,8 @@ export type ComplianceBreakdownItem = {
 
 type ComplianceBreakdownChartProps = {
   total: number;
+  totalLabel?: string;
+  findingNoun?: string;
   data: ComplianceBreakdownItem[];
   mode?: string;
   onSegmentClick?: (item: ComplianceBreakdownItem) => void;
@@ -61,6 +63,8 @@ function allocateRoundedPercentages(exactPercentages: number[]) {
 
 export default function ComplianceBreakdownChart({
   total,
+  totalLabel = "Total issues",
+  findingNoun = "issue",
   data,
   mode,
   onSegmentClick,
@@ -147,7 +151,7 @@ export default function ComplianceBreakdownChart({
             {total}
           </span>
           <span className="mt-1 text-center text-sm leading-[18px] text-foreground">
-            Total issues
+            {totalLabel}
           </span>
         </div>
 
@@ -168,7 +172,7 @@ export default function ComplianceBreakdownChart({
                 <div className="mt-3 flex items-center gap-2 text-primary">
                   <TrendingUp className="h-4 w-4" />
                   <span className="text-sm font-medium">
-                    {segments[activeIndex].percentage}% of total issues
+                    {segments[activeIndex].percentage}% of {totalLabel.toLowerCase()}
                   </span>
                 </div>
               </div>
@@ -179,7 +183,7 @@ export default function ComplianceBreakdownChart({
 
       <div className="w-full max-w-[340px] space-y-2">
         {segments.map((item, index) => {
-          const issueLabel = item.value === 1 ? "issue" : "issues";
+          const issueLabel = item.value === 1 ? findingNoun : `${findingNoun}s`;
           return (
             <button
               key={item.key}

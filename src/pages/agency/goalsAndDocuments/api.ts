@@ -1,3 +1,4 @@
+import type {ReviewOverview, ClaimReview, CareerOverviewArgs, CareerClaimArgs} from '@/lib/api/career-reconciliation';
 import type {CareerEnvelope, CareerPlanList, CareerPlanScope, CareerPlanDetail, CareerPlanDraft, CareerRevision, CareerRevisionSummary, CareerPage} from '@/lib/api/career-planning';
 import { createApi } from "@reduxjs/toolkit/query/react";
 import { customBaseQuery } from "@/lib/baseQuery";
@@ -20,6 +21,16 @@ export const goalsAndDocumentsApi = createApi({
   tagTypes: ['CareerPlan'],
   keepUnusedDataFor: 300,
   endpoints: (builder) => ({
+    getCareerReconciliation: builder.query<ReviewOverview,CareerOverviewArgs>({
+      query: ({scopeKey: _scopeKey,...params})=>({url:'/goalsAndDocuments/career-reconciliation',method:'GET',requiresAuth:true,params}),
+      transformResponse:(response:CareerEnvelope<ReviewOverview>)=>response.data,
+      keepUnusedDataFor:0,
+    }),
+    getCareerClaimReconciliation: builder.query<ClaimReview,CareerClaimArgs>({
+      query: ({scopeKey: _scopeKey,claimId,...params})=>({url:'/goalsAndDocuments/career-reconciliation/claims/'+encodeURIComponent(claimId),method:'GET',requiresAuth:true,params}),
+      transformResponse:(response:CareerEnvelope<ClaimReview>)=>response.data,
+      keepUnusedDataFor:0,
+    }),
     getCareerPlans: builder.query<CareerPlanList, CareerPlanScope>({
       query: params => ({url:'/goalsAndDocuments/career-plans', method:'GET', requiresAuth:true, params}),
       transformResponse:(response:CareerEnvelope<CareerPlanList>)=>response.data,
@@ -135,6 +146,7 @@ export const goalsAndDocumentsApi = createApi({
 });
 
 export const {
+  useGetCareerReconciliationQuery, useLazyGetCareerReconciliationQuery, useGetCareerClaimReconciliationQuery, useLazyGetCareerClaimReconciliationQuery,
   useGetCareerPlansQuery, useGetCareerPlanQuery, useLazyGetCareerPlanQuery, useSaveCareerPlanMutation, usePublishCareerPlanMutation, useGetCareerRevisionsQuery, useGetCareerRevisionQuery,
   useGetAllGoalDocumentsQuery,
   useGetSingleGoalDocumentQuery,

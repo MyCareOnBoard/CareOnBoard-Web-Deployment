@@ -56,11 +56,12 @@ export interface DocumentComplianceItem {
   resolvedAt: string | null; resolutionReason: string | null;
 }
 export interface DocumentComplianceResponse {
+  monitoringState?: 'disabled' | 'baselining' | 'active' | 'paused';
   pilotEnabled: boolean; items: DocumentComplianceItem[]; nextCursor: string | null;
   evaluatedAt: string | null; syncStatus: string;
   timezone: string | null; localDate: string | null;
 }
-export interface DocumentComplianceArgs {
+export interface DocumentComplianceArgs { scopeKey?: string;
   viewerId?: string; agencyId?: string; employeeId?: string; mode?: string; condition?: string;
   search?: string; employeeStatus?: string; cursor?: string; limit?: number;
 }
@@ -93,7 +94,7 @@ export interface ShiftNoteComplianceItem {
 export type ShiftNoteCoverage = 'disabled' | 'checking' | 'ready' | 'paused' | 'unavailable';
 export interface ShiftNoteComplianceResponse {items: ShiftNoteComplianceItem[]; nextCursor: string | null; coverage: ShiftNoteCoverage; timezone: string | null;}
 export interface ShiftNoteComplianceDetail extends ShiftNoteComplianceItem {coverage: ShiftNoteCoverage; timezone: string | null; activityLogId: string | null; submissionIds: string[]; approvalIds: string[];}
-export interface ShiftNoteComplianceArgs {
+export interface ShiftNoteComplianceArgs { scopeKey?: string;
   viewerId: string; agencyId: string; mode?: string; employeeId?: string;
   stateGroup?: 'unresolved' | 'submitted' | 'approved' | 'inactive' | 'all'; startDate?: string; endDate?: string; limit?: number; cursor?: string;
 }
@@ -101,3 +102,11 @@ export const shiftNoteLabels: Record<ShiftNoteState, string> = {
   not_due: 'Not due', not_applicable: 'Not applicable', needs_review: 'Needs review', missing: 'Note missing',
   draft: 'Draft not submitted', needs_correction: 'Needs correction', submitted: 'Submitted — awaiting review', approved: 'Approved',
 };
+
+export interface ClientComplianceArgs { scopeKey?: string; agencyId: string; mode: string; clientId?: string; search?: string; status?: string; cursor?: string; limit?: number; }
+export interface ClientChecklistItem {
+  id: string; name: string; status: string;
+  documentChecklist: {state: 'ready' | 'unavailable'; reasonCode: string | null; warningCode: string | null; evaluatedAt: string; timezone: string | null; localDate: string | null;
+    groups: Array<{program: string; rows: Array<{key: string; status: import('@/lib/api/clients').ChecklistStatus; reasonCode: string | null; warningCode: string | null; issuedDate: string | null; expiryDate: string | null}>}>};
+}
+export interface ClientCompliancePage<T> {items: T[]; nextCursor: string | null; partialPage: boolean; evaluatedAt: string; timezone: string | null; localDate: string | null;}

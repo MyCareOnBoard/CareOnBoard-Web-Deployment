@@ -1,3 +1,7 @@
+import {validCareerReviewId} from '@/lib/api/career-reconciliation';
+import {useSearchParams} from 'react-router';
+import {useAssignmentReviewScope} from '@/hooks/useAssignmentReview';
+import {canAccessBillingChild} from '@/lib/agency/agency-billing-permissions';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getBillingClaimById,
@@ -62,7 +66,17 @@ const OutOfPocketInvoiceModal = lazy(
 );
 
 export function ClaimsDashboardContent() {
-  const { agencyId } = useOperationalAgency();
+  const { agencyId, actor, mode } = useOperationalAgency();
+  const {user}=useAuth();
+  const authScope=useAssignmentReviewScope();
+  const [reportParams,setReportParams]=useSearchParams();
+  const reportClaimId=reportParams.get('claimId');
+  const reportClientId=reportParams.get('clientId');
+  const reportAgencyId=reportParams.get('agencyId');
+  const canViewReport=user?.profile?.isActive!==false && !['inactive','suspended','disabled','deleted'].includes(user?.profile?.status??'') && (actor==='super_admin'?Boolean(user?.profile?.accessList?.includes('Billing Management')):canAccessBillingChild(user?.userType,user?.profile?.accessList,'Claims View'));
+  const reportScope=JSON.stringify([authScope,agencyId,actor,mode,canViewReport,reportClientId,reportClaimId]);
+  const currentReportScope=useRef(reportScope);currentReportScope.current=reportScope;
+  const [reportSelectionError,setReportSelectionError]=useState('');
   const { toast } = useToast();
   const [dateRange, setDateRange] = useState(getCurrentWeekDateRange);
   const [activeTab, setActiveTab] = useState<ClaimsWorkspaceTab>("shifts");
@@ -153,6 +167,7 @@ export function ClaimsDashboardContent() {
   const [claimReport, setClaimReport] = useState<{
     claim: RecentClaim;
     savedClaim: SavedBillingClaim;
+    scopeKey: string;
   } | null>(null);
 
   useEffect(() => () => {
@@ -446,61 +461,55 @@ export function ClaimsDashboardContent() {
   ]);
 
   const handleCloseReportModal = useCallback(() => {
-    setClaimReport(null);
-  }, []);
-
+    openingReportRequestIdRef.current++;
+    openingReportControllerRef.current?.abort();
+    setClaimReport(null);setOpeningReport(null);
+    setReportParams(previous=>{const next=new URLSearchParams(previous);next.delete('claimId');next.delete('clientId');return next;},{replace:true});
+  }, [setReportParams]);
+  useEffect(()=>{
+    setClaimReport(null);setOpeningReport(null);
+    return()=>{openingReportRequestIdRef.current++;openingReportControllerRef.current?.abort();};
+  },[reportScope]);
   const handleViewReport = useCallback(
-    async (claim: BillingClaimListItem) => {
-      const requestId = openingReportRequestIdRef.current + 1;
-      openingReportRequestIdRef.current = requestId;
+    async (claim: Pick<BillingClaimListItem,'id'|'clientId'> & {claimNumber?:string}) => {
+      if(!canViewReport)return;
+      const capturedScope=reportScope;
+      const requestId = ++openingReportRequestIdRef.current;
       openingReportControllerRef.current?.abort();
       const controller = new AbortController();
       openingReportControllerRef.current = controller;
-      setOpeningReport({ claimNumber: claim.claimNumber });
-
+      setClaimReport(null);
+      setOpeningReport({ claimNumber: claim.claimNumber || claim.id });
+      const current=()=>openingReportRequestIdRef.current===requestId&&!controller.signal.aborted&&currentReportScope.current===capturedScope;
       try {
-        const detail = await getBillingClaimById({
-          context: { agencyId },
-          claimId: claim.id,
-          signal: controller.signal,
-        });
-
-        if (openingReportRequestIdRef.current !== requestId) {
-          return;
-        }
-
+        const detail = await getBillingClaimById({context:{agencyId},claimId:claim.id,signal:controller.signal});
+        if(!current())return;
+        if(detail.id!==claim.id || detail.clientId!==claim.clientId)throw new Error('Claim unavailable.');
         setClaimReport({
+          scopeKey:capturedScope,
           claim: buildRecentClaimFromBillingDetail(detail),
           savedClaim: {
-            id: detail.id,
-            claimNumber: detail.claimNumber,
-            status: detail.status,
-            rejectionReason: detail.rejectionReason,
-            amount: detail.amount,
-            clientId: detail.clientId,
-            shiftIds: detail.shiftIds,
-            reportPrefill: detail.reportPrefill,
+            id: detail.id, claimNumber: detail.claimNumber, status: detail.status,
+            rejectionReason: detail.rejectionReason, amount: detail.amount,
+            clientId: detail.clientId, shiftIds: detail.shiftIds, reportPrefill: detail.reportPrefill,
           },
         });
       } catch (error) {
-        if (controller.signal.aborted) return;
-        if (openingReportRequestIdRef.current !== requestId) {
-          return;
-        }
-
-        toast({
-          title: "Couldn't open claim report",
-          description: getBillingClaimMutationErrorMessage(error),
-          variant: "destructive",
-        });
-      } finally {
-        if (openingReportRequestIdRef.current === requestId) {
-          setOpeningReport(null);
-        }
-      }
-    },
-    [agencyId, toast],
+        if(!current())return;
+        toast({title:"Couldn't open claim report",description:getBillingClaimMutationErrorMessage(error),variant:"destructive"});
+      } finally {if(current())setOpeningReport(null);}
+    },[agencyId,toast,canViewReport,reportScope],
   );
+  useEffect(()=>{
+    setReportSelectionError('');
+    if(reportClaimId===null && reportClientId===null)return;
+    if(!validCareerReviewId(reportClaimId)||!validCareerReviewId(reportClientId)||(reportAgencyId && reportAgencyId!==agencyId)){
+      setReportSelectionError('This report selection is unavailable. Open a claim from the billing workspace.');return;
+    }
+    if(!canViewReport){setReportSelectionError('Claims View access is required to open this report.');return;}
+    void handleViewReport({id:reportClaimId!,clientId:reportClientId!});
+    return()=>{openingReportRequestIdRef.current++;openingReportControllerRef.current?.abort();setClaimReport(null);setOpeningReport(null);};
+  },[reportClaimId,reportClientId,reportAgencyId,agencyId,canViewReport,handleViewReport]);
 
   const handleConfirmStatusUpdate = useCallback(
     async (payload: { status: Exclude<BillingClaimStatus, "pending">; rejectionReason?: string }) => {
@@ -596,6 +605,7 @@ export function ClaimsDashboardContent() {
 
   return (
     <div className="min-h-[calc(100vh-200px)] space-y-8 pb-8">
+      {reportSelectionError&&<p role="alert">{reportSelectionError}</p>}
       <ClaimsDashboardHeader
         dateRange={dateRange}
         onDateRangeChange={setDateRange}
@@ -658,7 +668,7 @@ export function ClaimsDashboardContent() {
         </Suspense>
       )}
 
-      {claimReport && (
+      {claimReport && canViewReport && claimReport.scopeKey===reportScope && (
         <Suspense fallback={null}>
           <ClaimReportModal
             key={claimReport.savedClaim.id}

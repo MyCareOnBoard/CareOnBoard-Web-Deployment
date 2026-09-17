@@ -55,9 +55,9 @@ export const agencyNotesApi = createApi({
       },
       invalidatesTags: (_result,error) => error ? [] : ['SubmittedNotes', 'SubmittedNoteDetails']
     }),
-    getSubmittedNoteDetails: builder.query<SubmittedNoteDetails, string>({
-      query: (submissionId) => ({
-        url: `/employees/submitted-notes/${submissionId}`,
+    getSubmittedNoteDetails: builder.query<SubmittedNoteDetails, string | {submissionId:string;scopeKey:string}>({
+      query: (selection) => ({
+        url: `/employees/submitted-notes/${encodeURIComponent(typeof selection === 'string' ? selection : selection.submissionId)}`,
         method: "GET",
         requiresAuth: true
       }),

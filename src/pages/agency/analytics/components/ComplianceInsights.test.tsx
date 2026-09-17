@@ -29,12 +29,12 @@ describe("ComplianceInsights", () => {
   it("matches the agency analytics card and AI button styling", () => {
     render(
       <MemoryRouter>
-        <ComplianceInsights total={1} data={data} />
+        <ComplianceInsights total={1} data={data} availability="available" />
       </MemoryRouter>,
     );
 
     const heading = screen.getByRole("heading", {
-      name: "Compliance insights",
+      name: "Selected risk indicators",
     });
     const card = heading.parentElement?.parentElement?.parentElement;
     const insightsButton = screen.getByRole("button", { name: "AI insights" });
@@ -49,6 +49,24 @@ describe("ComplianceInsights", () => {
     expect(insightsButton).not.toHaveClass("border-border", "bg-card");
   });
 
+  it("has no sample findings on failure or hidden findings when restricted", () => {
+    const { rerender } = render(
+      <MemoryRouter>
+        <ComplianceInsights />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("Unavailable")).toBeInTheDocument();
+    expect(screen.queryByText("Expired Certification")).not.toBeInTheDocument();
+    rerender(
+      <MemoryRouter>
+        <ComplianceInsights total={739} data={data} availability="restricted" />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByText("739")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "AI insights" }),
+    ).not.toBeInTheDocument();
+  });
   it("uses the agency analytics skeleton palette while loading", () => {
     const { container } = render(
       <MemoryRouter>

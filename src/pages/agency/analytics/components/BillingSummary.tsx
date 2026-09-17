@@ -10,8 +10,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-import AIInsightsCard from "./AIInsightsCard";
-import { useLazyGetAnalyticsInsightsQuery } from "@/lib/api/reports";
+import AIInsightsCard, {useScopedAnalyticsInsights} from "./AIInsightsCard";
 import { useNavigate } from "react-router";
 import { Routes } from "@/routes/constants";
 
@@ -28,6 +27,8 @@ interface BillingSummaryProps {
   isLoading?: boolean;
   startDate?: string;
   endDate?: string;
+  scopeKey?: string;
+  mode?: string;
 }
 
 const FALLBACK_DATA: BillingSegment[] = [
@@ -65,8 +66,10 @@ export default function BillingSummary({
   isLoading,
   startDate,
   endDate,
+  scopeKey,
+  mode,
 }: BillingSummaryProps) {
-  const [fetchInsights, { data: insightsData, isLoading: insightsLoading }] = useLazyGetAnalyticsInsightsQuery();
+  const {fetchInsights, insightsData, insightsLoading, insightsDisabled} = useScopedAnalyticsInsights({startDate,endDate,mode,scopeKey});
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [animatedProgress, setAnimatedProgress] = useState(0);
   const [showInsights, setShowInsights] = useState(false);
@@ -118,8 +121,10 @@ export default function BillingSummary({
     });
   }, [data, total, animatedProgress]);
 
+  useEffect(() => { setShowInsights(false); }, [startDate, endDate, mode, scopeKey]);
+
   const handleInsightsClick = () => {
-    if (!showInsights) fetchInsights({ startDate, endDate });
+    if (!showInsights) fetchInsights();
     setShowInsights((p) => !p);
   };
 
@@ -162,6 +167,7 @@ export default function BillingSummary({
 
         <div ref={insightsBtnRef} className="relative">
           <button
+            disabled={insightsDisabled}
             onClick={handleInsightsClick}
             className="
               inline-flex items-center gap-2
@@ -177,8 +183,8 @@ export default function BillingSummary({
           {showInsights && (
             <AIInsightsCard
               isLoading={insightsLoading}
-              insight={insightsData?.data.billing.insight ?? ""}
-              recommendation={insightsData?.data.billing.recommendation ?? ""}
+              insight={insightsData?.billing?.insight ?? ""}
+              recommendation={insightsData?.billing?.recommendation ?? ""}
             />
           )}
         </div>

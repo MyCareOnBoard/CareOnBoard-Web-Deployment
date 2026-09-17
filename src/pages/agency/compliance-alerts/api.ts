@@ -1,3 +1,4 @@
+import type {ClientComplianceArgs, ClientCompliancePage, ClientChecklistItem, UnsignedForm485Client} from './apiTypes';
 import { ShiftNoteComplianceArgs, ShiftNoteComplianceResponse, ShiftNoteComplianceDetail } from './apiTypes';
 import { useEffect } from 'react';
 import {createApi} from "@reduxjs/toolkit/query/react";
@@ -10,12 +11,19 @@ export const complianceAlertsApi = createApi({
     tagTypes: ['ExpiredDocuments', 'UnsignedForm485', 'DocumentCompliance', 'DocumentComplianceSettings', 'ShiftNoteCompliance'],
     keepUnusedDataFor: 300,
     endpoints: (builder) => ({
+        getClientChecklistPage: builder.query<ClientCompliancePage<ClientChecklistItem>, ClientComplianceArgs>({
+            query: ({scopeKey: _scopeKey, limit = 25, ...params}) => ({url: '/clients/compliance/document-checklist', method: 'GET', params: {...params, limit: Math.min(25, Math.max(1, limit))}, requiresAuth: true}),
+        }),
+        getUnsignedForm485Page: builder.query<ClientCompliancePage<UnsignedForm485Client>, Omit<ClientComplianceArgs, 'search' | 'status'>>({
+            query: ({scopeKey: _scopeKey, limit = 25, ...params}) => ({url: '/clients/compliance/unsigned-form485-page', method: 'GET', params: {...params, limit: Math.min(25, Math.max(1, limit))}, requiresAuth: true}),
+            providesTags: ['UnsignedForm485'],
+        }),
         getShiftNoteCompliance: builder.query<ShiftNoteComplianceResponse, ShiftNoteComplianceArgs>({
-            query: ({viewerId: _viewerId, limit = 25, ...params}) => ({url: '/shifts/note-compliance', method: 'GET', params: {...params, limit: Math.min(50, Math.max(1, limit))}, requiresAuth: true}),
+            query: ({scopeKey: _scopeKey, viewerId: _viewerId, limit = 25, ...params}) => ({url: '/shifts/note-compliance', method: 'GET', params: {...params, limit: Math.min(50, Math.max(1, limit))}, requiresAuth: true}),
             providesTags: ['ShiftNoteCompliance'],
         }),
-        getShiftNoteComplianceDetail: builder.query<ShiftNoteComplianceDetail, {shiftId: string; viewerId: string; agencyId: string; mode?: string; employeeId?: string}>({
-            query: ({shiftId, viewerId: _viewerId, ...params}) => ({url: `/shifts/${encodeURIComponent(shiftId)}/note-compliance`, method: 'GET', params, requiresAuth: true}),
+        getShiftNoteComplianceDetail: builder.query<ShiftNoteComplianceDetail, {scopeKey?: string; shiftId: string; viewerId: string; agencyId: string; mode?: string; employeeId?: string}>({
+            query: ({shiftId, scopeKey: _scopeKey, viewerId: _viewerId, ...params}) => ({url: `/shifts/${encodeURIComponent(shiftId)}/note-compliance`, method: 'GET', params, requiresAuth: true}),
             providesTags: ['ShiftNoteCompliance'],
         }),
         getDocumentComplianceSettings: builder.query<DocumentComplianceSettings, {viewerId: string; agencyId?: string}>({
@@ -27,7 +35,7 @@ export const complianceAlertsApi = createApi({
             invalidatesTags: ['DocumentComplianceSettings', 'DocumentCompliance'],
         }),
         getDocumentCompliance: builder.query<DocumentComplianceResponse, DocumentComplianceArgs>({
-            query: ({viewerId: _viewerId, ...params}) => ({url: '/documents/compliance', method: 'GET', params, requiresAuth: true}),
+            query: ({scopeKey: _scopeKey, viewerId: _viewerId, ...params}) => ({url: '/documents/compliance', method: 'GET', params, requiresAuth: true}),
             providesTags: ['DocumentCompliance'],
         }),
         getExpiredDocuments: builder.query<ExpiredDocumentsResponse, { agencyId: string; mode?: string }>({
@@ -53,7 +61,7 @@ export const complianceAlertsApi = createApi({
     }),
 });
 
-export const {
+export const { useGetClientChecklistPageQuery, useGetUnsignedForm485PageQuery,
     useGetShiftNoteComplianceQuery,
     useGetShiftNoteComplianceDetailQuery,
     useGetDocumentComplianceSettingsQuery,

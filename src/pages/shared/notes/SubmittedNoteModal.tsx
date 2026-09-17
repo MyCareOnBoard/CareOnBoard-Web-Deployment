@@ -15,6 +15,7 @@ interface SubmittedNoteModalProps {
   isOpen: boolean;
   submissionId: string | null;
   readOnly: boolean;
+  scopeKey?: string;
   onClose: () => void;
 }
 
@@ -24,8 +25,10 @@ const TemplateLoadingState = () => (
   </div>
 );
 
-export default function SubmittedNoteModal({ isOpen, submissionId, readOnly, onClose }: SubmittedNoteModalProps) {
-  const { data: loadedNote, isLoading, isError } = useGetSubmittedNoteDetailsQuery(submissionId!, { skip: !submissionId });
+export default function SubmittedNoteModal({ isOpen, submissionId, readOnly, scopeKey, onClose }: SubmittedNoteModalProps) {
+  const query = useGetSubmittedNoteDetailsQuery(scopeKey ? {submissionId:submissionId!,scopeKey} : submissionId!, { skip: !submissionId || !isOpen, refetchOnMountOrArgChange: Boolean(scopeKey) });
+  const {isLoading,isError}=query;
+  const loadedNote = scopeKey ? (query.isFetching || isError ? undefined : query.currentData) : query.data;
 
   const submittedNote = loadedNote && (loadedNote.submissionId === submissionId || loadedNote.id === submissionId) ? loadedNote : undefined;
   if (!isOpen) return null;
@@ -36,7 +39,7 @@ export default function SubmittedNoteModal({ isOpen, submissionId, readOnly, onC
     switch (submittedNote.activityType) {
       case "career-planning":
         if (!submittedNote.snapshot || !submittedNote.signature) return <p role="alert">This signed note could not be verified. Close it and try again.</p>;
-        return <div className="space-y-5"><CareerSignedContent snapshot={submittedNote.snapshot} signature={submittedNote.signature}/>{submittedNote.approvedAt && <p>Approved: {submittedNote.approvedAt}</p>}{!readOnly && submittedNote.status==='submitted' && <><div className="flex gap-3"><EditableNoteActions submissionId={submissionId!} onEdit={()=>undefined} canEdit={false}/></div><p>Returned entries must be corrected and signed again by the employee.</p></>}<CareerSignatureHistory key={submittedNote.snapshot.context.activityLogId} activityLogId={submittedNote.snapshot.context.activityLogId}/></div>;
+        return <div className="space-y-5"><CareerSignedContent snapshot={submittedNote.snapshot} signature={submittedNote.signature}/>{submittedNote.approvedAt && <p>Approved: {submittedNote.approvedAt}</p>}{!readOnly && submittedNote.status==='submitted' && <><div className="flex gap-3"><EditableNoteActions submissionId={submissionId!} onEdit={()=>undefined} canEdit={false}/></div><p>Returned entries must be corrected and signed again by the employee.</p></>}{!scopeKey && <CareerSignatureHistory key={submittedNote.snapshot.context.activityLogId} activityLogId={submittedNote.snapshot.context.activityLogId}/>}</div>;
       case "community-based":
         return <CommunityBasedNote {...commonProps} />;
       case "community-inclusion":

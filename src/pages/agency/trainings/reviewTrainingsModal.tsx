@@ -1,3 +1,4 @@
+import {sourceError} from '@/pages/agency/compliance-alerts/SourceControls';
 import React, {useEffect, useRef, useState} from "react";
 import {X} from "lucide-react";
 import {
@@ -13,6 +14,7 @@ import {Button} from '@/components/ui/button';
 
 
 interface ReviewTrainingsModalProps {
+    scopeKey?: string;
     open: boolean;
     onOpenChange: (open: boolean) => void;
     employee: {
@@ -30,6 +32,7 @@ interface ReviewTrainingsModalProps {
 
 export default function ReviewTrainingsModal(
     {
+        scopeKey,
         open,
         onOpenChange,
         employee,
@@ -57,12 +60,12 @@ export default function ReviewTrainingsModal(
         setLoadError(false);
         let active = true;
         const generation = ++requestGeneration.current;
-        const request = loadTrainings({employeeId: employee.id, agencyId: agencyId, limit: 25, mode});
+        const request = loadTrainings({...(scopeKey ? {scopeKey} : {}), employeeId: employee.id, agencyId: agencyId, limit: 25, mode});
         request.unwrap()
             .then(page => { if (active && generation === requestGeneration.current) { setCourses(page.items); setNextCursor(page.nextCursor); } })
             .catch(() => { if (active && generation === requestGeneration.current) { setLoadError(true); toast.error('Failed to load trainings'); } });
         return () => { active = false; requestGeneration.current++; request.abort?.(); };
-    }, [open, employee?.id, agencyId, mode, loadTrainings]);
+    }, [open, employee?.id, agencyId, mode, scopeKey, loadTrainings]);
 
     const handleToggle = async (trainingId: string, approved?: boolean) => {
         if (readOnly || !employee || pendingApproval) return;
@@ -85,7 +88,7 @@ export default function ReviewTrainingsModal(
             onApprovalChange?.(trainingId, newState);
             toast.success(newState ? 'Training approved' : training.requiresCertificate ? 'Certificate changes requested' : 'Training approval removed');
         } catch (error) {
-            if (generation === requestGeneration.current) toast.error('Unable to save review. Reopen the training to check the latest certificate, then try again.');
+            if (generation === requestGeneration.current) {if (sourceError(error) === 'restricted' || sourceError(error) === 'missing') {setCourses([]); setNextCursor(null); setLoadError(true);} toast.error('Unable to save review. Reopen the training to check the latest certificate, then try again.');}
         } finally {
             setPendingApproval(null);
         }
@@ -227,9 +230,9 @@ export default function ReviewTrainingsModal(
                     {nextCursor && <button disabled={isFetching} className="self-center text-[14px] font-semibold text-[#00b4b8] disabled:opacity-50" onClick={() => {
                         const generation = requestGeneration.current;
                         const employeeId = employee.id;
-                        loadTrainings({employeeId, agencyId: agencyId, limit: 25, cursor: nextCursor, mode}).unwrap()
+                        loadTrainings({...(scopeKey ? {scopeKey} : {}), employeeId, agencyId: agencyId, limit: 25, cursor: nextCursor, mode}).unwrap()
                             .then(page => { if (generation === requestGeneration.current) { setCourses(current => [...current, ...page.items]); setNextCursor(page.nextCursor); } })
-                            .catch(() => { if (generation === requestGeneration.current) toast.error('Failed to load trainings'); });
+                            .catch(error => { if (generation === requestGeneration.current) {if (sourceError(error) !== 'retry') {setCourses([]); setNextCursor(null);} setLoadError(true); toast.error('Failed to load trainings');} });
                     }}>Load more trainings</button>}
                 </div>
             </DialogContent>

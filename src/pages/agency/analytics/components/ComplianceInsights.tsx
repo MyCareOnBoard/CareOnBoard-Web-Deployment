@@ -1,71 +1,40 @@
 import { useEffect, useRef, useState } from "react";
 import { Sparkles } from "lucide-react";
-import { useNavigate } from "react-router";
 
 import ComplianceBreakdownChart, {
   type ComplianceBreakdownItem,
 } from "@/components/compliance/ComplianceBreakdownChart";
-import { useLazyGetAnalyticsInsightsQuery } from "@/lib/api/reports";
-import { Routes } from "@/routes/constants";
-import AIInsightsCard from "./AIInsightsCard";
+import type { MetricAvailability } from "@/lib/api/reports";
+import { INDICATORS_HELPER } from "../analyticsScope";
+import AIInsightsCard, { useScopedAnalyticsInsights } from "./AIInsightsCard";
 
 export type ComplianceSegment = ComplianceBreakdownItem;
 
 interface ComplianceInsightsProps {
   total?: number;
+  availability?: MetricAvailability;
   data?: ComplianceSegment[];
   isLoading?: boolean;
   startDate?: string;
   endDate?: string;
+  scopeKey?: string;
   mode?: string;
 }
 
-const FALLBACK_DATA: ComplianceSegment[] = [
-  {
-    label: "Expired Certification",
-    value: 4,
-    color: "#f33500",
-    description: "Staff certifications expired this week",
-  },
-  {
-    label: "Overtime risk",
-    value: 2,
-    color: "#FF7A00",
-    description: "Staff exceeding safe overtime thresholds",
-  },
-  {
-    label: "Missing document",
-    value: 1,
-    color: "#3B82F6",
-    description: "Required compliance documents missing",
-  },
-  {
-    label: "Unsigned Form 485",
-    value: 0,
-    color: "#8B5CF6",
-    description: "HHA clients active on an unsigned Form 485",
-  },
-  {
-    label: "Other",
-    value: 0,
-    color: "#BDBDBD",
-    description: "Additional uncategorized compliance issues",
-  },
-];
-
 export default function ComplianceInsights({
-  total = 6,
-  data = FALLBACK_DATA,
+  total,
+  data,
+  availability,
   isLoading,
   startDate,
   endDate,
+  scopeKey,
   mode,
 }: ComplianceInsightsProps) {
-  const [fetchInsights, { data: insightsData, isLoading: insightsLoading }] =
-    useLazyGetAnalyticsInsightsQuery();
+  const { fetchInsights, insightsData, insightsLoading, insightsDisabled } =
+    useScopedAnalyticsInsights({ startDate, endDate, mode, scopeKey });
   const [showInsights, setShowInsights] = useState(false);
   const insightsBtnRef = useRef<HTMLDivElement>(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
     if (!showInsights) return;
@@ -83,9 +52,13 @@ export default function ComplianceInsights({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showInsights]);
 
+  useEffect(() => {
+    setShowInsights(false);
+  }, [startDate, endDate, mode, scopeKey]);
+
   const handleInsightsClick = () => {
     if (!showInsights) {
-      fetchInsights({ startDate, endDate, mode });
+      fetchInsights();
     }
     setShowInsights((isVisible) => !isVisible);
   };
@@ -112,20 +85,30 @@ export default function ComplianceInsights({
     );
   }
 
+  if (availability === "restricted") return null;
+  if (availability !== "available" || !data || !Number.isFinite(total))
+    return (
+      <div
+        role="status"
+        className="rounded-[32px] border border-[#E8ECEF] bg-[#FFFFFF66] p-6"
+      >
+        <h3 className="text-[22px] font-semibold">Selected risk indicators</h3>
+        <p>Unavailable</p>
+      </div>
+    );
   return (
     <div className="rounded-[32px] border border-[#E8ECEF] bg-[#FFFFFF66] p-6">
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
           <h3 className="text-[22px] font-semibold text-[#111827]">
-            Compliance insights
+            Selected risk indicators
           </h3>
-          <p className="mt-2 text-[15px] text-[#6B7280]">
-            Issue distribution
-          </p>
+          <p className="mt-2 text-[15px] text-[#6B7280]">{INDICATORS_HELPER}</p>
         </div>
 
         <div ref={insightsBtnRef} className="relative">
           <button
+            disabled={insightsDisabled}
             type="button"
             aria-expanded={showInsights}
             onClick={handleInsightsClick}
@@ -136,21 +119,21 @@ export default function ComplianceInsights({
           </button>
           {showInsights && (
             <AIInsightsCard
+              limitedCoverage
               isLoading={insightsLoading}
-              insight={insightsData?.data.compliance.insight ?? ""}
-              recommendation={
-                insightsData?.data.compliance.recommendation ?? ""
-              }
+              insight={insightsData?.compliance?.insight ?? ""}
+              recommendation={insightsData?.compliance?.recommendation ?? ""}
             />
           )}
         </div>
       </div>
 
       <ComplianceBreakdownChart
-        total={total}
+        total={total!}
+        totalLabel="Indicator findings"
+        findingNoun="finding"
         data={data}
         mode={mode}
-        onSegmentClick={() => navigate(Routes.agency.complianceAlerts)}
       />
     </div>
   );

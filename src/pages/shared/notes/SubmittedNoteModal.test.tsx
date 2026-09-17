@@ -97,3 +97,14 @@ it('uses immutable Career Planning identity and rows rather than current labels'
 it('shows a recoverable error for a missing signed snapshot',()=>{detailsHook.mockReturnValue({isLoading:false,data:{...submittedNote,activityType:'career-planning'}});render(<SubmittedNoteModal isOpen submissionId="submission-1" readOnly onClose={vi.fn()}/>);expect(screen.getByRole('alert')).toHaveTextContent('This signed note could not be verified');});
 
 it('does not display a cached snapshot under another submission scope',()=>{detailsHook.mockReturnValue({data:{...submittedNote,activityType:'career-planning',snapshot:{context:{clientName:'Old signed client'}}},isLoading:false});render(<SubmittedNoteModal isOpen submissionId="different-submission" readOnly={false} onClose={vi.fn()}/>);expect(screen.queryByText(/Old signed client/)).not.toBeInTheDocument();expect(screen.queryByRole('button',{name:'Approve'})).not.toBeInTheDocument();expect(screen.getByLabelText('Loading note template')).toBeInTheDocument();});
+
+it('scopes reconciliation evidence and hides retained data while reauthorizing',()=>{
+  detailsHook.mockReturnValue({data:submittedNote,currentData:submittedNote,isLoading:false,isFetching:true});
+  const view=render(<SubmittedNoteModal isOpen submissionId="submission-1" scopeKey="actor/database/agency/client" readOnly onClose={vi.fn()}/>);
+  expect(detailsHook).toHaveBeenLastCalledWith({submissionId:'submission-1',scopeKey:'actor/database/agency/client'},expect.objectContaining({refetchOnMountOrArgChange:true}));
+  expect(screen.queryByText('Respite template: read only')).not.toBeInTheDocument();
+  detailsHook.mockReturnValue({data:submittedNote,currentData:submittedNote,isLoading:false,isFetching:false,isError:true});
+  view.rerender(<SubmittedNoteModal isOpen submissionId="submission-1" scopeKey="actor/database/agency/client" readOnly onClose={vi.fn()}/>);
+  expect(screen.getByRole('alert')).toBeInTheDocument();
+  expect(screen.queryByText('Respite template: read only')).not.toBeInTheDocument();
+});

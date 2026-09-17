@@ -6,7 +6,7 @@ export type TrendSentiment = "improvement" | "regression" | "neutral";
 type AnalyticsMetricCardProps = {
   value: string;
   label: string;
-  trend: number;
+  trend?: number;
   sentiment: TrendSentiment;
   graph: ReactNode;
   helper?: string;
@@ -56,11 +56,13 @@ export default function AnalyticsMetricCard({
   graph,
   helper,
 }: AnalyticsMetricCardProps) {
+  const showTrend = typeof trend === "number" && Number.isFinite(trend);
+  const trendValue = trend ?? 0;
   const accessibleTrend =
     sentiment === "neutral"
       ? "No change"
-      : `${Math.abs(trend)}% ${sentiment}`;
-  const DirectionIcon = trend > 0 ? ArrowUp : trend < 0 ? ArrowDown : null;
+      : `${Math.abs(trendValue)}% ${sentiment}`;
+  const DirectionIcon = trendValue > 0 ? ArrowUp : trendValue < 0 ? ArrowDown : null;
 
   return (
     <div className="rounded-2xl border border-[#E6EAEC] bg-white/80 px-5 py-4 shadow-[0_2px_10px_rgba(15,23,42,0.02)]">
@@ -70,15 +72,15 @@ export default function AnalyticsMetricCard({
             <h3 className="text-[28px] font-semibold leading-none tracking-[-1px] text-[#111827]">
               {value}
             </h3>
-            <span
+            {showTrend && <span
               aria-label={accessibleTrend}
               className={`flex items-center gap-1 text-[14px] font-medium ${sentimentClass[sentiment]}`}
             >
               {DirectionIcon ? (
                 <DirectionIcon aria-hidden="true" className="h-3.5 w-3.5" />
               ) : null}
-              {Math.abs(trend)}%
-            </span>
+              {Math.abs(trendValue)}%
+            </span>}
           </div>
           <p className="mt-3 text-[13px] font-semibold leading-[18px] text-[#111827]">
             {label}
