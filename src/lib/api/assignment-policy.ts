@@ -4,7 +4,7 @@ export type PolicyInput = {expectedRevision: number; enabled: boolean; serviceDa
 export type AssignmentPolicyResponse = {
   policy: {version: 1; revision: number; enabled: boolean; serviceDateCutoff: string | null; entries: PolicyEntry[]};
   canEdit: boolean; timezone: string | null;
-  approvedRules: Array<{ruleId: string; ruleVersion: number; label: string; programs: Array<'ddd' | 'hha'>; allowedSeverities: Array<PolicyEntry['severity']>; dateCoverage: unknown; acknowledgeable: boolean}>;
+  approvedRules: Array<{ruleId: string; ruleVersion: number; label: string; programs: Array<'ddd' | 'hha'>; allowedSeverities: Array<PolicyEntry['severity']>; dateCoverage: unknown; acknowledgeable: boolean; kinds?: Array<'service_roster' | 'caregiver_link' | 'shift'>}>;
 };
 export const validPolicyDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
 export function parseAssignmentPolicy(value: unknown): AssignmentPolicyResponse | null {
@@ -17,7 +17,7 @@ export function parseAssignmentPolicy(value: unknown): AssignmentPolicyResponse 
       && Array.isArray(r.programs) && r.programs.length > 0 && r.programs.every(p => ['ddd','hha'].includes(p))
       && Array.isArray(r.allowedSeverities) && r.allowedSeverities.length > 0 && r.allowedSeverities.every(s => ['mandatory','warning'].includes(s)) && typeof r.acknowledgeable === 'boolean')
     || !Array.isArray(p.entries) || p.entries.length > 20 || new Set(p.entries.map(e => e?.ruleId)).size !== p.entries.length
-    || !p.entries.every(e => e && d.approvedRules.some(r => r.ruleId === e.ruleId && r.ruleVersion === e.ruleVersion && r.allowedSeverities.includes(e.severity)))
+    || !p.entries.every(e => e && d.approvedRules.some(r => r.ruleId === e.ruleId && (r.ruleVersion === e.ruleVersion || (r.ruleVersion === 2 && e.ruleVersion === 1 && e.severity === 'warning')) && r.allowedSeverities.includes(e.severity)))
     || (p.enabled && (!p.entries.length || !p.serviceDateCutoff))) return null;
   return d;
 }

@@ -4,6 +4,7 @@ import {validComplianceId} from '@/pages/agency/compliance-alerts/workspaceScope
 import React, {lazy, Suspense, useEffect, useState} from "react";
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
+import {Skeleton} from "@/components/ui/skeleton";
 import {ChevronLeft, ChevronRight, Search} from "lucide-react";
 import AgencyAssignTrainingModal, {SaveTrainingData} from "@/pages/agency/trainings/assignTraining";
 const ReviewTrainingsModal = lazy(() => import('./reviewTrainingsModal'));
@@ -17,6 +18,8 @@ import {toast} from "sonner";
 import {AnimatePresence, motion} from "framer-motion";
 import {useStaffLabels} from "@/hooks/useStaffLabels";
 import {useEffectiveAgencyMode} from '@/hooks/useEffectiveAgencyMode';
+
+const TRAINING_ROW_CLASS = "grid grid-cols-[260px_140px_180px_280px] min-w-[940px] justify-between gap-4 backdrop-blur-[20px] bg-white/50 rounded-[20px] items-center p-4";
 
 export default function AgencyTrainings() {
   const scopeKey = JSON.stringify([useAssignmentReviewScope(), useEffectiveAgencyMode()]);
@@ -46,7 +49,7 @@ function AgencyTrainingsView({scopeKey}: {scopeKey: string}) {
   useEffect(() => { setCursor(undefined); setCursorHistory([]); }, [user?.agencyId, mode]);
 
   useEffect(() => {
-    if (validSelection) {setSelectedEmployee({id: employeeId!, fullName: '', profilePictureUrl: '', status: '', assignedCount: 0}); setIsReviewModalOpen(true);}
+    if (validSelection) {setSelectedEmployee({id: employeeId!, fullName: 'Selected staff member', profilePictureUrl: '', status: '', assignedCount: 0}); setIsReviewModalOpen(true);}
     else {setSelectedEmployee(null); setIsReviewModalOpen(false);}
   }, [employeeId, validSelection]);
   const closeReview = (open: boolean) => {
@@ -125,10 +128,10 @@ function AgencyTrainingsView({scopeKey}: {scopeKey: string}) {
                 trainings!.items.map((item) => (
                   <div
                     key={item.id}
-                    className="flex justify-between gap-4 backdrop-blur-[20px] bg-white/50 rounded-[20px] items-center p-4"
+                    className={TRAINING_ROW_CLASS}
                   >
                     {/* Avatar */}
-                    <div className="flex gap-4 items-center">
+                    <div className="flex gap-4 items-center min-w-0">
                       <div className="w-[52.5px] h-[60px] rounded-[8px] overflow-hidden flex-shrink-0">
                         {item?.profilePictureUrl
                           ? (
@@ -145,8 +148,8 @@ function AgencyTrainingsView({scopeKey}: {scopeKey: string}) {
                           )}
                       </div>
                       {/* Name */}
-                      <div>
-                        <p className="text-[16px] font-semibold leading-[1.6] text-black">
+                      <div className="min-w-0">
+                        <p className="break-words text-[16px] font-semibold leading-[1.6] text-black">
                           {item?.fullName}
                         </p>
                       </div>
@@ -156,7 +159,7 @@ function AgencyTrainingsView({scopeKey}: {scopeKey: string}) {
                           (item?.status ?? "Not Assigned") === "Not Assigned"
                               ? "bg-[#8080811A] border border-[#808081]"
                               : "bg-[#0EAF520D] border border-[#0EAF52]"
-                      } rounded-[60px] px-4 py-2`}>
+                      } justify-self-start max-w-full break-words rounded-[60px] px-4 py-2`}>
                           <p className={`text-[12px] font-semibold capitalize ${
                               (item?.status ?? "Not Assigned") === "Not Assigned"
                                   ? "text-[#808081]"
@@ -171,8 +174,9 @@ function AgencyTrainingsView({scopeKey}: {scopeKey: string}) {
                         Training
                       </p>
                       <p className="text-[14px] font-medium text-black">
-                        {item.assignedCount}
+                        {item.assignedCount} assigned
                       </p>
+                      {(item.requiredCount ?? 0) > 0 && <p className="text-[12px] text-[#808081]">{item.requiredCount} automatic requirements</p>}
                     </div>
 
                     {/* Actions */}
@@ -199,8 +203,25 @@ function AgencyTrainingsView({scopeKey}: {scopeKey: string}) {
               ))
             }
             {trainingsLoading && (
-              <div className="flex items-center justify-center py-20">
-                <p className="text-[16px] text-[#808081]">Loading...</p>
+              <div role="status" aria-label="Loading trainings" className="space-y-4">
+                <span className="sr-only">Loading trainings...</span>
+                {Array.from({length: 8}, (_, index) => (
+                  <div key={index} aria-hidden="true" className={TRAINING_ROW_CLASS}>
+                    <div className="flex gap-4 items-center min-w-0">
+                      <Skeleton className="w-[52.5px] h-[60px] rounded-[8px] shrink-0" />
+                      <Skeleton className="h-5 w-36 max-w-full" />
+                    </div>
+                    <Skeleton className="h-9 w-24 rounded-full shrink-0" />
+                    <div className="space-y-2 shrink-0">
+                      <Skeleton className="h-4 w-16" />
+                      <Skeleton className="h-4 w-20" />
+                    </div>
+                    <div className="flex items-center shrink-0 gap-2">
+                      <Skeleton className="h-9 w-32 rounded-full" />
+                      <Skeleton className="h-9 w-28 rounded-full" />
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
             {trainingsError && !trainingsLoading && (
@@ -250,10 +271,10 @@ function AgencyTrainingsView({scopeKey}: {scopeKey: string}) {
         employee={selectedEmployee ? {
           id: selectedEmployee.id,
           fullName: selectedEmployee.fullName,
-          role: staffLabel,
+          role: validSelection ? 'Staff' : staffLabel,
           profilePictureUrl: selectedEmployee.profilePictureUrl
         } : null}
-        mode={mode ?? undefined}
+        mode={validSelection ? undefined : mode ?? undefined}
         onApprovalChange={(trainingId, approved) => {
           console.log(`Training ${trainingId} approval changed to ${approved}`);
         }}

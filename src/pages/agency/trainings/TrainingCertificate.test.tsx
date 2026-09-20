@@ -16,6 +16,12 @@ beforeEach(() => {
 });
 
 describe('private training certificate', () => {
+    it('keeps expiry and review warnings when the timeline supplies the status heading', () => {
+        render(<TrainingCertificate training={{...training, source:'policy', policyContextState:'current', deadlineState:'expired', effectiveExpiryDateKey:'2026-09-01', reviewState:'changes_requested', reviewReason:'Upload a legible certificate.'}} showPolicySummary={false}/>);
+        expect(screen.queryByText('Automatically assigned')).not.toBeInTheDocument();
+        expect(screen.getByText('Calculated renewal date: 2026-09-01')).toBeInTheDocument();
+        expect(screen.getByText('Changes requested: Upload a legible certificate.')).toBeInTheDocument();
+    });
     it('retries the same file with the same request ID and reports the saved certificate', async () => {
         const result = {certificateId: 'certificate-1', certificateName: 'completion.pdf', status: 'Completed', approved: true, completedAt: '2026-09-16'};
         requests.post.mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce({data: result});

@@ -9,10 +9,11 @@ type CertificateResult = Pick<TrainingData, 'certificateId' | 'certificateName' 
 interface Props {
     training: TrainingData;
     canEditHireDate?: boolean;
+    showPolicySummary?: boolean;
     onUploaded?: (certificate: CertificateResult) => void;
 }
 
-export default function TrainingCertificate({training, onUploaded, canEditHireDate=false}: Props) {
+export default function TrainingCertificate({training, onUploaded, canEditHireDate=false, showPolicySummary=true}: Props) {
     const [selection, setSelection] = useState<{file: File; requestId: string} | null>(null);
     const [uploading, setUploading] = useState(false);
     const [completedOnDate,setCompletedOnDate] = useState('');
@@ -69,11 +70,11 @@ export default function TrainingCertificate({training, onUploaded, canEditHireDa
         }
     };
 
-    return <div className="flex flex-col items-start gap-2 text-sm">
+    return <div className="flex flex-col items-start gap-2 text-sm empty:hidden">
         {training.certificateId && <Button type="button" variant="ghost" className="h-auto px-0 text-[#008f92]" onClick={() => {setPreviewCertificate('latest');setPreviewOpen(true);}}>
             View certificate
         </Button>}
-        <TrainingPolicyStatus training={training} canEditHireDate={canEditHireDate}/>
+        <TrainingPolicyStatus training={training} canEditHireDate={canEditHireDate} showSummary={showPolicySummary}/>
         {policy && training.acceptedCertificate && training.acceptedCertificate.id !== training.certificateId && <Button type="button" variant="ghost" className="h-auto px-0 text-[#008f92]" onClick={()=>{setPreviewCertificate('accepted');setPreviewOpen(true);}}>View accepted certificate</Button>}
         {onUploaded && (training.source !== 'policy' || policy) && <>
             {policy && <div className="flex flex-wrap gap-3"><TrainingDateField label="Completion date" value={completedOnDate} onChange={value=>changeDate(setCompletedOnDate,value)} disabled={uploading}/>{training.requirementId==='cpr-certification' && <TrainingDateField label="Printed expiry date (optional)" value={printedExpiryDate} onChange={value=>changeDate(setPrintedExpiryDate,value)} disabled={uploading}/>}</div>}

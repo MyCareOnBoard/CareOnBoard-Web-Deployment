@@ -1,4 +1,3 @@
-import { AssignmentReview } from "@/components/AssignmentReview";
 import { AssignmentDecision, assignmentAcknowledgments, type AssignmentConsentDrafts } from "@/components/AssignmentDecision";
 import { useAssignmentDecision } from "@/hooks/useAssignmentDecision";
 import { assignmentDecisionError, parseAssignmentDecisions, type AssignmentDecision as Decision } from "@/lib/api/assignment-decision";
@@ -1887,12 +1886,17 @@ export default function AddScheduleModal({
       ...serviceAuthorizationFieldsForApi(selectedClientServices, formData),
     },
   } : null;
-  const assignmentReview = useAssignmentReview(reviewSelection, {enabled: isOpen && agencyMode !== "sc", scopeKey: reviewScope});
+  const assignmentReview = useAssignmentReview(reviewSelection, {enabled: false, scopeKey: reviewScope});
   const occurrenceId = selectedReviewRequest?.id;
   const decisionKeyFor = (request: CreateShiftRequest) => JSON.stringify([reviewScope, effectiveClientType, request.id, request.agencyId, request.clientId, request.employeeId, request.serviceAuthorizationId, request.serviceCode, request.date, request.startTime, request.endTime]);
   const selectedDecisionKey = selectedReviewRequest ? decisionKeyFor(selectedReviewRequest) : null;
   const decisionOverride = selectedDecisionKey ? decisionOverrides[selectedDecisionKey] : undefined;
-  const decisionSelection = reviewSelection && occurrenceId ? {...reviewSelection, input: {...reviewSelection.input, shiftId: occurrenceId}} : null;
+  const liveDecisionSelection = reviewSelection && occurrenceId ? {...reviewSelection, input: {...reviewSelection.input, shiftId: occurrenceId}} : null;
+  const rejectedScope = JSON.stringify([reviewScope, isOpen, formData.clientId, formData.serviceAuthorizationId, formData.serviceCode, effectiveClientType, formData.date, formData.startDate, formData.endDate, formData.clockInTime, formData.clockOutTime]);
+  const [rejectedStaff, setRejectedStaff] = useState<{scope: string; selection: NonNullable<typeof liveDecisionSelection>; name: string} | null>(null);
+  const retainedStaff = rejectedStaff?.scope === rejectedScope ? rejectedStaff : null;
+  const decisionSelection = liveDecisionSelection || (!formData.assignedDspId ? retainedStaff?.selection : null) || null;
+  useEffect(() => {setRejectedStaff(null);}, [rejectedScope]);
   const assignmentDecision = useAssignmentDecision(decisionSelection, {enabled: isOpen && agencyMode !== "sc" && !decisionOverride, scopeKey: reviewScope});
   useEffect(() => {
     if (assignmentDecision.accessDenied) {setDecisionOverrides({}); setConsentDrafts({});}
@@ -1903,12 +1907,24 @@ export default function AddScheduleModal({
     }
   };
   const currentDecision = decisionOverride || assignmentDecision.decision;
+  useEffect(() => {
+    if (!formData.assignedDspId || !liveDecisionSelection || assignmentDecision.loading || !(currentDecision?.state === 'inactive' || currentDecision?.decision === 'BLOCKED')) return;
+    if (decisionOverride) assignmentDecision.acceptDecision(currentDecision, assignmentDecision.viewKey);
+    setRejectedStaff({scope: rejectedScope, selection: liveDecisionSelection, name: formData.assignedDsp});
+    dspVerifyTokenRef.current++;
+    staffContextAbortRef.current?.abort();
+    setShowAssignDspDropdown(false);
+    setFormData(previous => ({...previous, assignedDsp: '', assignedDspId: ''}));
+  }, [currentDecision, decisionOverride, assignmentDecision.acceptDecision, assignmentDecision.viewKey, assignmentDecision.loading, formData.assignedDspId, formData.assignedDsp, liveDecisionSelection, rejectedScope]);
   const currentAcknowledgments = currentDecision ? assignmentAcknowledgments({[currentDecision.contextKey]: currentDecision}, consentDrafts) : [];
   useEffect(() => {
     setConsentDrafts(previous => Object.fromEntries(Object.entries(previous).map(([key, draft]) => [key, {...draft, consent: false}])));
   }, [assignmentDecision.viewKey]);
-  const assignmentSubmissionBlocked = assignmentDecision.loading || !!assignmentDecision.error || currentDecision?.state === "unavailable"
-    || currentDecision?.decision === "BLOCKED" || (currentDecision?.decision === "WARNING" && currentAcknowledgments.length === 0);
+  const staffSelectionRejected = !formData.assignedDspId && !!retainedStaff && currentDecision?.decision === 'BLOCKED'
+    && !currentDecision.hasRestrictedFindings && currentDecision.findings.some(f => f.severity === 'mandatory')
+    && currentDecision.findings.filter(f => f.severity === 'mandatory').every(f => currentDecision.checks?.some(check => check.ruleId === f.ruleId && check.category === 'staff'));
+  const assignmentSubmissionBlocked = assignmentDecision.loading || !!assignmentDecision.error || (!!currentDecision && currentDecision.state !== "ready")
+    || (currentDecision?.decision === "BLOCKED" && !staffSelectionRejected) || (currentDecision?.decision === "WARNING" && currentAcknowledgments.length === 0);
   const adoptDecision = (id: string | undefined, response: unknown) => {
     const envelope = parseAssignmentDecisions(response);
     const returned = Object.values(envelope?.assignmentDecisions || {})[0];
@@ -2627,6 +2643,19 @@ export default function AddScheduleModal({
                   )}
                 </div>
 
+            {agencyMode !== "sc" && (formData.assignedDspId || retainedStaff) && <div className="col-span-full">
+              {reviewRequests.length > 1 && <label className="mb-2 flex flex-col gap-1 text-sm">Assignment to review
+                <select aria-label="Assignment to review" className="rounded-xl border border-[#cccccd] bg-white p-2" value={Math.min(reviewOccurrence, reviewRequests.length - 1)} onChange={event => setReviewOccurrence(Number(event.target.value))}>
+                  {reviewRequests.map((request, index) => <option key={`${request.date}:${index}`} value={index}>{request.date} · {request.startTime} – {request.endTime}</option>)}
+                </select>
+              </label>}
+              {!formData.assignedDspId && retainedStaff && <p className="text-sm text-muted-foreground">{staffSelectionRejected ? 'Staff selection cleared. You can choose another staff member.' : 'Staff selection cleared. Resolve the requirements, then select staff again.'}</p>}
+              <AssignmentDecision selectionCleared={staffSelectionRejected} employeeName={formData.assignedDsp || retainedStaff?.name} date={selectedReviewRequest?.date || retainedStaff?.selection.input.date} decision={currentDecision} loading={assignmentDecision.loading} error={assignmentDecision.error}
+                refresh={() => {if (selectedDecisionKey && decisionOverride) setDecisionOverrides(previous => {const next = {...previous}; delete next[selectedDecisionKey]; return next;}); else void assignmentDecision.refresh();}}
+                draft={currentDecision ? consentDrafts[currentDecision.contextKey] : undefined}
+                onChange={draft => {if (currentDecision) setConsentDrafts(previous => ({...previous, [currentDecision.contextKey]: draft}));}} />
+            </div>}
+
                 <div className="flex flex-col gap-1 relative">
                   <label className="text-[12px] font-normal text-[#10141a]">Notes Type</label>
                   <button
@@ -3288,18 +3317,6 @@ export default function AddScheduleModal({
               </div>
             </div>
 
-            {agencyMode !== "sc" && <div className="px-1 pb-4">
-              {reviewRequests.length > 1 && <label className="mb-2 flex flex-col gap-1 text-sm">Assignment to review
-                <select aria-label="Assignment to review" className="rounded-xl border border-[#cccccd] bg-white p-2" value={Math.min(reviewOccurrence, reviewRequests.length - 1)} onChange={event => setReviewOccurrence(Number(event.target.value))}>
-                  {reviewRequests.map((request, index) => <option key={`${request.date}:${index}`} value={index}>{request.date} · {request.startTime} – {request.endTime}</option>)}
-                </select>
-              </label>}
-              <AssignmentReview controller={assignmentReview} employeeName={formData.assignedDsp} />
-              <AssignmentDecision decision={currentDecision} loading={assignmentDecision.loading} error={assignmentDecision.error}
-                refresh={() => {if (selectedDecisionKey && decisionOverride) setDecisionOverrides(previous => {const next = {...previous}; delete next[selectedDecisionKey]; return next;}); else void assignmentDecision.refresh();}}
-                draft={currentDecision ? consentDrafts[currentDecision.contextKey] : undefined}
-                onChange={draft => {if (currentDecision) setConsentDrafts(previous => ({...previous, [currentDecision.contextKey]: draft}));}} />
-            </div>}
             {/* Action Buttons - Fixed (used for both create and edit) */}
             <div className="flex gap-3 p-5 pt-0 shrink-0">
               <Button

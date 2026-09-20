@@ -7,7 +7,7 @@ const save = vi.hoisted(() => vi.fn());
 vi.mock('./hooks/useClientSave', async importOriginal => ({...await importOriginal<typeof import('./hooks/useClientSave')>(), useClientSave: () => ({saveClient: save, isSaving: false, setErrorMessage: vi.fn()})}));
 vi.mock('@/utils/auth', () => ({useAuth: () => ({user: {uid: 'owner', userType: 'agency', agencyId: 'a'}})}));
 vi.mock('@/hooks/useEffectiveAgencyMode', () => ({useEffectiveAgencyMode: () => 'ddd'}));
-vi.mock('@/components/AssignmentReviewRoster', async importOriginal => ({...await importOriginal<typeof import('@/components/AssignmentReviewRoster')>(), AssignmentReviewRosterProvider: ({children}: {children: ReactNode}) => children}));
+vi.mock('@/components/AssignmentReviewRoster', async importOriginal => ({...await importOriginal<typeof import('@/components/AssignmentReviewRoster')>(), rosterSubmissionBlocked: () => false, AssignmentReviewRosterProvider: ({children}: {children: ReactNode}) => children}));
 vi.mock('./stages/Stage1ClientIdentityAndContact', () => ({Stage1ClientIdentityAndContact: ({footer}: {footer: ReactNode}) => footer}));
 vi.mock('./stages/Stage2GuardianAndFunding', () => ({Stage2GuardianAndFunding: ({footer, formData}: {footer: ReactNode; formData: ReturnType<typeof createInitialAddClientFormData>}) => <><p>{formData.stage2.outcomes[0]?.services[0]?.assignedDsps?.map(d => d.name).join(', ')}</p>{footer}</>}));
 vi.mock('./stages/Stage3HealthcareAndDocuments', () => ({Stage3HealthcareAndDocuments: () => null}));
