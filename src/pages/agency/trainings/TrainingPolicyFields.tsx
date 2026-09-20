@@ -15,10 +15,11 @@ export function trainingPolicyLabel(training:TrainingData) {
  if(training.deadlineState==='before_work' && training.policyProgram==='hha')return 'Required before HHA services';
  return labels[training.deadlineState || ''] || 'Not assessed';
 }
-export function TrainingPolicyStatus({training,canEditHireDate=false}: {training:TrainingData;canEditHireDate?:boolean}) {
+export function TrainingPolicyStatus({training,canEditHireDate=false,showSummary=true}: {training:TrainingData;canEditHireDate?:boolean;showSummary?:boolean}) {
  if(training.source!=='policy')return null;
  const explanations:Record<string,string>={hire_date_needed:canEditHireDate?'Add a hire date in the staff profile to calculate training deadlines.':'Ask your agency administrator to add your hire date.',invalid_timezone:'Review agency time zone.',service_details_needed:'Review service details to confirm the CPR requirement.',evidence_unavailable:'The accepted certificate could not be verified. Review its source.'};
- return <div className="space-y-1 text-xs text-[#596065]"><p className="font-medium">Automatically assigned</p><p>{trainingPolicyLabel(training)}{training.policyContextState==='current' && training.dueDateKey && !['satisfied','not_required','details_needed','expired','before_work'].includes(training.deadlineState || '') ? ' ' + training.dueDateKey : ''}</p>
+ if (!showSummary && !(training.policyContextState==='current' && (training.effectiveExpiryDateKey || ['awaiting_review','changes_requested'].includes(training.reviewState || '') || training.reasonCode && explanations[training.reasonCode]))) return null;
+ return <div className="space-y-1 text-xs text-[#596065]">{showSummary && <><p className="font-medium">Automatically assigned</p><p>{trainingPolicyLabel(training)}{training.policyContextState==='current' && training.dueDateKey && !['satisfied','not_required','details_needed','expired','before_work'].includes(training.deadlineState || '') ? ' ' + training.dueDateKey : ''}</p></>}
  {training.policyContextState==='current' && <>{training.validityState==='valid' && training.effectiveExpiryDateKey && <p>Certificate valid until {training.effectiveExpiryDateKey}</p>}
  {training.effectiveExpiryDateKey && <p>{training.acceptedCertificate?.printedExpiryDate ? 'Effective expiry date: ' : 'Calculated renewal date: '}{training.effectiveExpiryDateKey}</p>}
  {training.reviewState==='awaiting_review' && <p>Certificate submitted. Agency review is pending.</p>}
