@@ -99,3 +99,11 @@ describe("formDataToApiPayload outcomes", () => {
     expect(payload.outcomes?.[0].services?.[0]?.code).toBe("DH1");
   });
 });
+
+it.each([undefined,true,false])('preserves the original service CPR answer %s through edit and save',answer=>{
+ const client={id:'cpr',firstName:'A',lastName:'B',type:'ddd',outcomes:[{id:'o',statement:'Goal',services:[{id:'s',name:'Service',code:'X',cprRequired:answer}]}]} as unknown as Client;
+ const form=clientToFormData(client);form.stage1.location={lat:'1',lon:'2'};form.stage1.address='Address';
+ expect(form.stage2.outcomes[0].services[0].cprRequired).toBe(answer);
+ const payload=formDataToApiPayload(form,false,false,false);
+ expect(payload.outcomes?.[0].services?.[0].cprRequired).toBe(answer);
+});

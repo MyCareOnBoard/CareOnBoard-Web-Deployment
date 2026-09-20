@@ -237,6 +237,7 @@ export function wizardServiceToClientService(
     clientRate: svc.clientRate || "",
     clientPayType: svc.clientPayType,
     ispEffectiveDate: toIso(svc.ispEffectiveDate),
+    cprRequired: svc.cprRequired,
     startAuthDate: toIso(svc.startAuthDate),
     endAuthDate: toIso(svc.endAuthDate),
     pcptDate: toIso(svc.pcptDate),

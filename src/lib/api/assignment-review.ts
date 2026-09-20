@@ -5,16 +5,18 @@ export type AssignmentReviewInput = {
   program: 'ddd' | 'hha'; kind: 'shift' | 'caregiver_link' | 'service_roster'; employeeId: string;
   serviceRowKey?: string; date?: string; startTime?: string; endTime?: string;
   serviceCode?: string; serviceAuthorizationId?: string; serviceAuthStartDate?: string; serviceAuthEndDate?: string;
-  startDate?: string; assignmentEndDate?: string;
+  startDate?: string; assignmentEndDate?: string; cprRequired?: boolean | null;
 };
 export type AssignmentReview = {
   version: 1; evaluatedAt: string; agencyDate: string | null; timezone: string | null;
   context: {
     agencyId: string; clientId: string; employeeId: string; program: 'ddd' | 'hha';
+    cprRequired?: boolean | null;
     kind: AssignmentReviewInput['kind']; serviceRowKey: string | null;
     startDate: string | null; endDate: string | null; startTime: string | null; endTime: string | null;
     dateCoverage: 'period' | 'start_only' | 'as_of_today' | 'unavailable';
   };
+  cpr?: {state:string;reasonCode:string;validUntilDate:string|null;coverage:string};
   state: 'information' | 'attention' | 'unavailable';
   coverage: {clientDocuments: ReviewCoverage; employeeTraining: ReviewCoverage};
   findings: Array<{code: string; category: 'client_document' | 'training' | 'coverage'; severity: 'advisory' | 'info'; reasonCode: string; subjectId?: string; evidence?: {kind: 'client_documents' | 'employee_training'; id: string}; dates?: {expiryDate?: string; serviceDate?: string}}>;

@@ -49,6 +49,8 @@ function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
 
   const [totalCount, setTotalCount] = useState(0);
   const [completedCount, setCompletedCount] = useState(0);
+  const [automaticAccepted, setAutomaticAccepted] = useState(0);
+  const [policyAssessmentComplete, setPolicyAssessmentComplete] = useState(false);
   const [trainingsLoading, setTrainingsLoading] = useState(false);
   
   const [documents, setDocuments] = useState<EmployeeDocument[]>([]);
@@ -68,16 +70,20 @@ function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
         if (!active) return;
         setTotalCount(trainings.summary?.assigned ?? 0);
         setCompletedCount(trainings.summary?.manualCompleted ?? 0);
+        setAutomaticAccepted(trainings.summary?.policyAccepted ?? 0);
+        setPolicyAssessmentComplete(trainings.summary?.policyAssessmentComplete === true);
       })
       .catch(error => {
         if (!active) return;
         console.error('Failed to fetch trainings:', error);
         setTotalCount(0);
         setCompletedCount(0);
+        setAutomaticAccepted(0);
+        setPolicyAssessmentComplete(false);
       })
       .finally(() => { if (active) setTrainingsLoading(false); });
     return () => { active = false; };
-  }, [dsp.id, user?.agencyId, mode]);
+  }, [dsp.id, user?.agencyId, mode, currentDsp.hireDate, currentDsp.role]);
 
   const fetchDocuments = async () => {
     try {
@@ -320,6 +326,8 @@ function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
           documentsLoading={documentsLoading}
           totalCount={totalCount}
           completedCount={completedCount}
+          automaticAccepted={automaticAccepted}
+          policyAssessmentComplete={policyAssessmentComplete}
           documents={documents}
           compliance={compliance}
           complianceError={complianceError}

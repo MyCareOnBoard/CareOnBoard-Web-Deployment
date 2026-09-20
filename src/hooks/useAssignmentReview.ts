@@ -23,6 +23,7 @@ export function reviewMatchesSelection(review: AssignmentReview, selection: Revi
   if (context.agencyId !== selection.agencyId || context.clientId !== selection.clientId || context.employeeId !== input.employeeId || context.program !== input.program || context.kind !== input.kind) return false;
   const row = input.serviceRowKey || input.serviceAuthorizationId;
   if (row && context.serviceRowKey !== row && context.serviceRowKey !== selection.requestServiceRowKey) return false;
+  if (Object.hasOwn(input,'cprRequired') && context.cprRequired !== input.cprRequired) return false;
   if (input.kind === 'service_roster') return !selection.expectedDates || (context.startDate === selection.expectedDates.startDate && context.endDate === selection.expectedDates.endDate);
   if (input.kind === 'shift' && input.date) {
     const end = clock(input.endTime);

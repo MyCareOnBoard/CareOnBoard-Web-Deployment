@@ -205,6 +205,7 @@ export interface ClientService {
   clientRate?: string;
   clientPayType?: "hourly" | "15-min" | "daily" | "mile";
   ispEffectiveDate?: string;
+  cprRequired?: boolean;
   startAuthDate?: string;
   endAuthDate?: string;
   pcptDate?: string;

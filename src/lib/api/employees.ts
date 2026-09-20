@@ -179,7 +179,7 @@ export interface EmployeeTrainingsResponse {
         status: string;
     }>;
     nextCursor: string | null;
-    summary: {assigned: number; manualCompleted: number; policyAwaitingReview: number; policyAccepted: number} | null;
+    summary: {assigned: number; manualCompleted: number; policyAwaitingReview: number; policyAccepted: number; policyAssessmentComplete?: boolean} | null;
 }
 
 // ==================== API Functions ====================
@@ -287,6 +287,8 @@ export async function getEmployeeById(employeeId: string, agencyId?: string, opt
  */
 export async function updateEmployee(employeeId: string, data: UpdateEmployeeRequest, agencyId?: string): Promise<Employee> {
     try {
+        const trainingCache = data.role !== undefined || data.hireDate !== undefined
+            ? await Promise.all([import('@/store/redux/store'), import('@/pages/agency/trainings/trainingApi')]) : null;
         const response = await axiosClient.put<EmployeeResponse>(`/employees/${employeeId}`, data, {
             params: agencyId ? {agencyId} : undefined,
         });
@@ -294,6 +296,7 @@ export async function updateEmployee(employeeId: string, data: UpdateEmployeeReq
         if (!response.data.success) {
             throw new Error('Failed to update employee');
         }
+        if (trainingCache) trainingCache[0].store.dispatch(trainingCache[1].employeeTrainingsApi.util.invalidateTags([{type:'EmployeeTrainings',id:employeeId},{type:'TrainingStaff',id:'LIST'}]));
 
         return response.data.employee;
     } catch (err: any) {

@@ -11,8 +11,10 @@ const state = vi.hoisted(() => ({
   approval: vi.fn(),
   courseArgs: [] as any[],
   loadCourses: vi.fn(),
+  evidenceGet: vi.fn(),
 }));
 
+vi.mock('@/lib/axios', () => ({default:{get:state.evidenceGet}}));
 vi.mock('react-router', () => ({useSearchParams: () => [new URLSearchParams(state.search), state.setSearch]}));
 vi.mock('@/hooks/useAssignmentReview', () => ({useAssignmentReviewScope: () => 'scope'}));
 vi.mock('@/utils/auth', () => ({useAuth: () => ({user: {agencyId: 'agency-1'}})}));
@@ -27,6 +29,7 @@ vi.mock('./trainingApi', () => ({
   useLazyGetEmployeeTrainingsQuery: () => [state.loadCourses, {isFetching: false}],
   useSaveTrainingMutation: () => [vi.fn(), {isLoading: false}],
   useApproveTrainingMutation: () => [state.approval],
+  usePolicyEvidenceMutation: () => [vi.fn(), {isLoading: false}],
 }));
 
 describe('agency training pagination', () => {
@@ -35,6 +38,8 @@ describe('agency training pagination', () => {
     state.staff = {items: [], nextCursor: null};
     state.courses = {items: [], nextCursor: null, summary: null, localDate: null};
     state.approval.mockReset();
+    state.evidenceGet.mockReset();
+    state.evidenceGet.mockResolvedValue({data:{items:[],nextCursor:null}});
     state.loadCourses.mockImplementation((args: any) => { state.courseArgs.push(args); const response = state.courses; return {unwrap: async () => response}; });
     state.courseArgs.length = 0;
   });
@@ -99,6 +104,15 @@ describe('agency training pagination', () => {
     expect(screen.queryByRole('button', {name: 'Approve CPR'})).not.toBeInTheDocument();
     expect(screen.queryByRole('button', {name: 'Request changes for CPR'})).not.toBeInTheDocument();
     expect(state.approval).not.toHaveBeenCalled();
+  });
+  it('renders fourteen HHA rows without fetching history until one is opened', async () => {
+    state.courses.items = Array.from({length:14},(_,index)=>({id:'hha-'+index,name:'HHA course '+index,assignedDsp:'employee-1',source:'policy',policyContextState:'current',policyProgram:'hha',requiresCertificate:true,deadlineState:'before_work'}));
+    render(<ReviewTrainingsModal open onOpenChange={vi.fn()} employee={{id:'employee-1',fullName:'Ada',role:'HHA'}} mode="hha"/>);
+    await screen.findByText('HHA course 13');
+    expect(state.evidenceGet).not.toHaveBeenCalled();
+    fireEvent.click(screen.getAllByRole('button',{name:'Use existing certificate'})[0]);
+    await waitFor(()=>expect(state.evidenceGet).toHaveBeenCalledTimes(1));
+    expect(state.evidenceGet.mock.calls[0][1].params).toEqual({kind:'training_certificate',limit:25});
   });
   it('selects only accepted current certificates without approving trainings', async () => {
     const accepted = {id: 'accepted', name: 'Accepted CPR', requiresCertificate: true, certificateId: 'a'.repeat(64), status: 'Completed', approved: true};

@@ -1,10 +1,12 @@
 interface TrainingSectionProps {
   totalCount: number;
   completedCount: number;
+  automaticAccepted?: number;
+  policyAssessmentComplete?: boolean;
   isLoading: boolean;
 }
 
-export function TrainingSection({ totalCount, completedCount, isLoading }: TrainingSectionProps) {
+export function TrainingSection({ totalCount, completedCount, automaticAccepted = 0, policyAssessmentComplete = false, isLoading }: TrainingSectionProps) {
   return (
     <div className="bg-[#edf1f2] p-6 rounded-lg">
       <div className="flex items-center justify-between mb-4">
@@ -16,10 +18,12 @@ export function TrainingSection({ totalCount, completedCount, isLoading }: Train
           </div>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-blue-300"></div>
-            <span>Training Completed · {completedCount || 0}</span>
+            <span>Manual completed · {completedCount || 0}</span>
           </div>
         </div>
       </div>
+      <p className="text-xs text-gray-600 mb-3">Automatic evidence accepted · {automaticAccepted}. Check Trainings for current CPR validity.</p>
+      {!isLoading && !policyAssessmentComplete && <p className="text-xs text-gray-600 mb-3">Some automatic requirements are not assessed yet. Open Trainings for details.</p>}
       {isLoading ? (
         <div className="flex items-center justify-center py-4">
           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-teal-500"></div>

@@ -10,6 +10,8 @@ import {TrainingData, useApproveTrainingMutation, useLazyGetEmployeeTrainingsQue
 import {useAuth} from "@/utils/auth";
 import {toast} from "sonner";
 import TrainingCertificate from './TrainingCertificate';
+import PolicyEvidenceReview from './PolicyEvidenceReview';
+import {trainingPolicyLabel} from './TrainingPolicyFields';
 import {Button} from '@/components/ui/button';
 
 
@@ -157,7 +159,7 @@ export default function ReviewTrainingsModal(
                         <div key={training.id} className="flex gap-[8px] items-start w-full">
                             {/* Timeline */}
                             <div className={"border border-[#808081] rounded-full p-2 text-xs text-[#808081]"}>
-                                {training?.status || "Not Completed"}
+                                {training.source === 'policy' ? trainingPolicyLabel(training) : training.status || 'Not Completed'}
                             </div>
                             <div className="flex flex-col items-center pt-0 pb-px px-0 self-stretch shrink-0 w-[12px]">
                                 <div className="bg-[#2b82ff] h-[7px] mb-[-1px] shrink-0 w-[2px]"/>
@@ -185,11 +187,15 @@ export default function ReviewTrainingsModal(
                                         Not Completed
                                     </p>}
                                     {training.requiresCertificate && <>
-                                        <TrainingCertificate key={`${employee.id}-${training.id}-${open}`} training={training}/>
+                                        <TrainingCertificate key={`${employee.id}-${training.id}-${open}`} training={training} canEditHireDate={user?.userType==='agency' || user?.userType==='agency_staff' && user.profile?.accessList?.includes('DSP Management')===true}/>
                                         {onSelectCertificate && training.source !== 'policy' && training.requiresCertificate === true && training.approved === true && training.status === 'Completed' && training.id && /^[a-f0-9]{64}$/.test(training.certificateId || '') &&
                                             <Button type="button" size="sm" variant="outline" className="rounded-full" aria-label={`Select certificate for ${training.name}`}
                                                 onClick={() => onSelectCertificate({trainingId: training.id!, certificateId: training.certificateId!})}>Select certificate</Button>}
-                                        {!readOnly && training.certificateId ? <div className="flex flex-wrap gap-2">
+                                        {training.source === 'policy' && <PolicyEvidenceReview training={training} readOnly={readOnly || training.policyContextState !== 'current'} onChanged={() => {
+                                            const generation = requestGeneration.current;
+                                            void loadTrainings({employeeId: employee.id, agencyId, limit: 25, mode, scopeKey}).unwrap().then(page=>{if(generation===requestGeneration.current){setCourses(page.items);setNextCursor(page.nextCursor);}}).catch(()=>toast.error('Unable to reload trainings'));
+                                        }}/>}
+                                        {training.source !== 'policy' && !readOnly && training.certificateId ? <div className="flex flex-wrap gap-2">
                                             <Button type="button" size="sm" disabled={pendingApproval !== null || training.approved}
                                                 className="rounded-full bg-[#00b4b8] text-white hover:bg-[#009da1]"
                                                 onClick={() => handleToggle(training.id!, true)} aria-label={`Approve ${training.name}`}>Approve</Button>
