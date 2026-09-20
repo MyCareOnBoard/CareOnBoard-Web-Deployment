@@ -260,3 +260,24 @@ it('preserves save-client-first structured errors and never retries a writer aut
   });
   expect(updateClientWithReview).toHaveBeenCalledOnce();
 });
+
+it('keeps acuity drafts, requires type and upload on completion, and uploads before activation', async () => {
+  vi.clearAllMocks();
+  const data = formData();
+  data.acuityRequirements = {enabled: true, types: []};
+  const {result} = renderHook(() => useClientSave());
+  await act(async () => {expect((await result.current.saveClient(data, false, undefined, false, true, false)).success).toBe(true);});
+  expect(vi.mocked(createClient).mock.calls[0][0].acuityRequirements).toEqual(data.acuityRequirements);
+  vi.clearAllMocks();
+  await act(async () => {expect((await result.current.saveClient(data, true, 'client-1', false, true, true)).error).toMatch(/Select Medication/);});
+  expect(updateClient).not.toHaveBeenCalled();
+  data.acuityRequirements.types = ['medication', 'behavioral'];
+  await act(async () => {expect((await result.current.saveClient(data, true, 'client-1', false, true, true)).error).toMatch(/Upload the required AENF/);});
+  expect(updateClient).not.toHaveBeenCalled();
+  data.stage3.docs.find(doc => doc.key === 'aenf')!.file = new File(['aenf'], 'aenf.pdf', {type: 'application/pdf'});
+  await act(async () => {expect((await result.current.saveClient(data, true, 'client-1', false, true, true)).success).toBe(true);});
+  expect(vi.mocked(updateClient).mock.calls[0][1]).not.toHaveProperty('status');
+  expect(uploadClientDocument).toHaveBeenCalledOnce();
+  expect(updateClient).toHaveBeenLastCalledWith('client-1', expect.objectContaining({status: 'active', documents: expect.arrayContaining([expect.objectContaining({key: 'aenf', url: 'https://example.test/new'})])}));
+  expect(vi.mocked(uploadClientDocument).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(updateClient).mock.invocationCallOrder.at(-1)!);
+});

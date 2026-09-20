@@ -2,7 +2,7 @@ import {clientToFormData} from "../utils/clientToFormData";
 import {formDataToApiPayload} from "../utils/formDataToApiPayload";
 import {fireEvent, render, screen, waitFor} from '@testing-library/react';
 import {beforeEach, expect, it, vi} from 'vitest';
-import {ServiceAssignedDspsSection} from './ServiceAssignedDspsSection';
+import {MedicationRequirementQuestion, ServiceAssignedDspsSection} from './ServiceAssignedDspsSection';
 import {AssignmentReviewRosterProvider} from '@/components/AssignmentReviewRoster';
 import {getAssignmentReview} from '@/lib/api/assignment-review';
 import {getClientCompetencies} from '@/lib/api/client-needs';
@@ -12,6 +12,7 @@ vi.mock('@/hooks/useEffectiveAgencyMode', () => ({useEffectiveAgencyMode: () => 
 vi.mock('@/pages/agency/trainings/reviewTrainingsModal', () => ({default: () => null}));
 vi.mock('@/lib/api/assignment-review', async original => ({...await original<object>(), getAssignmentReview: vi.fn(() => new Promise(() => {}))}));
 vi.mock('@/lib/api/client-needs', () => ({getClientCompetencies: vi.fn(() => new Promise(() => {}))}));
+vi.mock('@/lib/api/employees', () => ({searchEmployees: vi.fn()}));
 const row = {id: 'service', startDate: '2026-09-01', endDate: '2026-10-01'};
 const staff = [{id: 'staff-a', name: 'Ada'}, {id: 'staff-b', name: 'Grace'}];
 beforeEach(() => vi.clearAllMocks());
@@ -68,4 +69,44 @@ it('does not automatically preview when saving creates the client identity', () 
   expect(getAssignmentReview).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', {name: 'Review assignment for Ada'}));
   expect(getAssignmentReview).toHaveBeenCalledTimes(1);
+});
+
+it.each(['ddd', 'hha'] as const)('asks only when medication is on, and both answers assign staff in %s', async program => {
+  const {useState} = await import('react');
+  const {searchEmployees} = await import('@/lib/api/employees');
+  vi.mocked(searchEmployees).mockResolvedValue([{id: 'staff-a', fullName: 'Ada'}, {id: 'staff-b', fullName: 'Grace'}] as Awaited<ReturnType<typeof searchEmployees>>);
+  function Harness() {
+    const [settings, setSettings] = useState({underMedication: false, trainingRequired: false});
+    const [assigned, setAssigned] = useState<Array<{id: string; name: string}>>([]);
+    return <AssignmentReviewRosterProvider agencyId="agency" program={program} savedRows={[]} medication={{value: settings, onChange: setSettings, showQuestion: true}}>
+      <MedicationRequirementQuestion />
+      <ServiceAssignedDspsSection isEditing reviewRow={row} assignedDsps={assigned} onChange={setAssigned} />
+      <output data-testid="settings">{JSON.stringify(settings)}</output>
+    </AssignmentReviewRosterProvider>;
+  }
+  render(<Harness />);
+  const pick = async (name: string) => {
+    fireEvent.click(screen.getByRole('button', {name: 'Add Caregiver'}));
+    fireEvent.change(screen.getByPlaceholderText('Search staff by name (2+ characters)'), {target: {value: name}});
+    fireEvent.click(await screen.findByRole('button', {name}));
+  };
+  await pick('Ada');
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(screen.getByRole('button', {name: 'Remove Ada from this service'})).toBeVisible();
+  fireEvent.click(screen.getByRole('button', {name: 'Remove Ada from this service'}));
+  fireEvent.click(screen.getByRole('switch', {name: 'Is this client under medication?'}));
+  await pick('Ada');
+  expect(screen.getByRole('dialog')).toHaveTextContent('Medication Training Required');
+  expect(screen.queryByRole('button', {name: 'Remove Ada from this service'})).toBeNull();
+  fireEvent.click(screen.getByRole('button', {name: 'No'}));
+  expect(screen.getByRole('button', {name: 'Remove Ada from this service'})).toBeVisible();
+  expect(screen.getByTestId('settings')).toHaveTextContent('{"underMedication":true,"trainingRequired":false}');
+  // No does not switch off the medication answer: the next selection still asks.
+  await pick('Grace');
+  expect(screen.getByRole('dialog')).toBeVisible();
+  fireEvent.click(screen.getByRole('button', {name: 'Yes'}));
+  expect(screen.getByRole('button', {name: 'Remove Grace from this service'})).toBeVisible();
+  expect(screen.getByTestId('settings')).toHaveTextContent('{"underMedication":true,"trainingRequired":true}');
+  fireEvent.click(screen.getByRole('switch', {name: 'Is this client under medication?'}));
+  expect(screen.getByTestId('settings')).toHaveTextContent('{"underMedication":false,"trainingRequired":false}');
 });

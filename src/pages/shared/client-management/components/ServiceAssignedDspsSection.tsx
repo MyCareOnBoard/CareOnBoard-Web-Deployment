@@ -1,5 +1,7 @@
 import { RosterAssignmentReview, useRosterReviewSelection, type ReviewRosterRow } from "@/components/AssignmentReviewRoster";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useId, useRef, useState } from "react";
+import {Switch} from "@/components/ui/switch";
+import {ConfirmDialog, ConfirmDialogContent} from "@/components/ui/confirm-dialog";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { searchEmployees, type Employee } from "@/lib/api/employees";
@@ -141,6 +143,21 @@ function DspSearchSlotRow({
   );
 }
 
+export function MedicationRequirementQuestion() {
+  const {medication} = useRosterReviewSelection(undefined);
+  const toggleId = useId();
+  if (!medication?.showQuestion) return null;
+  return (
+    <div className="mb-10 space-y-2">
+      <div className="flex items-center gap-3">
+        <label htmlFor={toggleId} className="text-sm font-bold">Is this client under medication?</label>
+        <Switch id={toggleId} checked={medication.value.underMedication} onCheckedChange={underMedication => medication.onChange({underMedication, trainingRequired: underMedication})} />
+      </div>
+      {medication.value.underMedication && <p className="text-sm font-bold text-muted-foreground">Medication training requirement: {medication.value.trainingRequired ? 'On' : 'Off'}. Confirm the requirement when selecting staff.</p>}
+    </div>
+  );
+}
+
 function ServiceAssignedDspsEditor({
   assignedDsps,
   onChange,
@@ -151,6 +168,9 @@ function ServiceAssignedDspsEditor({
   onChange: (assignedDsps: AssignedDsp[]) => void;
 }) {
   const review = useRosterReviewSelection(reviewRow);
+  const medication = review.medication;
+  const [pendingStaff, setPendingStaff] = useState<{employee: Employee; slotId: string; scopeKey: string} | null>(null);
+  useEffect(() => {setPendingStaff(null);}, [review.scopeKey, medication?.value.underMedication]);
   const [dspSearchSlotIds, setDspSearchSlotIds] = useState<string[]>([]);
 
   const addDspFromEmployee = useCallback(
@@ -161,6 +181,14 @@ function ServiceAssignedDspsEditor({
     },
     [assignedDsps, onChange],
   );
+
+  const confirmMedicationTraining = (trainingRequired: boolean) => {
+    if (!pendingStaff || pendingStaff.scopeKey !== review.scopeKey || !medication?.value.underMedication) return;
+    medication.onChange({...medication.value, trainingRequired});
+    addDspFromEmployee(pendingStaff.employee);
+    removeSearchSlot(pendingStaff.slotId);
+    setPendingStaff(null);
+  };
 
   const removeDsp = (id: string) => {
     onChange(assignedDsps.filter((d) => d.id !== id));
@@ -221,8 +249,8 @@ function ServiceAssignedDspsEditor({
             program={review.program}
             assigned={assignedDsps}
             onPick={(emp) => {
-              addDspFromEmployee(emp);
-              removeSearchSlot(slotId);
+              if (medication?.value.underMedication) setPendingStaff({employee: emp, slotId, scopeKey: review.scopeKey});
+              else {addDspFromEmployee(emp); removeSearchSlot(slotId);}
             }}
             onRemoveSlot={() => removeSearchSlot(slotId)}
           />
@@ -237,6 +265,19 @@ function ServiceAssignedDspsEditor({
         <Plus className="mr-1 h-4 w-4" />
         Add Caregiver
       </Button>
+      <ConfirmDialog open={!!pendingStaff && pendingStaff.scopeKey === review.scopeKey && medication?.value.underMedication === true} onOpenChange={open => {if (!open) setPendingStaff(null);}}>
+        <ConfirmDialogContent className="max-w-md"
+          title="Medication Training Required"
+          description={`This client requires medication-related support. Does ${pendingStaff?.employee.fullName || 'this staff member'} have the required medication training?`}
+          confirmText="Yes"
+          confirmVariant="default"
+          cancelText="No"
+          onConfirm={() => confirmMedicationTraining(true)}
+          onCancel={() => confirmMedicationTraining(false)}
+        >
+          <p className="text-sm text-muted-foreground">Both answers add this staff member. Yes keeps the medication training requirement on for this client; No turns it off. This does not verify a training certificate.</p>
+        </ConfirmDialogContent>
+      </ConfirmDialog>
       {review.selectedEmployee && assignedDsps.some(d => d.id === review.selectedEmployee) && <div className="mt-4"><RosterAssignmentReview key={review.selectedEmployee} row={reviewRow} employeeId={review.selectedEmployee} employeeName={assignedDsps.find(d => d.id === review.selectedEmployee)!.name} /></div>}
     </div>
   );

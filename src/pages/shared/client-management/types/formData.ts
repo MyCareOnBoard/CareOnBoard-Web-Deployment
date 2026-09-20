@@ -543,6 +543,8 @@ export type Stage7SystemAiAndAuditData = {
 };
 
 export type AddClientFormData = {
+    medicationSupportSettings?: import('@/lib/api/clients').MedicationSupportSettings;
+    acuityRequirements?: import('@/lib/api/clients').ClientAcuityRequirements;
     agencyId?: string;
     type: ClientType;
     servicePrograms?: ("ddd" | "hha" | "sc")[];

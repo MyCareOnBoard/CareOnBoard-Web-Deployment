@@ -43,7 +43,13 @@ export interface ClientOutOfPocketPayer {
  * Client interface
  * Represents a client/consumer in the care system
  */
+export type ClientAcuityRequirements = { enabled: boolean; types: Array<'medication' | 'behavioral'> };
+
+export type MedicationSupportSettings = { underMedication: boolean; trainingRequired: boolean };
+
 export interface Client {
+  medicationSupportSettings?: MedicationSupportSettings;
+  acuityRequirements?: ClientAcuityRequirements;
   documentChecklist?: Checklist;
   servicePrograms?: ("ddd" | "hha" | "sc")[];
   // Core identifiers
@@ -642,6 +648,8 @@ export interface ClientPayrollServiceLocation { source: "primaryAddress" | "seco
  * Create Client Request
  */
 export interface CreateClientRequest {
+  medicationSupportSettings?: MedicationSupportSettings;
+  acuityRequirements?: ClientAcuityRequirements;
   servicePrograms?: ("ddd" | "hha" | "sc")[];
   agencyId?: string;
   type?: ClientType;
@@ -788,6 +796,8 @@ export interface CreateClientRequest {
  * Update Client Request
  */
 export interface UpdateClientRequest {
+  medicationSupportSettings?: MedicationSupportSettings;
+  acuityRequirements?: ClientAcuityRequirements;
   servicePrograms?: ("ddd" | "hha" | "sc")[];
   agencyId?: string;
   type?: ClientType;

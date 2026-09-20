@@ -1392,6 +1392,8 @@ export function ServicesTab({ client, clientId, onServicesUpdated, readOnly = fa
   const [isSaving, setIsSaving] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [medicationSupportSettings, setMedicationSupportSettings] = useState(client.medicationSupportSettings);
+  useEffect(() => {setMedicationSupportSettings(client.medicationSupportSettings);}, [clientId, client.medicationSupportSettings, isEditing]);
   const [error, setError] = useState<string | null>(null);
   const decisionScope = JSON.stringify([useAssignmentReviewScope(), clientId, client.agencyId, reviewMode]);
   const currentDecisionScope = React.useRef(decisionScope); currentDecisionScope.current = decisionScope;
@@ -1509,6 +1511,7 @@ export function ServicesTab({ client, clientId, onServicesUpdated, readOnly = fa
 
       const response = await updateClientWithReview(clientId, {
         outcomes: mapEditableOutcomesToApi(pruned),
+        ...(medicationSupportSettings ? {medicationSupportSettings} : {}),
       }, client.agencyId, rosterAcknowledgments(decisionState, mapClientOutcomesToEditable(client.outcomes).flatMap(group => group.services), pruned.flatMap(group => group.services), 'ddd'));
       if (currentDecisionScope.current !== submittedScope) return;
       const decisions = parseAssignmentDecisions(response)?.assignmentDecisions || null;
@@ -1650,7 +1653,7 @@ export function ServicesTab({ client, clientId, onServicesUpdated, readOnly = fa
   }
 
   return (
-    <AssignmentReviewRosterProvider enabled={reviewMode !== "sc"} clientId={clientId} agencyId={client.agencyId} program="ddd" savedRows={mapClientOutcomesToEditable(client.outcomes).flatMap(group => group.services)} decisionState={decisionState} onDecisionState={setDecisionState} decisionCaptureRef={decisionCaptureRef}>
+    <AssignmentReviewRosterProvider medication={{value: medicationSupportSettings ?? {underMedication: false, trainingRequired: false}, onChange: setMedicationSupportSettings}} enabled={reviewMode !== "sc"} clientId={clientId} agencyId={client.agencyId} program="ddd" savedRows={mapClientOutcomesToEditable(client.outcomes).flatMap(group => group.services)} decisionState={decisionState} onDecisionState={setDecisionState} decisionCaptureRef={decisionCaptureRef}>
     <div className="mt-4 backdrop-blur bg-[rgba(255,255,255,0.3)] border border-[rgba(255,255,255,0.3)] rounded-[30px] p-5 flex flex-col gap-4">
       {canReviewCareer(careerUser) && reviewMode !== 'sc' && client.type==='ddd' && <Button variant="outline" onClick={()=>navigate((careerUser?.userType==='super_admin'?Routes.superAdmin.careerReconciliation:Routes.agency.careerReconciliation)+'?'+new URLSearchParams({clientId,...(client.agencyId?{agencyId:client.agencyId}:{})}))}>Usage &amp; reconciliation</Button>}
       {careerAccess && (!readOnly||careerReadOnly) && reviewMode !== 'sc' && client.type==='ddd' && careerRows.map(row=><Button key={row.id} variant="outline" onClick={()=>navigate(`${careerReadOnly?Routes.superAdmin.careerPlanning:Routes.agency.goalsAndDocuments.careerPlanning}?agencyId=${encodeURIComponent(client.agencyId??'')}&clientId=${encodeURIComponent(clientId)}&serviceAuthorizationId=${encodeURIComponent(row.id)}`)}>Open Career Planning plan · {row.startAuthDate?.slice(0,10)??'Authorization'} – {row.endAuthDate?.slice(0,10)??''}</Button>)}

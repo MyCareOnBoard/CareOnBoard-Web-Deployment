@@ -37,7 +37,7 @@ import { skipToken } from "@reduxjs/toolkit/query";
 import { useListServicesQuery } from "@/lib/api/services";
 import { Stage2SdrImportPanel } from "@/pages/shared/client-management/components/Stage2SdrImportPanel";
 import { WeeklyDistributionInline } from "@/pages/shared/client-management/components/WeeklyDistributionInline";
-import { ServiceAssignedDspsSection } from "@/pages/shared/client-management/components/ServiceAssignedDspsSection";
+import { MedicationRequirementQuestion, ServiceAssignedDspsSection } from "@/pages/shared/client-management/components/ServiceAssignedDspsSection";
 import { HhaAuthorizationFields } from "@/pages/shared/client-management/components/HhaAuthorizationFields";
 import { RatePayTypeField } from "@/pages/shared/client-management/components/RatePayTypeField";
 import { applyHhaCatalogService } from "@/pages/shared/client-management/utils/applyHhaCatalogService";
@@ -1012,6 +1012,8 @@ export function Stage2GuardianAndFunding({
           </div>
         </div>
 
+        <MedicationRequirementQuestion />
+
         <div>
           <div className="mb-4">
             <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a]">
@@ -1436,6 +1438,8 @@ export function Stage2GuardianAndFunding({
           </Button>
         </div>
       </div>
+
+      {!isHhaClient && <MedicationRequirementQuestion />}
 
       {!isHhaClient ? (
       <div className="mb-10">

@@ -1,7 +1,6 @@
 import { useEffectiveAgencyMode } from '@/hooks/useEffectiveAgencyMode';
 import { useClientDocumentRefresh } from '@/pages/shared/client-details/hooks/useClientDocumentRefresh';
 import { showClientChecklist } from '@/pages/shared/client-details/components/ClientDocumentChecklist';
-import {ClientNeedsPanel} from '@/pages/shared/client-details/components/ClientNeedsPanel';
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Phone, Edit, ArrowLeft } from "lucide-react";
 import { useParams, useSearchParams, useNavigate } from "react-router";
@@ -360,7 +359,6 @@ export default function ClientDetailsPage() {
       )}
       {!isLoading && client && activeTab === "documents" && (
         <>
-        {mode !== 'sc' && <ClientNeedsPanel clientId={clientId} agencyId={client.agencyId || ''} program={mode === 'hha' ? 'hha' : 'ddd'} documents={client.documents} documentsBusy={refreshing} onRefreshDocuments={() => refresh(true)} />}
         <DocumentsTab
           client={client}
           readOnly={true}

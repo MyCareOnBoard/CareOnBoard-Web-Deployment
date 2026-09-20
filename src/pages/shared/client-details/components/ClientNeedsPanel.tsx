@@ -9,6 +9,7 @@ import type {ClientDocument} from '@/lib/api/clients';
 
 export type ClientNeedsDraft = {scopeKey: string; answers: NeedsAnswers; revision: number};
 type Props = Omit<NeedsScope, 'clientId'> & {
+  showMedication?: boolean; wizardManagedAenf?: boolean; refreshKey?: string;
   clientId?: string; documents?: ClientDocument[]; documentsDirty?: boolean; documentsBusy?: boolean;
   onUploadAenf?: () => void; draft?: ClientNeedsDraft; onDraftChange?: (draft: ClientNeedsDraft | undefined) => void;
   onRefreshDocuments?: () => Promise<unknown>;
@@ -16,7 +17,7 @@ type Props = Omit<NeedsScope, 'clientId'> & {
 const choices = [['yes', 'Yes'], ['no', 'No'], ['unknown', 'Not recorded']] as const;
 const labels = {medicationSupport: 'Medication support needed', medicalAcuity: 'Medical support needs identified', behavioralAcuity: 'Behavioral support needs identified', aenfApplicability: 'AENF required'};
 const statusLabels = {applicability_not_recorded: 'Applicability not recorded', not_required: 'Not required', missing: 'No AENF on file', on_file: 'Evidence on file', verified: 'Verification recorded', not_verified: 'Not verified', needs_review: 'Needs review'};
-const reasons: Record<string, string> = {needs_changed: 'Client needs changed.', evidence_changed: 'The reviewed AENF changed.', duplicate_evidence: 'Multiple AENF files need review.', invalid_reference: 'An AENF file reference needs review.', invalid_documents: 'Document records could not be evaluated.', expired_evidence: 'The recorded expiry date has passed.', expires_today: 'The recorded expiry date is today.', invalid_timezone: 'The agency time zone needs review.'};
+const reasons: Record<string, string> = {acuity_type_missing: 'Select Medication, Behavioral, or Both in the AENF section.', needs_changed: 'Client needs changed.', evidence_changed: 'The reviewed AENF changed.', duplicate_evidence: 'Multiple AENF files need review.', invalid_reference: 'An AENF file reference needs review.', invalid_documents: 'Document records could not be evaluated.', expired_evidence: 'The recorded expiry date has passed.', expires_today: 'The recorded expiry date is today.', invalid_timezone: 'The agency time zone needs review.'};
 const conflictText: Record<string, string> = {CLIENT_NEEDS_CHANGED: 'Client needs changed.', AENF_EVIDENCE_CHANGED: 'AENF changed.', AENF_REVIEW_CHANGED: 'Another review was saved.'};
 const normalized = (answers: NeedsAnswers): NeedsAnswers => ({...answers,
   medicationSupportDescription: answers.medicationSupport === 'yes' ? answers.medicationSupportDescription?.trim() || null : null,
@@ -29,7 +30,7 @@ export function ClientNeedsPanel(props: Props) {
   return <NeedsEditor key={scopeKey} {...props} scopeKey={scopeKey} />;
 }
 
-function NeedsEditor({clientId, agencyId, program, documents, documentsDirty = false, documentsBusy = false, onUploadAenf, onRefreshDocuments, draft, onDraftChange, scopeKey}: Props & {scopeKey: string}) {
+function NeedsEditor({showMedication = true, wizardManagedAenf = false, refreshKey,  clientId, agencyId, program, documents, documentsDirty = false, documentsBusy = false, onUploadAenf, onRefreshDocuments, draft, onDraftChange, scopeKey}: Props & {scopeKey: string}) {
   const id = useId();
   const [loaded, setLoaded] = useState<NeedsDTO>();
   const [editing, setEditing] = useState<ClientNeedsDraft | undefined>(draft?.scopeKey === scopeKey ? draft : undefined);
@@ -53,7 +54,7 @@ function NeedsEditor({clientId, agencyId, program, documents, documentsDirty = f
   const loadedDocumentKey = useRef<string | undefined>(undefined);
   const aenfRecords = (Array.isArray(documents) ? documents : []).filter(doc => doc?.key === 'aenf');
   const evidence = aenfRecords.filter(doc => typeof doc.url === 'string' && doc.url.trim());
-  const documentKey = JSON.stringify(Array.isArray(documents) || documents == null ? aenfRecords.map(doc => [doc.url, doc.issuedOnDate ?? null, doc.expiryDate ?? null]) : 'invalid_documents');
+  const documentKey = JSON.stringify(Array.isArray(documents) || documents == null ? aenfRecords.map(doc => [doc.url, doc.issuedOnDate ?? null, doc.expiryDate ?? null]) : 'invalid_documents') + (refreshKey || '');
   const scope: NeedsScope | undefined = clientId ? {clientId, agencyId, program} : undefined;
   function keepDraft(next: ClientNeedsDraft | undefined) { editingRef.current = next; setEditing(next); draftCallback.current?.(next); }
   const load = useCallback(async (reload = false) => {
@@ -119,7 +120,7 @@ function NeedsEditor({clientId, agencyId, program, documents, documentsDirty = f
     request.current?.abort(); const sequence = ++generation.current;
     try {
       const data = review
-        ? await reviewClientAenf(scope, {expectedNeedsRevision: ready.revision, expectedReviewRevision: ready.aenf.reviewRevision, result: reviewResult, basis: reviewBasis.trim(), document: {url: document!.url!, issuedOnDate: document!.issuedOnDate ?? null, expiryDate: document!.expiryDate ?? null}})
+        ? await reviewClientAenf(scope, {...(ready.aenf.acuityFingerprint ? {expectedAcuityFingerprint: ready.aenf.acuityFingerprint} : {}), expectedNeedsRevision: ready.revision, expectedReviewRevision: ready.aenf.reviewRevision, result: reviewResult, basis: reviewBasis.trim(), document: {url: document!.url!, issuedOnDate: document!.issuedOnDate ?? null, expiryDate: document!.expiryDate ?? null}})
         : await saveClientNeeds(scope, {...normalized(answers!), expectedRevision: editing?.revision ?? ready.revision});
       if (!mounted.current || sequence !== generation.current) return;
       setLoaded(data); keepDraft(undefined); setComparison(false); setReviewBasis('');
@@ -141,9 +142,9 @@ function NeedsEditor({clientId, agencyId, program, documents, documentsDirty = f
     {message && <p className="mt-3 text-sm" role="status">{message}</p>}
     {loaded?.state === 'unavailable' && <p role="alert">Records unavailable. Ask your agency administrator to review the saved assessment.</p>}
     {ready && answers && <>
-      {comparison && <div className="my-3 rounded-lg bg-muted p-3 text-sm"><h3 className="font-medium">Saved assessment</h3><p>Review these saved values against your retained edits before saving.</p><dl>{(Object.keys(labels) as Array<keyof typeof labels>).map(field => <div key={field}><dt className="inline font-medium">{labels[field]}: </dt><dd className="inline">{ready.answers[field].replaceAll('_', ' ')}</dd></div>)}<dt>Medication support description</dt><dd>{ready.answers.medicationSupportDescription || 'Not recorded'}</dd><dt>AENF basis</dt><dd>{ready.answers.aenfBasis || 'Not recorded'}</dd></dl></div>}
+      {comparison && <div className="my-3 rounded-lg bg-muted p-3 text-sm"><h3 className="font-medium">Saved assessment</h3><p>Review these saved values against your retained edits before saving.</p><dl>{(Object.keys(labels) as Array<keyof typeof labels>).filter(field => (showMedication || field !== 'medicationSupport') && (!wizardManagedAenf || field !== 'aenfApplicability')).map(field => <div key={field}><dt className="inline font-medium">{labels[field]}: </dt><dd className="inline">{ready.answers[field].replaceAll('_', ' ')}</dd></div>)}{showMedication && <><dt>Medication support description</dt><dd>{ready.answers.medicationSupportDescription || 'Not recorded'}</dd></>}{!wizardManagedAenf && <><dt>AENF basis</dt><dd>{ready.answers.aenfBasis || 'Not recorded'}</dd></>}</dl></div>}
       <fieldset disabled={saving || loading || !ready.canEdit} className="mt-4 min-w-0 space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2">{(Object.keys(labels) as Array<keyof typeof labels>).map(field => <div key={field}>
+        <div className="grid gap-4 sm:grid-cols-2">{(Object.keys(labels) as Array<keyof typeof labels>).filter(field => (showMedication || field !== 'medicationSupport') && (!wizardManagedAenf || field !== 'aenfApplicability')).map(field => <div key={field}>
           <label htmlFor={`${id}-${field}`} className="mb-1 block text-sm font-medium">{labels[field]}</label>
           <Select value={answers[field]} onValueChange={value => edit(field, value)} disabled={!ready.canEdit || saving || loading}>
             <SelectTrigger className="w-full" id={`${id}-${field}`}><SelectValue /></SelectTrigger><SelectContent>
@@ -151,19 +152,19 @@ function NeedsEditor({clientId, agencyId, program, documents, documentsDirty = f
             </SelectContent>
           </Select>
         </div>)}</div>
-        {answers.medicationSupport === 'yes' && <div><label htmlFor={`${id}-description`} className="text-sm font-medium">Medication support description</label><Textarea id={`${id}-description`} maxLength={500} value={answers.medicationSupportDescription || ''} onChange={event => edit('medicationSupportDescription', event.target.value)} /></div>}
-        {answers.aenfApplicability !== 'unknown' && <div><label htmlFor={`${id}-basis`} className="text-sm font-medium">AENF applicability basis</label><Textarea id={`${id}-basis`} maxLength={500} value={answers.aenfBasis || ''} onChange={event => edit('aenfBasis', event.target.value)} /></div>}
+        {showMedication && answers.medicationSupport === 'yes' && <div><label htmlFor={`${id}-description`} className="text-sm font-medium">Medication support description</label><Textarea id={`${id}-description`} maxLength={500} value={answers.medicationSupportDescription || ''} onChange={event => edit('medicationSupportDescription', event.target.value)} /></div>}
+        {!wizardManagedAenf && answers.aenfApplicability !== 'unknown' && <div><label htmlFor={`${id}-basis`} className="text-sm font-medium">AENF applicability basis</label><Textarea id={`${id}-basis`} maxLength={500} value={answers.aenfBasis || ''} onChange={event => edit('aenfBasis', event.target.value)} /></div>}
         {ready.canEdit && <div className="flex flex-wrap items-center gap-3"><Button type="button" disabled={!valid || !dirty || conflict || saving || loading} onClick={() => void save()}>Save needs</Button><p className="text-sm text-muted-foreground">Client details and needs are saved separately.</p></div>}
       </fieldset>
       <div className="mt-5 border-t border-border pt-4">
-        <h3 className="font-medium">AENF evidence (optional)</h3><p className="mt-1 text-sm">{statusLabels[ready.aenf.state]}</p>
+        <h3 className="font-medium">AENF status</h3><p className="mt-1 text-sm">{statusLabels[ready.aenf.state]}</p>
         {ready.aenf.reasonCode && <p className="text-sm text-muted-foreground">{reasons[ready.aenf.reasonCode] || 'The recorded file dates need review.'}</p>}
         {ready.aenf.review && <p className="mt-2 break-words text-sm">{statusLabels[ready.aenf.review.result]} by {ready.aenf.review.reviewerUid}{ready.aenf.review.reviewedAt ? ` on ${new Date(ready.aenf.review.reviewedAt).toLocaleString()}` : ''}. {ready.aenf.review.basis}</p>}
         <div className="my-3 flex flex-wrap gap-2">{evidence.map((doc, index) => <Button key={`${doc.url}-${index}`} className="h-auto min-h-11 max-w-full whitespace-normal break-all py-2" variant="outline" type="button" onClick={() => setPreview(doc)}>{doc.fileName || `View AENF ${index + 1}`}</Button>)}
           {onUploadAenf && ready.canEdit && <Button type="button" variant="outline" disabled={documentsDirty || documentsBusy || saving} onClick={onUploadAenf}>Upload AENF</Button>}
         </div>
         {(dirty || documentsDirty) && <p className="text-sm text-muted-foreground">Save changes before recording a review.</p>}
-        {ready.canEdit && ready.answers.aenfApplicability === 'required' && evidence.length > 0 && <fieldset className="mt-3 min-w-0 space-y-3" disabled={saving || loading || conflict || dirty || documentsDirty || documentsBusy}>
+        {ready.canEdit && !['not_required', 'applicability_not_recorded'].includes(ready.aenf.state) && evidence.length > 0 && <fieldset className="mt-3 min-w-0 space-y-3" disabled={saving || loading || conflict || dirty || documentsDirty || documentsBusy}>
           {evidence.length > 1 && <div><label htmlFor={`${id}-document`}>AENF to review</label><Select value={selected} onValueChange={setSelected}><SelectTrigger className="w-full" id={`${id}-document`}><SelectValue placeholder="Select an AENF" /></SelectTrigger><SelectContent>{evidence.map((doc, index) => <SelectItem key={index} value={String(index)}>{doc.fileName || `AENF ${index + 1}`}</SelectItem>)}</SelectContent></Select></div>}
           <div><label htmlFor={`${id}-result`} className="text-sm font-medium">Review result</label><Select value={reviewResult} onValueChange={value => setReviewResult(value as typeof reviewResult)}><SelectTrigger className="w-full" id={`${id}-result`}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="verified">Verification recorded</SelectItem><SelectItem value="not_verified">Not verified</SelectItem></SelectContent></Select></div>
           <div><label htmlFor={`${id}-review-basis`} className="text-sm font-medium">Review basis</label><Textarea id={`${id}-review-basis`} maxLength={500} value={reviewBasis} onChange={event => setReviewBasis(event.target.value)} /></div>

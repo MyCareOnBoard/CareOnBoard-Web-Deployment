@@ -169,6 +169,8 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
     return {
         ...initial,
         type: clientType,
+        medicationSupportSettings: client.medicationSupportSettings,
+        acuityRequirements: client.acuityRequirements,
         servicePrograms: client.servicePrograms,
         ...(includeAgencyId && client.agencyId ? { agencyId: String(client.agencyId) } : {}),
         stage1: {
