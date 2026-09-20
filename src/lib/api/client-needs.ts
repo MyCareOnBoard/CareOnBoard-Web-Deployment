@@ -10,10 +10,10 @@ export type NeedsAnswers = {
 export type AenfReview = {revision: number; needsRevision: number; fingerprint: string; result: 'verified' | 'not_verified'; basis: string; reviewerUid: string; reviewedAt: string | null};
 export type NeedsDTO = {state: 'unavailable'; canEdit: false} | {
   state: 'ready'; answers: NeedsAnswers; revision: number; updatedBy: string | null; updatedAt: string | null; canEdit: boolean;
-  aenf: {state: 'applicability_not_recorded' | 'not_required' | 'missing' | 'on_file' | 'verified' | 'not_verified' | 'needs_review'; count: number; reviewRevision: number; reasonCode?: string; review?: AenfReview};
+  aenf: {acuityFingerprint?: string; state: 'applicability_not_recorded' | 'not_required' | 'missing' | 'on_file' | 'verified' | 'not_verified' | 'needs_review'; count: number; reviewRevision: number; reasonCode?: string; review?: AenfReview};
 };
 export type NeedsInput = NeedsAnswers & {expectedRevision: number};
-export type AenfReviewInput = {expectedNeedsRevision: number; expectedReviewRevision: number; result: 'verified' | 'not_verified'; basis: string; document: {url: string; issuedOnDate: string | null; expiryDate: string | null}};
+export type AenfReviewInput = {expectedAcuityFingerprint?: string | null; expectedNeedsRevision: number; expectedReviewRevision: number; result: 'verified' | 'not_verified'; basis: string; document: {url: string; issuedOnDate: string | null; expiryDate: string | null}};
 const path = (scope: NeedsScope) => `/clients/${encodeURIComponent(scope.clientId)}/assignment-needs`;
 const params = ({agencyId, program}: NeedsScope) => ({agencyId, program});
 export async function getClientNeeds(scope: NeedsScope, signal?: AbortSignal): Promise<NeedsDTO> {

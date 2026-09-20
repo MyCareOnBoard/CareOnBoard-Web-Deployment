@@ -41,8 +41,16 @@ export function useClientSave() {
 
     try {
       preflightClientDocumentEdits(formData.stage3);
+      if (markComplete && formData.acuityRequirements?.enabled) {
+        if (!formData.acuityRequirements.types.length) throw new Error('Select Medication, Behavioral, or Both in Step 3 before completing onboarding.');
+        const hasAenf = formData.stage3.docs.some(doc => doc.key === 'aenf' && (doc.file || doc.files?.length || doc.url?.trim()))
+          || formData.stage3.originalDocuments?.some(doc => doc.key === 'aenf' && doc.url?.trim());
+        if (!hasAenf) throw new Error('Upload the required AENF in Step 3 before completing onboarding.');
+      }
       const documentsChanged = hasClientDocumentEdits(formData.stage3);
       const { documents: _documents, ...payload } = formDataToApiPayload(formData, includeAgencyId, progressive, markComplete);
+      // Upload first; the server checks the saved AENF when the final active status is sent.
+      if (markComplete && formData.acuityRequirements?.enabled) delete payload.status;
       if (isEditMode && !savedClientId) throw new Error("Reload the client before saving.");
       const profileResponse = savedClientId
         ? await updateClientWithReview(savedClientId, payload, formData.agencyId, assignmentAcknowledgments)

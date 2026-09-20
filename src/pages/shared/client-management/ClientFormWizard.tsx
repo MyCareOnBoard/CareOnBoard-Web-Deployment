@@ -6,7 +6,7 @@ import {clientToFormData} from './utils/clientToFormData';
 import {assignmentSaveMessage, assignmentServiceRowKey} from "@/lib/api/assignment-review";
 import { hasClientDocumentEdit, refreshClientDocumentBaseline } from "./utils/clientDocumentEdits";
 import React, { useMemo, useCallback, useEffect, Suspense, lazy, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useLocation } from "react-router";
 import { AddClientFormData, createInitialDocs, type ClientType } from "./types/formData";
 import { ClientFormConfig } from "./types/config";
 import { useClientForm } from "./hooks/useClientForm";
@@ -92,6 +92,9 @@ export function ClientFormWizard({
   const { user } = useAuth();
   const agencyMode = useEffectiveAgencyMode();
   const navigate = useNavigate();
+  const location = useLocation();
+  const requestedStage = new URLSearchParams(location.search).get('stage');
+  useEffect(() => {if (isEditMode && requestedStage === '3') goToStage(3);}, [isEditMode, requestedStage, goToStage]);
 
   const [showSaveSuccess, setShowSaveSuccess] = React.useState(false);
   const [savedClientName, setSavedClientName] = React.useState<string | undefined>(undefined);
@@ -118,7 +121,11 @@ export function ClientFormWizard({
     const current = await getClientById(savedId, formData.agencyId || user?.agencyId, {mode: formData.type});
     if (currentNeedsIdentity.current !== needsIdentity) return;
     const fresh = clientToFormData(current).stage3;
-    setFormData(previous => ({...previous, stage3: {...previous.stage3, originalDocuments: fresh.originalDocuments,
+    const previousAcuityKey = JSON.stringify(savedAssignmentFormRef.current?.acuityRequirements);
+    if (savedAssignmentFormRef.current) savedAssignmentFormRef.current = {...savedAssignmentFormRef.current, acuityRequirements: current.acuityRequirements};
+    setFormData(previous => ({...previous,
+      acuityRequirements: JSON.stringify(previous.acuityRequirements) === previousAcuityKey ? current.acuityRequirements : previous.acuityRequirements,
+      stage3: {...previous.stage3, originalDocuments: fresh.originalDocuments,
       docs: fresh.docs.map(doc => previous.stage3.docs.find(old => old.key === doc.key && hasClientDocumentEdit(old)) || doc)}}));
   }, [clientId, formData.agencyId, formData.type, needsIdentity, setFormData, user?.agencyId]);
   const rosterRows = (data?: AddClientFormData) => data?.type === "hha" ? data.stage2.hhaAuthorizations ?? [] : data?.stage2.outcomes.flatMap(outcome => outcome.services) ?? [];
@@ -375,7 +382,7 @@ export function ClientFormWizard({
       );
     if (stage === 2)
       return (
-        <AssignmentReviewRosterProvider enabled={agencyMode !== 'sc'} clientId={savedClientIdRef.current} agencyId={formData.agencyId} program={formData.type} savedRows={rosterRows(savedAssignmentFormRef.current)} captureRef={reviewCaptureRef} savedReview={savedReview} decisionState={decisionState} onDecisionState={setDecisionState} decisionCaptureRef={decisionCaptureRef} onViewNeeds={() => goToStage(3)}>
+        <AssignmentReviewRosterProvider medication={{value: formData.medicationSupportSettings ?? {underMedication: false, trainingRequired: false}, showQuestion: true, onChange: medicationSupportSettings => setFormData(previous => ({...previous, medicationSupportSettings}))}} enabled={agencyMode !== 'sc'} clientId={savedClientIdRef.current} agencyId={formData.agencyId} program={formData.type} savedRows={rosterRows(savedAssignmentFormRef.current)} captureRef={reviewCaptureRef} savedReview={savedReview} decisionState={decisionState} onDecisionState={setDecisionState} decisionCaptureRef={decisionCaptureRef} onViewNeeds={() => goToStage(3)}>
         <Stage2GuardianAndFunding
           footer={footer}
           formData={formData}
@@ -393,8 +400,8 @@ export function ClientFormWizard({
           pageTitle={pageTitle}
           clientId={clientId ?? savedClientIdRef.current}
           isSaving={isSaving}
-          needsPanel={agencyMode !== 'sc' ? <ClientNeedsPanel clientId={clientId ?? savedClientIdRef.current} agencyId={formData.agencyId || user?.agencyId || ''} program={formData.type}
-            documents={formData.stage3.originalDocuments} documentsDirty={formData.stage3.docs.some(doc => doc.key === 'aenf' && hasClientDocumentEdit(doc))}
+          needsPanel={agencyMode !== 'sc' ? <ClientNeedsPanel showMedication={false} wizardManagedAenf refreshKey={JSON.stringify(savedAssignmentFormRef.current?.acuityRequirements)} clientId={clientId ?? savedClientIdRef.current} agencyId={formData.agencyId || user?.agencyId || ''} program={formData.type}
+            documents={formData.stage3.originalDocuments} documentsDirty={JSON.stringify(formData.acuityRequirements) !== JSON.stringify(savedAssignmentFormRef.current?.acuityRequirements) || formData.stage3.docs.some(doc => doc.key === 'aenf' && hasClientDocumentEdit(doc))}
             documentsBusy={isSaving} draft={needsDraft} onDraftChange={setNeedsDraft} onRefreshDocuments={refreshNeedsDocuments} /> : undefined}
         />
       );

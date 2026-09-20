@@ -29,6 +29,7 @@ interface ConfirmDialogContentProps extends React.ComponentPropsWithoutRef<typeo
   title?: string;
   description?: string;
   confirmText?: string;
+  confirmVariant?: "default" | "destructive";
   cancelText?: string;
   onConfirm?: () => void;
   onCancel?: () => void;
@@ -44,6 +45,7 @@ const ConfirmDialogContent = React.forwardRef<
   children, 
   title, 
   description, 
+  confirmVariant = "destructive",
   confirmText = "Confirm", 
   cancelText = "Cancel",
   onConfirm, 
@@ -103,8 +105,8 @@ const ConfirmDialogContent = React.forwardRef<
             {cancelText}
           </Button>
           <Button 
-            variant="destructive"
-            className="flex-1 rounded-[60px] bg-[#ef4444] px-4 py-4 text-[14px] font-semibold leading-[1.4] text-white hover:bg-[#dc2626] cursor-pointer disabled:cursor-not-allowed" 
+            variant={confirmVariant}
+            className={cn("flex-1 rounded-[60px] px-4 py-4 text-[14px] font-semibold leading-[1.4] text-white cursor-pointer disabled:cursor-not-allowed", confirmVariant === "destructive" && "bg-[#ef4444] hover:bg-[#dc2626]")}
             onClick={onConfirm}
             disabled={isLoading}
           >

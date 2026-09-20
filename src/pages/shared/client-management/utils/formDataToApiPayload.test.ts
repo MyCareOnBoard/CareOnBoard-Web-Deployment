@@ -172,3 +172,19 @@ it("preserves raw document metadata and serializes new calendar dates consistent
   slot.editedDates = { expiryDate: true };
   expect(formDataToApiPayload(data, false, true).documents!.find(doc => doc.key === "form485")).toEqual({ ...original, expiryDate: "2027-09-16" });
 });
+
+it.each(['ddd', 'hha'] as const)('preserves medication answers through %s wizard load and save', type => {
+  for (const trainingRequired of [false, true]) {
+    const medicationSupportSettings = {underMedication: true, trainingRequired};
+    const form = clientToFormData({id: 'client', type, medicationSupportSettings});
+    expect(form.medicationSupportSettings).toEqual(medicationSupportSettings);
+    expect(formDataToApiPayload(form, false, true).medicationSupportSettings).toEqual(medicationSupportSettings);
+  }
+  expect(formDataToApiPayload(createInitialAddClientFormData(), false, true)).not.toHaveProperty('medicationSupportSettings');
+});
+
+it('round-trips the acuity requirement and stores concrete types without a separate Both value', () => {
+  const acuityRequirements = {enabled: true, types: ['medication', 'behavioral'] as const};
+  const data = clientToFormData({id: 'client', acuityRequirements: {...acuityRequirements, types: [...acuityRequirements.types]}});
+  expect(formDataToApiPayload(data, false, true).acuityRequirements).toEqual(acuityRequirements);
+});

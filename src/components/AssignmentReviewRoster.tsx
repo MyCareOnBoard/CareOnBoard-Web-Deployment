@@ -14,7 +14,7 @@ export type RosterDecisionProps = {decisionState?: RosterDecisionState; onDecisi
 
 export type ReviewRosterRow = {id?: string; reviewSourceRowKey?: string | null; code?: string; serviceCode?: string; serviceId?: string; startAuthDate?: unknown; endAuthDate?: unknown; sdrStartDate?: unknown; sdrEndDate?: unknown; startDate?: unknown; endDate?: unknown};
 export type SavedRosterReview = {metadata?: AssignmentReviewEnvelope; submittedViewKey: string; documentsChanged: boolean; assignmentChanged?: boolean};
-type RosterScope = RosterDecisionProps & {clientId?: string; agencyId?: string; program: 'ddd' | 'hha'; savedRows: ReviewRosterRow[]; selected: string; select: (key: string) => void; captureRef?: MutableRefObject<string>; savedReview?: SavedRosterReview; onViewNeeds?: () => void};
+type RosterScope = RosterDecisionProps & {medication?: {value: import('@/lib/api/clients').MedicationSupportSettings; onChange: (settings: import('@/lib/api/clients').MedicationSupportSettings) => void; showQuestion?: boolean}; clientId?: string; agencyId?: string; program: 'ddd' | 'hha'; savedRows: ReviewRosterRow[]; selected: string; select: (key: string) => void; captureRef?: MutableRefObject<string>; savedReview?: SavedRosterReview; onViewNeeds?: () => void};
 const RosterContext = createContext<RosterScope | null>(null);
 export function AssignmentReviewRosterProvider({children, enabled = true, ...scope}: Omit<RosterScope, 'selected' | 'select'> & {children: ReactNode; enabled?: boolean}) {
   const [selected, select] = useState('');
@@ -57,7 +57,7 @@ export function useRosterReviewSelection(row: ReviewRosterRow | undefined) {
   const scope = useContext(RosterContext);
   const localId = useRef(Math.random().toString(36));
   const rowKey = row?.id || localId.current;
-  return {available: !!scope, agencyId: scope?.agencyId, program: scope?.program, select: (employeeId: string) => scope?.select(JSON.stringify([rowKey, employeeId])), selectedEmployee: scope?.selected ? (() => {const [key, employee] = JSON.parse(scope.selected); return key === rowKey ? employee as string : undefined;})() : undefined};
+  return {medication: scope?.medication, scopeKey: JSON.stringify([scope?.clientId, scope?.agencyId, scope?.program]), available: !!scope, agencyId: scope?.agencyId, program: scope?.program, select: (employeeId: string) => scope?.select(JSON.stringify([rowKey, employeeId])), selectedEmployee: scope?.selected ? (() => {const [key, employee] = JSON.parse(scope.selected); return key === rowKey ? employee as string : undefined;})() : undefined};
 }
 
 export function RosterAssignmentReview({row, employeeId, employeeName}: {row?: ReviewRosterRow; employeeId: string; employeeName: string}) {
@@ -107,8 +107,8 @@ export function RosterAssignmentReview({row, employeeId, employeeName}: {row?: R
   return <><AssignmentReview controller={controller} employeeName={employeeName} unsaved={!saved && !controller.review} documentsChanged={controller.saved && scope.savedReview?.documentsChanged && scope.savedReview.submittedViewKey === controller.viewKey} />
     <AssignmentDecision decision={checks.decision} loading={checks.loading} error={scope.decisionState?.submitted?.viewKey === checks.viewKey ? scope.decisionState.submitted.error || checks.error : checks.error} refresh={checks.refresh} draft={checks.decision ? scope.decisionState?.drafts[checks.decision.contextKey] : undefined} onChange={draft => {if (checks.decision) scope.onDecisionState?.(previous => ({...previous, drafts: {...previous.drafts, [checks.decision!.contextKey]: draft}}));}} />
     {scope.clientId && agencyId && <ClientCompetencyPanel clientId={scope.clientId} agencyId={agencyId} program={scope.program} employeeId={employeeId} employeeName={employeeName} onViewNeeds={scope.onViewNeeds || (() => {
-      const route = user?.userType === 'super_admin' ? Routes.superAdmin.clientDetails : Routes.agency.clientDetails;
-      window.location.assign(`${route.replace(':clientId', encodeURIComponent(scope.clientId!))}?tab=documents`);
+      const route = user?.userType === 'super_admin' ? Routes.superAdmin.editClient : Routes.agency.editClient;
+      window.location.assign(`${route.replace(':clientId', encodeURIComponent(scope.clientId!))}?stage=3`);
     })} />}
   </>;
 }

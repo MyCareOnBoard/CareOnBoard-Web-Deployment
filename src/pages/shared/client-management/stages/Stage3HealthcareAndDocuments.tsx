@@ -7,6 +7,7 @@ import { AddressAutocompleteInput } from "@/pages/shared/client-management/compo
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -254,6 +255,9 @@ export function Stage3HealthcareAndDocuments({
     if (!documentEditingDisabled.current) setFormData(update);
   };
   const isHhaClient = formData.type === "hha";
+  const acuity = formData.acuityRequirements ?? {enabled: false, types: []};
+  const aenfVisible = acuity.enabled;
+  const setAcuity = (next: typeof acuity) => setFormData(previous => ({...previous, acuityRequirements: next}));
   const [medicalConditionsOtherText, setMedicalConditionsOtherText] = useState<string | null>(null);
   const [allergiesOtherText, setAllergiesOtherText] = useState<string | null>(null);
   const [dietaryRestrictionsOtherText, setDietaryRestrictionsOtherText] = useState<string | null>(null);
@@ -854,9 +858,20 @@ export function Stage3HealthcareAndDocuments({
 
               return (
                 <div key={doc.key}>
-                  {doc.key === 'aenf' && <h3 className="mb-3 border-t border-border pt-6 text-sm font-semibold">Additional needs evidence (optional)</h3>}
+                  {doc.key === 'aenf' && <>
+                    <div className="mb-3 flex items-center gap-3 border-t border-border pt-6"><label htmlFor="aenf-upload-toggle" className="text-sm font-semibold">Does this client have an Acuity requirement?</label><Switch id="aenf-upload-toggle" checked={aenfVisible} onCheckedChange={enabled => setAcuity({...acuity, enabled})} /></div>
+                    {aenfVisible ? <fieldset className="mb-4 space-y-3" aria-describedby="acuity-required-hint">
+                      <legend className="mb-2 text-sm font-medium">What type of Acuity? (required)</legend>
+                      <div className="flex flex-wrap gap-5">
+                        {(['medication', 'behavioral'] as const).map(type => <Checkbox key={type} label={type === 'medication' ? 'Medication' : 'Behavioral'} checked={acuity.types.includes(type)} onChange={event => setAcuity({...acuity, types: event.target.checked ? [...acuity.types, type] : acuity.types.filter(value => value !== type)})} />)}
+                        <Checkbox label="Both" checked={acuity.types.length === 2} onChange={event => setAcuity({...acuity, types: event.target.checked ? ['medication', 'behavioral'] : []})} />
+                      </div>
+                      <p id="acuity-required-hint" className="text-sm text-muted-foreground">{acuity.types.length ? 'Upload the applicable AENF before completing onboarding.' : 'Select Medication, Behavioral, or Both, and upload the applicable AENF before completing onboarding.'} You can save a draft first.</p>
+                    </fieldset> : null}
+                  </>}
+                  <div hidden={doc.key === 'aenf' && (!aenfVisible || !acuity.types.length)}>
                   <p className="text-[12px] font-normal text-[#10141a] mb-2">
-                    {doc.title}
+                    {doc.title}{doc.key === 'aenf' && aenfVisible ? ' (required)' : ''}
                   </p>
 
                   {doc.key === "poc" && canGeneratePoc(formData) ? (
@@ -913,6 +928,7 @@ export function Stage3HealthcareAndDocuments({
                       id={`doc-upload-${doc.key}`}
                       type="file"
                       className="sr-only"
+                      aria-required={doc.key === "aenf" && aenfVisible}
                       accept=".pdf,.doc,.docx,image/*"
                       multiple={
                         doc.key === "medicalDocs" ||
@@ -976,6 +992,7 @@ export function Stage3HealthcareAndDocuments({
                         onCheckedChange={(checked) => updateDoc(doc.key, { autoReminder: checked })}
                       />
                     </div>
+                  </div>
                   </div>
                 </div>
               );
