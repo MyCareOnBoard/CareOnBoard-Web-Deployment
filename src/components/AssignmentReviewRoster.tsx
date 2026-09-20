@@ -12,7 +12,7 @@ import type {AssignmentDecision as Decision} from '@/lib/api/assignment-decision
 export type RosterDecisionState = {decisions: Record<string, Decision>; drafts: AssignmentConsentDrafts; loading?: boolean; submitted?: {viewKey: string; decisions: Record<string, Decision> | null; saved: boolean; error?: string}};
 export type RosterDecisionProps = {decisionState?: RosterDecisionState; onDecisionState?: React.Dispatch<React.SetStateAction<RosterDecisionState>>; decisionCaptureRef?: MutableRefObject<string>};
 
-export type ReviewRosterRow = {id?: string; reviewSourceRowKey?: string | null; code?: string; serviceCode?: string; serviceId?: string; startAuthDate?: unknown; endAuthDate?: unknown; sdrStartDate?: unknown; sdrEndDate?: unknown; startDate?: unknown; endDate?: unknown};
+export type ReviewRosterRow = {cprRequired?: boolean;id?: string; reviewSourceRowKey?: string | null; code?: string; serviceCode?: string; serviceId?: string; startAuthDate?: unknown; endAuthDate?: unknown; sdrStartDate?: unknown; sdrEndDate?: unknown; startDate?: unknown; endDate?: unknown};
 export type SavedRosterReview = {metadata?: AssignmentReviewEnvelope; submittedViewKey: string; documentsChanged: boolean; assignmentChanged?: boolean};
 type RosterScope = RosterDecisionProps & {medication?: {value: import('@/lib/api/clients').MedicationSupportSettings; onChange: (settings: import('@/lib/api/clients').MedicationSupportSettings) => void; showQuestion?: boolean}; clientId?: string; agencyId?: string; program: 'ddd' | 'hha'; savedRows: ReviewRosterRow[]; selected: string; select: (key: string) => void; captureRef?: MutableRefObject<string>; savedReview?: SavedRosterReview; onViewNeeds?: () => void};
 const RosterContext = createContext<RosterScope | null>(null);
@@ -38,7 +38,7 @@ function dates(row: ReviewRosterRow) {
 const rowIdentity = (row: ReviewRosterRow) => JSON.stringify([row.code || row.serviceCode || '', row.serviceId || '']);
 
 export function rosterAssignmentsChanged(before: Array<ReviewRosterRow & {assignedDsps?: Array<{id: string}>}>, after: Array<ReviewRosterRow & {assignedDsps?: Array<{id: string}>}>) {
-  const entries = (rows: typeof before) => rows.flatMap(row => (row.assignedDsps ?? []).map(employee => JSON.stringify([row.id, rowIdentity(row), employee.id, dates(row)])));
+  const entries = (rows: typeof before) => rows.flatMap(row => (row.assignedDsps ?? []).map(employee => JSON.stringify([row.id, rowIdentity(row), employee.id, dates(row), row.cprRequired])));
   const previous = new Set(entries(before));
   return entries(after).some(key => !previous.has(key));
 }
@@ -72,9 +72,9 @@ export function RosterAssignmentReview({row, employeeId, employeeName}: {row?: R
   const saved = !!scope.clientId && !!uniqueSource && !!requestRowKey && !!savedRow && !!row && dates(savedRow) === dates(row) && rowIdentity(savedRow) === rowIdentity(row);
   const agencyId = scope.agencyId || user?.agencyId || (user?.userType === 'agency' ? user?.uid : undefined);
   const recordedDates = row ? JSON.parse(dates(row)) as [string | null, string | null] : [null, null];
-  const selection = scope.clientId && viewRowKey && agencyId ? {agencyId, clientId: scope.clientId, input: {program: scope.program, kind: 'service_roster' as const, employeeId, serviceRowKey: viewRowKey}, ...(requestRowKey ? {requestServiceRowKey: requestRowKey} : {}), expectedDates: {startDate: recordedDates[0], endDate: recordedDates[1]}} : null;
+  const selection = scope.clientId && viewRowKey && agencyId ? {agencyId, clientId: scope.clientId, input: {program: scope.program, kind: 'service_roster' as const, employeeId, serviceRowKey: viewRowKey, ...(scope.program==='ddd'?{cprRequired:row?.cprRequired ?? null}:{})}, ...(requestRowKey ? {requestServiceRowKey: requestRowKey} : {}), expectedDates: {startDate: recordedDates[0], endDate: recordedDates[1]}} : null;
   const controller = useAssignmentReview(selection, {enabled: !!selection, previewEnabled: saved, scopeKey});
-  const checks = useAssignmentDecision(selection ? {agencyId: selection.agencyId, clientId: selection.clientId, input: {...selection.input, serviceRowKey: requestRowKey || viewRowKey!}} : null, {enabled: !!selection, previewEnabled: saved, scopeKey});
+  const checks = useAssignmentDecision(selection ? {agencyId: selection.agencyId, clientId: selection.clientId, input: {program:scope.program,kind:"service_roster" as const,employeeId,serviceRowKey: requestRowKey || viewRowKey!}} : null, {enabled: !!selection, previewEnabled: saved, scopeKey});
   if (scope.decisionCaptureRef) scope.decisionCaptureRef.current = checks.viewKey;
   useEffect(() => {
     scope.onDecisionState?.(previous => {

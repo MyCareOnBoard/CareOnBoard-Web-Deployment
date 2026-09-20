@@ -17,7 +17,7 @@ it.each([
   [{status:'Completed',evidenceStatus:'accepted'},'Completion accepted — certificate on record'],
   [{status:'Completed',evidenceStatus:'legacy'},'Legacy completion recorded; certificate acceptance not checked'],
   [{status:'Completed',evidenceStatus:'needs_review'},'Needs review'],
-  [{status:'Completed',source:'policy',evidenceStatus:'not_applicable'},'Policy evaluation not enabled'],
+  [{status:'Completed',source:'policy',evidenceStatus:'not_applicable'},'Not assessed'],
 ])('renders precise training evidence %j',(row,label)=>{mocks.courses.mockReturnValue({currentData:{items:[{id:'course',name:'CPR',timeFrame:'Within a month',...row}],nextCursor:null},refetch:vi.fn()});render(<StaffChecks {...props}/>);expect(screen.getByText(label)).toBeInTheDocument();expect(screen.getByText('Assigned timeframe: Within a month')).toBeInTheDocument();expect(screen.queryByText(/overdue/i)).not.toBeInTheDocument();});
 it('zero training assignments is not clearance',()=>{render(<StaffChecks {...props}/>);expect(screen.getByText('No training assignments found')).toBeInTheDocument();});
 it.each([['baselining','Checking records. Some results are not available yet.'],['paused','Monitoring is paused.']])('renders document %s coverage',(monitoringState,message)=>{mocks.documents.mockReturnValue({currentData:{pilotEnabled:true,monitoringState,syncStatus:'ready',items:[],nextCursor:null},refetch:vi.fn()});render(<StaffChecks {...props} view={{source:'document_expiry'}}/>);expect(screen.getByText(message)).toBeInTheDocument();});

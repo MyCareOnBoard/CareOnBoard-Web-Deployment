@@ -18,6 +18,8 @@ interface ActivityTabProps {
   documentsLoading: boolean;
   totalCount: number;
   completedCount: number;
+  automaticAccepted?: number;
+  policyAssessmentComplete?: boolean;
   documents: EmployeeDocument[];
   onRequestDocument: () => void;
   getDocumentStatusColor: (status: string) => string;
@@ -33,6 +35,7 @@ export function ActivityTab({
   documentsLoading,
   totalCount,
   completedCount,
+  automaticAccepted, policyAssessmentComplete,
   documents,
   onRequestDocument,
   getDocumentStatusColor,
@@ -54,6 +57,8 @@ export function ActivityTab({
           <TrainingSection
             totalCount={totalCount}
             completedCount={completedCount}
+            automaticAccepted={automaticAccepted}
+            policyAssessmentComplete={policyAssessmentComplete}
             isLoading={trainingsLoading}
           />
           <div className=" bg-[#edf1f2] p-6 rounded-lg aspect"></div>

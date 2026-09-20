@@ -107,6 +107,7 @@ export function clientToFormData(client: Client, includeAgencyId: boolean = fals
         clientRate: svc.clientRate || "",
         clientPayType: svc.clientPayType,
         ispEffectiveDate: svc.ispEffectiveDate ? parseDate(svc.ispEffectiveDate) : undefined,
+        cprRequired: svc.cprRequired,
         startAuthDate: svc.startAuthDate ? parseDate(svc.startAuthDate) : undefined,
         endAuthDate: svc.endAuthDate ? parseDate(svc.endAuthDate) : undefined,
         pcptDate: svc.pcptDate ? parseDate(svc.pcptDate) : undefined,

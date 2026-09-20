@@ -1,3 +1,4 @@
+import {CprRequirementField} from "@/pages/shared/client-management/components/CprRequirementField";
 import {canReviewCareer} from '@/lib/api/career-reconciliation';
 import {useAuth} from '@/utils/auth';
 import {useEffectiveAgencyMode} from "@/hooks/useEffectiveAgencyMode";
@@ -74,6 +75,7 @@ type EditableServiceRow = {
   clientRate?: string;
   clientPayType?: ClientService["payType"];
   ispEffectiveDate?: Date | null;
+  cprRequired?: boolean;
   startAuthDate?: Date | null;
   endAuthDate?: Date | null;
   pcptDate?: Date | null;
@@ -266,6 +268,7 @@ function mapClientServicesToEditable(services?: ClientService[]): EditableServic
     clientRate: svc.clientRate,
     clientPayType: svc.clientPayType,
     ispEffectiveDate: parseDate(svc.ispEffectiveDate),
+    cprRequired: svc.cprRequired,
     startAuthDate: parseDate(svc.startAuthDate),
     endAuthDate: parseDate(svc.endAuthDate),
     pcptDate: parseDate(svc.pcptDate),
@@ -300,6 +303,7 @@ function mapEditableToClientServices(services: EditableServiceRow[]): ClientServ
     ispEffectiveDate: svc.ispEffectiveDate
       ? svc.ispEffectiveDate.toISOString()
       : undefined,
+    cprRequired: svc.cprRequired,
     startAuthDate: svc.startAuthDate
       ? svc.startAuthDate.toISOString()
       : undefined,
@@ -664,6 +668,7 @@ function ServiceRow({
         </div>
       </div>
 
+      <CprRequirementField value={service.cprRequired} disabled={!isEditing} onChange={value=>handleFieldChange("cprRequired",value)}/>
       {(isEditing || (service.assignedDsps?.length ?? 0) > 0) && (
         <ServiceAssignedDspsSection
         reviewRow={service}

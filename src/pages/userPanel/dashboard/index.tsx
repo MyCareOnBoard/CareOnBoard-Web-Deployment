@@ -25,6 +25,7 @@ import {useDispatch} from "react-redux";
 import {toast} from "sonner";
 import type {TrainingData} from '@/pages/agency/trainings/trainingApi';
 import TrainingCertificate from '@/pages/agency/trainings/TrainingCertificate';
+import {trainingPolicyLabel} from '@/pages/agency/trainings/TrainingPolicyFields';
 import {parseISO} from 'date-fns';
 
 
@@ -359,6 +360,7 @@ export default function UserPanelDashboardPage() {
                             <p className="text-[14px] text-[#808081] mt-1">Here are your trainings</p>
                         </div>
 
+                        {trainingPage?.summary?.policyAssessmentComplete === false && <p className="text-sm text-[#808081] mb-3">Some training requirements are not assessed yet. Review the details below.</p>}
                         {/* Training Items */}
                         <div className="space-y-3">
                             {(trainings.length > 0 || !isTrainingLoading) && (
@@ -379,7 +381,7 @@ export default function UserPanelDashboardPage() {
                                                     training.requiresCertificate ? training.status : "assigned"
                                                 )}`}
                                             >
-                        {training.requiresCertificate ? training.status : "Take Training"}
+                        {training.source==='policy' ? trainingPolicyLabel(training) : training.requiresCertificate ? training.status : 'Take Training'}
                       </span>
                                             {!training.requiresCertificate && <span
                                                 className={`text-[12px] font-semibold px-3 py-1 rounded-full border ${getStatusColor(
@@ -388,7 +390,7 @@ export default function UserPanelDashboardPage() {
                                             >
                         {"Assigned"}
                       </span>}
-                                            {training.requiresCertificate && training.source !== 'policy' && <div className="w-full">
+                                            {training.requiresCertificate && <div className="w-full">
                                                 <TrainingCertificate training={training} onUploaded={certificate => {
                                                     setTrainings(current => current.map(item => item.id === training.id
                                                         ? {...item, ...certificate} : item));

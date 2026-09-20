@@ -19,8 +19,9 @@ import {
   visibleSourceData,
   type SourceProps,
 } from "./SourceControls";
+import {trainingPolicyLabel} from '@/pages/agency/trainings/TrainingPolicyFields';
 export function trainingStatus(row: TrainingData) {
-  if (row.source === "policy") return "Policy evaluation not enabled";
+  if (row.source === "policy") return trainingPolicyLabel(row);
   if (row.evidenceStatus === "needs_review") return "Needs review";
   if (row.evidenceStatus === "accepted")
     return "Completion accepted — certificate on record";
@@ -413,6 +414,7 @@ function EmployeeTrainings({
               <div key={row.id || index} className="py-4">
                 <p className="font-semibold">{row.name}</p>
                 <p>{trainingStatus(row)}</p>
+                {row.source === "policy" && row.policyContextState === "current" && row.reviewState === "awaiting_review" && <p>Certificate awaiting review</p>}
                 <p className="text-sm text-[#808081]">
                   Assigned timeframe: {row.timeFrame || "Not recorded"}
                 </p>

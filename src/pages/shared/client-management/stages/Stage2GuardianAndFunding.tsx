@@ -1,3 +1,4 @@
+import {CprRequirementField} from "../components/CprRequirementField";
 import React, { useCallback, useMemo, useState } from "react";
 import { AddressAutocompleteInput } from "@/pages/shared/client-management/components/AddressAutocompleteInput";
 import { CalendarDays, Plus, Trash2, FileUp } from "lucide-react";
@@ -520,6 +521,7 @@ const ServiceAuthorizationFields = React.memo(function ServiceAuthorizationField
           />
         </div>
       </div>
+      <CprRequirementField value={service.cprRequired} onChange={cprRequired=>update({cprRequired})}/>
       <ServiceAssignedDspsSection
         reviewRow={service}
         isEditing
