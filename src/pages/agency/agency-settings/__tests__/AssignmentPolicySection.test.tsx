@@ -1,7 +1,10 @@
 import {render, screen, waitFor, fireEvent, cleanup} from '@testing-library/react';
-import {beforeAll, expect, it, vi} from 'vitest';
+import {beforeAll, beforeEach, expect, it, vi} from 'vitest';
 import AssignmentPolicySection from '../components/AssignmentPolicySection';
 import {getAssignmentPolicy, saveAssignmentPolicy} from '@/lib/api/assignment-policy';
+const toast = vi.hoisted(() => vi.fn());
+vi.mock('@/hooks/use-toast', () => ({useToast: () => ({toast})}));
+beforeEach(() => toast.mockClear());
 vi.mock('@/hooks/useAssignmentReview', () => ({useAssignmentReviewScope: () => 'actor'}));
 vi.mock('@/hooks/useEffectiveAgencyMode', () => ({useEffectiveAgencyMode: () => 'ddd'}));
 vi.mock('@/lib/api/assignment-policy', () => ({getAssignmentPolicy: vi.fn(), saveAssignmentPolicy: vi.fn()}));
@@ -51,6 +54,7 @@ it('configures the seven warning-only document checks and saves only the remaini
   fireEvent.click(screen.getByRole('checkbox', {name: /I confirm these requirements/}));
   fireEvent.click(screen.getByRole('button', {name: 'Save assignment checks'}));
   await waitFor(() => expect(saveAssignmentPolicy).toHaveBeenCalledWith('agency', expect.objectContaining({enabled: true, serviceDateCutoff: '2026-09-16', entries: [{ruleId: 'hha_form485_record', ruleVersion: 1, severity: 'warning'}], adoption: true})));
+  expect(toast).toHaveBeenCalledWith({title: 'Assignment checks updated', description: 'Your assignment requirements have been saved.'});
   expect(submitProfile).not.toHaveBeenCalled();
 });
 it('saves independently, retains the draft on revision conflict and requires explicit reload', async () => {
@@ -65,6 +69,7 @@ it('saves independently, retains the draft on revision conflict and requires exp
   fireEvent.click(screen.getByRole('button', {name: 'Save assignment checks'}));
   await waitFor(() => expect(screen.getByRole('button', {name: 'Save assignment checks'})).toBeDisabled());
   expect(submitProfile).not.toHaveBeenCalled();
+  expect(toast).toHaveBeenCalledWith(expect.objectContaining({title: 'Assignment checks could not be updated', variant: 'destructive', description: expect.stringContaining('Requirements changed.')}));
   expect(screen.getByRole('checkbox', {name: 'Enable assignment checks'})).toBeChecked();
   fireEvent.click(await screen.findByRole('button', {name: 'Reload current policy'}));
   await waitFor(() => expect(screen.getByRole('checkbox', {name: 'Enable assignment checks'})).not.toBeChecked());
