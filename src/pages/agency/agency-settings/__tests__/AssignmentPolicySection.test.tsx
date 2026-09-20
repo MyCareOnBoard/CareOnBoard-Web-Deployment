@@ -31,8 +31,8 @@ it('configures the seven warning-only document checks and saves only the remaini
   const submitProfile = vi.fn();
   render(<form onSubmit={submitProfile}><AssignmentPolicySection agencyId="agency" /></form>);
 
-  expect(await screen.findByText('Checks recorded files and any dates entered as of today. Blank dates are allowed. File contents and future service coverage are not verified.')).toBeInTheDocument();
-  expect(screen.getByText('Includes assignments that overlap this date. Document records are checked as of today.')).toBeInTheDocument();
+  expect(await screen.findByText(/Choose Required to block assignments/)).toBeInTheDocument();
+  expect(screen.getByText(/Includes assignments that overlap this date/)).toBeInTheDocument();
   for (const rule of approvedRules) expect(screen.getByRole('combobox', {name: rule.label})).toHaveTextContent('Not selected');
 
   fireEvent.click(screen.getByRole('checkbox', {name: 'Enable assignment checks'}));

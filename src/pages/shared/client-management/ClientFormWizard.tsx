@@ -1,4 +1,4 @@
-import {AssignmentReviewRosterProvider, rosterAssignmentsChanged, rosterAcknowledgments, type RosterDecisionState, type SavedRosterReview} from "@/components/AssignmentReviewRoster";
+import {AssignmentReviewRosterProvider, rosterAssignmentsChanged, rosterAcknowledgments, rosterSubmissionBlocked, type RosterDecisionState, type SavedRosterReview} from "@/components/AssignmentReviewRoster";
 import {ClientNeedsPanel, type ClientNeedsDraft} from '@/pages/shared/client-details/components/ClientNeedsPanel';
 import {useAssignmentReviewScope} from '@/hooks/useAssignmentReview';
 import {getClientById} from '@/lib/api/clients';
@@ -181,7 +181,7 @@ export function ClientFormWizard({
     const submittedDecisionKey = decisionCaptureRef.current;
     const submittedIdentity = currentNeedsIdentity.current;
     const assignmentsChanged = rosterAssignmentsChanged(rosterRows(savedAssignmentFormRef.current), rosterRows(dataToSave));
-    if (assignmentsChanged && decisionState.loading) return;
+    if (agencyMode !== "sc" && rosterSubmissionBlocked(decisionState, rosterRows(savedAssignmentFormRef.current), rosterRows(dataToSave), dataToSave.type)) return;
     const result = await saveClient(
       !isEditMode && agencyMode === "sc" && !dataToSave.servicePrograms ? { ...dataToSave, servicePrograms: ["sc"] } : dataToSave,
       isEditMode,
@@ -330,12 +330,13 @@ export function ClientFormWizard({
         onNext={goToNext}
         onSave={handleSave}
         primaryLoading={isSaving}
-        saveDisabled={!!decisionState.loading && rosterAssignmentsChanged(rosterRows(savedAssignmentFormRef.current), rosterRows(formData))}
+        saveDisabled={agencyMode !== "sc" && rosterSubmissionBlocked(decisionState, rosterRows(savedAssignmentFormRef.current), rosterRows(formData), formData.type)}
+        nextBlocked={stage === 2 && agencyMode !== "sc" && rosterSubmissionBlocked(decisionState, rosterRows(savedAssignmentFormRef.current), rosterRows(formData), formData.type)}
         requireDeclaration={true}
         saveButtonText={Object.values(decisionState.decisions).some(d => d.decision === 'WARNING') ? 'Assign with warnings' : config.successMessage || "Save Progress"}
       />
     ),
-    [declared, isFirst, isLast, isSaving, config.successMessage, goToNext, goToPrev, handleSave, decisionState.decisions, decisionState.loading, formData]
+    [declared, isFirst, isLast, isSaving, config.successMessage, goToNext, goToPrev, handleSave, decisionState, formData, stage, agencyMode]
   );
 
   const pageTitle = config.pageTitle || (isEditMode ? "Edit client" : "Add client");
@@ -479,6 +480,7 @@ export function ClientFormWizard({
         </label>
       )}
       {stageContent}
+      {stage !== 2 && agencyMode !== "sc" && rosterSubmissionBlocked(decisionState, rosterRows(savedAssignmentFormRef.current), rosterRows(formData), formData.type) && <p className="my-3 text-sm">Review each newly selected staff member in Step 2 before saving assignments.</p>}
       {decisionState.submitted && !decisionState.submitted.saved && !saveClientFirst && <p role="alert" className="my-3 text-sm">{decisionState.submitted.error || 'Staff assignments still need review. Select the affected staff in Step 2 to review the current checks.'}</p>}
       {assignmentsUnsaved && <p role="status" className="my-3 text-sm">Client saved. Staff assignments still need review. Selected staff are not yet assigned.</p>}
       {saveClientFirst && <div className="my-3 space-y-3 rounded-xl border p-4"><p>Save the client without assignments first, then review and assign staff.</p><Button type="button" disabled={isSaving} onClick={() => void saveWithoutAssignments()}>Save client without assignments</Button></div>}

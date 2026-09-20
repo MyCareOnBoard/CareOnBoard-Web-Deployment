@@ -169,6 +169,8 @@ function ServiceAssignedDspsEditor({
 }) {
   const review = useRosterReviewSelection(reviewRow);
   const medication = review.medication;
+  const [rejectedStaff, setRejectedStaff] = useState<AssignedDsp | null>(null);
+  useEffect(() => {setRejectedStaff(null);}, [review.scopeKey]);
   const [pendingStaff, setPendingStaff] = useState<{employee: Employee; slotId: string; scopeKey: string} | null>(null);
   useEffect(() => {setPendingStaff(null);}, [review.scopeKey, medication?.value.underMedication]);
   const [dspSearchSlotIds, setDspSearchSlotIds] = useState<string[]>([]);
@@ -176,6 +178,7 @@ function ServiceAssignedDspsEditor({
   const addDspFromEmployee = useCallback(
     (emp: Employee) => {
       if (assignedDsps.some((d) => d.id === emp.id)) return;
+      setRejectedStaff(null);
       onChange([...assignedDsps, { id: emp.id, name: emp.fullName }]);
       review.select(emp.id);
     },
@@ -191,6 +194,7 @@ function ServiceAssignedDspsEditor({
   };
 
   const removeDsp = (id: string) => {
+    setRejectedStaff(null);
     onChange(assignedDsps.filter((d) => d.id !== id));
   };
 
@@ -205,6 +209,16 @@ function ServiceAssignedDspsEditor({
   const removeSearchSlot = (slotId: string) => {
     setDspSearchSlotIds((s) => s.filter((x) => x !== slotId));
   };
+
+  const selectedStaff = assignedDsps.find(d => d.id === review.selectedEmployee) || (rejectedStaff?.id === review.selectedEmployee ? rejectedStaff : null);
+  const clearBlockedStaff = useCallback(() => {
+    const staff = assignedDsps.find(d => d.id === review.selectedEmployee);
+    if (!staff || rejectedStaff?.id === staff.id) return;
+    setRejectedStaff(staff);
+    setPendingStaff(null);
+    setDspSearchSlotIds([crypto.randomUUID()]);
+    onChange(assignedDsps.filter(d => d.id !== staff.id));
+  }, [assignedDsps, review.selectedEmployee, onChange, rejectedStaff]);
 
   return (
     <div>
@@ -278,7 +292,7 @@ function ServiceAssignedDspsEditor({
           <p className="text-sm text-muted-foreground">Both answers add this staff member. Yes keeps the medication training requirement on for this client; No turns it off. This does not verify a training certificate.</p>
         </ConfirmDialogContent>
       </ConfirmDialog>
-      {review.selectedEmployee && assignedDsps.some(d => d.id === review.selectedEmployee) && <div className="mt-4"><RosterAssignmentReview key={review.selectedEmployee} row={reviewRow} employeeId={review.selectedEmployee} employeeName={assignedDsps.find(d => d.id === review.selectedEmployee)!.name} /></div>}
+      {selectedStaff && <div className="mt-4">{rejectedStaff?.id === selectedStaff.id && <p className="text-sm text-muted-foreground">Staff selection cleared. You can search for another staff member.</p>}<RosterAssignmentReview key={selectedStaff.id} row={reviewRow} employeeId={selectedStaff.id} employeeName={selectedStaff.name} onBlocked={clearBlockedStaff} selectionCleared={rejectedStaff?.id === selectedStaff.id} /></div>}
     </div>
   );
 }

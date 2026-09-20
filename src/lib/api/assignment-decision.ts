@@ -6,10 +6,11 @@ export type AssignmentDecision = {
   policyRevision: number | null; evaluatedAt: string; contextKey: string; fingerprint?: string;
   findings: Array<{ruleId: string; ruleVersion: number; severity: 'mandatory' | 'warning'; code: string; message: string}>;
   hasRestrictedFindings: boolean; canAcknowledge: boolean;
+  checks?: Array<{ruleId: string; label: string; category: 'staff' | 'client'; outcome: 'pass' | 'fail' | 'unknown'}>;
 };
 export type AssignmentAcknowledgment = {contextKey: string; fingerprint: string; reason: string};
 export type AssignmentDecisionEnvelope = {assignmentDecisions: Record<string, AssignmentDecision>};
-export type DecisionSelection = {agencyId: string; clientId: string; input: AssignmentReviewInput & {shiftId?: string}};
+export type DecisionSelection = {agencyId: string; clientId: string; input: AssignmentReviewInput & {shiftId?: string; roster?: {serviceCode: string; startDate: string | null; endDate: string | null; cprRequired: boolean | null}}};
 export const CHECKS_UNAVAILABLE = 'Assignment checks could not finish. Your changes are still here. Retry checks.';
 export function isAssignmentDecision(value: unknown): value is AssignmentDecision {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -21,6 +22,7 @@ export function isAssignmentDecision(value: unknown): value is AssignmentDecisio
     || !Array.isArray(d.findings) || d.findings.length > 20
     || !d.findings.every(f => f && typeof f.ruleId === 'string' && !!f.ruleId && Number.isSafeInteger(f.ruleVersion) && f.ruleVersion >= 1
       && ['mandatory', 'warning'].includes(f.severity) && typeof f.code === 'string' && !!f.code && typeof f.message === 'string' && !!f.message)) return false;
+  if (d.checks !== undefined && (!Array.isArray(d.checks) || d.checks.length > 20 || !d.checks.every(c => c && typeof c.ruleId === 'string' && typeof c.label === 'string' && ['staff', 'client'].includes(c.category) && ['pass', 'fail', 'unknown'].includes(c.outcome)))) return false;
   if (d.state !== 'ready') return d.decision === undefined && d.fingerprint === undefined && !d.findings.length && !d.hasRestrictedFindings && !d.canAcknowledge;
   if (d.policyRevision === null || typeof d.fingerprint !== 'string' || !/^[a-f0-9]{64}$/.test(d.fingerprint)
     || !['CLEARED', 'WARNING', 'BLOCKED'].includes(d.decision ?? '')) return false;

@@ -124,7 +124,7 @@ describe("AddScheduleModal operational data boundary", () => {
     vi.setSystemTime(new Date("2026-08-10T12:00:00Z"));
     toast.mockReset();
     vi.mocked(getAssignmentReview).mockClear();
-    vi.mocked(getAssignmentDecision).mockReset().mockResolvedValue({state: "inactive", policyRevision: 0, evaluatedAt: "2026-08-10T12:00:00Z", contextKey: "pair", findings: [], hasRestrictedFindings: false, canAcknowledge: false});
+    vi.mocked(getAssignmentDecision).mockReset().mockResolvedValue({state: "ready", decision: "CLEARED", fingerprint: "a".repeat(64), policyRevision: 1, evaluatedAt: "2026-08-10T12:00:00Z", contextKey: "pair", findings: [], hasRestrictedFindings: false, canAcknowledge: false});
     shiftApi.updateShift.mockReset();
     shiftApi.listShifts.mockReset();
     shiftApi.listShifts.mockResolvedValue({ success: true, shifts: [] });
@@ -664,14 +664,35 @@ describe("AddScheduleModal operational data boundary", () => {
     expect(onShiftsUpdated).not.toHaveBeenCalled();
     expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ title: "Changes Saved" }));
   });
-  it("previews the selected agency and keeps Save enabled while review is pending", async () => {
+  it("blocks Save when no applicable assignment checks are enabled", async () => {
+    vi.mocked(getAssignmentDecision).mockResolvedValue({state: "inactive", policyRevision: 0, evaluatedAt: "2026-08-10T12:00:00Z", contextKey: "pair", findings: [], hasRestrictedFindings: false, canAcknowledge: false});
     const data = createDataAdapter();
     vi.mocked(data.getClientSchedulingContext).mockResolvedValue({id: "client-1", type: "ddd", services: [{id: "service-1", code: "H2021", name: "Support"}]});
     render(modalElement(data, {mode: "edit", editData: editableShift({serviceAuthorizationId: "service-1"})}));
     await act(async () => Promise.resolve());
-    expect(getAssignmentReview).toHaveBeenCalledWith(expect.objectContaining({agencyId: "agency-b", clientId: "client-1", input: expect.objectContaining({employeeId: "staff-1", program: "ddd", kind: "shift", date: "2026-08-10", serviceAuthorizationId: "service-1"})}), expect.any(AbortSignal));
-    expect(screen.getByRole("button", {name: "Save"})).toBeEnabled();
-    expect(screen.getByText("Checking assignment records…")).toBeVisible();
+    expect(getAssignmentDecision).toHaveBeenCalledWith(expect.objectContaining({agencyId: "agency-b", clientId: "client-1", input: expect.objectContaining({employeeId: "staff-1", program: "ddd", kind: "shift", date: "2026-08-10", serviceAuthorizationId: "service-1"})}), expect.any(AbortSignal));
+    expect(screen.getByRole("button", {name: "Save"})).toBeDisabled();
+    expect(screen.getByText("Blocked · no applicable assignment checks enabled")).toBeVisible();
+    expect(screen.getByText("Staff selection cleared. Resolve the requirements, then select staff again.")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", {name: "Save"}));
+    expect(shiftApi.updateShift).not.toHaveBeenCalled();
+  });
+  it('rejects a failing staff selection without blocking selection of another staff member', async () => {
+    vi.mocked(getAssignmentDecision).mockResolvedValue({state: 'ready', decision: 'BLOCKED', fingerprint: 'a'.repeat(64), policyRevision: 1, evaluatedAt: '2026-08-10T12:00:00Z', contextKey: 'pair', findings: [{ruleId: 'staff_training', ruleVersion: 1, severity: 'mandatory', code: 'missing', message: 'Staff training missing'}], checks: [{ruleId: 'staff_training', label: 'Staff training', category: 'staff', outcome: 'fail'}], hasRestrictedFindings: false, canAcknowledge: false});
+    const data = createDataAdapter();
+    vi.mocked(data.getClientSchedulingContext).mockResolvedValue({id: 'client-1', type: 'ddd', services: [{id: 'service-1', code: 'H2021', name: 'Support', assignedDsps: [{id: 'staff-1', name: 'Robin Staff'}, {id: 'staff-2', name: 'Other Staff'}]}]});
+    vi.mocked(data.getStaffSchedulingContext).mockResolvedValue({id: 'staff-2', workAvailability: true});
+    render(modalElement(data, {mode: 'edit', editData: editableShift({serviceAuthorizationId: 'service-1'})}));
+    await act(async () => Promise.resolve());
+    expect(screen.getByText('Staff not selected · requirements not met')).toBeVisible();
+    expect(screen.queryByText('Blocked · requirements need attention')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Save'})).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', {name: 'Select DSP'}));
+    vi.mocked(getAssignmentDecision).mockResolvedValue({state: 'ready', decision: 'CLEARED', fingerprint: 'b'.repeat(64), policyRevision: 1, evaluatedAt: '2026-08-10T12:00:00Z', contextKey: 'other', findings: [], hasRestrictedFindings: false, canAcknowledge: false});
+    fireEvent.click(screen.getByRole('button', {name: 'Other Staff'}));
+    await act(async () => Promise.resolve());
+    expect(screen.getByRole('button', {name: 'Other Staff'})).toBeVisible();
+    expect(screen.getByText('Cleared · configured requirements passed')).toBeVisible();
   });
   it("binds the warning preview to the saved shift ID and does not preview or submit on consent edits", async () => {
     const data = createDataAdapter();
@@ -693,12 +714,12 @@ describe("AddScheduleModal operational data boundary", () => {
     shiftApi.updateShift.mockResolvedValue({success: true, shift: {id: "shift-1"}, assignmentReviews: {pair: review}, reviewedPairCount: 1, unreviewedPairCount: 0, assignmentReviewCoverage: "complete"});
     render(modalElement(data, {mode: "edit", editData: editableShift({serviceAuthorizationId: "service-1"})}));
     await act(async () => Promise.resolve());
-    expect(getAssignmentReview).toHaveBeenCalledTimes(1);
+    expect(getAssignmentDecision).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", {name: "Save"}));
     await act(async () => Promise.resolve());
     expect(shiftApi.updateShift).toHaveBeenCalledTimes(1);
-    expect(getAssignmentReview).toHaveBeenCalledTimes(1);
-    expect(screen.getByText("Evidence on record")).toBeVisible();
+    expect(getAssignmentDecision).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("region", {name: "Assignment review"})).not.toBeInTheDocument();
   });
 
   it("uses the selected HHA program and authorization for review", async () => {
@@ -706,7 +727,7 @@ describe("AddScheduleModal operational data boundary", () => {
     vi.mocked(data.getClientSchedulingContext).mockResolvedValue({id: "client-1", type: "hha", hhaAuthorizations: [{id: "service-1", serviceCode: "T1019", serviceName: "Personal care"}]});
     render(modalElement(data, {agencyMode: "hha", supportedClientTypes: ["hha"], mode: "edit", editData: editableShift({serviceAuthorizationId: "service-1", serviceCode: "T1019"})}));
     await act(async () => Promise.resolve());
-    expect(getAssignmentReview).toHaveBeenCalledWith(expect.objectContaining({agencyId: "agency-b", input: expect.objectContaining({program: "hha", serviceAuthorizationId: "service-1", serviceCode: "T1019"})}), expect.any(AbortSignal));
+    expect(getAssignmentDecision).toHaveBeenCalledWith(expect.objectContaining({agencyId: "agency-b", input: expect.objectContaining({program: "hha", serviceAuthorizationId: "service-1", serviceCode: "T1019"})}), expect.any(AbortSignal));
     });
   it('uses the exact raw Career Planning authorization rather than a merged projection',async()=>{
     const data=createDataAdapter();

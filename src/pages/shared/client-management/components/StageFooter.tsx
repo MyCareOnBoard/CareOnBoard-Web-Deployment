@@ -15,6 +15,7 @@ export const StageFooter = memo(function StageFooter({
   requireDeclaration = true,
   saveButtonText = "Save Progress",
   saveDisabled = false,
+  nextBlocked = false,
 }: {
   declared: boolean;
   setDeclared: (next: boolean) => void;
@@ -27,6 +28,7 @@ export const StageFooter = memo(function StageFooter({
   requireDeclaration?: boolean;
   saveButtonText?: string;
   saveDisabled?: boolean;
+  nextBlocked?: boolean;
 }) {
   const nextDisabled = requireDeclaration ? !declared : false;
 
@@ -76,7 +78,7 @@ export const StageFooter = memo(function StageFooter({
             type="button"
             className="h-[44px] rounded-[60px] px-6 text-[14px] font-semibold"
             onClick={onNext}
-            disabled={nextDisabled || primaryLoading}
+            disabled={nextDisabled || primaryLoading || nextBlocked}
           >
             Next
             <ArrowRight className="w-5 h-5 text-white" />
