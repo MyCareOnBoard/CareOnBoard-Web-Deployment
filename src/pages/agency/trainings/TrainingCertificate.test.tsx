@@ -16,6 +16,27 @@ beforeEach(() => {
 });
 
 describe('private training certificate', () => {
+    it('keeps dashboard submission disabled until a valid certificate is selected', async () => {
+        requests.post.mockResolvedValue({data: {certificateId: 'new', approved: false, status: 'Awaiting Review'}});
+        const uploaded = vi.fn();
+        render(<TrainingCertificate training={training} dashboard onUploaded={uploaded}/>);
+        const submit = screen.getByRole('button', {name: 'Submit for review'});
+        expect(submit).toBeDisabled();
+        fireEvent.change(screen.getByLabelText('Upload completion certificate'), {target: {files: [new File(['pdf'], 'completion.pdf', {type: 'application/pdf'})]}});
+        expect(screen.getByText('completion.pdf')).toBeVisible();
+        expect(submit).toBeEnabled();
+        fireEvent.click(submit);
+        await waitFor(() => expect(uploaded).toHaveBeenCalledWith(expect.objectContaining({approved: false})));
+        expect(submit).toBeDisabled();
+    });
+
+    it('also requires completion date for a policy certificate in the dashboard', () => {
+        render(<TrainingCertificate training={{...training, source: 'policy', policyContextState: 'current'}} dashboard onUploaded={vi.fn()}/>);
+        fireEvent.change(screen.getByLabelText('Upload completion certificate'), {target: {files: [new File(['pdf'], 'completion.pdf', {type: 'application/pdf'})]}});
+        expect(screen.getByRole('button', {name: 'Submit for review'})).toBeDisabled();
+        expect(requests.post).not.toHaveBeenCalled();
+    });
+
     it('keeps expiry and review warnings when the timeline supplies the status heading', () => {
         render(<TrainingCertificate training={{...training, source:'policy', policyContextState:'current', deadlineState:'expired', effectiveExpiryDateKey:'2026-09-01', reviewState:'changes_requested', reviewReason:'Upload a legible certificate.'}} showPolicySummary={false}/>);
         expect(screen.queryByText('Automatically assigned')).not.toBeInTheDocument();

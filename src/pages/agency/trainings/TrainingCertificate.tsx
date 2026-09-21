@@ -1,4 +1,5 @@
 import {useEffect, useRef, useState} from 'react';
+import {Upload, FileCheck2} from 'lucide-react';
 import axiosClient from '@/lib/axios';
 import {DocumentPreviewModal} from '@/components/documents/DocumentPreviewModal';
 import {Button} from '@/components/ui/button';
@@ -10,10 +11,11 @@ interface Props {
     training: TrainingData;
     canEditHireDate?: boolean;
     showPolicySummary?: boolean;
+    dashboard?: boolean;
     onUploaded?: (certificate: CertificateResult) => void;
 }
 
-export default function TrainingCertificate({training, onUploaded, canEditHireDate=false, showPolicySummary=true}: Props) {
+export default function TrainingCertificate({training, onUploaded, canEditHireDate=false, showPolicySummary=true, dashboard=false}: Props) {
     const [selection, setSelection] = useState<{file: File; requestId: string} | null>(null);
     const [uploading, setUploading] = useState(false);
     const [completedOnDate,setCompletedOnDate] = useState('');
@@ -70,18 +72,21 @@ export default function TrainingCertificate({training, onUploaded, canEditHireDa
         }
     };
 
-    return <div className="flex flex-col items-start gap-2 text-sm empty:hidden">
+    return <div className={dashboard ? "flex w-full flex-col items-stretch gap-4 text-sm empty:hidden" : "flex flex-col items-start gap-2 text-sm empty:hidden"}>
         {training.certificateId && <Button type="button" variant="ghost" className="h-auto px-0 text-[#008f92]" onClick={() => {setPreviewCertificate('latest');setPreviewOpen(true);}}>
             View certificate
         </Button>}
         <TrainingPolicyStatus training={training} canEditHireDate={canEditHireDate} showSummary={showPolicySummary}/>
         {policy && training.acceptedCertificate && training.acceptedCertificate.id !== training.certificateId && <Button type="button" variant="ghost" className="h-auto px-0 text-[#008f92]" onClick={()=>{setPreviewCertificate('accepted');setPreviewOpen(true);}}>View accepted certificate</Button>}
         {onUploaded && (training.source !== 'policy' || policy) && <>
-            {policy && <div className="flex flex-wrap gap-3"><TrainingDateField label="Completion date" value={completedOnDate} onChange={value=>changeDate(setCompletedOnDate,value)} disabled={uploading}/>{training.requirementId==='cpr-certification' && <TrainingDateField label="Printed expiry date (optional)" value={printedExpiryDate} onChange={value=>changeDate(setPrintedExpiryDate,value)} disabled={uploading}/>}</div>}
-            <label className="flex max-w-full flex-col gap-1 text-[#596065]">
-                {training.certificateId ? 'Replace completion certificate' : 'Upload completion certificate'}
+            {policy && <div className={dashboard ? "flex flex-wrap gap-3 [&>div]:min-w-0 [&>div]:flex-1 [&_button]:w-full [&_button]:justify-start [&_button]:bg-white" : "flex flex-wrap gap-3"}><TrainingDateField label="Completion date" value={completedOnDate} onChange={value=>changeDate(setCompletedOnDate,value)} disabled={uploading}/>{training.requirementId==='cpr-certification' && <TrainingDateField label="Printed expiry date (optional)" value={printedExpiryDate} onChange={value=>changeDate(setPrintedExpiryDate,value)} disabled={uploading}/>}</div>}
+            <label className={dashboard ? "relative flex w-full cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed border-[#b7cccf] bg-white p-5 text-center text-[#596065] focus-within:ring-2 focus-within:ring-[#00b4b8]" : "flex max-w-full flex-col gap-1 text-[#596065]"}>
+                {dashboard && (selection ? <FileCheck2 aria-hidden="true" className="h-6 w-6 text-[#00858a]"/> : <Upload aria-hidden="true" className="h-6 w-6 text-[#687e82]"/>)}
+                <span className={dashboard ? 'font-semibold text-[#007f83]' : undefined}>{training.certificateId ? 'Replace completion certificate' : 'Upload completion certificate'}</span>
+                {dashboard && <span className="max-w-full break-all text-xs">{selection ? selection.file.name : 'Choose a PDF, JPG, PNG or WEBP · Up to 10 MB'}</span>}
                 <input ref={input} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" disabled={uploading}
-                    className="max-w-full text-xs file:mr-2 file:rounded-full file:border-0 file:bg-[#e5f7f7] file:px-3 file:py-2 file:text-[#008f92]"
+                    aria-label={training.certificateId ? 'Replace completion certificate' : 'Upload completion certificate'}
+                    className={dashboard ? "absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-wait" : "max-w-full text-xs file:mr-2 file:rounded-full file:border-0 file:bg-[#e5f7f7] file:px-3 file:py-2 file:text-[#008f92]"}
                     onChange={event => {
                         const file = event.target.files?.[0];
                         setError(null);
@@ -95,10 +100,11 @@ export default function TrainingCertificate({training, onUploaded, canEditHireDa
                         setSelection({file, requestId: crypto.randomUUID()});
                     }}/>
             </label>
-            <p className="text-xs text-[#808081]">PDF, JPEG, PNG, or WEBP, up to 10 MB. Agency approval is required.</p>
-            {selection && <Button type="button" disabled={uploading || policy && !completedOnDate} className="h-auto rounded-full bg-[#00b4b8] px-4 py-2 text-white hover:bg-[#009da1]" onClick={upload}>
-                {uploading ? 'Uploading certificate…' : 'Submit certificate'}
+            {!dashboard && <p className="text-xs text-[#808081]">PDF, JPEG, PNG, or WEBP, up to 10 MB. Agency approval is required.</p>}
+            {(selection || dashboard) && <Button type="button" disabled={!selection || uploading || policy && !completedOnDate} className={dashboard ? "h-auto w-full rounded-xl bg-[#00b4b8] px-4 py-3 text-white hover:bg-[#009da1] disabled:opacity-50" : "h-auto rounded-full bg-[#00b4b8] px-4 py-2 text-white hover:bg-[#009da1]"} onClick={upload}>
+                {uploading ? 'Uploading certificate…' : dashboard ? 'Submit for review' : 'Submit certificate'}
             </Button>}
+            {dashboard && <p className="text-center text-xs text-[#596065]">Your agency reviews the certificate before approval.</p>}
             {error && <p role="alert" className="text-[#d53411]">{error}</p>}
         </>}
         <DocumentPreviewModal open={previewOpen} onOpenChange={setPreviewOpen} title={`${training.name} certificate`}
