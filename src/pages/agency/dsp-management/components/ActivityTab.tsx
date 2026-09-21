@@ -10,6 +10,7 @@ interface ActivityTabProps {
   complianceError?: boolean;
   refreshCompliance?: () => unknown;
   focusDocumentId?: string | null;
+  focusDocumentKey?: string | null;
   dspId: string;
   dspName: string;
   shifts: Shift[];
@@ -27,7 +28,7 @@ interface ActivityTabProps {
 }
 
 export function ActivityTab({
-  compliance, complianceError, refreshCompliance, focusDocumentId,
+  compliance, complianceError, refreshCompliance, focusDocumentId, focusDocumentKey,
   dspName: _dspName,
   shifts,
   detailsLoading,
@@ -45,7 +46,7 @@ export function ActivityTab({
   return (
     <div className="space-y-6">
       {/* Grid Layout: Shifts Chart (Left) and Training (Right) */}
-      <div className="grid grid-cols-2 gap-6">
+      {!focusDocumentId && !focusDocumentKey && <div className="grid grid-cols-2 gap-6">
         {/* Left Column: Shifts Chart */}
         <ShiftsChart
           shifts={shifts}
@@ -63,7 +64,7 @@ export function ActivityTab({
           />
           <div className=" bg-[#edf1f2] p-6 rounded-lg aspect"></div>
         </div>
-      </div>
+      </div>}
 
       {/* Documents Section - Full Width */}
       <DocumentsSection
@@ -71,6 +72,7 @@ export function ActivityTab({
         complianceError={complianceError}
         refreshCompliance={refreshCompliance}
         focusDocumentId={focusDocumentId}
+        focusDocumentKey={focusDocumentKey}
         documents={documents}
         isLoading={documentsLoading}
         onRequestDocument={onRequestDocument}

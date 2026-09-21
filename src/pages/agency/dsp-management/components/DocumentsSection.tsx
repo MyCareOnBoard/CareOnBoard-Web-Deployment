@@ -1,5 +1,6 @@
 import { complianceLabel, civilDateLabel, type DocumentComplianceResponse } from '@/pages/agency/compliance-alerts/apiTypes';
-import { useState, useEffect } from "react";
+import {getApplicantDocs} from "@/pages/applicant/application/documentConfig";
+import { useState, useEffect, useRef } from "react";
 import { FileText, Plus } from "lucide-react";
 import { DocumentPreviewModal } from "@/components/documents/DocumentPreviewModal";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ interface DocumentsSectionProps {
   complianceError?: boolean;
   refreshCompliance?: () => unknown;
   focusDocumentId?: string | null;
+  focusDocumentKey?: string | null;
   documents: EmployeeDocument[];
   isLoading: boolean;
   onRequestDocument: () => void;
@@ -18,13 +20,16 @@ interface DocumentsSectionProps {
 }
 
 export function DocumentsSection({
-  compliance, complianceError, refreshCompliance, focusDocumentId,
+  compliance, complianceError, refreshCompliance, focusDocumentId, focusDocumentKey,
   documents,
   isLoading,
   onRequestDocument,
   getDocumentStatusColor,
   getDocumentActionButton,
 }: DocumentsSectionProps) {
+  const slot=[...getApplicantDocs('dsp'),...getApplicantDocs('hha')].find(row=>row.id===focusDocumentKey);
+  const slotRef=useRef<HTMLDivElement>(null);
+  useEffect(()=>{if(slot&&!isLoading){slotRef.current?.focus();slotRef.current?.scrollIntoView?.({block:'nearest'});}},[slot?.id,isLoading]);
   const [preview, setPreview] = useState<EmployeeDocument | null>(null);
 
   useEffect(() => {
@@ -48,6 +53,7 @@ export function DocumentsSection({
         </button>
       </div>
 
+      {slot&&!isLoading&&<div ref={slotRef} tabIndex={-1} className="mb-4 rounded-xl border border-primary/30 bg-background p-4"><p className="font-semibold">Selected requirement: {slot.label}</p><p className="my-2 text-sm text-muted-foreground">Review the matching files below. If the required file is missing, request it from this staff member.</p><Button variant="outline" onClick={onRequestDocument}>Request document</Button></div>}
       {(complianceError || compliance?.syncStatus === 'error') && <p role="alert" className="text-sm text-red-700">We couldn't load document expiry status. Try again. Last checked: {compliance?.evaluatedAt ? new Date(compliance.evaluatedAt).toLocaleString() : 'Not yet checked'}. <button type="button" onClick={refreshCompliance}>Retry</button></p>}
       {focusDocumentId && !isLoading && !documents.some(doc => doc.id === focusDocumentId) && <p role="status">This document is unavailable or you no longer have access. <a href="?">Back to documents</a></p>}
       <div className="space-y-2">

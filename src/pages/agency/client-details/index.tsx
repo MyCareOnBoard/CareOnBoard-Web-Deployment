@@ -1,3 +1,4 @@
+import {NotificationContext} from '@/components/compliance/NotificationContext';
 import { useEffectiveAgencyMode } from '@/hooks/useEffectiveAgencyMode';
 import { useClientDocumentRefresh } from '@/pages/shared/client-details/hooks/useClientDocumentRefresh';
 import { showClientChecklist } from '@/pages/shared/client-details/components/ClientDocumentChecklist';
@@ -39,7 +40,9 @@ export default function ClientDetailsPage() {
   const activeTab: ClientDetailsTab = ["activity", "profile", "services", "documents", "family-portal"].includes(requestedTab || "") ? requestedTab as ClientDetailsTab : "activity";
   const setActiveTab = (tab: ClientDetailsTab) => {const next = new URLSearchParams(searchParams); next.set('tab', tab); setSearchParams(next);};
   const [currentPage, setCurrentPage] = useState(1);
-  const mode = useEffectiveAgencyMode();
+  const effectiveMode = useEffectiveAgencyMode();
+  const requestedMode=searchParams.get('mode');
+  const mode=requestedMode==='ddd'||requestedMode==='hha'?requestedMode:effectiveMode;
   const environment = import.meta.env.VITE_API_ENVIRONMENT || 'staging';
   const scopeKey = JSON.stringify([user?.profile?.accessList, user?.profile?.agencyModes, user?.profile?.isActive, user?.profile?.agencyScope, user?.profile?.agencyIds, user?.profile?.status, user?.profile?.supportedClientTypes, user?.agency?.supportedClientTypes]);
   const loadClient = useCallback((signal: AbortSignal) => getAgencyClientById(clientId!, { signal, mode }), [clientId, mode]);
@@ -357,6 +360,7 @@ export default function ClientDetailsPage() {
           onClientUpdated={fetchClient}
         />
       )}
+      {['services','documents'].includes(activeTab)&&<NotificationContext notificationId={searchParams.get('notificationId')} initialRunId={searchParams.get('initialRunId')} initialItemId={searchParams.get('initialItemId')} expectedClientId={clientId}/>}
       {activeTab === "services" && (
         <ServicesTab
           client={client}
@@ -367,6 +371,7 @@ export default function ClientDetailsPage() {
       {activeTab === "documents" && (
         <>
         <DocumentsTab
+          focusDocumentKey={searchParams.get('documentKey')}
           client={client}
           showChecklist={showClientChecklist(client, user?.userType, mode)}
           refreshing={refreshing} refreshError={error} onRefresh={() => void fetchClient()}
