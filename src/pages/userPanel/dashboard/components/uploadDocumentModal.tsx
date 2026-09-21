@@ -19,15 +19,16 @@ const tenYearsFromNow = new Date()
 tenYearsFromNow.setFullYear(new Date().getFullYear() + 10)
 
 const UserPanelDocumentUpload = (
-  {isOpen, setIsOpen, onComplete, onError}: {
+  {isOpen, setIsOpen, onComplete, onError, initialDocumentType = ''}: {
     isOpen: boolean;
+    initialDocumentType?: string;
     setIsOpen: (value: boolean) => void;
     onComplete: (result: SaveEmployeeDocumentResponse) => void;
     onError: () => void;
   }
 ) => {
   const [formData, setFormData] = useState<FormData>({
-    type: '',
+    type: initialDocumentType,
     file: null,
     expiryDate: null,
   });
@@ -55,7 +56,7 @@ const UserPanelDocumentUpload = (
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!formData.file) return;
+    if (!formData.file || !formData.type) return;
     const formDataInstance = new FormData();
     formDataInstance.append("file", formData.file);
     try {
@@ -120,7 +121,7 @@ const UserPanelDocumentUpload = (
                     <SelectValue placeholder="Select document type"/>
                   </SelectTrigger>
                   <SelectContent>
-                    {userPanelDocumentTypes.map((doc) => <SelectItem value={doc.value}>{doc.label}</SelectItem>)}
+                    {userPanelDocumentTypes.map((doc) => <SelectItem key={doc.value} value={doc.value}>{doc.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -210,7 +211,7 @@ const UserPanelDocumentUpload = (
           <div className="flex items-center p-3 w-full">
             <Button
               type={"submit"}
-              disabled={isUploading || isSavingDocument}
+              disabled={isUploading || isSavingDocument || !formData.type || !formData.file}
               className="w-full px-6 text-white font-medium bg-teal-500 hover:bg-teal-600 rounded-full transition-colors"
             >
               {buttonText()}

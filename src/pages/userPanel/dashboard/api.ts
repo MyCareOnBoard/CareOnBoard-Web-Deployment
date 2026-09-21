@@ -1,3 +1,4 @@
+import {normalizeDocumentResponse} from './documentResponse';
 import { complianceAlertsApi } from '@/pages/agency/compliance-alerts/api';
 import {createApi} from "@reduxjs/toolkit/query/react";
 import {customBaseQuery} from "@/lib/baseQuery";
@@ -24,6 +25,7 @@ export const userPanelDashboardApi = createApi({
                 method: "GET",
                 requiresAuth: true
             }),
+            transformResponse: normalizeDocumentResponse,
             providesTags: ['EmployeeDocuments']
         }),
         uploadDocument: builder.mutation<UploadDocumentResponse, UploadDocumentPayload>({

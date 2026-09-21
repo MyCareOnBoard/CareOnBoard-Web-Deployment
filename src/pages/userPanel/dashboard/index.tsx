@@ -3,11 +3,12 @@ import { useGetDocumentComplianceQuery, useComplianceDateRefresh } from '@/pages
 import { complianceLabel, civilDateLabel } from '@/pages/agency/compliance-alerts/apiTypes';
 import React, {useState, useCallback, useEffect} from "react";
 import {useNavigate, useSearchParams} from "react-router";
-import {Plus, X} from "lucide-react";
+import {X} from "lucide-react";
 import {Button} from "@/components/ui/button";
+import DashboardDocuments from './components/DashboardDocuments';
 import {auth} from "@/lib/firebase";
 import {Toggle} from "@/components/ui/toggle";
-import {ChevronLeft, ChevronRight} from "lucide-react";
+
 import UserPanelDocumentUpload from "@/pages/userPanel/dashboard/components/uploadDocumentModal";
 import {AnimatePresence, motion} from "framer-motion";
 import {
@@ -38,18 +39,18 @@ export default function UserPanelDashboardPage() {
     const [askLocationPerm, setAskLocationPerm] = useState<boolean>(false);
     const [isDocumentUploadModalOpen, setIsDocumentUploadModalOpen] = useState<boolean>(false);
     const [workAvailability, setWorkAvailability] = useState<boolean>(false);
-    const [currentPage, setCurrentPage] = useState<number>(1);
+    const [uploadDocumentType, setUploadDocumentType] = useState<string>();
     const [approvalStates, setApprovalStates] = useState<Record<string, boolean>>({});
     const [trainingCursor, setTrainingCursor] = useState<string>();
     const [trainings, setTrainings] = useState<TrainingData[]>([]);
     const [pendingTraining, setPendingTraining] = useState<string | null>(null);
-    const itemsPerPage = 5;
+
 
     const [searchParams] = useSearchParams();
     const focusDocumentId = searchParams.get('documentId');
     const [upload, setUpload] = useState<(SaveEmployeeDocumentResponse & {savedAt: number}) | null>(null);
     const [withinUploadWindow, setWithinUploadWindow] = useState(false);
-    const {data: employeeDocuments = []} = useGetEmployeeDocumentsQuery();
+    const {data: employeeDocuments = [], isLoading: documentsLoading, isError: documentsError, refetch: refreshDocuments} = useGetEmployeeDocumentsQuery();
     const {currentData: trainingPage, isFetching: isTrainingLoading, isError: trainingError, refetch: refreshTrainings} = useGetEmployeeTrainingsQuery(
         {limit: 25, cursor: trainingCursor}, {refetchOnMountOrArgChange: true, refetchOnFocus: true});
     const [updateEmployeeInfo] = useUpdateEmployeeInfoMutation();
@@ -78,17 +79,6 @@ export default function UserPanelDashboardPage() {
         setPending(waiting && !failed);
         if (failed) setWithinUploadWindow(false);
     }, [upload, compliance, complianceError]);
-    useEffect(() => {
-        const target = employeeDocuments.find(doc => doc.id === focusDocumentId || doc.documentId === focusDocumentId);
-        const index = userPanelDocumentTypes.findIndex(type => type.value === target?.documentType);
-        if (index >= 0) setCurrentPage(Math.floor(index / itemsPerPage) + 1);
-    }, [focusDocumentId, employeeDocuments]);
-    useEffect(() => {
-        if (!focusDocumentId) return;
-        const row = window.document.getElementById(`document-${focusDocumentId}`);
-        row?.focus(); row?.scrollIntoView?.({block: 'nearest'});
-    }, [focusDocumentId, currentPage, employeeDocuments]);
-
     const employeeInfo = user;
 
     const navigate = useNavigate();
@@ -123,8 +113,9 @@ export default function UserPanelDashboardPage() {
     };
 
     const getDocument = useCallback((documentType: string) => {
-        const employeeDocument = employeeDocuments?.find(doc => doc.documentType === documentType) || {
-            status: "",
+        const employeeDocument = employeeDocuments.find(doc => doc.documentType === documentType);
+        if (!employeeDocument) return {
+            status: "Not uploaded",
             fileUrl: "",
             expiryDate: null
         };
@@ -132,7 +123,7 @@ export default function UserPanelDashboardPage() {
         const issue = compliance?.items.find(item => item.documentId === ('id' in employeeDocument ? employeeDocument.id : undefined) || item.documentId === ('documentId' in employeeDocument ? employeeDocument.documentId : undefined));
         if (compliance?.pilotEnabled !== false) return {...employeeDocument,
             status: complianceError || compliance?.syncStatus === 'error' ? 'Expiry status unavailable' : complianceLabel(issue),
-            expiryDateKey: issue?.expiryDateKey};
+            expiryDateKey: issue?.expiryDateKey, reasonCode: issue?.reasonCode};
         let status = employeeDocument.status
 
         // get days until expiry (normalize both dates to midnight to avoid sub-day rounding issues)
@@ -153,31 +144,6 @@ export default function UserPanelDashboardPage() {
         }
 
     }, [employeeDocuments, compliance, complianceError]);
-
-    const getStatusColor = (status: string) => {
-        switch (status.toLowerCase()) {
-            case "current":
-            case "available":
-            case "completed":
-                return "bg-[#d4f4dd] text-[#0e6027] border-[#0e6027]/20";
-            case "expired":
-            case "changes requested":
-                return "bg-[#ffd4cc] text-[#d53411] border-[#d53411]/20";
-            case "pending soon":
-                return "bg-[#ffe8cc] text-[#cc6600] border-[#cc6600]/20";
-            case "new training":
-                return "bg-[#e5f7f7] text-[#00b4b8] border-[#00b4b8]/20";
-            case "assigned":
-                return "bg-[#0EAF521A] text-[#0EAF52] border-[#0EAF52]";
-            case "expires today":
-            case "awaiting review":
-            case "needs review":
-            case "expiring":
-                return "bg-[#FF6C1017] text-[#FF6C10] border-[#FF6C10]"
-            default:
-                return "bg-gray-100 text-gray-600 border-gray-300/20";
-        }
-    };
 
     const calculateAge = (dateOfBirth: string) => {
         const today = new Date();
@@ -225,8 +191,11 @@ export default function UserPanelDashboardPage() {
     }
 
     const handleOpenDocument = (url: string | null) => {
-        if (!url) return;
-        window.open(url, "_blank");
+        if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) {
+            toast.error('This document link is unavailable. Upload a replacement or contact your agency.');
+            return;
+        }
+        window.open(url, "_blank", "noopener,noreferrer");
     }
 
     const handleToggle = async (trainingId: string) => {
@@ -369,102 +338,30 @@ export default function UserPanelDashboardPage() {
                             </Button>}
                         </>}/>
                 </div>
-                {/* Right Column - Documents */}
-                <div className="bg-[#FFFFFF4D] rounded-[20px] p-6 shadow-sm">
-                    <div className="flex items-center justify-between mb-6">
-                        <div>
-                            <h3 className="text-[20px] font-bold text-[#10141a]">Documents</h3>
-                            <p className="text-[14px] text-[#808081] mt-1">
-                                Here are all your uploaded documents
-                            </p>
-                        </div>
-                        <Button
-                            type={"button"}
-                            onClick={() => setIsDocumentUploadModalOpen(true)}
-                            className="flex items-center gap-2 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-4 py-2 h-auto text-[14px] font-semibold shadow-sm transition-all duration-200"
-                        >
-                            <Plus size={16}/>
-                            Upload new document
-                        </Button>
-                    </div>
-
+                <DashboardDocuments key={user?.uid} documents={userPanelDocumentTypes.map(type => {
+                    const document = getDocument(type.value);
+                    return {type: type.value, label: type.label, fileUrl: document.fileUrl, status: document.status,
+                        id: 'id' in document ? document.id : undefined,
+                        documentId: 'documentId' in document ? document.documentId : undefined,
+                        reasonCode: 'reasonCode' in document ? document.reasonCode : undefined,
+                        expiryLabel: 'expiryDateKey' in document && document.expiryDateKey ? civilDateLabel(document.expiryDateKey)
+                            : document.expiryDate ? formatDate(document.expiryDate) : undefined};
+                })} loading={documentsLoading} error={documentsError} focusDocumentId={focusDocumentId}
+                    onRetry={() => {void refreshDocuments();}} onView={handleOpenDocument}
+                    onUpload={type => {setUploadDocumentType(type); setIsDocumentUploadModalOpen(true);}}>
                     {(complianceError || compliance?.syncStatus === 'error') && <p role="alert" className="text-sm text-[#d53411]">We couldn't load document expiry status. Try again. Last checked: {compliance?.evaluatedAt ? new Date(compliance.evaluatedAt).toLocaleString() : 'Not yet checked'}. <button type="button" onClick={() => refreshCompliance()}>Retry</button></p>}
                     {pending && <p role="status" className="text-sm text-[#808081]">Document saved. Updating expiry status…</p>}
                     {(pending && !withinUploadWindow) && <p className="text-sm text-[#808081]">Last checked: {compliance?.evaluatedAt ? new Date(compliance.evaluatedAt).toLocaleString() : 'Not yet checked'}. <button type="button" onClick={() => refreshCompliance()}>Refresh</button></p>}
-                    {focusDocumentId && !employeeDocuments.some(doc => doc.id === focusDocumentId || doc.documentId === focusDocumentId) && <p role="status">This document is unavailable or you no longer have access. <button type="button" onClick={() => navigate(Routes.userPanel.dashboard)}>Back to documents</button></p>}
-                    {/* Documents List */}
-                    <div className="space-y-3">
-                        {userPanelDocumentTypes
-                            .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-                            .map((document) => {
-                                const documentData = getDocument(document.value);
-                                const excludedTexts: Record<string, string> = {
-                                    expiring: `Expiring Soon ${documentData?.expiryDate ? ('on ' + new Date(documentData?.expiryDate).toDateString()) : ''}`
-                                }
-                                const statusText = Object.keys(excludedTexts).includes(documentData?.status) ? excludedTexts[documentData?.status] : documentData?.status;
-                                return (
-                                    <div
-                                        key={document.value}
-                                        id={`document-${'id' in documentData ? documentData.id : ''}`}
-                                        tabIndex={0}
-                                        role="button"
-                                        onKeyDown={event => {if (event.key === 'Enter' || event.key === ' ') {event.preventDefault(); handleOpenDocument(documentData.fileUrl);}}}
-                                        onClick={() => handleOpenDocument(getDocument(document.value)?.fileUrl)}
-                                        className="cursor-pointer flex items-center justify-between p-4 rounded-xl border border-[#e5e5e6] hover:border-[#00b4b8]/30 transition-colors"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <img
-                                                src={"/document-image.png"}
-                                                alt={"document"}
-                                                className="w-12 h-12 text-[#808081] scale-x-[-1]"
-                                            />
-                                            <span className="text-[14px] font-medium text-[#10141a]">
-                    {document.label}
-                  </span>
-                                        </div>
-                                        <span
-                                            className={`capitalize text-[12px] font-semibold px-3 py-1 rounded-full border ${getStatusColor(
-                                                documentData?.status || "pending"
-                                            )}`}
-                                        >
-                  {statusText || 'Unavailable'}{'expiryDateKey' in documentData && documentData.expiryDateKey ? ` · ${civilDateLabel(documentData.expiryDateKey)}` : ''}
-                </span>
-                                    </div>
-                                )
-                            })}
-                    </div>
-
-                    {/* Pagination */}
-                    {userPanelDocumentTypes.length > itemsPerPage && (
-                        <div className="flex items-center justify-center gap-2 mt-6">
-              <span className={"text-[18px]"}>
-                {currentPage}/<span className={"text-[#808081]"}>
-                  {Math.ceil(userPanelDocumentTypes.length / itemsPerPage)}
-                </span>
-              </span>
-                            <div
-                                className={`rounded-full p-2 cursor-pointer ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'bg-white'}`}
-                                onClick={() => currentPage > 1 && setCurrentPage(prev => prev - 1)}
-                            >
-                                <ChevronLeft size={14} className={currentPage === 1 ? 'text-gray-400' : ''}/>
-                            </div>
-                            <div
-                                className={`rounded-full p-2 cursor-pointer ${currentPage * itemsPerPage >= userPanelDocumentTypes.length ? 'opacity-50 cursor-not-allowed' : 'bg-white'}`}
-                                onClick={() => currentPage * itemsPerPage < userPanelDocumentTypes.length && setCurrentPage(prev => prev + 1)}
-                            >
-                                <ChevronRight size={14}
-                                              className={currentPage * itemsPerPage >= userPanelDocumentTypes.length ? 'text-gray-400' : ''}/>
-                            </div>
-                        </div>
-                    )}
-                </div>
+                    {!documentsLoading && !documentsError && focusDocumentId && !employeeDocuments.some(doc => doc.id === focusDocumentId || doc.documentId === focusDocumentId) && <p role="status">This document is unavailable or you no longer have access. <button type="button" onClick={() => navigate(Routes.userPanel.dashboard)}>Back to documents</button></p>}
+                </DashboardDocuments>
             </div>
-            <UserPanelDocumentUpload
+            {isDocumentUploadModalOpen && <UserPanelDocumentUpload
+                initialDocumentType={uploadDocumentType}
                 isOpen={isDocumentUploadModalOpen}
                 setIsOpen={setIsDocumentUploadModalOpen}
                 onComplete={handleDocumentUploaded}
                 onError={handleDocumentUploadError}
-            />
+            />}
             <AnimatePresence>
                 {error && (
                     <motion.div
