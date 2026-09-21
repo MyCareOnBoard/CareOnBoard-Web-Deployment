@@ -22,7 +22,7 @@ afterEach(() => vi.useRealTimers());
 describe('upload compliance refresh', () => {
  it('treats a missing issue as pending and stops after its exact revision was evaluated before the HTTP response', () => {
   const {rerender} = render(<Dashboard />);
-  fireEvent.click(screen.getByText('Save upload'));
+  fireEvent.click(screen.getByRole('button', {name: 'Upload document'})); fireEvent.click(screen.getByText('Save upload'));
   expect(mocks.query).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({pollingInterval: 5000, skipPollingIfUnfocused: true}));
   mocks.data = {...mocks.data, items: [{documentId: 'doc', condition: 'current', syncStatus: 'ready', observedSourceRevision: {seconds: 100, nanoseconds: 500}, evaluatedAt: new Date(Date.now() - 60_000).toISOString()}]};
   rerender(<Dashboard />);
@@ -30,7 +30,7 @@ describe('upload compliance refresh', () => {
  });
  it('keeps polling for an older revision or pending persistence despite a newer evaluation clock', () => {
   const {rerender} = render(<Dashboard />);
-  fireEvent.click(screen.getByText('Save upload'));
+  fireEvent.click(screen.getByRole('button', {name: 'Upload document'})); fireEvent.click(screen.getByText('Save upload'));
   mocks.data = {...mocks.data, items: [{documentId: 'doc', condition: 'current', syncStatus: 'ready', observedSourceRevision: {seconds: 100, nanoseconds: 499}, evaluatedAt: new Date(Date.now() + 60_000).toISOString()}]};
   rerender(<Dashboard />);
   expect(mocks.query).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({pollingInterval: 5000}));
@@ -41,11 +41,11 @@ describe('upload compliance refresh', () => {
  it('does not infer completion when a legacy save response omits the revision', () => {
   mocks.saved = {};
   mocks.data = {...mocks.data, items: [{documentId: 'doc', condition: 'current', syncStatus: 'ready', observedSourceRevision: {seconds: 101, nanoseconds: 0}}]};
-  render(<Dashboard />); fireEvent.click(screen.getByText('Save upload'));
+  render(<Dashboard />); fireEvent.click(screen.getByRole('button', {name: 'Upload document'})); fireEvent.click(screen.getByText('Save upload'));
   expect(mocks.query).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({pollingInterval: 5000}));
  });
  it('ends the upload deadline after sixty seconds without a focus reset and offers Refresh', async () => {
-  render(<Dashboard />); fireEvent.click(screen.getByText('Save upload'));
+  render(<Dashboard />); fireEvent.click(screen.getByRole('button', {name: 'Upload document'})); fireEvent.click(screen.getByText('Save upload'));
   await act(() => vi.advanceTimersByTimeAsync(30_000));
   fireEvent.focus(window);
   await act(() => vi.advanceTimersByTimeAsync(30_000));
@@ -53,7 +53,7 @@ describe('upload compliance refresh', () => {
   expect(mocks.query).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({pollingInterval: 0}));
  });
  it('stops polling on errors and cancels its deadline on unmount', () => {
-  const {rerender, unmount} = render(<Dashboard />); fireEvent.click(screen.getByText('Save upload'));
+  const {rerender, unmount} = render(<Dashboard />); fireEvent.click(screen.getByRole('button', {name: 'Upload document'})); fireEvent.click(screen.getByText('Save upload'));
   mocks.error = true; rerender(<Dashboard />);
   expect(mocks.query).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({pollingInterval: 0}));
   expect(screen.getByText('Retry')).toBeInTheDocument();

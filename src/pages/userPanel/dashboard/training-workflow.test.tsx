@@ -2,9 +2,9 @@ import {fireEvent, render, screen} from '@testing-library/react';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 import Dashboard from './index';
 
-const state = vi.hoisted(() => ({trainingArgs: [] as any[], dispatch: vi.fn()}));
+const state = vi.hoisted(() => ({trainingArgs: [] as any[], dispatch: vi.fn(), documentsLoading: false, documentsError: false, refreshDocuments: vi.fn()}));
 let trainingPage = {items: [{id: 'one', name: 'First', timeFrame: '30 days', assignedDsp: 'employee-1', trainingType: 'manual', completedAt: null, status: 'Assigned', approved: false}], nextCursor: 'cursor-2', summary: null, localDate: '2026-09-16'};
-beforeEach(() => { state.trainingArgs.length = 0; state.dispatch.mockClear(); trainingPage = {...trainingPage, items: [{id: 'one', name: 'First', timeFrame: '30 days', assignedDsp: 'employee-1', trainingType: 'manual', completedAt: null, status: 'Assigned', approved: false}]}; });
+beforeEach(() => { state.documentsLoading = false; state.documentsError = false; state.refreshDocuments.mockClear(); state.trainingArgs.length = 0; state.dispatch.mockClear(); trainingPage = {...trainingPage, items: [{id: 'one', name: 'First', timeFrame: '30 days', assignedDsp: 'employee-1', trainingType: 'manual', completedAt: null, status: 'Assigned', approved: false}]}; });
 vi.mock('@/utils/auth', () => ({useAuth: () => ({user: {uid: 'employee-1', profile: {}}}), setUser: vi.fn()}));
 vi.mock('@/lib/firebase', () => ({auth: {currentUser: null}}));
 vi.mock('@/lib/api/users', () => ({getUser: vi.fn()}));
@@ -17,7 +17,7 @@ vi.mock('./components/uploadDocumentModal', () => ({default: () => null}));
 vi.mock('@/pages/agency/trainings/TrainingCertificate', () => ({default: ({onUploaded}: any) => <><span>Upload completion certificate</span><button onClick={() => onUploaded({certificateId: 'cert-1', certificateName: 'completion.pdf', status: 'Completed', approved: true, completedAt: '2026-09-16'})}>Save certificate</button></>}));
 vi.mock('./api', () => ({
   userPanelDashboardApi: {util: {invalidateTags: (tags: unknown) => ({type: 'invalidate', payload: tags})}},
-  useGetEmployeeDocumentsQuery: () => ({data: []}),
+  useGetEmployeeDocumentsQuery: () => ({data: [], isLoading: state.documentsLoading, isError: state.documentsError, refetch: state.refreshDocuments}),
   useUpdateEmployeeInfoMutation: () => [vi.fn()],
   useCompleteTrainingMutation: () => [vi.fn()],
   useGetEmployeeTrainingsQuery: (args: any) => {
@@ -55,5 +55,26 @@ describe('employee training pagination', () => {
     rerender(<Dashboard />);
     expect(screen.getByText('Updated training')).toBeInTheDocument();
     expect(screen.queryByText('First')).not.toBeInTheDocument();
+  });
+});
+
+describe('dashboard document states', () => {
+  it('shows missing documents without implying they are being assessed', () => {
+    render(<Dashboard/>);
+    expect(screen.getAllByText('Not uploaded', {selector: 'span'})).toHaveLength(10);
+    expect(screen.queryByText('Updating expiry status…')).not.toBeInTheDocument();
+  });
+  it('shows a skeleton while loading and an actionable error on failure', () => {
+    state.documentsLoading = true;
+    const {rerender} = render(<Dashboard/>);
+    expect(screen.getByRole('status', {name: 'Loading documents'})).toBeVisible();
+    expect(screen.queryByText('Not uploaded')).not.toBeInTheDocument();
+    state.documentsLoading = false;
+    state.documentsError = true;
+    rerender(<Dashboard/>);
+    expect(screen.queryByRole('status', {name: 'Loading documents'})).not.toBeInTheDocument();
+    expect(screen.queryByText('Not uploaded')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {name: 'Retry documents'}));
+    expect(state.refreshDocuments).toHaveBeenCalledOnce();
   });
 });

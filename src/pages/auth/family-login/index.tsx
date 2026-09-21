@@ -66,8 +66,6 @@ export default function FamilyLoginPage() {
     const [password, setPassword] = useState("")
     const [phone, setPhone] = useState("")
     const [phoneError, setPhoneError] = useState("")
-    // UI only for now — not validated or sent to the API yet
-    const [email, setEmail] = useState("")
     const [otpCode, setOtpCode] = useState("")
     const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null)
     const [sending, setSending] = useState(false)
