@@ -210,6 +210,7 @@ export const Routes = {
         schedule: "/family/schedule",
         messages: "/family/messages",
         announcements: "/family/announcements",
+        grantAccess: "/family/grant-access",
     },
     onboarding: {
         index: "/onboarding",

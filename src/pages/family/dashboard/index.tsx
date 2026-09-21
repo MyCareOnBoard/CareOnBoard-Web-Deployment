@@ -20,6 +20,7 @@ import {
 import axiosClient from "@/lib/axios"
 import {Routes} from "@/routes/constants"
 import {roleLabel} from "@/lib/roleLabel"
+import {SetPasswordCard} from "@/pages/family/components/SetPasswordCard"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -679,6 +680,7 @@ export default function FamilyDashboardPage() {
 
     return (
         <div className="flex flex-col gap-5">
+            <SetPasswordCard/>
             {announcements.length > 0 && (
                 <AnnouncementsBanner
                     announcements={announcements}
