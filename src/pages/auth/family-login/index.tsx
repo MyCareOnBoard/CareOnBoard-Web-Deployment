@@ -6,6 +6,7 @@ import {useDispatch} from "react-redux"
 import PhoneInput, {isValidPhoneNumber} from "react-phone-number-input"
 import "react-phone-number-input/style.css"
 import {Button} from "@/components/ui/button"
+import {Input} from "@/components/ui/input"
 import {Label} from "@/components/ui/label"
 import {useToast} from "@/hooks/use-toast"
 import {auth} from "@/lib/firebase"
@@ -23,6 +24,13 @@ import {
     startPhoneSignIn,
     completePhoneSignIn,
 } from "@/utils/auth/services/phoneAuthService"
+import {
+    sendFamilySignInLink,
+    isFamilyEmailLink,
+    completeEmailLinkSignIn,
+    signInWithPassword,
+    readPendingEmail,
+} from "@/utils/auth/services/emailLinkService"
 import {RecaptchaAnchor} from "@/pages/auth/components/RecaptchaAnchor"
 import OtpBoxInput from "./OtpBoxInput"
 import type {ConfirmationResult} from "firebase/auth"
@@ -31,16 +39,35 @@ import QRCode from "react-qr-code";
 const RECAPTCHA_CONTAINER_ID = "recaptcha-family-login"
 const RESEND_COOLDOWN_SEC = 60
 
-type Phase = "enter-phone" | "enter-code"
+/** How the family member proves who they are. Both reach the same /verify call. */
+type Method = "phone" | "email"
+
+/** Email members sign in by link; a password is offered to those who set one. */
+type EmailMode = "link" | "password"
+
+type Phase = "enter-phone" | "enter-code" | "enter-email" | "link-sent" | "completing-link"
+
+/** mm:ss countdown, matching the wording the phone flow already uses. */
+const RESEND_LINK_LABEL = (seconds: number) =>
+    `Resend link in ${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export default function FamilyLoginPage() {
     const navigate = useNavigate()
     const dispatch = useDispatch<AppDispatch>()
     const {toast} = useToast()
 
+    const [method, setMethod] = useState<Method>("phone")
+    const [emailMode, setEmailMode] = useState<EmailMode>("link")
     const [phase, setPhase] = useState<Phase>("enter-phone")
+    const [email, setEmail] = useState("")
+    const [emailError, setEmailError] = useState("")
+    const [password, setPassword] = useState("")
     const [phone, setPhone] = useState("")
     const [phoneError, setPhoneError] = useState("")
+    // UI only for now — not validated or sent to the API yet
+    const [email, setEmail] = useState("")
     const [otpCode, setOtpCode] = useState("")
     const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null)
     const [sending, setSending] = useState(false)
@@ -101,14 +128,12 @@ export default function FamilyLoginPage() {
         await sendCode(phone)
     }
 
-    const handleSignIn = async (e: React.FormEvent) => {
-        e.preventDefault()
-        if (!confirmationResult || otpCode.length < 6) return
-        setVerifying(true)
-        setInlineError("")
+    /**
+     * Everything after Firebase has accepted the credential, shared by all three
+     * routes in: the portal only trusts the server's answer about who this is.
+     */
+    const finishSignIn = useCallback(async (onFailure: () => void) => {
         try {
-            await completePhoneSignIn(confirmationResult, otpCode)
-
             const response = await axiosClient.post<{ success: boolean; data: User }>(
                 "/familyPortal/verify"
             )
@@ -121,10 +146,10 @@ export default function FamilyLoginPage() {
             const status = axiosErr.response?.status
             const serverMsg = axiosErr.response?.data?.message
 
-            if (status === 404) {
+            if (status === 404 || status === 403) {
                 toast({
-                    title: "No portal access",
-                    description: serverMsg || "No Care-On-Board account found for this phone number. Contact your care agency.",
+                    title: status === 403 ? "Email not confirmed" : "No portal access",
+                    description: serverMsg || "No Care-On-Board account found. Contact your care agency.",
                     variant: "destructive",
                 })
             } else {
@@ -135,14 +160,136 @@ export default function FamilyLoginPage() {
                 })
             }
 
+            // The Firebase session is real but useless without a matching contact
+            // record, and leaving it signed in would strand the app in a state the
+            // route guards read as "logged in".
             await signOut(auth)
-            clearRecaptchaVerifier()
-            setOtpCode("")
-            setConfirmationResult(null)
-            setPhase("enter-phone")
+            onFailure()
+        }
+    }, [dispatch, navigate, toast])
+
+    const handleSignIn = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!confirmationResult || otpCode.length < 6) return
+        setVerifying(true)
+        setInlineError("")
+        try {
+            await completePhoneSignIn(confirmationResult, otpCode)
+            await finishSignIn(() => {
+                clearRecaptchaVerifier()
+                setOtpCode("")
+                setConfirmationResult(null)
+                setPhase("enter-phone")
+            })
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : "Unable to sign in. Please try again."
+            setInlineError(msg)
         } finally {
             setVerifying(false)
         }
+    }
+
+    const handleSendLink = async (e: React.FormEvent) => {
+        e.preventDefault()
+        const address = email.trim()
+        if (!EMAIL_PATTERN.test(address)) {
+            setEmailError("Enter a valid email address")
+            return
+        }
+        setEmailError("")
+        setInlineError("")
+        setSending(true)
+        try {
+            await sendFamilySignInLink(address)
+            setPhase("link-sent")
+            startResendCountdown()
+        } catch (err: unknown) {
+            setInlineError(err instanceof Error ? err.message : "Failed to send the sign-in link")
+        } finally {
+            setSending(false)
+        }
+    }
+
+    const handlePasswordSignIn = async (e: React.FormEvent) => {
+        e.preventDefault()
+        const address = email.trim()
+        if (!EMAIL_PATTERN.test(address)) {
+            setEmailError("Enter a valid email address")
+            return
+        }
+        if (!password) {
+            setInlineError("Enter your password")
+            return
+        }
+        setEmailError("")
+        setInlineError("")
+        setVerifying(true)
+        try {
+            await signInWithPassword(address, password)
+            await finishSignIn(() => {
+                setPassword("")
+                setPhase("enter-email")
+            })
+        } catch {
+            // Firebase distinguishes "no such user" from "wrong password"; repeating
+            // that back would confirm which addresses have portal accounts.
+            setInlineError("That email address and password do not match.")
+            setPassword("")
+        } finally {
+            setVerifying(false)
+        }
+    }
+
+    /**
+     * Returning from the inbox. The link carries a one-time code, not an identity,
+     * so Firebase also needs the address it was sent to — stashed when it was
+     * requested, or typed again here if that browser state is gone.
+     */
+    useEffect(() => {
+        let cancelled = false
+
+        const completeLink = async () => {
+            if (!(await isFamilyEmailLink())) return
+            if (cancelled) return
+
+            const stored = readPendingEmail()
+            const address = stored || window.prompt("Confirm the email address this link was sent to") || ""
+            if (!EMAIL_PATTERN.test(address.trim())) {
+                setMethod("email")
+                setPhase("enter-email")
+                setInlineError("We could not confirm which address this link was for. Please request a new one.")
+                return
+            }
+
+            setMethod("email")
+            setPhase("completing-link")
+            setVerifying(true)
+            try {
+                await completeEmailLinkSignIn(address.trim())
+                // Drop the one-time code from the address bar so a refresh does not
+                // replay a link Firebase has already spent.
+                window.history.replaceState({}, document.title, window.location.pathname)
+                if (!cancelled) await finishSignIn(() => setPhase("enter-email"))
+            } catch {
+                if (!cancelled) {
+                    setInlineError("That sign-in link has expired or has already been used. Request a new one.")
+                    setPhase("enter-email")
+                }
+            } finally {
+                if (!cancelled) setVerifying(false)
+            }
+        }
+
+        void completeLink()
+        return () => { cancelled = true }
+    }, [finishSignIn])
+
+    const switchMethod = (next: Method) => {
+        setMethod(next)
+        setPhase(next === "phone" ? "enter-phone" : "enter-email")
+        setInlineError("")
+        setEmailError("")
+        setPhoneError("")
     }
 
     return (
@@ -224,8 +371,30 @@ export default function FamilyLoginPage() {
 
                     <RecaptchaAnchor id={RECAPTCHA_CONTAINER_ID}/>
 
+                    {/* Method switcher — an agency records a phone, an email, or both */}
+                    {(phase === "enter-phone" || phase === "enter-email") && (
+                        <div className="mb-5 grid grid-cols-2 gap-1 rounded-full bg-slate-100 p-1">
+                            {([["phone", "Phone"], ["email", "Email"]] as const).map(([value, label]) => (
+                                <button
+                                    key={value}
+                                    type="button"
+                                    onClick={() => switchMethod(value)}
+                                    aria-pressed={method === value}
+                                    className="h-10 rounded-full text-[14px] font-semibold transition-colors"
+                                    style={
+                                        method === value
+                                            ? {backgroundColor: "#FFFFFF", color: "#00B4B8", boxShadow: "0 1px 2px rgba(0,0,0,0.08)"}
+                                            : {color: "#64748b"}
+                                    }
+                                >
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
                     {/* Phase: enter phone */}
-                    {phase === "enter-phone" && (
+                    {method === "phone" && phase === "enter-phone" && (
                         <form onSubmit={(e) => void handleContinue(e)} className="space-y-4">
                             <div className="space-y-1.5">
                                 <Label className="text-[15px] font-semibold text-slate-800">Phone Number</Label>
@@ -243,6 +412,17 @@ export default function FamilyLoginPage() {
                                 />
                                 {phoneError && <p className="text-xs text-red-600">{phoneError}</p>}
                                 {inlineError && <p className="text-xs text-red-600">{inlineError}</p>}
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <Label className="text-[15px] font-semibold text-slate-800">Email Address</Label>
+                                <Input
+                                    type="email"
+                                    placeholder="e.g. jane@example.com"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="h-12 rounded-xl border-slate-200 bg-white text-[16px] text-slate-800 placeholder:text-slate-400 focus-visible:border-[#00B4B8] focus-visible:ring-2 focus-visible:ring-[#00B4B8]/20"
+                                />
                             </div>
 
                             <Button
@@ -273,7 +453,7 @@ export default function FamilyLoginPage() {
                     )}
 
                     {/* Phase: enter OTP */}
-                    {phase === "enter-code" && (
+                    {method === "phone" && phase === "enter-code" && (
                         <form onSubmit={(e) => void handleSignIn(e)} className="space-y-5">
                             <p className="text-[15px] font-semibold text-slate-700">
                                 Check your phone number for the one time PIN
@@ -318,6 +498,127 @@ export default function FamilyLoginPage() {
                                     : "Resend code"}
                             </button>
                         </form>
+                    )}
+
+                    {/* Phase: enter email — link by default, password for those who set one */}
+                    {method === "email" && phase === "enter-email" && (
+                        <form
+                            onSubmit={(e) => void (emailMode === "link" ? handleSendLink(e) : handlePasswordSignIn(e))}
+                            className="space-y-4"
+                        >
+                            <div className="space-y-1.5">
+                                <Label className="text-[15px] font-semibold text-slate-800">Email Address</Label>
+                                <Input
+                                    type="email"
+                                    inputMode="email"
+                                    autoComplete="email"
+                                    placeholder="you@example.com"
+                                    value={email}
+                                    onChange={(e) => {
+                                        setEmail(e.target.value)
+                                        if (emailError) setEmailError("")
+                                        if (inlineError) setInlineError("")
+                                    }}
+                                    className="h-12 rounded-xl border-slate-200 text-[15px]"
+                                    autoFocus
+                                />
+                                {emailError && <p className="text-xs text-red-600">{emailError}</p>}
+                            </div>
+
+                            {emailMode === "password" && (
+                                <div className="space-y-1.5">
+                                    <Label className="text-[15px] font-semibold text-slate-800">Password</Label>
+                                    <Input
+                                        type="password"
+                                        autoComplete="current-password"
+                                        placeholder="Your password"
+                                        value={password}
+                                        onChange={(e) => {
+                                            setPassword(e.target.value)
+                                            if (inlineError) setInlineError("")
+                                        }}
+                                        className="h-12 rounded-xl border-slate-200 text-[15px]"
+                                    />
+                                </div>
+                            )}
+
+                            {inlineError && <p className="text-xs text-red-600">{inlineError}</p>}
+
+                            <Button
+                                type="submit"
+                                disabled={sending || verifying}
+                                className="h-12 w-full rounded-full text-[15px] font-semibold text-white"
+                                style={{backgroundColor: "#00B4B8"}}
+                            >
+                                {sending || verifying ? (
+                                    <span className="flex items-center gap-2">
+                                        <Loader2 className="h-4 w-4 animate-spin"/>
+                                        {emailMode === "link" ? "Sending link…" : "Signing in…"}
+                                    </span>
+                                ) : (
+                                    emailMode === "link" ? "Email me a sign-in link" : "Sign in"
+                                )}
+                            </Button>
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setEmailMode(emailMode === "link" ? "password" : "link")
+                                    setInlineError("")
+                                    setPassword("")
+                                }}
+                                className="block w-full text-center text-[13px] font-medium"
+                                style={{color: "#00B4B8"}}
+                            >
+                                {emailMode === "link"
+                                    ? "I have a password"
+                                    : "Email me a sign-in link instead"}
+                            </button>
+                        </form>
+                    )}
+
+                    {/* Phase: link sent */}
+                    {method === "email" && phase === "link-sent" && (
+                        <div className="space-y-5">
+                            <p className="text-[15px] font-semibold text-slate-700">
+                                Check your inbox
+                            </p>
+                            <p className="text-[14px] leading-relaxed text-slate-500">
+                                We sent a sign-in link to <span className="font-medium text-slate-700">{email}</span>.
+                                Open it on this device to finish signing in. It can take a minute to arrive,
+                                and it may be in your spam folder.
+                            </p>
+
+                            {inlineError && <p className="text-xs text-red-600">{inlineError}</p>}
+
+                            <button
+                                type="button"
+                                disabled={resendSeconds > 0 || sending}
+                                onClick={(e) => void handleSendLink(e)}
+                                className="block w-full text-center text-[13px] font-medium disabled:opacity-60"
+                                style={{color: "#00B4B8"}}
+                            >
+                                {resendSeconds > 0
+                                    ? RESEND_LINK_LABEL(resendSeconds)
+                                    : "Resend link"}
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setPhase("enter-email")}
+                                className="block w-full text-center text-[13px] font-medium text-slate-500"
+                            >
+                                Use a different email address
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Phase: finishing a link sign-in */}
+                    {phase === "completing-link" && (
+                        <div className="flex flex-col items-center gap-3 py-8">
+                            <Loader2 className="h-6 w-6 animate-spin" style={{color: "#00B4B8"}}/>
+                            <p className="text-[14px] text-slate-600">Signing you in…</p>
+                        </div>
                     )}
 
                     {/* Divider */}
