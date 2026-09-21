@@ -6,25 +6,43 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import axiosClient from "@/lib/axios"
+import { familyPortalApi, GrantAccessError } from "@/lib/api/family-portal"
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 const emptyForm = { name: "", primaryPhone: "", email: "", relationship: "" }
 
+/** Mirrors the server rule: a contact needs a way to be identified at sign-in. */
+type FormErrors = { name?: string; primaryPhone?: string; email?: string; identifier?: string }
+
+/** What the new contact can actually use, so the confirmation is specific. */
+function signInMethodLabel(form: { primaryPhone: string; email: string }): string {
+  const methods = [form.primaryPhone && "their phone", form.email.trim() && "their email"]
+    .filter(Boolean)
+  return methods.join(" or ")
+}
+
 export default function FamilyGrantAccessPage() {
   const [form, setForm] = useState(emptyForm)
-  const [formErrors, setFormErrors] = useState<{ name?: string; primaryPhone?: string; email?: string }>({})
+  const [formErrors, setFormErrors] = useState<FormErrors>({})
   const [saving, setSaving] = useState(false)
 
   const validate = () => {
-    const errors: { name?: string; primaryPhone?: string; email?: string } = {}
+    const errors: FormErrors = {}
+    const email = form.email.trim()
+
     if (!form.name.trim()) errors.name = "Name is required"
-    if (!form.primaryPhone) errors.primaryPhone = "Phone number is required"
-    else if (!isValidPhoneNumber(form.primaryPhone))
+
+    // Either identifier will do — the portal signs people in by phone or by
+    // email — but whichever is given has to be usable. A mistyped one is worse
+    // than a blank one: it looks like access was granted when nobody can use it.
+    if (form.primaryPhone && !isValidPhoneNumber(form.primaryPhone))
       errors.primaryPhone = "Enter a valid phone number including country code"
-    if (form.email.trim() && !EMAIL_REGEX.test(form.email.trim()))
+    if (email && !EMAIL_REGEX.test(email))
       errors.email = "Enter a valid email address"
+    if (!form.primaryPhone && !email)
+      errors.identifier = "Add a phone number or an email address so they can sign in"
+
     setFormErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -34,20 +52,31 @@ export default function FamilyGrantAccessPage() {
     const name = form.name.trim()
     setSaving(true)
     try {
-      await axiosClient.post("/familyPortal/contacts", {
+      await familyPortalApi.grantAccess({
         name,
         primaryPhone: form.primaryPhone,
-        email: form.email.trim() || undefined,
-        relationship: form.relationship.trim() || undefined,
+        email: form.email,
+        relationship: form.relationship.trim(),
       })
       setForm(emptyForm)
       setFormErrors({})
-      toast.success("Access granted", { description: `${name} can now access the family portal.` })
+      toast.success("Access granted", {
+        description: `${name} can now sign in with ${signInMethodLabel(form)}.`,
+      })
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        (err instanceof Error ? err.message : "Failed to grant access")
-      toast.error("Failed to grant access", { description: msg })
+      if (err instanceof GrantAccessError && err.reason === "duplicate") {
+        // Not a failure worth a red toast — the outcome they wanted is already
+        // true, and the useful place to say so is next to the field.
+        setFormErrors({ identifier: "That person already has access to this portal." })
+        return
+      }
+      const description =
+        err instanceof GrantAccessError && err.reason === "not-permitted"
+          ? "Only a family member with portal access can add someone. Try signing in again."
+          : err instanceof Error
+            ? err.message
+            : "Failed to grant access"
+      toast.error("Failed to grant access", { description })
     } finally {
       setSaving(false)
     }
@@ -87,16 +116,15 @@ export default function FamilyGrantAccessPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-[13px] font-medium text-slate-600">
-                Phone Number <span className="text-red-500">*</span>
-              </Label>
+              <Label className="text-[13px] font-medium text-slate-600">Phone Number</Label>
               <PhoneInput
                 international
                 defaultCountry="US"
                 value={form.primaryPhone || undefined}
                 onChange={(value) => {
                   setForm((f) => ({ ...f, primaryPhone: value ?? "" }))
-                  if (formErrors.primaryPhone) setFormErrors((fe) => ({ ...fe, primaryPhone: undefined }))
+                  if (formErrors.primaryPhone || formErrors.identifier)
+                    setFormErrors((fe) => ({ ...fe, primaryPhone: undefined, identifier: undefined }))
                 }}
                 className="phone-input-family"
               />
@@ -113,7 +141,8 @@ export default function FamilyGrantAccessPage() {
                 value={form.email}
                 onChange={(e) => {
                   setForm((f) => ({ ...f, email: e.target.value }))
-                  if (formErrors.email) setFormErrors((fe) => ({ ...fe, email: undefined }))
+                  if (formErrors.email || formErrors.identifier)
+                    setFormErrors((fe) => ({ ...fe, email: undefined, identifier: undefined }))
                 }}
                 className="h-10 rounded-xl border-[#e8eaed] bg-[#f8fafb] text-[14px]"
               />
@@ -130,6 +159,10 @@ export default function FamilyGrantAccessPage() {
               />
             </div>
           </div>
+
+          {formErrors.identifier && (
+            <p className="mt-3 text-[12px] text-red-600">{formErrors.identifier}</p>
+          )}
 
           <Button
             type="button"
@@ -151,7 +184,8 @@ export default function FamilyGrantAccessPage() {
           </Button>
 
           <p className="mt-3 text-[12px] text-slate-400">
-            The phone number entered here will be used to log in to the family portal via SMS verification.
+            A phone number signs in by SMS code; an email address signs in by a link sent to that
+            inbox. Give both and they can use either.
           </p>
         </div>
       </div>

@@ -66,8 +66,6 @@ export default function FamilyLoginPage() {
     const [password, setPassword] = useState("")
     const [phone, setPhone] = useState("")
     const [phoneError, setPhoneError] = useState("")
-    // UI only for now — not validated or sent to the API yet
-    const [email, setEmail] = useState("")
     const [otpCode, setOtpCode] = useState("")
     const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null)
     const [sending, setSending] = useState(false)
@@ -412,17 +410,6 @@ export default function FamilyLoginPage() {
                                 />
                                 {phoneError && <p className="text-xs text-red-600">{phoneError}</p>}
                                 {inlineError && <p className="text-xs text-red-600">{inlineError}</p>}
-                            </div>
-
-                            <div className="space-y-1.5">
-                                <Label className="text-[15px] font-semibold text-slate-800">Email Address</Label>
-                                <Input
-                                    type="email"
-                                    placeholder="e.g. jane@example.com"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className="h-12 rounded-xl border-slate-200 bg-white text-[16px] text-slate-800 placeholder:text-slate-400 focus-visible:border-[#00B4B8] focus-visible:ring-2 focus-visible:ring-[#00B4B8]/20"
-                                />
                             </div>
 
                             <Button
