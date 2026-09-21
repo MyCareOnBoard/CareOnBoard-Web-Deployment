@@ -22,6 +22,7 @@ const FamilyDashboardPage = lazy(() => import("@/pages/family/dashboard"));
 const FamilySchedulePage = lazy(() => import("@/pages/family/schedule"));
 const FamilyMessagesPage = lazy(() => import("@/pages/family/messages"));
 const FamilyAnnouncementsPage = lazy(() => import("@/pages/family/announcements"));
+const FamilyGrantAccessPage = lazy(() => import("@/pages/family/grant-access"));
 const ApplicantDashboardPage = lazy(() => import("@/pages/applicant/dashboard"));
 const DocumentsPage = lazy(() => import("@/pages/applicant/documents"));
 const HelpCenterPage = lazy(() => import("@/pages/help-center"));
@@ -982,6 +983,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.family.announcements,
                 Component: FamilyAnnouncementsPage,
+            },
+            {
+                path: Routes.family.grantAccess,
+                Component: FamilyGrantAccessPage,
             },
         ],
     },

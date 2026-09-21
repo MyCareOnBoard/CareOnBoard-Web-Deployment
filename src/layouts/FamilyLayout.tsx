@@ -6,6 +6,7 @@ import {
   CalendarDays,
   MessageSquare,
   Megaphone,
+  UserPlus,
   LogOut,
   Bell,
   HelpCircle,
@@ -57,6 +58,7 @@ const NAV_ITEMS = [
   { icon: CalendarDays,   label: "Schedule",        to: Routes.family.schedule       as string | null },
   { icon: MessageSquare,  label: "Messages",        to: Routes.family.messages       as string | null },
   { icon: Megaphone,      label: "Announcements",   to: Routes.family.announcements  as string | null },
+  { icon: UserPlus,       label: "Grant Access",   to: Routes.family.grantAccess     as string | null },
 ] satisfies { icon: React.ComponentType<{ className?: string }>; label: string; to: string | null }[]
 
 const BADGE_EVENT = "family_ann_badge_change"
