@@ -36,7 +36,9 @@ function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
   const mode = useEffectiveAgencyMode();
   const [searchParams] = useSearchParams();
   const focusDocumentId = searchParams.get('documentId');
-  useEffect(() => {if (focusDocumentId) setActiveTab('Activity');}, [focusDocumentId]);
+  const focusDocumentKey = searchParams.get('documentKey');
+  const documentsOnly = activeTab === 'Activity' && Boolean(focusDocumentId || focusDocumentKey);
+  useEffect(() => {if (focusDocumentId || focusDocumentKey) setActiveTab('Activity');}, [focusDocumentId,focusDocumentKey]);
   const {data: compliance, isError: complianceError, refetch: refreshCompliance} = useGetDocumentComplianceQuery(
     {viewerId: user?.uid, agencyId: user?.agencyId, employeeId: dsp.id, mode: mode ?? undefined, condition: 'all', limit: 100},
     {skip: !dsp.id || activeTab !== 'Activity', refetchOnFocus: true, refetchOnMountOrArgChange: true},
@@ -44,7 +46,7 @@ function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
   useComplianceDateRefresh(activeTab === 'Activity' ? compliance?.timezone : null, refreshCompliance, compliance?.localDate);
 
   const navigate = useNavigate();
-  const { shifts, isLoading: detailsLoading, refetch: refetchDspDetails } = useDSPDetails(dsp.id);
+  const { shifts, isLoading: detailsLoading, refetch: refetchDspDetails } = useDSPDetails(documentsOnly ? null : dsp.id);
   const { updateStatus } = useUpdateDSPStatus();
 
   const [totalCount, setTotalCount] = useState(0);
@@ -62,7 +64,7 @@ function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
   }, [dsp.id]);
 
   useEffect(() => {
-    if (!dsp.id) return;
+    if (!dsp.id || documentsOnly) return;
     let active = true;
     setTrainingsLoading(true);
     getEmployeeTrainings(dsp.id, user?.agencyId, true, mode ?? undefined)
@@ -83,7 +85,7 @@ function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
       })
       .finally(() => { if (active) setTrainingsLoading(false); });
     return () => { active = false; };
-  }, [dsp.id, user?.agencyId, mode, currentDsp.hireDate, currentDsp.role]);
+  }, [dsp.id, user?.agencyId, mode, currentDsp.hireDate, currentDsp.role, documentsOnly]);
 
   const fetchDocuments = async () => {
     try {
@@ -318,6 +320,7 @@ function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
       {/* Tab Content */}
       {activeTab === "Activity" && (
         <ActivityTab
+          focusDocumentKey={focusDocumentKey}
           dspId={currentDsp.id}
           dspName={currentDsp.fullName}
           shifts={shifts}

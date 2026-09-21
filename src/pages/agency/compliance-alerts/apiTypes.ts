@@ -110,3 +110,13 @@ export interface ClientChecklistItem {
     groups: Array<{program: string; rows: Array<{key: string; status: import('@/lib/api/clients').ChecklistStatus; reasonCode: string | null; warningCode: string | null; issuedDate: string | null; expiryDate: string | null}>}>};
 }
 export interface ClientCompliancePage<T> {items: T[]; nextCursor: string | null; partialPage: boolean; evaluatedAt: string; timezone: string | null; localDate: string | null;}
+
+export interface InitialFindingsPage {
+ items:Array<{id:string;program:'ddd'|'hha';title:string;initialReason:string;checkedAt:string|null;currentState:'open'|'resolved'|'unavailable';actionUrl:string|null}>;
+ nextCursor:string|null;coverage:'ready'|'partial';checkedAt:string|null;
+}
+export interface ComplianceNotificationContext {
+ kind:'condition'|'assignment_warning';state:'open'|'resolved'|'unavailable'|'recorded';program:'ddd'|'hha';
+ clientId?:string;employeeId?:string;shiftId?:string;serviceRowKey?:string;slot?:string|null;
+ reasons:Array<{label:string;code:string}>;acknowledgedBy?:string;acknowledgedAt?:string|null;acknowledgmentReason?:string;
+}

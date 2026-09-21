@@ -15,6 +15,7 @@ import {
   type Source,
   type ComplianceView,
 } from "./workspaceScope";
+import InitialFindings from "./InitialFindings";
 import StaffChecks from "./StaffChecks";
 import ClientChecks from "./ClientChecks";
 import ShiftNotesSection from "./ShiftNotesSection";
@@ -72,6 +73,7 @@ export default function ComplianceAlertsPage() {
           "shiftId",
           "cursor",
           "staffCursor",
+          "initialRunId",
         ])
           next.delete(key);
         setParams(next, { replace: true });
@@ -112,6 +114,8 @@ export default function ComplianceAlertsPage() {
         !sources.length ||
         (parsed.view.source && !sources.includes(parsed.view.source)) ? (
         <p role="alert">{restricted}</p>
+      ) : parsed.view.initialRunId ? (
+        <InitialFindings key={scopeKey+parsed.view.initialRunId} scopeKey={scopeKey} runId={parsed.view.initialRunId} mode={mode!} onBack={reset}/>
       ) : (
         <Workspace
           key={scopeKey}

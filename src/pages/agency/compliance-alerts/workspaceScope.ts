@@ -7,6 +7,7 @@ export type Source =
   | "shift_notes";
 export type Section = "staff" | "clients" | "shifts";
 export interface ComplianceView {
+  initialRunId?: string;
   section?: Section;
   source?: Source;
   mode?: "ddd" | "hha";
@@ -138,6 +139,7 @@ export function parseComplianceView(params: URLSearchParams): ViewParseResult {
     return fail();
   if (raw.mode !== undefined && !["ddd", "hha"].includes(raw.mode))
     return fail();
+  if (raw.initialRunId !== undefined) return validComplianceId(raw.initialRunId) && Object.keys(raw).every(key=>['initialRunId','mode'].includes(key)) ? {ok:true,view:raw as ComplianceView} : fail();
   if (!raw.source && raw.shiftId && !raw.section) {
     raw.source = "shift_notes";
     raw.section = "shifts";

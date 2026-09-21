@@ -1,3 +1,4 @@
+import type {InitialFindingsPage, ComplianceNotificationContext} from './apiTypes';
 import type {ClientComplianceArgs, ClientCompliancePage, ClientChecklistItem, UnsignedForm485Client} from './apiTypes';
 import { ShiftNoteComplianceArgs, ShiftNoteComplianceResponse, ShiftNoteComplianceDetail } from './apiTypes';
 import { useEffect } from 'react';
@@ -11,6 +12,14 @@ export const complianceAlertsApi = createApi({
     tagTypes: ['ExpiredDocuments', 'UnsignedForm485', 'DocumentCompliance', 'DocumentComplianceSettings', 'ShiftNoteCompliance', 'ManualAudit'],
     keepUnusedDataFor: 300,
     endpoints: (builder) => ({
+        getInitialFindings: builder.query<InitialFindingsPage,{runId:string;scopeKey:string;mode?:string;cursor?:string}>({
+            query:({runId,scopeKey:_scopeKey,...params})=>({url:'/notifications/compliance/initial/'+encodeURIComponent(runId),method:'GET',params,requiresAuth:true}),
+            keepUnusedDataFor:0,
+        }),
+        getComplianceNotificationContext: builder.query<ComplianceNotificationContext,{notificationId?:string;initialRunId?:string;initialItemId?:string;scopeKey:string}>({
+            query:({notificationId,initialRunId,initialItemId})=>({url:notificationId?'/notifications/compliance/context/'+encodeURIComponent(notificationId):'/notifications/compliance/initial/'+encodeURIComponent(initialRunId! )+'/context/'+encodeURIComponent(initialItemId!),method:'GET',requiresAuth:true}),
+            keepUnusedDataFor:0,
+        }),
         getClientChecklistPage: builder.query<ClientCompliancePage<ClientChecklistItem>, ClientComplianceArgs>({
             query: ({scopeKey: _scopeKey, limit = 25, ...params}) => ({url: '/clients/compliance/document-checklist', method: 'GET', params: {...params, limit: Math.min(25, Math.max(1, limit))}, requiresAuth: true}),
         }),
@@ -61,7 +70,7 @@ export const complianceAlertsApi = createApi({
     }),
 });
 
-export const { useGetClientChecklistPageQuery, useGetUnsignedForm485PageQuery,
+export const { useGetInitialFindingsQuery, useGetComplianceNotificationContextQuery, useGetClientChecklistPageQuery, useGetUnsignedForm485PageQuery,
     useGetShiftNoteComplianceQuery,
     useGetShiftNoteComplianceDetailQuery,
     useGetDocumentComplianceSettingsQuery,

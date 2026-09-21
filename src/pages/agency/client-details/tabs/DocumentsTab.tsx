@@ -13,12 +13,14 @@ import { DocumentPreviewModal } from "@/components/documents/DocumentPreviewModa
 import { ClientDocumentChecklist, checklistEntryDisplay, usableClientDocuments, clientDocumentUrl } from '@/pages/shared/client-details/components/ClientDocumentChecklist';
 
 export function DocumentsTab({
+  focusDocumentKey,
   client,
   showChecklist = false, refreshing = false, refreshError = null, onRefresh = () => {}, onUploadChecklist,
   onOpenUploadModal,
   onActivateClient,
 }: {
   client: Client;
+  focusDocumentKey?:string|null;
   showChecklist?: boolean;
   refreshing?: boolean;
   refreshError?: string | null;
@@ -27,6 +29,9 @@ export function DocumentsTab({
   onOpenUploadModal?: (document?: ClientDocument) => void;
   onActivateClient?: () => void;
 }) {
+  const requestedSlot=['isp','pcpt','sdr','aenf','form485','poc','physicianOrders','clinicalAssessment'].includes(focusDocumentKey || '')?focusDocumentKey:null;
+  const focusRef=useRef<HTMLDivElement>(null);
+  useEffect(()=>{if(requestedSlot){focusRef.current?.focus();focusRef.current?.scrollIntoView?.({block:'nearest'});}},[requestedSlot,client.id]);
   const [preview, setPreview] = useState<ClientDocument | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   useEffect(() => setPreview(null), [client]);
@@ -59,6 +64,7 @@ export function DocumentsTab({
 
   return (
     <>
+      {requestedSlot&&<div ref={focusRef} tabIndex={-1} className="mt-4 rounded-xl border border-primary/30 bg-background p-4"><p className="font-semibold">Selected document: {requestedSlot.toUpperCase()}</p><p className="my-2 text-sm text-muted-foreground">Review the current file and dates below.</p>{safeDocuments.some(({document})=>document.key===requestedSlot&&clientDocumentUrl(document.url))?<Button variant="outline" onClick={()=>{const doc=safeDocuments.find(({document})=>document.key===requestedSlot&&clientDocumentUrl(document.url))?.document;if(doc)setPreview(doc);}}>View selected document</Button>:onUploadChecklist?<Button onClick={()=>onUploadChecklist(requestedSlot as ChecklistRow['key'])}>Upload required document</Button>:<p className="text-sm">No file recorded. Ask your agency administrator to upload it.</p>}</div>}
       <div className="mt-4 backdrop-blur bg-[rgba(255,255,255,0.3)] border border-[rgba(255,255,255,0.3)] rounded-[30px] p-[20px] flex flex-col gap-[24px] overflow-hidden">
         <div className="flex items-start justify-between gap-4">
           <div className="flex flex-col gap-[4px]">

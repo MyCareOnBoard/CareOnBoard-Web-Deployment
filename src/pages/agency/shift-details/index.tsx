@@ -1,3 +1,4 @@
+import {NotificationContext} from "@/components/compliance/NotificationContext";
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 import { format, parseISO } from "date-fns";
@@ -366,6 +367,7 @@ export default function AgencyShiftDetailsPage({ readOnly = false }: AgencyShift
   return (
     <>
       <div className="space-y-5">
+        <NotificationContext notificationId={new URLSearchParams(location.search).get("notificationId")} expectedShiftId={shiftId} expectedClientId={shift.clientId}/>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-4">
             <button
