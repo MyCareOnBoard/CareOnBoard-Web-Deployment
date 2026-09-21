@@ -274,7 +274,9 @@ export interface ClientIspMetadata {
 
 export interface FamilyPortalContact {
   name: string;
-  primaryPhone: string;
+  /** Either of these identifies the contact at sign-in; at least one is required. */
+  primaryPhone?: string;
+  email?: string;
   relationship?: string;
 }
 

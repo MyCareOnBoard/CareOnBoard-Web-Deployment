@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Loader2, Plus, Trash2, Phone, User, Users } from "lucide-react"
+import { Loader2, Plus, Trash2, Phone, Mail, User, Users } from "lucide-react"
 import PhoneInput, { isValidPhoneNumber, formatPhoneNumberIntl } from "react-phone-number-input"
 import "react-phone-number-input/style.css"
 import { Button } from "@/components/ui/button"
@@ -14,7 +14,10 @@ type FamilyPortalTabProps = {
   onClientUpdated?: () => void
 }
 
-const emptyForm = { name: "", primaryPhone: "", relationship: "" }
+const emptyForm = { name: "", primaryPhone: "", email: "", relationship: "" }
+
+/** Mirrors the server rule: a contact needs a way to be identified at sign-in. */
+type ContactFormErrors = { name?: string; primaryPhone?: string; email?: string; identifier?: string }
 
 export function FamilyPortalTab({ client, clientId, onClientUpdated }: FamilyPortalTabProps) {
   const { toast } = useToast()
@@ -22,16 +25,26 @@ export function FamilyPortalTab({ client, clientId, onClientUpdated }: FamilyPor
     client.familyPortalContacts ?? []
   )
   const [form, setForm] = useState(emptyForm)
-  const [formErrors, setFormErrors] = useState<{ name?: string; primaryPhone?: string }>({})
+  const [formErrors, setFormErrors] = useState<ContactFormErrors>({})
   const [saving, setSaving] = useState(false)
   const [removingIndex, setRemovingIndex] = useState<number | null>(null)
 
   const validate = () => {
-    const errors: { name?: string; primaryPhone?: string } = {}
+    const errors: ContactFormErrors = {}
+    const email = form.email.trim()
+
     if (!form.name.trim()) errors.name = "Name is required"
-    if (!form.primaryPhone) errors.primaryPhone = "Phone number is required"
-    else if (!isValidPhoneNumber(form.primaryPhone))
+
+    // Either identifier will do, but whichever is given has to be usable — a
+    // mistyped address is worse than a blank one, because it looks like access
+    // was granted when nobody can sign in with it.
+    if (form.primaryPhone && !isValidPhoneNumber(form.primaryPhone))
       errors.primaryPhone = "Enter a valid phone number including country code"
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+      errors.email = "Enter a valid email address"
+    if (!form.primaryPhone && !email)
+      errors.identifier = "Add a phone number or an email address so they can sign in"
+
     setFormErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -40,7 +53,10 @@ export function FamilyPortalTab({ client, clientId, onClientUpdated }: FamilyPor
     if (!validate()) return
     const newContact: FamilyPortalContact = {
       name: form.name.trim(),
-      primaryPhone: form.primaryPhone,
+      // Omitted rather than sent empty: the server requires at least one of the
+      // two, and an empty string would satisfy that check without being usable.
+      primaryPhone: form.primaryPhone || undefined,
+      email: form.email.trim().toLowerCase() || undefined,
       relationship: form.relationship.trim() || undefined,
     }
     const updated = [...contacts, newContact]
@@ -50,7 +66,13 @@ export function FamilyPortalTab({ client, clientId, onClientUpdated }: FamilyPor
       setContacts(updated)
       setForm(emptyForm)
       setFormErrors({})
-      toast({ title: "Contact added", description: `${newContact.name} can now access the family portal.` })
+      toast({
+        title: "Contact added",
+        description: `${newContact.name} can sign in to the family portal with ${
+          [newContact.primaryPhone && "their phone", newContact.email && "their email"]
+            .filter(Boolean).join(" or ")
+        }.`,
+      })
       onClientUpdated?.()
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to save contact"
@@ -87,7 +109,8 @@ export function FamilyPortalTab({ client, clientId, onClientUpdated }: FamilyPor
 
         {contacts.length === 0 ? (
           <p className="text-sm text-[#808081]">
-            No family portal contacts yet. Add a phone number below to grant portal access.
+            No family portal contacts yet. Add a phone number or an email address below to
+            grant portal access.
           </p>
         ) : (
           <ul className="flex flex-col gap-3">
@@ -109,9 +132,19 @@ export function FamilyPortalTab({ client, clientId, onClientUpdated }: FamilyPor
                         </span>
                       )}
                     </p>
-                    <div className="flex items-center gap-1 text-[12px] text-[#808081]">
-                      <Phone className="h-3 w-3" />
-                      {formatPhoneNumberIntl(contact.primaryPhone) || contact.primaryPhone}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[#808081]">
+                      {contact.primaryPhone && (
+                        <span className="flex items-center gap-1">
+                          <Phone className="h-3 w-3" />
+                          {formatPhoneNumberIntl(contact.primaryPhone) || contact.primaryPhone}
+                        </span>
+                      )}
+                      {contact.email && (
+                        <span className="flex items-center gap-1">
+                          <Mail className="h-3 w-3" />
+                          {contact.email}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -142,7 +175,7 @@ export function FamilyPortalTab({ client, clientId, onClientUpdated }: FamilyPor
           <h3 className="text-[15px] font-semibold text-[#10141a]">Add Family Portal Contact</h3>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-1.5">
             <Label className="text-[13px] font-medium text-[#525253]">
               Name <span className="text-red-500">*</span>
@@ -161,7 +194,7 @@ export function FamilyPortalTab({ client, clientId, onClientUpdated }: FamilyPor
 
           <div className="space-y-1.5">
             <Label className="text-[13px] font-medium text-[#525253]">
-              Phone Number <span className="text-red-500">*</span>
+              Phone Number
             </Label>
             <PhoneInput
               international
@@ -179,6 +212,24 @@ export function FamilyPortalTab({ client, clientId, onClientUpdated }: FamilyPor
           </div>
 
           <div className="space-y-1.5">
+            <Label className="text-[13px] font-medium text-[#525253]">Email Address</Label>
+            <Input
+              type="email"
+              inputMode="email"
+              autoComplete="off"
+              placeholder="e.g. jane@example.com"
+              value={form.email}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, email: e.target.value }))
+                if (formErrors.email || formErrors.identifier)
+                  setFormErrors((fe) => ({ ...fe, email: undefined, identifier: undefined }))
+              }}
+              className="h-10 rounded-xl border-[#e8eaed] bg-[#f8fafb] text-[14px]"
+            />
+            {formErrors.email && <p className="text-[12px] text-red-600">{formErrors.email}</p>}
+          </div>
+
+          <div className="space-y-1.5">
             <Label className="text-[13px] font-medium text-[#525253]">Relationship</Label>
             <Input
               placeholder="e.g. Mother, Brother"
@@ -188,6 +239,10 @@ export function FamilyPortalTab({ client, clientId, onClientUpdated }: FamilyPor
             />
           </div>
         </div>
+
+        {formErrors.identifier && (
+          <p className="mt-3 text-[12px] text-red-600">{formErrors.identifier}</p>
+        )}
 
         <Button
           type="button"
@@ -209,7 +264,8 @@ export function FamilyPortalTab({ client, clientId, onClientUpdated }: FamilyPor
         </Button>
 
         <p className="mt-3 text-[12px] text-[#808081]">
-          The phone number entered here will be used to log in to the family portal via SMS verification.
+          A phone number signs in by SMS code; an email address signs in by a link sent to that
+          inbox. Give both and the contact can use either.
         </p>
       </div>
 
