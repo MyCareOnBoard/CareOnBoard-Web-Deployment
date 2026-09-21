@@ -25,7 +25,7 @@ import {useDispatch} from "react-redux";
 import {toast} from "sonner";
 import type {TrainingData} from '@/pages/agency/trainings/trainingApi';
 import TrainingCertificate from '@/pages/agency/trainings/TrainingCertificate';
-import {trainingPolicyLabel} from '@/pages/agency/trainings/TrainingPolicyFields';
+import DashboardTrainings from './components/DashboardTrainings';
 import {parseISO} from 'date-fns';
 
 
@@ -50,7 +50,7 @@ export default function UserPanelDashboardPage() {
     const [upload, setUpload] = useState<(SaveEmployeeDocumentResponse & {savedAt: number}) | null>(null);
     const [withinUploadWindow, setWithinUploadWindow] = useState(false);
     const {data: employeeDocuments = []} = useGetEmployeeDocumentsQuery();
-    const {currentData: trainingPage, isFetching: isTrainingLoading, isError: trainingError} = useGetEmployeeTrainingsQuery(
+    const {currentData: trainingPage, isFetching: isTrainingLoading, isError: trainingError, refetch: refreshTrainings} = useGetEmployeeTrainingsQuery(
         {limit: 25, cursor: trainingCursor}, {refetchOnMountOrArgChange: true, refetchOnFocus: true});
     const [updateEmployeeInfo] = useUpdateEmployeeInfoMutation();
     const [completeTraining] = useCompleteTrainingMutation();
@@ -353,87 +353,22 @@ export default function UserPanelDashboardPage() {
                         </div>
                     </div>
 
-                    {/* Trainings Section */}
-                    <div className="bg-[#FFFFFF4D] rounded-[20px] p-6 shadow-sm">
-                        <div className="flex flex-col mb-4">
-                            <h3 className="text-[20px] font-bold text-[#10141a]">Trainings</h3>
-                            <p className="text-[14px] text-[#808081] mt-1">Here are your trainings</p>
-                        </div>
-
-                        {trainingPage?.summary?.policyAssessmentComplete === false && <p className="text-sm text-[#808081] mb-3">Some training requirements are not assessed yet. Review the details below.</p>}
-                        {/* Training Items */}
-                        <div className="space-y-3">
-                            {(trainings.length > 0 || !isTrainingLoading) && (
-                                trainings?.length > 0
-                                ? (
-                                    trainings.map((training) => (
-                                        <div
-                                            key={training.id}
-                                            className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl transition-colors"
-                                        >
-                                            <div className="flex items-center gap-3">
-                        <span className="text-[14px] font-semibold text-[#10141a]">
-                          {training.name}
-                        </span>
-                                            </div>
-                                            <span
-                                                className={`text-[12px] font-semibold px-3 py-1 rounded-full border ${getStatusColor(
-                                                    training.requiresCertificate ? training.status : "assigned"
-                                                )}`}
-                                            >
-                        {training.source==='policy' ? trainingPolicyLabel(training) : training.requiresCertificate ? training.status : 'Take Training'}
-                      </span>
-                                            {!training.requiresCertificate && <span
-                                                className={`text-[12px] font-semibold px-3 py-1 rounded-full border ${getStatusColor(
-                                                    "assigned"
-                                                )}`}
-                                            >
-                        {"Assigned"}
-                      </span>}
-                                            {training.requiresCertificate && <div className="w-full">
-                                                <TrainingCertificate training={training} onUploaded={certificate => {
-                                                    setTrainings(current => current.map(item => item.id === training.id
-                                                        ? {...item, ...certificate} : item));
-                                                    dispatch(userPanelDashboardApi.util.invalidateTags([{type: 'EmployeeTrainings', id: 'SELF'}]));
-                                                    toast.success(certificate.approved ? 'Certificate saved and approved' : 'Certificate saved');
-                                                }}/>
-                                            </div>}
-                                            {!training.requiresCertificate && training.source !== 'policy' && <button
-                                                onClick={() => handleToggle(training?.id || "")}
-                                                aria-label={`${approvalStates[training?.id as any] ? 'Mark incomplete' : 'Mark complete'} ${training.name}`}
-                                                disabled={pendingTraining !== null}
-                                                className={`relative w-[42px] h-[26px] rounded-full transition-colors ${
-                                                    approvalStates[training?.id as any] ? 'bg-[#0EAF52]' : 'bg-[#E0E0E0]'
-                                                }`}
-                                            >
-                                                <div
-                                                    className={`absolute top-[3px] w-[20px] h-[20px] bg-white rounded-full shadow-sm transition-transform ${
-                                                        approvalStates[training?.id as any] ? 'translate-x-[19px]' : 'translate-x-[3px]'
-                                                    }`}
-                                                />
-                                            </button>}
-                                        </div>
-                                    ))
-                                ) : !trainingError ? (
-                                    <p className="text-[14px] text-[#808081]">No trainings available</p>
-                                ) : null
-                            )}
-                            {isTrainingLoading && (
-                                <div>
-                                    <p className="text-[14px] text-[#808081]">Loading...</p>
-                                </div>
-                            )}
-                            {trainingError && !isTrainingLoading && <p className="text-[14px] text-[#808081]">Unable to load trainings</p>}
-                            {!isTrainingLoading && trainingPage?.nextCursor && <Button
-                                type="button"
-                                variant="ghost"
-                                aria-label="Load more trainings"
-                                onClick={() => setTrainingCursor(trainingPage.nextCursor ?? undefined)}
-                            >Load more</Button>}
-                        </div>
-                    </div>
+                    <DashboardTrainings key={user?.uid} trainings={trainings} loading={isTrainingLoading} error={trainingError}
+                        hasMore={!!trainingPage?.nextCursor} assessmentIncomplete={trainingPage?.summary?.policyAssessmentComplete === false}
+                        onLoadMore={() => setTrainingCursor(trainingPage?.nextCursor ?? undefined)} onRetry={() => {void refreshTrainings();}}
+                        renderTraining={training => <>
+                            {training.requiresCertificate && <TrainingCertificate training={training} dashboard showPolicySummary={false} onUploaded={certificate => {
+                                setTrainings(current => current.map(item => item.id === training.id ? {...item, ...certificate} : item));
+                                dispatch(userPanelDashboardApi.util.invalidateTags([{type: 'EmployeeTrainings', id: 'SELF'}]));
+                                toast.success(certificate.approved ? 'Certificate saved and approved' : 'Certificate submitted for agency review');
+                            }}/>}
+                            {!training.requiresCertificate && training.source !== 'policy' && <Button type="button" variant="outline"
+                                onClick={() => handleToggle(training.id || '')} disabled={pendingTraining !== null}
+                                aria-label={`${approvalStates[training.id ?? ''] ? 'Mark incomplete' : 'Mark complete'} ${training.name}`}>
+                                {approvalStates[training.id ?? ''] ? 'Mark incomplete' : 'Mark complete'}
+                            </Button>}
+                        </>}/>
                 </div>
-
                 {/* Right Column - Documents */}
                 <div className="bg-[#FFFFFF4D] rounded-[20px] p-6 shadow-sm">
                     <div className="flex items-center justify-between mb-6">

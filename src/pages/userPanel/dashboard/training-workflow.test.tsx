@@ -38,12 +38,14 @@ describe('employee training pagination', () => {
   it('requires a certificate instead of a completion toggle for new assignments', () => {
     Object.assign(trainingPage.items[0], {requiresCertificate: true, status: 'Awaiting Review'});
     render(<Dashboard />);
-    expect(screen.getByText('Upload completion certificate')).toBeInTheDocument();
+
+    expect(screen.getByText('Upload completion certificate')).toBeVisible();
     expect(screen.getByText('Awaiting Review')).toBeInTheDocument();
     expect(screen.queryByRole('button', {name: 'Mark complete First'})).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', {name: 'Save certificate'}));
     expect(state.dispatch).toHaveBeenCalledWith({type: 'invalidate', payload: [{type: 'EmployeeTrainings', id: 'SELF'}]});
-    expect(screen.getByText('Completed')).toBeInTheDocument();
+
+    expect(screen.getByText('Completed')).toBeVisible();
   });
 
   it('updates existing rows when a continuation page is refreshed', () => {
