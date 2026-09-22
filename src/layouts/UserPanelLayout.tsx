@@ -61,7 +61,7 @@ export default function UserPanelDashboardLayout({ children }: { children?: Reac
   const isSc = user?.applicantType === "support_coordinator" || user?.profile?.role === "support_coordinator" || user?.role === "support_coordinator";
   const excludedPaths = [Routes.userPanel.communityInclusion, Routes.userPanel.dayProgram];
   const excludedPage = isSc && excludedPaths.some((path) => location.pathname === path || location.pathname.startsWith(`${path}/`));
-  const visibleNavItems = isSc ? navItems.filter((item) => !item.path || !excludedPaths.includes(item.path)).map((item) => item.path === Routes.userPanel.shiftManagement ? { ...item, label: "Timesheets", path: Routes.userPanel.manualShiftManagement } : item) : navItems;
+  const visibleNavItems = isSc ? navItems.filter((item) => !item.path || ![...excludedPaths, Routes.userPanel.notes.index, Routes.userPanel.planOfCare].includes(item.path)).map((item) => item.path === Routes.userPanel.shiftManagement ? { ...item, label: "Timesheets", path: Routes.userPanel.manualShiftManagement } : item) : navItems;
   const [collapsed] = useSidebarCollapsed();
 
   const handleLogout = async () => {
