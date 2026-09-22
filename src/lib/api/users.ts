@@ -115,6 +115,7 @@ export async function getUser(): Promise<User> {
           ? [...profileSource.agencyIds]
           : undefined,
       role: profileSource.role || backendUser.role,
+      workAvailability: profileSource.workAvailability === true,
     };
 
     // The profile bootstrap embeds only minimal agency identity. Contact,

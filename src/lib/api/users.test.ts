@@ -112,3 +112,10 @@ describe("getUser", () => {
     });
   });
 });
+
+it.each([true, false])('preserves saved work availability %s after a profile refresh', async workAvailability => {
+  get.mockResolvedValueOnce({data: {success: true, user: {
+    uid: 'employee-1', userType: 'employee', profile: {role: 'dsp', workAvailability},
+  }}});
+  expect((await getUser()).profile?.workAvailability).toBe(workAvailability);
+});

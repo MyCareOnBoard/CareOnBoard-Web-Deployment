@@ -39,6 +39,7 @@ export default function UserPanelDashboardPage() {
     const [askLocationPerm, setAskLocationPerm] = useState<boolean>(false);
     const [isDocumentUploadModalOpen, setIsDocumentUploadModalOpen] = useState<boolean>(false);
     const [workAvailability, setWorkAvailability] = useState<boolean>(false);
+    const [savingAvailability, setSavingAvailability] = useState(false);
     const [uploadDocumentType, setUploadDocumentType] = useState<string>();
     const [approvalStates, setApprovalStates] = useState<Record<string, boolean>>({});
     const [trainingCursor, setTrainingCursor] = useState<string>();
@@ -173,16 +174,26 @@ export default function UserPanelDashboardPage() {
     }
 
     const handleWorkAvailabilityChange = async (pressed: boolean) => {
+        if (savingAvailability) return;
+        const previous = workAvailability;
+        setSavingAvailability(true);
         setWorkAvailability(pressed);
         try {
-            await updateEmployeeInfo({
-                workAvailability: pressed,
-            }).unwrap();
-            const user = await getUser();
-            dispatch(setUser(user));
+            await updateEmployeeInfo({workAvailability: pressed}).unwrap();
         } catch (error) {
             console.error("Error updating work availability:", error);
-            setWorkAvailability(!pressed);
+            setWorkAvailability(previous);
+            setSavingAvailability(false);
+            toast.error('Could not save work availability. Please try again.');
+            return;
+        }
+        try {
+            dispatch(setUser(await getUser()));
+        } catch (error) {
+            console.error("Error refreshing work availability:", error);
+            toast.error('Work availability was saved, but your profile could not refresh. Please reload the page.');
+        } finally {
+            setSavingAvailability(false);
         }
     };
 
@@ -315,6 +326,9 @@ export default function UserPanelDashboardPage() {
                                 <span className="text-[#808081]">Work Availability</span>
                                 <Toggle
                                     className={"h-8 w-14"}
+                                    aria-label="Work availability"
+                                    disabled={savingAvailability}
+                                    aria-busy={savingAvailability}
                                     pressed={workAvailability}
                                     onPressedChange={handleWorkAvailabilityChange}
                                 />
