@@ -23,3 +23,26 @@ it('opens details only on explicit selection and preserves contextual action',as
   expect(screen.getByText('Needs correction')).toBeInTheDocument();expect(mocks.detail).not.toHaveBeenCalled(); expect(screen.getByRole('link',{name:'Usage & reconciliation'})).toHaveAttribute('href',expect.stringContaining('clientId=client'));
   fireEvent.click(screen.getByRole('button',{name:'Open shift note'}));await screen.findByText('Detail');expect(mocks.detail).toHaveBeenLastCalledWith(expect.objectContaining({shiftId:'shift',scopeKey:'scope'}));
 });
+
+it('explains pending inventory once and hides empty pagination',()=>{
+ mocks.query.mockReturnValue({currentData:{items:[],nextCursor:null,coverage:'checking'},refetch:vi.fn()});render(<Harness/>);
+ expect(screen.getByRole('status')).toHaveTextContent('Monitoring is enabled.');
+ expect(screen.queryByText('Shift-note checking is not complete.')).not.toBeInTheDocument();
+ expect(screen.queryByRole('button',{name:'Next page'})).not.toBeInTheDocument();
+ expect(screen.queryByText('No matching shift notes')).not.toBeInTheDocument();
+});
+it('shows a skeleton while loading and a clear empty state only when ready',()=>{
+ mocks.query.mockReturnValue({isFetching:true,refetch:vi.fn()});const {rerender}=render(<Harness/>);
+ expect(screen.getByRole('status',{name:'Checking shift notes…'})).toBeInTheDocument();
+ mocks.query.mockReturnValue({currentData:{items:[],nextCursor:null,coverage:'ready'},refetch:vi.fn()});rerender(<Harness/>);
+ expect(screen.getByText('No matching shift notes')).toBeInTheDocument();
+ expect(screen.queryByRole('button',{name:'Next page'})).not.toBeInTheDocument();
+});
+
+it('opens a linked shift inside its selected panel and closes it without losing the list',async()=>{
+ mocks.query.mockReturnValue({currentData:{items:['first','linked'].map(shiftId=>({shiftId,employeeName:shiftId,clientName:'Client',state:'missing'})),nextCursor:null,coverage:'ready'},refetch:vi.fn()});
+ render(<Harness initial={{source:'shift_notes',shiftId:'linked'}}/>);
+ await screen.findByText('Detail');expect(screen.getByRole('button',{name:'Review linked'})).toHaveAttribute('aria-pressed','true');
+ fireEvent.click(screen.getByRole('button',{name:'Close selected record'}));
+ expect(screen.queryByText('Detail')).not.toBeInTheDocument();expect(screen.getByRole('button',{name:'Review first'})).toBeInTheDocument();
+});

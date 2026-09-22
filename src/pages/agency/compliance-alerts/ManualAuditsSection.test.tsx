@@ -82,9 +82,9 @@ describe('ManualAuditsSection',()=>{
   it('confirmed access loss clears previously visible audit rows',async()=>{
     const row={auditId:'r1',client:{id:'c1',displayName:'Visible Client'},program:'ddd',state:'recorded',observedOn:'2026-09-01',recordedBy:{uid:'u',displayName:'Reviewer'},answerCounts:{},openFollowUpCount:0,earliestDueOn:null,localDate:'2026-09-17'};
     mocks.request.mockResolvedValueOnce({data:{success:true,data:{...emptyList.data,items:[row]}}}).mockResolvedValue({error:{status:403}});
-    setup();expect(await screen.findByText('Visible Client')).toBeInTheDocument();
+    setup();expect(await screen.findByRole('button',{name:'Review Visible Client'})).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button',{name:'Refresh'}));
     expect(await screen.findByText('You do not have access to these records. Ask your agency administrator.')).toBeInTheDocument();
-    expect(screen.queryByText('Visible Client')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button',{name:'Review Visible Client'})).not.toBeInTheDocument();
   });
 });

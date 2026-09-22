@@ -1,3 +1,6 @@
+import {StaffWorkspace} from './WorkspaceSummary';
+import {ComplianceReviewList, ComplianceSkeleton, ComplianceBadge, complianceTone} from './CompliancePresentation';
+import {BookOpen, CalendarDays} from 'lucide-react';
 import { useCallback, useState } from "react";
 import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
@@ -6,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { sendDocumentAlert } from "@/lib/api/employee-documents";
 import { Routes } from "@/routes/constants";
 import { useGetDocumentComplianceQuery, useComplianceDateRefresh } from "./api";
-import { civilDateLabel, complianceLabel } from "./apiTypes";
+import { civilDateLabel, complianceLabel, type DocumentComplianceItem } from "./apiTypes";
 import {
   useGetTrainingsQuery,
   useGetEmployeeTrainingsQuery,
@@ -19,7 +22,7 @@ import {
   visibleSourceData,
   type SourceProps,
 } from "./SourceControls";
-import {trainingPolicyLabel} from '@/pages/agency/trainings/TrainingPolicyFields';
+import {trainingPolicyLabel, TrainingPolicyStatus} from '@/pages/agency/trainings/TrainingPolicyFields';
 export function trainingStatus(row: TrainingData) {
   if (row.source === "policy") return trainingPolicyLabel(row);
   if (row.evidenceStatus === "needs_review") return "Needs review";
@@ -41,7 +44,7 @@ export default function StaffChecks(props: SourceProps) {
   return props.view.source === "training" ? (
     <TrainingChecks {...props} />
   ) : (
-    <DocumentChecks {...props} />
+    props.mode === "sc" ? <DocumentChecks {...props} /> : <StaffWorkspace {...props} />
   );
 }
 function DocumentChecks(props: SourceProps) {
@@ -79,6 +82,12 @@ function DocumentChecks(props: SourceProps) {
     else void query.refetch();
   }, [view.cursor, onPage, query.refetch]);
   useComplianceDateRefresh(data?.timezone, refresh, data?.localDate);
+  const staffDocuments = new Map<string, DocumentComplianceItem[]>();
+  for (const item of data?.items || []) {
+    const documents = staffDocuments.get(item.employeeId);
+    if (documents) documents.push(item);
+    else staffDocuments.set(item.employeeId, [item]);
+  }
   async function alert(employeeId: string, documentId: string) {
     setSending(documentId);
     try {
@@ -115,7 +124,7 @@ function DocumentChecks(props: SourceProps) {
         reset={() => onApply({ employeeId: undefined, cursor: undefined })}
       />
       {query.isFetching && !data && (
-        <p role="status">Checking document expiry…</p>
+        <ComplianceSkeleton label="Checking document expiry…"/>
       )}
       {data?.pilotEnabled === false ? (
         <div className="space-y-3">
@@ -172,54 +181,29 @@ function DocumentChecks(props: SourceProps) {
               {data.items.length} document findings on this page. Expiry
               monitoring does not check every required document.
             </p>
-            <div className="divide-y divide-[#e5e5e6]">
-              {data.items.map((item) => (
-                <div
-                  key={item.issueId || item.documentId}
-                  className="grid gap-3 py-4 md:grid-cols-[1fr_1fr_1fr_auto] md:items-center"
-                >
-                  <div>
-                    <Link
-                      className="font-semibold text-[#008b90] underline"
-                      to={`${Routes.agency.dspManagement}/${encodeURIComponent(item.employeeId)}?documentId=${encodeURIComponent(item.documentId)}`}
-                    >
-                      {item.employeeName}
-                    </Link>
-                    <p className="text-sm capitalize text-[#808081]">
-                      {item.employeeStatus} · {item.program}
-                    </p>
-                  </div>
-                  <p>{item.documentLabel}</p>
-                  <div>
-                    <p>{complianceLabel(item)}</p>
-                    <p className="text-sm">
-                      {item.expiryDateKey
-                        ? `Expires ${civilDateLabel(item.expiryDateKey)}`
-                        : item.condition === "not_applicable"
-                          ? "No deadline set"
-                          : "Not recorded"}
-                    </p>
-                    <p className="text-xs text-[#808081]">
-                      {item.evaluatedAt
-                        ? `Checked ${new Date(item.evaluatedAt).toLocaleString()}`
-                        : "Not yet checked"}
-                    </p>
-                    {item.syncStatus === "pending" && (
-                      <p className="text-sm">
-                        Your change is saved. The list status is updating.
-                      </p>
-                    )}
-                  </div>
-                  <Button
-                    disabled={sending !== null || !!query.error}
-                    className="rounded-full bg-red-500 text-white hover:bg-red-600"
-                    onClick={() => void alert(item.employeeId, item.documentId)}
-                  >
-                    {sending === item.documentId ? "Sending…" : "Send Alert"}
-                  </Button>
+            <ComplianceReviewList label="Staff document findings" items={[...staffDocuments].map(([employeeId, documents]) => ({
+              id: employeeId,
+              title: documents[0].employeeName,
+              subtitle: `${documents.length} document finding${documents.length === 1 ? '' : 's'} on this page`,
+              meta: [...new Set(documents.map(item => complianceLabel(item)))].join(' · '),
+              detail: <>
+                <h3>{documents[0].employeeName}</h3>
+                <p className="text-sm text-[#5e7378]">Document findings on this page</p>
+                <div className="divide-y divide-[#dce7e8]">{documents.map(item => <section key={item.issueId || item.documentId} className="py-5">
+                <h4 className="mb-2 font-bold">{item.documentLabel}</h4>
+                <p className="text-sm text-[#5e7378]">{item.employeeName} · <span className="capitalize">{item.employeeStatus} · {item.program}</span></p>
+                <ComplianceBadge tone={complianceTone(item.condition)}>{complianceLabel(item)}</ComplianceBadge>
+                <p className="text-sm text-[#5e7378]">{item.expiryDateKey ? `Expiry date: ${civilDateLabel(item.expiryDateKey)}` : 'Expiry date: Not recorded'}</p>
+                <p className="mt-2 text-xs text-[#5e7378]">{item.evaluatedAt ? `Checked ${new Date(item.evaluatedAt).toLocaleString()}` : 'Not yet checked'}</p>
+                {item.syncStatus === 'pending' && <p className="mt-3 text-sm">Your change is saved. The list status is updating.</p>}
+                <p className="mt-5 text-sm text-[#5e7378]">Open the staff document to review the file and recorded expiry date.</p>
+                <div className="compliance-actions">
+                  <Link className="compliance-primary" to={`${Routes.agency.dspManagement}/${encodeURIComponent(item.employeeId)}?documentId=${encodeURIComponent(item.documentId)}`}>Open staff documents</Link>
+                  <Button variant="outline" disabled={sending !== null || !!query.error} className="rounded-full" onClick={() => void alert(item.employeeId, item.documentId)}>{sending === item.documentId ? 'Sending…' : 'Send Alert'}</Button>
                 </div>
-              ))}
-            </div>
+                </section>)}</div>
+              </>,
+            }))}/>
             {!data.items.length &&
               data.syncStatus === "ready" &&
               (!data.monitoringState || data.monitoringState === "active") && (
@@ -243,108 +227,56 @@ function DocumentChecks(props: SourceProps) {
   );
 }
 function TrainingChecks(props: SourceProps) {
-  const {
-    view,
-    scopeKey,
-    agencyId,
-    mode,
-    onApply,
-    onSelect,
-    onPage,
-    onPrevious,
-  } = props;
-  const query = useGetTrainingsQuery(
-    {
-      scopeKey,
-      agencyId,
-      mode,
-      workspace: true,
-      search: view.search,
-      cursor: view.staffCursor,
-      limit: 8,
-    },
-    { refetchOnMountOrArgChange: true },
-  );
-  const data = visibleSourceData(query.currentData, query.error);
-  return (
-    <section aria-label="Training assignments" className="p-4 sm:p-6">
-      <h2 className="text-xl font-bold">Training assignments</h2>
-      <SourceFilters view={view} onApply={onApply}>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={query.isFetching}
-          onClick={() => void query.refetch()}
-        >
-          Refresh staff
-        </Button>
-      </SourceFilters>
-      <SourceNotice
-        error={query.error}
-        hasData={!!data}
-        retry={() => void query.refetch()}
-        reset={() => onApply({ staffCursor: undefined, employeeId: undefined })}
-      />
-      {query.isFetching && !data && <p role="status">Loading staff…</p>}
-      {data && (
-        <>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {data.items.map((employee) => (
-              <button
-                key={employee.id}
-                type="button"
-                aria-pressed={view.employeeId === employee.id}
-                onClick={() =>
-                  onSelect({ employeeId: employee.id, cursor: undefined })
-                }
-                className="rounded-xl border border-white bg-white/60 p-4 text-left hover:border-[#00b4b8] aria-pressed:border-[#00b4b8]"
-              >
-                <p className="font-semibold">{employee.fullName}</p>
-                <p className="text-sm text-[#808081]">
-                  {employee.assignedCount} assigned training
-                  {employee.assignedCount === 1 ? "" : "s"}
-                </p>
-              </button>
-            ))}
-          </div>
-          {!data.items.length && (
-            <p>
-              {data.nextCursor
-                ? "No matches on this page. More records are available."
-                : "No matching records in this view"}
-            </p>
-          )}
-          <SourcePage
-            cursor={view.staffCursor}
-            next={data.nextCursor}
-            loading={query.isFetching}
-            onNext={() => onPage(data.nextCursor!, true)}
-            onPrevious={() => onPrevious(true)}
-          />
-        </>
-      )}
-      {!view.employeeId ? (
-        <p className="mt-6">
-          Select a staff member to view training assignments.
-        </p>
-      ) : (
-        (!query.error || data) && (
-          <EmployeeTrainings key={view.employeeId} {...props} />
-        )
-      )}
-    </section>
-  );
+  const {view,scopeKey,agencyId,mode,onApply,onSelect,onPage,onPrevious}=props;
+  const query=useGetTrainingsQuery({scopeKey,agencyId,mode,workspace:true,search:view.search,cursor:view.staffCursor,limit:8},{refetchOnMountOrArgChange:true});
+  const data=visibleSourceData(query.currentData,query.error);
+  const items=(data?.items || []).map(employee=>({
+    id:employee.id,title:employee.fullName,subtitle:'Training assignments',
+    status:<ComplianceBadge>{employee.assignedCount} assigned</ComplianceBadge>,
+    meta:'Open assignments, certificate status and deadlines',
+    detail:<EmployeeTrainings key={employee.id} {...props} staffName={employee.fullName}/>,
+  }));
+  // Keep a direct staff link usable when that person is outside the current page.
+  if(view.employeeId && !items.some(item=>item.id===view.employeeId) && (!query.error || data))items.push({
+    id:view.employeeId,title:'Selected staff',subtitle:'Opened from a direct link',status:<></>,meta:'Training assignments',
+    detail:<EmployeeTrainings key={view.employeeId} {...props}/>,
+  });
+  return <section aria-label="Training assignments" className="p-4 sm:p-6">
+    <h2 className="text-xl font-bold">Training assignments</h2>
+    <p className="mt-2 text-sm text-[#5e7378]">Select a staff member to review courses, deadlines and submitted certificates.</p>
+    <SourceFilters view={view} onApply={onApply} hideExpiry>
+      <Button type="button" variant="outline" disabled={query.isFetching} onClick={()=>void query.refetch()}>Refresh staff</Button>
+    </SourceFilters>
+    <SourceNotice error={query.error} hasData={!!data} retry={query.refetch} reset={()=>onApply({staffCursor:undefined,employeeId:undefined})}/>
+    {query.isFetching && !data && <ComplianceSkeleton label="Loading staff…"/>}
+    {data && <p className="text-sm text-[#5e7378]">{data.items.length} staff on this page. Badges show assigned courses.</p>}
+    <ComplianceReviewList label="Staff training assignments" items={items} selection={{id:view.employeeId || null,onChange:id=>onSelect({employeeId:id || undefined,cursor:undefined})}}/>
+    {data && !data.items.length && <p className="py-4 text-sm text-[#5e7378]">{data.nextCursor?'No matches on this page. More records are available.':'No matching staff in this view.'}</p>}
+    {data && data.items.length>0 && !view.employeeId && <p className="flex items-center gap-2 py-4 text-sm text-[#5e7378]"><BookOpen size={18} aria-hidden="true"/>Select a staff member to view training assignments.</p>}
+    {data && <SourcePage cursor={view.staffCursor} next={data.nextCursor} loading={query.isFetching} onNext={()=>onPage(data.nextCursor!,true)} onPrevious={()=>onPrevious(true)}/>}
+  </section>;
+}
+function trainingTone(row:TrainingData) {
+  if(row.source==='policy') {
+    if(row.policyContextState!=='current')return 'neutral';
+    if(['overdue','expired'].includes(row.deadlineState || ''))return 'danger';
+    if(['before_work','due_soon','due_today','renewal_due','details_needed'].includes(row.deadlineState || ''))return 'warning';
+    return row.deadlineState==='satisfied'?'success':'neutral';
+  }
+  if(row.evidenceStatus==='accepted')return 'success';
+  if(row.evidenceStatus==='needs_review' || ['Awaiting Review','Changes Requested'].includes(row.status))return 'warning';
+  return 'neutral';
 }
 function EmployeeTrainings({
+  staffName,
   view,
   scopeKey,
   agencyId,
   mode,
   onApply,
-  onSelect,
   onPage,
   onPrevious,
-}: SourceProps) {
+}: SourceProps & {staffName?:string}) {
   const query = useGetEmployeeTrainingsQuery(
     {
       scopeKey,
@@ -359,17 +291,11 @@ function EmployeeTrainings({
   );
   const data = visibleSourceData(query.currentData, query.error);
   return (
-    <div className="mt-6 border-t border-[#e5e5e6] pt-4">
+    <div className="min-w-0">
       <h3 className="text-lg font-semibold">
-        Selected staff training assignments
+        {staffName || "Selected staff training assignments"}
       </h3>
-      <div className="my-3 flex flex-wrap gap-3">
-        <Button
-          variant="outline"
-          onClick={() => onSelect({ employeeId: undefined, cursor: undefined })}
-        >
-          Clear staff selection
-        </Button>
+      <div className="compliance-actions mb-4">
         <Button
           variant="outline"
           disabled={query.isFetching}
@@ -379,7 +305,7 @@ function EmployeeTrainings({
         </Button>
         {data && (
           <Link
-            className="self-center text-[#008b90] underline"
+            className="compliance-primary"
             to={`${Routes.agency.trainings}?employeeId=${encodeURIComponent(view.employeeId!)}`}
           >
             Open training review
@@ -394,7 +320,7 @@ function EmployeeTrainings({
         reset={() => onApply({ employeeId: undefined, cursor: undefined })}
       />
       {query.isFetching && !data && (
-        <p role="status">Loading training assignments…</p>
+        <ComplianceSkeleton label="Loading training assignments…" detail={false}/>
       )}
       {data && (
         <>
@@ -409,15 +335,17 @@ function EmployeeTrainings({
             Recorded certificate acceptance does not confirm authenticity,
             current file availability, or clearance for every service.
           </p>
-          <div className="divide-y divide-[#e5e5e6]">
+          <div className="mt-5 space-y-3">
             {data.items.map((row, index) => (
-              <div key={row.id || index} className="py-4">
-                <p className="font-semibold">{row.name}</p>
-                <p>{trainingStatus(row)}</p>
-                {row.source === "policy" && row.policyContextState === "current" && row.reviewState === "awaiting_review" && <p>Certificate awaiting review</p>}
-                <p className="text-sm text-[#808081]">
-                  Assigned timeframe: {row.timeFrame || "Not recorded"}
-                </p>
+              <div key={row.id || index} className="rounded-xl border border-[#dce7e8] bg-white p-4">
+                <p className="mb-2 text-xs text-[#5e7378]">{row.source==='policy'?'Automatically assigned':row.source==='manual'?'Manually assigned':'Assigned training'}</p>
+                <h4 className="mb-3 font-bold text-[#16343a]">{row.name}</h4>
+                <ComplianceBadge tone={trainingTone(row)}>{trainingStatus(row)}</ComplianceBadge>
+                <div className="mt-3"><TrainingPolicyStatus training={row} showSummary={false}/></div>
+                {row.source==='policy' && row.policyContextState==='current' && row.dueDateKey && !['satisfied','not_required','details_needed','expired','before_work'].includes(row.deadlineState || '') && <p className="mt-3 flex items-center gap-2 text-xs text-[#5e7378]"><CalendarDays size={15} aria-hidden="true"/>Due {civilDateLabel(row.dueDateKey)}</p>}
+                {(row.source!=="policy" || row.timeFrame) && <p className="mt-3 flex items-start gap-2 text-xs text-[#5e7378]"><CalendarDays size={15} className="mt-0.5 shrink-0" aria-hidden="true"/><span>
+                  Assigned timeframe: {row.timeFrame || "Not recorded"}</span>
+                </p>}
               </div>
             ))}
           </div>

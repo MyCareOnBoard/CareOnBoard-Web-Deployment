@@ -52,9 +52,9 @@ export const sourceSection: Record<Source, Section> = {
   shift_notes: "shifts",
 };
 export const sourceLabels: Record<Source, string> = {
-  document_expiry: "Document expiry",
+  document_expiry: "Staff compliance",
   training: "Training assignments",
-  client_documents: "Document checklist",
+  client_documents: "Client compliance",
   manual_audits: "Manual audits",
   unsigned_form485: "Unsigned Form 485",
   shift_notes: "Shift notes",
@@ -107,7 +107,7 @@ export function getComplianceSources(
   if (!owner && !access.includes("Compliance Alerts")) return [];
   const has = (key: string) => owner || access.includes(key);
   const sources: Source[] = [];
-  if (has("DSP Management")) sources.push("document_expiry");
+  if (has("DSP Management") || mode !== "sc" && has("Trainings")) sources.push("document_expiry");
   if (has("Trainings")) sources.push("training");
   if (mode !== "sc" && has("Client Management"))
     sources.push("client_documents");

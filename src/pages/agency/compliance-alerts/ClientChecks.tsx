@@ -1,7 +1,8 @@
+import {WorkspaceSummary, WorkspaceReviewList} from './WorkspaceSummary';
+import {ComplianceReviewList, ComplianceSkeleton, ComplianceBadge, complianceTone} from './CompliancePresentation';
 import { useCallback, useState } from "react";
 import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Routes } from "@/routes/constants";
 import { DOCUMENT_TYPE_OPTIONS } from "@/pages/shared/client-management/utils/documentTypeConstants";
 import {
@@ -106,7 +107,7 @@ function ChecklistChecks({
           checked={attention}
           onChange={(event) => setAttention(event.target.checked)}
         />
-        Needs attention on this page
+        Document issues on this page
       </label>
       <SourceNotice
         error={query.error}
@@ -116,7 +117,7 @@ function ChecklistChecks({
         reset={() => onApply({ clientId: undefined, cursor: undefined })}
       />
       {query.isFetching && !data && (
-        <p role="status">Checking client documents…</p>
+        <ComplianceSkeleton label="Checking client documents…"/>
       )}
       {data && (
         <>
@@ -127,7 +128,7 @@ function ChecklistChecks({
               : ""}
           </p>
           <p className="text-sm text-[#808081]">
-            Files and dates on record do not confirm approval or readiness for
+            Alert counts cover client documents, AENF and client policy checks. A + means some checks are incomplete. Files and dates on record do not confirm approval or readiness for
             assignment.
           </p>
           {data.partialPage && (
@@ -135,21 +136,11 @@ function ChecklistChecks({
               Checking records. Some results are not available yet.
             </p>
           )}
-          <div className="divide-y divide-[#e5e5e6]">
-            {rows.map((client) => (
-              <details key={client.id} className="py-4">
-                <summary className="cursor-pointer font-semibold">
-                  {client.name}{" "}
-                  <span className="font-normal capitalize text-[#808081]">
-                    · {client.status}
-                  </span>{" "}
-                  <span className="text-sm font-normal">
-                    —{" "}
-                    {client.documentChecklist.state === "unavailable"
-                      ? "Checklist unavailable"
-                      : `${client.documentChecklist.groups.reduce((count, group) => count + group.rows.filter((row) => attentionStatuses.has(row.status)).length, 0)} document slots need attention`}
-                  </span>
-                </summary>
+          <WorkspaceReviewList key={`${scopeKey}:${mode}:${rows.map(c=>c.id).join()}:${query.fulfilledTimeStamp}`} kind="client" {...{agencyId,mode,scopeKey}} label="Client document checklists" items={rows.map(client => ({
+            id: client.id, title: client.name,
+            subtitle: <span className="capitalize">{client.status}</span>,
+            meta: client.documentChecklist.state === 'unavailable' ? 'Checklist unavailable' : `${client.documentChecklist.groups.reduce((count, group) => count + group.rows.filter(row => attentionStatuses.has(row.status)).length, 0)} document slots need attention`,
+            detail: <><h3>{client.name}</h3>
                 {client.documentChecklist.state === "unavailable" ? (
                   <p className="mt-3">
                     Checklist unavailable. Saved document details need checking.
@@ -184,12 +175,13 @@ function ChecklistChecks({
                               </p>
                             )}
                           </div>
-                          <Badge variant="outline">{labels[row.status]}</Badge>
+                          <ComplianceBadge tone={complianceTone(row.status)}>{labels[row.status]}</ComplianceBadge>
                         </div>
                       ))}
                     </div>
                   ))
                 )}
+                <div className="mt-5"><WorkspaceSummary showName={false} kind="client" id={client.id} {...{agencyId,mode,scopeKey}}/></div>
                 <div className="mt-3 flex flex-wrap gap-4">
                   <Link
                     className="text-[#008b90] underline"
@@ -207,9 +199,8 @@ function ChecklistChecks({
                 <p className="mt-2 text-sm text-[#808081]">
                   Assignment review: Not checked here
                 </p>
-              </details>
-            ))}
-          </div>
+            </>,
+          }))}/>
           {!rows.length && (
             <p className="py-4">
               {attention && data.items.length ? (
@@ -287,7 +278,7 @@ function UnsignedChecks({
         reset={() => onApply({ clientId: undefined, cursor: undefined })}
       />
       {query.isFetching && !data && (
-        <p role="status">Checking unsigned forms…</p>
+        <ComplianceSkeleton label="Checking unsigned forms…"/>
       )}
       {data && (
         <>
@@ -298,41 +289,16 @@ function UnsignedChecks({
           {data.partialPage && (
             <p>Checking records. Some results are not available yet.</p>
           )}
-          <div className="divide-y divide-[#e5e5e6]">
-            {data.items.map((client) => (
-              <div
-                key={client.id}
-                className="grid gap-3 py-4 sm:grid-cols-[1fr_1fr_auto]"
-              >
-                <div>
-                  <p className="font-semibold">{client.name}</p>
-                  <p className="text-sm capitalize">{client.status}</p>
-                </div>
-                <div>
-                  <p>
-                    {client.deactivated
-                      ? "Deactivated — signed 485 overdue"
-                      : client.daysLeft == null
-                        ? "Unsigned"
-                        : client.daysLeft <= 0
-                          ? "Unsigned — overdue"
-                          : `Unsigned — ${client.daysLeft} day${client.daysLeft === 1 ? "" : "s"} left`}
-                  </p>
-                  <p className="text-sm text-[#808081]">
-                    {client.deadline
-                      ? `Due ${new Date(client.deadline).toLocaleDateString()}`
-                      : "No deadline set"}
-                  </p>
-                </div>
-                <Link
-                  className="text-[#008b90] underline"
-                  to={clientHref(client.id, "documents")}
-                >
-                  Open client documents
-                </Link>
-              </div>
-            ))}
-          </div>
+          <ComplianceReviewList label="Unsigned forms" items={data.items.map(client => ({
+            id: client.id, title: client.name, subtitle: 'Form 485',
+            status: <ComplianceBadge tone={client.deactivated || (client.daysLeft != null && client.daysLeft <= 0) ? 'danger' : 'warning'}>Unsigned</ComplianceBadge>,
+            meta: client.deadline ? `Due ${new Date(client.deadline).toLocaleDateString()}` : 'No deadline set',
+            detail: <><h3>Unsigned Form 485</h3><p>{client.name}</p><p className="mt-3 text-sm capitalize">{client.status}</p>
+              <p className="mt-4 font-semibold">{client.deactivated ? 'Deactivated — signed 485 overdue' : client.daysLeft == null ? 'Unsigned' : client.daysLeft <= 0 ? 'Unsigned — overdue' : `Unsigned — ${client.daysLeft} day${client.daysLeft === 1 ? '' : 's'} left`}</p>
+              <p className="mt-3 text-sm text-[#5e7378]">Review the signature and grace deadline on the client record.</p>
+              <div className="compliance-actions"><Link className="compliance-primary" to={clientHref(client.id, 'documents')}>Open client documents</Link></div>
+            </>,
+          }))}/>
           {!data.items.length && (
             <p className="py-4">
               {data.nextCursor

@@ -49,7 +49,7 @@ describe('scoped compliance workspace', () => {
     expect(mocks.documentRequest).not.toHaveBeenCalled(); expect(mocks.courseRequest).not.toHaveBeenCalled();
     expect(mocks.request.mock.calls[0][0]).toMatchObject({url:'/agencies/trainings',params:{workspace:true,limit:8}});
   });
-  it.each(['source=document_expiry','section=clients&source=training','source=training&startDate=2026-09-01'])('makes zero requests for forbidden or invalid %s', query => {
+  it.each(['source=client_documents','section=clients&source=training','source=training&startDate=2026-09-01'])('makes zero requests for forbidden or invalid %s', query => {
     setup('/agency/compliance-alerts?'+query); expect(screen.getByRole('alert')).toBeInTheDocument(); expect(mocks.request).not.toHaveBeenCalled();
   });
   it('typing requests nothing, Apply requests once, and back restores applied search', async () => {
@@ -67,12 +67,12 @@ describe('scoped compliance workspace', () => {
     await waitFor(() => expect(mocks.request).toHaveBeenCalledTimes(1)); expect(mocks.request.mock.calls[0][0]).toMatchObject({url:'/clients/compliance/document-checklist',params:{status:'all',limit:25}});
   });
   it('disabled document pilot makes no legacy request and retains permitted action', async () => {
-    mocks.user.userType='agency'; mocks.request.mockResolvedValue({data:{...emptyDocument,pilotEnabled:false}}); setup('/agency/compliance-alerts');
+    mocks.mode='sc'; mocks.user.userType='agency'; mocks.request.mockResolvedValue({data:{...emptyDocument,pilotEnabled:false}}); setup('/agency/compliance-alerts');
     expect(await screen.findByText('Expiry monitoring is not enabled. Open staff documents to review expiry.')).toBeInTheDocument(); expect(screen.getByRole('link',{name:'Open staff documents'})).toBeInTheDocument(); expect(mocks.request).toHaveBeenCalledTimes(1);
   });
   it('retains only same-scope stale rows after 503, then clears them after 403', async () => {
-    mocks.user.userType='agency'; mocks.request.mockResolvedValueOnce({data:{...emptyDocument,items:[document]}}).mockResolvedValueOnce({error:{status:503}}).mockResolvedValue({error:{status:403}}); setup('/agency/compliance-alerts');
-    await screen.findByText('Visible Staff'); fireEvent.click(screen.getByRole('button',{name:'Refresh'})); await screen.findByText(/Could not refresh. Showing results checked at/); expect(screen.getByText('Visible Staff')).toBeInTheDocument();
+    mocks.mode='sc'; mocks.user.userType='agency'; mocks.request.mockResolvedValueOnce({data:{...emptyDocument,items:[document]}}).mockResolvedValueOnce({error:{status:503}}).mockResolvedValue({error:{status:403}}); setup('/agency/compliance-alerts');
+    await screen.findByRole('button',{name:'Review Visible Staff'}); fireEvent.click(screen.getByRole('button',{name:'Refresh'})); await screen.findByText(/Could not refresh. Showing results checked at/); expect(screen.getByRole('button',{name:'Review Visible Staff'})).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button',{name:'Retry'})); await screen.findByText('You do not have access to these records. Ask your agency administrator.'); expect(screen.queryByText('Visible Staff')).not.toBeInTheDocument();
   });
   it('expired cursor hides its invalid page and offers reset', async () => {
@@ -86,7 +86,7 @@ describe('scoped compliance workspace', () => {
     rerender(<App/>); await act(async()=>resolve({data:{...emptyDocument,items:[document]}})); expect(screen.queryByText('Visible Staff')).not.toBeInTheDocument();
   });
   it('preserves document reminder action', async()=>{
-    mocks.user.userType='agency'; mocks.request.mockResolvedValue({data:{...emptyDocument,items:[document]}}); setup('/agency/compliance-alerts');
+    mocks.mode='sc'; mocks.user.userType='agency'; mocks.request.mockResolvedValue({data:{...emptyDocument,items:[document]}}); setup('/agency/compliance-alerts');
     fireEvent.click(await screen.findByRole('button',{name:'Send Alert'})); await waitFor(()=>expect(mocks.alert).toHaveBeenCalledWith('staff','doc'));
   });
 });
@@ -94,12 +94,12 @@ describe('scoped compliance workspace', () => {
 
 it('preserves each source cursor and unsubscribes inactive lists', async()=>{
   mocks.user.userType='agency';
-  mocks.request.mockImplementation(async(args:any)=>({data:args.url==='/documents/compliance'?{...emptyDocument,nextCursor:args.params.cursor?null:'next'}:{items:[],nextCursor:null,evaluatedAt:'2026-09-17T12:00:00Z'}}));
+  mocks.request.mockImplementation(async(args:any)=>({data:args.url==='/notifications/compliance/workspace/staff'?{...emptyDocument,nextCursor:args.params.cursor?null:'next'}:{items:[],nextCursor:null,evaluatedAt:'2026-09-17T12:00:00Z'}}));
   const {store}=setup('/agency/compliance-alerts'); await screen.findByText('More results available');
   fireEvent.click(screen.getByRole('button',{name:'Next page'}));await waitFor(()=>expect(mocks.request).toHaveBeenCalledTimes(2));
   fireEvent.click(screen.getByRole('tab',{name:'Clients'}));await waitFor(()=>expect(mocks.request).toHaveBeenCalledTimes(3));
   await act(async()=>{store.dispatch(complianceAlertsApi.util.invalidateTags(['DocumentCompliance']));});expect(mocks.request).toHaveBeenCalledTimes(3);
-  fireEvent.click(screen.getByRole('tab',{name:'Staff'}));await waitFor(()=>expect(mocks.request).toHaveBeenCalledTimes(4));expect(mocks.request.mock.calls[3][0]).toMatchObject({url:'/documents/compliance',params:{cursor:'next'}});
+  fireEvent.click(screen.getByRole('tab',{name:'Staff'}));await waitFor(()=>expect(mocks.request).toHaveBeenCalledTimes(4));expect(mocks.request.mock.calls[3][0]).toMatchObject({url:'/notifications/compliance/workspace/staff',params:{cursor:'next'}});
 });
 it('uses a permitted URL mode without dropping the requested employee',async()=>{
   const {rerender,App}=setup('/agency/compliance-alerts?section=staff&source=training&mode=hha&employeeId=direct');expect(mocks.request).not.toHaveBeenCalled();
@@ -141,7 +141,7 @@ describe('review regressions: layout mode and browser pagination', () => {
     expect(store.getState().agencyMode.modeByAgency.agency).toBe('ddd'); expect(mocks.request).not.toHaveBeenCalled();
   });
   it.each([
-    ['document_expiry','cursor','/documents/compliance',0],
+    ['document_expiry','cursor','/notifications/compliance/workspace/staff',0],
     ['client_documents','cursor','/clients/compliance/document-checklist',0],
     ['shift_notes','cursor','/shifts/note-compliance',0],
     ['training','staffCursor','/agencies/trainings',0],

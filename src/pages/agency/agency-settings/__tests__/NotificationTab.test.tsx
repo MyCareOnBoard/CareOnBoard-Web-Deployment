@@ -16,20 +16,20 @@ beforeEach(() => {
   }}));
 });
 afterEach(() => vi.useRealTimers());
-describe('agency document monitoring settings', () => {
+describe('agency compliance monitoring settings', () => {
   it('retains shared preferences without exposing owner controls or requests to staff', () => {
     mocks.userType = 'agency_staff'; render(<AgencyNotificationTab />);
     expect(screen.getByText('Notification preferences')).toBeInTheDocument();
-    expect(screen.queryByText('Document expiry monitoring')).not.toBeInTheDocument();
+    expect(screen.queryByText('Compliance monitoring')).not.toBeInTheDocument();
     expect(mocks.query).not.toHaveBeenCalled();
   });
   it('enables existing agencies and shows bounded setup progress without a backlog', async () => {
     render(<AgencyNotificationTab />);
-    fireEvent.click(screen.getByRole('button', {name: 'Enable document expiry monitoring'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Enable compliance monitoring'}));
     await act(async () => {});
     expect(mocks.update).toHaveBeenCalledWith({enabled: true});
-    expect(screen.getByText('Setting up document monitoring')).toBeInTheDocument();
-    expect(screen.getByText(/without sending a backlog of alerts/)).toBeInTheDocument();
+    expect(screen.getByText('Setting up compliance monitoring')).toBeInTheDocument();
+    expect(screen.getByText(/one catch-up summary/)).toBeInTheDocument();
     expect(mocks.query).toHaveBeenLastCalledWith({viewerId: 'owner', agencyId: 'agency'}, expect.objectContaining({pollingInterval: 5000, skipPollingIfUnfocused: true}));
     await act(() => vi.advanceTimersByTimeAsync(60_000));
     expect(mocks.query).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({pollingInterval: 0}));
@@ -46,7 +46,7 @@ describe('agency document monitoring settings', () => {
     rerender(<AgencyNotificationTab active />);
     expect(screen.getByRole('button', {name: 'Refresh'})).toBeInTheDocument();
     mocks.data = {...mocks.data, state: 'active'}; rerender(<AgencyNotificationTab active />);
-    expect(screen.getByText('Document expiry monitoring is enabled')).toBeInTheDocument();
+    expect(screen.getByText('Compliance monitoring is enabled')).toBeInTheDocument();
     expect(mocks.query).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({pollingInterval: 0}));
     unmount();
   });
@@ -62,7 +62,7 @@ describe('agency document monitoring settings', () => {
   it('blocks enabling without an agency timezone and honestly retries load errors', () => {
     mocks.data = {...mocks.data, timezone: null, canEnable: false};
     const {rerender} = render(<AgencyNotificationTab />);
-    expect(screen.getByRole('button', {name: 'Enable document expiry monitoring'})).toBeDisabled();
+    expect(screen.getByRole('button', {name: 'Enable compliance monitoring'})).toBeDisabled();
     expect(screen.getByText(/Set a valid agency timezone in Agency Information/)).toBeInTheDocument();
     mocks.error = true; rerender(<AgencyNotificationTab />);
     fireEvent.click(screen.getByRole('button', {name: 'Retry'}));

@@ -41,7 +41,7 @@ export const complianceAlertsApi = createApi({
         }),
         updateDocumentComplianceSettings: builder.mutation<DocumentComplianceSettings, {enabled: boolean}>({
             query: (data) => ({url: '/documents/compliance/settings', method: 'PUT', data, requiresAuth: true}),
-            invalidatesTags: ['DocumentComplianceSettings', 'DocumentCompliance'],
+            invalidatesTags: ['DocumentComplianceSettings', 'DocumentCompliance', 'ShiftNoteCompliance'],
         }),
         getDocumentCompliance: builder.query<DocumentComplianceResponse, DocumentComplianceArgs>({
             query: ({scopeKey: _scopeKey, viewerId: _viewerId, ...params}) => ({url: '/documents/compliance', method: 'GET', params, requiresAuth: true}),

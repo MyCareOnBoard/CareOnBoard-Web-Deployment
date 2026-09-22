@@ -3,7 +3,7 @@ import {getComplianceSources, parseComplianceView, complianceHref} from './works
 const staff = (accessList: string[], agencyModes: unknown = ['ddd', 'hha', 'sc']) => ({userType: 'agency_staff', profile: {accessList, agencyModes}, agency: {supportedClientTypes: ['ddd', 'hha', 'sc']}});
 describe('workspace access and URL boundary', () => {
   it('intersects workspace with independent source grants', () => {
-    expect(getComplianceSources(staff(['Compliance Alerts', 'Trainings']), 'ddd')).toEqual(['training']);
+    expect(getComplianceSources(staff(['Compliance Alerts', 'Trainings']), 'ddd')).toEqual(['document_expiry', 'training']);
     expect(getComplianceSources(staff(['Compliance Alerts', 'Client Management']), 'hha')).toEqual(['client_documents', 'manual_audits', 'unsigned_form485']);
     expect(getComplianceSources(staff(['Compliance Alerts', 'Notes', 'Scheduling']), 'ddd')).toEqual(['shift_notes']);
     expect(getComplianceSources(staff(['Compliance Alerts', 'Notes', 'Shift Management']), 'ddd')).toEqual(['shift_notes']);

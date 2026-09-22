@@ -15,6 +15,7 @@ import {
   type Source,
   type ComplianceView,
 } from "./workspaceScope";
+import "./compliance.css";
 import InitialFindings from "./InitialFindings";
 import StaffChecks from "./StaffChecks";
 import ClientChecks from "./ClientChecks";
@@ -99,10 +100,11 @@ export default function ComplianceAlertsPage() {
   const sources = getComplianceSources(user, mode);
   const reset = () => setParams({});
   return (
-    <div className="min-h-[calc(100vh-200px)] px-4 sm:px-6 lg:px-0">
-      <h1 className="mb-6 text-[28px] font-bold text-[#10141a] sm:text-[40px]">
+    <div className="compliance-workspace min-h-[calc(100vh-200px)] px-4 sm:px-6 lg:px-0">
+      <h1 className="mb-2 text-[28px] font-bold tracking-tight text-[#16343a] sm:text-[36px]">
         Compliance Alerts
       </h1>
+      <p className="mb-7 text-sm text-[#5e7378]">See what needs attention. Open the affected record to take the next step.</p>
       {!parsed.ok ? (
         <div role="alert">
           {parsed.message}{" "}
@@ -214,7 +216,7 @@ function Workspace({
       <div
         role="tablist"
         aria-label="Compliance sections"
-        className="mb-4 flex flex-wrap gap-2"
+        className="mb-5 flex flex-wrap gap-6 border-b border-[#dce7e8]"
       >
         {sections.map((section, index) => (
           <button
@@ -257,7 +259,7 @@ function Workspace({
                   sources.find((item) => sourceSection[item] === section)!,
               )
             }
-            className={`rounded-full border px-5 py-2 text-sm font-medium ${view.section === section ? "border-[#00b4b8] bg-[#00b4b8] text-white" : "border-[#e5e5e6] text-[#10141a] hover:bg-[#eef4f5]"}`}
+            className={`border-b-[3px] px-1 py-3 text-base font-semibold transition-colors ${view.section === section ? "border-[#008b90] text-[#007f84]" : "border-transparent text-[#5e7378] hover:text-[#007f84]"}`}
           >
             {section[0].toUpperCase() + section.slice(1)}
           </button>
@@ -273,17 +275,17 @@ function Workspace({
         role="tabpanel"
         id={`compliance-panel-${view.section}`}
         aria-labelledby={`compliance-tab-${view.section}`}
-        className="overflow-hidden rounded-2xl border border-white bg-[#FFFFFF4D] shadow-sm"
+        className="min-w-0 overflow-hidden rounded-2xl border border-[#dce7e8] bg-white"
       >
-        <div className="flex flex-wrap gap-2 border-b border-[#e5e7eb] p-4">
+        <div className="flex flex-wrap gap-2 border-b border-[#dce7e8] p-3 sm:px-5">
           {sources
             .filter((item) => sourceSection[item] === view.section)
             .map((item) => (
               <Button
                 key={item}
-                variant={item === source ? "default" : "outline"}
+                variant="ghost"
                 aria-pressed={item === source}
-                className="rounded-full"
+                className={`rounded-lg px-4 text-sm ${item === source ? "bg-[#e4f5f4] text-[#007f84] hover:bg-[#d8eeee]" : "text-[#5e7378] hover:bg-[#f5f9f9]"}`}
                 onClick={() => selectSource(item)}
               >
                 {sourceLabels[item]}

@@ -64,7 +64,7 @@ export function SourceNotice({
   const kind = sourceError(error);
   if (!kind) return null;
   return (
-    <div role="alert" className="my-3 text-sm text-[#b54708]">
+    <div role="alert" className="my-3 flex flex-wrap items-center gap-3 rounded-xl border border-[#ecd4ad] bg-[#fff8e9] p-4 text-sm text-[#865615]">
       {kind === "restricted"
         ? "You do not have access to these records. Ask your agency administrator."
         : kind === "missing"
@@ -103,7 +103,7 @@ export function SourcePage({
   onPrevious: () => void;
 }) {
   return (
-    <div className="mt-4 flex flex-wrap items-center gap-3">
+    <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-[#dce7e8] pt-4">
       <Button
         variant="outline"
         disabled={!cursor || loading}
@@ -124,10 +124,12 @@ export function SourceFilters({
   view,
   onApply,
   children,
+  hideExpiry = false,
 }: {
   view: ComplianceView;
   onApply: SourceProps["onApply"];
   children?: ReactNode;
+  hideExpiry?: boolean;
 }) {
   const [draft, setDraft] = useState(view);
   const key = JSON.stringify(view);
@@ -141,7 +143,7 @@ export function SourceFilters({
         event.preventDefault();
         onApply(draft);
       }}
-      className="my-4 flex flex-wrap items-end gap-3"
+      className="compliance-filters"
     >
       {["training", "document_expiry", "client_documents"].includes(
         view.source || "",
@@ -178,7 +180,7 @@ export function SourceFilters({
               <option value="inactive">Inactive</option>
             </select>
           </label>
-          <label className="text-sm">
+          {!hideExpiry && <label className="text-sm">
             Expiry status
             <select
               aria-label="Expiry status"
@@ -203,7 +205,7 @@ export function SourceFilters({
                 </option>
               ))}
             </select>
-          </label>
+          </label>}
         </>
       )}
       {view.source === "client_documents" && !view.clientId && (

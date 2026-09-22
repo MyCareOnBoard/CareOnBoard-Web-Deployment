@@ -6,7 +6,7 @@ import SettingsSectionCard from '@/pages/shared/settings/SettingsSectionCard';
 import {settingsActionBtnClass, settingsAlertErrorClass} from '@/pages/shared/settings/settingsCardStyles';
 import {useGetDocumentComplianceSettingsQuery, useUpdateDocumentComplianceSettingsMutation} from '@/pages/agency/compliance-alerts/api';
 
-function DocumentMonitoringSettings({active, viewerId, agencyId}: {active: boolean; viewerId: string; agencyId?: string}) {
+function ComplianceMonitoringSettings({active, viewerId, agencyId}: {active: boolean; viewerId: string; agencyId?: string}) {
   const [deadline, setDeadline] = useState<number | null>(null);
   const [withinSetupWindow, setWithinSetupWindow] = useState(false);
   const [actionError, setActionError] = useState(false);
@@ -33,19 +33,19 @@ function DocumentMonitoringSettings({active, viewerId, agencyId}: {active: boole
     } catch {setActionError(true);}
   };
   const settingUp = data?.state === 'baselining';
-  return <SettingsSectionCard title="Document expiry monitoring" subtitle="Monitor employee document expiry dates and send reminders.">
+  return <SettingsSectionCard title="Compliance monitoring" subtitle="Monitor document expiry, training and CPR deadlines, client requirements, and missing shift notes.">
     <div className="space-y-3">
-      {isLoading && <p role="status" className="text-sm text-[#808081]">Loading document monitoring settings...</p>}
+      {isLoading && <p role="status" className="text-sm text-[#808081]">Loading compliance monitoring settings...</p>}
       {(isError || actionError) && <div role="alert" className={settingsAlertErrorClass}>
-        <span>{actionError ? "We couldn't update document monitoring. Please try again." : "We couldn't load document monitoring settings."}</span>
+        <span>{actionError ? "We couldn't update compliance monitoring. Please try again." : "We couldn't load compliance monitoring settings."}</span>
         {isError && <Button type="button" variant="outline" className={settingsActionBtnClass} onClick={() => refetch()}>Retry</Button>}
       </div>}
       {data && <>
-        <p role="status" className="text-sm font-medium text-[#10141a]">{settingUp ? 'Setting up document monitoring' : data.state === 'active' ? 'Document expiry monitoring is enabled' : data.state === 'paused' ? 'Document expiry monitoring is paused' : 'Document expiry monitoring is not enabled'}</p>
-        <p className="text-[13px] text-[#808081]">{settingUp ? 'Existing documents are being initialized without sending a backlog of alerts.' : 'When enabled, existing documents are initialized without sending a backlog of alerts.'}</p>
-        {!data.canEnable && data.state !== 'active' && !settingUp && <p className="text-[13px] text-[#808081]">{data.message || 'Set a valid agency timezone in Agency Information before enabling document monitoring.'}</p>}
+        <p role="status" className="text-sm font-medium text-[#10141a]">{settingUp ? 'Setting up compliance monitoring' : data.state === 'active' ? 'Compliance monitoring is enabled' : data.state === 'paused' ? 'Compliance monitoring is paused' : 'Compliance monitoring is not enabled'}</p>
+        <p className="text-[13px] text-[#808081]">Existing issues are grouped into one catch-up summary. Shift-note reminders start from activation; individual notification preferences still apply.</p>
+        {!data.canEnable && data.state !== 'active' && !settingUp && <p className="text-[13px] text-[#808081]">{data.message || 'Set a valid agency timezone in Agency Information before enabling compliance monitoring.'}</p>}
         {settingUp ? !withinSetupWindow && <Button type="button" variant="outline" className={settingsActionBtnClass} disabled={isFetching} onClick={() => refetch()}>Refresh</Button> : <Button type="button" className={settingsActionBtnClass} variant={data.state === 'active' ? 'outline' : 'default'} disabled={saving || isFetching || isError || (data.state !== 'active' && !data.canEnable)} onClick={() => changeMonitoring(data.state !== 'active')}>
-          {saving ? 'Saving...' : data.state === 'active' ? 'Pause' : data.state === 'paused' ? 'Resume' : 'Enable document expiry monitoring'}
+          {saving ? 'Saving...' : data.state === 'active' ? 'Pause' : data.state === 'paused' ? 'Resume' : 'Enable compliance monitoring'}
         </Button>}
       </>}
     </div>
@@ -56,6 +56,6 @@ export default function AgencyNotificationTab({active = true}: {active?: boolean
   const {user} = useAuth();
   return <div className="space-y-4">
     <NotificationPreferencesTab />
-    {user?.userType === 'agency' && user.uid && <DocumentMonitoringSettings key={`${user.uid}:${user.agencyId}`} active={active} viewerId={user.uid} agencyId={user.agencyId} />}
+    {user?.userType === 'agency' && user.uid && <ComplianceMonitoringSettings key={`${user.uid}:${user.agencyId}`} active={active} viewerId={user.uid} agencyId={user.agencyId} />}
   </div>;
 }

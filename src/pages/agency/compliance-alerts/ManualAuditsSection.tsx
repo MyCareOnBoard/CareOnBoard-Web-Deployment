@@ -1,3 +1,4 @@
+import {ComplianceReviewList, ComplianceSkeleton, ComplianceBadge} from './CompliancePresentation';
 import {useEffect,useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {useGetClientChecklistPageQuery} from './api';
@@ -31,7 +32,7 @@ export default function ManualAuditsSection({view,scopeKey,agencyId,mode,onApply
   const close=()=>{setStarting(null);onSelect({auditId:undefined,cursor:undefined});};
   if(detailMode||starting){
     const checklist=starting?.checklist;
-    if(starting&&!checklist)return <section className="p-4 sm:p-6"><SourceNotice error={query.error} hasData={false} retry={()=>void query.refetch()} reset={close}/><p role="status">Loading review questions…</p><Button variant="outline" onClick={close}>Back to reviews</Button></section>;
+    if(starting&&!checklist)return <section className="p-4 sm:p-6"><SourceNotice error={query.error} hasData={false} retry={()=>void query.refetch()} reset={close}/><ComplianceSkeleton label="Loading review questions…" detail={false}/><Button variant="outline" onClick={close}>Back to reviews</Button></section>;
     const clientId=starting?.clientId||view.clientId!;
     return <ManualAuditEditor key={JSON.stringify([scopeKey,clientId,starting?.correctsAuditId,starting?'new':view.auditId])}
       scopeKey={scopeKey} agencyId={agencyId} program={program} clientId={clientId}
@@ -50,18 +51,22 @@ export default function ManualAuditsSection({view,scopeKey,agencyId,mode,onApply
         <label className="text-sm">Client name<input aria-label="Client name" maxLength={100} className="mt-1 block min-h-11 rounded-xl border border-[#cccccd] px-3" value={searchInput} onChange={e=>setSearchInput(e.target.value)}/></label><Button variant="outline" type="submit">Find clients</Button>
       </form>
       <SourceNotice error={clientQuery.error} hasData={!!clients} retry={()=>void clientQuery.refetch()} reset={()=>{setSearch('');setSearchInput('');setClientCursors([undefined]);setSelection('');}}/>
+      {clientQuery.isFetching && !clients && <ComplianceSkeleton label="Loading clients…" detail={false}/>}
       <label className="mt-3 block text-sm">Client<select aria-label="Client" disabled={!clients||clientQuery.isFetching} className="mt-1 block min-h-11 w-full rounded-xl border border-[#cccccd] bg-white px-3" value={selection} onChange={e=>setSelection(e.target.value)}><option value="">Select client</option>{clients?.items.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
       {clients&&!clients.items.length?<p role="status" className="mt-2 text-sm">{clients.nextCursor?'No accessible clients on this page. Continue to the next page.':'No active clients found.'}</p>:null}
       <div className="mt-3 flex flex-wrap gap-2"><Button disabled={!selection||!data?.checklist||clientQuery.isFetching} onClick={()=>setStarting({clientId:selection,checklist:data!.checklist})}>Start review</Button><Button variant="outline" disabled={!selection||!clients||clientQuery.isFetching} onClick={()=>onApply({clientId:selection,auditId:undefined})}>Filter reviews</Button></div>
       <SourcePage cursor={clientCursors.at(-1)} next={clients?.nextCursor} loading={clientQuery.isFetching} onNext={()=>{if(clients?.nextCursor){setClientCursors([...clientCursors,clients.nextCursor]);setSelection('');}}} onPrevious={()=>{setClientCursors(clientCursors.slice(0,-1));setSelection('');}}/>
     </details>
     <SourceNotice error={query.error} hasData={!!data} retry={()=>void query.refetch()} reset={()=>onApply({auditView:'follow_up_needed',clientId:undefined,auditId:undefined})}/>
-    {!data&&query.isFetching?<p role="status">Loading manual audits…</p>:null}
-    {data?<><p className="text-sm text-[#62686f]">As of {new Date(data.evaluatedAt).toLocaleString()}</p><div className="divide-y divide-[#e5e5e6]">{data.items.map(item=><article key={item.auditId} className="grid gap-3 py-4 sm:grid-cols-[1fr_1fr_auto]">
-      <div><p className="font-semibold">{item.clientName||item.clientId}</p><p className="text-sm capitalize">{item.state}</p>{item.recordedBy?<p className="text-sm">Recorded by {item.recordedBy.displayName}</p>:null}</div>
-      <div><p>{item.openFollowUpCount?`Follow-up needed · ${item.openFollowUpCount} open`:'No open follow-ups'}</p>{item.earliestOpenDueOn?<p className="text-sm">{item.localDate&&item.earliestOpenDueOn<item.localDate?'Overdue':item.earliestOpenDueOn===item.localDate?'Due today':'Due'} · {item.earliestOpenDueOn}</p>:null}<p className="text-sm text-[#62686f]">{item.observedOn?`Observed on ${item.observedOn}`:'Observation date not set'}</p></div>
-      <Button variant="outline" onClick={()=>onSelect({clientId:item.clientId,auditId:item.auditId,cursor:undefined})}>Open review</Button>
-    </article>)}</div>{!data.items.length?<p className="py-6">{data.nextCursor?'No accessible reviews on this page. Continue to the next page.':empty[auditView]}</p>:null}
+    {!data&&query.isFetching?<ComplianceSkeleton label="Loading manual audits…"/>:null}
+    {data?<><p className="text-sm text-[#62686f]">As of {new Date(data.evaluatedAt).toLocaleString()}</p><ComplianceReviewList label="Manual audit findings" items={data.items.map(item => ({
+      id:item.auditId, title:item.clientName||item.clientId, subtitle:<span className="capitalize">{item.state}</span>,
+      status:<ComplianceBadge tone={item.openFollowUpCount?'warning':'neutral'}>{item.openFollowUpCount?`${item.openFollowUpCount} open`:'No open follow-ups'}</ComplianceBadge>,
+      meta:item.observedOn?`Observed on ${item.observedOn}`:'Observation date not set',
+      detail:<><h3>{item.clientName||item.clientId}</h3>{item.recordedBy?<p className="text-sm text-[#5e7378]">Recorded by {item.recordedBy.displayName}</p>:null}
+      <p className="mt-5 font-semibold">{item.openFollowUpCount?`Follow-up needed · ${item.openFollowUpCount} open`:'No open follow-ups'}</p>{item.earliestOpenDueOn?<p className="text-sm">{item.localDate&&item.earliestOpenDueOn<item.localDate?'Overdue':item.earliestOpenDueOn===item.localDate?'Due today':'Due'} · {item.earliestOpenDueOn}</p>:null}
+      <div className="compliance-actions"><Button className="compliance-primary" onClick={()=>onSelect({clientId:item.clientId,auditId:item.auditId,cursor:undefined})}>Open review</Button></div></>,
+    }))}/>{!data.items.length?<p className="py-6">{data.nextCursor?'No accessible reviews on this page. Continue to the next page.':empty[auditView]}</p>:null}
     {auditView==='follow_up_needed'&&!data.items.length&&!data.nextCursor?<Button variant="outline" onClick={()=>onApply({auditView:'recorded'})}>View all recorded reviews</Button>:null}
     <SourcePage cursor={view.cursor} next={data.nextCursor} loading={query.isFetching} onNext={()=>onPage(data.nextCursor!)} onPrevious={()=>onPrevious()}/></>:null}
   </section>;
