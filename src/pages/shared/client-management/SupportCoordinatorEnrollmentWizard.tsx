@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router";
 import { format, parseISO } from "date-fns";
 import { Eye, EyeOff, Info, Upload, UploadCloud, X } from "lucide-react";
@@ -62,6 +62,9 @@ export function SupportCoordinatorEnrollmentWizard() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [form, setForm] = useState<Form>(initialForm);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState("");
+  const [photoError, setPhotoError] = useState("");
   const [document, setDocument] = useState<File | null>(null);
   const [pendingDocument, setPendingDocument] = useState<File | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -76,6 +79,12 @@ export function SupportCoordinatorEnrollmentWizard() {
   const completedCount = completed.filter(Boolean).length;
   const progress = Math.round(completedCount / steps.length * 100);
   const name = form.firstName.trim() ? `Enrolling ${form.firstName.trim()} ${form.lastName.trim()}`.trim() : "New client enrollment";
+  useEffect(() => {
+    if (!photoFile) { setPhotoPreview(""); return; }
+    const url = URL.createObjectURL(photoFile);
+    setPhotoPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [photoFile]);
   const update = <K extends keyof Form>(key: K, value: Form[K]) => {
     setForm(previous => {
       const next = { ...previous, [key]: value };
@@ -102,6 +111,16 @@ export function SupportCoordinatorEnrollmentWizard() {
     }
     setPendingDocument(file);
     setUploadError("");
+  };
+  const selectPhoto = (files: FileList | null) => {
+    const file = files?.[0];
+    if (!file) return;
+    if (!["image/jpeg", "image/png"].includes(file.type) || file.size === 0 || file.size > 5 * 1024 * 1024) {
+      setPhotoError("Choose a JPG or PNG photo up to 5 MB.");
+      return;
+    }
+    setPhotoFile(file);
+    setPhotoError("");
   };
   const selectAddress = (details: AddressDetails) => {
     setForm(previous => ({ ...previous, addressSearch: details.formattedAddress, address: details.line1 || details.street, city: details.city, state: details.stateCode || details.state, zip: details.zipCode }));
@@ -169,6 +188,14 @@ export function SupportCoordinatorEnrollmentWizard() {
     };
     try {
       const client = await createClient(payload);
+      if (photoFile) {
+        try {
+          const uploaded = await uploadClientDocument(client.id, "client-photo", photoFile);
+          await updateClient(client.id, { profileImage: uploaded.url });
+        } catch {
+          toast({ title: "Client saved", description: "The photo could not be attached to the enrollment.", variant: "destructive" });
+        }
+      }
       if (document) {
         try {
           const uploaded = await uploadClientDocument(client.id, "consent-and-releases", document);
@@ -222,7 +249,11 @@ export function SupportCoordinatorEnrollmentWizard() {
         </div>}
 
         {step === 1 && <div className="sc-enrollment-card sc-enrollment-sections">
-          <section><h2>1. Personal information</h2><div className="sc-enrollment-grid three">
+          <section><h2>1. Personal information</h2>
+          <div className="sc-enrollment-photo"><span className="sc-enrollment-photo-label">Client photo</span>
+            <FileUpload aria-label="Client photo" aria-invalid={photoError ? true : undefined} aria-describedby={`sc-photo-help${photoError ? " sc-photo-error" : ""}`} accept="image/jpeg,image/png" onFilesSelected={selectPhoto} className={`sc-enrollment-photo-upload ${photoError ? "invalid" : ""}`} icon={photoPreview ? <img src={photoPreview} alt="" className="sc-enrollment-photo-preview" /> : <span className="sc-enrollment-photo-icon"><UploadCloud size={23} /></span>} label={<span className="sc-enrollment-photo-copy"><strong>{photoFile ? "Photo ready" : "Click to upload or drag and drop"}</strong><small id="sc-photo-help">{photoFile ? `${photoFile.name} · Click or drop to replace` : "JPG or PNG · Up to 5 MB"}</small></span>} />
+            {photoError && <p id="sc-photo-error" className="sc-enrollment-photo-error" role="alert">{photoError}</p>}
+          </div><div className="sc-enrollment-grid three">
             <Field label="First name" required><Input value={form.firstName} onChange={event => update("firstName", event.target.value)} placeholder="Enter first name" required /></Field>
             <Field label="Middle name"><Input value={form.middleName} onChange={event => update("middleName", event.target.value)} placeholder="Enter middle name" /></Field>
             <Field label="Last name" required><Input value={form.lastName} onChange={event => update("lastName", event.target.value)} placeholder="Enter last name" required /></Field>

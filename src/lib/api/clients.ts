@@ -819,6 +819,7 @@ export interface CreateClientRequest {
  */
 export interface UpdateClientRequest {
   scEnrollment?: ScEnrollment;
+  profileImage?: string;
   medicationSupportSettings?: MedicationSupportSettings;
   acuityRequirements?: ClientAcuityRequirements;
   servicePrograms?: ("ddd" | "hha" | "sc")[];

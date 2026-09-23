@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 const FileUpload = React.forwardRef<
   HTMLInputElement,
   React.ComponentProps<"input"> & {
-    label?: string
+    label?: React.ReactNode
     icon?: React.ReactNode
     onFilesSelected?: (files: FileList | null) => void
   }

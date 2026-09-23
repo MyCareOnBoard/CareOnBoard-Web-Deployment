@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { vi, test, expect } from "vitest";
 import type { AddressDetails } from "@/hooks/useGooglePlacesAutocomplete";
@@ -40,4 +40,20 @@ test("step one opens the document modal with download disabled", () => {
   expect(screen.getByRole("dialog", { name: "Download & fill forms" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Download document here" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Upload document" })).toBeDisabled();
+});
+
+test("participant photo upload previews the selected image and rejects other files", async () => {
+  URL.createObjectURL = vi.fn(() => "blob:client-photo");
+  URL.revokeObjectURL = vi.fn();
+  const { container } = render(<MemoryRouter><SupportCoordinatorEnrollmentWizard /></MemoryRouter>);
+  fireEvent.click(screen.getByRole("button", { name: /Supports Program SP/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Get started" }));
+  const input = screen.getByLabelText("Client photo");
+  fireEvent.change(input, { target: { files: [new File(["not an image"], "notes.pdf", { type: "application/pdf" })] } });
+  expect(screen.getByRole("alert")).toHaveTextContent("Choose a JPG or PNG photo up to 5 MB.");
+  fireEvent.change(input, { target: { files: [new File(["image"], "client-photo.png", { type: "image/png" })] } });
+  await waitFor(() => expect(container.querySelector(".sc-enrollment-photo-preview")).toHaveAttribute("src", "blob:client-photo"));
+  expect(screen.getByText("Photo ready")).toBeInTheDocument();
+  expect(screen.getByText(/client-photo.png · Click or drop to replace/)).toBeInTheDocument();
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
