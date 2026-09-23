@@ -97,7 +97,7 @@ export default function SupportCoordinatorClientsPage() {
               <p className="px-4 py-12 text-center text-[14px] text-[#6b7280]">No clients match your search or filter.</p>
             ) : pageClients.map((client) => {
               const tone = client.compliance === 100 ? "#0eaf52" : client.compliance < 50 ? "#d92d20" : "#f97316";
-              const openDetails = () => navigate(`${Routes.agency.clientDetails.replace(":clientId", client.id)}?tab=profile-isp`);
+              const openDetails = () => navigate(`${Routes.agency.clientDetails.replace(":clientId", client.id)}?tab=assessment`);
               return <div role="row" aria-label={`Open details for ${client.name}`} tabIndex={0} onClick={openDetails} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openDetails(); } }} key={client.id} className="sc-client-grid grid cursor-pointer grid-cols-1 gap-3 border-b border-[#e5e5e6] px-4 py-4 last:border-b-0 hover:bg-[#f9fafb] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#00b4b8] lg:items-center">
                 <div role="cell" className="flex min-w-0 items-center gap-3">
                   <Avatar className="h-10 w-10">{client.id === "182441" && <AvatarImage src="/user-profile-image.png" alt="" className="object-cover" />}<AvatarFallback className="bg-[#e6f8f8] text-[12px] font-bold text-[#007f84]">{client.initials}</AvatarFallback></Avatar>

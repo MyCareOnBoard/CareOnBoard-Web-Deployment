@@ -12,7 +12,7 @@ describe("SupportCoordinatorClientsPage", () => {
     render(<MemoryRouter><SupportCoordinatorClientsPage /><Location /></MemoryRouter>);
 
     await user.click(screen.getByRole("row", { name: "Open details for Leslie Alexander" }));
-    expect(screen.getByTestId("location")).toHaveTextContent("/agency/clients/182441?tab=profile-isp");
+    expect(screen.getByTestId("location")).toHaveTextContent("/agency/clients/182441?tab=assessment");
   });
 
   it("paginates sample clients and resets to page one when filters change", async () => {

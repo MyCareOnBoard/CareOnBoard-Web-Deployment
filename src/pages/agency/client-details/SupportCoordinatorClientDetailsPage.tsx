@@ -1,18 +1,24 @@
-import { useEffect, useState } from "react";
-import { ArrowLeft, CircleHelp, FileText, FolderOpen } from "lucide-react";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { ArrowLeft, CircleHelp, FileText, FolderOpen, X } from "lucide-react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { normalizeSignaturePayload } from "@/pages/agency/billing/claims/utils/claimReportSignatureUtils";
 import { getAgencyClientById, type Client } from "@/lib/api/clients";
-import { DatePickerField } from "@/pages/shared/client-management/components/forms/formControls";
+import { DatePickerField, SignatureField } from "@/pages/shared/client-management/components/forms/formControls";
 import { clients } from "@/pages/agency/clients-management/supportCoordinatorSampleClients";
 import { Routes } from "@/routes/constants";
 
+const DigitalSignatureModal = lazy(() => import("@/pages/applicant/application/components/DigitalSignature"));
+
 const tabs = [
-  { id: "profile-isp", label: "Profile & ISP" },
+  { id: "assessment", label: "Assessment & Tier" },
   { id: "planning", label: "Planning" },
   { id: "services", label: "Services" },
   { id: "monitoring", label: "Monitoring" },
@@ -29,21 +35,88 @@ const sampleOutcomes = [
 ];
 
 const documentShortcuts = [
-  { title: "ISP Quality Review", description: "Pre-finalization checklist" },
-  { title: "Participant Rights", description: "Rights & Responsibilities record" },
-  { title: "PCPT", description: "Person-Centered Planning Tool" },
-  { title: "ISP", description: "Individualized Service Plan" },
+  { title: "ISP Quality Review", description: "Pre-finalization checklist", action: "Open →" },
+  { title: "Participant Rights", description: "Rights & Responsibilities record", action: "Open →" },
+  { title: "PCPT", description: "Person-Centered Planning Tool", action: "Review auto-Draft" },
+  { title: "ISP", description: "Individualized Service Plan", action: "Review auto-Draft" },
 ];
+
+const qualityReviewItems = [
+  "Plan is person-centered and reflects individual preferences and goals",
+  "Information is consistent with NJCAT assessment findings",
+  "Goals are clearly documented with measurable outcomes",
+  "Services correspond to identified needs and goals",
+  "Provider information is complete and current",
+  "Required signatures are complete (Participant, Guardian if applicable, SC)",
+  "Required supporting documents are attached (Rights, Enrollment Agreement)",
+  "Effective dates and authorization periods have been reviewed",
+];
+
+const participantRights = [
+  "Be treated with dignity and respect",
+  "Participate in ISP development and service choice",
+  "Privacy and confidentiality of records (HIPAA)",
+  "File a complaint or request a fair hearing",
+  "Receive services free from abuse, neglect, and exploitation",
+  "Be informed of available service options",
+];
+
+const rightsCompletionItems = [
+  "Presented to participant / representative",
+  "Reviewed together with participant",
+  "Participant acknowledged understanding",
+];
+
+const sampleServices = [
+  { name: "Individual supports", status: "Active", code: "H2016HT", provider: "Morning Star Supportive Services Corp", contact: "Madu Sarah", phone: "551.312.8522", authorization: "03/24/2026 → 03/23/2027", units: "90 hrs/week", rate: "$9.85", totalCost: "$197,728.90", frequency: "Weekly", pa: "Received", sdr: "Received" },
+  { name: "Community Inclusion Services", status: "Active", code: "H2015H104", provider: "Morning Star Supportive Services Corp", contact: "Madu Sarah", phone: "551.312.8522", authorization: "03/24/2026 → 03/23/2027", units: "18 hrs/week", rate: "$8.50", totalCost: "$31,416.00", frequency: "Weekly", pa: "Missing", sdr: "Received" },
+  { name: "Respite", status: "Review", code: "H2016H1", provider: "Hopes Promise Respite LLC", contact: "Renee Johnson", phone: "609.555.0142", authorization: "05/18/2026 → 08/01/2026", units: "8 days", rate: "$387.00", totalCost: "$3,096.00", frequency: "Weekly", pa: "Pending", sdr: "Pending" },
+] as const;
+
+type Service = {
+  name: string; code: string; status: string; provider: string; contact: string; phone: string;
+  authorization: string; units: string; rate: string; totalCost: string; frequency: string;
+  pa: string; sdr: string; source?: string;
+};
+
+const sampleAuthorizationWeeks = ["Aug 10–16", "Aug 3–9", "Jul 27–Aug 2", "Jul 20–26", "Jul 13–19"];
 
 export default function SupportCoordinatorClientDetailsPage() {
   const { clientId } = useParams();
   const [searchParams] = useSearchParams();
   const requestedTab = searchParams.get("tab");
-  const activeTab: Tab = tabs.some(({ id }) => id === requestedTab) ? requestedTab as Tab : "profile-isp";
+  const activeTab: Tab = requestedTab === "profile-isp" ? "assessment" : tabs.some(({ id }) => id === requestedTab) ? requestedTab as Tab : "assessment";
   const sample = clients.find((client) => client.id === clientId);
   const [savedClient, setSavedClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(Boolean(!sample && clientId));
   const [error, setError] = useState(false);
+  const [selectedShortcut, setSelectedShortcut] = useState<string | null>(null);
+  const [confirmedItems, setConfirmedItems] = useState<number[]>([]);
+  const [reviewerName, setReviewerName] = useState("");
+  const [correctionsNote, setCorrectionsNote] = useState("");
+  const [showCorrectionsNote, setShowCorrectionsNote] = useState(false);
+  const [reviewSaved, setReviewSaved] = useState(false);
+  const [rightsChecked, setRightsChecked] = useState<number[]>([]);
+  const [rightsDob, setRightsDob] = useState<Date | undefined>();
+  const [rightsSignature, setRightsSignature] = useState("");
+  const [rightsSignatureOpen, setRightsSignatureOpen] = useState(false);
+  const [rightsSignatureError, setRightsSignatureError] = useState("");
+  const [rightsSaved, setRightsSaved] = useState(false);
+
+  useEffect(() => {
+    setSelectedShortcut(null);
+    setConfirmedItems([]);
+    setReviewerName("");
+    setCorrectionsNote("");
+    setShowCorrectionsNote(false);
+    setReviewSaved(false);
+    setRightsChecked([]);
+    setRightsDob(undefined);
+    setRightsSignature("");
+    setRightsSignatureOpen(false);
+    setRightsSignatureError("");
+    setRightsSaved(false);
+  }, [clientId]);
 
   useEffect(() => {
     if (sample || !clientId) return;
@@ -112,7 +185,7 @@ export default function SupportCoordinatorClientDetailsPage() {
         </nav>
 
         <main className="pt-6">
-          {activeTab === "profile-isp" ? <AssessmentTab tier={tier} lastName={name.split(" ").at(-1) || name} sample={Boolean(sample)} /> : activeTab === "planning" ? (
+          {activeTab === "assessment" ? <AssessmentTab tier={tier} lastName={name.split(" ").at(-1) || name} sample={Boolean(sample)} /> : activeTab === "planning" ? (
             <section aria-labelledby="sc-planning-heading">
               <div className="mb-6">
                 <h2 id="sc-planning-heading" className="text-2xl font-semibold text-[#10141a]">Person-Centered Planning</h2>
@@ -134,14 +207,14 @@ export default function SupportCoordinatorClientDetailsPage() {
                 ))}</div> : <p className="mt-4 text-sm text-[#6b7280]">No ISP outcomes recorded yet.</p>}
               </section>
               <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                {documentShortcuts.map((item) => <div key={item.title} className="rounded-xl border border-[#e5e7eb] p-4">
+                {documentShortcuts.map((item) => <button key={item.title} type="button" onClick={() => setSelectedShortcut(item.title)} className="h-full w-full cursor-pointer rounded-xl border border-[#e5e7eb] p-4 text-left transition-[transform,border-color,box-shadow] duration-150 hover:-translate-y-0.5 hover:border-[#00b4b8] hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00b4b8]">
                   <p className="text-sm font-semibold text-[#10141a]">{item.title}</p>
                   <p className="mt-1 text-sm text-[#4b5563]">{item.description}</p>
-                  <p className="mt-2 text-xs text-[#6b7280]">Coming soon</p>
-                </div>)}
+                  <p className="mt-2 text-xs font-semibold text-[#008f93]">{(item.title === "ISP Quality Review" && reviewSaved) || (item.title === "Participant Rights" && rightsSaved) ? "Saved in this preview" : item.action}</p>
+                </button>)}
               </div>
             </section>
-          ) : (
+          ) : activeTab === "services" ? <ServiceAuthorizationTab key={clientId} sample={Boolean(sample)} /> : (
             <section aria-label={`${tabs.find((tab) => tab.id === activeTab)?.label} tab`} className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-[#d1d5db] px-6 text-center">
               {activeTab === "documents" ? <FolderOpen className="mb-3 h-8 w-8 text-[#008f93]" /> : <FileText className="mb-3 h-8 w-8 text-[#008f93]" />}
               <h2 className="text-xl font-semibold text-[#10141a]">{tabs.find((tab) => tab.id === activeTab)?.label}</h2>
@@ -150,6 +223,98 @@ export default function SupportCoordinatorClientDetailsPage() {
           )}
         </main>
       </div>
+      <Dialog open={selectedShortcut !== null} onOpenChange={(open) => { if (!open && !rightsSignatureOpen) setSelectedShortcut(null); }}>
+        {selectedShortcut && <DialogContent showCloseButton={false} onPointerDownOutside={(event) => { if (rightsSignatureOpen) event.preventDefault(); }} onInteractOutside={(event) => { if (rightsSignatureOpen) event.preventDefault(); }} className={"max-h-[calc(100vh-32px)] w-[calc(100vw-32px)] overflow-y-auto p-4 sm:p-5 " + (selectedShortcut === "ISP Quality Review" || selectedShortcut === "Participant Rights" ? "max-w-[480px]" : "max-w-[400px]")}>
+          {selectedShortcut === "ISP Quality Review" ? <form onSubmit={(event) => {
+            event.preventDefault();
+            if (confirmedItems.length < qualityReviewItems.length && !correctionsNote.trim()) {
+              setShowCorrectionsNote(true);
+              return;
+            }
+            setReviewSaved(true);
+            setSelectedShortcut(null);
+          }}>
+            <DialogTitle className="text-xl leading-7">ISP Quality Review Checklist</DialogTitle>
+            <DialogDescription className="mt-1 border-b border-[#e5e7eb] pb-3 text-sm leading-5 text-[#4b5563]">Complete this checklist before ISP finalization. All items must be confirmed or a corrections note must be added.</DialogDescription>
+            <div className="space-y-3 py-4">
+              {qualityReviewItems.map((item, index) => <div key={item} className="[&_label]:items-start [&_label]:gap-2">
+                <Checkbox label={item} checked={confirmedItems.includes(index)} onChange={() => {
+                  setConfirmedItems((current) => current.includes(index) ? current.filter((value) => value !== index) : [...current, index]);
+                  setReviewSaved(false);
+                }} className="mt-0.5 size-4 shrink-0 self-start rounded border-[#00a4a8]" labelClassName="text-sm font-normal leading-5" />
+              </div>)}
+            </div>
+            <p className="rounded border border-[#e5e7eb] px-2 py-1 text-sm text-[#374151]" aria-live="polite">{confirmedItems.length} of {qualityReviewItems.length} items confirmed</p>
+            {showCorrectionsNote && confirmedItems.length < qualityReviewItems.length && <div className="mt-4">
+              <label htmlFor="sc-review-corrections" className="mb-1 block text-sm font-medium text-[#10141a]">Corrections note*</label>
+              <Textarea id="sc-review-corrections" value={correctionsNote} onChange={(event) => { setCorrectionsNote(event.target.value); setReviewSaved(false); }} placeholder="Describe the items that need correction" required className="resize-y" />
+              {!correctionsNote.trim() && <p className="mt-1 text-xs text-[#ad182d]">Add a note for the unconfirmed items.</p>}
+            </div>}
+            <div className="mt-4">
+              <label htmlFor="sc-reviewer-name" className="mb-1 block text-sm font-medium text-[#10141a]">Reviewer's name*</label>
+              <Input id="sc-reviewer-name" value={reviewerName} onChange={(event) => { setReviewerName(event.target.value); setReviewSaved(false); }} placeholder="SC or Supervisor's name" required pattern=".*\S.*" title="Enter the reviewer's name" maxLength={120} />
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setSelectedShortcut(null)}>Cancel</Button>
+              <Button type="submit">Save review</Button>
+            </div>
+          </form> : selectedShortcut === "Participant Rights" ? <form onSubmit={(event) => {
+            event.preventDefault();
+            setRightsSaved(true);
+            setSelectedShortcut(null);
+          }}>
+            <DialogTitle className="text-xl leading-7">Participant Rights &amp; Responsibilities</DialogTitle>
+            <DialogDescription className="mt-1 border-b border-[#e5e7eb] pb-3 text-sm leading-5 text-[#4b5563]">Document that the participant's rights and responsibilities were reviewed as required by DDD.</DialogDescription>
+            <div className="mt-4 rounded-lg border border-[#dce6eb] bg-[#f2f8fa] p-3 text-sm text-[#374151]">
+              <p className="font-semibold text-[#10141a]">Rights include the right to:</p>
+              <ul className="mt-2 list-disc space-y-1.5 pl-5 marker:text-[#ad182d]">
+                {participantRights.map((right) => <li key={right}>{right}</li>)}
+              </ul>
+            </div>
+            <div className="mt-4">
+              <p className="mb-2 text-sm font-medium text-[#10141a]">Completion status</p>
+              <div className="space-y-2">
+                {rightsCompletionItems.map((item, index) => <div key={item} className="[&_label]:items-start [&_label]:gap-2">
+                  <Checkbox label={item} checked={rightsChecked.includes(index)} onChange={() => {
+                    setRightsChecked((current) => current.includes(index) ? current.filter((value) => value !== index) : [...current, index]);
+                    setRightsSaved(false);
+                  }} className="mt-0.5 size-4 shrink-0 self-start rounded border-[#00a4a8]" labelClassName="text-sm font-normal leading-5" />
+                </div>)}
+              </div>
+            </div>
+            <div className="mt-4">
+              <DatePickerField id="sc-rights-dob" label="Date of birth" value={rightsDob} onChange={(date) => { setRightsDob(date); setRightsSaved(false); }} placeholder="-- Select DOB --" maxDate={new Date()} />
+            </div>
+            <div className="mt-4">
+              <p className="mb-1 text-sm font-medium text-[#10141a]">Participant / Representative Signature</p>
+              <SignatureField id="sc-rights-signature" value={rightsSignature} onOpen={() => setRightsSignatureOpen(true)} onClear={() => { setRightsSignature(""); setRightsSaved(false); }} ariaLabel="Participant or representative signature" />
+              {rightsSignatureError && <p role="alert" className="mt-1 text-xs text-[#ad182d]">{rightsSignatureError}</p>}
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setSelectedShortcut(null)}>Cancel</Button>
+              <Button type="submit">Save record</Button>
+            </div>
+          </form> : <>
+            <DialogTitle className="text-xl leading-7">{selectedShortcut}</DialogTitle>
+            <DialogDescription className="mt-2 text-sm text-[#4b5563]">This preview is not available yet.</DialogDescription>
+            <div className="mt-6 flex justify-end"><Button variant="outline" onClick={() => setSelectedShortcut(null)}>Close</Button></div>
+          </>}
+        </DialogContent>}
+      </Dialog>
+      {rightsSignatureOpen && <Suspense fallback={null}><DigitalSignatureModal isOpen setIsOpen={setRightsSignatureOpen} nested skipBackend useCase="sc-participant-rights" onSave={async (payload) => {
+        try {
+          const normalized = await normalizeSignaturePayload(payload as Parameters<typeof normalizeSignaturePayload>[0]);
+          if (!/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(normalized.signatureData) || normalized.signatureData.length > 100000) {
+            setRightsSignatureError("This signature could not be saved. Please try a smaller signature.");
+            return;
+          }
+          setRightsSignature(normalized.signatureData);
+          setRightsSignatureError("");
+          setRightsSaved(false);
+        } catch {
+          setRightsSignatureError("This signature could not be saved. Please try again.");
+        }
+      }} disclaimer="This captures a participant or representative acknowledgement of the rights review." /></Suspense>}
     </div>
   );
 }
@@ -160,6 +325,156 @@ function InfoCard({ label, value, source }: { label: string; value: string; sour
     <p className="mt-1 text-base font-semibold text-[#10141a]">{value}</p>
     {source && <p className="mt-2 inline-block rounded bg-[#f9fafb] px-1.5 py-0.5 text-xs text-[#4b5563]">Source: {source}</p>}
   </div>;
+}
+
+function ServiceAuthorizationTab({ sample }: { sample: boolean }) {
+  const [preview, setPreview] = useState<"Add service" | Service | null>(null);
+  const [documentWeek, setDocumentWeek] = useState<string | null>(null);
+  const [addedServices, setAddedServices] = useState<Service[]>([]);
+  const [startDate, setStartDate] = useState<Date>();
+  const [endDate, setEndDate] = useState<Date>();
+  const [unit, setUnit] = useState("");
+  const [frequency, setFrequency] = useState("Weekly");
+  const [formError, setFormError] = useState("");
+  const services: Service[] = sample ? [...sampleServices, ...addedServices] : addedServices;
+  const selectedService = preview && preview !== "Add service" ? preview : null;
+  return <section aria-labelledby="sc-services-heading">
+    <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+      <div>
+        <h2 id="sc-services-heading" className="text-2xl font-semibold text-[#10141a]">Service Authorization</h2>
+        <p className="mt-1 text-sm text-[#4b5563]">Services · Providers · PA Records · SDR · Authorized Units</p>
+      </div>
+      <Button type="button" className="h-9 px-3 text-sm" style={{ borderRadius: 8 }} onClick={() => { setStartDate(undefined); setEndDate(undefined); setUnit(""); setFrequency("Weekly"); setFormError(""); setPreview("Add service"); }}>Add service</Button>
+    </div>
+    {services.length ? <div className="space-y-5">
+      {services.map((service, index) => <article key={service.name + service.code + index} className="rounded-xl border border-[#e5e7eb] p-4">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <h3 className="text-lg font-medium text-[#10141a]">{service.name}</h3>
+          <span className={"rounded px-2 py-0.5 text-xs font-semibold " + (service.status === "Active" ? "bg-[#e8fff2] text-[#047857]" : "bg-[#fff8e9] text-[#a16207]")}>{service.status}</span>
+          <span className="text-xs text-[#8a929e]">{service.code}</span>
+          <button type="button" className="ml-auto cursor-pointer text-sm font-semibold text-[#008f93] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00b4b8]" onClick={() => { setDocumentWeek(null); setPreview(service); }}>View details</button>
+        </div>
+        <div className="mt-3 grid gap-y-4 border-t border-[#eef0f2] pt-4 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            ["Provider", service.provider], ["Authorization", service.authorization],
+            ["Authorized Units", service.units], ["Rate", service.rate],
+            ["Total Cost", service.totalCost], ["Frequency", service.frequency],
+          ].map(([label, value], index) => <div key={label} className={"min-w-0 " + (index % 2 ? "sm:border-l sm:border-[#eef0f2] sm:pl-3" : index === 2 ? "xl:border-l xl:border-[#eef0f2] xl:pl-3" : "")}>
+            <p className="text-xs text-[#6b7280]">{label}</p>
+            <p className="mt-1 break-words text-sm font-medium text-[#10141a]">{value}</p>
+          </div>)}
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-[#f3f4f6] pt-3 text-xs">
+          {([["PA", service.pa], ["SDR", service.sdr]] as const).map(([label, status]) => <span key={label} className="inline-flex items-center gap-1.5 text-[#4b5563]">
+            <span aria-hidden="true" className={"size-1.5 rounded-full " + (status === "Received" ? "bg-[#00a878]" : status === "Missing" ? "bg-[#d11f35]" : "bg-[#d99b20]")} />
+            {label}: <span className={"font-medium " + (status === "Missing" ? "text-[#ad182d]" : "text-[#10141a]")}>{status}</span>
+          </span>)}
+          <span className="text-[#6b7280]">Source: {service.source ?? "DDD / iRecord"}</span>
+        </div>
+      </article>)}
+    </div> : <p className="rounded-xl border border-dashed border-[#d1d5db] px-6 py-12 text-center text-sm text-[#6b7280]">No service authorizations recorded yet.</p>}
+    <Dialog open={preview !== null} onOpenChange={(open) => { if (!open) { setPreview(null); setDocumentWeek(null); } }}>
+      {preview && <DialogContent showCloseButton={false} className={"max-h-[calc(100vh-32px)] w-[calc(100vw-32px)] " + (preview === "Add service" ? "flex max-w-[640px] flex-col overflow-hidden rounded-[28px] p-5 sm:p-7" : "max-w-[520px] overflow-y-auto p-4 sm:p-5")}>
+        <DialogTitle className={preview === "Add service" ? "shrink-0 border-b border-[#eef0f2] pb-4 text-2xl font-semibold leading-8" : "text-xl font-medium leading-7"}>{selectedService?.name ?? "Add service"}</DialogTitle>
+        {preview === "Add service" ? <>
+          <DialogDescription className="sr-only">Enter a service authorization to add it to this preview.</DialogDescription>
+          <button type="button" aria-label="Close add service" onClick={() => setPreview(null)} className="absolute right-5 top-5 flex size-9 cursor-pointer items-center justify-center rounded-full bg-[#f0f3f5] text-[#303741] hover:bg-[#e4ebed] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00b4b8] sm:right-7 sm:top-7"><X className="size-4" /></button>
+          <form className="flex min-h-0 flex-1 flex-col" onSubmit={(event) => {
+            event.preventDefault();
+            const data = new FormData(event.currentTarget);
+            const name = String(data.get("name") ?? "").trim();
+            const code = String(data.get("code") ?? "").trim();
+            const provider = String(data.get("provider") ?? "").trim();
+            const totalUnits = Number(data.get("totalUnits"));
+            const rate = Number(data.get("rate"));
+            if (!name || !code || !provider || !startDate || !endDate || !unit || !Number.isFinite(totalUnits) || totalUnits <= 0 || !Number.isFinite(rate) || rate < 0) {
+              setFormError("Complete all service fields before adding the service.");
+              return;
+            }
+            if (endDate < startDate) {
+              setFormError("End date must be on or after the start date.");
+              return;
+            }
+            const dateOptions = { month: "2-digit", day: "2-digit", year: "numeric" } as const;
+            setAddedServices((current) => [...current, {
+              name, code, provider, status: "Review", contact: "—", phone: "—",
+              authorization: startDate.toLocaleDateString("en-US", dateOptions) + " → " + endDate.toLocaleDateString("en-US", dateOptions),
+              units: totalUnits.toLocaleString("en-US") + " total · " + unit,
+              rate: rate.toLocaleString("en-US", { style: "currency", currency: "USD" }),
+              totalCost: (totalUnits * rate).toLocaleString("en-US", { style: "currency", currency: "USD" }),
+              frequency, pa: "Pending", sdr: "Pending", source: "Local preview",
+            }]);
+            setPreview(null);
+            setStartDate(undefined);
+            setEndDate(undefined);
+            setUnit("");
+            setFrequency("Weekly");
+            setFormError("");
+          }}>
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-0.5 py-5">
+            <div><label htmlFor="sc-service-name" className="mb-2 block text-sm font-semibold text-[#10141a]">Service name<span aria-hidden="true" className="ml-0.5 text-[#d53411]">*</span></label><Input id="sc-service-name" name="name" required maxLength={120} placeholder="e.g. Community Inclusion Services" className="h-12 rounded-xl border-[#e5e7eb] text-base placeholder:text-[#9ca3af]" /></div>
+            <div><label htmlFor="sc-service-code" className="mb-2 block text-sm font-semibold text-[#10141a]">Service code<span aria-hidden="true" className="ml-0.5 text-[#d53411]">*</span></label><Input id="sc-service-code" name="code" required maxLength={40} placeholder="e.g. H2015H104" className="h-12 rounded-xl border-[#e5e7eb] text-base placeholder:text-[#9ca3af]" /></div>
+            <div><label htmlFor="sc-service-provider" className="mb-2 block text-sm font-semibold text-[#10141a]">Provider / Agency<span aria-hidden="true" className="ml-0.5 text-[#d53411]">*</span></label><Input id="sc-service-provider" name="provider" required maxLength={120} placeholder="Agency name" className="h-12 rounded-xl border-[#e5e7eb] text-base placeholder:text-[#9ca3af]" /></div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="[&_label]:text-sm [&_label]:font-medium [&_label]:text-[#10141a]"><DatePickerField id="sc-service-start-date" label="Start date" value={startDate} onChange={(date) => { setStartDate(date); setFormError(""); }} placeholder="Select start date" required ariaInvalid={Boolean(formError && !startDate)} /></div>
+              <div className="[&_label]:text-sm [&_label]:font-medium [&_label]:text-[#10141a]"><DatePickerField id="sc-service-end-date" label="End date" value={endDate} onChange={(date) => { setEndDate(date); setFormError(""); }} placeholder="Select end date" required ariaInvalid={Boolean(formError && !endDate)} /></div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div><label htmlFor="sc-service-units" className="mb-2 block text-sm font-semibold text-[#10141a]">Total authorized units<span aria-hidden="true" className="ml-0.5 text-[#d53411]">*</span></label><Input id="sc-service-units" name="totalUnits" type="number" inputMode="numeric" min="1" step="1" required placeholder="e.g. 120 total units" className="h-12 rounded-xl border-[#e5e7eb] text-base placeholder:text-[#9ca3af]" /></div>
+              <div><label htmlFor="sc-service-unit" className="mb-2 block text-sm font-semibold text-[#10141a]">Unit<span aria-hidden="true" className="ml-0.5 text-[#d53411]">*</span></label><Select value={unit} required onValueChange={(value) => { setUnit(value); setFormError(""); }}><SelectTrigger id="sc-service-unit" aria-label="Unit" aria-invalid={Boolean(formError && !unit)} className="h-12 w-full rounded-xl border-[#e5e7eb] text-base"><SelectValue placeholder="Select unit" /></SelectTrigger><SelectContent>{["15 min", "Hourly", "Daily", "Weekly", "Mile"].map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select></div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div><label htmlFor="sc-service-rate" className="mb-2 block text-sm font-semibold text-[#10141a]">Rate<span aria-hidden="true" className="ml-0.5 text-[#d53411]">*</span></label><Input id="sc-service-rate" name="rate" type="number" inputMode="decimal" min="0" step="0.01" required placeholder="Price per selected unit" className="h-12 rounded-xl border-[#e5e7eb] text-base placeholder:text-[#9ca3af]" /></div>
+              <div><label htmlFor="sc-service-frequency" className="mb-2 block text-sm font-medium text-[#10141a]">Frequency<span aria-hidden="true" className="ml-0.5 text-[#d53411]">*</span></label><Select value={frequency} required onValueChange={setFrequency}><SelectTrigger id="sc-service-frequency" aria-label="Frequency" className="h-12 w-full rounded-xl border-[#e5e7eb] text-base"><SelectValue /></SelectTrigger><SelectContent>{["Daily", "Weekly", "Monthly", "As needed"].map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select></div>
+            </div>
+            </div>
+            <div className="shrink-0 border-t border-[#eef0f2] pt-4">
+              {formError && <p role="alert" className="mb-3 text-sm text-[#ad182d]">{formError}</p>}
+              <div className="flex justify-end gap-3"><Button type="button" variant="outline" onClick={() => setPreview(null)} className="rounded-lg">Cancel</Button><Button type="submit" className="rounded-lg">Add service</Button></div>
+            </div>
+          </form>
+        </> : selectedService ? <>
+          <DialogDescription className="sr-only">Service authorization, prior authorization history, and SDR record</DialogDescription>
+          <div className="flex items-center gap-2 border-b border-[#e5e7eb] pb-3 text-xs">
+            <span className={"rounded px-2 py-0.5 font-semibold " + (selectedService.status === "Active" ? "bg-[#e8fff2] text-[#047857]" : "bg-[#fff8e9] text-[#a16207]")}>{selectedService.status}</span>
+            <span className="text-[#8a929e]">{selectedService.code}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {([
+              ["Provider", selectedService.provider], ["Contact", selectedService.contact], ["Phone", selectedService.phone],
+              ["Start Date", selectedService.authorization.split(" → ")[0]], ["End Date", selectedService.authorization.split(" → ")[1]], ["Authorized", selectedService.units],
+              ["Rate", selectedService.rate], ["Total Cost", selectedService.totalCost], ["Frequency", selectedService.frequency],
+            ] as const).map(([label, value]) => <div key={label} className="min-w-0 rounded border border-[#ebedf0] bg-[#fafbfc] px-2.5 py-2 text-xs">
+              <p className="text-[#8a929e]">{label}</p>
+              <p className="mt-0.5 break-words font-medium text-[#10141a]">{value}</p>
+            </div>)}
+          </div>
+          <div className="mt-2">
+            <h3 className="mb-1 text-xs font-semibold uppercase text-[#303741]">Prior authorization history</h3>
+            {selectedService.pa === "Received" ? <div className="overflow-hidden rounded border border-[#e5e7eb]">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-[#fafbfc] text-[#303741]"><tr><th scope="col" className="px-2.5 py-1.5">Week</th><th scope="col" className="px-2.5 py-1.5">Status</th><th scope="col" className="px-2.5 py-1.5">Document</th></tr></thead>
+                <tbody>{sampleAuthorizationWeeks.map((week) => <tr key={week} className="border-t border-[#f0f1f3]">
+                  <td className="px-2.5 py-1.5 text-[#303741]">{week}</td>
+                  <td className="px-2.5 py-1.5 text-[#303741]"><span aria-hidden="true" className="mr-1.5 inline-block size-1.5 rounded-full bg-[#00a878]" />✓ Received</td>
+                  <td className="px-2.5 py-1.5"><button type="button" className="cursor-pointer font-medium text-[#008f93] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00b4b8]" aria-label={"View PA document for " + week} onClick={() => setDocumentWeek(week)}>View</button></td>
+                </tr>)}</tbody>
+              </table>
+            </div> : <p className="rounded border border-[#e5e7eb] px-3 py-2 text-xs text-[#6b7280]">{selectedService.pa === "Missing" ? "No prior authorization history recorded." : "Prior authorization is pending."}</p>}
+            {documentWeek && <p role="status" className="mt-2 text-xs text-[#6b7280]">Sample PA document for {documentWeek} is not available yet.</p>}
+          </div>
+          <div className="mt-1">
+            <h3 className="mb-1 text-xs font-semibold uppercase text-[#303741]">SDR record</h3>
+            <div className={"flex flex-wrap items-center justify-between gap-2 rounded border px-2.5 py-2 text-xs " + (selectedService.sdr === "Received" ? "border-[#b7f0d5] bg-[#f0fff8]" : "border-[#f5dfb1] bg-[#fffaf0]")}>
+              <span className="text-[#303741]"><span aria-hidden="true" className={"mr-1.5 inline-block size-1.5 rounded-full " + (selectedService.sdr === "Received" ? "bg-[#00a878]" : "bg-[#d99b20]")} /><strong>{selectedService.sdr}</strong>{selectedService.sdr === "Received" && " · Effective " + selectedService.authorization.split(" → ")[0]}</span>
+              <span className="text-[#6b7280]">Source: {selectedService.source ?? "DDD / iRecord"}</span>
+            </div>
+          </div>
+        </> : null}
+        {selectedService && <div className="mt-2 flex justify-end"><Button variant="outline" onClick={() => setPreview(null)}>Close</Button></div>}
+      </DialogContent>}
+    </Dialog>
+  </section>;
 }
 
 function AssessmentTab({ tier, lastName, sample }: { tier: string; lastName: string; sample: boolean }) {
