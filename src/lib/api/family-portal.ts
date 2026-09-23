@@ -8,6 +8,8 @@ import axiosClient from '../axios';
  */
 
 export type FamilyPortalContact = {
+  /** Server-set stable id, so a single contact can be targeted for removal. */
+  id?: string;
   name: string;
   /** Either identifies the contact at sign-in; at least one is required. */
   primaryPhone?: string;
@@ -68,7 +70,32 @@ function classify(status: number | undefined, message: string): GrantAccessFailu
   return 'unknown';
 }
 
+export type ListContactsResponse = {
+  success: boolean;
+  data?: FamilyPortalContact[];
+};
+
+export type RevokeAccessRequest = {
+  /** Prefer `id` once the server sends one; phone/email are the fallback for
+   *  a contact that predates it — the server should match on whichever of the
+   *  three is present. */
+  id?: string;
+  primaryPhone?: string;
+  email?: string;
+};
+
+export type RevokeAccessResponse = {
+  success: boolean;
+  message?: string;
+};
+
 export const familyPortalApi = {
+  /** All contacts with portal access to the client you are linked to. */
+  async listContacts(): Promise<FamilyPortalContact[]> {
+    const res = await axiosClient.get<ListContactsResponse>('/familyPortal/contacts');
+    return res.data.data ?? [];
+  },
+
   /** Grant another relative access to the portal of the client you are linked to. */
   async grantAccess(payload: GrantAccessRequest): Promise<GrantAccessResponse> {
     try {
@@ -89,6 +116,28 @@ export const familyPortalApi = {
       const message =
         axiosErr.response?.data?.message ?? axiosErr.message ?? 'Failed to grant access';
       throw new GrantAccessError(classify(axiosErr.response?.status, message), message);
+    }
+  },
+
+  /** Revoke a contact's access to the client you are linked to. */
+  async revokeAccess(payload: RevokeAccessRequest): Promise<RevokeAccessResponse> {
+    try {
+      const res = await axiosClient.delete<RevokeAccessResponse>('/familyPortal/contacts', {
+        data: {
+          id: payload.id,
+          primaryPhone: payload.primaryPhone || undefined,
+          email: payload.email || undefined,
+        },
+      });
+      return res.data;
+    } catch (err: unknown) {
+      const axiosErr = err as {
+        response?: { status?: number; data?: { message?: string } };
+        message?: string;
+      };
+      const message =
+        axiosErr.response?.data?.message ?? axiosErr.message ?? 'Failed to remove access';
+      throw new Error(message);
     }
   },
 };

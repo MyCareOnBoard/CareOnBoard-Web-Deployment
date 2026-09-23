@@ -291,11 +291,21 @@ export interface ClientIspMetadata {
 }
 
 export interface FamilyPortalContact {
+  /**
+   * Server-set stable id. Present on contacts added through the family portal
+   * (see `familyPortalApi` in `family-portal.ts`); may be absent on ones added
+   * here by agency staff, since this tab still replaces the whole array via
+   * `updateClient` rather than calling that API.
+   */
+  id?: string;
   name: string;
   /** Either of these identifies the contact at sign-in; at least one is required. */
   primaryPhone?: string;
   email?: string;
   relationship?: string;
+  /** Server-set: the family member who granted this access, if it was granted from the family portal rather than added here. */
+  addedBy?: string;
+  addedAt?: string;
 }
 
 export interface ClientGuardianContactRow {
