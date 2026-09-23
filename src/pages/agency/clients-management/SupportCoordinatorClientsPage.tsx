@@ -1,32 +1,16 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { CalendarDays, ClipboardCheck, Plus, Search, TriangleAlert, UsersRound } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Routes } from "@/routes/constants";
 import "./support-coordinator-clients.css";
+import { clients } from "./supportCoordinatorSampleClients";
 
 type Filter = "All clients" | "Alerts" | "Monitoring due" | "SP" | "CCP";
 
-const clients = [
-  { id: "182441", name: "Leslie Alexander", initials: "LA", coordinator: "M. S.", program: "CCP", county: "HUDSON", tier: "Tier D", effective: "01/15/2026", isp: "04/21/2026 – 04/20/2027", compliance: 60, monitoring: "Sep 24", monitoringNote: "Due soon", monitoringDue: true, alerts: 1, underReview: true },
-  { id: "310562", name: "Sofia Ramirez", initials: "SR", coordinator: "Ph. D.", program: "SP", county: "Essex", tier: "Tier B", effective: "01/15/2026", isp: "04/21/2026 – 04/20/2027", compliance: 100, monitoring: "Oct 5", monitoringNote: "Scheduled", monitoringDue: false, alerts: 0, underReview: false },
-  { id: "274893", name: "Marcus Chen", initials: "MC", coordinator: "B. A.", program: "SP", county: "Bergen", tier: "Tier C", effective: "04/01/2026", isp: "04/21/2026 – 04/20/2027", compliance: 80, monitoring: "Oct 12", monitoringNote: "Scheduled", monitoringDue: false, alerts: 2, underReview: false },
-  { id: "198037", name: "James Okafor", initials: "JO", coordinator: "M. B. A.", program: "CCP", county: "Middlesex", tier: "Tier A", effective: "02/20/2026", isp: "04/21/2026 – 04/20/2027", compliance: 64, monitoring: "Oct 28", monitoringNote: "Scheduled", monitoringDue: false, alerts: 3, underReview: false },
-  { id: "214608", name: "Ava Patel", initials: "AP", coordinator: "M. S.", program: "SP", county: "Hudson", tier: "Tier B", effective: "03/10/2026", isp: "05/01/2026 – 04/30/2027", compliance: 92, monitoring: "Oct 18", monitoringNote: "Scheduled", monitoringDue: false, alerts: 0, underReview: false },
-  { id: "225719", name: "Evan Brooks", initials: "EB", coordinator: "B. A.", program: "CCP", county: "Bergen", tier: "Tier C", effective: "02/01/2026", isp: "03/01/2026 – 02/28/2027", compliance: 72, monitoring: "Sep 25", monitoringNote: "Due soon", monitoringDue: true, alerts: 2, underReview: true },
-  { id: "236820", name: "Naomi Carter", initials: "NC", coordinator: "Ph. D.", program: "SP", county: "Essex", tier: "Tier A", effective: "05/15/2026", isp: "06/01/2026 – 05/31/2027", compliance: 96, monitoring: "Nov 3", monitoringNote: "Scheduled", monitoringDue: false, alerts: 0, underReview: false },
-  { id: "247931", name: "Daniel Kim", initials: "DK", coordinator: "M. S.", program: "CCP", county: "Passaic", tier: "Tier D", effective: "01/20/2026", isp: "02/01/2026 – 01/31/2027", compliance: 55, monitoring: "Oct 22", monitoringNote: "Scheduled", monitoringDue: false, alerts: 2, underReview: false },
-  { id: "259042", name: "Olivia Thompson", initials: "OT", coordinator: "B. A.", program: "SP", county: "Union", tier: "Tier B", effective: "04/12/2026", isp: "05/01/2026 – 04/30/2027", compliance: 88, monitoring: "Nov 8", monitoringNote: "Scheduled", monitoringDue: false, alerts: 0, underReview: false },
-  { id: "260153", name: "Henry Reed", initials: "HR", coordinator: "M. B. A.", program: "CCP", county: "Morris", tier: "Tier C", effective: "03/05/2026", isp: "04/01/2026 – 03/31/2027", compliance: 70, monitoring: "Oct 1", monitoringNote: "Due soon", monitoringDue: true, alerts: 1, underReview: false },
-  { id: "271264", name: "Priya Shah", initials: "PS", coordinator: "Ph. D.", program: "SP", county: "Somerset", tier: "Tier A", effective: "06/01/2026", isp: "06/15/2026 – 06/14/2027", compliance: 100, monitoring: "Nov 15", monitoringNote: "Scheduled", monitoringDue: false, alerts: 0, underReview: false },
-  { id: "282375", name: "Gabriel Torres", initials: "GT", coordinator: "M. S.", program: "CCP", county: "Hudson", tier: "Tier D", effective: "01/03/2026", isp: "02/01/2026 – 01/31/2027", compliance: 48, monitoring: "Oct 20", monitoringNote: "Scheduled", monitoringDue: false, alerts: 4, underReview: true },
-  { id: "293486", name: "Emma Wilson", initials: "EW", coordinator: "B. A.", program: "SP", county: "Bergen", tier: "Tier B", effective: "05/20/2026", isp: "06/01/2026 – 05/31/2027", compliance: 84, monitoring: "Nov 19", monitoringNote: "Scheduled", monitoringDue: false, alerts: 1, underReview: false },
-  { id: "304597", name: "Robert Davis", initials: "RD", coordinator: "M. B. A.", program: "CCP", county: "Middlesex", tier: "Tier C", effective: "02/14/2026", isp: "03/01/2026 – 02/28/2027", compliance: 76, monitoring: "Oct 29", monitoringNote: "Scheduled", monitoringDue: false, alerts: 1, underReview: false },
-  { id: "315708", name: "Maya Johnson", initials: "MJ", coordinator: "Ph. D.", program: "SP", county: "Union", tier: "Tier A", effective: "06/10/2026", isp: "07/01/2026 – 06/30/2027", compliance: 90, monitoring: "Nov 25", monitoringNote: "Scheduled", monitoringDue: false, alerts: 0, underReview: false },
-] as const;
 
 const pageSize = 5;
 const totalAlerts = clients.reduce((sum, client) => sum + client.alerts, 0);
@@ -113,9 +97,10 @@ export default function SupportCoordinatorClientsPage() {
               <p className="px-4 py-12 text-center text-[14px] text-[#6b7280]">No clients match your search or filter.</p>
             ) : pageClients.map((client) => {
               const tone = client.compliance === 100 ? "#0eaf52" : client.compliance < 50 ? "#d92d20" : "#f97316";
-              return <div role="row" key={client.id} className="sc-client-grid grid grid-cols-1 gap-3 border-b border-[#e5e5e6] px-4 py-4 last:border-b-0 hover:bg-[#f9fafb] lg:items-center">
+              const openDetails = () => navigate(`${Routes.agency.clientDetails.replace(":clientId", client.id)}?tab=profile-isp`);
+              return <div role="row" aria-label={`Open details for ${client.name}`} tabIndex={0} onClick={openDetails} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openDetails(); } }} key={client.id} className="sc-client-grid grid cursor-pointer grid-cols-1 gap-3 border-b border-[#e5e5e6] px-4 py-4 last:border-b-0 hover:bg-[#f9fafb] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#00b4b8] lg:items-center">
                 <div role="cell" className="flex min-w-0 items-center gap-3">
-                  <Avatar className="h-10 w-10"><AvatarFallback className="bg-[#e6f8f8] text-[12px] font-bold text-[#007f84]">{client.initials}</AvatarFallback></Avatar>
+                  <Avatar className="h-10 w-10">{client.id === "182441" && <AvatarImage src="/user-profile-image.png" alt="" className="object-cover" />}<AvatarFallback className="bg-[#e6f8f8] text-[12px] font-bold text-[#007f84]">{client.initials}</AvatarFallback></Avatar>
                   <div className="min-w-0"><p className="truncate text-[14px] font-semibold text-[#10141a]">{client.name}</p><p className="truncate text-[12px] text-[#6b7280]">ID: {client.id} · SC: {client.coordinator}</p></div>
                 </div>
                 <div role="cell"><span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] lg:hidden">Program</span><Badge variant="outline" className="px-2 py-1" style={{ borderColor: client.program === "CCP" ? "#2b82ff" : "#8754d6", color: client.program === "CCP" ? "#2b82ff" : "#8754d6" }}>{client.program}</Badge></div>

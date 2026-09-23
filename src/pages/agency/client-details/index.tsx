@@ -27,10 +27,20 @@ import {
 import { useAuth } from "@/utils/auth";
 import { getAgencyClientById, updateClient, type Client, type ClientDocument, type ClientDocumentKey } from "@/lib/api/clients";
 import { Routes } from "@/routes/constants";
+import SupportCoordinatorClientDetailsPage from "./SupportCoordinatorClientDetailsPage";
 
 type ClientDetailsTab = "activity" | "profile" | "services" | "documents" | "family-portal";
 
 export default function ClientDetailsPage() {
+  const { clientId } = useParams();
+  const effectiveMode = useEffectiveAgencyMode();
+  const [searchParams] = useSearchParams();
+  const requestedMode = searchParams.get("mode");
+  const mode = requestedMode === "ddd" || requestedMode === "hha" ? requestedMode : effectiveMode;
+  return mode === "sc" ? <SupportCoordinatorClientDetailsPage key={clientId} /> : <AgencyClientDetailsPage />;
+}
+
+function AgencyClientDetailsPage() {
   const { clientId } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();

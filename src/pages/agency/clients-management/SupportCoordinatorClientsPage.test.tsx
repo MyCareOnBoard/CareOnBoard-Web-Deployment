@@ -1,10 +1,20 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router";
-import { describe, expect, it } from "vitest";
+import { MemoryRouter, useLocation } from "react-router";
+import { describe, expect, it, vi } from "vitest";
+vi.unmock("react-router");
 import SupportCoordinatorClientsPage from "./SupportCoordinatorClientsPage";
 
 describe("SupportCoordinatorClientsPage", () => {
+  it("opens client details from a row with the initial tab in the URL", async () => {
+    const user = userEvent.setup();
+    function Location() { return <output data-testid="location">{useLocation().pathname}{useLocation().search}</output>; }
+    render(<MemoryRouter><SupportCoordinatorClientsPage /><Location /></MemoryRouter>);
+
+    await user.click(screen.getByRole("row", { name: "Open details for Leslie Alexander" }));
+    expect(screen.getByTestId("location")).toHaveTextContent("/agency/clients/182441?tab=profile-isp");
+  });
+
   it("paginates sample clients and resets to page one when filters change", async () => {
     const user = userEvent.setup();
     render(<MemoryRouter><SupportCoordinatorClientsPage /></MemoryRouter>);
