@@ -1,0 +1,4 @@
+@media (min-width: 1024px) {
+  .sc-client-table { min-width: 1120px; }
+  .sc-client-grid { grid-template-columns: 200px 80px 100px 135px 185px 140px 135px 70px; }
+}

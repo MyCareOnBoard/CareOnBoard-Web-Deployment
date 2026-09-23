@@ -203,6 +203,7 @@ export function DatePickerField({
   onChange,
   placeholder = "Select date",
   required,
+  maxDate,
   ariaInvalid,
   ariaDescribedBy,
 }: {
@@ -212,6 +213,7 @@ export function DatePickerField({
   onChange: (next: Date | undefined) => void;
   placeholder?: string;
   required?: boolean;
+  maxDate?: Date;
   ariaInvalid?: boolean;
   ariaDescribedBy?: string;
 }) {
@@ -249,7 +251,8 @@ export function DatePickerField({
             defaultMonth={value ?? new Date()}
             captionLayout="dropdown"
             fromYear={1900}
-            toYear={new Date().getFullYear() + 10}
+            toYear={maxDate?.getFullYear() ?? new Date().getFullYear() + 10}
+            disabled={maxDate ? { after: maxDate } : undefined}
             formatters={{
               formatMonthDropdown: (date) =>
                 date.toLocaleString("default", { month: "long" }),

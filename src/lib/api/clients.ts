@@ -47,7 +47,25 @@ export type ClientAcuityRequirements = { enabled: boolean; types: Array<'medicat
 
 export type MedicationSupportSettings = { underMedication: boolean; trainingRequired: boolean };
 
+export type ScEnrollment = {
+  program: "SP" | "CCP";
+  hasGuardian: boolean;
+  familyMemberParticipates: boolean;
+  familyMemberName?: string;
+  familyMemberRelationship?: string;
+  eligibility: { medicaid: boolean; functional: boolean; financial: boolean; njResident: boolean; documents: boolean; requirements: boolean };
+  agreementSummaryReviewed: true;
+  participantSignature: string;
+  participantSignatureImage: string;
+  guardianSignature?: string;
+  guardianSignatureImage?: string;
+  familySignature?: string;
+  familySignatureImage?: string;
+  signedOn: string;
+};
+
 export interface Client {
+  scEnrollment?: ScEnrollment;
   medicationSupportSettings?: MedicationSupportSettings;
   acuityRequirements?: ClientAcuityRequirements;
   documentChecklist?: Checklist;
@@ -651,6 +669,7 @@ export interface ClientPayrollServiceLocation { source: "primaryAddress" | "seco
  * Create Client Request
  */
 export interface CreateClientRequest {
+  scEnrollment?: ScEnrollment;
   medicationSupportSettings?: MedicationSupportSettings;
   acuityRequirements?: ClientAcuityRequirements;
   servicePrograms?: ("ddd" | "hha" | "sc")[];
@@ -799,6 +818,7 @@ export interface CreateClientRequest {
  * Update Client Request
  */
 export interface UpdateClientRequest {
+  scEnrollment?: ScEnrollment;
   medicationSupportSettings?: MedicationSupportSettings;
   acuityRequirements?: ClientAcuityRequirements;
   servicePrograms?: ("ddd" | "hha" | "sc")[];

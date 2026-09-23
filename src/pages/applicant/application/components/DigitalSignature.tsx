@@ -39,6 +39,7 @@ interface DigitalSignatureModalProps {
   existingSignature?: SignaturePayload | null;
   nested?: boolean;
   portalClassName?: string;
+  disclaimer?: string;
 }
 
 const DigitalSignatureModal = ({
@@ -52,6 +53,7 @@ const DigitalSignatureModal = ({
   existingSignature,
   nested = false,
   portalClassName,
+  disclaimer,
 }: DigitalSignatureModalProps) => {
   const [activeTab, setActiveTab] = useState('type');
   const [typedSignature, setTypedSignature] = useState('');
@@ -431,8 +433,7 @@ const DigitalSignatureModal = ({
 
                 {/* Disclaimer */}
                 <p className="text-xs text-gray-600 mt-4 leading-relaxed">
-                  By signing this document with an electronic signature, I agree that such signature will be as valid as
-                  handwritten signatures to the extent allowed by local law.
+                  {disclaimer ?? 'By signing this document with an electronic signature, I agree that such signature will be as valid as handwritten signatures to the extent allowed by local law.'}
                 </p>
               </div>
 

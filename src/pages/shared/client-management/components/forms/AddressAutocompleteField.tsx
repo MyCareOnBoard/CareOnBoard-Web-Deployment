@@ -38,6 +38,7 @@ export function AddressAutocompleteField({
   onSelectDetails,
   placeholder = "Start typing an address…",
   required,
+  ariaInvalid,
 }: {
   label: string;
   id?: string;
@@ -46,6 +47,7 @@ export function AddressAutocompleteField({
   onSelectDetails?: (details: AddressDetails) => void;
   placeholder?: string;
   required?: boolean;
+  ariaInvalid?: boolean;
 }) {
   const autocomplete = useGooglePlacesAutocomplete();
   const { suggestions, isSearching, showSuggestions, setShowSuggestions } = autocomplete;
@@ -186,6 +188,7 @@ export function AddressAutocompleteField({
               aria-autocomplete="list"
               aria-activedescendant={open && activeIndex >= 0 ? optionId(activeIndex) : undefined}
               aria-required={required || undefined}
+              aria-invalid={ariaInvalid || undefined}
               className="pr-11"
               onChange={(e) => {
                 onChange(e.target.value);

@@ -12,6 +12,7 @@ import { useAuth } from "@/utils/auth";
 import { useListAgencyClientsQuery, useGetClientStatsQuery, type Client } from "@/lib/api/clients";
 import { countUniqueAssignedDspsForClient } from "@/lib/countUniqueAssignedDsps";
 import { isForm485Required } from "@/pages/shared/client-management/utils/form485GenerationEligibility";
+import SupportCoordinatorClientsPage from "./SupportCoordinatorClientsPage";
 
 interface DisplayClient {
   id: string;
@@ -26,6 +27,11 @@ interface DisplayClient {
 }
 
 export default function ClientsPage() {
+  const mode = useEffectiveAgencyMode();
+  return mode === "sc" ? <SupportCoordinatorClientsPage /> : <AgencyClientsPage />;
+}
+
+function AgencyClientsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const agencyId = user?.agencyId || "";
