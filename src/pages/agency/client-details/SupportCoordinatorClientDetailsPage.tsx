@@ -14,6 +14,7 @@ import { getAgencyClientById, type Client } from "@/lib/api/clients";
 import { DatePickerField, SignatureField } from "@/pages/shared/client-management/components/forms/formControls";
 import { clients } from "@/pages/agency/clients-management/supportCoordinatorSampleClients";
 import { Routes } from "@/routes/constants";
+import SupportCoordinatorMonitoringTab from "./SupportCoordinatorMonitoringTab";
 import SupportCoordinatorDocumentsTab from "./SupportCoordinatorDocumentsTab";
 
 const DigitalSignatureModal = lazy(() => import("@/pages/applicant/application/components/DigitalSignature"));
@@ -215,7 +216,7 @@ export default function SupportCoordinatorClientDetailsPage() {
                 </button>)}
               </div>
             </section>
-          ) : activeTab === "services" ? <ServiceAuthorizationTab key={clientId} sample={Boolean(sample)} /> : activeTab === "documents" ? <SupportCoordinatorDocumentsTab key={clientId} sample={Boolean(sample)} /> : (
+          ) : activeTab === "services" ? <ServiceAuthorizationTab key={clientId} sample={Boolean(sample)} /> : activeTab === "monitoring" ? <SupportCoordinatorMonitoringTab key={clientId} sample={Boolean(sample)} /> : activeTab === "documents" ? <SupportCoordinatorDocumentsTab key={clientId} sample={Boolean(sample)} /> : (
             <section aria-label={`${tabs.find((tab) => tab.id === activeTab)?.label} tab`} className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-[#d1d5db] px-6 text-center">
               <FileText className="mb-3 h-8 w-8 text-[#008f93]" />
               <h2 className="text-xl font-semibold text-[#10141a]">{tabs.find((tab) => tab.id === activeTab)?.label}</h2>

@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { addDays, format, startOfWeek } from "date-fns";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 vi.unmock("react-router");
@@ -158,6 +159,47 @@ it("adds a service to the local preview with total units and a selected unit", a
   expect(cards[3]).toHaveTextContent("120 total · Hourly");
   expect(cards[3]).toHaveTextContent("$1,182.00");
   expect(cards[3]).toHaveTextContent("Source: Local preview");
+}, 15000);
+
+it("handles monitoring dates, follow-up tasks, and service monitoring in the local preview", async () => {
+  const user = userEvent.setup();
+  const today = new Date();
+  const weekStart = startOfWeek(today, { weekStartsOn: 1 });
+  render(<MemoryRouter initialEntries={["/agency/clients/182441?tab=monitoring"]}>
+    <Routes><Route path="/agency/clients/:clientId" element={<SupportCoordinatorClientDetailsPage />} /></Routes>
+  </MemoryRouter>);
+
+  expect(screen.getByText(format(today, "EEE, MMMM d"))).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: format(today, "EEEE, MMMM d, yyyy") })).toHaveAttribute("aria-current", "date");
+  expect(screen.getByRole("button", { name: format(weekStart, "EEEE, MMMM d, yyyy") })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: format(addDays(weekStart, 6), "EEEE, MMMM d, yyyy") })).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Next week" }));
+  expect(screen.getByText(format(addDays(today, 7), "EEE, MMMM d"))).toBeInTheDocument();
+  expect(screen.getByText("No services scheduled for this date.")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Previous week" }));
+
+  await user.click(screen.getByRole("button", { name: "Follow up" }));
+  const followUp = screen.getByRole("dialog", { name: "Follow-Up: Missing PA (Aug 10–16)" });
+  expect(within(followUp).getByRole("button", { name: "Create follow-up task" })).toBeDisabled();
+  fireEvent.keyDown(within(followUp).getByRole("combobox", { name: "Follow-Up Method" }), { key: "ArrowDown" });
+  await user.click(screen.getByRole("option", { name: "Phone call" }));
+  await user.click(within(followUp).getByRole("button", { name: "Create follow-up task" }));
+  expect(screen.queryByRole("dialog", { name: "Follow-Up: Missing PA (Aug 10–16)" })).not.toBeInTheDocument();
+  expect(screen.getByText("3 Pending")).toBeInTheDocument();
+  expect(screen.getByText("Missing PA follow-up task created · Phone call")).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Start monitoring" }));
+  const monitoring = screen.getByRole("dialog", { name: "Individual Supports" });
+  await user.click(within(monitoring).getByRole("button", { name: "Save monitoring record" }));
+  expect(within(monitoring).getByRole("alert")).toHaveTextContent("Answer each monitoring question");
+  for (const question of ["Service Delivery", "Client Satisfaction", "Goal Alignment"]) {
+    const fieldset = within(monitoring).getByRole("group", { name: new RegExp(question) });
+    await user.click(within(fieldset).getByRole("button", { name: "Yes" }));
+  }
+  await user.click(within(monitoring).getByRole("button", { name: "Save monitoring record" }));
+  expect(screen.queryByRole("dialog", { name: "Individual Supports" })).not.toBeInTheDocument();
+  expect(screen.getByText("Completed today")).toBeInTheDocument();
+  expect(screen.getByText("Individual Supports monitoring recorded")).toBeInTheDocument();
 }, 15000);
 
 it("shows sample documents and adds an uploaded document to the local preview", async () => {
