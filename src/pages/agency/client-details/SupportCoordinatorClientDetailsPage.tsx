@@ -17,6 +17,7 @@ import { Routes } from "@/routes/constants";
 import SupportCoordinatorMonitoringTab from "./SupportCoordinatorMonitoringTab";
 import SupportCoordinatorDocumentsTab from "./SupportCoordinatorDocumentsTab";
 import SupportCoordinatorPcpt from "./SupportCoordinatorPcpt";
+import SupportCoordinatorIsp from "./SupportCoordinatorIsp";
 
 const DigitalSignatureModal = lazy(() => import("@/pages/applicant/application/components/DigitalSignature"));
 
@@ -91,6 +92,7 @@ export default function SupportCoordinatorClientDetailsPage() {
   const requestedTab = searchParams.get("tab");
   const activeTab: Tab = requestedTab === "profile-isp" ? "assessment" : tabs.some(({ id }) => id === requestedTab) ? requestedTab as Tab : "assessment";
   const pcptOpen = activeTab === "planning" && searchParams.get("view") === "pcpt";
+  const ispOpen = activeTab === "planning" && searchParams.get("view") === "isp";
   const sample = clients.find((client) => client.id === clientId);
   const [savedClient, setSavedClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(Boolean(!sample && clientId));
@@ -142,6 +144,7 @@ export default function SupportCoordinatorClientDetailsPage() {
   const tier = sample?.tier || savedClient?.tier || "Not set";
   const planId = sample ? "10.04" : savedClient?.ispMetadata?.planId || "Not set";
   const outcomes = sample ? sampleOutcomes : savedClient?.ispOutcomes ? [{ goal: savedClient.ispOutcomes, support: "" }] : [];
+  const sampleIspOutcomes = sample ? sampleOutcomes.map((outcome, index) => ({ statement: `${firstName} ${outcome.goal}`, services: sampleServices[index] ? [{ name: sampleServices[index].name, code: sampleServices[index].code, provider: sampleServices[index].provider, hours: sampleServices[index].units, clientRate: sampleServices[index].rate, frequency: sampleServices[index].frequency }] : [] })) : undefined;
 
   const tabLink = (tab: Tab) => {
     const params = new URLSearchParams(searchParams);
@@ -181,7 +184,7 @@ export default function SupportCoordinatorClientDetailsPage() {
           <p className="text-sm text-[#10141a]"><strong className="mr-1 text-lg">{sample ? "ISP Active" : "ISP period"}</strong>{period}</p>
         </header>
 
-        {!pcptOpen && <nav aria-label="Client details tabs" className="mt-5 flex gap-2 overflow-x-auto border-b border-[#e5e7eb] pb-3">
+        {!pcptOpen && !ispOpen && <nav aria-label="Client details tabs" className="mt-5 flex gap-2 overflow-x-auto border-b border-[#e5e7eb] pb-3">
           {tabs.map((tab) => (
             <Link key={tab.id} to={tabLink(tab.id)} aria-current={activeTab === tab.id ? "page" : undefined}
               className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00b4b8] ${activeTab === tab.id ? "border-[#00b4b8] bg-[#00b4b8] text-white" : "border-[#e5e7eb] text-[#4b5563] hover:border-[#00b4b8] hover:text-[#008f93]"}`}>
@@ -190,8 +193,8 @@ export default function SupportCoordinatorClientDetailsPage() {
           ))}
         </nav>}
 
-        <main className={pcptOpen ? "pt-5" : "pt-6"}>
-          {pcptOpen ? <SupportCoordinatorPcpt client={savedClient} name={name} clientId={sample?.id || savedClient?.id || ""} period={period} photo={savedClient?.profileImage || (sample?.id === "182441" ? "/user-profile-image.png" : undefined)} backTo={tabLink("planning")} sample={Boolean(sample)} /> : activeTab === "assessment" ? <AssessmentTab tier={tier} lastName={name.split(" ").at(-1) || name} sample={Boolean(sample)} /> : activeTab === "planning" ? (
+        <main className={pcptOpen || ispOpen ? "pt-5" : "pt-6"}>
+          {pcptOpen ? <SupportCoordinatorPcpt client={savedClient} name={name} clientId={sample?.id || savedClient?.id || ""} period={period} photo={savedClient?.profileImage || (sample?.id === "182441" ? "/user-profile-image.png" : undefined)} backTo={tabLink("planning")} sample={Boolean(sample)} /> : ispOpen ? <SupportCoordinatorIsp client={savedClient} name={name} clientId={sample?.id || savedClient?.id || ""} period={period} program={program} backTo={tabLink("planning")} sample={Boolean(sample)} sampleOutcomes={sampleIspOutcomes} /> : activeTab === "assessment" ? <AssessmentTab tier={tier} lastName={name.split(" ").at(-1) || name} sample={Boolean(sample)} /> : activeTab === "planning" ? (
             <section aria-labelledby="sc-planning-heading">
               <div className="mb-6">
                 <h2 id="sc-planning-heading" className="text-2xl font-semibold text-[#10141a]">Person-Centered Planning</h2>
@@ -213,7 +216,7 @@ export default function SupportCoordinatorClientDetailsPage() {
                 ))}</div> : <p className="mt-4 text-sm text-[#6b7280]">No ISP outcomes recorded yet.</p>}
               </section>
               <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                {documentShortcuts.map((item) => <button key={item.title} type="button" onClick={() => item.title === "PCPT" ? navigate(`${tabLink("planning")}&view=pcpt`) : setSelectedShortcut(item.title)} className="h-full w-full cursor-pointer rounded-xl border border-[#e5e7eb] p-4 text-left transition-[transform,border-color,box-shadow] duration-150 hover:-translate-y-0.5 hover:border-[#00b4b8] hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00b4b8]">
+                {documentShortcuts.map((item) => <button key={item.title} type="button" onClick={() => item.title === "PCPT" || item.title === "ISP" ? navigate(`${tabLink("planning")}&view=${item.title.toLowerCase()}`) : setSelectedShortcut(item.title)} className="h-full w-full cursor-pointer rounded-xl border border-[#e5e7eb] p-4 text-left transition-[transform,border-color,box-shadow] duration-150 hover:-translate-y-0.5 hover:border-[#00b4b8] hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00b4b8]">
                   <p className="text-sm font-semibold text-[#10141a]">{item.title}</p>
                   <p className="mt-1 text-sm text-[#4b5563]">{item.description}</p>
                   <p className="mt-2 text-xs font-semibold text-[#008f93]">{(item.title === "ISP Quality Review" && reviewSaved) || (item.title === "Participant Rights" && rightsSaved) ? "Saved in this preview" : item.action}</p>
