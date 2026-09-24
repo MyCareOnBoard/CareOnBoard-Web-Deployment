@@ -33,4 +33,29 @@ describe("SupportCoordinatorManagement", () => {
     await user.click(screen.getByRole("tab", { name: "Document review" }));
     expect(screen.getByRole("link", { name: "Review documents" })).toHaveAttribute("href", "/agency/dsp-management/sc-1");
   });
+
+  it("opens and resets the add coordinator form without claiming an invitation was sent", async () => {
+    mocks.listClients.mockReset().mockResolvedValue([]);
+    mocks.updateClient.mockReset();
+    mocks.useDSPList.mockReturnValue({ dsps: [], isLoading: false, error: null });
+    const user = userEvent.setup();
+
+    render(<MemoryRouter><SupportCoordinatorManagement /></MemoryRouter>);
+    await user.click(await screen.findByRole("button", { name: "Add support coordinator" }));
+    expect(screen.getByRole("dialog", { name: "Add Support coordinator" })).toBeInTheDocument();
+    await user.type(screen.getByLabelText("Full name"), "Tiara Booker");
+    await user.type(screen.getByLabelText("Email"), "tiara@example.com");
+    await user.type(screen.getByLabelText("Phone number"), "123");
+    await user.click(screen.getByRole("button", { name: "Send invitation" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Enter a valid phone number.");
+    await user.clear(screen.getByLabelText("Phone number"));
+    await user.type(screen.getByLabelText("Phone number"), "241234567");
+    await user.click(screen.getByRole("button", { name: "Send invitation" }));
+    expect(screen.getByRole("status")).toHaveTextContent("No invitation was sent.");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await user.click(screen.getByRole("button", { name: "Add support coordinator" }));
+    expect(screen.getByLabelText("Full name")).toHaveValue("");
+    expect(screen.getByLabelText("Email")).toHaveValue("");
+    expect(mocks.updateClient).not.toHaveBeenCalled();
+  });
 });

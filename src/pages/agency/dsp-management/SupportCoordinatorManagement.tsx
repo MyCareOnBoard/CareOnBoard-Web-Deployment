@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Plus, X } from "lucide-react";
+import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input";
+import "react-phone-number-input/style.css";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { listClients, updateClient, type Client } from "@/lib/api/clients";
 import { Routes } from "@/routes/constants";
@@ -48,6 +52,19 @@ export default function SupportCoordinatorManagement() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [showAddCoordinator, setShowAddCoordinator] = useState(false);
+  const [inviteName, setInviteName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [invitePhone, setInvitePhone] = useState("");
+  const [inviteNotice, setInviteNotice] = useState("");
+
+  const closeAddCoordinator = () => {
+    setShowAddCoordinator(false);
+    setInviteName("");
+    setInviteEmail("");
+    setInvitePhone("");
+    setInviteNotice("");
+  };
 
   const refreshClients = async () => {
     const result = await listClients({ agencyId, type: "sc", all: true });
@@ -127,7 +144,10 @@ export default function SupportCoordinatorManagement() {
           </div>
         </section>
         <section aria-labelledby="sc-team-title" className="space-y-3">
-          <h2 id="sc-team-title" className="text-lg font-semibold text-[#10141a]">My team</h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 id="sc-team-title" className="text-lg font-semibold text-[#10141a]">My team</h2>
+            <Button type="button" size="sm" className="h-9 rounded-lg" aria-label="Add support coordinator" onClick={() => setShowAddCoordinator(true)}><Plus className="h-4 w-4" />Add</Button>
+          </div>
           {coordinators.length === 0 ? <p className="rounded-xl border border-[#e5e7eb] bg-white p-6 text-sm text-[#6b7280]">No support coordinators yet.</p> : coordinators.map((person) => {
             const assigned = clients.filter((client) => assignedTo(client, person));
             const expanded = expandedId === person.id;
@@ -155,6 +175,38 @@ export default function SupportCoordinatorManagement() {
         {coordinators.length === 0 ? <p className="rounded-xl border border-[#e5e7eb] bg-white p-6 text-sm text-[#6b7280]">No support coordinators yet.</p> : coordinators.map((person) => <div key={person.id} className="flex items-center justify-between gap-3 rounded-xl border border-[#e5e7eb] bg-white p-4"><span className="truncate text-sm font-semibold">{person.fullName}</span><Button asChild variant="outline" size="sm"><Link to={Routes.agency.dspProfile.replace(":dspId", person.id)}>Review documents</Link></Button></div>)}
       </section>}
     </div>
+
+    <Dialog open={showAddCoordinator} onOpenChange={(open) => { if (!open) closeAddCoordinator(); }}>
+      <DialogContent className="w-[min(95vw,440px)] rounded-[20px] p-0" showCloseButton={false}>
+        <form onSubmit={(event) => {
+          event.preventDefault();
+          if (!isValidPhoneNumber(invitePhone)) {
+            setInviteNotice("Enter a valid phone number.");
+            return;
+          }
+          setInviteNotice("Invitation sending is not available yet. No invitation was sent.");
+        }}>
+          <div className="flex items-center justify-between px-5 pt-5">
+            <DialogTitle className="text-base font-semibold leading-tight text-[#10141a]">Add Support coordinator</DialogTitle>
+            <DialogDescription className="sr-only">Enter the support coordinator's contact details.</DialogDescription>
+            <button type="button" aria-label="Close add support coordinator" onClick={closeAddCoordinator} className="flex size-7 items-center justify-center rounded-full bg-[#f1f3f5] text-[#525b66] hover:bg-[#e5e7eb]"><X className="size-4" /></button>
+          </div>
+          <div className="space-y-3.5 px-5 pt-5">
+            <div className="space-y-1.5"><Label htmlFor="sc-invite-name" className="text-xs font-semibold text-[#10141a]">Full name</Label><Input id="sc-invite-name" value={inviteName} onChange={(event) => { setInviteName(event.target.value); setInviteNotice(""); }} autoComplete="name" placeholder="Enter their full name here" required className="h-9 rounded-lg border-[#e5e7eb] px-3 text-xs" /></div>
+            <div className="space-y-1.5"><Label htmlFor="sc-invite-email" className="text-xs font-semibold text-[#10141a]">Email</Label><Input id="sc-invite-email" type="email" value={inviteEmail} onChange={(event) => { setInviteEmail(event.target.value); setInviteNotice(""); }} autoComplete="email" placeholder="Enter their email here" required className="h-9 rounded-lg border-[#e5e7eb] px-3 text-xs" /></div>
+            <div className="space-y-1.5">
+              <Label htmlFor="sc-invite-phone" className="text-xs font-semibold text-[#10141a]">Phone number</Label>
+              <PhoneInput id="sc-invite-phone" international defaultCountry="GH" countryCallingCodeEditable={false} value={invitePhone || undefined} onChange={(value) => { setInvitePhone(value ?? ""); setInviteNotice(""); }} placeholder="Enter your phone number here" required className="flex h-9 items-center gap-2 rounded-lg border border-[#e5e7eb] px-3 text-xs focus-within:border-[#008f93] focus-within:ring-2 focus-within:ring-[#008f93]/15 [&_.PhoneInputInput]:min-w-0 [&_.PhoneInputInput]:flex-1 [&_.PhoneInputInput]:border-0 [&_.PhoneInputInput]:bg-transparent [&_.PhoneInputInput]:text-xs [&_.PhoneInputInput]:outline-none [&_.PhoneInputCountrySelect]:cursor-pointer" />
+            </div>
+            {inviteNotice && <p role="status" className="text-xs text-[#80541a]">{inviteNotice}</p>}
+          </div>
+          <div className="flex justify-end gap-2 px-5 py-5">
+            <Button type="button" variant="outline" size="sm" onClick={closeAddCoordinator} className="h-9 rounded-lg border-[#e5e7eb] px-3 text-xs font-normal text-[#10141a]">Cancel</Button>
+            <Button type="submit" size="sm" className="h-9 rounded-lg bg-[#008f93] px-3 text-xs hover:bg-[#007d81]">Send invitation</Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
 
     <Dialog open={assigning !== null} onOpenChange={(open) => { if (!open && !saving) setAssigning(null); }}>
       <DialogContent className="w-[min(95vw,520px)] p-0" showCloseButton={false}>
