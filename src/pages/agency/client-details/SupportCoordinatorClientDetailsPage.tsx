@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { ArrowLeft, CircleHelp, FileText, FolderOpen, X } from "lucide-react";
+import { ArrowLeft, CircleHelp, FileText, X } from "lucide-react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,7 @@ import { getAgencyClientById, type Client } from "@/lib/api/clients";
 import { DatePickerField, SignatureField } from "@/pages/shared/client-management/components/forms/formControls";
 import { clients } from "@/pages/agency/clients-management/supportCoordinatorSampleClients";
 import { Routes } from "@/routes/constants";
+import SupportCoordinatorDocumentsTab from "./SupportCoordinatorDocumentsTab";
 
 const DigitalSignatureModal = lazy(() => import("@/pages/applicant/application/components/DigitalSignature"));
 
@@ -214,9 +215,9 @@ export default function SupportCoordinatorClientDetailsPage() {
                 </button>)}
               </div>
             </section>
-          ) : activeTab === "services" ? <ServiceAuthorizationTab key={clientId} sample={Boolean(sample)} /> : (
+          ) : activeTab === "services" ? <ServiceAuthorizationTab key={clientId} sample={Boolean(sample)} /> : activeTab === "documents" ? <SupportCoordinatorDocumentsTab key={clientId} sample={Boolean(sample)} /> : (
             <section aria-label={`${tabs.find((tab) => tab.id === activeTab)?.label} tab`} className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-[#d1d5db] px-6 text-center">
-              {activeTab === "documents" ? <FolderOpen className="mb-3 h-8 w-8 text-[#008f93]" /> : <FileText className="mb-3 h-8 w-8 text-[#008f93]" />}
+              <FileText className="mb-3 h-8 w-8 text-[#008f93]" />
               <h2 className="text-xl font-semibold text-[#10141a]">{tabs.find((tab) => tab.id === activeTab)?.label}</h2>
               <p className="mt-2 text-sm text-[#6b7280]">This section is ready for client records.</p>
             </section>

@@ -159,3 +159,30 @@ it("adds a service to the local preview with total units and a selected unit", a
   expect(cards[3]).toHaveTextContent("$1,182.00");
   expect(cards[3]).toHaveTextContent("Source: Local preview");
 }, 15000);
+
+it("shows sample documents and adds an uploaded document to the local preview", async () => {
+  const user = userEvent.setup();
+  render(<MemoryRouter initialEntries={["/agency/clients/182441?tab=documents"]}>
+    <Routes><Route path="/agency/clients/:clientId" element={<SupportCoordinatorClientDetailsPage />} /></Routes>
+  </MemoryRouter>);
+
+  expect(screen.getByRole("heading", { name: "Document Control" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Leslie Alexander" })).toBeInTheDocument();
+  const table = screen.getByRole("table");
+  expect(within(table).getAllByRole("row")).toHaveLength(7);
+  expect(within(table).getByText("NJ ISP — Plan 10.04")).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Upload document" }));
+  const dialog = screen.getByRole("dialog", { name: "Upload document" });
+  await user.upload(within(dialog).getByLabelText("Document file"), new File(["sample"], "sample.pdf", { type: "application/pdf" }));
+  fireEvent.keyDown(within(dialog).getByRole("combobox", { name: "Document type" }), { key: "ArrowDown" });
+  await user.click(screen.getByRole("option", { name: "Assessment" }));
+  await user.type(within(dialog).getByRole("textbox", { name: "Document name" }), "Follow-up assessment");
+  await user.click(within(dialog).getByRole("button", { name: "Effective date" }));
+  await user.click(screen.getByRole("button", { name: /^Today,/ }));
+  await user.click(within(dialog).getByRole("button", { name: "Upload & save" }));
+
+  expect(screen.queryByRole("dialog", { name: "Upload document" })).not.toBeInTheDocument();
+  expect(within(table).getAllByRole("row")).toHaveLength(8);
+  expect(within(table).getByText("Follow-up assessment")).toBeInTheDocument();
+}, 15000);
