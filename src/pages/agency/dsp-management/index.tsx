@@ -6,9 +6,17 @@ import { Button } from "@/components/ui/button";
 import { Routes } from "@/routes/constants";
 import { useAuth } from "@/utils/auth";
 import { staffLabels } from "@/lib/roleLabel";
+import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
+import SupportCoordinatorManagement from "./SupportCoordinatorManagement";
 import type { RootState } from "@/store/redux/store";
 
 export default function DSPManagementPage() {
+  const mode = useEffectiveAgencyMode();
+  if (mode === "sc") return <SupportCoordinatorManagement />;
+  return <StandardDSPManagementPage />;
+}
+
+function StandardDSPManagementPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const agencyId = user?.agencyId || "";

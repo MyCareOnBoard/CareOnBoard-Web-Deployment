@@ -121,7 +121,7 @@ export function useDSPList() {
     const user = useSelector((state: RootState) => state.auth.user);
     const agencyId = user?.agencyId;
     const selectedMode = useEffectiveAgencyMode();
-    const role = selectedMode === "hha" ? "hha" : selectedMode === "ddd" ? "dsp" : undefined;
+    const role = selectedMode === "hha" ? "hha" : selectedMode === "ddd" ? "dsp" : selectedMode === "sc" ? "support_coordinator" : undefined;
 
     const fetchDSPs = useCallback(async () => {
         if (!agencyId) {

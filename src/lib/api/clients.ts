@@ -141,6 +141,7 @@ export interface Client {
   guardianPhone?: string;
   guardianAddress?: string;
   supportCoordinatorName?: string;
+  supportCoordinatorId?: string | null;
   supportCoordinatorAgency?: string;
   supportCoordinatorContact?: string;
   healthcareSafety?: ClientHealthcareSafety;
@@ -601,6 +602,7 @@ export interface ListClientsResponse {
   clients: Client[];
   total: number;
   count: number;
+  pagination?: { fetchedCount?: number };
 }
 
 /**
@@ -615,6 +617,7 @@ export interface ListAgencyClientsResponse {
     limit: number;
     offset: number;
     count: number;
+    fetchedCount?: number;
   }
 }
 
@@ -650,12 +653,13 @@ export interface ClientStatsResponse {
  */
 export interface ListClientsParams {
   agencyId?: string; // Required for employees
-  type?: ClientType;
+  type?: ClientType | "sc";
   mode?: "ddd" | "hha" | "sc";
   status?: 'active' | 'inactive' | 'pending' | 'archived';
   service?: string;
   search?: string;
   limit?: number;
+  all?: boolean;
   agency?: boolean;
   signal?: AbortSignal;
 }
@@ -886,6 +890,7 @@ export interface UpdateClientRequest {
   guardianPhone?: string | null;
   guardianAddress?: string | null;
   supportCoordinatorName?: string | null;
+  supportCoordinatorId?: string | null;
   supportCoordinatorAgency?: string | null;
   supportCoordinatorContact?: string | null;
   medicalConditions?: string[] | null;
@@ -1078,24 +1083,29 @@ export async function getAgencyClientById(clientId: string, options: { signal?: 
  */
 export async function listClients(params?: ListClientsParams): Promise<Client[]> {
   try {
-    const response = await axiosClient.get<ListClientsResponse>('/clients', {
-      params: {
-        agencyId: params?.agencyId,
-        type: params?.type,
-        status: params?.status,
-        service: params?.service,
-        search: params?.search,
-        limit: params?.limit,
-        agency: params?.agency,
-      },
-      signal: params?.signal,
-    });
+    const clients: Client[] = [];
+    const limit = params?.all ? 100 : params?.limit;
+    for (let offset = 0; ; offset += limit || 50) {
+      const response = await axiosClient.get<ListClientsResponse>('/clients', {
+        params: {
+          agencyId: params?.agencyId,
+          type: params?.type,
+          status: params?.status,
+          service: params?.service,
+          search: params?.search,
+          limit,
+          offset: params?.all ? offset : undefined,
+          agency: params?.agency,
+        },
+        signal: params?.signal,
+      });
 
-    if (!response.data.success) {
-      throw new Error('Failed to fetch clients');
+      if (!response.data.success) throw new Error('Failed to fetch clients');
+      clients.push(...response.data.clients || []);
+      if (!params?.all || (response.data.pagination?.fetchedCount ?? response.data.clients.length) < 100) return clients;
+      // ponytail: Full-roster fetches stop at 5000 raw clients; use server pagination if an agency grows beyond that.
+      if (offset >= 4900) throw new Error('Client roster is too large to load');
     }
-
-    return response.data.clients || [];
   } catch (error) {
     console.error('Failed to fetch clients:', error);
     throw error;

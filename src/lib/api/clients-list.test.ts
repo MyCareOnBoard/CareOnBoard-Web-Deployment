@@ -50,4 +50,15 @@ describe("client list mode forwarding", () => {
       undefined,
     );
   });
+
+  it("reads every raw page when the program filter leaves a sparse page", async () => {
+    mocks.get
+      .mockResolvedValueOnce({ data: { success: true, clients: [{ id: "first" }], pagination: { fetchedCount: 100 } } })
+      .mockResolvedValueOnce({ data: { success: true, clients: [], pagination: { fetchedCount: 100 } } })
+      .mockResolvedValueOnce({ data: { success: true, clients: [{ id: "last" }], pagination: { fetchedCount: 1 } } });
+
+    const clients = await listClients({ agencyId: "agency-1", type: "sc", all: true });
+    expect(clients.map((client) => client.id)).toEqual(["first", "last"]);
+    expect(mocks.get.mock.calls.map(([, config]) => config.params.offset)).toEqual([0, 100, 200]);
+  });
 });
