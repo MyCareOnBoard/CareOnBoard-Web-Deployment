@@ -14,6 +14,7 @@ interface DeleteConfirmationModalProps {
   confirmText?: string
   cancelText?: string
   confirmButtonClassName?: string
+  instant?: boolean
 }
 
 export function DeleteConfirmationModal({
@@ -26,6 +27,7 @@ export function DeleteConfirmationModal({
   confirmText = "Delete",
   cancelText = "Cancel",
   confirmButtonClassName = "flex-1 bg-[#d93c24] hover:bg-[#c52d16] text-white",
+  instant = false,
 }: DeleteConfirmationModalProps) {
   const [confirmReady, setConfirmReady] = useState(false)
 
@@ -44,15 +46,15 @@ export function DeleteConfirmationModal({
       {isOpen && (
         <motion.div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm"
-          initial={{ opacity: 0 }}
+          initial={instant ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          exit={instant ? { opacity: 1, transition: { duration: 0 } } : { opacity: 0 }}
           onMouseDown={onClose}
         >
           <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
+            initial={instant ? false : { scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
+            exit={instant ? { scale: 1, opacity: 1, transition: { duration: 0 } } : { scale: 0.9, opacity: 0 }}
             transition={{ duration: 0.25 }}
             className="w-full max-w-md px-8 py-8 mx-4 text-center bg-white shadow-2xl rounded-2xl"
             onMouseDown={(e) => e.stopPropagation()}

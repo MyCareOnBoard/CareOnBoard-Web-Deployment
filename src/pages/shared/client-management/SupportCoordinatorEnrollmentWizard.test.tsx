@@ -33,6 +33,7 @@ test("SC wizard enables the first step after selecting a program and counts comp
   expect(screen.getByRole("textbox", { name: "City" })).toHaveValue("Newark");
   expect(screen.getByRole("textbox", { name: "State" })).toHaveValue("NJ");
   expect(screen.getByRole("textbox", { name: "ZIP code" })).toHaveValue("07102");
+  expect(screen.getByRole("textbox", { name: "County" })).toHaveValue("Essex");
   fireEvent.change(screen.getByRole("textbox", { name: "Primary address search" }), { target: { value: "Other address" } });
   expect(screen.getByRole("textbox", { name: "Street address" })).toHaveValue("");
 });
@@ -65,7 +66,7 @@ test("edit wizard loads saved fields and preserves outcome services and status",
   const service = { id: "service-1", name: "Community coaching" };
   const client = {
     id: "real-1", firstName: "Alex", lastName: "Example", dateOfBirth: "1990-01-02", status: "active",
-    primaryAddress: { address: "42 Service Lane, Newark, NJ 07102", line1: "42 Service Lane", city: "Newark", state: "NJ", postalCode: "07102" },
+    primaryAddress: { address: "42 Service Lane, Newark, NJ 07102", line1: "42 Service Lane", city: "Newark", state: "NJ", postalCode: "07102", countyState: "Essex" },
     scOutcomes: [{ id: "outcome-1", statement: "Join activities", services: [service] }],
     scEnrollment: { program: "SP", hasGuardian: false, familyMemberParticipates: false, eligibility: { medicaid: true, functional: true, financial: true, njResident: true, documents: true, requirements: true }, agreementSummaryReviewed: true, participantSignature: "Alex Example", participantSignatureImage: "data:image/png;base64,YQ==", signedOn: "2026-01-01" },
   } as Client;
@@ -77,6 +78,8 @@ test("edit wizard loads saved fields and preserves outcome services and status",
   expect(container.querySelector(".sc-enrollment-sidebar .animate-pulse")).toBeInTheDocument();
   expect(container.querySelector(".sc-enrollment-main .animate-pulse")).toBeInTheDocument();
   expect(await screen.findByText("Editing Alex Example")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /Participant information.*Completed/ }));
+  expect(screen.getByRole("textbox", { name: "County" })).toHaveValue("Essex");
   fireEvent.click(screen.getByRole("button", { name: /Guardian \/ representative.*Completed/ }));
   fireEvent.click(screen.getByRole("button", { name: "Remove outcome 1" }));
   expect(screen.getByRole("dialog", { name: "Remove outcome 1?" })).toHaveTextContent("remove 1 attached service");
@@ -96,6 +99,8 @@ test("edit wizard loads saved fields and preserves outcome services and status",
   expect(savingButton.querySelector("svg.animate-spin")).toBeInTheDocument();
   await waitFor(() => expect(updateClient).toHaveBeenCalledWith("real-1", expect.objectContaining({
     scOutcomes: [{ id: "outcome-1", statement: "Join more activities", services: [service] }],
+    countyState: "Essex",
+    primaryAddress: expect.objectContaining({ countyState: "Essex" }),
   })));
   expect(vi.mocked(updateClient).mock.calls[0][1]).not.toHaveProperty("status");
   finishSave(client);

@@ -162,7 +162,7 @@ export default function SupportCoordinatorManagement() {
               {expanded && <div className="space-y-2 border-t border-[#f0f0f0] px-4 py-3">
                 {assigned.length === 0 ? <p className="text-sm text-[#808081]">No clients assigned.</p> : assigned.map((client) => <Link key={client.id} to={Routes.agency.clientDetails.replace(":clientId", client.id)} className="flex items-center gap-3 rounded-lg border border-[#f0f0f0] bg-[#fcfcfd] p-2 hover:bg-[#f5fafa]">
                   <Avatar className="h-8 w-8"><AvatarFallback className="bg-[#fbe7ea] text-[10px] font-semibold text-[#c8213a]">{initials(clientName(client))}</AvatarFallback></Avatar>
-                  <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-[#10141a]">{clientName(client)}</p><p className="truncate text-[11px] text-[#808081]">ID: {client.id} · {client.scEnrollment?.program || "SC"} · {client.countyState || "County not set"} · {client.tier || "Tier not set"}</p></div>
+                  <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-[#10141a]">{clientName(client)}</p><p className="truncate text-[11px] text-[#808081]">ID: {client.id} · {client.scEnrollment?.program || "SC"} · {client.countyState || client.primaryAddress?.countyState || "County not set"} · {client.tier || "Tier not set"}</p></div>
                   <Badge variant={client.status === "active" ? "success" : "warning"}>{client.status === "active" ? "Active" : "Review"}</Badge>
                 </Link>)}
               </div>}
@@ -221,7 +221,7 @@ export default function SupportCoordinatorManagement() {
               return <label key={client.id} className={`flex cursor-pointer items-center gap-3 rounded-lg border p-2.5 ${checked ? "border-[#ff5775] bg-[#fff4f6]" : "border-[#e5e7eb]"}`}>
                 <input type="checkbox" checked={checked} disabled={saving || atCapacity} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...current, client.id] : current.filter((id) => id !== client.id))} aria-label={`Assign ${clientName(client)}`} className="size-4 shrink-0 accent-[#c8213a]" />
                 <Avatar className="h-8 w-8"><AvatarFallback className="bg-[#fbe7ea] text-[10px] font-semibold text-[#c8213a]">{initials(clientName(client))}</AvatarFallback></Avatar>
-                <span className="min-w-0 flex-1"><span className="block truncate text-xs font-semibold text-[#10141a]">{clientName(client)}</span><span className="block truncate text-[11px] text-[#808081]">ID: {client.id} · {client.scEnrollment?.program || "SC"} · {client.countyState || "County not set"} · {client.tier || "Tier not set"}</span></span>
+                <span className="min-w-0 flex-1"><span className="block truncate text-xs font-semibold text-[#10141a]">{clientName(client)}</span><span className="block truncate text-[11px] text-[#808081]">ID: {client.id} · {client.scEnrollment?.program || "SC"} · {client.countyState || client.primaryAddress?.countyState || "County not set"} · {client.tier || "Tier not set"}</span></span>
                 <Badge variant={client.status === "active" ? "success" : "warning"}>{client.status === "active" ? "Active" : "Review"}</Badge>
               </label>;
             })}

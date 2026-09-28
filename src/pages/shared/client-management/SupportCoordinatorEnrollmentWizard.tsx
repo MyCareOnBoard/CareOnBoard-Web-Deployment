@@ -102,7 +102,7 @@ export function SupportCoordinatorEnrollmentWizard({ isEditMode = false }: { isE
         program: enrollment.program, firstName: client.firstName || "", middleName: client.middleName || "", lastName: client.lastName || "",
         dob: typeof dob === "string" ? dob.slice(0, 10) : dob instanceof Date ? format(dob, "yyyy-MM-dd") : dob?._seconds ? format(new Date(dob._seconds * 1000), "yyyy-MM-dd") : "",
         gender: client.gender || "", ssn: client.ssn || "", addressSearch: client.primaryAddress?.address || "", address: client.primaryAddress?.line1 || "",
-        city: client.primaryAddress?.city || "", county: client.countyState || "", state: client.primaryAddress?.state || "", zip: client.primaryAddress?.postalCode || client.primaryAddress?.zipCode || "",
+        city: client.primaryAddress?.city || "", county: client.countyState || client.primaryAddress?.countyState || "", state: client.primaryAddress?.state || "", zip: client.primaryAddress?.postalCode || client.primaryAddress?.zipCode || "",
         phone: client.phone || "", email: client.email || "", medicaidId: client.medicaidId || "", dddId: client.dddId || "",
         hasGuardian: enrollment.hasGuardian, guardianName: client.guardianName || "", guardianRelationship: client.guardianRelationship || "", guardianPhone: client.guardianPhone || "", guardianEmail: client.guardianEmail || "", guardianAddress: client.guardianAddress || "",
         familyMemberParticipates: enrollment.familyMemberParticipates, familyMemberName: enrollment.familyMemberName || "", familyMemberRelationship: enrollment.familyMemberRelationship || "",
@@ -219,7 +219,7 @@ export function SupportCoordinatorEnrollmentWizard({ isEditMode = false }: { isE
       phone: form.phone.trim() || (isEditMode ? "" : undefined), email: form.email.trim() || (isEditMode ? "" : undefined),
       medicaidId: form.medicaidId.trim() || (isEditMode ? "" : undefined), dddId: form.dddId.trim() || (isEditMode ? "" : undefined),
       countyState: form.county.trim() || (isEditMode ? "" : undefined),
-      primaryAddress: { address: form.addressSearch.trim(), line1: form.address.trim(), city: form.city.trim(), state: form.state.trim(), postalCode: form.zip.trim(), zipCode: form.zip.trim(), country: "US" },
+      primaryAddress: { address: form.addressSearch.trim(), line1: form.address.trim(), city: form.city.trim(), state: form.state.trim(), postalCode: form.zip.trim(), zipCode: form.zip.trim(), countyState: form.county.trim() || undefined, country: "US" },
       guardianName: form.hasGuardian ? form.guardianName.trim() : isEditMode ? "" : undefined,
       guardianRelationship: form.hasGuardian ? form.guardianRelationship : isEditMode ? "" : undefined,
       guardianPhone: form.hasGuardian ? form.guardianPhone.trim() : isEditMode ? "" : undefined,
@@ -332,6 +332,7 @@ export function SupportCoordinatorEnrollmentWizard({ isEditMode = false }: { isE
             <Field label="City" required><Input value={form.city} placeholder="Filled from address selection" readOnly /></Field>
             <Field label="State" required><Input value={form.state} placeholder="Filled from address selection" readOnly /></Field>
             <Field label="ZIP code" required><Input value={form.zip} placeholder="Filled from address selection" readOnly /></Field>
+            <Field label="County" className="span-three"><Input value={form.county} onChange={event => update("county", event.target.value)} placeholder="Filled from address selection or enter county" /></Field>
             <Field label="Phone"><Input type="tel" value={form.phone} onChange={event => update("phone", event.target.value)} placeholder="Enter phone number" /></Field>
             <Field label="Email address" className="span-two"><Input type="email" value={form.email} onChange={event => update("email", event.target.value)} placeholder="name@example.com" /></Field>
           </div></section>

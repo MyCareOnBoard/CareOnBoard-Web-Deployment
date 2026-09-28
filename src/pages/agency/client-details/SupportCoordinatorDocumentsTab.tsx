@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { format } from "date-fns";
-import { UploadCloud, X } from "lucide-react";
+import { Loader2, UploadCloud, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { FileUpload } from "@/components/ui/file-upload";
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DatePickerField } from "@/pages/shared/client-management/components/forms/formControls";
 import { updateClient, uploadClientDocument, type Client, type ClientDocument } from "@/lib/api/clients";
+import { useToast } from "@/hooks/use-toast";
 
 type Document = {
   name: string;
@@ -37,6 +38,7 @@ const allowedTypes = ["application/pdf", "image/png", "image/jpeg"];
 const maxFileSize = 10 * 1024 * 1024;
 
 export default function SupportCoordinatorDocumentsTab({ sample, client, onSaved }: { sample: boolean; client: Client | null; onSaved: (client: Client) => void }) {
+  const { toast } = useToast();
   const [addedDocuments, setAddedDocuments] = useState<Document[]>([]);
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -126,6 +128,7 @@ export default function SupportCoordinatorDocumentsTab({ sample, client, onSaved
               await updateClient(client.id, { documents });
               onSaved({ ...client, documents });
               close();
+              toast({ title: "Document uploaded", description: "Saved to the client record.", variant: "success" });
             } catch {
               setError("Document could not be saved. Please try again.");
             } finally { setSaving(false); }
@@ -138,6 +141,7 @@ export default function SupportCoordinatorDocumentsTab({ sample, client, onSaved
             source, provider: provider || undefined,
           }]);
           close();
+          toast({ title: "Document added to preview", description: "This preview is not saved to the client record.", variant: "success" });
         }}>
           <div className="min-h-0 flex-1 space-y-3.5 overflow-y-auto py-4 pr-0.5">
             <div className="rounded bg-[#fafbfc] py-1 text-sm text-[#4b5563]"><p className="font-semibold text-[#10141a]">Upload your filled forms here</p><p>Upload your assets of choice to me.</p></div>
@@ -155,7 +159,7 @@ export default function SupportCoordinatorDocumentsTab({ sample, client, onSaved
           </div>
           <div className="shrink-0 border-t border-[#eef0f2] pt-3">
             {error && <p role="alert" className="mb-2 text-sm text-[#ad182d]">{error}</p>}
-            <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={close} className="rounded-lg">Cancel</Button><Button type="submit" disabled={saving} className="rounded-lg">{saving ? "Saving…" : "Upload & save"}</Button></div>
+            <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={close} className="rounded-lg">Cancel</Button><Button type="submit" disabled={saving} aria-busy={saving} className="gap-2 rounded-lg">{saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}{saving ? "Saving…" : "Upload & save"}</Button></div>
           </div>
         </form>
       </DialogContent>

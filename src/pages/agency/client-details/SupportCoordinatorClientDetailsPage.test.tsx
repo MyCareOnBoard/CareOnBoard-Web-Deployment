@@ -1,10 +1,12 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { addDays, format, startOfWeek } from "date-fns";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 vi.unmock("react-router");
 vi.mock("@/lib/api/clients", () => ({ getAgencyClientById: vi.fn(), updateClient: vi.fn(), uploadClientDocument: vi.fn() }));
+const toast = vi.hoisted(() => vi.fn());
+vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast }) }));
 import { getAgencyClientById, updateClient, uploadClientDocument, type Client } from "@/lib/api/clients";
 import SupportCoordinatorClientDetailsPage from "./SupportCoordinatorClientDetailsPage";
 
@@ -102,6 +104,79 @@ it("submits a real client's DDD assessment and keeps the saved selections", asyn
   expect(screen.getByRole("combobox", { name: "Tier" })).toHaveTextContent("Tier D");
 });
 
+it("shows a real client's uploaded assessment and tier letter in their matching sections", async () => {
+  const user = userEvent.setup();
+  const client = {
+    id: "real-documents", firstName: "Alex", lastName: "Example", tier: "D",
+    documents: [
+      { key: "scDocuments", category: "Other", fileName: "Unrelated.pdf", url: "https://example.com/other.pdf" },
+      { key: "scDocuments", category: "Assessment", fileName: "NJCAT_Example.pdf", url: "https://example.com/njcat.pdf", source: "DDD / State record" },
+      { key: "scDocuments", category: "Tier", fileName: "TierLetter_Example.pdf", url: "https://example.com/tier.pdf" },
+      { key: "scDocuments", category: "Assessment", fileName: "Unsafe.pdf", url: "javascript:alert(1)" },
+    ],
+  } as Client;
+  vi.mocked(getAgencyClientById).mockResolvedValue(client);
+  render(<MemoryRouter initialEntries={["/agency/clients/real-documents?tab=assessment"]}>
+    <Routes><Route path="/agency/clients/:clientId" element={<SupportCoordinatorClientDetailsPage />} /></Routes>
+  </MemoryRouter>);
+
+  expect(await screen.findByRole("heading", { name: "Alex Example" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Yes, I have information" })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("combobox", { name: "NJCAT Status" })).toHaveTextContent("Available");
+  expect(screen.getByRole("combobox", { name: "Assessment Source" })).toHaveTextContent("DDD / State record");
+  expect(screen.getByRole("combobox", { name: "Tier Letter Available?" })).toHaveTextContent("Yes");
+  await user.click(screen.getByRole("button", { name: "View NJCAT Document" }));
+  const njcatPreview = screen.getByRole("dialog", { name: "NJCAT Assessment" });
+  expect(within(njcatPreview).getByTitle("NJCAT Assessment preview")).toHaveAttribute("src", "https://example.com/njcat.pdf#toolbar=0&navpanes=0");
+  await user.click(within(njcatPreview).getByRole("button", { name: "Close" }));
+  await user.click(screen.getByRole("button", { name: "View Tier Letter Document" }));
+  const tierPreview = screen.getByRole("dialog", { name: "Tier Letter" });
+  expect(within(tierPreview).getByTitle("Tier Letter preview")).toHaveAttribute("src", "https://example.com/tier.pdf#toolbar=0&navpanes=0");
+  expect(screen.getByText("NJCAT_Example.pdf")).toBeInTheDocument();
+  expect(screen.getByText("TierLetter_Example.pdf")).toBeInTheDocument();
+  expect(screen.queryByText("Unrelated.pdf")).not.toBeInTheDocument();
+  expect(screen.queryByText("Unsafe.pdf")).not.toBeInTheDocument();
+  expect(screen.queryByText("SC Verified")).not.toBeInTheDocument();
+});
+
+it("keeps saved assessment decisions when current documents are on file", async () => {
+  const user = userEvent.setup();
+  vi.mocked(getAgencyClientById).mockResolvedValue({
+    id: "saved-assessment", firstName: "Alex", lastName: "Example",
+    scAssessment: { answer: "pending", njcatStatus: "Pending", assessmentSource: "Not selected", tierLetterAvailable: "Pending" },
+    documents: [
+      { key: "scDocuments", category: "Assessment", fileName: "NJCAT.pdf", url: "https://example.com/njcat.pdf", source: "DDD / State record" },
+      { key: "scDocuments", category: "Tier", fileName: "Tier.pdf", url: "https://example.com/tier.pdf" },
+    ],
+  } as Client);
+  render(<MemoryRouter initialEntries={["/agency/clients/saved-assessment?tab=assessment"]}>
+    <Routes><Route path="/agency/clients/:clientId" element={<SupportCoordinatorClientDetailsPage />} /></Routes>
+  </MemoryRouter>);
+
+  expect(await screen.findByRole("heading", { name: "Alex Example" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "No, information is pending" })).toHaveAttribute("aria-pressed", "true");
+  await user.click(screen.getByRole("button", { name: "Yes, I have information" }));
+  expect(screen.getByRole("combobox", { name: "NJCAT Status" })).toHaveTextContent("Pending");
+  expect(screen.getByRole("combobox", { name: "Assessment Source" })).toHaveTextContent("Not selected");
+  expect(screen.getByRole("combobox", { name: "Tier Letter Available?" })).toHaveTextContent("Pending");
+});
+
+it("does not infer availability from expired assessment documents", async () => {
+  vi.mocked(getAgencyClientById).mockResolvedValue({
+    id: "expired-assessment", firstName: "Alex", lastName: "Example",
+    documents: [
+      { key: "scDocuments", category: "Assessment", fileName: "NJCAT.pdf", url: "https://example.com/njcat.pdf", expiryDate: "2020-01-01" },
+      { key: "scDocuments", category: "Tier", fileName: "Tier.pdf", url: "https://example.com/tier.pdf", expiryDate: "2020-01-01" },
+    ],
+  } as Client);
+  render(<MemoryRouter initialEntries={["/agency/clients/expired-assessment?tab=assessment"]}>
+    <Routes><Route path="/agency/clients/:clientId" element={<SupportCoordinatorClientDetailsPage />} /></Routes>
+  </MemoryRouter>);
+
+  expect(await screen.findByRole("heading", { name: "Alex Example" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "No, information is pending" })).toHaveAttribute("aria-pressed", "true");
+});
+
 it("opens the ISP quality checklist and keeps the preview review on the page", async () => {
   const user = userEvent.setup();
   render(<MemoryRouter initialEntries={["/agency/clients/182441?tab=planning"]}>
@@ -156,7 +231,10 @@ it("shows sample service authorizations and responds to service actions", async 
   expect(services).toHaveLength(3);
   expect(within(services[0]).getByRole("heading", { name: "Individual supports" })).toBeInTheDocument();
   expect(within(services[0]).getByText("90 hrs/week")).toBeInTheDocument();
-  expect(within(services[1]).getByText("Missing")).toBeInTheDocument();
+  const missingPa = within(services[1]).getByText("Missing");
+  expect(missingPa.parentElement).toHaveTextContent("PA: Missing");
+  expect(missingPa).toHaveClass("text-[#c52236]");
+  expect(within(services[0]).getAllByText("Received")[0].parentElement).toHaveTextContent("PA: Received");
   expect(within(services[2]).getByText("Review")).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Add service" }));
   const addService = screen.getByRole("dialog", { name: "Add service" });
@@ -181,6 +259,7 @@ it("shows sample service authorizations and responds to service actions", async 
 
 it("edits and deletes a sample service in the local preview", async () => {
   const user = userEvent.setup();
+  toast.mockClear();
   render(<MemoryRouter initialEntries={["/agency/clients/182441?tab=services"]}>
     <Routes><Route path="/agency/clients/:clientId" element={<SupportCoordinatorClientDetailsPage />} /></Routes>
   </MemoryRouter>);
@@ -194,6 +273,7 @@ it("edits and deletes a sample service in the local preview", async () => {
   await user.click(within(dialog).getByRole("button", { name: "Edit service" }));
   const updated = screen.getAllByRole("article")[0];
   expect(within(updated).getByRole("heading", { name: "Updated supports" })).toBeInTheDocument();
+  expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Service updated in preview", variant: "success" }));
   await user.click(within(updated).getByRole("button", { name: "Actions" }));
   await user.click(screen.getByRole("menuitem", { name: "Delete service" }));
   expect(screen.getByText("Delete Updated supports from this preview? This action cannot be undone.")).toBeInTheDocument();
@@ -204,6 +284,7 @@ it("edits and deletes a sample service in the local preview", async () => {
 
 it("adds a service to the local preview with total units and a selected unit", async () => {
   const user = userEvent.setup();
+  toast.mockClear();
   render(<MemoryRouter initialEntries={["/agency/clients/182441?tab=services"]}>
     <Routes><Route path="/agency/clients/:clientId" element={<SupportCoordinatorClientDetailsPage />} /></Routes>
   </MemoryRouter>);
@@ -229,13 +310,16 @@ it("adds a service to the local preview with total units and a selected unit", a
   expect(cards[3]).toHaveTextContent("120 total · Hourly");
   expect(cards[3]).toHaveTextContent("$1,182.00");
   expect(cards[3]).toHaveTextContent("Source: Local preview");
+  expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Service added to preview", variant: "success" }));
 }, 15000);
 
 it("saves a real client's service under its outcome", async () => {
   const user = userEvent.setup();
+  toast.mockClear();
   const client = { id: "real-1", firstName: "Alex", lastName: "Example", servicePrograms: ["sc"], scOutcomes: [{ id: "outcome-1", statement: "Join activities", services: [] }] } as Client;
   vi.mocked(getAgencyClientById).mockResolvedValue(client);
-  vi.mocked(updateClient).mockResolvedValue(undefined as unknown as Client);
+  let finishSave!: (value: Client) => void;
+  vi.mocked(updateClient).mockImplementation(() => new Promise<Client>(resolve => { finishSave = resolve; }));
   render(<MemoryRouter initialEntries={["/agency/clients/real-1?tab=services"]}>
     <Routes><Route path="/agency/clients/:clientId" element={<SupportCoordinatorClientDetailsPage />} /></Routes>
   </MemoryRouter>);
@@ -257,12 +341,20 @@ it("saves a real client's service under its outcome", async () => {
   await user.click(screen.getByRole("option", { name: "Hourly" }));
   await user.type(within(dialog).getByRole("spinbutton", { name: "Rate" }), "9.85");
   await user.click(within(dialog).getByRole("button", { name: "Add service" }));
+  const saveButton = within(dialog).getByRole("button", { name: "Saving…" });
+  expect(saveButton).toBeDisabled();
+  expect(saveButton).toHaveAttribute("aria-busy", "true");
+  expect(saveButton.querySelector("svg.animate-spin")).toBeInTheDocument();
+  expect(toast).not.toHaveBeenCalled();
+  await act(async () => finishSave(undefined as unknown as Client));
   expect(updateClient).toHaveBeenCalledWith("real-1", { scOutcomes: [expect.objectContaining({ id: "outcome-1", services: [expect.objectContaining({ name: "Community coaching", code: "H2020" })] })] });
   expect(await screen.findByRole("heading", { name: "Community coaching" })).toBeInTheDocument();
+  expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Service added", variant: "success" }));
 }, 15000);
 
 it("edits a real service, moves it between outcomes, and deletes it", async () => {
   const user = userEvent.setup();
+  toast.mockClear();
   const client = { id: "real-2", firstName: "Sam", lastName: "Example", servicePrograms: ["sc"], scOutcomes: [
     { id: "outcome-1", statement: "Join activities", services: [{ id: "service-1", name: "Coaching", code: "H2020", provider: "Provider", startAuthDate: "2026-09-28", endAuthDate: "2026-10-28", totalUnits: "12", unitType: "Hourly", clientRate: "9.85", frequency: "Weekly", narrative: "Keep this detail" }] },
     { id: "outcome-2", statement: "Build skills", services: [] },
@@ -287,7 +379,10 @@ it("edits a real service, moves it between outcomes, and deletes it", async () =
     expect.objectContaining({ id: "outcome-2", services: [expect.objectContaining({ id: "service-1", name: "Updated coaching", narrative: "Keep this detail" })] }),
   ] }));
   const updated = await screen.findByRole("article");
-  expect(updated).toHaveTextContent("Outcome: Build skills");
+  const outcomeLabel = within(updated).getByText("Outcome");
+  expect(outcomeLabel.nextElementSibling).toHaveTextContent("Build skills");
+  expect(outcomeLabel.parentElement?.parentElement?.firstElementChild).toBe(outcomeLabel.parentElement);
+  expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Service updated", variant: "success" }));
   await user.click(within(updated).getByRole("button", { name: "Actions" }));
   await user.click(screen.getByRole("menuitem", { name: "Delete service" }));
   await waitFor(() => expect(screen.getByRole("button", { name: "Delete service" })).toBeEnabled());
@@ -342,6 +437,7 @@ it("handles monitoring dates, follow-up tasks, and service monitoring in the loc
 
 it("shows sample documents and adds an uploaded document to the local preview", async () => {
   const user = userEvent.setup();
+  toast.mockClear();
   render(<MemoryRouter initialEntries={["/agency/clients/182441?tab=documents"]}>
     <Routes><Route path="/agency/clients/:clientId" element={<SupportCoordinatorClientDetailsPage />} /></Routes>
   </MemoryRouter>);
@@ -365,13 +461,16 @@ it("shows sample documents and adds an uploaded document to the local preview", 
   expect(screen.queryByRole("dialog", { name: "Upload document" })).not.toBeInTheDocument();
   expect(within(table).getAllByRole("row")).toHaveLength(8);
   expect(within(table).getByText("Follow-up assessment")).toBeInTheDocument();
+  expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Document added to preview", variant: "success" }));
 }, 15000);
 
 it("uploads a real client's document and saves its metadata", async () => {
   const user = userEvent.setup();
+  toast.mockClear();
   const client = { id: "real-doc", firstName: "Alex", lastName: "Example", servicePrograms: ["sc"], documents: [] } as Client;
   vi.mocked(getAgencyClientById).mockResolvedValue(client);
-  vi.mocked(uploadClientDocument).mockResolvedValue({ fileName: "plan.pdf", fileSize: 4, fileType: "application/pdf", url: "https://example.com/plan.pdf", storagePath: "test/plan.pdf", uploadedAt: "2026-09-28T00:00:00Z" });
+  let finishUpload!: (value: Awaited<ReturnType<typeof uploadClientDocument>>) => void;
+  vi.mocked(uploadClientDocument).mockImplementation(() => new Promise(resolve => { finishUpload = resolve; }));
   vi.mocked(updateClient).mockResolvedValue(undefined as unknown as Client);
   render(<MemoryRouter initialEntries={["/agency/clients/real-doc?tab=documents"]}>
     <Routes><Route path="/agency/clients/:clientId" element={<SupportCoordinatorClientDetailsPage />} /></Routes>
@@ -387,7 +486,14 @@ it("uploads a real client's document and saves its metadata", async () => {
   await user.click(within(dialog).getByRole("button", { name: "Effective date" }));
   await user.click(screen.getByRole("button", { name: /^Today,/ }));
   await user.click(within(dialog).getByRole("button", { name: "Upload & save" }));
+  const saveButton = within(dialog).getByRole("button", { name: "Saving…" });
+  expect(saveButton).toBeDisabled();
+  expect(saveButton).toHaveAttribute("aria-busy", "true");
+  expect(saveButton.querySelector("svg.animate-spin")).toBeInTheDocument();
+  expect(toast).not.toHaveBeenCalled();
+  await act(async () => finishUpload({ fileName: "plan.pdf", fileSize: 4, fileType: "application/pdf", url: "https://example.com/plan.pdf", storagePath: "test/plan.pdf", uploadedAt: "2026-09-28T00:00:00Z" }));
   expect(uploadClientDocument).toHaveBeenCalledWith("real-doc", "support-coordination", file);
   expect(updateClient).toHaveBeenCalledWith("real-doc", { documents: [expect.objectContaining({ key: "scDocuments", category: "ISP", title: "Current plan", url: "https://example.com/plan.pdf" })] });
   expect(await screen.findByRole("link", { name: "Current plan" })).toHaveAttribute("href", "https://example.com/plan.pdf");
+  expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Document uploaded", variant: "success" }));
 }, 15000);

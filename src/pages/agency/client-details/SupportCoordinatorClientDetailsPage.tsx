@@ -9,12 +9,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
+import { DocumentPreviewModal } from "@/components/documents/DocumentPreviewModal";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { normalizeSignaturePayload } from "@/pages/agency/billing/claims/utils/claimReportSignatureUtils";
-import { getAgencyClientById, updateClient, type Client, type ClientService } from "@/lib/api/clients";
+import { getAgencyClientById, updateClient, type Client, type ClientDocument, type ClientService } from "@/lib/api/clients";
+import { clientDocumentUrl } from "@/pages/shared/client-details/components/ClientDocumentChecklist";
 import { DatePickerField, SignatureField } from "@/pages/shared/client-management/components/forms/formControls";
 import { useToast } from "@/hooks/use-toast";
 import { clients } from "@/pages/agency/clients-management/supportCoordinatorSampleClients";
@@ -143,7 +145,7 @@ export default function SupportCoordinatorClientDetailsPage() {
   const name = sample?.name || [savedClient?.firstName, savedClient?.middleName, savedClient?.lastName].filter(Boolean).join(" ");
   const initials = sample?.initials || name.split(" ").filter(Boolean).slice(0, 2).map((part) => part[0].toUpperCase()).join("");
   const firstName = name.split(" ")[0] || "Participant";
-  const county = sample?.county || savedClient?.countyState || "County not set";
+  const county = sample?.county || savedClient?.countyState || savedClient?.primaryAddress?.countyState || "County not set";
   const program = sample?.program || savedClient?.scEnrollment?.program;
   const period = sample?.isp || "Dates not set";
   const recordedTier = sample?.tier || savedClient?.tier;
@@ -357,6 +359,7 @@ function InfoCard({ label, value, source }: { label: string; value: string; sour
 }
 
 function ServiceAuthorizationTab({ sample, client, onSaved }: { sample: boolean; client: Client | null; onSaved: (client: Client) => void }) {
+  const { toast } = useToast();
   const [preview, setPreview] = useState<"Add service" | "Edit service" | Service | null>(null);
   const [documentWeek, setDocumentWeek] = useState<string | null>(null);
   const [addedServices, setAddedServices] = useState<Service[]>([...sampleServices]);
@@ -396,7 +399,6 @@ function ServiceAuthorizationTab({ sample, client, onSaved }: { sample: boolean;
       {services.map((service, index) => <article key={service.name + service.code + index} className="rounded-xl border border-[#e5e7eb] p-4">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <h3 className="text-lg font-medium text-[#10141a]">{service.name}</h3>
-          {service.outcome && <span className="text-xs text-[#6b7280]">Outcome: {service.outcome}</span>}
           <span className={"rounded px-2 py-0.5 text-xs font-semibold " + (service.status === "Active" ? "bg-[#e8fff2] text-[#047857]" : "bg-[#fff8e9] text-[#a16207]")}>{service.status}</span>
           <span className="text-xs text-[#8a929e]">{service.code}</span>
           <DropdownMenu>
@@ -409,6 +411,10 @@ function ServiceAuthorizationTab({ sample, client, onSaved }: { sample: boolean;
           </DropdownMenu>
         </div>
         <div className="mt-3 grid gap-y-4 border-t border-[#eef0f2] pt-4 sm:grid-cols-2 xl:grid-cols-4">
+          {service.outcome && <div className="min-w-0 sm:col-span-2 xl:col-span-4">
+            <p className="text-xs text-[#6b7280]">Outcome</p>
+            <p className="mt-1 break-words text-sm font-medium text-[#10141a]">{service.outcome}</p>
+          </div>}
           {[
             ["Provider", service.provider], ["Authorization", service.authorization],
             ["Authorized Units", service.units], ["Rate", service.rate],
@@ -419,10 +425,14 @@ function ServiceAuthorizationTab({ sample, client, onSaved }: { sample: boolean;
           </div>)}
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-[#f3f4f6] pt-3 text-xs">
-          {([["PA", service.pa], ["SDR", service.sdr]] as const).map(([label, status]) => <span key={label} className="inline-flex items-center gap-1.5 text-[#4b5563]">
-            <span aria-hidden="true" className={"size-1.5 rounded-full " + (status === "Received" ? "bg-[#00a878]" : status === "Missing" ? "bg-[#d11f35]" : "bg-[#d99b20]")} />
-            {label}: <span className={"font-medium " + (status === "Missing" ? "text-[#ad182d]" : "text-[#10141a]")}>{status}</span>
-          </span>)}
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[#4b5563]">
+            <span aria-hidden="true" className={"size-2 rounded-full " + (service.pa === "Received" ? "bg-[#00a878]" : service.pa === "Missing" ? "bg-[#c52236]" : "bg-[#d99b20]")} />
+            PA: <span className={service.pa === "Missing" ? "text-[#c52236]" : "text-[#10141a]"}>{service.pa}</span>
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-[#4b5563]">
+            <span aria-hidden="true" className={"size-1.5 rounded-full " + (service.sdr === "Received" ? "bg-[#00a878]" : service.sdr === "Missing" ? "bg-[#d11f35]" : "bg-[#d99b20]")} />
+            SDR: <span className={"font-medium " + (service.sdr === "Missing" ? "text-[#ad182d]" : "text-[#10141a]")}>{service.sdr}</span>
+          </span>
           <span className="text-[#6b7280]">Source: {service.source ?? "DDD / iRecord"}</span>
         </div>
       </article>)}
@@ -460,6 +470,7 @@ function ServiceAuthorizationTab({ sample, client, onSaved }: { sample: boolean;
                 await updateClient(client.id, { scOutcomes: nextOutcomes });
                 onSaved({ ...client, scOutcomes: nextOutcomes });
                 setPreview(null);
+                toast({ title: editing ? "Service updated" : "Service added", description: "Saved to the client record.", variant: "success" });
               } catch {
                 setFormError("Service could not be saved. Please try again.");
               } finally { setSaving(false); }
@@ -481,6 +492,7 @@ function ServiceAuthorizationTab({ sample, client, onSaved }: { sample: boolean;
             setUnit("");
             setFrequency("Weekly");
             setFormError("");
+            toast({ title: editing ? "Service updated in preview" : "Service added to preview", description: "This preview is not saved to the client record.", variant: "success" });
           }}>
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-0.5 py-5">
             {!sample && <div><label htmlFor="sc-service-outcome" className="mb-2 block text-sm font-semibold text-[#10141a]">ISP outcome *</label><select id="sc-service-outcome" value={outcomeId} onChange={event => setOutcomeId(event.target.value)} className="h-12 w-full rounded-xl border border-[#e5e7eb] bg-white px-3 text-base">{(client?.scOutcomes ?? []).map(outcome => <option key={outcome.id} value={outcome.id}>{outcome.statement}</option>)}<option value="new">New outcome</option></select>{outcomeId === "new" && <Input aria-label="New outcome" value={newOutcome} maxLength={1000} onChange={event => setNewOutcome(event.target.value)} placeholder="Describe the desired outcome" className="mt-2 h-12 rounded-xl border-[#e5e7eb]" />}</div>}
@@ -502,7 +514,7 @@ function ServiceAuthorizationTab({ sample, client, onSaved }: { sample: boolean;
             </div>
             <div className="shrink-0 border-t border-[#eef0f2] pt-4">
               {formError && <p role="alert" className="mb-3 text-sm text-[#ad182d]">{formError}</p>}
-              <div className="flex justify-end gap-3"><Button type="button" variant="outline" onClick={() => setPreview(null)} className="rounded-lg">Cancel</Button><Button type="submit" disabled={saving} className="rounded-lg">{saving ? "Saving…" : preview}</Button></div>
+              <div className="flex justify-end gap-3"><Button type="button" variant="outline" onClick={() => setPreview(null)} className="rounded-lg">Cancel</Button><Button type="submit" disabled={saving} aria-busy={saving} className="gap-2 rounded-lg">{saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}{saving ? "Saving…" : preview}</Button></div>
             </div>
           </form>
         </> : selectedService ? <>
@@ -546,7 +558,7 @@ function ServiceAuthorizationTab({ sample, client, onSaved }: { sample: boolean;
         {selectedService && <div className="mt-2 flex justify-end"><Button variant="outline" onClick={() => setPreview(null)}>Close</Button></div>}
       </DialogContent>}
     </Dialog>
-    <DeleteConfirmationModal isOpen={Boolean(deleting)} onClose={() => { if (!isDeleting) setDeleting(null); }} isDeleting={isDeleting} title="Delete service?" message={deleteError || `Delete ${deleting?.service.name ?? "this service"} from ${sample ? "this preview" : "the outcome"}? This action cannot be undone.`} confirmText="Delete service" onConfirm={async () => {
+    <DeleteConfirmationModal isOpen={Boolean(deleting)} instant onClose={() => { if (!isDeleting) setDeleting(null); }} isDeleting={isDeleting} title="Delete service?" message={deleteError || `Delete ${deleting?.service.name ?? "this service"} from ${sample ? "this preview" : "the outcome"}? This action cannot be undone.`} confirmText="Delete service" onConfirm={async () => {
       if (!deleting) return;
       if (sample) { setAddedServices(current => current.filter((_, index) => index !== deleting.index)); setDeleting(null); return; }
       if (!client || !deleting.service.record || !deleting.service.outcomeId) return;
@@ -562,11 +574,17 @@ function ServiceAuthorizationTab({ sample, client, onSaved }: { sample: boolean;
 function AssessmentTab({ tier, lastName, sample, client, onSaved }: { tier: string; lastName: string; sample: boolean; client: Client | null; onSaved: (client: Client) => void }) {
   const { toast } = useToast();
   const assessment = client?.scAssessment;
-  const [answer, setAnswer] = useState<"yes" | "pending" | "unavailable">(assessment?.answer || (sample ? "yes" : "pending"));
-  const [njcatStatus, setNjcatStatus] = useState(assessment?.njcatStatus || (sample ? "Available" : "Not selected"));
-  const [assessmentSource, setAssessmentSource] = useState(assessment?.assessmentSource || (sample ? "DDD / State record" : "Not selected"));
+  const njcatDocument = client?.documents?.filter(document => document.category === "Assessment" && clientDocumentUrl(document.url)).at(-1);
+  const tierDocument = client?.documents?.filter(document => document.category === "Tier" && clientDocumentUrl(document.url)).at(-1);
+  const today = format(new Date(), "yyyy-MM-dd");
+  const currentDocument = (document: ClientDocument) => clientDocumentUrl(document.url) && (!document.expiryDate || document.expiryDate.slice(0, 10) >= today);
+  const currentNjcatDocument = client?.documents?.filter(document => document.category === "Assessment" && currentDocument(document)).at(-1);
+  const currentTierDocument = client?.documents?.filter(document => document.category === "Tier" && currentDocument(document)).at(-1);
+  const [answer, setAnswer] = useState<"yes" | "pending" | "unavailable">(assessment?.answer || (currentNjcatDocument || currentTierDocument ? "yes" : sample ? "yes" : "pending"));
+  const [njcatStatus, setNjcatStatus] = useState(assessment?.njcatStatus || (currentNjcatDocument ? "Available" : sample ? "Available" : "Not selected"));
+  const [assessmentSource, setAssessmentSource] = useState(assessment?.assessmentSource || currentNjcatDocument?.source || (sample ? "DDD / State record" : "Not selected"));
   const [selectedTier, setSelectedTier] = useState(tier);
-  const [tierLetterAvailable, setTierLetterAvailable] = useState(assessment?.tierLetterAvailable || (sample ? "Yes" : "Pending"));
+  const [tierLetterAvailable, setTierLetterAvailable] = useState(assessment?.tierLetterAvailable || (currentTierDocument ? "Yes" : sample ? "Yes" : "Pending"));
   const [assessmentDate, setAssessmentDate] = useState<Date | undefined>(assessment?.assessmentDate ? parseISO(assessment.assessmentDate) : sample ? new Date(2026, 3, 7) : undefined);
   const [determinationDate, setDeterminationDate] = useState<Date | undefined>(assessment?.determinationDate ? parseISO(assessment.determinationDate) : sample ? new Date(2026, 3, 7) : undefined);
   const [effectiveDate, setEffectiveDate] = useState<Date | undefined>(assessment?.effectiveDate ? parseISO(assessment.effectiveDate) : sample ? new Date(2026, 3, 7) : undefined);
@@ -602,6 +620,7 @@ function AssessmentTab({ tier, lastName, sample, client, onSaved }: { tier: stri
     { year: "2020", tier: "Tier C", date: "01/08/2020", source: "Document provided to SCA", current: false, reviewedBy: "—", notes: "Historical NJCAT assessment. Tier C recorded on 01/08/2020." },
   ];
   const [selectedDocument, setSelectedDocument] = useState<"njcat" | "tier" | null>(null);
+  const [previewDocument, setPreviewDocument] = useState<ClientDocument | null>(null);
   const [selectedHistory, setSelectedHistory] = useState<(typeof history)[number] | null>(null);
   const isTierLetter = selectedDocument === "tier";
 
@@ -634,7 +653,7 @@ function AssessmentTab({ tier, lastName, sample, client, onSaved }: { tier: stri
           <AssessmentSelect label="NJCAT Status" value={njcatStatus} onChange={setNjcatStatus} options={["Not selected", "Available", "Pending", "Not available"]} />
           <DatePickerField id="sc-njcat-assessment-date" label="NJCAT Assessment Date" value={assessmentDate} onChange={setAssessmentDate} />
           <AssessmentSelect label="Assessment Source" value={assessmentSource} onChange={setAssessmentSource} options={["Not selected", "DDD / State record", "Document provided to SCA", "Other"]} />
-          {sample ? <SampleDocument label="NJCAT Document" filename={`NJCAT_${lastName}_2026.pdf`} onView={() => setSelectedDocument("njcat")} /> : <p className="text-sm text-[#6b7280]">No NJCAT document recorded.</p>}
+          {sample ? <AssessmentDocument label="NJCAT Document" filename={`NJCAT_${lastName}_2026.pdf`} onView={() => setSelectedDocument("njcat")} /> : njcatDocument ? <AssessmentDocument label="NJCAT Document" filename={njcatDocument.fileName || njcatDocument.title || "NJCAT Document"} document={njcatDocument} onView={() => setPreviewDocument(njcatDocument)} /> : <p className="text-sm text-[#6b7280]">No NJCAT document recorded.</p>}
         </div>
       </section>
       <section aria-labelledby="sc-tier-heading">
@@ -646,7 +665,7 @@ function AssessmentTab({ tier, lastName, sample, client, onSaved }: { tier: stri
             <DatePickerField id="sc-effective-date" label="Effective Date" value={effectiveDate} onChange={setEffectiveDate} />
           </div>
           <AssessmentSelect label="Tier Letter Available?" value={tierLetterAvailable} onChange={setTierLetterAvailable} options={["Yes", "No", "Pending"]} />
-          {sample ? <SampleDocument label="Tier Letter Document" filename={`TierLetter_${lastName}_2026.pdf`} onView={() => setSelectedDocument("tier")} /> : <p className="text-sm text-[#6b7280]">No tier letter recorded.</p>}
+          {sample ? <AssessmentDocument label="Tier Letter Document" filename={`TierLetter_${lastName}_2026.pdf`} onView={() => setSelectedDocument("tier")} /> : tierDocument ? <AssessmentDocument label="Tier Letter Document" filename={tierDocument.fileName || tierDocument.title || "Tier Letter Document"} document={tierDocument} onView={() => setPreviewDocument(tierDocument)} /> : <p className="text-sm text-[#6b7280]">No tier letter recorded.</p>}
         </div>
       </section>
     </div>}
@@ -677,7 +696,8 @@ function AssessmentTab({ tier, lastName, sample, client, onSaved }: { tier: stri
           <div key={label} className="flex flex-wrap items-center justify-between gap-2"><span>{label}: {value}</span><span className="rounded border border-[#e5e7eb] px-2 py-0.5 text-xs text-[#6b7280]">Source: {source}</span></div>)}
       </div>
     </section>}
-    <Dialog open={selectedDocument !== null} onOpenChange={(open) => { if (!open) setSelectedDocument(null); }}>
+    <DocumentPreviewModal open={previewDocument !== null} onOpenChange={(open) => { if (!open) setPreviewDocument(null); }} title={previewDocument?.title || (previewDocument?.category === "Tier" ? "Tier Letter" : "NJCAT Assessment")} url={clientDocumentUrl(previewDocument?.url)} fileName={previewDocument?.fileName} />
+    {sample && <Dialog open={selectedDocument !== null} onOpenChange={(open) => { if (!open) setSelectedDocument(null); }}>
       <DialogContent showCloseButton={false} className="max-h-[min(90vh,720px)] w-[calc(100vw-32px)] max-w-[400px] overflow-y-auto p-4 sm:p-5">
         <DialogTitle className="text-xl leading-7">{isTierLetter ? `Tier Letter — ${tier}` : "NJCAT Assessment"}</DialogTitle>
         <DialogDescription className="mt-2 flex items-center gap-2 text-sm">
@@ -703,7 +723,7 @@ function AssessmentTab({ tier, lastName, sample, client, onSaved }: { tier: stri
           <Button disabled title="Sample document unavailable">Download</Button>
         </div>
       </DialogContent>
-    </Dialog>
+    </Dialog>}
     <Dialog open={selectedHistory !== null} onOpenChange={(open) => { if (!open) setSelectedHistory(null); }}>
       {selectedHistory && <DialogContent showCloseButton={false} className="max-h-[min(90vh,620px)] w-[calc(100vw-32px)] max-w-[405px] overflow-y-auto p-4 sm:p-5">
         <DialogTitle className="text-xl leading-7">NJCAT — {selectedHistory.year}</DialogTitle>
@@ -744,13 +764,13 @@ function AssessmentSelect({ label, value, onChange, options }: { label: string; 
   </div>;
 }
 
-function SampleDocument({ label, filename, onView }: { label: string; filename: string; onView?: () => void }) {
+function AssessmentDocument({ label, filename, document, onView }: { label: string; filename: string; document?: ClientDocument; onView: () => void }) {
   return <div className="space-y-1.5">
     <p className="text-sm text-[#6b7280]">{label}</p>
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-[#32d597] bg-[#f5fffa] px-3 py-3 text-sm text-[#05725e]">
-      <span aria-hidden="true">✓</span><span className="min-w-0 flex-1 truncate">{filename}</span>
-      <span className="rounded bg-[#ddf9e8] px-1.5 py-0.5 text-xs">SC Verified</span>
-      <button type="button" aria-label={`View ${label}`} disabled={!onView} title={onView ? undefined : "Sample document unavailable"} onClick={onView} className="ml-auto text-[#ad182d] hover:underline disabled:cursor-not-allowed disabled:opacity-60 disabled:no-underline">View</button>
+    <div className="flex min-h-[68px] items-center gap-2 rounded-[8px] border-2 border-dashed border-[#5ee9b5] bg-[#ecfdf5] px-3 py-3 text-base text-[#007a55]">
+      <span aria-hidden="true" className="shrink-0">✓</span><span className="min-w-0 truncate font-medium">{filename}</span>
+      <span className="shrink-0 rounded-[4px] bg-[#d0fae5] px-1.5 py-0.5 text-sm font-medium text-[#009966]">{document ? "On file" : "SC Verified"}</span>
+      <button type="button" aria-label={`View ${label}`} onClick={onView} className="ml-auto shrink-0 text-sm font-medium text-[#c8102e] hover:underline">View</button>
     </div>
   </div>;
 }

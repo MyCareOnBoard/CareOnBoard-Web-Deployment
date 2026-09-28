@@ -14,21 +14,26 @@ import SupportCoordinatorManagement from "./SupportCoordinatorManagement";
 describe("SupportCoordinatorManagement", () => {
   it("loads the team skeleton, assigns a client, and opens document review", async () => {
     let resolveClients!: (value: unknown[]) => void;
-    mocks.listClients.mockReset().mockImplementationOnce(() => new Promise((resolve) => { resolveClients = resolve; })).mockResolvedValue([{ id: "client-1", firstName: "Leslie", lastName: "Alexander", status: "active" }]);
+    const client = { id: "client-1", firstName: "Leslie", lastName: "Alexander", status: "active", primaryAddress: { countyState: "Essex County" } };
+    mocks.listClients.mockReset().mockImplementationOnce(() => new Promise((resolve) => { resolveClients = resolve; })).mockResolvedValue([{ ...client, supportCoordinatorId: "sc-1" }]);
     mocks.updateClient.mockReset().mockResolvedValue({});
     mocks.useDSPList.mockReturnValue({ dsps: [{ id: "sc-1", fullName: "Tiara Booker", role: "support_coordinator", email: "tiara@example.com" }], isLoading: false, error: null });
     const user = userEvent.setup();
 
     render(<MemoryRouter><SupportCoordinatorManagement /></MemoryRouter>);
     expect(screen.getByRole("status", { name: "Loading support coordinators" })).toBeInTheDocument();
-    resolveClients([{ id: "client-1", firstName: "Leslie", lastName: "Alexander", status: "active" }]);
+    resolveClients([client]);
     expect(await screen.findByText("Tiara Booker")).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "My Team" })).toHaveAttribute("aria-selected", "true");
 
     await user.click(screen.getByRole("button", { name: "Assign Clients" }));
+    expect(screen.getByRole("dialog", { name: "Assign Clients to Tiara Booker" })).toHaveTextContent("Essex County");
     await user.click(screen.getByRole("checkbox", { name: "Assign Leslie Alexander" }));
     await user.click(screen.getByRole("button", { name: "Save Assignment" }));
     await waitFor(() => expect(mocks.updateClient).toHaveBeenCalledWith("client-1", expect.objectContaining({ supportCoordinatorId: "sc-1", supportCoordinatorName: "Tiara Booker" }), "agency-1"));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Assign Clients to Tiara Booker" })).not.toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: "Expand Tiara Booker's clients" }));
+    expect(screen.getByRole("link", { name: /Leslie Alexander/ })).toHaveTextContent("Essex County");
 
     await user.click(screen.getByRole("tab", { name: "Document review" }));
     expect(screen.getByRole("link", { name: "Review documents" })).toHaveAttribute("href", "/agency/dsp-management/sc-1");

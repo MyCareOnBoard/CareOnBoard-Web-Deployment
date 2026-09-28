@@ -27,10 +27,11 @@ it("updates the ISP preview and submits all three narratives", async () => {
   const user = userEvent.setup();
   vi.mocked(getIsp).mockResolvedValue({ plan: null, canEdit: true, canReview: false });
   vi.mocked(saveIsp).mockImplementation(async (_id, content, submit) => ({ content, status: submit ? "submitted" : "draft", updatedAt: "2026-09-24" }));
-  render(<MemoryRouter><SupportCoordinatorIsp client={{ id: "client-1", dateOfBirth: { _seconds: Date.parse("1971-07-25T12:00:00Z") / 1000 }, guardianInfo: { supportCoordinatorName: "Coordinator A" }, outcomes: [{ id: "outcome-1", statement: "Live independently", services: [{ id: "service-1", name: "Individual Supports", code: "H2016", startAuthDate: "2026-03-24" }] }] }} clientId="client-1" name="Alex Client" period="2026–2027" backTo="?tab=planning" /></MemoryRouter>);
+  render(<MemoryRouter><SupportCoordinatorIsp client={{ id: "client-1", dateOfBirth: { _seconds: Date.parse("1971-07-25T12:00:00Z") / 1000 }, primaryAddress: { countyState: "Essex County" }, guardianInfo: { supportCoordinatorName: "Coordinator A" }, outcomes: [{ id: "outcome-1", statement: "Live independently", services: [{ id: "service-1", name: "Individual Supports", code: "H2016", startAuthDate: "2026-03-24" }] }] }} clientId="client-1" name="Alex Client" period="2026–2027" backTo="?tab=planning" /></MemoryRouter>);
   await screen.findByRole("textbox", { name: "Service delivery notes" });
   expect(screen.getByRole("article", { name: "ISP report preview" })).toHaveTextContent("07/25/1971");
   expect(screen.getByRole("article", { name: "ISP report preview" })).toHaveTextContent("Coordinator A");
+  expect(screen.getByRole("article", { name: "ISP report preview" })).toHaveTextContent("County: Essex County");
   expect(screen.getByRole("article", { name: "ISP report preview" })).toHaveTextContent("03/24/2026");
   await user.type(screen.getByRole("textbox", { name: "Service delivery notes" }), "Service active");
   await user.type(screen.getByRole("textbox", { name: "Employment first narrative" }), "Seeking work");
