@@ -105,6 +105,7 @@ export const Routes = {
         shiftManagement: "/user-panel/shift-management",
         manualShiftManagement: "/user-panel/shift-management/manual",
         clientsAndServices: "/user-panel/clients-and-services",
+        clientMonitoring: "/user-panel/clients-and-services/:clientId/monitoring",
         planOfCare: "/user-panel/plan-of-care",
         notes: {
             careerPlanning: "/user-panel/notes/career-planning",

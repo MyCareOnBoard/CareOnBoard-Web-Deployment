@@ -47,6 +47,7 @@ const UserPanelMessagesPage = lazy(() => import("@/pages/userPanel/messages"));
 const ShiftManagementPage = lazy(() => import("@/pages/userPanel/shiftManagement"));
 const ManualShiftManagementPage = lazy(() => import("@/pages/userPanel/manualShiftManagement"));
 const ClientsAndServicesPage = lazy(() => import("@/pages/userPanel/clientsAndServices"));
+const ClientMonitoringPage = lazy(() => import("@/pages/userPanel/clientMonitoring"));
 const PlanOfCarePage = lazy(() => import("@/pages/userPanel/planOfCare"));
 const CommunityBasedPage = lazy(() => import("@/pages/userPanel/notes/community-based"));
 const CommunityInclusionPage = lazy(() => import("@/pages/userPanel/notes/community-inclusion"));
@@ -640,6 +641,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.userPanel.clientsAndServices,
                 Component: ClientsAndServicesPage,
+            },
+            {
+                path: Routes.userPanel.clientMonitoring,
+                Component: ClientMonitoringPage,
             },
             {
                 path: Routes.userPanel.planOfCare,

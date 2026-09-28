@@ -8,8 +8,9 @@ import { toast } from "sonner";
 import ExpandIcon from "@/assets/icons/arrow-expand-01.svg?react";
 import ServicesAvatar from "@/assets/icons/services-avatar.png";
 import { useAuth } from "@/utils/auth";
+import SupportCoordinatorClientsPage from "./SupportCoordinatorClientsPage";
 
-export default function ClientsAndServicesPage() {
+function FieldStaffClientsAndServicesPage() {
   const { user } = useAuth();
   const [pendingClients, setPendingClients] = useState<Client[]>([]);
   const [pastClients, setPastClients] = useState<Client[]>([]);
@@ -427,4 +428,10 @@ export default function ClientsAndServicesPage() {
       )}
     </div>
   );
+}
+
+export default function ClientsAndServicesPage() {
+  const { user } = useAuth();
+  return user?.applicantType === "support_coordinator" || user?.profile?.role === "support_coordinator" || user?.role === "support_coordinator"
+    ? <SupportCoordinatorClientsPage /> : <FieldStaffClientsAndServicesPage />;
 }
