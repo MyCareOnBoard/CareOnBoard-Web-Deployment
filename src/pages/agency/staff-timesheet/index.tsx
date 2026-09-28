@@ -2,6 +2,7 @@ import { useMemo, useRef, useState, useEffect } from "react";
 import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   ChevronDown,
   ChevronUp,
@@ -37,6 +38,88 @@ import {
 } from "@/lib/api/staff-timesheets";
 
 type Signature = StaffTimesheetSignature;
+
+function TimesheetSkeleton() {
+  return (
+    <div role="status" aria-label="Loading timesheet" aria-busy="true" className="min-h-[calc(100vh-200px)] px-4 sm:px-6 lg:px-0">
+      <div aria-hidden="true">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3 sm:mb-6">
+          <div className="space-y-2">
+            <Skeleton className="h-10 w-44" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+          <Skeleton className="h-7 w-32 rounded-full" />
+        </div>
+
+        <div className="space-y-6">
+          <div className="rounded-2xl bg-white p-5 shadow-sm sm:p-6">
+            <Skeleton className="mb-4 h-5 w-32" />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {Array.from({ length: 2 }, (_, index) => (
+                <div key={index} className="space-y-1.5">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-10 w-full rounded-lg" />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-2xl bg-white p-5 shadow-sm sm:p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-5 w-14" />
+                <Skeleton className="h-5 w-9 rounded-full" />
+              </div>
+              <Skeleton className="h-7 w-24 rounded-full" />
+            </div>
+            <div className="overflow-hidden rounded-xl bg-[#0EAF520D]">
+              <div className="grid grid-cols-4 gap-4 p-4">
+                {Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-4 w-16 max-w-full" />)}
+              </div>
+              {Array.from({ length: 7 }, (_, index) => (
+                <div key={index} className="grid grid-cols-4 gap-4 border-b border-[#e5e5e6] p-4 last:border-b-0">
+                  <Skeleton className="my-auto h-4 w-20 max-w-full" />
+                  {Array.from({ length: 3 }, (_, field) => <Skeleton key={field} className="h-10 w-full rounded-md" />)}
+                </div>
+              ))}
+              <div className="flex justify-end bg-[#f8f9fa] p-4"><Skeleton className="h-4 w-32" /></div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-white p-5 shadow-sm sm:p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3"><Skeleton className="h-5 w-14" /><Skeleton className="h-5 w-9 rounded-full" /></div>
+              <Skeleton className="h-7 w-24 rounded-full" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <div className="rounded-2xl bg-white p-5 shadow-sm sm:p-6">
+              <Skeleton className="mb-4 h-5 w-24" />
+              <div className="flex h-[84px] flex-col items-center justify-center gap-2 rounded-xl bg-[#00b4b80a]">
+                <Skeleton className="h-3 w-20" /><Skeleton className="h-8 w-12" />
+              </div>
+              <div className="mt-4 space-y-3">
+                <div className="flex justify-between"><Skeleton className="h-4 w-20" /><Skeleton className="h-5 w-12 rounded-full" /></div>
+                <div className="flex justify-between"><Skeleton className="h-4 w-24" /><Skeleton className="h-4 w-28" /></div>
+              </div>
+            </div>
+            <div className="rounded-2xl bg-white p-5 shadow-sm sm:p-6">
+              <Skeleton className="mb-3 h-5 w-24" />
+              <div className="flex min-h-[130px] items-center justify-center rounded-xl border-2 border-dashed border-[#e5e5e6] p-4"><Skeleton className="h-5 w-28" /></div>
+              <Skeleton className="mt-2 h-3 w-40" />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:justify-end">
+            <Skeleton className="h-11 w-full rounded-full sm:w-[180px]" />
+            <Skeleton className="h-11 w-full rounded-full sm:w-[180px]" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /** Renders a saved signature: typed shows as script text, drawn/uploaded as an image. */
 function SignaturePreview({ signature }: { signature: Signature }) {
@@ -222,11 +305,7 @@ export default function StaffTimesheetPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-solid border-[#00b4b8] border-r-transparent" />
-      </div>
-    );
+    return <TimesheetSkeleton />;
   }
 
   const totalHours =
