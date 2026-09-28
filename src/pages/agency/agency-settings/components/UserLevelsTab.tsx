@@ -1,6 +1,12 @@
 import { useState } from "react";
-import { Search, Plus, Trash2, Pencil } from "lucide-react";
+import { Search, Plus, Trash2, Pencil, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -275,10 +281,8 @@ export default function InternalUsersPage() {
                       <Skeleton className="h-6 w-20 rounded-full" />
                     </div>
                   </div>
-                  <div className="flex flex-shrink-0 items-center gap-2">
-                    <Skeleton className="h-9 w-28 rounded-full" />
+                  <div className="flex flex-shrink-0 items-center">
                     <Skeleton className="h-9 w-24 rounded-full" />
-                    <Skeleton className="h-9 w-32 rounded-full" />
                   </div>
                 </div>
               ))}
@@ -370,50 +374,30 @@ export default function InternalUsersPage() {
                   </div>
                 </div>
 
-                {/* Fourth: Action Buttons */}
-                <div className="flex w-full flex-shrink-0 flex-wrap items-center gap-2 sm:w-auto sm:ml-auto">
-                  <Button
-                    variant="outline"
-                    onClick={() => handleEditClick(user)}
-                    disabled={isUpdating}
-                    className="h-9 rounded-full px-4 text-[13px] font-normal text-[#4b5563]"
-                  >
-                    <Pencil className="mr-1.5 h-4 w-4" />
-                    Edit
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => handleResetPasswordClick(user.id, user.name)}
-                    className="h-9 rounded-full px-4 text-[13px] font-normal text-[#4b5563]"
-                  >
-                    Reset Password
-                  </Button>
-                  {user.isActive ? (
-                    <Button
-                      variant="secondary"
-                      onClick={() => handleDeactivateClick(user.id, user.name)}
-                      className="h-9 rounded-full px-4 text-[13px] font-normal text-[#111827]"
-                    >
-                      Deactivate
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      onClick={() => handleDeactivateClick(user.id, user.name)}
-                      className="h-9 rounded-full px-4 text-[13px] font-normal text-green-600 border-green-600 hover:bg-green-50"
-                    >
-                      Activate
-                    </Button>
-                  )}
-                  <Button
-                    variant="destructive"
-                    onClick={() => handleDeleteClick(user.id, user.name)}
-                    disabled={isDeleting}
-                    className="h-9 rounded-full px-4 text-[13px] font-normal"
-                  >
-                    <Trash2 className="mr-1.5 h-4 w-4" />
-                    Delete
-                  </Button>
+                {/* Fourth: Actions */}
+                <div className="flex w-full flex-shrink-0 items-center sm:ml-auto sm:w-auto">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button type="button" variant="outline" aria-label={`Actions for ${user.name}`} className="h-9 rounded-full px-4 text-[13px] font-normal text-[#4b5563]">
+                        Action
+                        <ChevronDown className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="min-w-[180px] rounded-xl bg-white shadow-lg">
+                      <DropdownMenuItem disabled={isUpdating} onSelect={() => handleEditClick(user)}>
+                        <Pencil className="h-4 w-4" /> Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => handleResetPasswordClick(user.id, user.name)}>
+                        Reset Password
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => handleDeactivateClick(user.id, user.name)}>
+                        {user.isActive ? "Deactivate" : "Activate"}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem variant="destructive" disabled={isDeleting} onSelect={() => handleDeleteClick(user.id, user.name)}>
+                        <Trash2 className="h-4 w-4" /> Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             ))}
