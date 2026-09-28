@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { DocumentPreviewModal } from "@/components/documents/DocumentPreviewModal";
 import { Button } from "@/components/ui/button";
 import type { ApplicantDocumentItem } from "@/lib/api/agencyApplicantsExtra";
 
@@ -72,6 +74,7 @@ export function DocumentsTab({
   showAdvanceDocumentsAction = true,
   onAdvanceDocumentsStage,
 }: DocumentsTabProps) {
+  const [preview, setPreview] = useState<{ title: string; url: string; fileName?: string } | null>(null);
   const documentByType = new Map(documents.map((document) => [document.type, document]));
   const isAdvancingStage = actionLoading === "advance-documents-stage";
 
@@ -179,13 +182,12 @@ export function DocumentsTab({
                   {hasDocument ? (
                     <>
                       <Button
-                        asChild
+                        type="button"
                         variant="outline"
+                        onClick={() => { if (url) setPreview({ title: definition.label, url, fileName: document?.fileName }); }}
                         className="rounded-[60px] border-[#0eaf52] bg-[rgba(14,175,82,0.1)] px-4 py-[6px] text-[11px] font-semibold text-[#0eaf52] hover:bg-[rgba(14,175,82,0.15)]"
                       >
-                        <a href={url} target="_blank" rel="noreferrer">
-                          View Document
-                        </a>
+                        View Document
                       </Button>
                       <Button
                         variant="outline"
@@ -310,6 +312,13 @@ export function DocumentsTab({
           </Button>
         </div>
       )}
+      <DocumentPreviewModal
+        open={preview !== null}
+        onOpenChange={(open) => { if (!open) setPreview(null); }}
+        title={preview?.title ?? "Document preview"}
+        url={preview?.url}
+        fileName={preview?.fileName}
+      />
     </div>
   );
 }

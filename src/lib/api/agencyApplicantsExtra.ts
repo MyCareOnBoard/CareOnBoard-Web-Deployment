@@ -8,6 +8,7 @@ export type ApplicantDocumentItem = {
   required: boolean;
   status: 'pending' | 'uploaded' | 'verified' | 'rejected';
   url?: string;
+  fileName?: string;
   expiryDate?: string;
   uploadedAt?: string;
   verifiedAt?: string;

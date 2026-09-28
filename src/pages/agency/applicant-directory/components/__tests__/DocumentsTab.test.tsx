@@ -104,3 +104,30 @@ describe("DocumentsTab reference confirmation actions", () => {
     expect(screen.queryByRole("button", { name: "Manually Confirm" })).not.toBeInTheDocument();
   });
 });
+
+it("opens an uploaded document in the preview modal", async () => {
+  const user = userEvent.setup();
+  render(
+    <DocumentsTab
+      documentDefinitions={[{ type: "photo-id", label: "Photo ID" }]}
+      documents={[{ id: "photo-id", type: "photo-id", label: "Photo ID", required: true, status: "uploaded", url: "https://example.test/document?token=123", fileName: "id.png" }]}
+      getDocumentUrlByType={() => "https://example.test/document?token=123"}
+      references={[]}
+      actionLoading={null}
+      referenceActionLoading={null}
+      onSendReferenceConfirmation={vi.fn()}
+      onConfirmReferenceManually={vi.fn()}
+      onVerifyDocument={vi.fn()}
+      onRejectDocument={vi.fn()}
+      onRequestDocument={vi.fn()}
+      canAdvanceDocumentsStage={false}
+      onAdvanceDocumentsStage={vi.fn()}
+    />,
+  );
+
+  await user.click(screen.getByRole("button", { name: "View Document" }));
+  expect(screen.getByRole("dialog", { name: "Photo ID" })).toBeInTheDocument();
+  expect(screen.getByAltText("Photo ID preview")).toHaveAttribute("src", "https://example.test/document?token=123");
+  await user.click(screen.getByRole("button", { name: "Close" }));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});

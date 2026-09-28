@@ -398,6 +398,7 @@ function ApplicantProfilePageContent() {
               required: false,
               status,
               url: url.fileUrl,
+              fileName: url.fileName,
               expiryDate: typeof url.expiryDate === "string" ? url.expiryDate : undefined,
               uploadedAt: undefined,
               verifiedAt:
