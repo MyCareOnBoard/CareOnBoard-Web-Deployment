@@ -57,7 +57,7 @@ package-lock.json
 .claude/
 .superpowers/
 
-docs/superpowers/
+docs/
 .pnpm-store/
 .worktrees/
 .artifacts/payroll-performance/
