@@ -665,6 +665,8 @@ export interface ClientStats {
   active: number;
   inactive: number;
   total: number;
+  unassigned?: number;
+  caseloadByCoordinator?: Record<string, number>;
 }
 
 /**
@@ -682,10 +684,15 @@ export interface ListClientsParams {
   agencyId?: string; // Required for employees
   type?: ClientType | "sc";
   mode?: "ddd" | "hha" | "sc";
+  assignment?: "unassigned" | "coordinator" | "available";
+  coordinatorId?: string;
+  coordinatorName?: string;
+  brief?: boolean;
   status?: 'active' | 'inactive' | 'pending' | 'archived';
   service?: string;
   search?: string;
   limit?: number;
+  offset?: number;
   all?: boolean;
   agency?: boolean;
   signal?: AbortSignal;
@@ -1035,27 +1042,42 @@ export async function createClientWithReview(data: CreateClientRequest, assignme
  */
 export async function listAgencyClients(params?: ListClientsParams): Promise<Client[]> {
   try {
-    const response = await axiosClient.get<ListAgencyClientsResponse>('/clientManagement', {
-      params: {
-        agencyId: params?.agencyId,
-        type: params?.type,
-        mode: params?.mode,
-        status: params?.status,
-        service: params?.service,
-        search: params?.search,
-        limit: params?.limit,
-      }
-    });
-
-    if (!response.data.success) {
-      throw new Error('Failed to fetch clients');
+    const clients: Client[] = [];
+    const limit = params?.limit || 50;
+    let offset = params?.offset || 0;
+    for (;;) {
+      const response = await axiosClient.get<ListAgencyClientsResponse>('/clientManagement', {
+        signal: params?.signal,
+        params: {
+          agencyId: params?.agencyId,
+          type: params?.type,
+          mode: params?.mode,
+          assignment: params?.assignment,
+          coordinatorId: params?.coordinatorId,
+          coordinatorName: params?.coordinatorName,
+          brief: params?.brief,
+          status: params?.status,
+          service: params?.service,
+          search: params?.search,
+          limit: params?.limit,
+          offset,
+        }
+      });
+      if (!response.data.success) throw new Error('Failed to fetch clients');
+      clients.push(...(response.data.clients || []));
+      if (!params?.assignment || (response.data.pagination?.fetchedCount ?? 0) < limit) break;
+      offset += limit;
     }
-
-    return response.data.clients || [];
+    return clients;
   } catch (error) {
     console.error('Failed to fetch clients:', error);
     throw error;
   }
+}
+
+export async function saveScCaseload(coordinatorId: string, currentClientIds: string[], selectedClientIds: string[]): Promise<void> {
+  const response = await axiosClient.put(`/clientManagement/sc-caseload/${encodeURIComponent(coordinatorId)}`, { currentClientIds, selectedClientIds });
+  if (!response.data.success) throw new Error('Failed to save client assignments');
 }
 
 /**
@@ -1279,10 +1301,10 @@ export async function searchClients(
  * Endpoint: GET /clients/stats
  * Query params: agencyId (optional)
  */
-export async function getClientStats(agencyId?: string): Promise<ClientStats> {
+export async function getClientStats(agencyId?: string, type?: "sc"): Promise<ClientStats> {
   try {
     const response = await axiosClient.get<ClientStatsResponse>('/clients/stats', {
-      params: agencyId ? { agencyId } : undefined,
+      params: { agencyId, type },
     });
 
     if (!response.data.success) {
@@ -1335,6 +1357,10 @@ export const clientsApi = createApi({
         if (params?.service) queryParams.append('service', params.service);
         if (params?.search) queryParams.append('search', params.search);
         if (params?.type) queryParams.append('type', params.type);
+        if (params?.assignment) queryParams.append('assignment', params.assignment);
+        if (params?.coordinatorId) queryParams.append('coordinatorId', params.coordinatorId);
+        if (params?.coordinatorName) queryParams.append('coordinatorName', params.coordinatorName);
+        if (params?.brief !== undefined) queryParams.append('brief', params.brief.toString());
         if (params?.limit) queryParams.append('limit', params.limit.toString());
 
         return {

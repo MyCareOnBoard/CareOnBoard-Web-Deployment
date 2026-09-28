@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
-import { ChevronDown, Plus, X } from "lucide-react";
+import { ChevronDown, Loader2, Plus, X } from "lucide-react";
+import { toast } from "sonner";
 import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -10,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { listClients, updateClient, type Client } from "@/lib/api/clients";
+import { getClientStats, listAgencyClients, saveScCaseload, type Client, type ClientStats } from "@/lib/api/clients";
 import { Routes } from "@/routes/constants";
 import { useAuth } from "@/utils/auth";
 import { useDSPList } from "./useDSPManagement";
@@ -22,6 +23,7 @@ const clientName = (client: Client) => [client.firstName, client.lastName].filte
 const assignedTo = (client: Client, coordinator: DSP) => client.supportCoordinatorId
   ? client.supportCoordinatorId === coordinator.id
   : client.supportCoordinatorName?.trim().toLowerCase() === coordinator.fullName.trim().toLowerCase();
+const clientStatusBadge = (client: Client) => <Badge className={`rounded-md border-0 px-2 py-1 text-xs leading-none ${client.status === "active" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{client.status === "active" ? "Active" : "Review"}</Badge>;
 
 function TeamSkeleton() {
   return <div role="status" aria-label="Loading support coordinators" className="space-y-7">
@@ -43,12 +45,18 @@ export default function SupportCoordinatorManagement() {
   const agencyId = user?.agencyId || user?.agency?.id || "";
   const { dsps, isLoading: staffLoading, error: staffError } = useDSPList();
   const coordinators = dsps.filter((person) => person.role.toLowerCase() === "support_coordinator");
-  const [clients, setClients] = useState<Client[]>([]);
-  const [clientsLoading, setClientsLoading] = useState(true);
-  const [clientsError, setClientsError] = useState("");
+  const [stats, setStats] = useState<ClientStats | null>(null);
+  const [statsError, setStatsError] = useState("");
+  const [assignmentClients, setAssignmentClients] = useState<Client[]>([]);
+  const [assignmentLoading, setAssignmentLoading] = useState(false);
+  const [assignmentError, setAssignmentError] = useState("");
+  const [expandedClients, setExpandedClients] = useState<Client[]>([]);
+  const [expandedLoading, setExpandedLoading] = useState(false);
+  const [expandedError, setExpandedError] = useState("");
   const [tab, setTab] = useState<"team" | "documents">("team");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [assigning, setAssigning] = useState<DSP | null>(null);
+  const [assignmentRefresh, setAssignmentRefresh] = useState(0);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -66,62 +74,88 @@ export default function SupportCoordinatorManagement() {
     setInviteNotice("");
   };
 
-  const refreshClients = async () => {
-    const result = await listClients({ agencyId, type: "sc", all: true });
-    setClients(result);
-  };
-
   useEffect(() => {
     if (!agencyId) {
-      setClientsError("Agency ID not found.");
-      setClientsLoading(false);
+      setStatsError("Agency ID not found.");
       return;
     }
     let active = true;
-    setClientsLoading(true);
-    listClients({ agencyId, type: "sc", all: true })
-      .then((result) => { if (active) { setClients(result); setClientsError(""); } })
-      .catch(() => { if (active) setClientsError("Unable to load clients. Refresh the page to retry."); })
-      .finally(() => { if (active) setClientsLoading(false); });
+    getClientStats(agencyId, "sc")
+      .then((result) => { if (active) { setStats(result); setStatsError(""); } })
+      .catch(() => { if (active) setStatsError("Unable to load client counts. Refresh the page to retry."); });
     return () => { active = false; };
   }, [agencyId]);
 
+  useEffect(() => {
+    if (!agencyId || !assigning) return;
+    let active = true;
+    setAssignmentLoading(true);
+    setAssignmentError("");
+    setAssignmentClients([]);
+    listAgencyClients({ agencyId, type: "sc", assignment: "available", coordinatorId: assigning.id, coordinatorName: assigning.fullName, brief: true, limit: 100 })
+      .then((result) => {
+        if (!active) return;
+        const choices = result.filter((client) => (!client.supportCoordinatorId?.trim() && !client.supportCoordinatorName?.trim()) || assignedTo(client, assigning));
+        setAssignmentClients(choices);
+        setSelectedIds(choices.filter((client) => assignedTo(client, assigning)).map((client) => client.id));
+      }).catch(() => { if (active) setAssignmentError("Unable to load clients for assignment. Close and retry."); })
+      .finally(() => { if (active) setAssignmentLoading(false); });
+    return () => { active = false; };
+  }, [agencyId, assigning, assignmentRefresh]);
+
+  useEffect(() => {
+    const person = coordinators.find((coordinator) => coordinator.id === expandedId);
+    if (!agencyId || !person) return;
+    let active = true;
+    setExpandedLoading(true);
+    setExpandedError("");
+    setExpandedClients([]);
+    listAgencyClients({ agencyId, type: "sc", assignment: "coordinator", coordinatorId: person.id, coordinatorName: person.fullName, brief: true, limit: 100 })
+      .then((result) => { if (active) setExpandedClients(result.filter((client) => assignedTo(client, person))); })
+      .catch(() => { if (active) setExpandedError("Unable to load assigned clients. Try expanding again."); })
+      .finally(() => { if (active) setExpandedLoading(false); });
+    return () => { active = false; };
+  }, [agencyId, expandedId]);
+
   const openAssignment = (person: DSP) => {
+    if (saving) return;
+    setAssignmentLoading(true);
+    setAssignmentClients([]);
+    setAssignmentError("");
     setAssigning(person);
-    setSelectedIds(clients.filter((client) => assignedTo(client, person)).map((client) => client.id));
+    setSelectedIds([]);
     setSaveError("");
   };
 
   const saveAssignment = async () => {
-    if (!assigning || selectedIds.length > MAX_CASELOAD) return;
+    if (!assigning || assignmentLoading || assignmentError || selectedIds.length > MAX_CASELOAD) return;
     setSaving(true);
     setSaveError("");
     try {
-      for (const client of clients) {
-        const wasAssigned = assignedTo(client, assigning);
-        const shouldAssign = selectedIds.includes(client.id);
-        if (wasAssigned === shouldAssign) continue;
-        await updateClient(client.id, shouldAssign
-          ? { supportCoordinatorId: assigning.id, supportCoordinatorName: assigning.fullName, supportCoordinatorAgency: user?.agency?.name || "", supportCoordinatorContact: assigning.email || assigning.phoneNumber || "" }
-          : { supportCoordinatorId: null, supportCoordinatorName: "", supportCoordinatorAgency: "", supportCoordinatorContact: "" }, agencyId);
-      }
-      await refreshClients();
+      await saveScCaseload(assigning.id, assignmentClients.filter((client) => assignedTo(client, assigning)).map((client) => client.id), selectedIds);
+      setExpandedId(null);
       setAssigning(null);
+      try { setStats(await getClientStats(agencyId, "sc")); setStatsError(""); toast.success("Client assignments saved."); }
+      catch {
+        setStatsError("Assignments saved, but counts could not refresh. Refresh the page to retry.");
+        toast.warning("Assignments saved, but counts could not refresh. Refresh the page to retry.");
+      }
     } catch {
       setSaveError("Assignments could not be saved. Review the client list and try again.");
-      try { await refreshClients(); } catch { /* Preserve the save error. */ }
+      toast.error("Assignments could not be saved. Review the client list and try again.");
+      setAssignmentRefresh((value) => value + 1);
     } finally {
       setSaving(false);
     }
   };
 
-  const assignedCount = clients.filter((client) => coordinators.some((person) => assignedTo(client, person))).length;
-  const availableCount = coordinators.filter((person) => clients.filter((client) => assignedTo(client, person)).length < MAX_CASELOAD).length;
+  const caseload = (person: DSP) => (stats?.caseloadByCoordinator?.[person.id] || 0) + (stats?.caseloadByCoordinator?.[`name:${person.fullName.trim().toLowerCase()}`] || 0);
+  const availableCount = coordinators.filter((person) => caseload(person) < MAX_CASELOAD).length;
   const metrics = [
     ["My Team (SCs)", coordinators.length, "Support coordinators"],
-    ["My Clients", clients.length, "Assigned by agency"],
-    ["Unassigned", clients.length - assignedCount, "Need SC assignment"],
-    ["SC Capacity", `${availableCount}/${coordinators.length}`, "SCs with open slots"],
+    ["My Clients", stats?.total ?? "—", "SC clients in agency"],
+    ["Unassigned", stats?.unassigned ?? "—", "Need SC assignment"],
+    ["SC Capacity", stats?.caseloadByCoordinator ? `${availableCount}/${coordinators.length}` : "—", "SCs with open slots"],
   ] as const;
 
   return <div className="min-h-screen">
@@ -133,8 +167,8 @@ export default function SupportCoordinatorManagement() {
         </div>
       </header>
 
-      {(staffError || clientsError) && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{staffError || clientsError}</p>}
-      {staffLoading || clientsLoading ? <TeamSkeleton /> : staffError || clientsError ? null : tab === "team" ? <div id="sc-team-panel" role="tabpanel" aria-labelledby="sc-team-tab" className="space-y-7">
+      {(staffError || statsError) && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{staffError || statsError}</p>}
+      {staffLoading || (!stats && !statsError) ? <TeamSkeleton /> : staffError ? null : tab === "team" ? <div id="sc-team-panel" role="tabpanel" aria-labelledby="sc-team-tab" className="space-y-7">
         <section aria-labelledby="sc-overview-title">
           <h2 id="sc-overview-title" className="mb-3 text-lg font-semibold text-[#10141a]">Overview</h2>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -149,21 +183,20 @@ export default function SupportCoordinatorManagement() {
             <Button type="button" size="sm" className="h-9 rounded-lg" aria-label="Add support coordinator" onClick={() => setShowAddCoordinator(true)}><Plus className="h-4 w-4" />Add</Button>
           </div>
           {coordinators.length === 0 ? <p className="rounded-xl border border-[#e5e7eb] bg-white p-6 text-sm text-[#6b7280]">No support coordinators yet.</p> : coordinators.map((person) => {
-            const assigned = clients.filter((client) => assignedTo(client, person));
             const expanded = expandedId === person.id;
             return <div key={person.id} className="overflow-hidden rounded-xl border border-[#e5e7eb] bg-white">
               <div className="flex flex-wrap items-center gap-3 p-4 sm:flex-nowrap">
                 <Avatar className="h-10 w-10 shrink-0"><AvatarImage src={person.profilePicture} alt="" /><AvatarFallback className="bg-[#fbe7ea] text-xs font-semibold text-[#c8213a]">{initials(person.fullName)}</AvatarFallback></Avatar>
                 <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-[#10141a]">{person.fullName}</p><p className="truncate text-xs text-[#808081]">{[person.email, person.phoneNumber].filter(Boolean).join(" · ")}</p></div>
-                <div className="w-20 shrink-0 text-right"><p className="text-[11px] text-[#808081]">Caseload</p><div className="flex items-center gap-2"><div className="h-1 w-full rounded-full bg-[#e5e7eb]"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.min(100, assigned.length / MAX_CASELOAD * 100)}%` }} /></div><span className="text-xs font-semibold">{assigned.length}/{MAX_CASELOAD}</span></div></div>
-                <Button type="button" variant="outline" size="sm" onClick={() => openAssignment(person)} className="border-[#ffb7c2] bg-[#fff4f6] text-[#c8213a] hover:bg-[#ffe8ec]">Assign Clients</Button>
-                <button type="button" aria-label={`${expanded ? "Collapse" : "Expand"} ${person.fullName}'s clients`} aria-expanded={expanded} onClick={() => setExpandedId(expanded ? null : person.id)} className="rounded p-1 text-[#808081] hover:bg-gray-100"><ChevronDown className={`h-4 w-4 transition-transform ${expanded ? "rotate-180" : ""}`} /></button>
+                <div className="w-20 shrink-0 text-right"><p className="text-[11px] text-[#808081]">Caseload</p><div className="flex items-center gap-2"><div className="h-1 w-full rounded-full bg-[#e5e7eb]"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.min(100, caseload(person) / MAX_CASELOAD * 100)}%` }} /></div><span className="text-xs font-semibold">{stats?.caseloadByCoordinator ? caseload(person) : "—"}/{MAX_CASELOAD}</span></div></div>
+                <Button type="button" variant="outline" size="sm" disabled={saving} onClick={() => openAssignment(person)} className="border-[#ffb7c2] bg-[#fff4f6] text-[#c8213a] hover:bg-[#ffe8ec]">Assign Clients</Button>
+                <button type="button" aria-label={`${expanded ? "Collapse" : "Expand"} ${person.fullName}'s clients`} aria-expanded={expanded} onClick={() => { if (!expanded) { setExpandedLoading(true); setExpandedClients([]); } setExpandedId(expanded ? null : person.id); }} className="rounded p-1 text-[#808081] hover:bg-gray-100"><ChevronDown className={`h-4 w-4 transition-transform ${expanded ? "rotate-180" : ""}`} /></button>
               </div>
               {expanded && <div className="space-y-2 border-t border-[#f0f0f0] px-4 py-3">
-                {assigned.length === 0 ? <p className="text-sm text-[#808081]">No clients assigned.</p> : assigned.map((client) => <Link key={client.id} to={Routes.agency.clientDetails.replace(":clientId", client.id)} className="flex items-center gap-3 rounded-lg border border-[#f0f0f0] bg-[#fcfcfd] p-2 hover:bg-[#f5fafa]">
+                {expandedLoading ? <div role="status" aria-label="Loading assigned clients" className="space-y-2">{Array.from({ length: 2 }, (_, index) => <div key={index} className="flex items-center gap-3 rounded-[4px] border border-[#f0f0f0] p-2"><Skeleton className="h-8 w-8 rounded-full" /><div className="flex-1 space-y-2"><Skeleton className="h-3 w-32" /><Skeleton className="h-3 w-56 max-w-full" /></div></div>)}</div> : expandedError ? <p role="alert" className="text-sm text-red-700">{expandedError}</p> : expandedClients.length === 0 ? <p className="text-sm text-[#808081]">No clients assigned.</p> : expandedClients.map((client) => <Link key={client.id} to={Routes.agency.clientDetails.replace(":clientId", client.id)} className="flex items-center gap-3 rounded-[4px] border border-[#f0f0f0] bg-[#fcfcfd] p-2 hover:bg-[#f5fafa]">
                   <Avatar className="h-8 w-8"><AvatarFallback className="bg-[#fbe7ea] text-[10px] font-semibold text-[#c8213a]">{initials(clientName(client))}</AvatarFallback></Avatar>
                   <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-[#10141a]">{clientName(client)}</p><p className="truncate text-[11px] text-[#808081]">ID: {client.id} · {client.scEnrollment?.program || "SC"} · {client.countyState || client.primaryAddress?.countyState || "County not set"} · {client.tier || "Tier not set"}</p></div>
-                  <Badge variant={client.status === "active" ? "success" : "warning"}>{client.status === "active" ? "Active" : "Review"}</Badge>
+                  {clientStatusBadge(client)}
                 </Link>)}
               </div>}
             </div>;
@@ -209,25 +242,25 @@ export default function SupportCoordinatorManagement() {
     </Dialog>
 
     <Dialog open={assigning !== null} onOpenChange={(open) => { if (!open && !saving) setAssigning(null); }}>
-      <DialogContent className="w-[min(95vw,520px)] p-0" showCloseButton={false}>
+      <DialogContent className="w-[min(95vw,680px)] p-0" showCloseButton={false}>
         <div className="border-b border-[#e5e7eb] px-5 py-4"><DialogTitle className="text-base font-medium">Assign Clients to {assigning?.fullName}</DialogTitle><DialogDescription className="sr-only">Select up to five clients for this support coordinator.</DialogDescription></div>
         <div className="space-y-3 p-5">
           <p className="text-sm text-[#6b7280]">Assigning clients to <strong className="text-[#10141a]">{assigning?.fullName}</strong>. <span className="text-amber-700">Maximum 5 clients per coordinator.</span></p>
           <div className="flex items-center gap-2"><div className="h-1 flex-1 rounded-full bg-[#e5e7eb]"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${selectedIds.length / MAX_CASELOAD * 100}%` }} /></div><span className="text-xs">{selectedIds.length} / {MAX_CASELOAD}</span></div>
           <div className="max-h-[45vh] space-y-2 overflow-y-auto">
-            {clients.length === 0 ? <p className="py-6 text-center text-sm text-[#808081]">No clients to assign.</p> : clients.map((client) => {
+            {assignmentLoading ? <div role="status" aria-label="Loading clients for assignment" className="space-y-2">{Array.from({ length: 4 }, (_, index) => <div key={index} className="flex items-center gap-3 rounded-[4px] border border-[#e5e7eb] p-3"><Skeleton className="h-4 w-4" /><Skeleton className="h-8 w-8 rounded-full" /><div className="flex-1 space-y-2"><Skeleton className="h-3 w-32" /><Skeleton className="h-3 w-56 max-w-full" /></div><Skeleton className="h-5 w-12" /></div>)}</div> : assignmentError ? <p role="alert" className="py-6 text-center text-sm text-red-700">{assignmentError}</p> : assignmentClients.length === 0 ? <p className="py-6 text-center text-sm text-[#808081]">No clients to assign.</p> : assignmentClients.map((client) => {
               const checked = selectedIds.includes(client.id);
               const atCapacity = !checked && selectedIds.length >= MAX_CASELOAD;
-              return <label key={client.id} className={`flex cursor-pointer items-center gap-3 rounded-lg border p-2.5 ${checked ? "border-[#ff5775] bg-[#fff4f6]" : "border-[#e5e7eb]"}`}>
+              return <label key={client.id} className="flex cursor-pointer items-center gap-3 rounded-[4px] border border-[#e5e7eb] bg-white p-3 transition-colors hover:border-[#ee2f4e] hover:bg-[#fbe7ea] focus-within:ring-2 focus-within:ring-[#c8213a]">
                 <input type="checkbox" checked={checked} disabled={saving || atCapacity} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...current, client.id] : current.filter((id) => id !== client.id))} aria-label={`Assign ${clientName(client)}`} className="size-4 shrink-0 accent-[#c8213a]" />
-                <Avatar className="h-8 w-8"><AvatarFallback className="bg-[#fbe7ea] text-[10px] font-semibold text-[#c8213a]">{initials(clientName(client))}</AvatarFallback></Avatar>
-                <span className="min-w-0 flex-1"><span className="block truncate text-xs font-semibold text-[#10141a]">{clientName(client)}</span><span className="block truncate text-[11px] text-[#808081]">ID: {client.id} · {client.scEnrollment?.program || "SC"} · {client.countyState || client.primaryAddress?.countyState || "County not set"} · {client.tier || "Tier not set"}</span></span>
-                <Badge variant={client.status === "active" ? "success" : "warning"}>{client.status === "active" ? "Active" : "Review"}</Badge>
+                <Avatar className="h-8 w-8"><AvatarFallback className="bg-[#fbe7ea] text-xs font-semibold text-[#c8213a]">{initials(clientName(client))}</AvatarFallback></Avatar>
+                <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-[#10141a]">{clientName(client)}</span><span className="block truncate text-xs text-[#808081]">ID: {client.id} · {client.scEnrollment?.program || "SC"} · {client.countyState || client.primaryAddress?.countyState || "County not set"} · {client.tier || "Tier not set"}</span></span>
+                {clientStatusBadge(client)}
               </label>;
             })}
           </div>
           {saveError && <p role="alert" className="text-xs text-red-700">{saveError}</p>}
-          <div className="grid grid-cols-2 gap-2 border-t border-[#e5e7eb] pt-3"><Button variant="secondary" disabled={saving} onClick={() => setAssigning(null)}>Cancel</Button><Button disabled={saving || selectedIds.length > MAX_CASELOAD || Boolean(clientsError)} onClick={() => void saveAssignment()}>{saving ? "Saving…" : "Save Assignment"}</Button></div>
+          <div className="grid grid-cols-2 gap-2 border-t border-[#e5e7eb] pt-3"><Button variant="secondary" disabled={saving} onClick={() => setAssigning(null)}>Cancel</Button><Button aria-busy={saving} disabled={saving || assignmentLoading || Boolean(assignmentError) || selectedIds.length > MAX_CASELOAD} onClick={() => void saveAssignment()}>{saving ? <><Loader2 aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" />Saving…</> : "Save Assignment"}</Button></div>
         </div>
       </DialogContent>
     </Dialog>
