@@ -71,6 +71,18 @@ it("keeps the client header while routing tabs through the query parameter", asy
   expect(screen.getByRole("heading", { name: "Monitoring" })).toBeInTheDocument();
 });
 
+it("shows a saved ISP period in planning", async () => {
+  vi.mocked(getAgencyClientById).mockResolvedValue({
+    id: "period-client", firstName: "Alex", lastName: "Example",
+    ispPeriod: { startDate: "2026-09-01", endDate: "2027-08-31" },
+  } as Client);
+  render(<MemoryRouter initialEntries={["/agency/clients/period-client?tab=planning"]}>
+    <Routes><Route path="/agency/clients/:clientId" element={<SupportCoordinatorClientDetailsPage />} /></Routes>
+  </MemoryRouter>);
+  expect(await screen.findByRole("heading", { name: "Alex Example" })).toBeInTheDocument();
+  expect(screen.getAllByText("09/01/2026 – 08/31/2027")).toHaveLength(2);
+});
+
 it("submits a real client's DDD assessment and keeps the saved selections", async () => {
   const user = userEvent.setup();
   const client = {

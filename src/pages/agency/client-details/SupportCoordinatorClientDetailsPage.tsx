@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState, type FormEvent } from "react";
 import { ArrowLeft, CircleHelp, FileText, Loader2, X } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
-import { format, parse, parseISO } from "date-fns";
+import { format, isValid, parse, parseISO } from "date-fns";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -147,7 +147,11 @@ export default function SupportCoordinatorClientDetailsPage() {
   const firstName = name.split(" ")[0] || "Participant";
   const county = sample?.county || savedClient?.countyState || savedClient?.primaryAddress?.countyState || "County not set";
   const program = sample?.program || savedClient?.scEnrollment?.program;
-  const period = sample?.isp || "Dates not set";
+  const periodStart = savedClient?.ispPeriod?.startDate;
+  const periodEnd = savedClient?.ispPeriod?.endDate;
+  const period = sample?.isp || (periodStart && periodEnd && isValid(parseISO(periodStart)) && isValid(parseISO(periodEnd)) && periodEnd >= periodStart
+    ? `${format(parseISO(periodStart), "MM/dd/yyyy")} – ${format(parseISO(periodEnd), "MM/dd/yyyy")}`
+    : "Dates not set");
   const recordedTier = sample?.tier || savedClient?.tier;
   const tier = recordedTier ? recordedTier.startsWith("Tier ") ? recordedTier : `Tier ${recordedTier}` : "Not set";
   const planId = sample ? "10.04" : savedClient?.ispMetadata?.planId || "Not set";

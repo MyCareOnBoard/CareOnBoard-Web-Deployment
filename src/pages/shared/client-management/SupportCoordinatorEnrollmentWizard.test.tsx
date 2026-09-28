@@ -66,6 +66,7 @@ test("edit wizard loads saved fields and preserves outcome services and status",
   const service = { id: "service-1", name: "Community coaching" };
   const client = {
     id: "real-1", firstName: "Alex", lastName: "Example", dateOfBirth: "1990-01-02", status: "active",
+    ispMetadata: { planId: "ISP-1" }, ispPeriod: { startDate: "2026-09-01", endDate: "2027-08-31" },
     primaryAddress: { address: "42 Service Lane, Newark, NJ 07102", line1: "42 Service Lane", city: "Newark", state: "NJ", postalCode: "07102", countyState: "Essex" },
     scOutcomes: [{ id: "outcome-1", statement: "Join activities", services: [service] }],
     scEnrollment: { program: "SP", hasGuardian: false, familyMemberParticipates: false, eligibility: { medicaid: true, functional: true, financial: true, njResident: true, documents: true, requirements: true }, agreementSummaryReviewed: true, participantSignature: "Alex Example", participantSignatureImage: "data:image/png;base64,YQ==", signedOn: "2026-01-01" },
@@ -80,6 +81,8 @@ test("edit wizard loads saved fields and preserves outcome services and status",
   expect(await screen.findByText("Editing Alex Example")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: /Participant information.*Completed/ }));
   expect(screen.getByRole("textbox", { name: "County" })).toHaveValue("Essex");
+  expect(within(screen.getByRole("button", { name: "ISP start date" })).getByDisplayValue("Sep 1, 2026")).toBeInTheDocument();
+  expect(within(screen.getByRole("button", { name: "ISP end date" })).getByDisplayValue("Aug 31, 2027")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: /Guardian \/ representative.*Completed/ }));
   fireEvent.click(screen.getByRole("button", { name: "Remove outcome 1" }));
   expect(screen.getByRole("dialog", { name: "Remove outcome 1?" })).toHaveTextContent("remove 1 attached service");
@@ -101,7 +104,9 @@ test("edit wizard loads saved fields and preserves outcome services and status",
     scOutcomes: [{ id: "outcome-1", statement: "Join more activities", services: [service] }],
     countyState: "Essex",
     primaryAddress: expect.objectContaining({ countyState: "Essex" }),
+    ispPeriod: { startDate: "2026-09-01", endDate: "2027-08-31" },
   })));
+  expect(vi.mocked(updateClient).mock.calls[0][1]).not.toHaveProperty("ispMetadata");
   expect(vi.mocked(updateClient).mock.calls[0][1]).not.toHaveProperty("status");
   finishSave(client);
   await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Client updated", variant: "success" })));

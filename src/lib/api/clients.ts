@@ -139,6 +139,7 @@ export interface Client {
   hhaAuthorizations?: ClientHhaAuthorization[];
   ispOutcomes?: string;
   ispMetadata?: ClientIspMetadata;
+  ispPeriod?: ClientIspPeriod | null;
   guardians?: ClientGuardianContactRow[];
   careTeam?: ClientCareTeamContact[];
   insuranceInfo?: ClientHhaInsuranceInfo[];
@@ -302,6 +303,8 @@ export interface ClientIspMetadata {
   medicaidType?: string;
   insuranceDetails?: ClientInsuranceDetail[];
 }
+
+export interface ClientIspPeriod { startDate: string; endDate: string }
 
 export interface FamilyPortalContact {
   /**
@@ -748,6 +751,7 @@ export interface CreateClientRequest {
   outcomes?: ClientOutcome[];
   hhaAuthorizations?: ClientHhaAuthorization[];
   ispMetadata?: ClientIspMetadata;
+  ispPeriod?: ClientIspPeriod | null;
   guardians?: ClientGuardianContactRow[];
   careTeam?: ClientCareTeamContact[];
   insuranceInfo?: ClientHhaInsuranceInfo[];
@@ -898,6 +902,7 @@ export interface UpdateClientRequest {
   outcomes?: ClientOutcome[] | null;
   hhaAuthorizations?: ClientHhaAuthorization[] | null;
   ispMetadata?: ClientIspMetadata | null;
+  ispPeriod?: ClientIspPeriod | null;
   guardians?: ClientGuardianContactRow[] | null;
   careTeam?: ClientCareTeamContact[] | null;
   insuranceInfo?: ClientHhaInsuranceInfo[] | null;

@@ -41,6 +41,7 @@ const agreementTerms = [
 type Form = {
   program: "SP" | "CCP" | "";
   firstName: string; middleName: string; lastName: string; dob: string; gender: string; ssn: string;
+  periodStartDate: string; periodEndDate: string;
   addressSearch: string; address: string; city: string; county: string; state: string; zip: string; phone: string; email: string; medicaidId: string; dddId: string;
   hasGuardian: boolean; guardianName: string; guardianRelationship: string; guardianPhone: string; guardianEmail: string; guardianAddress: string;
   familyMemberParticipates: boolean; familyMemberName: string; familyMemberRelationship: string;
@@ -50,6 +51,7 @@ type Form = {
 
 const initialForm: Form = {
   program: "", firstName: "", middleName: "", lastName: "", dob: "", gender: "", ssn: "",
+  periodStartDate: "", periodEndDate: "",
   addressSearch: "", address: "", city: "", county: "", state: "", zip: "", phone: "", email: "", medicaidId: "", dddId: "",
   hasGuardian: false, guardianName: "", guardianRelationship: "", guardianPhone: "", guardianEmail: "", guardianAddress: "",
   familyMemberParticipates: false, familyMemberName: "", familyMemberRelationship: "",
@@ -104,6 +106,7 @@ export function SupportCoordinatorEnrollmentWizard({ isEditMode = false }: { isE
         gender: client.gender || "", ssn: client.ssn || "", addressSearch: client.primaryAddress?.address || "", address: client.primaryAddress?.line1 || "",
         city: client.primaryAddress?.city || "", county: client.countyState || client.primaryAddress?.countyState || "", state: client.primaryAddress?.state || "", zip: client.primaryAddress?.postalCode || client.primaryAddress?.zipCode || "",
         phone: client.phone || "", email: client.email || "", medicaidId: client.medicaidId || "", dddId: client.dddId || "",
+        periodStartDate: client.ispPeriod?.startDate || "", periodEndDate: client.ispPeriod?.endDate || "",
         hasGuardian: enrollment.hasGuardian, guardianName: client.guardianName || "", guardianRelationship: client.guardianRelationship || "", guardianPhone: client.guardianPhone || "", guardianEmail: client.guardianEmail || "", guardianAddress: client.guardianAddress || "",
         familyMemberParticipates: enrollment.familyMemberParticipates, familyMemberName: enrollment.familyMemberName || "", familyMemberRelationship: enrollment.familyMemberRelationship || "",
         outcomes: client.scOutcomes || [], eligibility: enrollment.eligibility, agreementSummaryReviewed: enrollment.agreementSummaryReviewed,
@@ -180,6 +183,11 @@ export function SupportCoordinatorEnrollmentWizard({ isEditMode = false }: { isE
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if ((step === 1 || step === 5) && (Boolean(form.periodStartDate) !== Boolean(form.periodEndDate) || (form.periodStartDate && form.periodEndDate < form.periodStartDate))) {
+      if (step !== 1) goTo(1);
+      setError("Enter both ISP period dates, with the end date on or after the start date.");
+      return;
+    }
     if (step === 1 && !form.dob) { setError("Select the participant's date of birth to continue."); return; }
     if (step === 1 && (!form.address || !form.city || !form.state || !form.zip)) { setError("Select an address from the suggestions to fill the address fields."); return; }
     if (step === 4 && !form.agreementSummaryReviewed) { setError("Review the agreement overview to continue."); return; }
@@ -225,6 +233,9 @@ export function SupportCoordinatorEnrollmentWizard({ isEditMode = false }: { isE
       guardianPhone: form.hasGuardian ? form.guardianPhone.trim() : isEditMode ? "" : undefined,
       guardianEmail: form.hasGuardian ? form.guardianEmail.trim() : isEditMode ? "" : undefined,
       guardianAddress: form.hasGuardian ? form.guardianAddress.trim() : isEditMode ? "" : undefined,
+      ispPeriod: form.periodStartDate && form.periodEndDate
+        ? { startDate: form.periodStartDate, endDate: form.periodEndDate }
+        : isEditMode && existingClient?.ispPeriod ? null : undefined,
       scOutcomes: form.outcomes.map(outcome => ({ ...outcome, statement: outcome.statement.trim() })).filter(outcome => outcome.statement),
     };
     try {
@@ -339,6 +350,10 @@ export function SupportCoordinatorEnrollmentWizard({ isEditMode = false }: { isE
           <section><h2>3. Program identifiers</h2><div className="sc-enrollment-grid two">
             <Field label="Medicaid ID"><Input value={form.medicaidId} onChange={event => update("medicaidId", event.target.value)} placeholder="Enter Medicaid ID" /></Field>
             <Field label="DDD client ID (if known)"><Input value={form.dddId} onChange={event => update("dddId", event.target.value)} placeholder="Enter DDD client ID" /></Field>
+          </div></section>
+          <section><h2>4. ISP plan period</h2><div className="sc-enrollment-grid two">
+            <DatePickerField id="sc-isp-period-start" label="ISP start date" value={form.periodStartDate ? parseISO(form.periodStartDate) : undefined} onChange={date => update("periodStartDate", date ? format(date, "yyyy-MM-dd") : "")} ariaInvalid={error.includes("ISP period dates")} />
+            <DatePickerField id="sc-isp-period-end" label="ISP end date" value={form.periodEndDate ? parseISO(form.periodEndDate) : undefined} onChange={date => update("periodEndDate", date ? format(date, "yyyy-MM-dd") : "")} ariaInvalid={error.includes("ISP period dates")} />
           </div></section>
         </div>}
 
