@@ -10,7 +10,7 @@ function ListPlaceholder({ rows }: { rows: number }) {
 export function MonitoringOverviewSkeleton() {
   return <div className="scm" role="status" aria-label="Loading client monitoring"><span className="sr-only">Loading client monitoring…</span>
     <div aria-hidden="true"><Skeleton className="mb-5 h-4 w-32" />
-      <div className="scm-panel scm-banner"><Skeleton className="h-12 w-12 rounded-full" /><div className="min-w-0 flex-1 space-y-2"><Skeleton className="h-5 w-44 max-w-full" /><Skeleton className="h-3 w-64 max-w-full" /></div><Skeleton className="h-10 w-40 max-w-full" /></div>
+      <div className="scm-panel scm-banner"><Skeleton className="h-12 w-12 rounded-full" /><div className="min-w-0 flex-1 space-y-2"><Skeleton className="h-5 w-44 max-w-full" /><Skeleton className="h-3 w-64 max-w-full" /></div><div className="scm-banner-period"><Skeleton className="h-10 w-40 max-w-full" /></div></div>
       <div className="scm-heading"><div className="space-y-2"><Skeleton className="h-3 w-28" /><Skeleton className="h-8 w-56" /><Skeleton className="h-4 w-72 max-w-full" /></div><Skeleton className="h-10 w-36 rounded-xl" /></div>
       <div className="scm-layout"><div className="scm-stack"><section><Skeleton className="mb-3 h-5 w-36" /><ListPlaceholder rows={2} /></section><section><Skeleton className="mb-3 h-5 w-44" /><ListPlaceholder rows={2} /></section></div>
         <aside className="scm-panel"><div className="scm-panel-head"><Skeleton className="h-5 w-28" /><Skeleton className="h-6 w-16 rounded-lg" /></div>{[0, 1, 2].map(index => <div className="scm-plan-row space-y-2" key={index}><Skeleton className="h-3 w-24" /><Skeleton className="h-4 w-44 max-w-full" /><Skeleton className="h-3 w-32" /></div>)}</aside></div>
