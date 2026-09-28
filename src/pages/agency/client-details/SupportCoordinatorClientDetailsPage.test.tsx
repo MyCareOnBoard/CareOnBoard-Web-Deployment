@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { addDays, format, startOfWeek } from "date-fns";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
@@ -9,10 +9,20 @@ import { getAgencyClientById, updateClient, uploadClientDocument, type Client } 
 import SupportCoordinatorClientDetailsPage from "./SupportCoordinatorClientDetailsPage";
 
 const scrollIntoView = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollIntoView");
-beforeAll(() => Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: () => {} }));
+const hasPointerCapture = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "hasPointerCapture");
+const setPointerCapture = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "setPointerCapture");
+beforeAll(() => {
+  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: () => {} });
+  Object.defineProperty(HTMLElement.prototype, "hasPointerCapture", { configurable: true, value: () => false });
+  Object.defineProperty(HTMLElement.prototype, "setPointerCapture", { configurable: true, value: () => {} });
+});
 afterAll(() => {
   if (scrollIntoView) Object.defineProperty(HTMLElement.prototype, "scrollIntoView", scrollIntoView);
   else Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
+  if (hasPointerCapture) Object.defineProperty(HTMLElement.prototype, "hasPointerCapture", hasPointerCapture);
+  else Reflect.deleteProperty(HTMLElement.prototype, "hasPointerCapture");
+  if (setPointerCapture) Object.defineProperty(HTMLElement.prototype, "setPointerCapture", setPointerCapture);
+  else Reflect.deleteProperty(HTMLElement.prototype, "setPointerCapture");
 });
 
 it("keeps the client header while routing tabs through the query parameter", async () => {
@@ -57,6 +67,39 @@ it("keeps the client header while routing tabs through the query parameter", asy
   expect(screen.getByTestId("location")).toHaveTextContent("?tab=monitoring");
   expect(screen.getByRole("heading", { name: "Leslie Alexander" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Monitoring" })).toBeInTheDocument();
+});
+
+it("submits a real client's DDD assessment and keeps the saved selections", async () => {
+  const user = userEvent.setup();
+  const client = {
+    id: "real-assessment", firstName: "Alex", lastName: "Example", tier: "C",
+    scAssessment: {
+      answer: "yes", njcatStatus: "Available", assessmentDate: "2026-09-20",
+      assessmentSource: "DDD / State record", determinationDate: "2026-09-21",
+      effectiveDate: "2026-09-22", tierLetterAvailable: "Yes",
+    },
+  } as Client;
+  vi.mocked(getAgencyClientById).mockResolvedValue(client);
+  vi.mocked(updateClient).mockResolvedValue(client);
+  vi.mocked(updateClient).mockClear();
+  render(<MemoryRouter initialEntries={["/agency/clients/real-assessment?tab=assessment"]}>
+    <Routes><Route path="/agency/clients/:clientId" element={<SupportCoordinatorClientDetailsPage />} /></Routes>
+  </MemoryRouter>);
+  expect(await screen.findByRole("heading", { name: "Alex Example" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Yes, I have information" })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("combobox", { name: "NJCAT Status" })).toHaveTextContent("Available");
+  expect(screen.getByDisplayValue("Sep 20, 2026")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "No, information is pending" }));
+  expect(screen.queryByRole("button", { name: "Submit assessment" })).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Yes, I have information" }));
+  await user.click(screen.getByRole("combobox", { name: "Tier" }));
+  await user.click(screen.getByRole("option", { name: "Tier D" }));
+  await user.click(screen.getByRole("button", { name: "Submit assessment" }));
+  expect(updateClient).toHaveBeenCalledWith("real-assessment", {
+    tier: "D",
+    scAssessment: client.scAssessment,
+  });
+  expect(screen.getByRole("combobox", { name: "Tier" })).toHaveTextContent("Tier D");
 });
 
 it("opens the ISP quality checklist and keeps the preview review on the page", async () => {
@@ -121,7 +164,8 @@ it("shows sample service authorizations and responds to service actions", async 
   expect(within(addService).getByRole("spinbutton", { name: "Total authorized units" })).toHaveAttribute("placeholder", "e.g. 120 total units");
   expect(within(addService).getByRole("combobox", { name: "Unit" })).toBeInTheDocument();
   await user.click(within(addService).getByRole("button", { name: "Cancel" }));
-  await user.click(within(services[0]).getByRole("button", { name: "View details" }));
+  await user.click(within(services[0]).getByRole("button", { name: "Actions" }));
+  await user.click(screen.getByRole("menuitem", { name: "View details" }));
   const detail = screen.getByRole("dialog", { name: "Individual supports" });
   expect(detail).toHaveTextContent("Madu Sarah");
   expect(detail).toHaveTextContent("551.312.8522");
@@ -130,8 +174,32 @@ it("shows sample service authorizations and responds to service actions", async 
   await user.click(within(detail).getByRole("button", { name: "View PA document for Aug 10–16" }));
   expect(detail).toHaveTextContent("Sample PA document for Aug 10–16 is not available yet.");
   await user.click(within(detail).getByRole("button", { name: "Close" }));
-  await user.click(within(services[1]).getByRole("button", { name: "View details" }));
+  await user.click(within(services[1]).getByRole("button", { name: "Actions" }));
+  await user.click(screen.getByRole("menuitem", { name: "View details" }));
   expect(screen.getByRole("dialog", { name: "Community Inclusion Services" })).toHaveTextContent("No prior authorization history recorded.");
+});
+
+it("edits and deletes a sample service in the local preview", async () => {
+  const user = userEvent.setup();
+  render(<MemoryRouter initialEntries={["/agency/clients/182441?tab=services"]}>
+    <Routes><Route path="/agency/clients/:clientId" element={<SupportCoordinatorClientDetailsPage />} /></Routes>
+  </MemoryRouter>);
+  await user.click(within(screen.getAllByRole("article")[0]).getByRole("button", { name: "Actions" }));
+  await user.click(screen.getByRole("menuitem", { name: "Edit service" }));
+  const dialog = screen.getByRole("dialog", { name: "Edit service" });
+  expect(within(dialog).getByRole("textbox", { name: "Service name" })).toHaveValue("Individual supports");
+  expect(within(dialog).getByRole("spinbutton", { name: "Total authorized units" })).toHaveValue(90);
+  await user.clear(within(dialog).getByRole("textbox", { name: "Service name" }));
+  await user.type(within(dialog).getByRole("textbox", { name: "Service name" }), "Updated supports");
+  await user.click(within(dialog).getByRole("button", { name: "Edit service" }));
+  const updated = screen.getAllByRole("article")[0];
+  expect(within(updated).getByRole("heading", { name: "Updated supports" })).toBeInTheDocument();
+  await user.click(within(updated).getByRole("button", { name: "Actions" }));
+  await user.click(screen.getByRole("menuitem", { name: "Delete service" }));
+  expect(screen.getByText("Delete Updated supports from this preview? This action cannot be undone.")).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole("button", { name: "Delete service" })).toBeEnabled());
+  await user.click(screen.getByRole("button", { name: "Delete service" }));
+  expect(screen.getAllByRole("article")).toHaveLength(2);
 });
 
 it("adds a service to the local preview with total units and a selected unit", async () => {
@@ -171,7 +239,9 @@ it("saves a real client's service under its outcome", async () => {
   render(<MemoryRouter initialEntries={["/agency/clients/real-1?tab=services"]}>
     <Routes><Route path="/agency/clients/:clientId" element={<SupportCoordinatorClientDetailsPage />} /></Routes>
   </MemoryRouter>);
+  expect(screen.getByRole("status", { name: "Loading client details" })).toBeInTheDocument();
   expect(await screen.findByRole("heading", { name: "Alex Example" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Edit Client" })).toHaveAttribute("href", "/agency/clients/edit/real-1");
   await user.click(screen.getByRole("button", { name: "Add service" }));
   const dialog = screen.getByRole("dialog", { name: "Add service" });
   expect(within(dialog).getByRole("combobox", { name: "ISP outcome *" })).toHaveValue("outcome-1");
@@ -189,6 +259,44 @@ it("saves a real client's service under its outcome", async () => {
   await user.click(within(dialog).getByRole("button", { name: "Add service" }));
   expect(updateClient).toHaveBeenCalledWith("real-1", { scOutcomes: [expect.objectContaining({ id: "outcome-1", services: [expect.objectContaining({ name: "Community coaching", code: "H2020" })] })] });
   expect(await screen.findByRole("heading", { name: "Community coaching" })).toBeInTheDocument();
+}, 15000);
+
+it("edits a real service, moves it between outcomes, and deletes it", async () => {
+  const user = userEvent.setup();
+  const client = { id: "real-2", firstName: "Sam", lastName: "Example", servicePrograms: ["sc"], scOutcomes: [
+    { id: "outcome-1", statement: "Join activities", services: [{ id: "service-1", name: "Coaching", code: "H2020", provider: "Provider", startAuthDate: "2026-09-28", endAuthDate: "2026-10-28", totalUnits: "12", unitType: "Hourly", clientRate: "9.85", frequency: "Weekly", narrative: "Keep this detail" }] },
+    { id: "outcome-2", statement: "Build skills", services: [] },
+  ] } as Client;
+  vi.mocked(getAgencyClientById).mockResolvedValue(client);
+  vi.mocked(updateClient).mockResolvedValue(undefined as unknown as Client);
+  render(<MemoryRouter initialEntries={["/agency/clients/real-2?tab=services"]}>
+    <Routes><Route path="/agency/clients/:clientId" element={<SupportCoordinatorClientDetailsPage />} /></Routes>
+  </MemoryRouter>);
+  const card = await screen.findByRole("article");
+  await user.click(within(card).getByRole("button", { name: "Actions" }));
+  await user.click(screen.getByRole("menuitem", { name: "Edit service" }));
+  const dialog = screen.getByRole("dialog", { name: "Edit service" });
+  expect(within(dialog).getByRole("textbox", { name: "Service name" })).toHaveValue("Coaching");
+  expect(within(dialog).getByRole("spinbutton", { name: "Total authorized units" })).toHaveValue(12);
+  await user.clear(within(dialog).getByRole("textbox", { name: "Service name" }));
+  await user.type(within(dialog).getByRole("textbox", { name: "Service name" }), "Updated coaching");
+  await user.selectOptions(within(dialog).getByRole("combobox", { name: "ISP outcome *" }), "outcome-2");
+  await user.click(within(dialog).getByRole("button", { name: "Edit service" }));
+  await waitFor(() => expect(updateClient).toHaveBeenCalledWith("real-2", { scOutcomes: [
+    expect.objectContaining({ id: "outcome-1", services: [] }),
+    expect.objectContaining({ id: "outcome-2", services: [expect.objectContaining({ id: "service-1", name: "Updated coaching", narrative: "Keep this detail" })] }),
+  ] }));
+  const updated = await screen.findByRole("article");
+  expect(updated).toHaveTextContent("Outcome: Build skills");
+  await user.click(within(updated).getByRole("button", { name: "Actions" }));
+  await user.click(screen.getByRole("menuitem", { name: "Delete service" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Delete service" })).toBeEnabled());
+  await user.click(screen.getByRole("button", { name: "Delete service" }));
+  await waitFor(() => expect(updateClient).toHaveBeenLastCalledWith("real-2", { scOutcomes: [
+    expect.objectContaining({ id: "outcome-1", services: [] }),
+    expect.objectContaining({ id: "outcome-2", services: [] }),
+  ] }));
+  expect(screen.getByText("No service authorizations recorded yet.")).toBeInTheDocument();
 }, 15000);
 
 it("handles monitoring dates, follow-up tasks, and service monitoring in the local preview", async () => {

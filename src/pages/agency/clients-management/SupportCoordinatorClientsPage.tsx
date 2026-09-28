@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Routes } from "@/routes/constants";
 import { useListAgencyClientsQuery } from "@/lib/api/clients";
 import { useAuth } from "@/utils/auth";
@@ -62,7 +63,7 @@ export default function SupportCoordinatorClientsPage() {
                 <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#e6f8f8] text-[#008f93]"><Icon className="h-4 w-4" /></span>
                 <span className="text-[13px] font-semibold text-[#6b7280]">{label}</span>
               </div>
-              <p className="mt-1 text-[28px] font-bold leading-tight text-[#10141a]">{value}</p>
+              {isLoading ? <Skeleton className="mt-2 h-8 w-14" /> : <p className="mt-1 text-[28px] font-bold leading-tight text-[#10141a]">{value}</p>}
               <p className="mt-1 text-[12px] text-[#6b7280]">{detail}</p>
             </div>
           ))}
@@ -89,14 +90,17 @@ export default function SupportCoordinatorClientsPage() {
               {item}
             </button>
           ))}
-          <span className="ml-auto text-[13px] text-[#6b7280]">{visibleClients.length} clients</span>
+          {isLoading ? <Skeleton className="ml-auto h-4 w-16" /> : <span className="ml-auto text-[13px] text-[#6b7280]">{visibleClients.length} clients</span>}
         </div>
         <div className="overflow-x-auto">
           <div role="table" aria-label="Support Coordination clients" className="sc-client-table">
             <div role="row" className="sc-client-grid hidden gap-3 border-b border-[#e5e5e6] bg-[#f9fafb] px-4 py-3 lg:grid">
               {columns.map((column) => <span key={column} role="columnheader" className="text-[12px] font-semibold uppercase tracking-wide text-[#808081]">{column}</span>)}
             </div>
-            {isLoading ? <p className="px-4 py-12 text-center text-[14px] text-[#6b7280]">Loading clients…</p> : error ? <p role="alert" className="px-4 py-12 text-center text-[14px] text-[#ad182d]">Could not load clients.</p> : visibleClients.length === 0 ? (
+            {isLoading ? <div role="status" aria-label="Loading clients">{Array.from({ length: pageSize }, (_, index) => <div key={index} className="sc-client-grid grid grid-cols-1 gap-3 border-b border-[#e5e5e6] px-4 py-4 last:border-b-0 lg:items-center">
+              <div className="flex items-center gap-3"><Skeleton className="h-10 w-10 shrink-0 rounded-full" /><div className="min-w-0 flex-1 space-y-2"><Skeleton className="h-4 w-32 max-w-full" /><Skeleton className="h-3 w-44 max-w-full" /></div></div>
+              {columns.slice(1).map(column => <Skeleton key={column} className="h-5 w-16" />)}
+            </div>)}<span className="sr-only">Loading clients…</span></div> : error ? <p role="alert" className="px-4 py-12 text-center text-[14px] text-[#ad182d]">Could not load clients.</p> : visibleClients.length === 0 ? (
               <p className="px-4 py-12 text-center text-[14px] text-[#6b7280]">No clients match your search or filter.</p>
             ) : pageClients.map((client) => {
               const name = [client.firstName, client.middleName, client.lastName].filter(Boolean).join(" ") || "Unnamed client";
@@ -121,7 +125,7 @@ export default function SupportCoordinatorClientsPage() {
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#e5e7eb] px-4 py-3 sm:pl-6" style={{ paddingRight: 72 }}>
-          <p className="text-[13px] text-[#6b7280]">Showing {visibleClients.length ? (currentPage - 1) * pageSize + 1 : 0}–{Math.min(currentPage * pageSize, visibleClients.length)} of {visibleClients.length} clients</p>
+          {isLoading ? <Skeleton className="h-4 w-44" /> : <p className="text-[13px] text-[#6b7280]">Showing {visibleClients.length ? (currentPage - 1) * pageSize + 1 : 0}–{Math.min(currentPage * pageSize, visibleClients.length)} of {visibleClients.length} clients</p>}
           <div className="flex items-center gap-2">
             <span className="mr-2 text-[13px] text-[#6b7280]">Page {currentPage} of {pageCount}</span>
             <Button variant="outline" size="sm" className="text-[#10141a]" aria-label="Previous page" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>Previous</Button>

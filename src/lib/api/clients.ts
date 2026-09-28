@@ -64,8 +64,19 @@ export type ScEnrollment = {
   signedOn: string;
 };
 
+export type ScAssessment = {
+  answer: "yes" | "pending" | "unavailable";
+  njcatStatus: string;
+  assessmentDate: string;
+  assessmentSource: string;
+  determinationDate: string;
+  effectiveDate: string;
+  tierLetterAvailable: string;
+};
+
 export interface Client {
   scEnrollment?: ScEnrollment;
+  scAssessment?: ScAssessment;
   scOutcomes?: ClientOutcome[];
   medicationSupportSettings?: MedicationSupportSettings;
   acuityRequirements?: ClientAcuityRequirements;
@@ -838,6 +849,7 @@ export interface CreateClientRequest {
  */
 export interface UpdateClientRequest {
   scEnrollment?: ScEnrollment;
+  scAssessment?: ScAssessment;
   scOutcomes?: ClientOutcome[];
   profileImage?: string;
   medicationSupportSettings?: MedicationSupportSettings;

@@ -1,17 +1,19 @@
 import { lazy, Suspense, useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import { format, parseISO } from "date-fns";
-import { Eye, EyeOff, Info, Upload, UploadCloud, X } from "lucide-react";
+import { Eye, EyeOff, Info, Loader2, Upload, UploadCloud, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ConfirmDialog, ConfirmDialogContent } from "@/components/ui/confirm-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { FileUpload } from "@/components/ui/file-upload";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { normalizeSignaturePayload } from "@/pages/agency/billing/claims/utils/claimReportSignatureUtils";
 import { AddressAutocompleteField } from "./components/forms/AddressAutocompleteField";
 import { DatePickerField, SignatureField } from "./components/forms/formControls";
 import type { AddressDetails } from "@/hooks/useGooglePlacesAutocomplete";
-import { createClient, updateClient, uploadClientDocument, type CreateClientRequest, type ScEnrollment } from "@/lib/api/clients";
+import { createClient, getAgencyClientById, updateClient, uploadClientDocument, type Client, type ClientOutcome, type CreateClientRequest, type ScEnrollment } from "@/lib/api/clients";
 import { useToast } from "@/hooks/use-toast";
 import { Routes } from "@/routes/constants";
 import "./support-coordinator-enrollment.css";
@@ -42,7 +44,7 @@ type Form = {
   addressSearch: string; address: string; city: string; county: string; state: string; zip: string; phone: string; email: string; medicaidId: string; dddId: string;
   hasGuardian: boolean; guardianName: string; guardianRelationship: string; guardianPhone: string; guardianEmail: string; guardianAddress: string;
   familyMemberParticipates: boolean; familyMemberName: string; familyMemberRelationship: string;
-  outcomeStatements: string[];
+  outcomes: ClientOutcome[];
   eligibility: Record<EligibilityKey, boolean>; agreementSummaryReviewed: boolean; participantSignature: string; guardianSignature: string; familySignature: string; participantSignatureImage: string; guardianSignatureImage: string; familySignatureImage: string; signedOn: string;
 };
 
@@ -51,7 +53,7 @@ const initialForm: Form = {
   addressSearch: "", address: "", city: "", county: "", state: "", zip: "", phone: "", email: "", medicaidId: "", dddId: "",
   hasGuardian: false, guardianName: "", guardianRelationship: "", guardianPhone: "", guardianEmail: "", guardianAddress: "",
   familyMemberParticipates: false, familyMemberName: "", familyMemberRelationship: "",
-  outcomeStatements: [],
+  outcomes: [],
   eligibility: { medicaid: false, functional: false, financial: false, njResident: false, documents: false, requirements: false },
   agreementSummaryReviewed: false, participantSignature: "", guardianSignature: "", familySignature: "", participantSignatureImage: "", guardianSignatureImage: "", familySignatureImage: "", signedOn: "",
 };
@@ -60,14 +62,19 @@ function Field({ label, children, required = false, className = "" }: { label: s
   return <label className={`sc-enrollment-field ${className}`}><span>{label}{required && <span aria-hidden="true"> *</span>}</span>{children}</label>;
 }
 
-export function SupportCoordinatorEnrollmentWizard() {
+export function SupportCoordinatorEnrollmentWizard({ isEditMode = false }: { isEditMode?: boolean }) {
   const navigate = useNavigate();
+  const { clientId } = useParams<{ clientId: string }>();
   const { toast } = useToast();
   const [form, setForm] = useState<Form>(initialForm);
+  const [existingClient, setExistingClient] = useState<Client | null>(null);
+  const [loading, setLoading] = useState(isEditMode);
+  const [loadError, setLoadError] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState("");
   const [photoError, setPhotoError] = useState("");
   const [document, setDocument] = useState<File | null>(null);
+  const [pendingOutcomeId, setPendingOutcomeId] = useState<string | null>(null);
   const [pendingDocument, setPendingDocument] = useState<File | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadError, setUploadError] = useState("");
@@ -80,7 +87,35 @@ export function SupportCoordinatorEnrollmentWizard() {
   const [error, setError] = useState("");
   const completedCount = completed.filter(Boolean).length;
   const progress = Math.round(completedCount / steps.length * 100);
-  const name = form.firstName.trim() ? `Enrolling ${form.firstName.trim()} ${form.lastName.trim()}`.trim() : "New client enrollment";
+  const pendingOutcome = form.outcomes.find(outcome => outcome.id === pendingOutcomeId);
+  const name = form.firstName.trim() ? `${isEditMode ? "Editing" : "Enrolling"} ${form.firstName.trim()} ${form.lastName.trim()}`.trim() : isEditMode ? "Edit client" : "New client enrollment";
+  useEffect(() => {
+    if (!isEditMode) return;
+    if (!clientId) { setLoadError(true); setLoading(false); return; }
+    const controller = new AbortController();
+    getAgencyClientById(clientId, { mode: "sc", signal: controller.signal }).then(client => {
+      const enrollment = client.scEnrollment;
+      if (!enrollment) { setLoadError(true); return; }
+      const dob = client.dateOfBirth;
+      setExistingClient(client);
+      setForm({
+        program: enrollment.program, firstName: client.firstName || "", middleName: client.middleName || "", lastName: client.lastName || "",
+        dob: typeof dob === "string" ? dob.slice(0, 10) : dob instanceof Date ? format(dob, "yyyy-MM-dd") : dob?._seconds ? format(new Date(dob._seconds * 1000), "yyyy-MM-dd") : "",
+        gender: client.gender || "", ssn: client.ssn || "", addressSearch: client.primaryAddress?.address || "", address: client.primaryAddress?.line1 || "",
+        city: client.primaryAddress?.city || "", county: client.countyState || "", state: client.primaryAddress?.state || "", zip: client.primaryAddress?.postalCode || client.primaryAddress?.zipCode || "",
+        phone: client.phone || "", email: client.email || "", medicaidId: client.medicaidId || "", dddId: client.dddId || "",
+        hasGuardian: enrollment.hasGuardian, guardianName: client.guardianName || "", guardianRelationship: client.guardianRelationship || "", guardianPhone: client.guardianPhone || "", guardianEmail: client.guardianEmail || "", guardianAddress: client.guardianAddress || "",
+        familyMemberParticipates: enrollment.familyMemberParticipates, familyMemberName: enrollment.familyMemberName || "", familyMemberRelationship: enrollment.familyMemberRelationship || "",
+        outcomes: client.scOutcomes || [], eligibility: enrollment.eligibility, agreementSummaryReviewed: enrollment.agreementSummaryReviewed,
+        participantSignature: enrollment.participantSignature, guardianSignature: enrollment.guardianSignature || "", familySignature: enrollment.familySignature || "",
+        participantSignatureImage: enrollment.participantSignatureImage, guardianSignatureImage: enrollment.guardianSignatureImage || "", familySignatureImage: enrollment.familySignatureImage || "", signedOn: enrollment.signedOn,
+      });
+      setCompleted(Array(6).fill(true));
+      setVisited(Array(6).fill(true));
+    }).catch(() => { if (!controller.signal.aborted) setLoadError(true); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [clientId, isEditMode]);
   useEffect(() => {
     if (!photoFile) { setPhotoPreview(""); return; }
     const url = URL.createObjectURL(photoFile);
@@ -99,7 +134,7 @@ export function SupportCoordinatorEnrollmentWizard() {
       if (key === "program") { next.agreementSummaryReviewed = false; next.participantSignatureImage = ""; next.guardianSignatureImage = ""; next.familySignatureImage = ""; }
       return next;
     });
-    setCompleted(previous => previous.map((done, index) => index >= step ? false : done));
+    if (!isEditMode || key === "program" || key === "agreementSummaryReviewed") setCompleted(previous => previous.map((done, index) => index >= step ? false : done));
     setError("");
   };
   const goTo = (target: number) => { setStep(target); setVisited(previous => previous.map((value, index) => value || index === target)); setError(""); window.scrollTo({ top: 0, behavior: "smooth" }); };
@@ -156,6 +191,8 @@ export function SupportCoordinatorEnrollmentWizard() {
     const firstIncomplete = completed.slice(0, 5).findIndex(value => !value);
     if (firstIncomplete !== -1) { goTo(firstIncomplete); setError(`Complete ${steps[firstIncomplete]} before submitting.`); return; }
     if (!form.program) { goTo(0); return; }
+    if (!form.agreementSummaryReviewed) { goTo(4); setError("Review the agreement overview before saving."); return; }
+    if (form.outcomes.some(outcome => outcome.services.length > 0 && !outcome.statement.trim())) { goTo(2); setError("An outcome with attached services needs a statement."); return; }
     if (!form.participantSignatureImage || (form.hasGuardian && !form.guardianSignatureImage) || (form.familyMemberParticipates && !form.familySignatureImage)) { setError("Capture each required signature before submitting."); return; }
     if (!form.signedOn) { setError("Select the date of signature before submitting."); return; }
     setSaving(true);
@@ -177,48 +214,72 @@ export function SupportCoordinatorEnrollmentWizard() {
     };
     const payload: CreateClientRequest = {
       type: "ddd", servicePrograms: ["sc"], status: "pending", scEnrollment: enrollment,
-      firstName: form.firstName.trim(), middleName: form.middleName.trim() || undefined, lastName: form.lastName.trim(),
-      dateOfBirth: form.dob || undefined, gender: form.gender || undefined, ssn: form.ssn.trim() || undefined,
-      phone: form.phone.trim() || undefined, email: form.email.trim() || undefined,
-      medicaidId: form.medicaidId.trim() || undefined, dddId: form.dddId.trim() || undefined,
-      countyState: form.county.trim() || undefined,
+      firstName: form.firstName.trim(), middleName: form.middleName.trim() || (isEditMode ? "" : undefined), lastName: form.lastName.trim(),
+      dateOfBirth: form.dob || undefined, gender: form.gender || (isEditMode ? "" : undefined), ssn: form.ssn.trim() || (isEditMode ? "" : undefined),
+      phone: form.phone.trim() || (isEditMode ? "" : undefined), email: form.email.trim() || (isEditMode ? "" : undefined),
+      medicaidId: form.medicaidId.trim() || (isEditMode ? "" : undefined), dddId: form.dddId.trim() || (isEditMode ? "" : undefined),
+      countyState: form.county.trim() || (isEditMode ? "" : undefined),
       primaryAddress: { address: form.addressSearch.trim(), line1: form.address.trim(), city: form.city.trim(), state: form.state.trim(), postalCode: form.zip.trim(), zipCode: form.zip.trim(), country: "US" },
-      guardianName: form.hasGuardian ? form.guardianName.trim() : undefined,
-      guardianRelationship: form.hasGuardian ? form.guardianRelationship : undefined,
-      guardianPhone: form.hasGuardian ? form.guardianPhone.trim() || undefined : undefined,
-      guardianEmail: form.hasGuardian ? form.guardianEmail.trim() || undefined : undefined,
-      guardianAddress: form.hasGuardian ? form.guardianAddress.trim() || undefined : undefined,
-      scOutcomes: form.outcomeStatements.map(statement => statement.trim()).filter(Boolean).map(statement => ({ id: crypto.randomUUID(), statement, services: [] })),
+      guardianName: form.hasGuardian ? form.guardianName.trim() : isEditMode ? "" : undefined,
+      guardianRelationship: form.hasGuardian ? form.guardianRelationship : isEditMode ? "" : undefined,
+      guardianPhone: form.hasGuardian ? form.guardianPhone.trim() : isEditMode ? "" : undefined,
+      guardianEmail: form.hasGuardian ? form.guardianEmail.trim() : isEditMode ? "" : undefined,
+      guardianAddress: form.hasGuardian ? form.guardianAddress.trim() : isEditMode ? "" : undefined,
+      scOutcomes: form.outcomes.map(outcome => ({ ...outcome, statement: outcome.statement.trim() })).filter(outcome => outcome.statement),
     };
     try {
-      const client = await createClient(payload);
+      const savedId = isEditMode ? clientId! : (await createClient(payload)).id;
+      if (isEditMode) {
+        const { type: _type, servicePrograms: _servicePrograms, status: _status, ...changes } = payload;
+        await updateClient(savedId, changes);
+      }
+      const attachmentErrors: string[] = [];
       if (photoFile) {
         try {
-          const uploaded = await uploadClientDocument(client.id, "client-photo", photoFile);
-          await updateClient(client.id, { profileImage: uploaded.url });
+          const uploaded = await uploadClientDocument(savedId, "client-photo", photoFile);
+          await updateClient(savedId, { profileImage: uploaded.url });
         } catch {
-          toast({ title: "Client saved", description: "The photo could not be attached to the enrollment.", variant: "destructive" });
+          attachmentErrors.push("photo");
         }
       }
       if (document) {
         try {
-          const uploaded = await uploadClientDocument(client.id, "consent-and-releases", document);
-          await updateClient(client.id, { documents: [{ key: "consents", title: "Enrollment document", fileName: uploaded.fileName, url: uploaded.url }] });
+          const uploaded = await uploadClientDocument(savedId, "consent-and-releases", document);
+          await updateClient(savedId, { documents: [...(existingClient?.documents || []), { key: "consents", title: "Enrollment document", fileName: uploaded.fileName, url: uploaded.url }] });
         } catch {
-          toast({ title: "Client saved", description: "The document could not be attached. Upload it from the client record.", variant: "destructive" });
+          attachmentErrors.push("document");
         }
       }
-      navigate(Routes.agency.clientDetails.replace(":clientId", client.id));
+      toast(attachmentErrors.length ? { title: "Client saved with missing attachments", description: `The ${attachmentErrors.join(" and ")} could not be attached. Add it from the client record.`, variant: "destructive" } : { title: isEditMode ? "Client updated" : "Enrollment saved", description: isEditMode ? "Client changes were saved." : "A pending client record was created.", variant: "success" });
+      navigate(Routes.agency.clientDetails.replace(":clientId", savedId));
     } catch (cause: unknown) {
       const response = cause as { response?: { data?: { error?: string; message?: string } } };
-      setError(response.response?.data?.error || response.response?.data?.message || "Enrollment could not be saved. Please try again.");
+      const message = response.response?.data?.error || response.response?.data?.message || "Enrollment could not be saved. Please try again.";
+      setError(message);
+      toast({ title: isEditMode ? "Could not update client" : "Could not save enrollment", description: message, variant: "destructive" });
     } finally { setSaving(false); }
   };
+
+  if (loading) return <div role="status" aria-label="Loading client enrollment" className="sc-enrollment-layout">
+    <aside className="sc-enrollment-sidebar space-y-4 p-4" aria-hidden="true">
+      <Skeleton className="h-28 rounded-lg" />
+      <Skeleton className="h-4 w-36" />
+      {steps.map(stepLabel => <Skeleton key={stepLabel} className="h-10 w-full" />)}
+      <Skeleton className="h-16 rounded-lg" />
+    </aside>
+    <main className="sc-enrollment-main" aria-hidden="true">
+      <div className="sc-enrollment-heading"><div className="space-y-3"><Skeleton className="h-7 w-52" /><Skeleton className="h-4 w-72 max-w-full" /></div><Skeleton className="h-7 w-20 rounded-full" /></div>
+      <div className="sc-enrollment-card space-y-5"><Skeleton className="h-4 w-3/4" /><div className="sc-enrollment-programs"><Skeleton className="h-32 rounded-lg" /><Skeleton className="h-32 rounded-lg" /></div><Skeleton className="h-16 rounded-lg" /></div>
+      <div className="mt-auto flex justify-end gap-3 pt-6"><Skeleton className="h-10 w-20 rounded-lg" /><Skeleton className="h-10 w-32 rounded-lg" /></div>
+    </main>
+    <span className="sr-only">Loading client enrollment…</span>
+  </div>;
+  if (loadError) return <div className="rounded-2xl bg-white p-8 text-center"><p className="mb-4 text-[#10141a]">Client enrollment could not be loaded.</p><Button variant="outline" onClick={() => navigate(Routes.agency.clients)}>Back to clients</Button></div>;
 
   return <div className="sc-enrollment-layout">
     <aside className="sc-enrollment-sidebar" aria-label="Enrollment progress">
       <div className="sc-enrollment-welcome">
-        <div><p className="sc-enrollment-welcome-title">{name} <span aria-hidden="true">👋</span></p><p className="sc-enrollment-welcome-subtitle">Follow the steps to complete enrollment.</p></div>
+        <div><p className="sc-enrollment-welcome-title">{name} <span aria-hidden="true">👋</span></p><p className="sc-enrollment-welcome-subtitle">{isEditMode ? "Review and update the client enrollment." : "Follow the steps to complete enrollment."}</p></div>
         <div className="sc-enrollment-ring" style={{ "--progress": `${progress}%` } as CSSProperties} aria-label={`${completedCount} of 6 steps completed, ${progress}%`}><span>{progress}%</span></div>
       </div>
       <p className="sc-enrollment-count">{completedCount} of 6 steps completed</p>
@@ -228,7 +289,7 @@ export function SupportCoordinatorEnrollmentWizard() {
           <span className={index === step ? "current" : completed[index] ? "done" : ""}>{label}</span><span className={`sc-enrollment-status ${status.toLowerCase().replace(" ", "-")}`}>{status}</span>
         </button>;
       })}</nav>
-      <div className="sc-enrollment-help"><Info size={16} aria-hidden="true" /><p>Complete each section to prepare the enrollment record. You can return to earlier steps.</p></div>
+      <div className="sc-enrollment-help"><Info size={16} aria-hidden="true" /><p>{isEditMode ? "Review each section, then save changes from Review & sign." : "Complete each section to prepare the enrollment record. You can return to earlier steps."}</p></div>
     </aside>
 
     <main className="sc-enrollment-main">
@@ -255,7 +316,7 @@ export function SupportCoordinatorEnrollmentWizard() {
         {step === 1 && <div className="sc-enrollment-card sc-enrollment-sections">
           <section><h2>1. Personal information</h2>
           <div className="sc-enrollment-photo"><span className="sc-enrollment-photo-label">Client photo</span>
-            <FileUpload aria-label="Client photo" aria-invalid={photoError ? true : undefined} aria-describedby={`sc-photo-help${photoError ? " sc-photo-error" : ""}`} accept="image/jpeg,image/png" onFilesSelected={selectPhoto} className={`sc-enrollment-photo-upload ${photoError ? "invalid" : ""}`} icon={photoPreview ? <img src={photoPreview} alt="" className="sc-enrollment-photo-preview" /> : <span className="sc-enrollment-photo-icon"><UploadCloud size={23} /></span>} label={<span className="sc-enrollment-photo-copy"><strong>{photoFile ? "Photo ready" : "Click to upload or drag and drop"}</strong><small id="sc-photo-help">{photoFile ? `${photoFile.name} · Click or drop to replace` : "JPG or PNG · Up to 5 MB"}</small></span>} />
+            <FileUpload aria-label="Client photo" aria-invalid={photoError ? true : undefined} aria-describedby={`sc-photo-help${photoError ? " sc-photo-error" : ""}`} accept="image/jpeg,image/png" onFilesSelected={selectPhoto} className={`sc-enrollment-photo-upload ${photoError ? "invalid" : ""}`} icon={photoPreview || existingClient?.profileImage ? <img src={photoPreview || existingClient?.profileImage} alt="" className="sc-enrollment-photo-preview" /> : <span className="sc-enrollment-photo-icon"><UploadCloud size={23} /></span>} label={<span className="sc-enrollment-photo-copy"><strong>{photoFile ? "Photo ready" : existingClient?.profileImage ? "Current photo" : "Click to upload or drag and drop"}</strong><small id="sc-photo-help">{photoFile ? `${photoFile.name} · Click or drop to replace` : "JPG or PNG · Up to 5 MB"}</small></span>} />
             {photoError && <p id="sc-photo-error" className="sc-enrollment-photo-error" role="alert">{photoError}</p>}
           </div><div className="sc-enrollment-grid three">
             <Field label="First name" required><Input value={form.firstName} onChange={event => update("firstName", event.target.value)} placeholder="Enter first name" required /></Field>
@@ -297,8 +358,8 @@ export function SupportCoordinatorEnrollmentWizard() {
             </div></>}
           </section>
           <section><h2>ISP outcomes</h2><p className="mb-3 text-sm text-[#6b7280]">Add outcomes now. Services can be attached to each outcome from the client's Services tab.</p>
-            {form.outcomeStatements.map((statement, index) => <div key={index} className="mb-3 flex items-end gap-2"><Field label={`Outcome ${index + 1}`} className="flex-1"><Input value={statement} maxLength={1000} onChange={event => update("outcomeStatements", form.outcomeStatements.map((value, row) => row === index ? event.target.value : value))} placeholder="Describe the desired outcome" /></Field><Button type="button" variant="outline" aria-label={`Remove outcome ${index + 1}`} onClick={() => update("outcomeStatements", form.outcomeStatements.filter((_, row) => row !== index))}>Remove</Button></div>)}
-            <Button type="button" variant="outline" onClick={() => update("outcomeStatements", [...form.outcomeStatements, ""])}>Add outcome</Button>
+            {form.outcomes.map((outcome, index) => <div key={outcome.id} className="mb-3 flex items-end gap-2"><Field label={`Outcome ${index + 1}`} className="flex-1"><Input value={outcome.statement} maxLength={1000} onChange={event => update("outcomes", form.outcomes.map(item => item.id === outcome.id ? { ...item, statement: event.target.value } : item))} placeholder="Describe the desired outcome" /></Field><Button type="button" variant="outline" aria-label={`Remove outcome ${index + 1}`} onClick={() => setPendingOutcomeId(outcome.id)}>Remove</Button></div>)}
+            <Button type="button" variant="outline" onClick={() => update("outcomes", [...form.outcomes, { id: crypto.randomUUID(), statement: "", services: [] }])}>Add outcome</Button>
           </section>
         </div>}
 
@@ -318,17 +379,26 @@ export function SupportCoordinatorEnrollmentWizard() {
           {form.hasGuardian && <section><h2>Guardian signature</h2><div className="sc-enrollment-grid two"><Field label="Full name" required><Input value={form.guardianSignature} onChange={event => update("guardianSignature", event.target.value)} placeholder="Type guardian's full name" required /></Field><div className={`sc-enrollment-signature-field ${!form.guardianSignatureImage && error.includes("required signature") ? "invalid" : ""}`}><span>Signature *</span><SignatureField value={form.guardianSignatureImage} onOpen={() => setSignatureTarget("guardian")} onClear={() => update("guardianSignatureImage", "")} ariaLabel="Guardian signature" required /></div></div></section>}
           {form.familyMemberParticipates && <section><h2>Family member signature</h2><div className="sc-enrollment-grid two"><Field label="Full name" required><Input value={form.familySignature} onChange={event => update("familySignature", event.target.value)} placeholder="Type family member's full name" required /></Field><div className={`sc-enrollment-signature-field ${!form.familySignatureImage && error.includes("required signature") ? "invalid" : ""}`}><span>Signature *</span><SignatureField value={form.familySignatureImage} onOpen={() => setSignatureTarget("family")} onClear={() => update("familySignatureImage", "")} ariaLabel="Family member signature" required /></div></div></section>}
           <section><h2>Date of signature</h2><div className="sc-enrollment-date"><DatePickerField id="sc-signature-date" label="Date" required ariaInvalid={!form.signedOn && error.includes("date of signature")} maxDate={new Date()} value={form.signedOn ? parseISO(form.signedOn) : undefined} onChange={date => update("signedOn", date ? format(date, "yyyy-MM-dd") : "")} /></div></section>
-          <div className="sc-enrollment-note"><span>This creates a pending client record. Formal enrollment still requires the completed program agreement and eligibility approval.</span></div>
+          <div className="sc-enrollment-note"><span>{isEditMode ? "Changes to the enrollment record will be saved. Formal enrollment still requires the completed program agreement and eligibility approval." : "This creates a pending client record. Formal enrollment still requires the completed program agreement and eligibility approval."}</span></div>
         </div>}
 
         {error && <p role="alert" className="sc-enrollment-error">{error}</p>}
         <div className="sc-enrollment-actions">
-          {step === 0 ? <Button type="button" variant="outline" onClick={() => navigate(Routes.agency.clients)} disabled={saving}>Cancel</Button> : <Button type="button" variant="outline" className="sc-enrollment-back" onClick={() => goTo(step - 1)} disabled={saving}>Go back</Button>}
+          {step === 0 ? <Button type="button" variant="outline" onClick={() => navigate(isEditMode && clientId ? Routes.agency.clientDetails.replace(":clientId", clientId) : Routes.agency.clients)} disabled={saving}>Cancel</Button> : <Button type="button" variant="outline" className="sc-enrollment-back" onClick={() => goTo(step - 1)} disabled={saving}>Go back</Button>}
           {step === 0 && <Button type="button" variant="outline" className="sc-enrollment-upload" onClick={() => { setPendingDocument(document); setUploadError(""); setUploadOpen(true); }}><Upload size={16} />{document ? document.name : "Upload document"}</Button>}
-          <Button type="submit" disabled={saving || (step === 0 && !form.program)}>{saving ? "Saving…" : step === 5 ? "Submit enrollment" : step === 0 ? "Get started" : "Continue"}</Button>
+          <Button type="submit" disabled={saving || (step === 0 && !form.program)}>{saving ? <><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />Saving…</> : step === 5 ? isEditMode ? "Save changes" : "Submit enrollment" : step === 0 ? isEditMode ? "Continue editing" : "Get started" : "Continue"}</Button>
         </div>
       </form>
     </main>
+    <ConfirmDialog open={Boolean(pendingOutcome)} onOpenChange={open => { if (!open) setPendingOutcomeId(null); }}>
+      <ConfirmDialogContent
+        title={`Remove outcome ${form.outcomes.findIndex(outcome => outcome.id === pendingOutcomeId) + 1}?`}
+        description={pendingOutcome?.services.length ? `This will also remove ${pendingOutcome.services.length} attached service${pendingOutcome.services.length === 1 ? "" : "s"} when you save the client.` : "This outcome will be removed when you save the client."}
+        confirmText="Remove outcome"
+        onCancel={() => setPendingOutcomeId(null)}
+        onConfirm={() => { if (pendingOutcomeId) update("outcomes", form.outcomes.filter(outcome => outcome.id !== pendingOutcomeId)); setPendingOutcomeId(null); }}
+      />
+    </ConfirmDialog>
     <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
       <DialogContent showCloseButton={false} className="sc-enrollment-modal w-[min(92vw,440px)] p-5 sm:p-6">
         <div className="flex items-start justify-between gap-3"><DialogTitle className="text-[18px] leading-tight">Download & fill forms</DialogTitle><Button type="button" variant="ghost" size="icon" className="sc-enrollment-modal-close h-7 w-7 rounded-full bg-[#f2f4f6]" aria-label="Close upload dialog" onClick={() => setUploadOpen(false)}><X size={16} /></Button></div>

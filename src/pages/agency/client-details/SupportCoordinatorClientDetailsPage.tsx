@@ -1,18 +1,22 @@
-import { lazy, Suspense, useEffect, useState } from "react";
-import { ArrowLeft, CircleHelp, FileText, X } from "lucide-react";
+import { lazy, Suspense, useEffect, useState, type FormEvent } from "react";
+import { ArrowLeft, CircleHelp, FileText, Loader2, X } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
-import { format } from "date-fns";
+import { format, parse, parseISO } from "date-fns";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { normalizeSignaturePayload } from "@/pages/agency/billing/claims/utils/claimReportSignatureUtils";
 import { getAgencyClientById, updateClient, type Client, type ClientService } from "@/lib/api/clients";
 import { DatePickerField, SignatureField } from "@/pages/shared/client-management/components/forms/formControls";
+import { useToast } from "@/hooks/use-toast";
 import { clients } from "@/pages/agency/clients-management/supportCoordinatorSampleClients";
 import { Routes } from "@/routes/constants";
 import SupportCoordinatorMonitoringTab from "./SupportCoordinatorMonitoringTab";
@@ -24,10 +28,10 @@ const DigitalSignatureModal = lazy(() => import("@/pages/applicant/application/c
 
 const tabs = [
   { id: "assessment", label: "Assessment & Tier" },
-  { id: "planning", label: "Planning" },
   { id: "services", label: "Services" },
-  { id: "monitoring", label: "Monitoring" },
   { id: "documents", label: "Documents" },
+  { id: "planning", label: "Planning" },
+  { id: "monitoring", label: "Monitoring" },
 ] as const;
 
 type Tab = (typeof tabs)[number]["id"];
@@ -81,7 +85,7 @@ const sampleServices = [
 type Service = {
   name: string; code: string; status: string; provider: string; contact: string; phone: string;
   authorization: string; units: string; rate: string; totalCost: string; frequency: string;
-  pa: string; sdr: string; source?: string; outcome?: string;
+  pa: string; sdr: string; source?: string; outcome?: string; outcomeId?: string; record?: ClientService;
 };
 
 const sampleAuthorizationWeeks = ["Aug 10–16", "Aug 3–9", "Jul 27–Aug 2", "Jul 20–26", "Jul 13–19"];
@@ -142,7 +146,8 @@ export default function SupportCoordinatorClientDetailsPage() {
   const county = sample?.county || savedClient?.countyState || "County not set";
   const program = sample?.program || savedClient?.scEnrollment?.program;
   const period = sample?.isp || "Dates not set";
-  const tier = sample?.tier || savedClient?.tier || "Not set";
+  const recordedTier = sample?.tier || savedClient?.tier;
+  const tier = recordedTier ? recordedTier.startsWith("Tier ") ? recordedTier : `Tier ${recordedTier}` : "Not set";
   const planId = sample ? "10.04" : savedClient?.ispMetadata?.planId || "Not set";
   const outcomes = sample ? sampleOutcomes : (savedClient?.scOutcomes ?? []).map(outcome => ({ goal: outcome.statement, support: "" }));
   const sampleIspOutcomes = sample ? sampleOutcomes.map((outcome, index) => ({ statement: `${firstName} ${outcome.goal}`, services: sampleServices[index] ? [{ name: sampleServices[index].name, code: sampleServices[index].code, provider: sampleServices[index].provider, hours: sampleServices[index].units, clientRate: sampleServices[index].rate, frequency: sampleServices[index].frequency }] : [] })) : undefined;
@@ -154,7 +159,18 @@ export default function SupportCoordinatorClientDetailsPage() {
     return `?${params.toString()}`;
   };
 
-  if (loading) return <p className="px-6 py-12 text-center text-[#6b7280]">Loading client details…</p>;
+  if (loading) return <div role="status" aria-label="Loading client details" className="min-h-[calc(100vh-200px)] px-4 pb-8 sm:px-6 lg:px-0">
+    <Skeleton className="mb-5 h-5 w-32" />
+    <div className="rounded-2xl bg-white p-4 shadow-sm sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-5 border-b border-[#e5e7eb] pb-5">
+        <div className="flex items-center gap-3"><Skeleton className="h-12 w-12 rounded-full" /><div className="space-y-2"><Skeleton className="h-5 w-44" /><Skeleton className="h-4 w-56" /></div></div>
+        <Skeleton className="h-9 w-28" />
+      </div>
+      <div className="mt-5 flex gap-2 overflow-hidden border-b border-[#e5e7eb] pb-3">{tabs.map(tab => <Skeleton key={tab.id} className="h-10 w-28 shrink-0 rounded-full" />)}</div>
+      <div className="space-y-5 pt-6"><Skeleton className="h-6 w-52" /><Skeleton className="h-4 w-72 max-w-full" /><div className="grid gap-4 sm:grid-cols-2">{[0, 1, 2, 3].map(index => <Skeleton key={index} className="h-28 rounded-xl" />)}</div></div>
+    </div>
+    <span className="sr-only">Loading client details…</span>
+  </div>;
   if (error || !name) return (
     <div className="rounded-2xl bg-white p-8 text-center">
       <p className="mb-4 text-[#10141a]">Client details could not be found.</p>
@@ -182,7 +198,10 @@ export default function SupportCoordinatorClientDetailsPage() {
               </div>
             </div>
           </div>
-          <p className="text-sm text-[#10141a]"><strong className="mr-1 text-lg">{sample ? "ISP Active" : "ISP period"}</strong>{period}</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-sm text-[#10141a]"><strong className="mr-1 text-lg">{sample ? "ISP Active" : "ISP period"}</strong>{period}</p>
+            {savedClient && <Button asChild variant="outline"><Link to={Routes.agency.editClient.replace(":clientId", savedClient.id)}>Edit Client</Link></Button>}
+          </div>
         </header>
 
         {!pcptOpen && !ispOpen && <nav aria-label="Client details tabs" className="mt-5 flex gap-2 overflow-x-auto border-b border-[#e5e7eb] pb-3">
@@ -195,7 +214,7 @@ export default function SupportCoordinatorClientDetailsPage() {
         </nav>}
 
         <main className={pcptOpen || ispOpen ? "pt-5" : "pt-6"}>
-          {pcptOpen ? <SupportCoordinatorPcpt client={savedClient} name={name} clientId={sample?.id || savedClient?.id || ""} period={period} photo={savedClient?.profileImage || (sample?.id === "182441" ? "/user-profile-image.png" : undefined)} backTo={tabLink("planning")} sample={Boolean(sample)} /> : ispOpen ? <SupportCoordinatorIsp client={savedClient} name={name} clientId={sample?.id || savedClient?.id || ""} period={period} program={program} backTo={tabLink("planning")} sample={Boolean(sample)} sampleOutcomes={sampleIspOutcomes} /> : activeTab === "assessment" ? <AssessmentTab tier={tier} lastName={name.split(" ").at(-1) || name} sample={Boolean(sample)} /> : activeTab === "planning" ? (
+          {pcptOpen ? <SupportCoordinatorPcpt client={savedClient} name={name} clientId={sample?.id || savedClient?.id || ""} period={period} photo={savedClient?.profileImage || (sample?.id === "182441" ? "/user-profile-image.png" : undefined)} backTo={tabLink("planning")} sample={Boolean(sample)} /> : ispOpen ? <SupportCoordinatorIsp client={savedClient} name={name} clientId={sample?.id || savedClient?.id || ""} period={period} program={program} backTo={tabLink("planning")} sample={Boolean(sample)} sampleOutcomes={sampleIspOutcomes} /> : activeTab === "assessment" ? <AssessmentTab key={clientId} tier={tier} lastName={name.split(" ").at(-1) || name} sample={Boolean(sample)} client={savedClient} onSaved={setSavedClient} /> : activeTab === "planning" ? (
             <section aria-labelledby="sc-planning-heading">
               <div className="mb-6">
                 <h2 id="sc-planning-heading" className="text-2xl font-semibold text-[#10141a]">Person-Centered Planning</h2>
@@ -338,9 +357,13 @@ function InfoCard({ label, value, source }: { label: string; value: string; sour
 }
 
 function ServiceAuthorizationTab({ sample, client, onSaved }: { sample: boolean; client: Client | null; onSaved: (client: Client) => void }) {
-  const [preview, setPreview] = useState<"Add service" | Service | null>(null);
+  const [preview, setPreview] = useState<"Add service" | "Edit service" | Service | null>(null);
   const [documentWeek, setDocumentWeek] = useState<string | null>(null);
-  const [addedServices, setAddedServices] = useState<Service[]>([]);
+  const [addedServices, setAddedServices] = useState<Service[]>([...sampleServices]);
+  const [editing, setEditing] = useState<{ service: Service; index: number } | null>(null);
+  const [deleting, setDeleting] = useState<{ service: Service; index: number } | null>(null);
+  const [deleteError, setDeleteError] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
   const [startDate, setStartDate] = useState<Date>();
   const [endDate, setEndDate] = useState<Date>();
   const [unit, setUnit] = useState("");
@@ -349,22 +372,25 @@ function ServiceAuthorizationTab({ sample, client, onSaved }: { sample: boolean;
   const [outcomeId, setOutcomeId] = useState("");
   const [newOutcome, setNewOutcome] = useState("");
   const [saving, setSaving] = useState(false);
-  const services: Service[] = sample ? [...sampleServices, ...addedServices] : (client?.scOutcomes ?? []).flatMap(outcome => outcome.services.map(service => ({
+  const services: Service[] = sample ? addedServices : (client?.scOutcomes ?? []).flatMap(outcome => outcome.services.map(service => ({
     name: service.name, code: service.code, provider: service.provider || "—", status: "Review", contact: "—", phone: "—",
     authorization: `${service.startAuthDate?.replace(/^(\d{4})-(\d{2})-(\d{2})$/, "$2/$3/$1") || "—"} → ${service.endAuthDate?.replace(/^(\d{4})-(\d{2})-(\d{2})$/, "$2/$3/$1") || "—"}`,
     units: `${service.totalUnits || "—"} total · ${service.unitType || "—"}`,
     rate: Number(service.clientRate || 0).toLocaleString("en-US", { style: "currency", currency: "USD" }),
     totalCost: (Number(service.totalUnits || 0) * Number(service.clientRate || 0)).toLocaleString("en-US", { style: "currency", currency: "USD" }),
-    frequency: service.frequency || "—", pa: "Pending", sdr: "Pending", source: "Client record", outcome: outcome.statement,
+    frequency: service.frequency || "—", pa: "Pending", sdr: "Pending", source: "Client record", outcome: outcome.statement, outcomeId: outcome.id, record: service,
   })));
-  const selectedService = preview && preview !== "Add service" ? preview : null;
+  const selectedService = preview && typeof preview !== "string" ? preview : null;
+  const formOpen = preview === "Add service" || preview === "Edit service";
+  const editRecord = editing?.service.record;
+  const editDate = (date: string | undefined) => date && /^\d{2}\/\d{2}\/\d{4}$/.test(date) ? parse(date, "MM/dd/yyyy", new Date()) : undefined;
   return <section aria-labelledby="sc-services-heading">
     <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
       <div>
         <h2 id="sc-services-heading" className="text-2xl font-semibold text-[#10141a]">Service Authorization</h2>
         <p className="mt-1 text-sm text-[#4b5563]">Services · Providers · PA Records · SDR · Authorized Units</p>
       </div>
-      <Button type="button" className="h-9 px-3 text-sm" style={{ borderRadius: 8 }} onClick={() => { setStartDate(undefined); setEndDate(undefined); setUnit(""); setFrequency("Weekly"); setOutcomeId(client?.scOutcomes?.[0]?.id || "new"); setNewOutcome(""); setFormError(""); setPreview("Add service"); }}>Add service</Button>
+      <Button type="button" className="h-9 px-3 text-sm" style={{ borderRadius: 8 }} onClick={() => { setEditing(null); setStartDate(undefined); setEndDate(undefined); setUnit(""); setFrequency("Weekly"); setOutcomeId(client?.scOutcomes?.[0]?.id || "new"); setNewOutcome(""); setFormError(""); setPreview("Add service"); }}>Add service</Button>
     </div>
     {services.length ? <div className="space-y-5">
       {services.map((service, index) => <article key={service.name + service.code + index} className="rounded-xl border border-[#e5e7eb] p-4">
@@ -373,7 +399,14 @@ function ServiceAuthorizationTab({ sample, client, onSaved }: { sample: boolean;
           {service.outcome && <span className="text-xs text-[#6b7280]">Outcome: {service.outcome}</span>}
           <span className={"rounded px-2 py-0.5 text-xs font-semibold " + (service.status === "Active" ? "bg-[#e8fff2] text-[#047857]" : "bg-[#fff8e9] text-[#a16207]")}>{service.status}</span>
           <span className="text-xs text-[#8a929e]">{service.code}</span>
-          <button type="button" className="ml-auto cursor-pointer text-sm font-semibold text-[#008f93] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00b4b8]" onClick={() => { setDocumentWeek(null); setPreview(service); }}>View details</button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild><button type="button" className="ml-auto cursor-pointer text-sm font-semibold text-[#008f93] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00b4b8]">Actions</button></DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-40">
+              <DropdownMenuItem className="cursor-pointer hover:bg-[#f0fbfb]" onSelect={() => { setDocumentWeek(null); setPreview(service); }}>View details</DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer hover:bg-[#f0fbfb]" onSelect={() => { setEditing({ service, index }); setStartDate(service.record?.startAuthDate ? parseISO(service.record.startAuthDate) : editDate(service.authorization.split(" → ")[0])); setEndDate(service.record?.endAuthDate ? parseISO(service.record.endAuthDate) : editDate(service.authorization.split(" → ")[1])); setUnit(service.record?.unitType || (service.units.includes("days") ? "Daily" : "Hourly")); setFrequency(service.frequency); setOutcomeId(service.outcomeId || "new"); setNewOutcome(""); setFormError(""); setPreview("Edit service"); }}>Edit service</DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer hover:bg-[#fef2f2]" variant="destructive" onSelect={() => { setDeleteError(""); setDeleting({ service, index }); }}>Delete service</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
         <div className="mt-3 grid gap-y-4 border-t border-[#eef0f2] pt-4 sm:grid-cols-2 xl:grid-cols-4">
           {[
@@ -395,12 +428,12 @@ function ServiceAuthorizationTab({ sample, client, onSaved }: { sample: boolean;
       </article>)}
     </div> : <p className="rounded-xl border border-dashed border-[#d1d5db] px-6 py-12 text-center text-sm text-[#6b7280]">No service authorizations recorded yet.</p>}
     <Dialog open={preview !== null} onOpenChange={(open) => { if (!open) { setPreview(null); setDocumentWeek(null); } }}>
-      {preview && <DialogContent showCloseButton={false} className={"max-h-[calc(100vh-32px)] w-[calc(100vw-32px)] " + (preview === "Add service" ? "flex max-w-[640px] flex-col overflow-hidden rounded-[28px] p-5 sm:p-7" : "max-w-[520px] overflow-y-auto p-4 sm:p-5")}>
-        <DialogTitle className={preview === "Add service" ? "shrink-0 border-b border-[#eef0f2] pb-4 text-2xl font-semibold leading-8" : "text-xl font-medium leading-7"}>{selectedService?.name ?? "Add service"}</DialogTitle>
-        {preview === "Add service" ? <>
+      {preview && <DialogContent showCloseButton={false} className={"max-h-[calc(100vh-32px)] w-[calc(100vw-32px)] " + (formOpen ? "flex max-w-[640px] flex-col overflow-hidden rounded-[28px] p-5 sm:p-7" : "max-w-[520px] overflow-y-auto p-4 sm:p-5")}>
+        <DialogTitle className={formOpen ? "shrink-0 border-b border-[#eef0f2] pb-4 text-2xl font-semibold leading-8" : "text-xl font-medium leading-7"}>{selectedService?.name ?? (typeof preview === "string" ? preview : "")}</DialogTitle>
+        {formOpen ? <>
           <DialogDescription className="sr-only">Enter a service authorization for this client.</DialogDescription>
-          <button type="button" aria-label="Close add service" onClick={() => setPreview(null)} className="absolute right-5 top-5 flex size-9 cursor-pointer items-center justify-center rounded-full bg-[#f0f3f5] text-[#303741] hover:bg-[#e4ebed] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00b4b8] sm:right-7 sm:top-7"><X className="size-4" /></button>
-          <form className="flex min-h-0 flex-1 flex-col" onSubmit={async (event) => {
+          <button type="button" aria-label={"Close " + preview.toLowerCase()} onClick={() => setPreview(null)} className="absolute right-5 top-5 flex size-9 cursor-pointer items-center justify-center rounded-full bg-[#f0f3f5] text-[#303741] hover:bg-[#e4ebed] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00b4b8] sm:right-7 sm:top-7"><X className="size-4" /></button>
+          <form key={editing?.service.record?.id ?? editing?.index ?? "new"} className="flex min-h-0 flex-1 flex-col" onSubmit={async (event) => {
             event.preventDefault();
             const data = new FormData(event.currentTarget);
             const name = String(data.get("name") ?? "").trim();
@@ -409,7 +442,7 @@ function ServiceAuthorizationTab({ sample, client, onSaved }: { sample: boolean;
             const totalUnits = Number(data.get("totalUnits"));
             const rate = Number(data.get("rate"));
             if (!name || !code || !provider || !startDate || !endDate || !unit || !Number.isInteger(totalUnits) || totalUnits <= 0 || !Number.isFinite(rate) || rate < 0 || (!sample && (!outcomeId || (outcomeId === "new" && !newOutcome.trim())))) {
-              setFormError("Complete all service fields before adding the service.");
+              setFormError("Complete all service fields before saving the service.");
               return;
             }
             if (endDate < startDate) {
@@ -418,10 +451,10 @@ function ServiceAuthorizationTab({ sample, client, onSaved }: { sample: boolean;
             }
             const dateOptions = { month: "2-digit", day: "2-digit", year: "numeric" } as const;
             if (!sample && client) {
-              const service: ClientService = { id: crypto.randomUUID(), name, code, provider, startAuthDate: format(startDate, "yyyy-MM-dd"), endAuthDate: format(endDate, "yyyy-MM-dd"), totalUnits: String(totalUnits), unitType: unit, clientRate: String(rate), frequency };
+              const service: ClientService = { ...editRecord, id: editRecord?.id ?? crypto.randomUUID(), name, code, provider, startAuthDate: format(startDate, "yyyy-MM-dd"), endAuthDate: format(endDate, "yyyy-MM-dd"), totalUnits: String(totalUnits), unitType: unit, clientRate: String(rate), frequency };
               const nextOutcomes = outcomeId === "new"
-                ? [...(client.scOutcomes ?? []), { id: crypto.randomUUID(), statement: newOutcome.trim(), services: [service] }]
-                : (client.scOutcomes ?? []).map(outcome => outcome.id === outcomeId ? { ...outcome, services: [...outcome.services, service] } : outcome);
+                ? [...(client.scOutcomes ?? []).map(outcome => ({ ...outcome, services: outcome.services.filter(item => item.id !== editRecord?.id || outcome.id !== editing?.service.outcomeId) })), { id: crypto.randomUUID(), statement: newOutcome.trim(), services: [service] }]
+                : (client.scOutcomes ?? []).map(outcome => ({ ...outcome, services: [...outcome.services.filter(item => item.id !== editRecord?.id || outcome.id !== editing?.service.outcomeId), ...(outcome.id === outcomeId ? [service] : [])] }));
               setSaving(true);
               try {
                 await updateClient(client.id, { scOutcomes: nextOutcomes });
@@ -432,14 +465,16 @@ function ServiceAuthorizationTab({ sample, client, onSaved }: { sample: boolean;
               } finally { setSaving(false); }
               return;
             }
-            setAddedServices((current) => [...current, {
-              name, code, provider, status: "Review", contact: "—", phone: "—",
+            const nextService: Service = {
+              ...editing?.service,
+              name, code, provider, status: editing?.service.status ?? "Review", contact: editing?.service.contact ?? "—", phone: editing?.service.phone ?? "—",
               authorization: startDate.toLocaleDateString("en-US", dateOptions) + " → " + endDate.toLocaleDateString("en-US", dateOptions),
               units: totalUnits.toLocaleString("en-US") + " total · " + unit,
               rate: rate.toLocaleString("en-US", { style: "currency", currency: "USD" }),
               totalCost: (totalUnits * rate).toLocaleString("en-US", { style: "currency", currency: "USD" }),
-              frequency, pa: "Pending", sdr: "Pending", source: "Local preview",
-            }]);
+              frequency, pa: editing?.service.pa ?? "Pending", sdr: editing?.service.sdr ?? "Pending", source: "Local preview",
+            };
+            setAddedServices((current) => editing ? current.map((item, index) => index === editing.index ? nextService : item) : [...current, nextService]);
             setPreview(null);
             setStartDate(undefined);
             setEndDate(undefined);
@@ -449,25 +484,25 @@ function ServiceAuthorizationTab({ sample, client, onSaved }: { sample: boolean;
           }}>
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-0.5 py-5">
             {!sample && <div><label htmlFor="sc-service-outcome" className="mb-2 block text-sm font-semibold text-[#10141a]">ISP outcome *</label><select id="sc-service-outcome" value={outcomeId} onChange={event => setOutcomeId(event.target.value)} className="h-12 w-full rounded-xl border border-[#e5e7eb] bg-white px-3 text-base">{(client?.scOutcomes ?? []).map(outcome => <option key={outcome.id} value={outcome.id}>{outcome.statement}</option>)}<option value="new">New outcome</option></select>{outcomeId === "new" && <Input aria-label="New outcome" value={newOutcome} maxLength={1000} onChange={event => setNewOutcome(event.target.value)} placeholder="Describe the desired outcome" className="mt-2 h-12 rounded-xl border-[#e5e7eb]" />}</div>}
-            <div><label htmlFor="sc-service-name" className="mb-2 block text-sm font-semibold text-[#10141a]">Service name<span aria-hidden="true" className="ml-0.5 text-[#d53411]">*</span></label><Input id="sc-service-name" name="name" required maxLength={120} placeholder="e.g. Community Inclusion Services" className="h-12 rounded-xl border-[#e5e7eb] text-base placeholder:text-[#9ca3af]" /></div>
-            <div><label htmlFor="sc-service-code" className="mb-2 block text-sm font-semibold text-[#10141a]">Service code<span aria-hidden="true" className="ml-0.5 text-[#d53411]">*</span></label><Input id="sc-service-code" name="code" required maxLength={40} placeholder="e.g. H2015H104" className="h-12 rounded-xl border-[#e5e7eb] text-base placeholder:text-[#9ca3af]" /></div>
-            <div><label htmlFor="sc-service-provider" className="mb-2 block text-sm font-semibold text-[#10141a]">Provider / Agency<span aria-hidden="true" className="ml-0.5 text-[#d53411]">*</span></label><Input id="sc-service-provider" name="provider" required maxLength={120} placeholder="Agency name" className="h-12 rounded-xl border-[#e5e7eb] text-base placeholder:text-[#9ca3af]" /></div>
+            <div><label htmlFor="sc-service-name" className="mb-2 block text-sm font-semibold text-[#10141a]">Service name<span aria-hidden="true" className="ml-0.5 text-[#d53411]">*</span></label><Input id="sc-service-name" name="name" defaultValue={editing?.service.name} required maxLength={120} placeholder="e.g. Community Inclusion Services" className="h-12 rounded-xl border-[#e5e7eb] text-base placeholder:text-[#9ca3af]" /></div>
+            <div><label htmlFor="sc-service-code" className="mb-2 block text-sm font-semibold text-[#10141a]">Service code<span aria-hidden="true" className="ml-0.5 text-[#d53411]">*</span></label><Input id="sc-service-code" name="code" defaultValue={editing?.service.code} required maxLength={40} placeholder="e.g. H2015H104" className="h-12 rounded-xl border-[#e5e7eb] text-base placeholder:text-[#9ca3af]" /></div>
+            <div><label htmlFor="sc-service-provider" className="mb-2 block text-sm font-semibold text-[#10141a]">Provider / Agency<span aria-hidden="true" className="ml-0.5 text-[#d53411]">*</span></label><Input id="sc-service-provider" name="provider" defaultValue={editing?.service.provider} required maxLength={120} placeholder="Agency name" className="h-12 rounded-xl border-[#e5e7eb] text-base placeholder:text-[#9ca3af]" /></div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="[&_label]:text-sm [&_label]:font-medium [&_label]:text-[#10141a]"><DatePickerField id="sc-service-start-date" label="Start date" value={startDate} onChange={(date) => { setStartDate(date); setFormError(""); }} placeholder="Select start date" required ariaInvalid={Boolean(formError && !startDate)} /></div>
               <div className="[&_label]:text-sm [&_label]:font-medium [&_label]:text-[#10141a]"><DatePickerField id="sc-service-end-date" label="End date" value={endDate} onChange={(date) => { setEndDate(date); setFormError(""); }} placeholder="Select end date" required ariaInvalid={Boolean(formError && !endDate)} /></div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div><label htmlFor="sc-service-units" className="mb-2 block text-sm font-semibold text-[#10141a]">Total authorized units<span aria-hidden="true" className="ml-0.5 text-[#d53411]">*</span></label><Input id="sc-service-units" name="totalUnits" type="number" inputMode="numeric" min="1" step="1" required placeholder="e.g. 120 total units" className="h-12 rounded-xl border-[#e5e7eb] text-base placeholder:text-[#9ca3af]" /></div>
-              <div><label htmlFor="sc-service-unit" className="mb-2 block text-sm font-semibold text-[#10141a]">Unit<span aria-hidden="true" className="ml-0.5 text-[#d53411]">*</span></label><Select value={unit} required onValueChange={(value) => { setUnit(value); setFormError(""); }}><SelectTrigger id="sc-service-unit" aria-label="Unit" aria-invalid={Boolean(formError && !unit)} className="h-12 w-full rounded-xl border-[#e5e7eb] text-base"><SelectValue placeholder="Select unit" /></SelectTrigger><SelectContent>{["15 min", "Hourly", "Daily", "Weekly", "Mile"].map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select></div>
+              <div><label htmlFor="sc-service-units" className="mb-2 block text-sm font-semibold text-[#10141a]">Total authorized units<span aria-hidden="true" className="ml-0.5 text-[#d53411]">*</span></label><Input id="sc-service-units" name="totalUnits" defaultValue={editRecord?.totalUnits ?? editing?.service.units.match(/^[\d,]+/)?.[0].replace(/,/g, "")} type="number" inputMode="numeric" min="1" step="1" required placeholder="e.g. 120 total units" className="h-12 rounded-xl border-[#e5e7eb] text-base placeholder:text-[#9ca3af]" /></div>
+              <div><label htmlFor="sc-service-unit" className="mb-2 block text-sm font-semibold text-[#10141a]">Unit<span aria-hidden="true" className="ml-0.5 text-[#d53411]">*</span></label><Select value={unit} required onValueChange={(value) => { setUnit(value); setFormError(""); }}><SelectTrigger id="sc-service-unit" aria-label="Unit" aria-invalid={Boolean(formError && !unit)} className="h-12 w-full rounded-xl border-[#e5e7eb] text-base"><SelectValue placeholder="Select unit" /></SelectTrigger><SelectContent>{[...new Set(["15 min", "Hourly", "Daily", "Weekly", "Mile", unit].filter(Boolean))].map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select></div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div><label htmlFor="sc-service-rate" className="mb-2 block text-sm font-semibold text-[#10141a]">Rate<span aria-hidden="true" className="ml-0.5 text-[#d53411]">*</span></label><Input id="sc-service-rate" name="rate" type="number" inputMode="decimal" min="0" step="0.01" required placeholder="Price per selected unit" className="h-12 rounded-xl border-[#e5e7eb] text-base placeholder:text-[#9ca3af]" /></div>
-              <div><label htmlFor="sc-service-frequency" className="mb-2 block text-sm font-medium text-[#10141a]">Frequency<span aria-hidden="true" className="ml-0.5 text-[#d53411]">*</span></label><Select value={frequency} required onValueChange={setFrequency}><SelectTrigger id="sc-service-frequency" aria-label="Frequency" className="h-12 w-full rounded-xl border-[#e5e7eb] text-base"><SelectValue /></SelectTrigger><SelectContent>{["Daily", "Weekly", "Monthly", "As needed"].map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select></div>
+              <div><label htmlFor="sc-service-rate" className="mb-2 block text-sm font-semibold text-[#10141a]">Rate<span aria-hidden="true" className="ml-0.5 text-[#d53411]">*</span></label><Input id="sc-service-rate" name="rate" defaultValue={(editRecord?.clientRate ?? editing?.service.rate)?.replace(/[$,]/g, "")} type="number" inputMode="decimal" min="0" step="0.01" required placeholder="Price per selected unit" className="h-12 rounded-xl border-[#e5e7eb] text-base placeholder:text-[#9ca3af]" /></div>
+              <div><label htmlFor="sc-service-frequency" className="mb-2 block text-sm font-medium text-[#10141a]">Frequency<span aria-hidden="true" className="ml-0.5 text-[#d53411]">*</span></label><Select value={frequency} required onValueChange={setFrequency}><SelectTrigger id="sc-service-frequency" aria-label="Frequency" className="h-12 w-full rounded-xl border-[#e5e7eb] text-base"><SelectValue /></SelectTrigger><SelectContent>{[...new Set(["Daily", "Weekly", "Monthly", "As needed", frequency].filter(Boolean))].map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select></div>
             </div>
             </div>
             <div className="shrink-0 border-t border-[#eef0f2] pt-4">
               {formError && <p role="alert" className="mb-3 text-sm text-[#ad182d]">{formError}</p>}
-              <div className="flex justify-end gap-3"><Button type="button" variant="outline" onClick={() => setPreview(null)} className="rounded-lg">Cancel</Button><Button type="submit" disabled={saving} className="rounded-lg">{saving ? "Saving…" : "Add service"}</Button></div>
+              <div className="flex justify-end gap-3"><Button type="button" variant="outline" onClick={() => setPreview(null)} className="rounded-lg">Cancel</Button><Button type="submit" disabled={saving} className="rounded-lg">{saving ? "Saving…" : preview}</Button></div>
             </div>
           </form>
         </> : selectedService ? <>
@@ -511,14 +546,56 @@ function ServiceAuthorizationTab({ sample, client, onSaved }: { sample: boolean;
         {selectedService && <div className="mt-2 flex justify-end"><Button variant="outline" onClick={() => setPreview(null)}>Close</Button></div>}
       </DialogContent>}
     </Dialog>
+    <DeleteConfirmationModal isOpen={Boolean(deleting)} onClose={() => { if (!isDeleting) setDeleting(null); }} isDeleting={isDeleting} title="Delete service?" message={deleteError || `Delete ${deleting?.service.name ?? "this service"} from ${sample ? "this preview" : "the outcome"}? This action cannot be undone.`} confirmText="Delete service" onConfirm={async () => {
+      if (!deleting) return;
+      if (sample) { setAddedServices(current => current.filter((_, index) => index !== deleting.index)); setDeleting(null); return; }
+      if (!client || !deleting.service.record || !deleting.service.outcomeId) return;
+      const nextOutcomes = (client.scOutcomes ?? []).map(outcome => outcome.id === deleting.service.outcomeId ? { ...outcome, services: outcome.services.filter(item => item.id !== deleting.service.record?.id) } : outcome);
+      setIsDeleting(true);
+      try { await updateClient(client.id, { scOutcomes: nextOutcomes }); onSaved({ ...client, scOutcomes: nextOutcomes }); setDeleting(null); }
+      catch { setDeleteError("Service could not be deleted. Please try again."); }
+      finally { setIsDeleting(false); }
+    }} />
   </section>;
 }
 
-function AssessmentTab({ tier, lastName, sample }: { tier: string; lastName: string; sample: boolean }) {
-  const [answer, setAnswer] = useState<"yes" | "pending" | "unavailable">(sample ? "yes" : "pending");
-  const [assessmentDate, setAssessmentDate] = useState<Date | undefined>(sample ? new Date(2026, 3, 7) : undefined);
-  const [determinationDate, setDeterminationDate] = useState<Date | undefined>(sample ? new Date(2026, 3, 7) : undefined);
-  const [effectiveDate, setEffectiveDate] = useState<Date | undefined>(sample ? new Date(2026, 3, 7) : undefined);
+function AssessmentTab({ tier, lastName, sample, client, onSaved }: { tier: string; lastName: string; sample: boolean; client: Client | null; onSaved: (client: Client) => void }) {
+  const { toast } = useToast();
+  const assessment = client?.scAssessment;
+  const [answer, setAnswer] = useState<"yes" | "pending" | "unavailable">(assessment?.answer || (sample ? "yes" : "pending"));
+  const [njcatStatus, setNjcatStatus] = useState(assessment?.njcatStatus || (sample ? "Available" : "Not selected"));
+  const [assessmentSource, setAssessmentSource] = useState(assessment?.assessmentSource || (sample ? "DDD / State record" : "Not selected"));
+  const [selectedTier, setSelectedTier] = useState(tier);
+  const [tierLetterAvailable, setTierLetterAvailable] = useState(assessment?.tierLetterAvailable || (sample ? "Yes" : "Pending"));
+  const [assessmentDate, setAssessmentDate] = useState<Date | undefined>(assessment?.assessmentDate ? parseISO(assessment.assessmentDate) : sample ? new Date(2026, 3, 7) : undefined);
+  const [determinationDate, setDeterminationDate] = useState<Date | undefined>(assessment?.determinationDate ? parseISO(assessment.determinationDate) : sample ? new Date(2026, 3, 7) : undefined);
+  const [effectiveDate, setEffectiveDate] = useState<Date | undefined>(assessment?.effectiveDate ? parseISO(assessment.effectiveDate) : sample ? new Date(2026, 3, 7) : undefined);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const submitAssessment = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!client || sample) return;
+    if (determinationDate && effectiveDate && effectiveDate < determinationDate) {
+      setSaveError("Effective date must be on or after the determination date.");
+      return;
+    }
+    const scAssessment = {
+      answer, njcatStatus, assessmentSource, tierLetterAvailable,
+      assessmentDate: assessmentDate ? format(assessmentDate, "yyyy-MM-dd") : "",
+      determinationDate: determinationDate ? format(determinationDate, "yyyy-MM-dd") : "",
+      effectiveDate: effectiveDate ? format(effectiveDate, "yyyy-MM-dd") : "",
+    };
+    const savedTier = selectedTier === "Not set" ? "" : selectedTier.replace(/^Tier /, "");
+    setSaving(true);
+    setSaveError("");
+    try {
+      await updateClient(client.id, { scAssessment, tier: savedTier });
+      onSaved({ ...client, scAssessment, tier: savedTier });
+      toast({ title: "Assessment saved", description: "DDD assessment information was saved to the client record.", variant: "success" });
+    } catch {
+      setSaveError("Assessment could not be saved. Please try again.");
+    } finally { setSaving(false); }
+  };
   const history = [
     { year: "2026", tier, date: "02/23/2026", source: "DDD / State record", current: true, reviewedBy: "T. Booker", notes: `Annual reassessment. ${tier} confirmed. Level of care met per NJCAT review on 02/23/2026.` },
     { year: "2023", tier: "Tier C", date: "04/11/2023", source: "DDD / State record", current: false, reviewedBy: "—", notes: "Historical NJCAT assessment. Tier C recorded on 04/11/2023." },
@@ -531,7 +608,9 @@ function AssessmentTab({ tier, lastName, sample }: { tier: string; lastName: str
   return <section aria-labelledby="sc-assessment-heading">
     <h2 id="sc-assessment-heading" className="text-2xl font-semibold text-[#10141a]">DDD Assessment &amp; Determination</h2>
     <p className="mt-1 text-sm text-[#4b5563]">Record available DDD assessment and tier information. Do not re-administer the NJCAT in CareOnBoard.</p>
-    <p className="mt-1 text-xs text-[#6b7280]">Preview only — changes here are not saved yet.</p>
+    {sample && <p className="mt-1 text-xs text-[#6b7280]">Preview only — changes here are not saved yet.</p>}
+
+    <form onSubmit={submitAssessment}>
 
     <div className="mt-6 rounded-xl border border-[#f9d681] bg-[#fffbef] p-4 text-sm text-[#a44a09]">
       <p className="font-semibold">Next Step: DDD Assessment Information</p>
@@ -552,38 +631,44 @@ function AssessmentTab({ tier, lastName, sample }: { tier: string; lastName: str
       <section aria-labelledby="sc-njcat-status-heading">
         <h3 id="sc-njcat-status-heading" className="border-b border-[#f7d9dc] pb-2 text-sm font-semibold text-[#10141a]">Section A — NJCAT Status</h3>
         <div className="mt-4 space-y-4">
-          <AssessmentSelect label="NJCAT Status" value={sample ? "Available" : "Not selected"} options={["Not selected", "Available", "Pending", "Not available"]} />
+          <AssessmentSelect label="NJCAT Status" value={njcatStatus} onChange={setNjcatStatus} options={["Not selected", "Available", "Pending", "Not available"]} />
           <DatePickerField id="sc-njcat-assessment-date" label="NJCAT Assessment Date" value={assessmentDate} onChange={setAssessmentDate} />
-          <AssessmentSelect label="Assessment Source" value={sample ? "DDD / State record" : "Not selected"} options={["Not selected", "DDD / State record", "Document provided to SCA", "Other"]} />
+          <AssessmentSelect label="Assessment Source" value={assessmentSource} onChange={setAssessmentSource} options={["Not selected", "DDD / State record", "Document provided to SCA", "Other"]} />
           {sample ? <SampleDocument label="NJCAT Document" filename={`NJCAT_${lastName}_2026.pdf`} onView={() => setSelectedDocument("njcat")} /> : <p className="text-sm text-[#6b7280]">No NJCAT document recorded.</p>}
         </div>
       </section>
       <section aria-labelledby="sc-tier-heading">
         <h3 id="sc-tier-heading" className="border-b border-[#f7d9dc] pb-2 text-sm font-semibold text-[#10141a]">Section B — DDD Tier Determination</h3>
         <div className="mt-4 space-y-4">
-          <AssessmentSelect label="Tier" value={tier} options={["Not set", "Tier A", "Tier B", "Tier C", "Tier D", "Tier E"]} />
+          <AssessmentSelect label="Tier" value={selectedTier} onChange={setSelectedTier} options={["Not set", "Tier A", "Tier B", "Tier C", "Tier D", "Tier E"]} />
           <div className="grid gap-4 sm:grid-cols-2">
             <DatePickerField id="sc-determination-date" label="Determination Date" value={determinationDate} onChange={setDeterminationDate} />
             <DatePickerField id="sc-effective-date" label="Effective Date" value={effectiveDate} onChange={setEffectiveDate} />
           </div>
-          <AssessmentSelect label="Tier Letter Available?" value={sample ? "Yes" : "Pending"} options={["Yes", "No", "Pending"]} />
+          <AssessmentSelect label="Tier Letter Available?" value={tierLetterAvailable} onChange={setTierLetterAvailable} options={["Yes", "No", "Pending"]} />
           {sample ? <SampleDocument label="Tier Letter Document" filename={`TierLetter_${lastName}_2026.pdf`} onView={() => setSelectedDocument("tier")} /> : <p className="text-sm text-[#6b7280]">No tier letter recorded.</p>}
         </div>
       </section>
     </div>}
 
-    <section aria-labelledby="sc-assessment-history-heading" className="mt-7">
+    {!sample && answer === "yes" && <div className="mt-6 flex flex-col items-start gap-3 sm:items-end">
+      {saveError && <p role="alert" className="text-sm text-[#ad182d]">{saveError}</p>}
+      <Button type="submit" disabled={saving || !client} className="gap-2">{saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}{saving ? "Submitting…" : "Submit assessment"}</Button>
+    </div>}
+    </form>
+
+    {sample && <section aria-labelledby="sc-assessment-history-heading" className="mt-7">
       <h3 id="sc-assessment-history-heading" className="border-b border-[#f7d9dc] pb-2 text-sm font-semibold text-[#10141a]">Assessment History / Timeline</h3>
       <p className="mt-3 text-sm text-[#6b7280]">Previous assessments are preserved and never overwritten.</p>
-      {sample ? <div className="mt-2 space-y-2">
+      <div className="mt-2 space-y-2">
         {history.map((item) => <div key={item.year} className={`flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border px-3 py-3 text-sm ${item.current ? "border-[#fce3e7] bg-[#fff0f2]" : "border-[#f1f2f3] bg-[#fbfbfc]"}`}>
           <span className="text-[#6b7280]">{item.year}</span><span className="font-medium text-[#10141a]">NJCAT</span><span>{item.tier}</span><span className="text-[#6b7280]">{item.date}</span>
           <span className="ml-auto text-[#8a929e]">{item.source}</span>
           <span className={`rounded px-2 py-1 ${item.current ? "bg-white text-[#047857]" : "bg-white text-[#6b7280]"}`}>{item.current ? "Current" : "Historical"}</span>
           <button type="button" aria-label={`View NJCAT history for ${item.year}`} onClick={() => setSelectedHistory(item)} className="font-medium text-[#ad182d] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ad182d]">View</button>
         </div>)}
-      </div> : <p className="mt-3 text-sm text-[#6b7280]">No assessment history recorded yet.</p>}
-    </section>
+      </div>
+    </section>}
 
     {answer !== "yes" && <section aria-labelledby="sc-data-lineage-heading" className="mt-5 rounded-xl border border-[#e5e7eb] p-4">
       <h3 id="sc-data-lineage-heading" className="text-sm font-semibold text-[#10141a]">Data Lineage</h3>
@@ -648,12 +733,11 @@ function AssessmentTab({ tier, lastName, sample }: { tier: string; lastName: str
   </section>;
 }
 
-function AssessmentSelect({ label, value, options }: { label: string; value: string; options: string[] }) {
-  const [selected, setSelected] = useState(value);
+function AssessmentSelect({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: string[] }) {
   const choices = options.includes(value) ? options : [value, ...options];
   return <div className="space-y-1.5">
     <p className="text-sm font-semibold text-[#10141a]">{label}</p>
-    <Select value={selected} onValueChange={setSelected}>
+    <Select value={value} onValueChange={onChange}>
       <SelectTrigger aria-label={label} className="h-11 w-full rounded-lg border-[#e5e7eb] bg-white text-sm"><SelectValue /></SelectTrigger>
       <SelectContent>{choices.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent>
     </Select>

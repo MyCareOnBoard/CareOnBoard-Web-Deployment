@@ -3,14 +3,25 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 vi.unmock("react-router");
+const { queryState } = vi.hoisted(() => ({ queryState: { loading: false } }));
 vi.mock("@/utils/auth", () => ({ useAuth: () => ({ user: { agencyId: "agency-a" } }) }));
-vi.mock("@/lib/api/clients", () => ({ useListAgencyClientsQuery: () => ({ data: { clients: [
+vi.mock("@/lib/api/clients", () => ({ useListAgencyClientsQuery: () => ({ isLoading: queryState.loading, data: { clients: [
   { id: "real-1", firstName: "Alex", lastName: "Example", status: "pending", servicePrograms: ["sc"], scEnrollment: { program: "SP" }, scOutcomes: [{ id: "outcome-1", statement: "Join activities", services: [] }] },
   { id: "real-2", firstName: "Sam", lastName: "Example", status: "active", servicePrograms: ["sc"], scEnrollment: { program: "CCP" }, scOutcomes: [] },
 ] } }) }));
 import SupportCoordinatorClientsPage from "./SupportCoordinatorClientsPage";
 
 describe("SupportCoordinatorClientsPage", () => {
+  it("shows client-shaped skeletons while the list loads", () => {
+    queryState.loading = true;
+    try {
+      const { container } = render(<MemoryRouter><SupportCoordinatorClientsPage /></MemoryRouter>);
+      expect(screen.getByRole("status", { name: "Loading clients" })).toBeInTheDocument();
+      expect(container.querySelectorAll(".sc-client-grid")).toHaveLength(6);
+      expect(screen.queryByText("0 clients")).not.toBeInTheDocument();
+    } finally { queryState.loading = false; }
+  });
+
   it("shows saved clients, filters by program, and opens the real client record", async () => {
     const user = userEvent.setup();
     function Location() { return <output data-testid="location">{useLocation().pathname}{useLocation().search}</output>; }
