@@ -27,6 +27,7 @@ export const DOC_KEY_TO_SERVER_TYPE: Record<ClientDocumentKey, string> = {
   form485: "form-485",
   hospitalDischarge: "hospital-discharge-papers",
   ids: "ids",
+  scDocuments: "support-coordination",
 };
 
 /** Options for the client-details "upload document" type pickers. */

@@ -66,6 +66,7 @@ export type ScEnrollment = {
 
 export interface Client {
   scEnrollment?: ScEnrollment;
+  scOutcomes?: ClientOutcome[];
   medicationSupportSettings?: MedicationSupportSettings;
   acuityRequirements?: ClientAcuityRequirements;
   documentChecklist?: Checklist;
@@ -463,7 +464,7 @@ export type ClientDocumentKey =
   | "form485"
   | "hospitalDischarge"
   | "ids"
-  | "aenf";
+  | "scDocuments";
 
 export interface ClientDocument {
   key: ClientDocumentKey;
@@ -473,6 +474,9 @@ export interface ClientDocument {
   issuedOnDate?: string;
   expiryDate?: string;
   autoReminder?: boolean;
+  source?: string;
+  provider?: string;
+  category?: "ISP" | "Assessment" | "Tier" | "SDR" | "PA" | "Enrollment" | "Other";
   /** Form 485 only: whether the uploaded copy is signed (default false/unsigned). */
   signed?: boolean;
 }
@@ -684,6 +688,7 @@ export interface ClientPayrollServiceLocation { source: "primaryAddress" | "seco
  */
 export interface CreateClientRequest {
   scEnrollment?: ScEnrollment;
+  scOutcomes?: ClientOutcome[];
   medicationSupportSettings?: MedicationSupportSettings;
   acuityRequirements?: ClientAcuityRequirements;
   servicePrograms?: ("ddd" | "hha" | "sc")[];
@@ -833,6 +838,7 @@ export interface CreateClientRequest {
  */
 export interface UpdateClientRequest {
   scEnrollment?: ScEnrollment;
+  scOutcomes?: ClientOutcome[];
   profileImage?: string;
   medicationSupportSettings?: MedicationSupportSettings;
   acuityRequirements?: ClientAcuityRequirements;

@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { ArrowLeft, CircleHelp, FileText, X } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
+import { format } from "date-fns";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { normalizeSignaturePayload } from "@/pages/agency/billing/claims/utils/claimReportSignatureUtils";
-import { getAgencyClientById, type Client } from "@/lib/api/clients";
+import { getAgencyClientById, updateClient, type Client, type ClientService } from "@/lib/api/clients";
 import { DatePickerField, SignatureField } from "@/pages/shared/client-management/components/forms/formControls";
 import { clients } from "@/pages/agency/clients-management/supportCoordinatorSampleClients";
 import { Routes } from "@/routes/constants";
@@ -80,7 +81,7 @@ const sampleServices = [
 type Service = {
   name: string; code: string; status: string; provider: string; contact: string; phone: string;
   authorization: string; units: string; rate: string; totalCost: string; frequency: string;
-  pa: string; sdr: string; source?: string;
+  pa: string; sdr: string; source?: string; outcome?: string;
 };
 
 const sampleAuthorizationWeeks = ["Aug 10–16", "Aug 3–9", "Jul 27–Aug 2", "Jul 20–26", "Jul 13–19"];
@@ -143,7 +144,7 @@ export default function SupportCoordinatorClientDetailsPage() {
   const period = sample?.isp || "Dates not set";
   const tier = sample?.tier || savedClient?.tier || "Not set";
   const planId = sample ? "10.04" : savedClient?.ispMetadata?.planId || "Not set";
-  const outcomes = sample ? sampleOutcomes : savedClient?.ispOutcomes ? [{ goal: savedClient.ispOutcomes, support: "" }] : [];
+  const outcomes = sample ? sampleOutcomes : (savedClient?.scOutcomes ?? []).map(outcome => ({ goal: outcome.statement, support: "" }));
   const sampleIspOutcomes = sample ? sampleOutcomes.map((outcome, index) => ({ statement: `${firstName} ${outcome.goal}`, services: sampleServices[index] ? [{ name: sampleServices[index].name, code: sampleServices[index].code, provider: sampleServices[index].provider, hours: sampleServices[index].units, clientRate: sampleServices[index].rate, frequency: sampleServices[index].frequency }] : [] })) : undefined;
 
   const tabLink = (tab: Tab) => {
@@ -223,7 +224,7 @@ export default function SupportCoordinatorClientDetailsPage() {
                 </button>)}
               </div>
             </section>
-          ) : activeTab === "services" ? <ServiceAuthorizationTab key={clientId} sample={Boolean(sample)} /> : activeTab === "monitoring" ? <SupportCoordinatorMonitoringTab key={clientId} sample={Boolean(sample)} /> : activeTab === "documents" ? <SupportCoordinatorDocumentsTab key={clientId} sample={Boolean(sample)} /> : (
+          ) : activeTab === "services" ? <ServiceAuthorizationTab key={clientId} sample={Boolean(sample)} client={savedClient} onSaved={setSavedClient} /> : activeTab === "monitoring" ? <SupportCoordinatorMonitoringTab key={clientId} sample={Boolean(sample)} /> : activeTab === "documents" ? <SupportCoordinatorDocumentsTab key={clientId} sample={Boolean(sample)} client={savedClient} onSaved={setSavedClient} /> : (
             <section aria-label={`${tabs.find((tab) => tab.id === activeTab)?.label} tab`} className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-[#d1d5db] px-6 text-center">
               <FileText className="mb-3 h-8 w-8 text-[#008f93]" />
               <h2 className="text-xl font-semibold text-[#10141a]">{tabs.find((tab) => tab.id === activeTab)?.label}</h2>
@@ -336,7 +337,7 @@ function InfoCard({ label, value, source }: { label: string; value: string; sour
   </div>;
 }
 
-function ServiceAuthorizationTab({ sample }: { sample: boolean }) {
+function ServiceAuthorizationTab({ sample, client, onSaved }: { sample: boolean; client: Client | null; onSaved: (client: Client) => void }) {
   const [preview, setPreview] = useState<"Add service" | Service | null>(null);
   const [documentWeek, setDocumentWeek] = useState<string | null>(null);
   const [addedServices, setAddedServices] = useState<Service[]>([]);
@@ -345,7 +346,17 @@ function ServiceAuthorizationTab({ sample }: { sample: boolean }) {
   const [unit, setUnit] = useState("");
   const [frequency, setFrequency] = useState("Weekly");
   const [formError, setFormError] = useState("");
-  const services: Service[] = sample ? [...sampleServices, ...addedServices] : addedServices;
+  const [outcomeId, setOutcomeId] = useState("");
+  const [newOutcome, setNewOutcome] = useState("");
+  const [saving, setSaving] = useState(false);
+  const services: Service[] = sample ? [...sampleServices, ...addedServices] : (client?.scOutcomes ?? []).flatMap(outcome => outcome.services.map(service => ({
+    name: service.name, code: service.code, provider: service.provider || "—", status: "Review", contact: "—", phone: "—",
+    authorization: `${service.startAuthDate?.replace(/^(\d{4})-(\d{2})-(\d{2})$/, "$2/$3/$1") || "—"} → ${service.endAuthDate?.replace(/^(\d{4})-(\d{2})-(\d{2})$/, "$2/$3/$1") || "—"}`,
+    units: `${service.totalUnits || "—"} total · ${service.unitType || "—"}`,
+    rate: Number(service.clientRate || 0).toLocaleString("en-US", { style: "currency", currency: "USD" }),
+    totalCost: (Number(service.totalUnits || 0) * Number(service.clientRate || 0)).toLocaleString("en-US", { style: "currency", currency: "USD" }),
+    frequency: service.frequency || "—", pa: "Pending", sdr: "Pending", source: "Client record", outcome: outcome.statement,
+  })));
   const selectedService = preview && preview !== "Add service" ? preview : null;
   return <section aria-labelledby="sc-services-heading">
     <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
@@ -353,12 +364,13 @@ function ServiceAuthorizationTab({ sample }: { sample: boolean }) {
         <h2 id="sc-services-heading" className="text-2xl font-semibold text-[#10141a]">Service Authorization</h2>
         <p className="mt-1 text-sm text-[#4b5563]">Services · Providers · PA Records · SDR · Authorized Units</p>
       </div>
-      <Button type="button" className="h-9 px-3 text-sm" style={{ borderRadius: 8 }} onClick={() => { setStartDate(undefined); setEndDate(undefined); setUnit(""); setFrequency("Weekly"); setFormError(""); setPreview("Add service"); }}>Add service</Button>
+      <Button type="button" className="h-9 px-3 text-sm" style={{ borderRadius: 8 }} onClick={() => { setStartDate(undefined); setEndDate(undefined); setUnit(""); setFrequency("Weekly"); setOutcomeId(client?.scOutcomes?.[0]?.id || "new"); setNewOutcome(""); setFormError(""); setPreview("Add service"); }}>Add service</Button>
     </div>
     {services.length ? <div className="space-y-5">
       {services.map((service, index) => <article key={service.name + service.code + index} className="rounded-xl border border-[#e5e7eb] p-4">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <h3 className="text-lg font-medium text-[#10141a]">{service.name}</h3>
+          {service.outcome && <span className="text-xs text-[#6b7280]">Outcome: {service.outcome}</span>}
           <span className={"rounded px-2 py-0.5 text-xs font-semibold " + (service.status === "Active" ? "bg-[#e8fff2] text-[#047857]" : "bg-[#fff8e9] text-[#a16207]")}>{service.status}</span>
           <span className="text-xs text-[#8a929e]">{service.code}</span>
           <button type="button" className="ml-auto cursor-pointer text-sm font-semibold text-[#008f93] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00b4b8]" onClick={() => { setDocumentWeek(null); setPreview(service); }}>View details</button>
@@ -386,9 +398,9 @@ function ServiceAuthorizationTab({ sample }: { sample: boolean }) {
       {preview && <DialogContent showCloseButton={false} className={"max-h-[calc(100vh-32px)] w-[calc(100vw-32px)] " + (preview === "Add service" ? "flex max-w-[640px] flex-col overflow-hidden rounded-[28px] p-5 sm:p-7" : "max-w-[520px] overflow-y-auto p-4 sm:p-5")}>
         <DialogTitle className={preview === "Add service" ? "shrink-0 border-b border-[#eef0f2] pb-4 text-2xl font-semibold leading-8" : "text-xl font-medium leading-7"}>{selectedService?.name ?? "Add service"}</DialogTitle>
         {preview === "Add service" ? <>
-          <DialogDescription className="sr-only">Enter a service authorization to add it to this preview.</DialogDescription>
+          <DialogDescription className="sr-only">Enter a service authorization for this client.</DialogDescription>
           <button type="button" aria-label="Close add service" onClick={() => setPreview(null)} className="absolute right-5 top-5 flex size-9 cursor-pointer items-center justify-center rounded-full bg-[#f0f3f5] text-[#303741] hover:bg-[#e4ebed] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00b4b8] sm:right-7 sm:top-7"><X className="size-4" /></button>
-          <form className="flex min-h-0 flex-1 flex-col" onSubmit={(event) => {
+          <form className="flex min-h-0 flex-1 flex-col" onSubmit={async (event) => {
             event.preventDefault();
             const data = new FormData(event.currentTarget);
             const name = String(data.get("name") ?? "").trim();
@@ -396,7 +408,7 @@ function ServiceAuthorizationTab({ sample }: { sample: boolean }) {
             const provider = String(data.get("provider") ?? "").trim();
             const totalUnits = Number(data.get("totalUnits"));
             const rate = Number(data.get("rate"));
-            if (!name || !code || !provider || !startDate || !endDate || !unit || !Number.isFinite(totalUnits) || totalUnits <= 0 || !Number.isFinite(rate) || rate < 0) {
+            if (!name || !code || !provider || !startDate || !endDate || !unit || !Number.isInteger(totalUnits) || totalUnits <= 0 || !Number.isFinite(rate) || rate < 0 || (!sample && (!outcomeId || (outcomeId === "new" && !newOutcome.trim())))) {
               setFormError("Complete all service fields before adding the service.");
               return;
             }
@@ -405,6 +417,21 @@ function ServiceAuthorizationTab({ sample }: { sample: boolean }) {
               return;
             }
             const dateOptions = { month: "2-digit", day: "2-digit", year: "numeric" } as const;
+            if (!sample && client) {
+              const service: ClientService = { id: crypto.randomUUID(), name, code, provider, startAuthDate: format(startDate, "yyyy-MM-dd"), endAuthDate: format(endDate, "yyyy-MM-dd"), totalUnits: String(totalUnits), unitType: unit, clientRate: String(rate), frequency };
+              const nextOutcomes = outcomeId === "new"
+                ? [...(client.scOutcomes ?? []), { id: crypto.randomUUID(), statement: newOutcome.trim(), services: [service] }]
+                : (client.scOutcomes ?? []).map(outcome => outcome.id === outcomeId ? { ...outcome, services: [...outcome.services, service] } : outcome);
+              setSaving(true);
+              try {
+                await updateClient(client.id, { scOutcomes: nextOutcomes });
+                onSaved({ ...client, scOutcomes: nextOutcomes });
+                setPreview(null);
+              } catch {
+                setFormError("Service could not be saved. Please try again.");
+              } finally { setSaving(false); }
+              return;
+            }
             setAddedServices((current) => [...current, {
               name, code, provider, status: "Review", contact: "—", phone: "—",
               authorization: startDate.toLocaleDateString("en-US", dateOptions) + " → " + endDate.toLocaleDateString("en-US", dateOptions),
@@ -421,6 +448,7 @@ function ServiceAuthorizationTab({ sample }: { sample: boolean }) {
             setFormError("");
           }}>
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-0.5 py-5">
+            {!sample && <div><label htmlFor="sc-service-outcome" className="mb-2 block text-sm font-semibold text-[#10141a]">ISP outcome *</label><select id="sc-service-outcome" value={outcomeId} onChange={event => setOutcomeId(event.target.value)} className="h-12 w-full rounded-xl border border-[#e5e7eb] bg-white px-3 text-base">{(client?.scOutcomes ?? []).map(outcome => <option key={outcome.id} value={outcome.id}>{outcome.statement}</option>)}<option value="new">New outcome</option></select>{outcomeId === "new" && <Input aria-label="New outcome" value={newOutcome} maxLength={1000} onChange={event => setNewOutcome(event.target.value)} placeholder="Describe the desired outcome" className="mt-2 h-12 rounded-xl border-[#e5e7eb]" />}</div>}
             <div><label htmlFor="sc-service-name" className="mb-2 block text-sm font-semibold text-[#10141a]">Service name<span aria-hidden="true" className="ml-0.5 text-[#d53411]">*</span></label><Input id="sc-service-name" name="name" required maxLength={120} placeholder="e.g. Community Inclusion Services" className="h-12 rounded-xl border-[#e5e7eb] text-base placeholder:text-[#9ca3af]" /></div>
             <div><label htmlFor="sc-service-code" className="mb-2 block text-sm font-semibold text-[#10141a]">Service code<span aria-hidden="true" className="ml-0.5 text-[#d53411]">*</span></label><Input id="sc-service-code" name="code" required maxLength={40} placeholder="e.g. H2015H104" className="h-12 rounded-xl border-[#e5e7eb] text-base placeholder:text-[#9ca3af]" /></div>
             <div><label htmlFor="sc-service-provider" className="mb-2 block text-sm font-semibold text-[#10141a]">Provider / Agency<span aria-hidden="true" className="ml-0.5 text-[#d53411]">*</span></label><Input id="sc-service-provider" name="provider" required maxLength={120} placeholder="Agency name" className="h-12 rounded-xl border-[#e5e7eb] text-base placeholder:text-[#9ca3af]" /></div>
@@ -439,7 +467,7 @@ function ServiceAuthorizationTab({ sample }: { sample: boolean }) {
             </div>
             <div className="shrink-0 border-t border-[#eef0f2] pt-4">
               {formError && <p role="alert" className="mb-3 text-sm text-[#ad182d]">{formError}</p>}
-              <div className="flex justify-end gap-3"><Button type="button" variant="outline" onClick={() => setPreview(null)} className="rounded-lg">Cancel</Button><Button type="submit" className="rounded-lg">Add service</Button></div>
+              <div className="flex justify-end gap-3"><Button type="button" variant="outline" onClick={() => setPreview(null)} className="rounded-lg">Cancel</Button><Button type="submit" disabled={saving} className="rounded-lg">{saving ? "Saving…" : "Add service"}</Button></div>
             </div>
           </form>
         </> : selectedService ? <>

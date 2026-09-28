@@ -86,7 +86,9 @@ export default function SupportCoordinatorIsp({ client, clientId, name, period, 
 
   const status = plan?.status || "draft";
   const preview = plan?.status === "approved" && !dirty ? plan.content : content;
-  const reportOutcomes: ReportOutcome[] = sampleOutcomes || (client?.outcomes?.length
+  const reportOutcomes: ReportOutcome[] = sampleOutcomes || (client?.scOutcomes?.length
+    ? client.scOutcomes.map(outcome => ({ statement: outcome.statement, services: outcome.services.map(service => ({ ...service, hours: `${service.totalUnits || ""} ${service.unitType || ""}`.trim() })) }))
+    : client?.outcomes?.length
     ? client.outcomes.map(outcome => ({ statement: outcome.statement, services: outcome.services || [] }))
     : client?.ispOutcomes || client?.services?.length
       ? [{ statement: client?.ispOutcomes || "Services in client record", services: client?.services || [] }]

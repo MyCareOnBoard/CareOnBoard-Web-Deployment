@@ -39,17 +39,19 @@ const agreementTerms = [
 type Form = {
   program: "SP" | "CCP" | "";
   firstName: string; middleName: string; lastName: string; dob: string; gender: string; ssn: string;
-  addressSearch: string; address: string; city: string; state: string; zip: string; phone: string; email: string; medicaidId: string; dddId: string;
+  addressSearch: string; address: string; city: string; county: string; state: string; zip: string; phone: string; email: string; medicaidId: string; dddId: string;
   hasGuardian: boolean; guardianName: string; guardianRelationship: string; guardianPhone: string; guardianEmail: string; guardianAddress: string;
   familyMemberParticipates: boolean; familyMemberName: string; familyMemberRelationship: string;
+  outcomeStatements: string[];
   eligibility: Record<EligibilityKey, boolean>; agreementSummaryReviewed: boolean; participantSignature: string; guardianSignature: string; familySignature: string; participantSignatureImage: string; guardianSignatureImage: string; familySignatureImage: string; signedOn: string;
 };
 
 const initialForm: Form = {
   program: "", firstName: "", middleName: "", lastName: "", dob: "", gender: "", ssn: "",
-  addressSearch: "", address: "", city: "", state: "", zip: "", phone: "", email: "", medicaidId: "", dddId: "",
+  addressSearch: "", address: "", city: "", county: "", state: "", zip: "", phone: "", email: "", medicaidId: "", dddId: "",
   hasGuardian: false, guardianName: "", guardianRelationship: "", guardianPhone: "", guardianEmail: "", guardianAddress: "",
   familyMemberParticipates: false, familyMemberName: "", familyMemberRelationship: "",
+  outcomeStatements: [],
   eligibility: { medicaid: false, functional: false, financial: false, njResident: false, documents: false, requirements: false },
   agreementSummaryReviewed: false, participantSignature: "", guardianSignature: "", familySignature: "", participantSignatureImage: "", guardianSignatureImage: "", familySignatureImage: "", signedOn: "",
 };
@@ -123,7 +125,7 @@ export function SupportCoordinatorEnrollmentWizard() {
     setPhotoError("");
   };
   const selectAddress = (details: AddressDetails) => {
-    setForm(previous => ({ ...previous, addressSearch: details.formattedAddress, address: details.line1 || details.street, city: details.city, state: details.stateCode || details.state, zip: details.zipCode }));
+    setForm(previous => ({ ...previous, addressSearch: details.formattedAddress, address: details.line1 || details.street, city: details.city, county: details.county, state: details.stateCode || details.state, zip: details.zipCode }));
     setError("");
   };
   const saveSignature = async (payload: { signatureType: string; signatureData: string }) => {
@@ -179,12 +181,14 @@ export function SupportCoordinatorEnrollmentWizard() {
       dateOfBirth: form.dob || undefined, gender: form.gender || undefined, ssn: form.ssn.trim() || undefined,
       phone: form.phone.trim() || undefined, email: form.email.trim() || undefined,
       medicaidId: form.medicaidId.trim() || undefined, dddId: form.dddId.trim() || undefined,
+      countyState: form.county.trim() || undefined,
       primaryAddress: { address: form.addressSearch.trim(), line1: form.address.trim(), city: form.city.trim(), state: form.state.trim(), postalCode: form.zip.trim(), zipCode: form.zip.trim(), country: "US" },
       guardianName: form.hasGuardian ? form.guardianName.trim() : undefined,
       guardianRelationship: form.hasGuardian ? form.guardianRelationship : undefined,
       guardianPhone: form.hasGuardian ? form.guardianPhone.trim() || undefined : undefined,
       guardianEmail: form.hasGuardian ? form.guardianEmail.trim() || undefined : undefined,
       guardianAddress: form.hasGuardian ? form.guardianAddress.trim() || undefined : undefined,
+      scOutcomes: form.outcomeStatements.map(statement => statement.trim()).filter(Boolean).map(statement => ({ id: crypto.randomUUID(), statement, services: [] })),
     };
     try {
       const client = await createClient(payload);
@@ -262,7 +266,7 @@ export function SupportCoordinatorEnrollmentWizard() {
             <div className="sc-enrollment-field"><label htmlFor="sc-ssn">SSN</label><div className="sc-enrollment-ssn"><Input id="sc-ssn" type={showSSN ? "text" : "password"} value={form.ssn} onChange={event => { const digits = event.target.value.replace(/\D/g, "").slice(0, 9); update("ssn", digits.length > 5 ? `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}` : digits.length > 3 ? `${digits.slice(0, 3)}-${digits.slice(3)}` : digits); }} placeholder="XXX-XX-XXXX" autoComplete="off" inputMode="numeric" pattern="[0-9]{3}-[0-9]{2}-[0-9]{4}" maxLength={11} className="pr-10" /><button type="button" aria-label={showSSN ? "Hide SSN" : "Show SSN"} onClick={() => setShowSSN(value => !value)}>{showSSN ? <EyeOff size={16} /> : <Eye size={16} />}</button></div></div>
           </div></section>
           <section><h2>2. Contact & address</h2><div className="sc-enrollment-grid three">
-            <div className="span-three"><AddressAutocompleteField label="Primary address search" id="sc-primary-address-search" value={form.addressSearch} onChange={addressSearch => { update("addressSearch", addressSearch); setForm(previous => ({ ...previous, address: "", city: "", state: "", zip: "" })); }} onSelectDetails={selectAddress} placeholder="Search for the primary address" required ariaInvalid={error.includes("Select an address")} /><p className="sc-enrollment-address-help">Select an address to fill the fields below.</p></div>
+            <div className="span-three"><AddressAutocompleteField label="Primary address search" id="sc-primary-address-search" value={form.addressSearch} onChange={addressSearch => { update("addressSearch", addressSearch); setForm(previous => ({ ...previous, address: "", city: "", county: "", state: "", zip: "" })); }} onSelectDetails={selectAddress} placeholder="Search for the primary address" required ariaInvalid={error.includes("Select an address")} /><p className="sc-enrollment-address-help">Select an address to fill the fields below.</p></div>
             <Field label="Street address" className="span-three"><Input value={form.address} placeholder="Filled from address selection" readOnly /></Field>
             <Field label="City" required><Input value={form.city} placeholder="Filled from address selection" readOnly /></Field>
             <Field label="State" required><Input value={form.state} placeholder="Filled from address selection" readOnly /></Field>
@@ -291,6 +295,10 @@ export function SupportCoordinatorEnrollmentWizard() {
               <Field label="Full name" required><Input value={form.familyMemberName} onChange={event => update("familyMemberName", event.target.value)} placeholder="Enter family member's full name" required /></Field>
               <Field label="Relationship to participant" required><select value={form.familyMemberRelationship} onChange={event => update("familyMemberRelationship", event.target.value)} required><option value="">Select relationship</option><option value="parent">Parent</option><option value="sibling">Sibling</option><option value="spouse">Spouse</option><option value="other">Other</option></select></Field>
             </div></>}
+          </section>
+          <section><h2>ISP outcomes</h2><p className="mb-3 text-sm text-[#6b7280]">Add outcomes now. Services can be attached to each outcome from the client's Services tab.</p>
+            {form.outcomeStatements.map((statement, index) => <div key={index} className="mb-3 flex items-end gap-2"><Field label={`Outcome ${index + 1}`} className="flex-1"><Input value={statement} maxLength={1000} onChange={event => update("outcomeStatements", form.outcomeStatements.map((value, row) => row === index ? event.target.value : value))} placeholder="Describe the desired outcome" /></Field><Button type="button" variant="outline" aria-label={`Remove outcome ${index + 1}`} onClick={() => update("outcomeStatements", form.outcomeStatements.filter((_, row) => row !== index))}>Remove</Button></div>)}
+            <Button type="button" variant="outline" onClick={() => update("outcomeStatements", [...form.outcomeStatements, ""])}>Add outcome</Button>
           </section>
         </div>}
 

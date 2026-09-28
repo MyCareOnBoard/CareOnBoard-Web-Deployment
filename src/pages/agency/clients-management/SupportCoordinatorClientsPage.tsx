@@ -1,44 +1,47 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { CalendarDays, ClipboardCheck, Plus, Search, TriangleAlert, UsersRound } from "lucide-react";
+import { ClipboardCheck, Plus, Search, UsersRound } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Routes } from "@/routes/constants";
+import { useListAgencyClientsQuery } from "@/lib/api/clients";
+import { useAuth } from "@/utils/auth";
 import "./support-coordinator-clients.css";
-import { clients } from "./supportCoordinatorSampleClients";
 
-type Filter = "All clients" | "Alerts" | "Monitoring due" | "SP" | "CCP";
+type Filter = "All clients" | "SP" | "CCP";
 
 
 const pageSize = 5;
-const totalAlerts = clients.reduce((sum, client) => sum + client.alerts, 0);
-const averageCompliance = Math.round(clients.reduce((sum, client) => sum + client.compliance, 0) / clients.length);
-const filters: Filter[] = ["All clients", "Alerts", "Monitoring due", "SP", "CCP"];
-const columns = ["Client", "Program", "County", "Tier", "ISP period", "PA compliance", "Next monitoring", "Alerts"];
+const filters: Filter[] = ["All clients", "SP", "CCP"];
+const columns = ["Client", "Program", "County", "Tier", "Outcomes", "Services", "Status", "Created"];
 
 export default function SupportCoordinatorClientsPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  // ponytail: API caps this list at 100; add server pagination if SC agencies exceed that.
+  const { data, isLoading, error } = useListAgencyClientsQuery(
+    { agencyId: user?.agencyId || "", type: "sc", limit: 100 },
+    { skip: !user?.agencyId, refetchOnMountOrArgChange: true },
+  );
+  const clients = data?.clients ?? [];
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("All clients");
   const [page, setPage] = useState(1);
   const query = search.trim().toLowerCase();
   const visibleClients = clients.filter((client) =>
-    client.name.toLowerCase().includes(query) &&
-    (filter === "All clients" ||
-      (filter === "Alerts" && client.alerts > 0) ||
-      (filter === "Monitoring due" && client.monitoringDue) ||
-      client.program === filter)
+    [client.firstName, client.middleName, client.lastName].filter(Boolean).join(" ").toLowerCase().includes(query) &&
+    (filter === "All clients" || client.scEnrollment?.program === filter)
   );
   const pageCount = Math.max(1, Math.ceil(visibleClients.length / pageSize));
-  const pageClients = visibleClients.slice((page - 1) * pageSize, page * pageSize);
+  const currentPage = Math.min(page, pageCount);
+  const pageClients = visibleClients.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const summary = [
-    { label: "Active clients", value: clients.length, detail: `${clients.filter((client) => client.underReview).length} under review`, icon: UsersRound },
-    { label: "Open alerts", value: totalAlerts, detail: "PA missing · SDR pending", icon: TriangleAlert },
-    { label: "Monitoring due", value: clients.filter((client) => client.monitoringDue).length, detail: "Within next 14 days", icon: CalendarDays },
-    { label: "PA Compliance", value: `${averageCompliance}%`, detail: "Avg across active services", icon: ClipboardCheck },
+    { label: "Clients", value: clients.length, detail: "Registered with the agency", icon: UsersRound },
+    { label: "Pending enrollment", value: clients.filter((client) => client.status === "pending").length, detail: "Awaiting completion", icon: ClipboardCheck },
+    { label: "Recorded services", value: clients.reduce((total, client) => total + (client.scOutcomes ?? []).reduce((count, outcome) => count + outcome.services.length, 0), 0), detail: "Across recorded outcomes", icon: ClipboardCheck },
   ];
 
   return (
@@ -52,7 +55,7 @@ export default function SupportCoordinatorClientsPage() {
 
       <section aria-labelledby="sc-overview-title" className="mb-7">
         <h2 id="sc-overview-title" className="mb-3 text-[20px] font-bold text-[#10141a]">Overview</h2>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {summary.map(({ label, value, detail, icon: Icon }) => (
             <div key={label} className="rounded-2xl border border-[#e5e7eb] bg-white p-4">
               <div className="flex items-center gap-3">
@@ -71,7 +74,7 @@ export default function SupportCoordinatorClientsPage() {
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div>
               <h2 id="sc-clients-title" className="text-[22px] font-bold text-[#10141a]">Clients</h2>
-              <p className="mt-0.5 text-[13px] text-[#6b7280]">Enrollment and monitoring overview</p>
+              <p className="mt-0.5 text-[13px] text-[#6b7280]">Enrollment overview</p>
             </div>
             <div className="relative w-full sm:w-[300px]">
               <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#808081]" />
@@ -83,7 +86,7 @@ export default function SupportCoordinatorClientsPage() {
           {filters.map((item) => (
             <button key={item} type="button" aria-pressed={filter === item} onClick={() => { setFilter(item); setPage(1); }}
               className={`rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00b4b8] ${filter === item ? "border-[#00b4b8] bg-[#00b4b8] text-white" : "border-[#e5e7eb] text-[#6b7280] hover:border-[#cccccd]"}`}>
-              {item === "Alerts" ? `Alerts (${totalAlerts})` : item}
+              {item}
             </button>
           ))}
           <span className="ml-auto text-[13px] text-[#6b7280]">{visibleClients.length} clients</span>
@@ -93,33 +96,36 @@ export default function SupportCoordinatorClientsPage() {
             <div role="row" className="sc-client-grid hidden gap-3 border-b border-[#e5e5e6] bg-[#f9fafb] px-4 py-3 lg:grid">
               {columns.map((column) => <span key={column} role="columnheader" className="text-[12px] font-semibold uppercase tracking-wide text-[#808081]">{column}</span>)}
             </div>
-            {visibleClients.length === 0 ? (
+            {isLoading ? <p className="px-4 py-12 text-center text-[14px] text-[#6b7280]">Loading clients…</p> : error ? <p role="alert" className="px-4 py-12 text-center text-[14px] text-[#ad182d]">Could not load clients.</p> : visibleClients.length === 0 ? (
               <p className="px-4 py-12 text-center text-[14px] text-[#6b7280]">No clients match your search or filter.</p>
             ) : pageClients.map((client) => {
-              const tone = client.compliance === 100 ? "#0eaf52" : client.compliance < 50 ? "#d92d20" : "#f97316";
+              const name = [client.firstName, client.middleName, client.lastName].filter(Boolean).join(" ") || "Unnamed client";
+              const serviceCount = (client.scOutcomes ?? []).reduce((count, outcome) => count + outcome.services.length, 0);
+              const createdAt = client.createdAt;
+              const createdDate = createdAt instanceof Date ? createdAt : typeof createdAt === "string" ? new Date(createdAt) : createdAt?._seconds ? new Date(createdAt._seconds * 1000) : null;
               const openDetails = () => navigate(`${Routes.agency.clientDetails.replace(":clientId", client.id)}?tab=assessment`);
-              return <div role="row" aria-label={`Open details for ${client.name}`} tabIndex={0} onClick={openDetails} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openDetails(); } }} key={client.id} className="sc-client-grid grid cursor-pointer grid-cols-1 gap-3 border-b border-[#e5e5e6] px-4 py-4 last:border-b-0 hover:bg-[#f9fafb] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#00b4b8] lg:items-center">
+              return <div role="row" aria-label={`Open details for ${name}`} tabIndex={0} onClick={openDetails} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openDetails(); } }} key={client.id} className="sc-client-grid grid cursor-pointer grid-cols-1 gap-3 border-b border-[#e5e5e6] px-4 py-4 last:border-b-0 hover:bg-[#f9fafb] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#00b4b8] lg:items-center">
                 <div role="cell" className="flex min-w-0 items-center gap-3">
-                  <Avatar className="h-10 w-10">{client.id === "182441" && <AvatarImage src="/user-profile-image.png" alt="" className="object-cover" />}<AvatarFallback className="bg-[#e6f8f8] text-[12px] font-bold text-[#007f84]">{client.initials}</AvatarFallback></Avatar>
-                  <div className="min-w-0"><p className="truncate text-[14px] font-semibold text-[#10141a]">{client.name}</p><p className="truncate text-[12px] text-[#6b7280]">ID: {client.id} · SC: {client.coordinator}</p></div>
+                  <Avatar className="h-10 w-10">{client.profileImage && <AvatarImage src={client.profileImage} alt="" className="object-cover" />}<AvatarFallback className="bg-[#e6f8f8] text-[12px] font-bold text-[#007f84]">{[client.firstName, client.lastName].filter(Boolean).map(part => part?.[0]?.toUpperCase()).join("")}</AvatarFallback></Avatar>
+                  <div className="min-w-0"><p className="truncate text-[14px] font-semibold text-[#10141a]">{name}</p><p className="truncate text-[12px] text-[#6b7280]">ID: {client.id} · SC: {client.supportCoordinatorName || "Unassigned"}</p></div>
                 </div>
-                <div role="cell"><span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] lg:hidden">Program</span><Badge variant="outline" className="px-2 py-1" style={{ borderColor: client.program === "CCP" ? "#2b82ff" : "#8754d6", color: client.program === "CCP" ? "#2b82ff" : "#8754d6" }}>{client.program}</Badge></div>
-                <div role="cell" className="text-[13px] text-[#10141a]"><span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] lg:hidden">County</span>{client.county}</div>
-                <div role="cell" className="text-[13px]"><span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] lg:hidden">Tier</span><span className="font-semibold text-[#10141a]">{client.tier}</span><span className="block text-[12px] text-[#6b7280]">eff. {client.effective}</span></div>
-                <div role="cell" className="text-[12px] text-[#10141a]"><span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] lg:hidden">ISP period</span>{client.isp}</div>
-                <div role="cell" className="flex items-center gap-2 text-[12px] font-semibold" style={{ color: tone }}><span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] lg:hidden">PA compliance</span><span role="progressbar" aria-label={`${client.name} PA compliance`} aria-valuenow={client.compliance} aria-valuemin={0} aria-valuemax={100} className="h-2 w-20 overflow-hidden rounded-full bg-[#e5e7eb]"><span className="block h-full rounded-full" style={{ width: `${client.compliance}%`, backgroundColor: tone }} /></span>{client.compliance}%</div>
-                <div role="cell" className="text-[13px] text-[#10141a]"><span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] lg:hidden">Next monitoring</span><span className="font-semibold">{client.monitoring}</span><span className="ml-1 text-[12px] text-[#6b7280]">{client.monitoringNote}</span></div>
-                <div role="cell"><span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] lg:hidden">Alerts</span><Badge variant={client.alerts ? "error" : "success"} className="px-2 py-1">{client.alerts || "Clear"}</Badge></div>
+                <div role="cell"><span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] lg:hidden">Program</span><Badge variant="outline" className="px-2 py-1">{client.scEnrollment?.program || "—"}</Badge></div>
+                <div role="cell" className="text-[13px] text-[#10141a]"><span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] lg:hidden">County</span>{client.countyState || client.primaryAddress?.countyState || "—"}</div>
+                <div role="cell" className="text-[13px] text-[#10141a]"><span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] lg:hidden">Tier</span>{client.tier || "—"}</div>
+                <div role="cell" className="text-[13px] text-[#10141a]"><span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] lg:hidden">Outcomes</span>{client.scOutcomes?.length ?? 0}</div>
+                <div role="cell" className="text-[13px] text-[#10141a]"><span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] lg:hidden">Services</span>{serviceCount}</div>
+                <div role="cell"><span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] lg:hidden">Status</span><Badge variant="outline" className="px-2 py-1 capitalize">{client.status || "pending"}</Badge></div>
+                <div role="cell" className="text-[12px] text-[#10141a]"><span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] lg:hidden">Created</span>{createdDate && !Number.isNaN(createdDate.getTime()) ? createdDate.toLocaleDateString() : "—"}</div>
               </div>;
             })}
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#e5e7eb] px-4 py-3 sm:pl-6" style={{ paddingRight: 72 }}>
-          <p className="text-[13px] text-[#6b7280]">Showing {visibleClients.length ? (page - 1) * pageSize + 1 : 0}–{Math.min(page * pageSize, visibleClients.length)} of {visibleClients.length} clients</p>
+          <p className="text-[13px] text-[#6b7280]">Showing {visibleClients.length ? (currentPage - 1) * pageSize + 1 : 0}–{Math.min(currentPage * pageSize, visibleClients.length)} of {visibleClients.length} clients</p>
           <div className="flex items-center gap-2">
-            <span className="mr-2 text-[13px] text-[#6b7280]">Page {page} of {pageCount}</span>
-            <Button variant="outline" size="sm" className="text-[#10141a]" aria-label="Previous page" disabled={page === 1} onClick={() => setPage((current) => current - 1)}>Previous</Button>
-            <Button variant="outline" size="sm" className="text-[#10141a]" aria-label="Next page" disabled={page === pageCount} onClick={() => setPage((current) => current + 1)}>Next</Button>
+            <span className="mr-2 text-[13px] text-[#6b7280]">Page {currentPage} of {pageCount}</span>
+            <Button variant="outline" size="sm" className="text-[#10141a]" aria-label="Previous page" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>Previous</Button>
+            <Button variant="outline" size="sm" className="text-[#10141a]" aria-label="Next page" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}>Next</Button>
           </div>
         </div>
       </section>

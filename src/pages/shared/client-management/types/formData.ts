@@ -368,6 +368,7 @@ export type DocKey =
     | "form485"
     | "hospitalDischarge"
     | "ids"
+    | "scDocuments"
     | "aenf";
 
 /**

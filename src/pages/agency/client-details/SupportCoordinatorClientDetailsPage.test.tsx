@@ -4,6 +4,8 @@ import { addDays, format, startOfWeek } from "date-fns";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 vi.unmock("react-router");
+vi.mock("@/lib/api/clients", () => ({ getAgencyClientById: vi.fn(), updateClient: vi.fn(), uploadClientDocument: vi.fn() }));
+import { getAgencyClientById, updateClient, uploadClientDocument, type Client } from "@/lib/api/clients";
 import SupportCoordinatorClientDetailsPage from "./SupportCoordinatorClientDetailsPage";
 
 const scrollIntoView = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollIntoView");
@@ -161,6 +163,34 @@ it("adds a service to the local preview with total units and a selected unit", a
   expect(cards[3]).toHaveTextContent("Source: Local preview");
 }, 15000);
 
+it("saves a real client's service under its outcome", async () => {
+  const user = userEvent.setup();
+  const client = { id: "real-1", firstName: "Alex", lastName: "Example", servicePrograms: ["sc"], scOutcomes: [{ id: "outcome-1", statement: "Join activities", services: [] }] } as Client;
+  vi.mocked(getAgencyClientById).mockResolvedValue(client);
+  vi.mocked(updateClient).mockResolvedValue(undefined as unknown as Client);
+  render(<MemoryRouter initialEntries={["/agency/clients/real-1?tab=services"]}>
+    <Routes><Route path="/agency/clients/:clientId" element={<SupportCoordinatorClientDetailsPage />} /></Routes>
+  </MemoryRouter>);
+  expect(await screen.findByRole("heading", { name: "Alex Example" })).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Add service" }));
+  const dialog = screen.getByRole("dialog", { name: "Add service" });
+  expect(within(dialog).getByRole("combobox", { name: "ISP outcome *" })).toHaveValue("outcome-1");
+  await user.type(within(dialog).getByRole("textbox", { name: "Service name" }), "Community coaching");
+  await user.type(within(dialog).getByRole("textbox", { name: "Service code" }), "H2020");
+  await user.type(within(dialog).getByRole("textbox", { name: "Provider / Agency" }), "Sample Agency");
+  await user.click(within(dialog).getByRole("button", { name: "Start date" }));
+  await user.click(screen.getByRole("button", { name: /^Today,/ }));
+  await user.click(within(dialog).getByRole("button", { name: "End date" }));
+  await user.click(screen.getByRole("button", { name: /^Today,/ }));
+  await user.type(within(dialog).getByRole("spinbutton", { name: "Total authorized units" }), "120");
+  fireEvent.keyDown(within(dialog).getByRole("combobox", { name: "Unit" }), { key: "ArrowDown" });
+  await user.click(screen.getByRole("option", { name: "Hourly" }));
+  await user.type(within(dialog).getByRole("spinbutton", { name: "Rate" }), "9.85");
+  await user.click(within(dialog).getByRole("button", { name: "Add service" }));
+  expect(updateClient).toHaveBeenCalledWith("real-1", { scOutcomes: [expect.objectContaining({ id: "outcome-1", services: [expect.objectContaining({ name: "Community coaching", code: "H2020" })] })] });
+  expect(await screen.findByRole("heading", { name: "Community coaching" })).toBeInTheDocument();
+}, 15000);
+
 it("handles monitoring dates, follow-up tasks, and service monitoring in the local preview", async () => {
   const user = userEvent.setup();
   const today = new Date();
@@ -227,4 +257,29 @@ it("shows sample documents and adds an uploaded document to the local preview", 
   expect(screen.queryByRole("dialog", { name: "Upload document" })).not.toBeInTheDocument();
   expect(within(table).getAllByRole("row")).toHaveLength(8);
   expect(within(table).getByText("Follow-up assessment")).toBeInTheDocument();
+}, 15000);
+
+it("uploads a real client's document and saves its metadata", async () => {
+  const user = userEvent.setup();
+  const client = { id: "real-doc", firstName: "Alex", lastName: "Example", servicePrograms: ["sc"], documents: [] } as Client;
+  vi.mocked(getAgencyClientById).mockResolvedValue(client);
+  vi.mocked(uploadClientDocument).mockResolvedValue({ fileName: "plan.pdf", fileSize: 4, fileType: "application/pdf", url: "https://example.com/plan.pdf", storagePath: "test/plan.pdf", uploadedAt: "2026-09-28T00:00:00Z" });
+  vi.mocked(updateClient).mockResolvedValue(undefined as unknown as Client);
+  render(<MemoryRouter initialEntries={["/agency/clients/real-doc?tab=documents"]}>
+    <Routes><Route path="/agency/clients/:clientId" element={<SupportCoordinatorClientDetailsPage />} /></Routes>
+  </MemoryRouter>);
+  expect(await screen.findByRole("heading", { name: "Alex Example" })).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Upload document" }));
+  const dialog = screen.getByRole("dialog", { name: "Upload document" });
+  const file = new File(["test"], "plan.pdf", { type: "application/pdf" });
+  await user.upload(within(dialog).getByLabelText("Document file"), file);
+  fireEvent.keyDown(within(dialog).getByRole("combobox", { name: "Document type" }), { key: "ArrowDown" });
+  await user.click(screen.getByRole("option", { name: "ISP" }));
+  await user.type(within(dialog).getByRole("textbox", { name: "Document name" }), "Current plan");
+  await user.click(within(dialog).getByRole("button", { name: "Effective date" }));
+  await user.click(screen.getByRole("button", { name: /^Today,/ }));
+  await user.click(within(dialog).getByRole("button", { name: "Upload & save" }));
+  expect(uploadClientDocument).toHaveBeenCalledWith("real-doc", "support-coordination", file);
+  expect(updateClient).toHaveBeenCalledWith("real-doc", { documents: [expect.objectContaining({ key: "scDocuments", category: "ISP", title: "Current plan", url: "https://example.com/plan.pdf" })] });
+  expect(await screen.findByRole("link", { name: "Current plan" })).toHaveAttribute("href", "https://example.com/plan.pdf");
 }, 15000);
