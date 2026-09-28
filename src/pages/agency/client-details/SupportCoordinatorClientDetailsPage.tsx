@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { normalizeSignaturePayload } from "@/pages/agency/billing/claims/utils/claimReportSignatureUtils";
-import { getAgencyClientById, updateClient, type Client, type ClientDocument, type ClientService } from "@/lib/api/clients";
+import { getAgencyClientById, updateClient, useUpdateClientMutation, type Client, type ClientDocument, type ClientService } from "@/lib/api/clients";
 import { clientDocumentUrl } from "@/pages/shared/client-details/components/ClientDocumentChecklist";
 import { DatePickerField, SignatureField } from "@/pages/shared/client-management/components/forms/formControls";
 import { useToast } from "@/hooks/use-toast";
@@ -577,6 +577,7 @@ function ServiceAuthorizationTab({ sample, client, onSaved }: { sample: boolean;
 
 function AssessmentTab({ tier, lastName, sample, client, onSaved }: { tier: string; lastName: string; sample: boolean; client: Client | null; onSaved: (client: Client) => void }) {
   const { toast } = useToast();
+  const [saveAssessment] = useUpdateClientMutation();
   const assessment = client?.scAssessment;
   const njcatDocument = client?.documents?.filter(document => document.category === "Assessment" && clientDocumentUrl(document.url)).at(-1);
   const tierDocument = client?.documents?.filter(document => document.category === "Tier" && clientDocumentUrl(document.url)).at(-1);
@@ -594,39 +595,65 @@ function AssessmentTab({ tier, lastName, sample, client, onSaved }: { tier: stri
   const [effectiveDate, setEffectiveDate] = useState<Date | undefined>(assessment?.effectiveDate ? parseISO(assessment.effectiveDate) : sample ? new Date(2026, 3, 7) : undefined);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const scAssessment = {
+    answer, njcatStatus, assessmentSource, tierLetterAvailable,
+    assessmentDate: assessmentDate ? format(assessmentDate, "yyyy-MM-dd") : "",
+    determinationDate: determinationDate ? format(determinationDate, "yyyy-MM-dd") : "",
+    effectiveDate: effectiveDate ? format(effectiveDate, "yyyy-MM-dd") : "",
+  };
+  const savedTier = selectedTier === "Not set" ? "" : selectedTier.replace(/^Tier /, "");
+  const snapshot = JSON.stringify({scAssessment, tier: savedTier});
+  const [savedSnapshot, setSavedSnapshot] = useState(snapshot);
+  const isDirty = snapshot !== savedSnapshot;
   const submitAssessment = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!client || sample) return;
+    if (!client || sample || !isDirty) return;
     if (determinationDate && effectiveDate && effectiveDate < determinationDate) {
       setSaveError("Effective date must be on or after the determination date.");
       return;
     }
-    const scAssessment = {
-      answer, njcatStatus, assessmentSource, tierLetterAvailable,
-      assessmentDate: assessmentDate ? format(assessmentDate, "yyyy-MM-dd") : "",
-      determinationDate: determinationDate ? format(determinationDate, "yyyy-MM-dd") : "",
-      effectiveDate: effectiveDate ? format(effectiveDate, "yyyy-MM-dd") : "",
-    };
-    const savedTier = selectedTier === "Not set" ? "" : selectedTier.replace(/^Tier /, "");
     setSaving(true);
     setSaveError("");
     try {
-      await updateClient(client.id, { scAssessment, tier: savedTier });
-      onSaved({ ...client, scAssessment, tier: savedTier });
+      const { data: updatedClient, assessmentHistoryEntry } = await saveAssessment({ clientId: client.id, data: { scAssessment, tier: savedTier } }).unwrap();
+      onSaved({
+        ...client, ...updatedClient, scAssessment, tier: savedTier,
+        scAssessmentHistory: assessmentHistoryEntry
+          ? [...(client.scAssessmentHistory?.length ? client.scAssessmentHistory : updatedClient.scAssessmentHistory || []), assessmentHistoryEntry]
+          : updatedClient.scAssessmentHistory || client.scAssessmentHistory,
+      });
+      setSavedSnapshot(snapshot);
       toast({ title: "Assessment saved", description: "DDD assessment information was saved to the client record.", variant: "success" });
     } catch {
       setSaveError("Assessment could not be saved. Please try again.");
     } finally { setSaving(false); }
   };
-  const history = [
-    { year: "2026", tier, date: "02/23/2026", source: "DDD / State record", current: true, reviewedBy: "T. Booker", notes: `Annual reassessment. ${tier} confirmed. Level of care met per NJCAT review on 02/23/2026.` },
-    { year: "2023", tier: "Tier C", date: "04/11/2023", source: "DDD / State record", current: false, reviewedBy: "—", notes: "Historical NJCAT assessment. Tier C recorded on 04/11/2023." },
-    { year: "2020", tier: "Tier C", date: "01/08/2020", source: "Document provided to SCA", current: false, reviewedBy: "—", notes: "Historical NJCAT assessment. Tier C recorded on 01/08/2020." },
+  const sampleHistory = [
+    { id: "2026", year: "2026", tier, date: "02/23/2026", source: "DDD / State record", current: true, reviewedBy: "T. Booker", notes: `Annual reassessment. ${tier} confirmed. Level of care met per NJCAT review on 02/23/2026.`, submittedAt: "" },
+    { id: "2023", year: "2023", tier: "Tier C", date: "04/11/2023", source: "DDD / State record", current: false, reviewedBy: "—", notes: "Historical NJCAT assessment. Tier C recorded on 04/11/2023.", submittedAt: "" },
+    { id: "2020", year: "2020", tier: "Tier C", date: "01/08/2020", source: "Document provided to SCA", current: false, reviewedBy: "—", notes: "Historical NJCAT assessment. Tier C recorded on 01/08/2020.", submittedAt: "" },
   ];
+  const savedHistory = client?.scAssessmentHistory?.length ? [...client.scAssessmentHistory].reverse() : assessment?.answer === "yes" ? [{ id: "current", assessment, tier: client?.tier || "", submittedAt: "", submittedBy: "" }] : [];
+  const history = sample ? sampleHistory : savedHistory.map((entry, index) => ({
+    id: entry.id,
+    year: (entry.assessment.assessmentDate || entry.assessment.determinationDate || entry.assessment.effectiveDate || entry.submittedAt).slice(0, 4) || "—",
+    tier: entry.tier ? entry.tier.startsWith("Tier ") ? entry.tier : `Tier ${entry.tier}` : "Not set",
+    date: entry.assessment.assessmentDate ? format(parseISO(entry.assessment.assessmentDate), "MM/dd/yyyy") : "Not recorded",
+    source: entry.assessment.assessmentSource === "Not selected" ? "Not recorded" : entry.assessment.assessmentSource,
+    current: index === 0,
+    reviewedBy: "Not recorded",
+    notes: "",
+    submittedAt: entry.submittedAt,
+  }));
   const [selectedDocument, setSelectedDocument] = useState<"njcat" | "tier" | null>(null);
   const [previewDocument, setPreviewDocument] = useState<ClientDocument | null>(null);
   const [selectedHistory, setSelectedHistory] = useState<(typeof history)[number] | null>(null);
   const isTierLetter = selectedDocument === "tier";
+  const selectedClientDocument = isTierLetter ? tierDocument : njcatDocument;
+  const documentFilename = selectedClientDocument?.fileName || selectedClientDocument?.title || (isTierLetter ? `TierLetter_${lastName}_2026.pdf` : `NJCAT_${lastName}_2026.pdf`);
+  const documentDateLabel = sample ? history[0].date : selectedClientDocument?.issuedOnDate ? format(parseISO(selectedClientDocument.issuedOnDate), "MM/dd/yyyy") : "Not recorded";
+  const documentStatus = sample ? "Current" : !selectedClientDocument?.expiryDate ? "On file" : selectedClientDocument.expiryDate.slice(0, 10) < today ? "Expired" : "Current";
+  const documentSource = sample ? isTierLetter ? "DDD / iRecord" : history[0].source : selectedClientDocument?.source || "Not recorded";
 
   return <section aria-labelledby="sc-assessment-heading">
     <h2 id="sc-assessment-heading" className="text-2xl font-semibold text-[#10141a]">DDD Assessment &amp; Determination</h2>
@@ -657,7 +684,7 @@ function AssessmentTab({ tier, lastName, sample, client, onSaved }: { tier: stri
           <AssessmentSelect label="NJCAT Status" value={njcatStatus} onChange={setNjcatStatus} options={["Not selected", "Available", "Pending", "Not available"]} />
           <DatePickerField id="sc-njcat-assessment-date" label="NJCAT Assessment Date" value={assessmentDate} onChange={setAssessmentDate} />
           <AssessmentSelect label="Assessment Source" value={assessmentSource} onChange={setAssessmentSource} options={["Not selected", "DDD / State record", "Document provided to SCA", "Other"]} />
-          {sample ? <AssessmentDocument label="NJCAT Document" filename={`NJCAT_${lastName}_2026.pdf`} onView={() => setSelectedDocument("njcat")} /> : njcatDocument ? <AssessmentDocument label="NJCAT Document" filename={njcatDocument.fileName || njcatDocument.title || "NJCAT Document"} document={njcatDocument} onView={() => setPreviewDocument(njcatDocument)} /> : <p className="text-sm text-[#6b7280]">No NJCAT document recorded.</p>}
+          {sample ? <AssessmentDocument label="NJCAT Document" filename={`NJCAT_${lastName}_2026.pdf`} onView={() => setSelectedDocument("njcat")} /> : njcatDocument ? <AssessmentDocument label="NJCAT Document" filename={njcatDocument.fileName || njcatDocument.title || "NJCAT Document"} document={njcatDocument} onView={() => setSelectedDocument("njcat")} /> : <p className="text-sm text-[#6b7280]">No NJCAT document recorded.</p>}
         </div>
       </section>
       <section aria-labelledby="sc-tier-heading">
@@ -669,26 +696,26 @@ function AssessmentTab({ tier, lastName, sample, client, onSaved }: { tier: stri
             <DatePickerField id="sc-effective-date" label="Effective Date" value={effectiveDate} onChange={setEffectiveDate} />
           </div>
           <AssessmentSelect label="Tier Letter Available?" value={tierLetterAvailable} onChange={setTierLetterAvailable} options={["Yes", "No", "Pending"]} />
-          {sample ? <AssessmentDocument label="Tier Letter Document" filename={`TierLetter_${lastName}_2026.pdf`} onView={() => setSelectedDocument("tier")} /> : tierDocument ? <AssessmentDocument label="Tier Letter Document" filename={tierDocument.fileName || tierDocument.title || "Tier Letter Document"} document={tierDocument} onView={() => setPreviewDocument(tierDocument)} /> : <p className="text-sm text-[#6b7280]">No tier letter recorded.</p>}
+          {sample ? <AssessmentDocument label="Tier Letter Document" filename={`TierLetter_${lastName}_2026.pdf`} onView={() => setSelectedDocument("tier")} /> : tierDocument ? <AssessmentDocument label="Tier Letter Document" filename={tierDocument.fileName || tierDocument.title || "Tier Letter Document"} document={tierDocument} onView={() => setSelectedDocument("tier")} /> : <p className="text-sm text-[#6b7280]">No tier letter recorded.</p>}
         </div>
       </section>
     </div>}
 
     {!sample && answer === "yes" && <div className="mt-6 flex flex-col items-start gap-3 sm:items-end">
       {saveError && <p role="alert" className="text-sm text-[#ad182d]">{saveError}</p>}
-      <Button type="submit" disabled={saving || !client} className="gap-2">{saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}{saving ? "Submitting…" : "Submit assessment"}</Button>
+      <Button type="submit" disabled={saving || !client || !isDirty} className="gap-2">{saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}{saving ? "Submitting…" : "Submit assessment"}</Button>
     </div>}
     </form>
 
-    {sample && <section aria-labelledby="sc-assessment-history-heading" className="mt-7">
+    {history.length > 0 && <section aria-labelledby="sc-assessment-history-heading" className="mt-7">
       <h3 id="sc-assessment-history-heading" className="border-b border-[#f7d9dc] pb-2 text-sm font-semibold text-[#10141a]">Assessment History / Timeline</h3>
-      <p className="mt-3 text-sm text-[#6b7280]">Previous assessments are preserved and never overwritten.</p>
+      <p className="mt-3 text-sm text-[#6b7280]">{sample ? "Previous assessments are preserved and never overwritten." : "Showing submitted assessments for this client."}</p>
       <div className="mt-2 space-y-2">
-        {history.map((item) => <div key={item.year} className={`flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border px-3 py-3 text-sm ${item.current ? "border-[#fce3e7] bg-[#fff0f2]" : "border-[#f1f2f3] bg-[#fbfbfc]"}`}>
+        {history.map((item, index) => <div key={item.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[4px] border border-[#f1f2f3] bg-[#fbfbfc] px-3 py-3 text-sm transition-colors hover:border-[#fce3e7] hover:bg-[#fff0f2]">
           <span className="text-[#6b7280]">{item.year}</span><span className="font-medium text-[#10141a]">NJCAT</span><span>{item.tier}</span><span className="text-[#6b7280]">{item.date}</span>
           <span className="ml-auto text-[#8a929e]">{item.source}</span>
           <span className={`rounded px-2 py-1 ${item.current ? "bg-white text-[#047857]" : "bg-white text-[#6b7280]"}`}>{item.current ? "Current" : "Historical"}</span>
-          <button type="button" aria-label={`View NJCAT history for ${item.year}`} onClick={() => setSelectedHistory(item)} className="font-medium text-[#ad182d] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ad182d]">View</button>
+          <button type="button" aria-label={`View NJCAT history for ${item.year}${!sample && history.length > 1 ? `, entry ${index + 1}` : ""}`} onClick={() => setSelectedHistory(item)} className="font-medium text-[#ad182d] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ad182d]">View</button>
         </div>)}
       </div>
     </section>}
@@ -701,33 +728,33 @@ function AssessmentTab({ tier, lastName, sample, client, onSaved }: { tier: stri
       </div>
     </section>}
     <DocumentPreviewModal open={previewDocument !== null} onOpenChange={(open) => { if (!open) setPreviewDocument(null); }} title={previewDocument?.title || (previewDocument?.category === "Tier" ? "Tier Letter" : "NJCAT Assessment")} url={clientDocumentUrl(previewDocument?.url)} fileName={previewDocument?.fileName} />
-    {sample && <Dialog open={selectedDocument !== null} onOpenChange={(open) => { if (!open) setSelectedDocument(null); }}>
+    <Dialog open={selectedDocument !== null} onOpenChange={(open) => { if (!open) setSelectedDocument(null); }}>
       <DialogContent showCloseButton={false} className="max-h-[min(90vh,720px)] w-[calc(100vw-32px)] max-w-[400px] overflow-y-auto p-4 sm:p-5">
         <DialogTitle className="text-xl leading-7">{isTierLetter ? `Tier Letter — ${tier}` : "NJCAT Assessment"}</DialogTitle>
         <DialogDescription className="mt-2 flex items-center gap-2 text-sm">
-          <span className="rounded bg-[#e8fff2] px-1.5 py-0.5 text-xs font-semibold text-[#047857]">Current</span>
+          <span className={`rounded px-1.5 py-0.5 text-xs font-semibold ${documentStatus === "Expired" ? "bg-[#fff0f2] text-[#ad182d]" : "bg-[#e8fff2] text-[#047857]"}`}>{documentStatus}</span>
           Assessment
         </DialogDescription>
         <div className="mt-4 grid grid-cols-2 gap-2 border-t border-[#e5e7eb] pt-3">
           {[
-            ["Document Type", isTierLetter ? "Tier" : "Assessment"], ["Version", "1"],
-            ["Status", "Current"], ["Effective Date", history[0].date],
-            ["Expiration", "—"], ["Source", isTierLetter ? "DDD / iRecord" : history[0].source],
+            ["Document Type", isTierLetter ? "Tier" : "Assessment"], ["Version", sample ? "1" : "—"],
+            ["Status", documentStatus], ["Effective Date", documentDateLabel],
+            ["Expiration", selectedClientDocument?.expiryDate ? format(parseISO(selectedClientDocument.expiryDate), "MM/dd/yyyy") : "—"], ["Source", documentSource],
             ["Related Provider", "—"], ["Related Service", "—"],
-            ["Signature Status", "N/A"], ["Last Modified", history[0].date],
+            ["Signature Status", "N/A"], ["Last Modified", sample ? history[0].date : "—"],
           ].map(([label, value]) => <div key={label} className="min-w-0 rounded border border-[#f0f1f3] bg-[#fbfbfc] px-2 py-1.5">
             <p className="text-xs text-[#8a929e]">{label}</p><p className="break-words text-sm font-medium text-[#10141a]">{value}</p>
           </div>)}
         </div>
-        <div className="mt-3 flex min-h-16 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-[#d8dce2] px-3 py-2 text-sm text-[#8a929e]">
-          <FileText className="h-4 w-4" aria-hidden="true" /><span className="break-all text-center">{isTierLetter ? `TierLetter_${lastName}_2026.pdf` : `NJCAT_${lastName}_2026.pdf`}</span>
-        </div>
+        <button type="button" disabled={!selectedClientDocument} aria-label={`Preview ${documentFilename}`} title={selectedClientDocument ? undefined : "Sample document unavailable"} onClick={() => { if (selectedClientDocument) { setSelectedDocument(null); setPreviewDocument(selectedClientDocument); } }} className="mt-3 flex min-h-16 w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-[#d8dce2] px-3 py-2 text-sm text-[#8a929e] transition-colors enabled:hover:border-[#00b4b8] enabled:hover:bg-[#f0fcfc] enabled:focus-visible:outline-2 enabled:focus-visible:outline-offset-2 enabled:focus-visible:outline-[#00b4b8] disabled:cursor-default">
+          <FileText className="h-4 w-4" aria-hidden="true" /><span className="break-all text-center">{documentFilename}</span>
+        </button>
         <div className="mt-5 flex items-center justify-between gap-2">
           <Button variant="outline" onClick={() => setSelectedDocument(null)}>Close</Button>
-          <Button disabled title="Sample document unavailable">Download</Button>
+          <Button disabled title="Download unavailable">Download</Button>
         </div>
       </DialogContent>
-    </Dialog>}
+    </Dialog>
     <Dialog open={selectedHistory !== null} onOpenChange={(open) => { if (!open) setSelectedHistory(null); }}>
       {selectedHistory && <DialogContent showCloseButton={false} className="max-h-[min(90vh,620px)] w-[calc(100vw-32px)] max-w-[405px] overflow-y-auto p-4 sm:p-5">
         <DialogTitle className="text-xl leading-7">NJCAT — {selectedHistory.year}</DialogTitle>
@@ -736,18 +763,18 @@ function AssessmentTab({ tier, lastName, sample, client, onSaved }: { tier: stri
           NJCAT · {selectedHistory.date}
         </DialogDescription>
         <div className="mt-4 grid grid-cols-2 gap-2 border-t border-[#e5e7eb] pt-3">
-          {[["Tier", selectedHistory.tier], ["Assessment Date", selectedHistory.date], ["Source", selectedHistory.source], ["Reviewed By", selectedHistory.reviewedBy]].map(([label, value]) =>
+          {[["Tier", selectedHistory.tier], ["Assessment Date", selectedHistory.date], ["Source", selectedHistory.source], ["Reviewed By", selectedHistory.reviewedBy], ...(!sample ? [["Submitted", selectedHistory.submittedAt ? format(parseISO(selectedHistory.submittedAt), "MMM d, yyyy h:mm a") : "Previously saved"]] : [])].map(([label, value]) =>
             <div key={label} className="min-w-0 rounded border border-[#f0f1f3] bg-[#fbfbfc] px-2 py-1.5">
               <p className="text-xs text-[#8a929e]">{label}</p><p className="break-words text-sm font-medium text-[#10141a]">{value}</p>
             </div>)}
         </div>
-        <div className="mt-4">
+        {selectedHistory.notes && <div className="mt-4">
           <p className="mb-1.5 text-sm font-semibold text-[#10141a]">Notes</p>
           <p className="rounded-lg border border-[#e5e7eb] p-2 text-sm text-[#10141a]">{selectedHistory.notes}</p>
-        </div>
+        </div>}
         <p className="mt-3 flex items-start gap-2 rounded-lg bg-[#fff8e9] px-2 py-2 text-sm text-[#a16207]">
           <CircleHelp aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
-          This record is read-only. Previous assessments are never overwritten.
+          {sample ? "This record is read-only. Previous assessments are never overwritten." : "This saved assessment is read-only here. Use the fields above to update it."}
         </p>
         <div className="mt-6 flex justify-end">
           <Button variant="outline" onClick={() => setSelectedHistory(null)}>Close</Button>

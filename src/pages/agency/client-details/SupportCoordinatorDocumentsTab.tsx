@@ -3,11 +3,13 @@ import { format } from "date-fns";
 import { Loader2, UploadCloud, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { DocumentPreviewModal } from "@/components/documents/DocumentPreviewModal";
 import { FileUpload } from "@/components/ui/file-upload";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DatePickerField } from "@/pages/shared/client-management/components/forms/formControls";
 import { updateClient, uploadClientDocument, type Client, type ClientDocument } from "@/lib/api/clients";
+import { clientDocumentUrl } from "@/pages/shared/client-details/components/ClientDocumentChecklist";
 import { useToast } from "@/hooks/use-toast";
 
 type Document = {
@@ -20,6 +22,7 @@ type Document = {
   source: string;
   provider?: string;
   url?: string;
+  fileName?: string;
 };
 
 const sampleDocuments: Document[] = [
@@ -40,6 +43,7 @@ const maxFileSize = 10 * 1024 * 1024;
 export default function SupportCoordinatorDocumentsTab({ sample, client, onSaved }: { sample: boolean; client: Client | null; onSaved: (client: Client) => void }) {
   const { toast } = useToast();
   const [addedDocuments, setAddedDocuments] = useState<Document[]>([]);
+  const [preview, setPreview] = useState<Document | null>(null);
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [type, setType] = useState<ClientDocument["category"] | "">("");
@@ -51,7 +55,7 @@ export default function SupportCoordinatorDocumentsTab({ sample, client, onSaved
   const documents = sample ? [...sampleDocuments, ...addedDocuments] : (client?.documents ?? []).map(document => ({
     name: document.title || document.fileName || "Document", type: document.category || "Other", version: "—",
     status: document.expiryDate && document.expiryDate.slice(0, 10) < format(new Date(), "yyyy-MM-dd") ? "Expired" : "On file",
-    effective: document.issuedOnDate?.slice(0, 10) || "—", expires: document.expiryDate?.slice(0, 10) || "—", source: document.source || "Not recorded", provider: document.provider, url: document.url,
+    effective: document.issuedOnDate?.slice(0, 10) || "—", expires: document.expiryDate?.slice(0, 10) || "—", source: document.source || "Not recorded", provider: document.provider, url: clientDocumentUrl(document.url), fileName: document.fileName,
   }));
 
   const close = () => setOpen(false);
@@ -87,7 +91,7 @@ export default function SupportCoordinatorDocumentsTab({ sample, client, onSaved
         </thead>
         <tbody className="divide-y divide-[#f0f1f3]">
           {documents.map((document, index) => <tr key={`${document.name}-${index}`}>
-            <td className="px-3 py-3 align-middle">{document.url ? <a href={document.url} target="_blank" rel="noopener noreferrer" className="font-medium text-[#bc1024] hover:underline">{document.name}</a> : <span className="font-medium text-[#bc1024]">{document.name}</span>}{document.provider && <span className="mt-1 block text-xs text-[#8a929e]">{document.provider}</span>}</td>
+            <td className="px-3 py-3 align-middle">{document.url ? <button type="button" onClick={() => setPreview(document)} className="cursor-pointer font-medium text-[#bc1024] hover:underline">{document.name}</button> : <span className="font-medium text-[#bc1024]">{document.name}</span>}{document.provider && <span className="mt-1 block text-xs text-[#8a929e]">{document.provider}</span>}</td>
             <td className="px-3 py-3 text-[#5e6672]">{document.type}</td>
             <td className="px-3 py-3 text-[#5e6672]">{document.version}</td>
             <td className="px-3 py-3"><span className={`inline-block rounded px-1.5 py-0.5 text-xs font-semibold ${document.status === "Expired" ? "bg-[#fff1f2] text-[#ad182d]" : "bg-[#e8fff2] text-[#047857]"}`}>{document.status}</span></td>
@@ -98,6 +102,8 @@ export default function SupportCoordinatorDocumentsTab({ sample, client, onSaved
         </tbody>
       </table>
     </div> : <p className="rounded-xl border border-dashed border-[#d1d5db] px-6 py-12 text-center text-sm text-[#6b7280]">No documents recorded yet.</p>}
+
+    <DocumentPreviewModal open={preview !== null} onOpenChange={(open) => { if (!open) setPreview(null); }} title={preview?.name || "Document preview"} url={preview?.url} fileName={preview?.fileName} />
 
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent showCloseButton={false} className="flex max-h-[calc(100vh-32px)] w-[calc(100vw-32px)] max-w-[455px] flex-col overflow-hidden rounded-[22px] p-5">

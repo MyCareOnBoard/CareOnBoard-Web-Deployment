@@ -4,7 +4,10 @@ import { addDays, format, startOfWeek } from "date-fns";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 vi.unmock("react-router");
-vi.mock("@/lib/api/clients", () => ({ getAgencyClientById: vi.fn(), updateClient: vi.fn(), uploadClientDocument: vi.fn() }));
+vi.mock("@/lib/api/clients", () => {
+  const updateClient = vi.fn();
+  return { getAgencyClientById: vi.fn(), updateClient, uploadClientDocument: vi.fn(), useUpdateClientMutation: () => [({ clientId, data }: { clientId: string; data: unknown }) => ({ unwrap: async () => { const result = await updateClient(clientId, data); return { data: result, assessmentHistoryEntry: result?.assessmentHistoryEntry }; } })] };
+});
 const toast = vi.hoisted(() => vi.fn());
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast }) }));
 import { getAgencyClientById, updateClient, uploadClientDocument, type Client } from "@/lib/api/clients";
@@ -86,7 +89,7 @@ it("shows a saved ISP period in planning", async () => {
 it("submits a real client's DDD assessment and keeps the saved selections", async () => {
   const user = userEvent.setup();
   const client = {
-    id: "real-assessment", firstName: "Alex", lastName: "Example", tier: "C",
+    id: "real-assessment", firstName: "Alex", lastName: "Example", tier: "C", scAssessmentHistory: [],
     scAssessment: {
       answer: "yes", njcatStatus: "Available", assessmentDate: "2026-09-20",
       assessmentSource: "DDD / State record", determinationDate: "2026-09-21",
@@ -94,7 +97,12 @@ it("submits a real client's DDD assessment and keeps the saved selections", asyn
     },
   } as Client;
   vi.mocked(getAgencyClientById).mockResolvedValue(client);
-  vi.mocked(updateClient).mockResolvedValue(client);
+  vi.mocked(updateClient).mockResolvedValue({
+    ...client, tier: "D", scAssessmentHistory: [
+      { id: "legacy", assessment: client.scAssessment!, tier: "C", submittedAt: "", submittedBy: "" },
+    ],
+    assessmentHistoryEntry: { id: "new", assessment: client.scAssessment!, tier: "D", submittedAt: "2026-09-28T12:00:00.000Z", submittedBy: "staff" },
+  } as Client);
   vi.mocked(updateClient).mockClear();
   render(<MemoryRouter initialEntries={["/agency/clients/real-assessment?tab=assessment"]}>
     <Routes><Route path="/agency/clients/:clientId" element={<SupportCoordinatorClientDetailsPage />} /></Routes>
@@ -103,9 +111,24 @@ it("submits a real client's DDD assessment and keeps the saved selections", asyn
   expect(screen.getByRole("button", { name: "Yes, I have information" })).toHaveAttribute("aria-pressed", "true");
   expect(screen.getByRole("combobox", { name: "NJCAT Status" })).toHaveTextContent("Available");
   expect(screen.getByDisplayValue("Sep 20, 2026")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Submit assessment" })).toBeDisabled();
+  expect(screen.getByRole("heading", { name: "Assessment History / Timeline" })).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "View NJCAT history for 2026" }));
+  const history = screen.getByRole("dialog", { name: "NJCAT — 2026" });
+  expect(within(history).getByText("09/20/2026")).toBeInTheDocument();
+  expect(within(history).getByText("Tier C")).toBeInTheDocument();
+  await user.click(within(history).getByRole("button", { name: "Close" }));
+  expect(screen.getByText("No NJCAT document recorded.")).toBeInTheDocument();
+  expect(screen.getByText("No tier letter recorded.")).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "No, information is pending" }));
   expect(screen.queryByRole("button", { name: "Submit assessment" })).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Yes, I have information" }));
+  await user.click(screen.getByRole("combobox", { name: "Tier" }));
+  await user.click(screen.getByRole("option", { name: "Tier D" }));
+  expect(screen.getByRole("button", { name: "Submit assessment" })).toBeEnabled();
+  await user.click(screen.getByRole("combobox", { name: "Tier" }));
+  await user.click(screen.getByRole("option", { name: "Tier C" }));
+  expect(screen.getByRole("button", { name: "Submit assessment" })).toBeDisabled();
   await user.click(screen.getByRole("combobox", { name: "Tier" }));
   await user.click(screen.getByRole("option", { name: "Tier D" }));
   await user.click(screen.getByRole("button", { name: "Submit assessment" }));
@@ -114,15 +137,24 @@ it("submits a real client's DDD assessment and keeps the saved selections", asyn
     scAssessment: client.scAssessment,
   });
   expect(screen.getByRole("combobox", { name: "Tier" })).toHaveTextContent("Tier D");
-});
+  expect(screen.getByRole("button", { name: "Submit assessment" })).toBeDisabled();
+  expect(screen.getByRole("heading", { name: "Assessment History / Timeline" })).toBeInTheDocument();
+  expect(screen.getAllByRole("button", { name: /View NJCAT history for 2026, entry/ })).toHaveLength(2);
+  await user.click(screen.getByRole("button", { name: "View NJCAT history for 2026, entry 1" }));
+  expect(within(screen.getByRole("dialog", { name: "NJCAT — 2026" })).getByText("Tier D")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Close" }));
+  await user.click(screen.getByRole("button", { name: "View NJCAT history for 2026, entry 2" }));
+  expect(within(screen.getByRole("dialog", { name: "NJCAT — 2026" })).getByText("Tier C")).toBeInTheDocument();
+}, 15000);
 
 it("shows a real client's uploaded assessment and tier letter in their matching sections", async () => {
   const user = userEvent.setup();
   const client = {
     id: "real-documents", firstName: "Alex", lastName: "Example", tier: "D",
+    scAssessment: { answer: "yes", njcatStatus: "Available", assessmentDate: "2026-09-22", assessmentSource: "Document provided to SCA", determinationDate: "2026-09-22", effectiveDate: "2026-09-22", tierLetterAvailable: "Yes" },
     documents: [
       { key: "scDocuments", category: "Other", fileName: "Unrelated.pdf", url: "https://example.com/other.pdf" },
-      { key: "scDocuments", category: "Assessment", fileName: "NJCAT_Example.pdf", url: "https://example.com/njcat.pdf", source: "DDD / State record" },
+      { key: "scDocuments", category: "Assessment", fileName: "NJCAT_Example.pdf", url: "https://example.com/njcat.pdf", source: "DDD / State record", issuedOnDate: "2026-09-15" },
       { key: "scDocuments", category: "Tier", fileName: "TierLetter_Example.pdf", url: "https://example.com/tier.pdf" },
       { key: "scDocuments", category: "Assessment", fileName: "Unsafe.pdf", url: "javascript:alert(1)" },
     ],
@@ -135,13 +167,26 @@ it("shows a real client's uploaded assessment and tier letter in their matching 
   expect(await screen.findByRole("heading", { name: "Alex Example" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Yes, I have information" })).toHaveAttribute("aria-pressed", "true");
   expect(screen.getByRole("combobox", { name: "NJCAT Status" })).toHaveTextContent("Available");
-  expect(screen.getByRole("combobox", { name: "Assessment Source" })).toHaveTextContent("DDD / State record");
+  expect(screen.getByRole("combobox", { name: "Assessment Source" })).toHaveTextContent("Document provided to SCA");
   expect(screen.getByRole("combobox", { name: "Tier Letter Available?" })).toHaveTextContent("Yes");
   await user.click(screen.getByRole("button", { name: "View NJCAT Document" }));
+  const njcatDetails = screen.getByRole("dialog", { name: "NJCAT Assessment" });
+  expect(within(njcatDetails).getByText("NJCAT_Example.pdf")).toBeInTheDocument();
+  expect(within(njcatDetails).getAllByText("On file")).toHaveLength(2);
+  expect(within(njcatDetails).getByText("Effective Date").nextElementSibling).toHaveTextContent("09/15/2026");
+  expect(within(njcatDetails).getByText("Source").nextElementSibling).toHaveTextContent("DDD / State record");
+  expect(within(njcatDetails).queryByTitle("NJCAT Assessment preview")).not.toBeInTheDocument();
+  await user.click(within(njcatDetails).getByRole("button", { name: "Preview NJCAT_Example.pdf" }));
   const njcatPreview = screen.getByRole("dialog", { name: "NJCAT Assessment" });
   expect(within(njcatPreview).getByTitle("NJCAT Assessment preview")).toHaveAttribute("src", "https://example.com/njcat.pdf#toolbar=0&navpanes=0");
   await user.click(within(njcatPreview).getByRole("button", { name: "Close" }));
   await user.click(screen.getByRole("button", { name: "View Tier Letter Document" }));
+  const tierDetails = screen.getByRole("dialog", { name: "Tier Letter — Tier D" });
+  expect(within(tierDetails).getByText("TierLetter_Example.pdf")).toBeInTheDocument();
+  expect(within(tierDetails).getByText("Effective Date").nextElementSibling).toHaveTextContent("Not recorded");
+  expect(within(tierDetails).getByText("Source").nextElementSibling).toHaveTextContent("Not recorded");
+  expect(within(tierDetails).queryByTitle("Tier Letter preview")).not.toBeInTheDocument();
+  await user.click(within(tierDetails).getByRole("button", { name: "Preview TierLetter_Example.pdf" }));
   const tierPreview = screen.getByRole("dialog", { name: "Tier Letter" });
   expect(within(tierPreview).getByTitle("Tier Letter preview")).toHaveAttribute("src", "https://example.com/tier.pdf#toolbar=0&navpanes=0");
   expect(screen.getByText("NJCAT_Example.pdf")).toBeInTheDocument();
@@ -506,6 +551,10 @@ it("uploads a real client's document and saves its metadata", async () => {
   await act(async () => finishUpload({ fileName: "plan.pdf", fileSize: 4, fileType: "application/pdf", url: "https://example.com/plan.pdf", storagePath: "test/plan.pdf", uploadedAt: "2026-09-28T00:00:00Z" }));
   expect(uploadClientDocument).toHaveBeenCalledWith("real-doc", "support-coordination", file);
   expect(updateClient).toHaveBeenCalledWith("real-doc", { documents: [expect.objectContaining({ key: "scDocuments", category: "ISP", title: "Current plan", url: "https://example.com/plan.pdf" })] });
-  expect(await screen.findByRole("link", { name: "Current plan" })).toHaveAttribute("href", "https://example.com/plan.pdf");
+  await user.click(await screen.findByRole("button", { name: "Current plan" }));
+  const preview = screen.getByRole("dialog", { name: "Current plan" });
+  expect(within(preview).getByTitle("Current plan preview")).toHaveAttribute("src", "https://example.com/plan.pdf#toolbar=0&navpanes=0");
+  await user.click(within(preview).getByRole("button", { name: "Close" }));
+  expect(screen.queryByRole("dialog", { name: "Current plan" })).not.toBeInTheDocument();
   expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Document uploaded", variant: "success" }));
 }, 15000);

@@ -74,9 +74,18 @@ export type ScAssessment = {
   tierLetterAvailable: string;
 };
 
+export type ScAssessmentHistoryEntry = {
+  id: string;
+  assessment: ScAssessment;
+  tier: string;
+  submittedAt: string;
+  submittedBy: string;
+};
+
 export interface Client {
   scEnrollment?: ScEnrollment;
   scAssessment?: ScAssessment;
+  scAssessmentHistory?: ScAssessmentHistoryEntry[];
   scOutcomes?: ClientOutcome[];
   medicationSupportSettings?: MedicationSupportSettings;
   acuityRequirements?: ClientAcuityRequirements;
@@ -1395,7 +1404,7 @@ export const clientsApi = createApi({
       invalidatesTags: ['Clients', 'ClientStats'],
     }),
     updateClient: builder.mutation<
-      { success: boolean; data: Client },
+      { success: boolean; data: Client; assessmentHistoryEntry?: ScAssessmentHistoryEntry },
       { clientId: string; data: UpdateClientRequest; agencyId?: string }
     >({
       query: ({ clientId, data, agencyId }) => {

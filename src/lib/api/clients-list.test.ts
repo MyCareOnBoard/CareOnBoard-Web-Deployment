@@ -61,4 +61,21 @@ describe("client list mode forwarding", () => {
     expect(clients.map((client) => client.id)).toEqual(["first", "last"]);
     expect(mocks.get.mock.calls.map(([, config]) => config.params.offset)).toEqual([0, 100, 200]);
   });
+
+  it("refreshes the Support Coordination client list after an assessment update", async () => {
+    const store = configureStore({
+      reducer: { [clientsApi.reducerPath]: clientsApi.reducer },
+      middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(clientsApi.middleware),
+    });
+    const list = store.dispatch(clientsApi.endpoints.listAgencyClients.initiate({ agencyId: "agency-1", type: "sc" }));
+    await list;
+    await store.dispatch(clientsApi.endpoints.updateClient.initiate({
+      clientId: "client-1", data: {
+        tier: "D",
+        scAssessment: { answer: "yes", njcatStatus: "Available", assessmentDate: "2026-09-28", assessmentSource: "DDD / State record", determinationDate: "2026-09-28", effectiveDate: "2026-09-28", tierLetterAvailable: "Yes" },
+      },
+    }));
+    await vi.waitFor(() => expect(mocks.baseQuery.mock.calls.filter(([request]) => request.url.startsWith("/clientManagement"))).toHaveLength(2));
+    list.unsubscribe();
+  });
 });
