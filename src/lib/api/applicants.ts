@@ -514,11 +514,12 @@ export const applicantsApi = {
     id: string,
     stepKey: string,
     confirmed: boolean,
-    reason?: string
+    reason?: string,
+    account?: { accountType: "employee" | "agency_staff"; staffDetails?: Omit<import("./agency-staff").StaffFormValues, "name" | "email" | "password"> }
   ): Promise<{ success: boolean; message: string; reviewStep: any }> => {
     const response = await axiosClient.post(
       `/agencyApplicants/${id}/review`,
-      { stepKey, confirmed, ...(reason != null && reason !== "" && { reason }) }
+      { stepKey, confirmed, ...(reason != null && reason !== "" && { reason }), ...account }
     );
     return response.data;
   },

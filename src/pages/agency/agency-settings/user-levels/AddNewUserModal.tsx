@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogFooter,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,6 +34,8 @@ import {
 interface AddNewUserModalProps {
   open: boolean;
   onClose: () => void;
+  reviewApplicant?: { name: string; email: string };
+  onCreateEmployee?: () => Promise<void>;
   mode?: "create" | "edit";
   initialData?: {
     name: string;
@@ -91,6 +94,8 @@ const MODE_OPTIONS: { value: "ddd" | "hha" | "sc"; label: string }[] = [
 export default function AddNewUserModal({
   open,
   onClose,
+  reviewApplicant,
+  onCreateEmployee,
   mode = "create",
   initialData,
   onSave,
@@ -103,8 +108,8 @@ export default function AddNewUserModal({
   // Only make the admin pick when there's an actual choice (dual-program agency).
   const showModePicker = agencyModeOptions.length > 1;
 
-  const [name, setName] = useState(initialData?.name || "");
-  const [email, setEmail] = useState(initialData?.email || "");
+  const [name, setName] = useState(initialData?.name || reviewApplicant?.name || "");
+  const [email, setEmail] = useState(initialData?.email || reviewApplicant?.email || "");
   const [password, setPassword] = useState(initialData?.password || "");
   const [accessList, setAccessList] = useState<string[]>(
     initialData ? normalizeAgencyAccessListForUi(initialData.accessList) : (mode === "create" ? CREATE_DEFAULTS : [])
@@ -141,6 +146,7 @@ export default function AddNewUserModal({
   const [isSaving, setIsSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showResetLinkMessage, setShowResetLinkMessage] = useState(false);
+  const [reviewAccountType, setReviewAccountType] = useState<"employee" | "agency_staff" | null>(null);
 
   const handleGeneratePassword = () => {
     const chars =
@@ -203,10 +209,13 @@ export default function AddNewUserModal({
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      if (onSave) {
+      if (reviewApplicant && reviewAccountType === "employee") {
+        if (!onCreateEmployee) throw new Error("Employee creation is unavailable.");
+        await onCreateEmployee();
+      } else if (onSave) {
         const values: StaffFormValues = {
-          name,
-          email,
+          name: reviewApplicant?.name ?? name,
+          email: reviewApplicant?.email ?? email,
           password,
           accessList,
           // Single-mode agency: nothing to pick, grant the agency's only mode.
@@ -230,6 +239,8 @@ export default function AddNewUserModal({
           values.compensationEffectiveDate = compensationEffectiveDate;
         }
         await onSave(values);
+      } else if (reviewApplicant) {
+        throw new Error("Agency staff creation is unavailable.");
       } else {
         // Default mock save if no onSave provided
         await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -283,8 +294,8 @@ export default function AddNewUserModal({
         );
         setCompensationEffectiveDate(initialData.compensationEffectiveDate ?? "");
       } else {
-        setName("");
-        setEmail("");
+        setName(reviewApplicant?.name ?? "");
+        setEmail(reviewApplicant?.email ?? "");
         setPassword("");
         setAccessList(mode === "create" ? CREATE_DEFAULTS : []);
         setAgencyModes(mode === "create" ? [] : agencyModeOptions);
@@ -300,13 +311,14 @@ export default function AddNewUserModal({
       setIsSaving(false);
       setShowPassword(false);
       setShowResetLinkMessage(false);
+      setReviewAccountType(null);
     }
 
     prevOpenRef.current = open;
   }, [open, initialData]);
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen && !isSaving) onClose(); }}>
       <DialogContent
         className="w-[min(490px,95vw)] h-[min(993px,95vh)] p-[20px] backdrop-blur bg-white border border-[rgba(255,255,255,0.3)] rounded-[30px] flex flex-col gap-[18px] !left-1/2 !-translate-x-1/2 md:!left-auto md:!right-[26px] md:!translate-x-0"
         showCloseButton={false}
@@ -314,11 +326,15 @@ export default function AddNewUserModal({
         {/* Header */}
         <div className="flex items-center justify-between w-full h-[44px] shrink-0">
           <DialogTitle className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
-            {mode === "create" ? "Add staff member" : "Edit staff member"}
+            {reviewApplicant ? "Create applicant account" : mode === "create" ? "Add staff member" : "Edit staff member"}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            {reviewApplicant ? "Choose an account type and configure staff access if needed." : "Enter the staff member's account and employment details."}
+          </DialogDescription>
           <button
             onClick={handleClose}
             disabled={isSaving}
+            aria-label="Close dialog"
             className="flex items-center justify-center p-[8px] rounded-[200px] bg-[#eff2f3] backdrop-blur-sm border border-[rgba(255,255,255,0.3)] hover:bg-[#e0e3e4] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <X className="w-4 h-4 text-[#10141a]" />
@@ -327,6 +343,21 @@ export default function AddNewUserModal({
 
         {/* Form */}
         <div className="flex flex-col gap-[20px] w-full flex-1 min-h-0 overflow-y-auto">
+          {reviewApplicant && (
+            <div className="space-y-3">
+              <p className="text-[14px] text-[#525253]">Choose an account for {reviewApplicant.name}. Their existing login{reviewApplicant.email ? ` (${reviewApplicant.email})` : ""} will be used.</p>
+              <fieldset className="space-y-2">
+                <legend className="text-[12px] font-medium text-[#10141a]">Account type</legend>
+                {([ ["employee", "Employee"], ["agency_staff", "Agency administrator (configurable access)"] ] as const).map(([value, label]) => (
+                  <label key={value} className="flex cursor-pointer items-center gap-2 rounded-[12px] border border-[#cccccd] px-4 py-3 text-[14px] text-[#10141a]">
+                    <input type="radio" name="review-account-type" value={value} checked={reviewAccountType === value} onChange={() => setReviewAccountType(value)} disabled={isSaving} />
+                    {label}
+                  </label>
+                ))}
+              </fieldset>
+            </div>
+          )}
+          {!reviewApplicant && <>
           {/* Name Field */}
           <div className="flex flex-col gap-[4px] w-full">
             <Label className="text-[12px] font-normal leading-[normal] text-[#10141a]">
@@ -422,7 +453,9 @@ export default function AddNewUserModal({
               )}
             </div>
           )}
+          </>}
 
+          {(!reviewApplicant || reviewAccountType === "agency_staff") && <>
           {/* Role */}
           <div className="flex flex-col gap-[4px] w-full">
             <Label className="text-[12px] font-normal leading-[normal] text-[#10141a]">
@@ -789,6 +822,7 @@ export default function AddNewUserModal({
               ))}
             </div>
           )}
+          </>}
         </div>
 
         {/* Footer Buttons */}
@@ -804,14 +838,14 @@ export default function AddNewUserModal({
           </button>
           <button
             onClick={handleSave}
-            disabled={isSaving || (showModePicker && agencyModes.length === 0) || !canSave}
+            disabled={isSaving || (reviewApplicant && !reviewAccountType) || (reviewAccountType !== "employee" && ((showModePicker && agencyModes.length === 0) || !canSave))}
             className="flex-1 flex items-center justify-center gap-2 px-[16px] py-[12px] rounded-[60px] bg-[#2b82ff] backdrop-blur-[22px] hover:bg-[#2775e5] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSaving && (
               <div className="h-5 w-5 animate-spin rounded-full border-2 border-solid border-white border-r-transparent"></div>
             )}
             <span className="text-[14px] font-semibold leading-[1.4] text-white">
-              {isSaving
+              {reviewApplicant ? isSaving ? "Creating..." : reviewAccountType === "agency_staff" ? "Create agency staff account" : reviewAccountType === "employee" ? "Create employee account" : "Select account type" : isSaving
                 ? mode === "create"
                   ? "Adding..."
                   : "Saving..."

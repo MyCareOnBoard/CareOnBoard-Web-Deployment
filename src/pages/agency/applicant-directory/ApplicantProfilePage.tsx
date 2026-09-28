@@ -29,6 +29,8 @@ import { DocumentsTab, type ReferenceItem } from "./components/DocumentsTab";
 import { ConditionalHireTab } from "./components/ConditionalHireTab";
 import { OfficialHireTab } from "./components/OfficialHireTab";
 import { FinalReviewTab, type ReviewStepsState } from "./components/FinalReviewTab";
+import AddNewUserModal from "@/pages/agency/agency-settings/user-levels/AddNewUserModal";
+import type { StaffFormValues } from "@/lib/api/agency-staff";
 import { getApplicantDocs, type ApplicantType } from "@/pages/applicant/application/documentConfig";
 import { roleLabel } from "@/lib/roleLabel";
 import { VoiceRecordingProvider } from "@/contexts/VoiceRecordingContext";
@@ -112,6 +114,7 @@ function ApplicantProfilePageContent() {
   const [pendingRejectDocumentId, setPendingRejectDocumentId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [showRejectReviewStepDialog, setShowRejectReviewStepDialog] = useState(false);
+  const [showCreateAccountDialog, setShowCreateAccountDialog] = useState(false);
   const [pendingRejectStepKey, setPendingRejectStepKey] = useState<keyof ReviewStepsState | null>(null);
   const [rejectReviewStepReason, setRejectReviewStepReason] = useState("");
   const [hasMovedBeyondDocumentsStage, setHasMovedBeyondDocumentsStage] =
@@ -212,17 +215,37 @@ function ApplicantProfilePageContent() {
     });
   }, [searchParams]);
 
+  useEffect(() => {
+    if (applicant.userType === "agency_staff" && activeSection === "official") {
+      setActiveSection("final");
+      setSearchParams({ tab: "final" }, { replace: true });
+    }
+  }, [applicant.userType, activeSection, setSearchParams]);
+
   const getDocumentUrlByType = (type: string) => {
     const item = documentsData.find((doc) => doc.type === type);
     return item?.url;
   };
 
-  const handleConfirmReviewStep = async (stepKey: keyof ReviewStepsState) => {
+  const handleConfirmReviewStep = async (
+    stepKey: keyof ReviewStepsState,
+    accountType?: "employee" | "agency_staff",
+    staff?: StaffFormValues,
+  ) => {
+    if (stepKey === "systemProfile" && !accountType) {
+      setShowCreateAccountDialog(true);
+      return;
+    }
     if (!id) return;
     setActionLoading(stepKey);
     try {
-      // Call API to save confirmation
-      await applicantsApi.confirmReviewStep(id, stepKey, true);
+      let staffDetails: Omit<StaffFormValues, "name" | "email" | "password"> | undefined;
+      if (staff) {
+        const { name: _name, email: _email, password: _password, ...details } = staff;
+        staffDetails = details;
+      }
+      await applicantsApi.confirmReviewStep(id, stepKey, true, undefined,
+        accountType ? { accountType, ...(staffDetails && { staffDetails }) } : undefined);
 
       setReviewSteps(prev => ({
         ...prev,
@@ -233,15 +256,20 @@ function ApplicantProfilePageContent() {
         }
       }));
       toast({
-        title: "Confirmed",
-        description: "Review step confirmed successfully"
+        title: accountType === "agency_staff" ? "Agency staff account created" : "Confirmed",
+        description: accountType === "agency_staff"
+          ? "The applicant hire flow is complete. An email notification has been queued for the new staff member."
+          : "Review step confirmed successfully"
       });
+      if (accountType) setShowCreateAccountDialog(false);
+      if (accountType === "agency_staff") await fetchApplicantData();
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to confirm step",
+        description: (error as { response?: { data?: { error?: string } } })?.response?.data?.error || "Failed to confirm step",
         variant: "destructive"
       });
+      if (accountType) throw error;
     } finally {
       setActionLoading(null);
     }
@@ -320,7 +348,7 @@ function ApplicantProfilePageContent() {
         profileScreening: Boolean(data.preScreening?.status),
         documents: Boolean(data.eligibility?.status),
         conditionalHire: Boolean(data.conditionalHire?.status),
-        finalAgencyReview: data.applicationStatus === 'approved' || false,
+        finalAgencyReview: data.applicationStatus === 'approved' || data.userType === 'agency_staff',
         // Map all pre-screening questions from preScreening data
         questionnaire: {
           isAtLeast18: data.preScreening?.isAtLeast18 ? 'Yes' : 'No',
@@ -470,7 +498,7 @@ function ApplicantProfilePageContent() {
         profile: data.preScreening?.status || null,
         documents: data.eligibility?.status || null,
         conditional: data.conditionalHire?.status || null,
-        final: allReviewsConfirmed,
+        final: allReviewsConfirmed || data.userType === 'agency_staff',
         official: data.officialHireStatus || null,
       });
 
@@ -481,7 +509,8 @@ function ApplicantProfilePageContent() {
         currentStep === "review" ||
         currentStep === "final-agency-review" ||
         currentStep === "official-hire" ||
-        currentStep === "orientation";
+        currentStep === "orientation" ||
+        currentStep === "completed";
       setHasMovedBeyondDocumentsStage(movedBeyondDocuments);
 
     } catch (error) {
@@ -861,6 +890,8 @@ function ApplicantProfilePageContent() {
                       <span className="text-[10px] font-semibold leading-[1.4] text-[#0eaf52]">
                         {applicant.userType === 'applicant'
                           ? 'Applicant'
+                          : applicant.userType === 'agency_staff'
+                            ? 'Agency staff'
                           : roleLabel({ applicantType: applicant.applicantType, role: applicant.role })}
                       </span>
                     </div>
@@ -975,11 +1006,11 @@ function ApplicantProfilePageContent() {
                     ) : (
                       <CircleAlert className="h-4 w-4" />
                     )}
-                    Final Agency Review
+                    {applicant.userType === "agency_staff" ? "Staff account created" : "Final Agency Review"}
                   </button>
 
                   {/* Official Hire */}
-                  <button
+                  {applicant.userType !== "agency_staff" && <button
                     type="button"
                     onClick={() => handleNavigateToSection("official")}
                     className={`pointer-events-auto flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "official"
@@ -995,7 +1026,7 @@ function ApplicantProfilePageContent() {
                       <CircleAlert className="h-4 w-4" />
                     )}
                     Official Hire
-                  </button>
+                  </button>}
                 </div>
               </>
             )}
@@ -1035,7 +1066,12 @@ function ApplicantProfilePageContent() {
           )}
 
           {activeSection === "final" && (
-            <FinalReviewTab
+            applicant.userType === "agency_staff" ? (
+              <div className="rounded-[20px] border border-[#0eaf52] bg-[#f0faf4] p-6 text-[#10141a]">
+                <h3 className="text-lg font-semibold">Agency staff account created</h3>
+                <p className="mt-2 text-sm">The applicant hire flow is complete. An email notification has been queued for the new staff member, who can sign in to the agency dashboard with their existing account.</p>
+              </div>
+            ) : <FinalReviewTab
               reviewSteps={reviewSteps}
               onConfirm={handleConfirmReviewStep}
               onReject={handleOpenRejectReviewStepDialog}
@@ -1043,7 +1079,15 @@ function ApplicantProfilePageContent() {
             />
           )}
 
-          {activeSection === "official" && (
+          <AddNewUserModal
+            open={showCreateAccountDialog}
+            onClose={() => setShowCreateAccountDialog(false)}
+            reviewApplicant={{ name: applicant.name, email: applicant.email || "" }}
+            onCreateEmployee={() => handleConfirmReviewStep("systemProfile", "employee")}
+            onSave={(staff) => handleConfirmReviewStep("systemProfile", "agency_staff", staff)}
+          />
+
+          {activeSection === "official" && applicant.userType !== "agency_staff" && (
             <OfficialHireTab
               isLoading={isLoading}
               hasSigned={Boolean(signatures?.officialHire)}

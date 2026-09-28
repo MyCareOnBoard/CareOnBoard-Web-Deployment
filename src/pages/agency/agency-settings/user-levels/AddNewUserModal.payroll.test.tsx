@@ -12,6 +12,26 @@ vi.mock("@/hooks/useStaffLabels", () => ({
 }));
 
 describe("AddNewUserModal payroll prerequisites", () => {
+  it("requires an account choice and reuses staff fields for applicant review", async () => {
+    const user = userEvent.setup();
+    const onCreateEmployee = vi.fn().mockResolvedValue(undefined);
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(<AddNewUserModal open onClose={vi.fn()} reviewApplicant={{ name: "Pat Applicant", email: "pat@example.com" }} onCreateEmployee={onCreateEmployee} onSave={onSave} />);
+
+    expect(screen.getByRole("button", { name: "Select account type" })).toBeDisabled();
+    expect(screen.queryByText("Employment Type")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("radio", { name: "Agency administrator (configurable access)" }));
+    expect(screen.getByText("Employment Type")).toBeInTheDocument();
+    expect(screen.getByText("Access List")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create agency staff account" })).toBeDisabled();
+    await user.click(screen.getByRole("radio", { name: "Employee" }));
+    const createEmployee = screen.getByRole("button", { name: "Create employee account" });
+    expect(createEmployee).toBeEnabled();
+    await user.click(createEmployee);
+    await waitFor(() => expect(onCreateEmployee).toHaveBeenCalledOnce());
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
   it("requires accessible employment dates and sends only current compensation terms", async () => {
     const user = userEvent.setup();
     const onSave = vi.fn().mockResolvedValue(undefined);
