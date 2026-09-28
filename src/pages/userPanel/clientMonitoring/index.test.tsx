@@ -85,3 +85,20 @@ it('shows the saved finding details and distinct action decisions', async () => 
   expect(screen.getByText('Immediate action: Called nurse')).toBeInTheDocument();
   expect(screen.getByText('No follow-up needed: Already resolved')).toBeInTheDocument();
 });
+
+it('shows a page-shaped skeleton while client details load', () => {
+  vi.mocked(getScOverview).mockReturnValueOnce(new Promise(() => {}));
+  renderPage();
+  const loading = screen.getByRole('status', { name: 'Loading client monitoring' });
+  expect(loading.querySelectorAll('.animate-pulse').length).toBeGreaterThan(8);
+  expect(screen.queryByText('Alex Morgan')).not.toBeInTheDocument();
+});
+
+it('shows a record-shaped skeleton while the selected contact loads', async () => {
+  vi.mocked(getScContact).mockReturnValueOnce(new Promise(() => {}));
+  renderPage();
+  await screen.findByText('Alex Morgan');
+  await userEvent.click(screen.getByRole('button', { name: 'Open record' }));
+  const loading = screen.getByRole('status', { name: 'Loading contact record' });
+  expect(loading.querySelectorAll('.animate-pulse').length).toBeGreaterThan(5);
+});

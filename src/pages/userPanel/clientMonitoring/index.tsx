@@ -8,6 +8,7 @@ import { addScContactAmendment, getScContact, getScOverview, listScContacts,
   type ScAnswer, type ScContact, type ScContactSummary, type ScOverview, type ScFollowUp } from '@/lib/api/sc-monitoring';
 import ContactForm from './ContactForm';
 import FollowUpPanel from './FollowUpPanel';
+import { MonitoringDetailSkeleton, MonitoringOverviewSkeleton } from './MonitoringSkeleton';
 import './monitoring.css';
 
 const instant = (value: string | null) => value ? new Date(value).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
@@ -119,7 +120,7 @@ export default function ClientMonitoringPage() {
 
   if (!isSc) return <Navigate to={Routes.userPanel.clientsAndServices} replace />;
   if (unavailable) return <div className="scm"><div className="scm-panel scm-detail"><h1 className="scm-title">This client is no longer available in your caseload.</h1><p className="scm-sub">Your agency may have changed the assignment.</p><button type="button" className="scm-button mt-5" onClick={() => navigate(Routes.userPanel.clientsAndServices)}>Back to My Clients</button></div></div>;
-  if (loading && !overview) return <div className="scm" role="status">Loading client monitoring…</div>;
+  if (loading && !overview) return <MonitoringOverviewSkeleton />;
   if (error && !overview) return <div className="scm scm-panel scm-detail"><h1 className="scm-title">Could not load monitoring for this client.</h1><button type="button" className="scm-button mt-5" onClick={() => void refresh()}>Try again</button></div>;
   if (!overview || !clientId) return null;
   return <main className="scm">
@@ -127,7 +128,7 @@ export default function ClientMonitoringPage() {
     {error && <p role="alert" className="scm-error">{error}</p>}
     {showForm ? <ContactForm overview={overview} onCancel={() => setShowForm(false)} onUnavailable={markUnavailable} onSaved={() => { setShowForm(false); setNotice('Contact saved'); void refresh(); }} />
       : selectedFollowUpId ? <FollowUpPanel clientId={clientId} followUpId={selectedFollowUpId} onBack={() => setSelectedFollowUpId(null)} onUnavailable={markUnavailable} />
-        : selectedContactId ? selectedContact ? <ContactRecord detail={selectedContact} clientName={overview.name} clientId={clientId} onBack={() => { setSelectedContactId(null); setSelectedContact(null); }} onFollowUp={setSelectedFollowUpId} onUnavailable={markUnavailable} /> : error ? <button type="button" className="scm-button" onClick={() => { setError(''); setSelectedContactId(null); }}>Back to monitoring overview</button> : <div role="status">Loading contact record…</div>
+        : selectedContactId ? selectedContact ? <ContactRecord detail={selectedContact} clientName={overview.name} clientId={clientId} onBack={() => { setSelectedContactId(null); setSelectedContact(null); }} onFollowUp={setSelectedFollowUpId} onUnavailable={markUnavailable} /> : error ? <button type="button" className="scm-button" onClick={() => { setError(''); setSelectedContactId(null); }}>Back to monitoring overview</button> : <MonitoringDetailSkeleton kind="contact" />
           : <><button type="button" className="scm-back" onClick={() => navigate(Routes.userPanel.clientsAndServices)}>← Back to My Clients</button>
             <div className="scm-panel scm-banner"><span className="scm-avatar">{initials(overview.name)}</span><div><h1>{overview.name}</h1><p>ID {overview.clientId} · {overview.program}{overview.county ? ` · ${overview.county}` : ''}</p></div><div className="scm-banner-period"><strong>Current ISP period</strong><small>{overview.ispPeriod ? `${civil(overview.ispPeriod.startDate)} – ${civil(overview.ispPeriod.endDate)}` : 'ISP period not recorded'}</small></div></div>
             <div className="scm-heading"><div><div className="scm-eyebrow">Client workspace</div><h1 className="scm-title">Monitoring overview</h1><p className="scm-sub">Plan details and contact findings are shown separately.</p></div><button type="button" className="scm-button scm-button-primary" onClick={() => { setNotice(''); setShowForm(true); }}><Plus size={16} /> Record contact</button></div>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import { type ScFollowUp, type ScFollowUpEvent, getScFollowUp, updateScFollowUp } from '@/lib/api/sc-monitoring';
+import { MonitoringDetailSkeleton } from './MonitoringSkeleton';
 
 type Detail = ScFollowUp & { events: ScFollowUpEvent[] };
 const date = (value: string | null) => value ? new Date(value.includes('T') ? value : `${value}T12:00:00Z`).toLocaleString('en-US',
@@ -37,7 +38,7 @@ export default function FollowUpPanel({ clientId, followUpId, onBack, onUnavaila
     } finally { setSaving(false); }
   };
 
-  if (!detail && !error) return <div role="status" className="scm-empty">Loading follow-up…</div>;
+  if (!detail && !error) return <MonitoringDetailSkeleton kind="follow-up" />;
   return <div>
     <button type="button" className="scm-back" onClick={onBack}>← Back to monitoring overview</button>
     <div className="scm-heading"><div><div className="scm-eyebrow">Follow-up</div><h1 className="scm-title">{detail?.description || 'Follow-up'}</h1><p className="scm-sub">Linked monitoring contact · ID {followUpId}</p></div>
