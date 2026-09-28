@@ -16,10 +16,20 @@ vi.mock('@/pages/userPanel/dashboard/components/uploadDocumentModal', () => ({de
 import Dashboard from './index';
 beforeEach(() => {
  vi.useFakeTimers(); vi.clearAllMocks(); mocks.error = false; mocks.saved = {documentId: 'doc', sourceRevision: {seconds: 100, nanoseconds: 500}}; mocks.data = {pilotEnabled: true, items: [], evaluatedAt: null};
+ mocks.documents = [{id: 'doc', documentId: 'doc', documentType: 'cpr', fileUrl: '', status: 'available'}];
  mocks.query.mockImplementation(() => ({data: mocks.data, isError: mocks.error, refetch: mocks.refetch}));
 });
 afterEach(() => vi.useRealTimers());
 describe('upload compliance refresh', () => {
+ it('shows only actual resume records in the Resume slot', () => {
+  mocks.documents = [{id: 'misc', documentId: 'misc', documentType: 'other', fileUrl: 'https://example.com/other.pdf', status: 'available'}];
+  const {rerender} = render(<Dashboard />);
+  expect(screen.getByRole('button', {name: 'Upload Resume'})).toBeInTheDocument();
+  expect(screen.queryByRole('button', {name: 'View Resume'})).not.toBeInTheDocument();
+  mocks.documents = [{id: 'resume', documentId: 'resume', documentType: 'resume', fileUrl: 'https://example.com/resume.pdf', status: 'available'}];
+  rerender(<Dashboard />);
+  expect(screen.getByRole('button', {name: 'View Resume'})).toBeInTheDocument();
+ });
  it('treats a missing issue as pending and stops after its exact revision was evaluated before the HTTP response', () => {
   const {rerender} = render(<Dashboard />);
   fireEvent.click(screen.getByRole('button', {name: 'Upload document'})); fireEvent.click(screen.getByText('Save upload'));

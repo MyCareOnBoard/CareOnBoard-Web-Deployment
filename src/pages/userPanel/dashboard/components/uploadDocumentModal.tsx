@@ -8,6 +8,7 @@ import {useSaveDocumentMutation, useUploadDocumentMutation} from "@/pages/userPa
 import {userPanelDocumentTypes} from "@/pages/userPanel/dashboard/constants";
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
 import {Calendar} from "@/components/ui/calendar";
+import {toast} from "sonner";
 
 interface FormData {
   type: string;
@@ -74,6 +75,10 @@ const UserPanelDocumentUpload = (
       onComplete(saved ?? {});
     } catch (error) {
       console.error("Error uploading file:", error);
+      if (error && typeof error === 'object' && 'status' in error && error.status === 409) {
+        toast.error('Multiple records exist for this document type. Contact your agency to review them.');
+        return;
+      }
       onError();
     }
   }

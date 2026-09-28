@@ -7,7 +7,7 @@
  * a panel looking for "driverLicense".
  */
 export const userPanelDocumentTypes = [
-  {label: "Resume", value: "other"},
+  {label: "Resume", value: "resume"},
   {label: "Photo ID", value: "photo-id"},
   {label: "Driver's License", value: "driver-license"},
   {label: "Social Security Card", value: "social-security-card"},
