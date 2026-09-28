@@ -54,7 +54,7 @@ export const applicationApi = createApi({
                 requiresAuth: true
             })
         }),
-        submitOfficialHire: builder.mutation<void, void>({
+        submitOfficialHire: builder.mutation<{ success: boolean; data: { userType: "employee" | "agency_staff" } }, void>({
             query: () => ({
                 url: `/officialHire/submit`,
                 method: "POST",

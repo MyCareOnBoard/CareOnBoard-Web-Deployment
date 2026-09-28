@@ -215,13 +215,6 @@ function ApplicantProfilePageContent() {
     });
   }, [searchParams]);
 
-  useEffect(() => {
-    if (applicant.userType === "agency_staff" && activeSection === "official") {
-      setActiveSection("final");
-      setSearchParams({ tab: "final" }, { replace: true });
-    }
-  }, [applicant.userType, activeSection, setSearchParams]);
-
   const getDocumentUrlByType = (type: string) => {
     const item = documentsData.find((doc) => doc.type === type);
     return item?.url;
@@ -256,9 +249,9 @@ function ApplicantProfilePageContent() {
         }
       }));
       toast({
-        title: accountType === "agency_staff" ? "Agency staff account created" : "Confirmed",
+        title: accountType === "agency_staff" ? "Agency staff details saved" : "Confirmed",
         description: accountType === "agency_staff"
-          ? "The applicant hire flow is complete. An email notification has been queued for the new staff member."
+          ? "The applicant can access the agency dashboard after signing the official hire letter."
           : "Review step confirmed successfully"
       });
       if (accountType) setShowCreateAccountDialog(false);
@@ -491,15 +484,15 @@ function ApplicantProfilePageContent() {
 
       // Extract step statuses for tab styling
       // Check if all review steps are confirmed for final review status
-      const allReviewsConfirmed = data.reviews
-        ? Object.keys(data.reviews).length === Object.keys(reviewSteps).length
-        : false;
+      const allReviewsConfirmed = Object.keys(reviewSteps).every(
+        (key) => data.reviews?.[key as keyof ReviewStepsState]?.confirmed === true
+      );
 
       setStepStatuses({
         profile: data.preScreening?.status || null,
         documents: data.eligibility?.status || null,
         conditional: data.conditionalHire?.status || null,
-        final: allReviewsConfirmed || data.userType === 'agency_staff',
+        final: allReviewsConfirmed,
         official: data.officialHireStatus || null,
       });
 
@@ -1007,11 +1000,11 @@ function ApplicantProfilePageContent() {
                     ) : (
                       <CircleAlert className="h-4 w-4" />
                     )}
-                    {applicant.userType === "agency_staff" ? "Staff account created" : "Final Agency Review"}
+                    Final Agency Review
                   </button>
 
                   {/* Official Hire */}
-                  {applicant.userType !== "agency_staff" && <button
+                  <button
                     type="button"
                     onClick={() => handleNavigateToSection("official")}
                     className={`pointer-events-auto flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "official"
@@ -1027,7 +1020,7 @@ function ApplicantProfilePageContent() {
                       <CircleAlert className="h-4 w-4" />
                     )}
                     Official Hire
-                  </button>}
+                  </button>
                 </div>
               </>
             )}
@@ -1070,7 +1063,7 @@ function ApplicantProfilePageContent() {
             applicant.userType === "agency_staff" ? (
               <div className="rounded-[20px] border border-[#0eaf52] bg-[#f0faf4] p-6 text-[#10141a]">
                 <h3 className="text-lg font-semibold">Agency staff account created</h3>
-                <p className="mt-2 text-sm">The applicant hire flow is complete. An email notification has been queued for the new staff member, who can sign in to the agency dashboard with their existing account.</p>
+                <p className="mt-2 text-sm">The applicant signed the official hire letter and can use their existing account to access the agency dashboard.</p>
               </div>
             ) : <FinalReviewTab
               reviewSteps={reviewSteps}
@@ -1088,7 +1081,7 @@ function ApplicantProfilePageContent() {
             onSave={(staff) => handleConfirmReviewStep("systemProfile", "agency_staff", staff)}
           />
 
-          {activeSection === "official" && applicant.userType !== "agency_staff" && (
+          {activeSection === "official" && (
             <OfficialHireTab
               isLoading={isLoading}
               hasSigned={Boolean(signatures?.officialHire)}

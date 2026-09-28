@@ -5,12 +5,14 @@ import {Input} from "@/components/ui/input";
 import {useNavigate} from "react-router";
 import {Routes} from "@/routes/constants";
 import {useAuth} from "@/utils/auth";
+import {useToast} from "@/hooks/use-toast";
 
 const EmployeeUserPanelLoginDetailsModal = (
   {isOpen, setIsOpen}: { isOpen: boolean; setIsOpen: (value: boolean) => void }
 ) => {
 
-  const {user} = useAuth();
+  const {user, refreshProfile, getToken} = useAuth();
+  const {toast} = useToast();
 
   const navigate = useNavigate();
 
@@ -110,7 +112,16 @@ const EmployeeUserPanelLoginDetailsModal = (
               Back to dashboard
             </Button>
             <Button
-              onClick={() => navigate(Routes.userPanel.dashboard)}
+              onClick={async () => {
+                try {
+                  await getToken(true);
+                  await refreshProfile();
+                  navigate(Routes.userPanel.dashboard);
+                } catch (error) {
+                  console.error(error);
+                  toast({title: "Error", description: "Unable to open the user panel. Please try again.", variant: "destructive"});
+                }
+              }}
               className="px-6 font-medium text-white transition-colors bg-teal-500 rounded-full hover:bg-teal-600"
             >
               Login to  user panel

@@ -8,6 +8,7 @@ import DashboardSidebar, {NavItem} from "@/components/DashboardSidebar";
 import {useSidebarCollapsed} from "@/hooks/useSidebarCollapsed";
 import {UserType} from "@/utils/auth/types/user.types";
 import {Routes} from "@/routes/constants";
+import {getDashboardRouteForUserType} from "@/utils/auth/helpers/roleDashboard";
 import QuestionIcon from "@/assets/icons/question-mark-circle.svg?react";
 import UserIcon from "@/assets/icons/user.svg?react";
 import FileIcon from "@/assets/icons/file.svg?react";
@@ -50,8 +51,8 @@ export default function ApplicantDashboardLayout({children}: { children?: ReactN
   ];
 
   useEffect(() => {
-    if (!user || (user?.userType !== UserType.APPLICANT)) {
-      navigate(Routes.auth.login, {replace: true});
+    if (!user || user.userType !== UserType.APPLICANT) {
+      navigate(user ? getDashboardRouteForUserType(user.userType) : Routes.auth.login, {replace: true});
     }
   }, [user]);
 

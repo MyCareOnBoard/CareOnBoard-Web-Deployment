@@ -31,7 +31,7 @@ type SignaturePayload = {
 interface DigitalSignatureModalProps {
   isOpen: boolean;
   setIsOpen: (value: boolean) => void;
-  proceed?: () => void;
+  proceed?: () => void | Promise<void>;
   useCase?: string;
   onSave?: (signatureData: SignaturePayload) => void;
   skipBackend?: boolean;
@@ -59,15 +59,26 @@ const DigitalSignatureModal = ({
   const [typedSignature, setTypedSignature] = useState('');
   const [isDrawing, setIsDrawing] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const contextRef = useRef<CanvasRenderingContext2D | null>(null);
+  // Signature POST rejects duplicates; retry only the next step after it succeeds.
+  const savedSignatureRef = useRef<SignaturePayload | null>(null);
+  const onSaveDoneRef = useRef(false);
 
   const [signDocument] = useSignDocumentMutation();
 
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      savedSignatureRef.current = null;
+      onSaveDoneRef.current = false;
+    }
+  }, [isOpen]);
 
   // Treat the hand-rolled portal as a real dialog: move focus in on open, trap
   // Tab within it, close on Escape, and restore focus to the opener on close.
@@ -216,6 +227,7 @@ const DigitalSignatureModal = ({
   };
 
   const handleNext = async () => {
+    if (isSaving) return;
     let signatureData: SignaturePayload | null = null;
 
     if (activeTab === 'type' && typedSignature.trim()) {
@@ -226,21 +238,35 @@ const DigitalSignatureModal = ({
       signatureData = { signatureType: 'upload', signatureData: uploadedImage };
     }
 
-    if (signatureData) {
+    if (signatureData || savedSignatureRef.current) {
+      let signatureSaved = false;
+      setIsSaving(true);
       try {
-        if (!skipBackend) {
-          await signDocument({
-            context: useCase,
-            data: signatureData
-          }).unwrap();
+        const payload = savedSignatureRef.current ?? signatureData!;
+        if (!savedSignatureRef.current) {
+          if (!skipBackend) {
+            await signDocument({
+              context: useCase,
+              data: payload
+            }).unwrap();
+          }
+          savedSignatureRef.current = payload;
         }
+        signatureSaved = true;
 
-        onSave?.(signatureData);
-        proceed?.();
+        if (!onSaveDoneRef.current) {
+          onSave?.(payload);
+          onSaveDoneRef.current = true;
+        }
+        await proceed?.();
         setIsOpen(false);
       } catch (error) {
-        console.error('Failed to save signature:', error);
-        alert('Failed to save signature. Please try again.');
+        console.error(signatureSaved ? 'Failed to proceed after signature:' : 'Failed to save signature:', error);
+        alert(signatureSaved
+          ? 'Signature saved, but the next step could not be completed. Please try again.'
+          : 'Failed to save signature. Please try again.');
+      } finally {
+        setIsSaving(false);
       }
     } else {
       alert('Please provide a signature before proceeding.');
@@ -447,9 +473,10 @@ const DigitalSignatureModal = ({
                 </Button>
                 <Button
                   onClick={handleNext}
+                  disabled={isSaving}
                   className="px-6 text-white font-medium bg-teal-500 hover:bg-teal-600 rounded-full transition-colors"
                 >
-                  Next
+                  {isSaving ? 'Saving...' : 'Next'}
                 </Button>
               </div>
             </>

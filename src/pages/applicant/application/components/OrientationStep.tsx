@@ -7,63 +7,75 @@ import {
     useGetOfficialHireStatusQuery,
     useSubmitOfficialHireMutation
 } from "@/pages/applicant/application/api";
-import {useDispatch} from "react-redux";
+import {useNavigate} from "react-router";
+import {useAuth} from "@/utils/auth";
 import {getUser} from "@/lib/api/users";
-import {setUser} from "@/utils/auth";
+import {UserType} from "@/utils/auth/types/user.types";
+import {Routes} from "@/routes/constants";
 
 export default function OrientationStep() {
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
     const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState<boolean>(false);
 
-    const dispatch = useDispatch();
+    const navigate = useNavigate();
+    const {user, refreshProfile, getToken} = useAuth();
 
     const {
         data,
         isLoading: isLoadingSignatureStatus,
+        isFetching: isFetchingSignatureStatus,
         refetch: refetchSignatureStatus,
     } = useCheckSignatureStatusQuery("official-hire");
     const {
         data: officialHireStatus,
         isLoading: isLoadingOfficialHireStatus,
+        isFetching: isFetchingOfficialHireStatus,
         refetch: refetchOfficialHireStatus,
     } = useGetOfficialHireStatusQuery(undefined);
     const [submitOfficialHire] = useSubmitOfficialHireMutation();
 
-    const handleProfileRetrieve = async () => {
-      try {
-        const user = await getUser();
-        dispatch(setUser(user));
-      } catch (error) {
-        console.error(error);
-      }
-    }
+    const openStaffPortal = async () => {
+        await getToken(true);
+        const user = await refreshProfile();
+        if (user?.userType === UserType.AGENCY_STAFF) {
+            navigate(Routes.agency.dashboard, {replace: true});
+        } else {
+            throw new Error("Agency staff access is not ready yet.");
+        }
+    };
 
     const handleModalOpen = async () => {
         if (officialHireStatus?.status?.overall?.status === "completed") {
-            await handleProfileRetrieve();
-            setIsEmployeeModalOpen(true);
+            try {
+                const user = await getUser();
+                if (user.userType === UserType.AGENCY_STAFF) await handleSubmitOfficialHire();
+                else setIsEmployeeModalOpen(true);
+            } catch (error) { reportSubmitError(error); }
         } else if (data?.data?.signatureId) {
-            await handleSubmitOfficialHire();
-            setIsEmployeeModalOpen(true);
+            try { await handleSubmitOfficialHire(); }
+            catch (error) { reportSubmitError(error); }
         } else {
             setIsModalOpen(true);
         }
     }
 
+    const reportSubmitError = (error: unknown) => {
+        console.error(error);
+        alert("Official hire could not be completed. Please try again.");
+    }
+
     const handleSubmitOfficialHire = async () => {
-        try {
-            await submitOfficialHire().unwrap();
-            setIsEmployeeModalOpen(true);
+        const result = await submitOfficialHire().unwrap().finally(() => {
             refetchSignatureStatus();
             refetchOfficialHireStatus();
-        } catch (error) {
-            console.error(error);
-        }
+        });
+        if (result.data.userType === UserType.AGENCY_STAFF) await openStaffPortal();
+        else setIsEmployeeModalOpen(true);
     }
 
     const buttonText = () => {
         if (officialHireStatus?.status?.overall?.status === "completed") {
-            return "Login to user panel";
+            return user?.userType === UserType.AGENCY_STAFF ? "Open agency dashboard" : "Login to user panel";
         } else if (data?.data?.signatureId) {
             return "Complete Official Hire";
         } else {
@@ -71,7 +83,9 @@ export default function OrientationStep() {
         }
     }
 
-    const isLoading = isLoadingSignatureStatus || isLoadingOfficialHireStatus;
+    const isLoading = isLoadingSignatureStatus || isLoadingOfficialHireStatus
+        || isFetchingSignatureStatus || isFetchingOfficialHireStatus;
+    const isCompleted = officialHireStatus?.status?.overall?.status === "completed";
 
     return (
         <div className={"flex items-center justify-center"}>
@@ -84,14 +98,16 @@ export default function OrientationStep() {
                           fill="white"/>
                 </svg>
                 <h1 className={"font-bold text-2xl mt-6 mb-3"}>
-                    Congratulations! You are hired officially!
+                    {isCompleted ? "Congratulations! You are hired officially!" : "Complete your official hire"}
                 </h1>
-                <p className={" mb-8 text-lg"}>Sign digitally & take your employee ID & Email!</p>
+                <p className={" mb-8 text-lg"}>{isCompleted
+                    ? "Your official hire letter has been signed."
+                    : "Sign the official hire letter to finish your application."}</p>
                 <Button
                     variant="ghost"
                     className="font-normal  border hover:border-[#B2B2B3] text-white fill-[#00b4b8] bg-[#00b4b8] hover:bg-[#028c8f] hover:text-white text-lg px-8"
                     onClick={handleModalOpen}
-                    disabled={isLoadingSignatureStatus || isLoadingOfficialHireStatus}
+                    disabled={isLoading}
                 >
                     {isLoading ? "Loading..." : buttonText()}
                 </Button>
