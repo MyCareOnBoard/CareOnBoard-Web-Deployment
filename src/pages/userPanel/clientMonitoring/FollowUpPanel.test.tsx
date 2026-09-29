@@ -42,3 +42,16 @@ it('reloads the latest detail after a revision conflict', async () => {
   expect(await screen.findByText('This follow-up changed while you were viewing it. Review the latest details and try again.')).toBeInTheDocument();
   expect(getScFollowUp).toHaveBeenCalledTimes(2);
 });
+
+it('disables the stale editor if conflict reload fails', async () => {
+  const user = userEvent.setup();
+  vi.mocked(updateScFollowUp).mockRejectedValueOnce(Object.assign(new Error('Conflict'), { isAxiosError: true, response: { status: 409 } }));
+  vi.mocked(getScFollowUp).mockResolvedValueOnce({ followUpId: 'f', contactId: 'c', issueKey: 'safety', category: 'safety', description: 'Concern', action: 'Call provider', responsiblePerson: 'Taylor', dueDate: '2026-09-29', priority: 'urgent', status: 'open', outcome: '', overdue: false, createdAt: '2026-09-28T12:00:00Z', updatedAt: '2026-09-28T12:00:00Z', completedAt: null, authorName: 'Taylor', revisionToken: 'observed', events: [] }).mockRejectedValueOnce(new Error('network'));
+  render(<FollowUpPanel clientId="client" followUpId="f" onBack={vi.fn()} onUnavailable={vi.fn()} />);
+  await screen.findByText('Call provider');
+  await user.click(screen.getByRole('button', { name: 'In progress' }));
+  await user.click(screen.getByRole('button', { name: 'Save update' }));
+  expect(await screen.findByText('Could not load this follow-up.')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Save update' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+});

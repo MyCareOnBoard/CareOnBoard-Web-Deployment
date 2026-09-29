@@ -22,6 +22,7 @@ export default function FollowUpPanel({ clientId, followUpId, onBack, onUnavaila
       return true;
     } catch (caught) {
       if (signal?.aborted) return false;
+      setDetail(null);
       if (axios.isAxiosError(caught) && [403, 404].includes(caught.response?.status || 0)) { setDetail(null); onUnavailable(); }
       else setError('Could not load this follow-up.');
       return false;
@@ -48,6 +49,7 @@ export default function FollowUpPanel({ clientId, followUpId, onBack, onUnavaila
     <div className="scm-heading"><div><div className="scm-eyebrow">Follow-up</div><h1 className="scm-title">{detail?.description || 'Follow-up'}</h1><p className="scm-sub">Linked monitoring contact · ID {followUpId}</p></div>
       {detail && <span className={`scm-tag scm-tag-${detail.priority === 'urgent' ? 'amber' : 'gray'}`}>{detail.priority} · {detail.status.replace('_', ' ')}</span>}</div>
     {error && <p role="alert" className="scm-error">{error}</p>}
+    {!detail && error && <button type="button" className="scm-button" onClick={() => void load()}>Try again</button>}
     {detail && <div className="scm-layout"><div className="scm-stack">
       <section className="scm-panel scm-detail"><h2>Issue and action</h2><dl>
         <div className="scm-keyval"><dt>Category</dt><dd>{detail.category.replace('_', ' ')}</dd></div>

@@ -7,7 +7,7 @@ const unwrap = <T>(body: Envelope<T>): T => {
   return body.data;
 };
 const path = (clientId: string) => `/clientManagement/${encodeURIComponent(clientId)}/monitoring`;
-export type AgencyFollowUpSummary = Omit<ScFollowUp, 'description' | 'action'>;
+export type AgencyFollowUpSummary = Omit<ScFollowUp, 'description' | 'action' | 'outcome'>;
 export type AgencyFollowUpPage = { items: AgencyFollowUpSummary[]; nextCursor: string | null };
 export type AgencyMonitoringOverview = { clientId: string; timezone: string; canUpdateFollowUps: boolean;
   lastContactAt: string | null; activeFollowUpCount: number; nextFollowUpDueDate: string | null;

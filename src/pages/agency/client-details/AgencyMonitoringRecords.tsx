@@ -66,7 +66,10 @@ export default function AgencyMonitoringRecords({ clientId }: { clientId: string
         else setCompleted(current => current && ({ items: [...current.items, ...page.items], nextCursor: page.nextCursor }));
       }
     } catch (error) {
-      if (lost(error)) { setOverview(null); setState('unavailable'); setSelected(null); }
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        setNotice('Monitoring records changed. The list has been refreshed.');
+        void refresh();
+      } else if (lost(error)) { setOverview(null); setState('unavailable'); setSelected(null); }
       else setPageError('Could not load older records. Try again.');
     } finally { setPaging(null); }
   };
@@ -98,7 +101,7 @@ export default function AgencyMonitoringRecords({ clientId }: { clientId: string
     </div>
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
       <section className={card} aria-labelledby="agency-followups-heading"><div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e6eded] p-4 sm:p-5"><div><h3 id="agency-followups-heading" className="text-lg font-semibold">Follow-ups</h3><p className="text-xs text-[#6a7e83]">Recorded actions and outcomes</p></div><div className="flex rounded-lg border border-[#cbdfe0] p-0.5" role="group" aria-label="Follow-up view">{(['active', 'completed'] as const).map(item => <button key={item} type="button" aria-pressed={view === item} className={`rounded-md px-3 py-1.5 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-[#008f93] ${view === item ? 'bg-[#008f93] text-white' : 'text-[#506a6e] hover:bg-[#eaf6f6]'}`} onClick={() => { setView(item); setPageError(''); }}>{label(item)}</button>)}</div></div>
-        {completedLoading ? <RowsSkeleton /> : followUps?.items.length ? <div className="divide-y divide-[#ebf0f0]">{followUps.items.map(item => <FollowUpRow key={item.followUpId} item={item} onOpen={() => setSelected({ kind: 'followUp', id: item.followUpId })} />)}</div> : <p className="p-5 text-sm text-[#617579]">{view === 'active' ? 'No active follow-ups.' : 'No completed follow-ups.'}</p>}
+        {view === 'completed' && completedLoading ? <RowsSkeleton /> : followUps?.items.length ? <div className="divide-y divide-[#ebf0f0]">{followUps.items.map(item => <FollowUpRow key={item.followUpId} item={item} onOpen={() => setSelected({ kind: 'followUp', id: item.followUpId })} />)}</div> : <p className="p-5 text-sm text-[#617579]">{view === 'active' ? 'No active follow-ups.' : 'No completed follow-ups.'}</p>}
         {followUps?.nextCursor && <div className="border-t border-[#ebf0f0] p-4"><Button variant="outline" disabled={paging === 'followUps'} onClick={() => void loadMore('followUps')}>Load more follow-ups</Button></div>}
       </section>
       <section className={card} aria-labelledby="agency-contacts-heading"><div className="border-b border-[#e6eded] p-4 sm:p-5"><h3 id="agency-contacts-heading" className="text-lg font-semibold">Contact history</h3><p className="text-xs text-[#6a7e83]">Newest SC records first</p></div>

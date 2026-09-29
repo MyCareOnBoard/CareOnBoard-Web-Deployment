@@ -29,6 +29,7 @@ export default function AgencyMonitoringFollowUpDetail({ clientId, followUpId, c
       return true;
     } catch (caught) {
       if (signal?.aborted) return false;
+      setDetail(null);
       if (axios.isAxiosError(caught) && [403, 404].includes(caught.response?.status || 0)) { setDetail(null); onUnavailable(); }
       else setError("Couldn't load this follow-up.");
       return false;

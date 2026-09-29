@@ -46,3 +46,28 @@ it('clears records and offers retry when the next overview fails', async () => {
   expect(screen.queryByText('Monthly review')).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
 });
+
+it('restores active records when a completed request is aborted by switching tabs', async () => {
+  const user = userEvent.setup();
+  vi.mocked(api.listAgencyMonitoringFollowUps).mockReturnValueOnce(new Promise(() => {}));
+  render(<MemoryRouter><AgencyMonitoringRecords clientId="c" /></MemoryRouter>);
+  await screen.findByText('Monthly review');
+  await user.click(screen.getByRole('button', { name: 'Completed' }));
+  expect(screen.getByRole('status', { name: 'Loading completed follow-ups' })).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Active' }));
+  expect(screen.getByRole('button', { name: 'View follow-up' })).toBeInTheDocument();
+  expect(screen.queryByRole('status', { name: 'Loading completed follow-ups' })).not.toBeInTheDocument();
+});
+
+it('refreshes an authorized list when a page cursor becomes stale', async () => {
+  const user = userEvent.setup();
+  vi.mocked(api.getAgencyMonitoringOverview).mockResolvedValue({ ...overview,
+    activeFollowUps: { ...overview.activeFollowUps, nextCursor: 'f' } } as unknown as api.AgencyMonitoringOverview);
+  vi.mocked(api.listAgencyMonitoringFollowUps).mockRejectedValueOnce(Object.assign(new Error('Not found'), { isAxiosError: true, response: { status: 404 } }));
+  render(<MemoryRouter><AgencyMonitoringRecords clientId="c" /></MemoryRouter>);
+  await screen.findByRole('button', { name: 'Load more follow-ups' });
+  await user.click(screen.getByRole('button', { name: 'Load more follow-ups' }));
+  await waitFor(() => expect(api.getAgencyMonitoringOverview).toHaveBeenCalledTimes(2));
+  expect(await screen.findByRole('button', { name: 'View follow-up' })).toBeInTheDocument();
+  expect(screen.queryByText('Monitoring is unavailable')).not.toBeInTheDocument();
+});
