@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense, useMemo, useCallback } from "react";
-import { useSearchParams } from "react-router";
+import { Navigate, useSearchParams } from "react-router";
 import AccountTab from "./components/AccountTab";
 import SettingsTabNav, { SettingsTabId, SettingsTabItem } from "./components/SettingsTabNav";
 import SettingsTabSkeleton from "./components/SettingsTabSkeleton";
@@ -7,10 +7,10 @@ import { TabPanel } from "@/pages/shared/settings";
 import { useAuth } from "@/utils/auth";
 import { UserType } from "@/utils/auth/types";
 import { canManageEmployeePayroll } from "@/lib/agency/agency-billing-permissions";
+import { Routes } from "@/routes/constants";
 
 const AgencyInfoTab = lazy(() => import("./components/AgencyInfoTab"));
 const NotificationsTab = lazy(() => import("./components/NotificationTab"));
-const UserLevelsTab = lazy(() => import("./components/UserLevelsTab"));
 const AgencyPayrollSetupTab = lazy(() => import("./components/AgencyPayrollSetupTab"));
 const MyPayrollTab = lazy(() => import("@/features/payroll/components/MyPayrollTab"));
 
@@ -28,16 +28,6 @@ export default function AgencySettingsPage() {
   const canOpenPayrollSetup = canManageEmployeePayroll(user?.userType, accessList)
     || user?.canOpenAgencyPayrollSetup === true;
 
-  const showTeamTab =
-
-    (user?.userType === UserType.AGENCY_STAFF &&
-
-      user?.profile?.accessList?.includes("User Levels")) ||
-
-    user?.userType === UserType.AGENCY;
-
-
-
   const tabs = useMemo(() => {
 
     const items: SettingsTabItem[] = [
@@ -50,17 +40,12 @@ export default function AgencySettingsPage() {
 
     ];
 
-    if (showTeamTab) {
-
-      items.push({ id: "userLevels", label: "Staff Management" });
-
-    }
     if (isAgencyStaff) items.push({ id: "myPayroll", label: "Payroll Setup" });
     if (canOpenPayrollSetup) items.push({ id: "payrollSetup", label: "Agency Payroll Setup" });
 
     return items;
 
-  }, [showTeamTab, isAgencyStaff, canOpenPayrollSetup]);
+  }, [isAgencyStaff, canOpenPayrollSetup]);
 
 
 
@@ -80,13 +65,12 @@ export default function AgencySettingsPage() {
   }, [activeTab]);
 
   useEffect(() => {
-    if (!user || !requestedTab || tabs.some((tab) => tab.id === requestedTab)) return;
+    if (!user || !requestedTab || requestedTab === "userLevels" || tabs.some((tab) => tab.id === requestedTab)) return;
     const next = new URLSearchParams(searchParams);
     next.set("tab", "account");
     setSearchParams(next, { replace: true });
   }, [requestedTab, searchParams, setSearchParams, tabs, user]);
-
-
+  if (requestedTab === "userLevels") return <Navigate to={Routes.agency.staffManagement} replace />;
 
   return (
 
@@ -98,7 +82,7 @@ export default function AgencySettingsPage() {
 
         <p className="mt-1 text-[14px] text-[#808081]">
 
-          Manage your account, agency profile, notifications, and staff access.
+          Manage your account, agency profile, and notifications.
 
         </p>
 
@@ -152,19 +136,6 @@ export default function AgencySettingsPage() {
 
 
 
-        {showTeamTab && visitedTabs.has("userLevels") && (
-
-          <TabPanel tabId="userLevels" activeTab={activeTab}>
-
-            <Suspense fallback={<SettingsTabSkeleton variant="form" cardCount={2} />}>
-
-              <UserLevelsTab />
-
-            </Suspense>
-
-          </TabPanel>
-
-        )}
 
         {isAgencyStaff && activeTab === "myPayroll" && visitedTabs.has("myPayroll") && user?.uid && user.agencyId && (
 

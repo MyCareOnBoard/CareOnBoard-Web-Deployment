@@ -28,6 +28,7 @@ const DocumentsPage = lazy(() => import("@/pages/applicant/documents"));
 const HelpCenterPage = lazy(() => import("@/pages/help-center"));
 const SettingsPage = lazy(() => import("@/pages/settings"));
 const AgencySettingsPage = lazy(() => import("@/pages/agency/agency-settings"));
+const StaffManagementPage = lazy(() => import("@/pages/agency/staff-management"));
 const ProfilePage = lazy(() => import("@/pages/profile"));
 const ApplicationStepper = lazy(() => import("@/pages/applicant/application"));
 const OnboardingSlider = lazy(() => import("@/pages/onboarding/components/OnboardingSlider"));
@@ -518,6 +519,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.agency.agencySettings,
                 Component: AgencySettingsPage,
+            },
+            {
+                path: Routes.agency.staffManagement,
+                Component: StaffManagementPage,
             },
             {
                 path: Routes.agency.myPayroll,

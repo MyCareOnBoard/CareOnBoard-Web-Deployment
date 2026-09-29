@@ -69,6 +69,7 @@ export const Routes = {
         announcements: "/agency/announcements",
         helpCenter: "/agency/help-center",
         agencySettings: "/agency/agency-settings",
+        staffManagement: "/agency/staff-management",
         agencySettingsInternalUsers: "/agency/agency-settings/user-levels/internal-users",
         agencySettingsDSP: "/agency/agency-settings/user-levels/dsp",
         agencySettingsClients: "/agency/agency-settings/user-levels/clients",

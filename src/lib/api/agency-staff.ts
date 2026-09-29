@@ -33,6 +33,7 @@ export enum AgencyAccessScope {
     COMMUNITY_INCLUSION = "Community Inclusion",
     TRAININGS = "Trainings",
     USER_LEVELS = "User Levels",
+    STAFF_MANAGEMENT = "Staff Management",
 }
 
 export type EmploymentType = "full_time" | "part_time";

@@ -47,11 +47,11 @@ export default function InternalUsersPage() {
     <div className="space-y-6">
       {/* Back Button */}
       <button
-        onClick={() => navigate(`${Routes.agency.agencySettings}?tab=userLevels`)}
+        onClick={() => navigate(Routes.agency.staffManagement)}
         className="flex items-center gap-2 text-gray-600 transition-colors cursor-pointer hover:text-gray-900"
       >
         <ArrowLeft className="w-5 h-5" />
-        <span className="text-sm font-medium">Back to User Levels</span>
+        <span className="text-sm font-medium">Back to Staff Management</span>
       </button>
     
     <div className="shadow-sm p-4 bg-[#f7f7f7] rounded-[16px]">

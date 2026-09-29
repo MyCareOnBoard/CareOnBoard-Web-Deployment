@@ -17,6 +17,9 @@ describe("agency billing access form invariants", () => {
   it("uses canonical billing options and removes legacy values", () => {
     expect(AGENCY_ACCESS_OPTIONS).toContain("Payroll Management");
     expect(AGENCY_ACCESS_OPTIONS).toContain("Payroll Approval");
+    expect(AGENCY_ACCESS_OPTIONS).toContain("Staff Management");
+    expect(AGENCY_ACCESS_OPTIONS).not.toContain("User Levels");
+    expect(normalizeAgencyAccessListForUi(["User Levels", "Staff Management"])).toEqual(["Staff Management"]);
     expect(AgencyAccessScope.PAYROLL_APPROVAL).toBe("Payroll Approval");
     expect(getAgencyAccessScopes()).toContain("Payroll Approval");
     expect(AGENCY_ACCESS_OPTIONS).not.toContain("Billing & Management");

@@ -9,7 +9,7 @@ export const AGENCY_ACCESS_OPTIONS = [
   "DSP Management", "Client Management", "Shift Management", "Notes",
   ...AGENCY_BILLING_SCOPES,
   "AI Automation", "Support", "Analytics", "Goals & Documents", "Applicant Directory",
-  "Reports", "Community Inclusion", "Trainings", "User Levels", "Mileage", "Incident",
+  "Reports", "Community Inclusion", "Trainings", "Staff Management", "Mileage", "Incident",
 ] as const;
 
 const BILLING_SCOPE_SET = new Set<string>(AGENCY_BILLING_SCOPES);
@@ -18,6 +18,7 @@ export function normalizeAgencyAccessListForUi(list: readonly string[]): string[
   const normalized = new Set<string>();
   for (const access of list) {
     if (access === "Scheduling") normalized.add("Shift Management");
+    else if (access === "User Levels") normalized.add("Staff Management");
     else if (access !== "Billing & Management") normalized.add(access);
   }
   for (const [elevated, view] of Object.entries(AGENCY_BILLING_SCOPE_IMPLICATIONS)) {

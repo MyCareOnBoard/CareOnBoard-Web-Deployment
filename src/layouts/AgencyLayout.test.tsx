@@ -225,3 +225,21 @@ describe('Compliance Alerts source entry', () => {
     expect(!!screen.queryByText('Compliance Alerts')).toBe(allowed);
   });
 });
+
+describe("Staff Management access", () => {
+  it.each([
+    ["agency", [], true],
+    ["agency_staff", ["Staff Management"], true],
+    ["agency_staff", ["User Levels"], true],
+    ["agency_staff", [], false],
+    ["agency_staff", "Not Staff Management", false],
+  ])("gates sidebar and direct page for %s with %j", (userType, accessList, allowed) => {
+    routing.pathname = "/agency/staff-management";
+    state.user = { uid: "staff", userType, profile: { accessList }, agency: { supportedClientTypes: ["ddd"] } };
+    const mounted = vi.fn();
+    function Child() { mounted(); return <p>Staff page</p>; }
+    render(<MemoryRouter><AgencyDashboardLayout><Child /></AgencyDashboardLayout></MemoryRouter>);
+    expect(!!screen.queryByText("Staff Management")).toBe(allowed);
+    expect(mounted).toHaveBeenCalledTimes(allowed ? 1 : 0);
+  });
+});

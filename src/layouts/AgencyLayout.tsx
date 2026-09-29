@@ -53,7 +53,9 @@ const SHIFT_MANAGEMENT_ACCESS_KEY = "Shift Management";
 
 function hasAgencyStaffAccess(accessList: string[], accessKey: string | undefined): boolean {
     if (!accessKey) return true;
+    if (!Array.isArray(accessList)) return false;
     if (accessList.includes(accessKey)) return true;
+    if (accessKey === "Staff Management" && accessList.includes("User Levels")) return true;
     if (accessKey === SHIFT_MANAGEMENT_ACCESS_KEY && accessList.includes("Scheduling")) return true;
     return false;
 }
@@ -123,6 +125,7 @@ const allNavItems: AgencyNavItem[] = [
     { label: "Support", path: Routes.agency.support, icon: SupportIcon, accessKey: "Support" },
     { label: "Announcements", path: Routes.agency.announcements, icon: Megaphone },
     { label: "My Payroll", path: Routes.agency.myPayroll, icon: BillingIcon, staffOnly: true },
+    { label: "Staff Management", path: Routes.agency.staffManagement, icon: UsersRound, accessKey: "Staff Management" },
     { label: "Settings", path: Routes.agency.agencySettings, icon: Settings },
 ];
 

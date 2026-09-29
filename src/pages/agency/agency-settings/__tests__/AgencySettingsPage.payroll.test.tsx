@@ -14,8 +14,9 @@ vi.mock("@/utils/auth", () => ({ useAuth: () => ({ user, refreshProfile }) }));
 vi.mock("../components/AccountTab", () => ({ default: () => <div>account</div> }));
 vi.mock("../components/AgencyPayrollSetupTab", () => ({ default: ({ scope, active }: any) => { payrollActiveStates.push(active); return <div data-testid="payroll-scope" data-active={String(active)}>{scope.actorUid}:{scope.agencyId}</div>; } }));
 vi.mock("@/features/payroll/components/MyPayrollTab", () => ({ default: ({ scope, active }: any) => <div data-testid="my-payroll-scope">{active ? `${scope.audience}:${scope.actorUid}:${scope.agencyId}:${scope.employmentId || "unavailable"}` : "inactive"}</div> }));
-vi.mock("../components/AgencyInfoTab", () => ({ default: () => null })); vi.mock("../components/NotificationTab", () => ({ default: () => null })); vi.mock("../components/UserLevelsTab", () => ({ default: () => null }));
+vi.mock("../components/AgencyInfoTab", () => ({ default: () => null })); vi.mock("../components/NotificationTab", () => ({ default: () => null }));
 const LocationProbe = () => <output data-testid="location">{useLocation().search}</output>;
+const PathProbe = () => <output data-testid="path">{useLocation().pathname}</output>;
 const expectLocation = async (search: string) => {
   await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent(search));
 };
@@ -44,14 +45,18 @@ describe("Agency Settings payroll tab", () => {
   it("canonicalizes an unauthorized company payroll query to account while preserving unrelated parameters", async () => { user = { ...user, userType: UserType.AGENCY_STAFF, canOpenAgencyPayrollSetup: false, profile: { accessList: [] } }; render(<MemoryRouter initialEntries={["/settings?from=notice&tab=payrollSetup"]}><AgencySettingsPage /><LocationProbe /></MemoryRouter>); expect(screen.queryByTestId("payroll-scope")).not.toBeInTheDocument(); await expectLocation("?from=notice&tab=account"); });
   it("canonicalizes an unknown tab query to account while preserving unrelated parameters", async () => { user = { uid: "u", agencyId: "a", payrollEmploymentId: "employment-1", canOpenAgencyPayrollSetup: true, userType: UserType.AGENCY, profile: {} }; render(<MemoryRouter initialEntries={["/settings?tab=unknown&from=notice"]}><AgencySettingsPage /><LocationProbe /></MemoryRouter>); expect(screen.queryByTestId("payroll-scope")).not.toBeInTheDocument(); await expectLocation("?tab=account&from=notice"); });
   it("writes every authorized agency settings tab while preserving unrelated parameters", async () => {
-    user = { ...user, userType: UserType.AGENCY_STAFF, canOpenAgencyPayrollSetup: true, profile: { accessList: ["User Levels"] } };
+    user = { ...user, userType: UserType.AGENCY_STAFF, canOpenAgencyPayrollSetup: true, profile: { accessList: ["Staff Management"] } };
     const interaction = userEvent.setup();
     render(<MemoryRouter initialEntries={["/settings?from=notice"]}><AgencySettingsPage /><LocationProbe /></MemoryRouter>);
 
-    for (const [label, tab] of [["Account", "account"], ["Agency Information", "agencyInfo"], ["Notifications", "notification"], ["Staff Management", "userLevels"], ["Payroll Setup", "myPayroll"], ["Agency Payroll Setup", "payrollSetup"]] as const) {
+    for (const [label, tab] of [["Account", "account"], ["Agency Information", "agencyInfo"], ["Notifications", "notification"], ["Payroll Setup", "myPayroll"], ["Agency Payroll Setup", "payrollSetup"]] as const) {
       await interaction.click(screen.getByRole("tab", { name: label }));
       await expectLocation(`?from=notice&tab=${tab}`);
     }
+  });
+  it("moves a bookmarked Staff Management tab to the new page", async () => {
+    render(<MemoryRouter initialEntries={["/agency/agency-settings?tab=userLevels"]}><AgencySettingsPage /><PathProbe /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByTestId("path")).toHaveTextContent("/agency/staff-management"));
   });
   it("falls back to Account and unmounts payroll when server setup capability is lost", async () => {
     user = { ...user, userType: UserType.AGENCY_STAFF, canOpenAgencyPayrollSetup: true, profile: { accessList: [] } };
