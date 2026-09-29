@@ -60,6 +60,8 @@ export interface ListStaffDirectoryResponse {
 }
 
 export interface SuperAdminStaffDetail extends StaffDirectoryStaffMember {
+  managedCoordinatorIds?: string[];
+  agencyModes?: Array<"ddd" | "hha" | "sc">;
   clientTypes: Array<"hha" | "ddd">;
   profile: {
     email: string | null;
@@ -127,6 +129,17 @@ export const staffDirectoryApi = createApi({
     getStaffDetail: builder.query<{ success: boolean; staff: SuperAdminStaffDetail }, string>({
       query: (staffId) => ({ url: `/superAdminStaffDirectory/staff-directory/${encodeURIComponent(staffId)}`, method: "GET", requiresAuth: true }),
     }),
+    assignStaffCoordinators: builder.mutation<
+      { success: boolean; coordinatorIds: string[] },
+      { staffId: string; coordinatorIds: string[]; expectedCoordinatorIds: string[] }
+    >({
+      query: ({ staffId, coordinatorIds, expectedCoordinatorIds }) => ({
+        url: `/superAdminStaffDirectory/staff-directory/${encodeURIComponent(staffId)}/coordinators`,
+        method: "PUT",
+        data: { coordinatorIds, expectedCoordinatorIds },
+        requiresAuth: true,
+      }),
+    }),
     getStaffDocuments: builder.query<{ success: boolean; documents: SuperAdminStaffDocument[]; pagination: { hasMore: boolean; nextCursor: string | null } }, StaffDocumentsParams>({
       query: ({ staffId, cursor }) => ({ url: `/superAdminStaffDirectory/staff-directory/${encodeURIComponent(staffId)}/documents`, method: "GET", params: { limit: 50, ...(cursor ? { cursor } : {}) }, requiresAuth: true }),
     }),
@@ -136,4 +149,4 @@ export const staffDirectoryApi = createApi({
   }),
 });
 
-export const { useListStaffDirectoryQuery, useGetStaffDetailQuery, useGetStaffDocumentsQuery, useLazyGetStaffDocumentsQuery, useLazyGetStaffDocumentViewQuery } = staffDirectoryApi;
+export const { useListStaffDirectoryQuery, useGetStaffDetailQuery, useAssignStaffCoordinatorsMutation, useGetStaffDocumentsQuery, useLazyGetStaffDocumentsQuery, useLazyGetStaffDocumentViewQuery } = staffDirectoryApi;

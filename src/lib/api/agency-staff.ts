@@ -70,6 +70,7 @@ export interface AgencyStaffMember {
     phone?: string;
     accessList: string[];
     agencyModes?: ("ddd" | "hha" | "sc")[];
+    managedCoordinatorIds?: string[];
     role?: string;
     employmentType?: EmploymentType;
     employmentStartDate?: string;
@@ -262,6 +263,19 @@ export const agencyStaffApi = createApi({
             ],
         }),
 
+        assignStaffCoordinators: builder.mutation<
+            { success: boolean; coordinatorIds: string[] },
+            { id: string; coordinatorIds: string[]; expectedCoordinatorIds: string[] }
+        >({
+            query: ({ id, coordinatorIds, expectedCoordinatorIds }) => ({
+                url: `/agencyStaff/staff/${encodeURIComponent(id)}/coordinators`,
+                method: "PUT",
+                data: { coordinatorIds, expectedCoordinatorIds },
+                requiresAuth: true,
+            }),
+            invalidatesTags: ["AgencyStaff"],
+        }),
+
         /**
          * Delete an agency staff member
          */
@@ -307,6 +321,7 @@ export const {
     useGetAgencyStaffQuery,
     useCreateAgencyStaffMutation,
     useUpdateAgencyStaffMutation,
+    useAssignStaffCoordinatorsMutation,
     useDeleteAgencyStaffMutation,
     useResetPasswordMutation,
     useToggleActiveMutation,

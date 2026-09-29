@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({ getClientStats: vi.fn(), listClients: vi.fn(),
 vi.unmock("react-router");
 vi.mock("sonner", () => ({ toast: { success: mocks.toastSuccess, error: mocks.toastError, warning: mocks.toastWarning } }));
 vi.mock("@/lib/api/clients", () => ({ getClientStats: mocks.getClientStats, listClients: mocks.listClients, listAgencyClients: mocks.listAgencyClients, saveScCaseload: mocks.saveScCaseload }));
-vi.mock("@/utils/auth", () => ({ useAuth: () => ({ user: { agencyId: "agency-1", agency: { name: "Agency" } } }) }));
+vi.mock("@/utils/auth", () => ({ useAuth: () => ({ user: { agencyId: "agency-1", userType: "agency", agency: { name: "Agency" } } }) }));
 vi.mock("./useDSPManagement", () => ({ useDSPList: mocks.useDSPList }));
 
 import SupportCoordinatorManagement from "./SupportCoordinatorManagement";

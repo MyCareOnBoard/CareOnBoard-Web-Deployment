@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import AddNewUserModal from "../user-levels/AddNewUserModal";
+import CoordinatorAssignmentDrawer from "../user-levels/CoordinatorAssignmentDrawer";
 import {
   useListAgencyStaffQuery,
   useDeleteAgencyStaffMutation,
@@ -18,6 +19,7 @@ import {
   useUpdateAgencyStaffMutation,
   useResetPasswordMutation,
   useToggleActiveMutation,
+  useAssignStaffCoordinatorsMutation,
   type CreateAgencyStaffRequest,
   type UpdateAgencyStaffRequest,
   type AgencyStaffMember,
@@ -29,11 +31,15 @@ import { ConfirmDialog, ConfirmDialogContent } from "@/components/ui/confirm-dia
 import { getInitials } from "@/lib/utils/string-utils";
 import { validateImageUrl } from "@/lib/utils/string-utils";
 import SettingsSectionCard from "./SettingsSectionCard";
+import { useAuth } from "@/utils/auth";
+import { UserType } from "@/utils/auth/types/user.types";
 
 export default function InternalUsersPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [editingStaff, setEditingStaff] = useState<AgencyStaffMember | null>(null);
+  const [assignmentStaff, setAssignmentStaff] = useState<AgencyStaffMember | null>(null);
+  const { user: signedInUser } = useAuth();
 
   // Confirmation dialog states
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -63,6 +69,7 @@ export default function InternalUsersPage() {
   // Mutations
   const [createStaff, { isLoading: isCreating }] = useCreateAgencyStaffMutation();
   const [updateStaff, { isLoading: isUpdating }] = useUpdateAgencyStaffMutation();
+  const [assignStaffCoordinators] = useAssignStaffCoordinatorsMutation();
   const [deleteStaff, { isLoading: isDeleting }] = useDeleteAgencyStaffMutation();
   const [resetPassword, { isLoading: isResettingPassword }] = useResetPasswordMutation();
   const [toggleActive, { isLoading: isTogglingActive }] = useToggleActiveMutation();
@@ -372,6 +379,7 @@ export default function InternalUsersPage() {
                       </span>
                     ))}
                   </div>
+                  {user.agencyModes?.includes("sc") && <p className="text-[11px] text-[#6b7280]">{user.managedCoordinatorIds?.length || 0} coordinators assigned</p>}
                 </div>
 
                 {/* Fourth: Actions */}
@@ -387,6 +395,9 @@ export default function InternalUsersPage() {
                       <DropdownMenuItem disabled={isUpdating} onSelect={() => handleEditClick(user)}>
                         <Pencil className="h-4 w-4" /> Edit
                       </DropdownMenuItem>
+                      {signedInUser?.userType === UserType.AGENCY && <DropdownMenuItem onSelect={() => setAssignmentStaff(user)}>
+                        Manage coordinators
+                      </DropdownMenuItem>}
                       <DropdownMenuItem onSelect={() => handleResetPasswordClick(user.id, user.name)}>
                         Reset Password
                       </DropdownMenuItem>
@@ -403,6 +414,19 @@ export default function InternalUsersPage() {
             ))}
         </div>
       </SettingsSectionCard>
+
+      {assignmentStaff && <CoordinatorAssignmentDrawer
+        key={assignmentStaff.id}
+        staffName={assignmentStaff.name}
+        agencyId={assignmentStaff.agencyId}
+        assignedIds={assignmentStaff.managedCoordinatorIds || []}
+        canAssign={assignmentStaff.agencyModes?.includes("sc") || false}
+        onClose={() => setAssignmentStaff(null)}
+        onSave={async (coordinatorIds, expectedCoordinatorIds) => {
+          await assignStaffCoordinators({ id: assignmentStaff.id, coordinatorIds, expectedCoordinatorIds }).unwrap();
+          toast({ title: "Assignments saved", description: `${assignmentStaff.name}'s coordinators were updated.` });
+        }}
+      />}
 
       {/* Add/Edit User Modal */}
       <AddNewUserModal

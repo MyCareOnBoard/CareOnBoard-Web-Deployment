@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getClientStats, listAgencyClients, saveScCaseload, type Client, type ClientStats } from "@/lib/api/clients";
 import { Routes } from "@/routes/constants";
 import { useAuth } from "@/utils/auth";
+import { UserType } from "@/utils/auth/types/user.types";
 import { useDSPList } from "./useDSPManagement";
 import type { DSP } from "./types";
 
@@ -42,6 +43,10 @@ function TeamSkeleton() {
 
 export default function SupportCoordinatorManagement() {
   const { user } = useAuth();
+  const canAssignClients = user?.userType === UserType.AGENCY ||
+    (user?.userType === UserType.SUPER_ADMIN && user.profile?.roleTemplate === "platform_administrator") ||
+    (user?.userType === UserType.AGENCY_STAFF && user.profile?.agencyModes?.includes("sc") &&
+      user.profile?.accessList?.includes("DSP Management") && user.profile?.accessList?.includes("Client Management"));
   const agencyId = user?.agencyId || user?.agency?.id || "";
   const { dsps, isLoading: staffLoading, error: staffError } = useDSPList();
   const coordinators = dsps.filter((person) => person.role.toLowerCase() === "support_coordinator");
@@ -153,7 +158,7 @@ export default function SupportCoordinatorManagement() {
   const availableCount = coordinators.filter((person) => caseload(person) < MAX_CASELOAD).length;
   const metrics = [
     ["My Team (SCs)", coordinators.length, "Support coordinators"],
-    ["My Clients", stats?.total ?? "—", "SC clients in agency"],
+    ["Agency Clients", stats?.total ?? "—", "SC clients in agency"],
     ["Unassigned", stats?.unassigned ?? "—", "Need SC assignment"],
     ["SC Capacity", stats?.caseloadByCoordinator ? `${availableCount}/${coordinators.length}` : "—", "SCs with open slots"],
   ] as const;
@@ -180,16 +185,16 @@ export default function SupportCoordinatorManagement() {
         <section aria-labelledby="sc-team-title" className="space-y-3">
           <div className="flex items-center justify-between gap-3">
             <h2 id="sc-team-title" className="text-lg font-semibold text-[#10141a]">My team</h2>
-            <Button type="button" size="sm" className="h-9 rounded-lg" aria-label="Add support coordinator" onClick={() => setShowAddCoordinator(true)}><Plus className="h-4 w-4" />Add</Button>
+            {user?.userType === UserType.AGENCY && <Button type="button" size="sm" className="h-9 rounded-lg" aria-label="Add support coordinator" onClick={() => setShowAddCoordinator(true)}><Plus className="h-4 w-4" />Add</Button>}
           </div>
-          {coordinators.length === 0 ? <p className="rounded-xl border border-[#e5e7eb] bg-white p-6 text-sm text-[#6b7280]">No support coordinators yet.</p> : coordinators.map((person) => {
+          {coordinators.length === 0 ? <p className="rounded-xl border border-[#e5e7eb] bg-white p-6 text-sm text-[#6b7280]">{user?.userType === UserType.AGENCY_STAFF ? "No support coordinators assigned to you yet." : "No support coordinators yet."}</p> : coordinators.map((person) => {
             const expanded = expandedId === person.id;
             return <div key={person.id} className="overflow-hidden rounded-xl border border-[#e5e7eb] bg-white">
               <div className="flex flex-wrap items-center gap-3 p-4 sm:flex-nowrap">
                 <Avatar className="h-10 w-10 shrink-0"><AvatarImage src={person.profilePicture} alt="" /><AvatarFallback className="bg-[#fbe7ea] text-xs font-semibold text-[#c8213a]">{initials(person.fullName)}</AvatarFallback></Avatar>
                 <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-[#10141a]">{person.fullName}</p><p className="truncate text-xs text-[#808081]">{[person.email, person.phoneNumber].filter(Boolean).join(" · ")}</p></div>
                 <div className="w-20 shrink-0 text-right"><p className="text-[11px] text-[#808081]">Caseload</p><div className="flex items-center gap-2"><div className="h-1 w-full rounded-full bg-[#e5e7eb]"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.min(100, caseload(person) / MAX_CASELOAD * 100)}%` }} /></div><span className="text-xs font-semibold">{stats?.caseloadByCoordinator ? caseload(person) : "—"}/{MAX_CASELOAD}</span></div></div>
-                <Button type="button" variant="outline" size="sm" disabled={saving} onClick={() => openAssignment(person)} className="border-[#ffb7c2] bg-[#fff4f6] text-[#c8213a] hover:bg-[#ffe8ec]">Assign Clients</Button>
+                {canAssignClients && <Button type="button" variant="outline" size="sm" disabled={saving} onClick={() => openAssignment(person)} className="border-[#ffb7c2] bg-[#fff4f6] text-[#c8213a] hover:bg-[#ffe8ec]">Assign Clients</Button>}
                 <button type="button" aria-label={`${expanded ? "Collapse" : "Expand"} ${person.fullName}'s clients`} aria-expanded={expanded} onClick={() => { if (!expanded) { setExpandedLoading(true); setExpandedClients([]); } setExpandedId(expanded ? null : person.id); }} className="rounded p-1 text-[#808081] hover:bg-gray-100"><ChevronDown className={`h-4 w-4 transition-transform ${expanded ? "rotate-180" : ""}`} /></button>
               </div>
               {expanded && <div className="space-y-2 border-t border-[#f0f0f0] px-4 py-3">
