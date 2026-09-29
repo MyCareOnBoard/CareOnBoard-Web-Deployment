@@ -14,10 +14,10 @@ it('uses only the SC monitoring API and sends no client-supplied authority field
   await listScClients();
   await getScOverview('client');
   await createScContact('client', { contactAt: '2026-09-28T12:00:00Z', summary: 'Visit' } as any);
-  await updateScFollowUp('client', 'follow', { status: 'completed', outcome: 'Resolved' });
+  await updateScFollowUp('client', 'follow', { status: 'completed', outcome: 'Resolved', revisionToken: 'revision' });
   expect(vi.mocked(axiosClient.get).mock.calls.map(call => call[0])).toEqual([
     '/employeePortal/sc-monitoring/clients', '/employeePortal/sc-monitoring/clients/client',
   ]);
   expect(axiosClient.post).toHaveBeenCalledWith('/employeePortal/sc-monitoring/clients/client/contacts', { contactAt: '2026-09-28T12:00:00Z', summary: 'Visit' });
-  expect(axiosClient.patch).toHaveBeenCalledWith('/employeePortal/sc-monitoring/clients/client/follow-ups/follow', { status: 'completed', outcome: 'Resolved' });
+  expect(axiosClient.patch).toHaveBeenCalledWith('/employeePortal/sc-monitoring/clients/client/follow-ups/follow', { status: 'completed', outcome: 'Resolved', revisionToken: 'revision' });
 });

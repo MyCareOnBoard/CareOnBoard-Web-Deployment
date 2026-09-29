@@ -1,16 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
-import { type ScFollowUp, type ScFollowUpEvent, getScFollowUp, updateScFollowUp } from '@/lib/api/sc-monitoring';
+import { type ScFollowUp, type ScFollowUpDetail, getScFollowUp, updateScFollowUp } from '@/lib/api/sc-monitoring';
 import { MonitoringDetailSkeleton } from './MonitoringSkeleton';
 
-type Detail = ScFollowUp & { events: ScFollowUpEvent[] };
 const date = (value: string | null) => value ? new Date(value.includes('T') ? value : `${value}T12:00:00Z`).toLocaleString('en-US',
   value.includes('T') ? { dateStyle: 'medium', timeStyle: 'short' } : { dateStyle: 'medium', timeZone: 'UTC' }) : '—';
 
 export default function FollowUpPanel({ clientId, followUpId, onBack, onUnavailable }: {
   clientId: string; followUpId: string; onBack: () => void; onUnavailable: () => void;
 }) {
-  const [detail, setDetail] = useState<Detail | null>(null);
+  const [detail, setDetail] = useState<ScFollowUpDetail | null>(null);
   const [status, setStatus] = useState<ScFollowUp['status']>('open');
   const [outcome, setOutcome] = useState('');
   const [error, setError] = useState('');
@@ -18,22 +17,27 @@ export default function FollowUpPanel({ clientId, followUpId, onBack, onUnavaila
   const load = useCallback(async (signal?: AbortSignal) => {
     try {
       const result = await getScFollowUp(clientId, followUpId, signal);
-      if (signal?.aborted) return;
+      if (signal?.aborted) return false;
       setDetail(result); setStatus(result.status); setOutcome(result.outcome || ''); setError('');
+      return true;
     } catch (caught) {
-      if (signal?.aborted) return;
-      if (axios.isAxiosError(caught) && caught.response?.status === 404) onUnavailable();
+      if (signal?.aborted) return false;
+      if (axios.isAxiosError(caught) && [403, 404].includes(caught.response?.status || 0)) { setDetail(null); onUnavailable(); }
       else setError('Could not load this follow-up.');
+      return false;
     }
   }, [clientId, followUpId, onUnavailable]);
   useEffect(() => { const controller = new AbortController(); void load(controller.signal); return () => controller.abort(); }, [load]);
 
   const save = async () => {
+    if (!detail) return;
     if (status === 'completed' && !outcome.trim()) { setError('Add an outcome before completing this follow-up'); return; }
     setSaving(true); setError('');
-    try { await updateScFollowUp(clientId, followUpId, { status, outcome: outcome.trim() }); await load(); }
+    try { await updateScFollowUp(clientId, followUpId, { status, outcome: outcome.trim(), revisionToken: detail.revisionToken }); await load(); }
     catch (caught) {
-      if (axios.isAxiosError(caught) && caught.response?.status === 404) onUnavailable();
+      if (axios.isAxiosError(caught) && caught.response?.status === 409) {
+        if (await load()) setError('This follow-up changed while you were viewing it. Review the latest details and try again.');
+      } else if (axios.isAxiosError(caught) && [403, 404].includes(caught.response?.status || 0)) { setDetail(null); onUnavailable(); }
       else setError('Could not save this update. Your changes are still here.');
     } finally { setSaving(false); }
   };

@@ -10,7 +10,14 @@ vi.mock("@/lib/api/clients", () => {
 });
 const toast = vi.hoisted(() => vi.fn());
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast }) }));
+vi.mock("@/lib/api/sc-agency-monitoring", () => ({
+  getAgencyMonitoringOverview: vi.fn().mockResolvedValue({ clientId: 'real-monitor', timezone: 'UTC', canUpdateFollowUps: true,
+    lastContactAt: null, activeFollowUpCount: 0, nextFollowUpDueDate: null,
+    activeFollowUps: { items: [], nextCursor: null }, contacts: { items: [], nextCursor: null } }),
+  listAgencyMonitoringFollowUps: vi.fn(), listAgencyMonitoringContacts: vi.fn(),
+}));
 import { getAgencyClientById, updateClient, uploadClientDocument, type Client } from "@/lib/api/clients";
+import { getAgencyMonitoringOverview } from "@/lib/api/sc-agency-monitoring";
 import SupportCoordinatorClientDetailsPage from "./SupportCoordinatorClientDetailsPage";
 
 const scrollIntoView = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollIntoView");
@@ -28,6 +35,17 @@ afterAll(() => {
   else Reflect.deleteProperty(HTMLElement.prototype, "hasPointerCapture");
   if (setPointerCapture) Object.defineProperty(HTMLElement.prototype, "setPointerCapture", setPointerCapture);
   else Reflect.deleteProperty(HTMLElement.prototype, "setPointerCapture");
+});
+
+it('routes real SC clients to saved monitoring records instead of the sample calendar', async () => {
+  vi.mocked(getAgencyClientById).mockResolvedValue({ id: 'real-monitor', firstName: 'Alex', lastName: 'Example', servicePrograms: ['sc'] } as Client);
+  render(<MemoryRouter initialEntries={['/agency/clients/real-monitor?tab=monitoring']}>
+    <Routes><Route path="/agency/clients/:clientId" element={<SupportCoordinatorClientDetailsPage />} /></Routes>
+  </MemoryRouter>);
+  expect(await screen.findByRole('heading', { name: 'Client monitoring' })).toBeInTheDocument();
+  expect(getAgencyMonitoringOverview).toHaveBeenCalledWith('real-monitor', expect.any(AbortSignal));
+  expect(screen.queryByRole('button', { name: 'Choose monitoring date' })).not.toBeInTheDocument();
+  expect(screen.queryByText('PA Missing')).not.toBeInTheDocument();
 });
 
 it("keeps the client header while routing tabs through the query parameter", async () => {

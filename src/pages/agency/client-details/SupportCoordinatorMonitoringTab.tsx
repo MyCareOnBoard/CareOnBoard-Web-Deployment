@@ -73,6 +73,7 @@ export default function SupportCoordinatorMonitoringTab({ sample }: { sample: bo
 
   return <section aria-labelledby="sc-monitoring-heading" className="space-y-6 text-sm text-[#10141a]">
     <h2 id="sc-monitoring-heading" className="sr-only">Monitoring</h2>
+    {sample && <div role="status" aria-label="Sample preview" className="rounded-lg border border-[#b8dcdf] bg-[#f0f9f9] px-4 py-3 text-sm text-[#17686c]"><strong>Preview only.</strong> Sample actions do not save client records.</div>}
     <div className="flex flex-wrap items-center justify-between gap-4">
       <div className="flex items-center gap-2">
         <h3 className="text-xl font-medium">{format(selectedDate, "EEE, MMMM d")}</h3>

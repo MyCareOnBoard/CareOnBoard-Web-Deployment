@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { clients } from "@/pages/agency/clients-management/supportCoordinatorSampleClients";
 import { Routes } from "@/routes/constants";
 import SupportCoordinatorMonitoringTab from "./SupportCoordinatorMonitoringTab";
+import AgencyMonitoringRecords from "./AgencyMonitoringRecords";
 import SupportCoordinatorDocumentsTab from "./SupportCoordinatorDocumentsTab";
 import SupportCoordinatorPcpt from "./SupportCoordinatorPcpt";
 import SupportCoordinatorIsp from "./SupportCoordinatorIsp";
@@ -101,9 +102,11 @@ export default function SupportCoordinatorClientDetailsPage() {
   const pcptOpen = activeTab === "planning" && searchParams.get("view") === "pcpt";
   const ispOpen = activeTab === "planning" && searchParams.get("view") === "isp";
   const sample = clients.find((client) => client.id === clientId);
-  const [savedClient, setSavedClient] = useState<Client | null>(null);
-  const [loading, setLoading] = useState(Boolean(!sample && clientId));
-  const [error, setError] = useState(false);
+  const [loadedClient, setSavedClient] = useState<Client | null>(null);
+  const [failedClientId, setFailedClientId] = useState<string | null>(null);
+  const savedClient = loadedClient?.id === clientId ? loadedClient : null;
+  const loading = Boolean(!sample && clientId && !savedClient && failedClientId !== clientId);
+  const error = failedClientId === clientId;
   const [selectedShortcut, setSelectedShortcut] = useState<string | null>(null);
   const [confirmedItems, setConfirmedItems] = useState<number[]>([]);
   const [reviewerName, setReviewerName] = useState("");
@@ -136,9 +139,8 @@ export default function SupportCoordinatorClientDetailsPage() {
     if (sample || !clientId) return;
     const controller = new AbortController();
     getAgencyClientById(clientId, { mode: "sc", signal: controller.signal })
-      .then((client) => { setSavedClient(client); setError(false); })
-      .catch(() => { if (!controller.signal.aborted) setError(true); })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+      .then((client) => { if (!controller.signal.aborted) { setSavedClient(client); setFailedClientId(null); } })
+      .catch(() => { if (!controller.signal.aborted) setFailedClientId(clientId); });
     return () => controller.abort();
   }, [clientId, sample]);
 
@@ -249,7 +251,7 @@ export default function SupportCoordinatorClientDetailsPage() {
                 </button>)}
               </div>
             </section>
-          ) : activeTab === "services" ? <ServiceAuthorizationTab key={clientId} sample={Boolean(sample)} client={savedClient} onSaved={setSavedClient} /> : activeTab === "monitoring" ? <SupportCoordinatorMonitoringTab key={clientId} sample={Boolean(sample)} /> : activeTab === "documents" ? <SupportCoordinatorDocumentsTab key={clientId} sample={Boolean(sample)} client={savedClient} onSaved={setSavedClient} /> : (
+          ) : activeTab === "services" ? <ServiceAuthorizationTab key={clientId} sample={Boolean(sample)} client={savedClient} onSaved={setSavedClient} /> : activeTab === "monitoring" ? sample ? <SupportCoordinatorMonitoringTab key={clientId} sample /> : <AgencyMonitoringRecords key={clientId} clientId={clientId || ''} /> : activeTab === "documents" ? <SupportCoordinatorDocumentsTab key={clientId} sample={Boolean(sample)} client={savedClient} onSaved={setSavedClient} /> : (
             <section aria-label={`${tabs.find((tab) => tab.id === activeTab)?.label} tab`} className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-[#d1d5db] px-6 text-center">
               <FileText className="mb-3 h-8 w-8 text-[#008f93]" />
               <h2 className="text-xl font-semibold text-[#10141a]">{tabs.find((tab) => tab.id === activeTab)?.label}</h2>

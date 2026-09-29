@@ -18,7 +18,8 @@ export type ScFollowUp = { followUpId: string; contactId: string; issueKey: stri
   status: 'open' | 'in_progress' | 'completed'; outcome: string; overdue: boolean; createdAt: string;
   updatedAt: string; completedAt: string | null; authorName: string };
 export type ScFollowUpEvent = { eventId: string; previousStatus: string; previousOutcome: string;
-  status: string; outcome: string; authorName: string; createdAt: string };
+  status: string; outcome: string; authorName: string; authorRole?: string | null; createdAt: string };
+export type ScFollowUpDetail = ScFollowUp & { revisionToken: string; events: ScFollowUpEvent[] };
 export type ScOverview = { clientId: string; name: string; program: string; county: string | null;
   ispPeriod: ScPeriod; scOutcomes: Array<{ id: string; statement: string; services: Array<{ id: string; name: string; provider: string }> }>;
   openFollowUps: ScFollowUp[]; contacts: ScContactPage; timezone: string };
@@ -54,8 +55,8 @@ export async function addScContactAmendment(clientId: string, contactId: string,
   return unwrap((await axiosClient.post<Envelope<{ amendmentId: string }>>(`${path(clientId)}/contacts/${encodeURIComponent(contactId)}/amendments`, { text })).data);
 }
 export async function getScFollowUp(clientId: string, followUpId: string, signal?: AbortSignal) {
-  return unwrap((await axiosClient.get<Envelope<ScFollowUp & { events: ScFollowUpEvent[] }>>(`${path(clientId)}/follow-ups/${encodeURIComponent(followUpId)}`, { signal })).data);
+  return unwrap((await axiosClient.get<Envelope<ScFollowUpDetail>>(`${path(clientId)}/follow-ups/${encodeURIComponent(followUpId)}`, { signal })).data);
 }
-export async function updateScFollowUp(clientId: string, followUpId: string, input: { status: ScFollowUp['status']; outcome?: string }) {
-  return unwrap((await axiosClient.patch<Envelope<ScFollowUp>>(`${path(clientId)}/follow-ups/${encodeURIComponent(followUpId)}`, input)).data);
+export async function updateScFollowUp(clientId: string, followUpId: string, input: { status: ScFollowUp['status']; outcome: string; revisionToken: string }) {
+  return unwrap((await axiosClient.patch<Envelope<ScFollowUp & { revisionToken: string }>>(`${path(clientId)}/follow-ups/${encodeURIComponent(followUpId)}`, input)).data);
 }

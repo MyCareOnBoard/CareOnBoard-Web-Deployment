@@ -7,7 +7,7 @@ import FollowUpPanel from './FollowUpPanel';
 vi.mock('@/lib/api/sc-monitoring', () => ({ getScFollowUp: vi.fn(), updateScFollowUp: vi.fn() }));
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(getScFollowUp).mockResolvedValue({ followUpId: 'f', contactId: 'c', issueKey: 'safety', category: 'safety', description: 'Concern', action: 'Call provider', responsiblePerson: 'Taylor', dueDate: '2026-09-29', priority: 'urgent', status: 'open', outcome: '', overdue: false, createdAt: '2026-09-28T12:00:00Z', updatedAt: '2026-09-28T12:00:00Z', completedAt: null, authorName: 'Taylor', events: [] });
+  vi.mocked(getScFollowUp).mockResolvedValue({ followUpId: 'f', contactId: 'c', issueKey: 'safety', category: 'safety', description: 'Concern', action: 'Call provider', responsiblePerson: 'Taylor', dueDate: '2026-09-29', priority: 'urgent', status: 'open', outcome: '', overdue: false, createdAt: '2026-09-28T12:00:00Z', updatedAt: '2026-09-28T12:00:00Z', completedAt: null, authorName: 'Taylor', revisionToken: 'observed', events: [] });
   vi.mocked(updateScFollowUp).mockResolvedValue({} as any);
 });
 
@@ -28,6 +28,17 @@ it('requires an outcome for completion and refreshes activity after save', async
   expect(updateScFollowUp).not.toHaveBeenCalled();
   await user.type(screen.getByRole('textbox', { name: 'Outcome note' }), 'Resolved');
   await user.click(screen.getByRole('button', { name: 'Save update' }));
-  expect(updateScFollowUp).toHaveBeenCalledWith('client', 'f', { status: 'completed', outcome: 'Resolved' });
+  expect(updateScFollowUp).toHaveBeenCalledWith('client', 'f', { status: 'completed', outcome: 'Resolved', revisionToken: 'observed' });
+  expect(getScFollowUp).toHaveBeenCalledTimes(2);
+});
+
+it('reloads the latest detail after a revision conflict', async () => {
+  const user = userEvent.setup();
+  vi.mocked(updateScFollowUp).mockRejectedValueOnce(Object.assign(new Error('Conflict'), { isAxiosError: true, response: { status: 409 } }));
+  render(<FollowUpPanel clientId="client" followUpId="f" onBack={vi.fn()} onUnavailable={vi.fn()} />);
+  await screen.findByText('Call provider');
+  await user.click(screen.getByRole('button', { name: 'In progress' }));
+  await user.click(screen.getByRole('button', { name: 'Save update' }));
+  expect(await screen.findByText('This follow-up changed while you were viewing it. Review the latest details and try again.')).toBeInTheDocument();
   expect(getScFollowUp).toHaveBeenCalledTimes(2);
 });

@@ -9,6 +9,7 @@ it("opens monitoring on the current week with today selected", async () => {
   const monday = startOfWeek(today, { weekStartsOn: 1 });
   const user = userEvent.setup();
   render(<SupportCoordinatorMonitoringTab sample />);
+  expect(screen.getByRole('status', { name: 'Sample preview' })).toHaveTextContent('Preview only. Sample actions do not save client records.');
 
   expect(screen.getByText(format(today, "EEE, MMMM d"))).toBeInTheDocument();
   expect(screen.getByRole("button", { name: format(today, "EEEE, MMMM d, yyyy") })).toHaveAttribute("aria-current", "date");
