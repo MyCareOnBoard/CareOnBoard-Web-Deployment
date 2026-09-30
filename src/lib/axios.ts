@@ -4,7 +4,38 @@ import { auth } from '@/lib/firebase';
 import { Routes } from "@/routes/constants";
 import { handleMfaApiError } from '@/utils/auth/helpers/handleMfaApiError';
 
+/** A request config carrying the one-retry marker the 401 handler sets. */
+type RetryableConfig = InternalAxiosRequestConfig & { _retriedAfter401?: boolean };
+
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
+/**
+ * Which backend database every request is routed to, via the `x-environment` header.
+ *
+ * The header decides which Firestore database the API reads: "staging" gets the named
+ * staging database, anything else gets the default one. That makes it the single most
+ * consequential variable in the app, and it used to be resolved inline in two places with
+ * a silent fallback — so an environment that had never set it read staging without
+ * announcing it. Two apps disagreeing that way is invisible from the outside: the account
+ * exists, the token verifies, and the API answers "User not found" about a user who is
+ * plainly there, in the other database.
+ *
+ * The default stays "staging" deliberately. Flipping it to production would fix the
+ * silence by pointing any deployment that forgot the variable at live data, which is worse
+ * than the problem — a forgotten variable should leave you broken, not writing to
+ * production. What changes is that it is now said out loud, once, at startup.
+ */
+export const API_ENVIRONMENT: string = import.meta.env.VITE_API_ENVIRONMENT || 'staging';
+
+const API_ENVIRONMENT_IS_DEFAULTED = !import.meta.env.VITE_API_ENVIRONMENT;
+
+// Logged once rather than warned per request. Answering "which database am I talking to"
+// should take one glance at the console, not a comparison of two apps' network tabs.
+console.info(
+  API_ENVIRONMENT_IS_DEFAULTED
+    ? `[api] environment "${API_ENVIRONMENT}" (defaulted — VITE_API_ENVIRONMENT is not set)`
+    : `[api] environment "${API_ENVIRONMENT}"`,
+);
 
 const axiosClient: AxiosInstance = axios.create({
   baseURL: BASE_URL,
@@ -68,8 +99,7 @@ axiosClient.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    const environment = import.meta.env.VITE_API_ENVIRONMENT || 'staging';
-    config.headers['x-environment'] = environment;
+    config.headers['x-environment'] = API_ENVIRONMENT;
 
     return config;
   },
@@ -80,8 +110,7 @@ axiosClient.interceptors.request.use(
 
 axiosClientWithoutAuth.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
-    const environment = import.meta.env.VITE_API_ENVIRONMENT || 'staging';
-    config.headers['x-environment'] = environment;
+    config.headers['x-environment'] = API_ENVIRONMENT;
 
     return config;
   },
@@ -122,16 +151,29 @@ axiosClient.interceptors.response.use(
     if (error.response) {
       switch (error.response.status) {
         case 401: {
-          try {
-            cachedToken = null;
-            const newToken = await getCachedIdToken(true);
-            if (newToken && error.config) {
-              error.config.headers = error.config.headers ?? {};
-              error.config.headers.Authorization = `Bearer ${newToken}`;
-              return axiosClient(error.config);
+          // One retry, and only one.
+          //
+          // A 401 that survives a freshly minted token is not a stale token: it is an
+          // account the API will not accept — no `users` record in the database this build
+          // points at, a revoked account, a wrong environment. Refreshing cannot fix any
+          // of those, and the retry re-enters this same handler, so without a guard it
+          // refreshes and retries forever. That loop hammers Firebase's token endpoint and
+          // never reaches the redirect below, so the user sits on a spinner instead of
+          // being told to sign in again.
+          const retryable = error.config as RetryableConfig | undefined;
+          if (retryable && !retryable._retriedAfter401) {
+            try {
+              cachedToken = null;
+              const newToken = await getCachedIdToken(true);
+              if (newToken) {
+                retryable._retriedAfter401 = true;
+                retryable.headers = retryable.headers ?? {};
+                retryable.headers.Authorization = `Bearer ${newToken}`;
+                return axiosClient(retryable);
+              }
+            } catch {
+              // fall through to redirect
             }
-          } catch {
-            // fall through to redirect
           }
           const agencyId = getAgencyId();
           if (window.location.pathname !== Routes.auth.login) {
