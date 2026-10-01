@@ -71,3 +71,10 @@ it('refreshes an authorized list when a page cursor becomes stale', async () => 
   expect(await screen.findByRole('button', { name: 'View follow-up' })).toBeInTheDocument();
   expect(screen.queryByText('Monitoring is unavailable')).not.toBeInTheDocument();
 });
+
+
+it('explains that unassigned clients do not receive SC reminders',async()=> {
+  vi.mocked(api.getAgencyMonitoringOverview).mockResolvedValue({...overview,hasAssignedCoordinator:false} as unknown as api.AgencyMonitoringOverview);
+  render(<MemoryRouter><AgencyMonitoringRecords clientId="c" /></MemoryRouter>);
+  expect(await screen.findByText('No SC assigned. Reminders cannot be sent until an SC is assigned.')).toBeInTheDocument();
+});

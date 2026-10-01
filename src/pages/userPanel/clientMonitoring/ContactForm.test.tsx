@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, it, vi } from 'vitest';
 import { createScContact, type ScOverview } from '@/lib/api/sc-monitoring';
@@ -37,4 +37,14 @@ it('saves a no-issue contact without stale not-reviewed reasons', async () => {
   await user.click(screen.getByRole('button', { name: 'Save contact' }));
   expect(createScContact).toHaveBeenCalledWith('c', expect.objectContaining({ experience: { status: 'satisfied' }, noFollowUpNeeded: true, issueDecisions: [] }));
   expect(onSaved).toHaveBeenCalled();
+});
+
+
+it('does not claim that a future or invalid contact qualifies',()=> {
+  render(<ContactForm overview={{...overview,scOutcomes:[],monitoringSchedule:{status:'upcoming',nextMonitoringDueDate:'2026-10-31',overdueDays:0,policyRevision:1,timezone:'UTC',evaluatedAt:'2026-10-01T12:00Z',intervalDays:30,qualifyingMethods:['phone'],requireDirectContact:true,latestQualifyingContactAt:null,latestQualifyingContactId:null}}} onCancel={vi.fn()} onSaved={vi.fn()} onUnavailable={vi.fn()} />);
+  fireEvent.change(screen.getByLabelText('Date'),{target:{value:'2099-10-01'}});
+  expect(screen.getByText('Enter a valid contact date and time that has already passed to check qualification.')).toBeInTheDocument();
+  expect(screen.queryByText(/This contact would qualify/)).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Date'),{target:{value:''}});
+  expect(screen.getByText('Enter a valid contact date and time that has already passed to check qualification.')).toBeInTheDocument();
 });

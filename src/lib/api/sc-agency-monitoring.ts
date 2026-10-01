@@ -1,5 +1,5 @@
 import axiosClient from '@/lib/axios';
-import type { ScContact, ScContactPage, ScFollowUp, ScFollowUpDetail } from './sc-monitoring';
+import type { ScContact, ScContactPage, ScFollowUp, ScFollowUpDetail, MonitoringScheduleDetail, ScFollowUpUpdate, ScFollowUpEventPage } from './sc-monitoring';
 
 type Envelope<T> = { success: boolean; data: T; error?: string };
 const unwrap = <T>(body: Envelope<T>): T => {
@@ -9,9 +9,9 @@ const unwrap = <T>(body: Envelope<T>): T => {
 const path = (clientId: string) => `/clientManagement/${encodeURIComponent(clientId)}/monitoring`;
 export type AgencyFollowUpSummary = Omit<ScFollowUp, 'description' | 'action' | 'outcome'>;
 export type AgencyFollowUpPage = { items: AgencyFollowUpSummary[]; nextCursor: string | null };
-export type AgencyMonitoringOverview = { clientId: string; timezone: string; canUpdateFollowUps: boolean;
+export type AgencyMonitoringOverview = { clientId: string; timezone: string; canUpdateFollowUps: boolean; hasAssignedCoordinator?: boolean;
   lastContactAt: string | null; activeFollowUpCount: number; nextFollowUpDueDate: string | null;
-  activeFollowUps: AgencyFollowUpPage; contacts: ScContactPage };
+  activeFollowUps: AgencyFollowUpPage; contacts: ScContactPage; monitoringSchedule?: MonitoringScheduleDetail };
 export type AgencyContactDetail = Omit<ScContact, 'followUps' | 'services' | 'goals'> & {
   followUps: AgencyFollowUpSummary[];
   services: Array<ScContact['services'][number] & { serviceName?: string; providerName?: string }>;
@@ -35,6 +35,10 @@ export async function getAgencyMonitoringFollowUp(clientId: string, followUpId: 
   return unwrap((await axiosClient.get<Envelope<AgencyFollowUpDetail>>(`${path(clientId)}/follow-ups/${encodeURIComponent(followUpId)}`, { signal })).data);
 }
 export async function updateAgencyMonitoringFollowUp(clientId: string, followUpId: string,
-  input: { status: ScFollowUp['status']; outcome: string; revisionToken: string }) {
+  input: ScFollowUpUpdate) {
   return unwrap((await axiosClient.patch<Envelope<ScFollowUp & { revisionToken: string }>>(`${path(clientId)}/follow-ups/${encodeURIComponent(followUpId)}`, input)).data);
+}
+
+export async function listAgencyFollowUpEvents(clientId: string, followUpId: string, cursor: string, signal?: AbortSignal) {
+  return unwrap((await axiosClient.get<Envelope<ScFollowUpEventPage>>(`${path(clientId)}/follow-ups/${encodeURIComponent(followUpId)}/events`, { params: { cursor }, signal })).data);
 }

@@ -1,10 +1,11 @@
 import {render, screen, waitFor, fireEvent, cleanup} from '@testing-library/react';
-import {beforeAll, beforeEach, expect, it, vi} from 'vitest';
+import {afterEach, beforeAll, beforeEach, expect, it, vi} from 'vitest';
 import AssignmentPolicySection from '../components/AssignmentPolicySection';
 import {getAssignmentPolicy, saveAssignmentPolicy} from '@/lib/api/assignment-policy';
 const toast = vi.hoisted(() => vi.fn());
 vi.mock('@/hooks/use-toast', () => ({useToast: () => ({toast})}));
-beforeEach(() => toast.mockClear());
+beforeEach(() => { toast.mockClear(); vi.setSystemTime(new Date('2026-09-15T12:00:00Z')); });
+afterEach(() => vi.useRealTimers());
 vi.mock('@/hooks/useAssignmentReview', () => ({useAssignmentReviewScope: () => 'actor'}));
 vi.mock('@/hooks/useEffectiveAgencyMode', () => ({useEffectiveAgencyMode: () => 'ddd'}));
 vi.mock('@/lib/api/assignment-policy', () => ({getAssignmentPolicy: vi.fn(), saveAssignmentPolicy: vi.fn()}));

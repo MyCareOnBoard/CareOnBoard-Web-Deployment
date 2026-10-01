@@ -16,11 +16,11 @@ it('requires outcome, saves only status/outcome/revision and reports success', a
   const user = userEvent.setup();
   const onSaved = vi.fn();
   render(<AgencyMonitoringFollowUpDetail clientId="c" followUpId="f" canUpdateFollowUps onBack={vi.fn()} onContact={vi.fn()} onUnavailable={vi.fn()} onSaved={onSaved} />);
-  expect(await screen.findByText('Call provider')).toBeInTheDocument();
+  expect((await screen.findAllByText('Call provider'))[0]).toBeInTheDocument();
   expect(screen.getByText(/Urgent follow-up\. Follow your agency's escalation process now/)).toBeInTheDocument();
   await user.selectOptions(screen.getByLabelText('Status'), 'completed');
   await user.click(screen.getByRole('button', { name: 'Save update' }));
-  expect(screen.getByRole('alert')).toHaveTextContent('Add an outcome before completing this follow-up.');
+  expect(screen.getByRole('alert')).toHaveTextContent('Add an outcome before completing this follow-up');
   expect(updateAgencyMonitoringFollowUp).not.toHaveBeenCalled();
   await user.type(screen.getByLabelText(/Outcome note/), 'Resolved');
   await user.click(screen.getByRole('button', { name: 'Save update' }));
@@ -31,7 +31,7 @@ it('requires outcome, saves only status/outcome/revision and reports success', a
 
 it('keeps a scoped super admin read-only', async () => {
   render(<AgencyMonitoringFollowUpDetail clientId="c" followUpId="f" canUpdateFollowUps={false} onBack={vi.fn()} onContact={vi.fn()} onUnavailable={vi.fn()} onSaved={vi.fn()} />);
-  expect(await screen.findByText('Call provider')).toBeInTheDocument();
+  expect((await screen.findAllByText('Call provider'))[0]).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Save update' })).not.toBeInTheDocument();
 });
 
@@ -40,7 +40,7 @@ it('reloads a changed follow-up before another agency edit', async () => {
   vi.mocked(updateAgencyMonitoringFollowUp).mockRejectedValueOnce(Object.assign(new Error('Conflict'), { isAxiosError: true, response: { status: 409 } }));
   vi.mocked(getAgencyMonitoringFollowUp).mockResolvedValueOnce(detail as any).mockResolvedValueOnce({ ...detail, revisionToken: 'latest' } as any);
   render(<AgencyMonitoringFollowUpDetail clientId="c" followUpId="f" canUpdateFollowUps onBack={vi.fn()} onContact={vi.fn()} onUnavailable={vi.fn()} onSaved={vi.fn()} />);
-  await screen.findByText('Call provider');
+  (await screen.findAllByText('Call provider'))[0];
   await user.selectOptions(screen.getByLabelText('Status'), 'in_progress');
   await user.click(screen.getByRole('button', { name: 'Save update' }));
   expect(await screen.findByText('This follow-up changed while you were viewing it. Review the latest details and try again.')).toBeInTheDocument();
@@ -52,10 +52,11 @@ it('removes the editor if a conflict cannot be reloaded', async () => {
   vi.mocked(updateAgencyMonitoringFollowUp).mockRejectedValueOnce(Object.assign(new Error('Conflict'), { isAxiosError: true, response: { status: 409 } }));
   vi.mocked(getAgencyMonitoringFollowUp).mockResolvedValueOnce(detail as any).mockRejectedValueOnce(new Error('network'));
   render(<AgencyMonitoringFollowUpDetail clientId="c" followUpId="f" canUpdateFollowUps onBack={vi.fn()} onContact={vi.fn()} onUnavailable={vi.fn()} onSaved={vi.fn()} />);
-  await screen.findByText('Call provider');
+  (await screen.findAllByText('Call provider'))[0];
   await user.selectOptions(screen.getByLabelText('Status'), 'in_progress');
   await user.click(screen.getByRole('button', { name: 'Save update' }));
-  expect(await screen.findByText("Couldn't load this follow-up.")).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Save update' })).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+  expect(await screen.findByText('Could not load this follow-up. Your draft is still here.')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Save update' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Load latest follow-up' })).toBeInTheDocument();
+  expect(screen.getByRole('textbox', {name:'Next action'})).toHaveValue('Call provider');
 });

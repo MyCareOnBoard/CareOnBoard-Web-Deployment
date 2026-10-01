@@ -1,6 +1,9 @@
+import MonitoringScheduleCard from '@/components/sc-monitoring/MonitoringScheduleCard';
+import { useScMonitoringRefresh } from '@/hooks/useScMonitoringRefresh';
+import { useAssignmentReviewScope } from '@/hooks/useAssignmentReview';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import axios from 'axios';
-import { Navigate, useNavigate, useParams } from 'react-router';
+import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import { ArrowRight, ClipboardList, Plus, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/utils/auth';
 import { Routes } from '@/routes/constants';
@@ -40,7 +43,7 @@ function ContactRecord({ detail, clientName, clientId, onBack, onFollowUp, onUna
     setSaving(true); setError('');
     try { await addScContactAmendment(clientId, detail.contactId, correction.trim()); setSaved(await getScContact(clientId, detail.contactId)); setCorrection(''); }
     catch (caught) {
-      if (axios.isAxiosError(caught) && caught.response?.status === 404) onUnavailable();
+      if (axios.isAxiosError(caught) && [403, 404].includes(caught.response?.status || 0)) onUnavailable();
       else setError('Could not save this amendment. Your correction is still here.');
     } finally { setSaving(false); }
   };
@@ -73,10 +76,14 @@ function ContactRecord({ detail, clientName, clientId, onBack, onFollowUp, onUna
   </>;
 }
 
-export default function ClientMonitoringPage() {
+function ClientMonitoringWorkspace() {
   const { clientId } = useParams<{ clientId: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const actorScope = useAssignmentReviewScope();
+  const [searchParams] = useSearchParams();
+  const linkedFollowUp = searchParams.get('followUpId');
+  const validLinkedFollowUp = linkedFollowUp && linkedFollowUp.length <= 512 && !/[\/\\\x00-\x1f]/.test(linkedFollowUp) ? linkedFollowUp : null;
   const isSc = user?.userType === 'employee' && (user.applicantType === 'support_coordinator' || user.profile?.role === 'support_coordinator' || user.role === 'support_coordinator');
   const [overview, setOverview] = useState<ScOverview | null>(null);
   const [contacts, setContacts] = useState<ScContactSummary[]>([]);
@@ -96,18 +103,19 @@ export default function ClientMonitoringPage() {
     if (!clientId) return;
     setLoading(true); setError('');
     try { const result = await getScOverview(clientId, signal); if (signal?.aborted) return;
-      setOverview(result); setContacts(result.contacts.items); setNextCursor(result.contacts.nextCursor); setUnavailable(false); }
+      setOverview(result); setContacts(result.contacts.items); setNextCursor(result.contacts.nextCursor); setUnavailable(false); return result; }
     catch (caught) { if (signal?.aborted) return;
-      if (axios.isAxiosError(caught) && caught.response?.status === 404) markUnavailable();
+      if (axios.isAxiosError(caught) && [403, 404].includes(caught.response?.status || 0)) markUnavailable();
       else setError('Could not load monitoring for this client.');
     } finally { if (!signal?.aborted) setLoading(false); }
   }, [clientId, markUnavailable]);
   useEffect(() => { if (!isSc) return; pagingController.current?.abort(); pagingController.current = null; setPaging(false);
-    setOverview(null); setContacts([]); setSelectedContactId(null); setSelectedContact(null); setSelectedFollowUpId(null); setShowForm(false); setNotice('');
-    const controller = new AbortController(); void refresh(controller.signal); return () => { controller.abort(); pagingController.current?.abort(); }; }, [clientId, isSc, refresh]);
+    setOverview(null); setContacts([]); setSelectedContactId(null); setSelectedContact(null); setSelectedFollowUpId(validLinkedFollowUp); setShowForm(false); setNotice(linkedFollowUp && !validLinkedFollowUp ? 'This follow-up link is invalid.' : '');
+    const controller = new AbortController(); void refresh(controller.signal); return () => { controller.abort(); pagingController.current?.abort(); }; }, [clientId, isSc, refresh, actorScope, validLinkedFollowUp, linkedFollowUp]);
+  useScMonitoringRefresh({ scopeKey: `${actorScope}:${clientId}`, timezone: overview?.monitoringSchedule?.timezone, refresh, enabled: Boolean(isSc && clientId && !unavailable) });
   useEffect(() => { if (!clientId || !selectedContactId || !isSc) return; const controller = new AbortController(); setSelectedContact(null);
     getScContact(clientId, selectedContactId, controller.signal).then(result => { if (!controller.signal.aborted) setSelectedContact(result); }).catch(caught => {
-      if (controller.signal.aborted) return; if (axios.isAxiosError(caught) && caught.response?.status === 404) markUnavailable(); else setError('Could not load this contact.');
+      if (controller.signal.aborted) return; if (axios.isAxiosError(caught) && [403, 404].includes(caught.response?.status || 0)) markUnavailable(); else setError('Could not load this contact.');
     }); return () => controller.abort(); }, [clientId, selectedContactId, isSc, markUnavailable]);
   const older = async () => { if (!clientId || !nextCursor || paging) return;
     const controller = new AbortController(); pagingController.current = controller; setPaging(true);
@@ -115,7 +123,7 @@ export default function ClientMonitoringPage() {
       if (controller.signal.aborted) return;
       setContacts(current => [...current, ...result.items]); setNextCursor(result.nextCursor);
     } catch (caught) { if (controller.signal.aborted) return;
-      if (axios.isAxiosError(caught) && caught.response?.status === 404) markUnavailable(); else setError('Could not load older contacts.');
+      if (axios.isAxiosError(caught) && [403, 404].includes(caught.response?.status || 0)) markUnavailable(); else setError('Could not load older contacts.');
     } finally { if (pagingController.current === controller) { pagingController.current = null; setPaging(false); } } };
 
   if (!isSc) return <Navigate to={Routes.userPanel.clientsAndServices} replace />;
@@ -126,12 +134,13 @@ export default function ClientMonitoringPage() {
   return <main className="scm">
     {notice && <div role="status" className="mb-4 rounded-xl border border-[#c8e6dc] bg-[#e8f8f1] px-4 py-3 text-sm font-bold text-[#2d7758]">{notice}</div>}
     {error && <p role="alert" className="scm-error">{error}</p>}
-    {showForm ? <ContactForm overview={overview} onCancel={() => setShowForm(false)} onUnavailable={markUnavailable} onSaved={() => { setShowForm(false); setNotice('Contact saved'); void refresh(); }} />
-      : selectedFollowUpId ? <FollowUpPanel clientId={clientId} followUpId={selectedFollowUpId} onBack={() => setSelectedFollowUpId(null)} onUnavailable={markUnavailable} />
+    {showForm ? <ContactForm overview={overview} onCancel={() => setShowForm(false)} onUnavailable={markUnavailable} onSaved={async input => { setShowForm(false); setNotice('Contact saved. Refreshing the schedule…'); const latest = await refresh(); const rules = latest?.monitoringSchedule; setNotice(!latest ? 'Contact saved. Latest details could not load; refresh monitoring.' : rules?.qualifyingMethods && ['upcoming','due_soon','due_today','overdue'].includes(rules.status) ? rules.qualifyingMethods.includes(input.method) && (!rules.requireDirectContact || input.directContact) ? 'Contact saved. It qualifies under the current monitoring rules; the current deadline is shown below.' : 'Contact saved. It does not qualify under the current monitoring rules.' : 'Contact saved. Scheduling is disabled or unavailable.'); }} />
+      : selectedFollowUpId ? <FollowUpPanel clientId={clientId} followUpId={selectedFollowUpId} onBack={() => setSelectedFollowUpId(null)} onUnavailable={markUnavailable} onSaved={() => void refresh()} />
         : selectedContactId ? selectedContact ? <ContactRecord detail={selectedContact} clientName={overview.name} clientId={clientId} onBack={() => { setSelectedContactId(null); setSelectedContact(null); }} onFollowUp={setSelectedFollowUpId} onUnavailable={markUnavailable} /> : error ? <button type="button" className="scm-button" onClick={() => { setError(''); setSelectedContactId(null); }}>Back to monitoring overview</button> : <MonitoringDetailSkeleton kind="contact" />
           : <><button type="button" className="scm-back" onClick={() => navigate(Routes.userPanel.clientsAndServices)}>← Back to My Clients</button>
             <div className="scm-panel scm-banner"><span className="scm-avatar">{initials(overview.name)}</span><div><h1>{overview.name}</h1><p>ID {overview.clientId} · {overview.program}{overview.county ? ` · ${overview.county}` : ''}</p></div><div className="scm-banner-period"><strong>Current ISP period</strong><small>{overview.ispPeriod ? `${civil(overview.ispPeriod.startDate)} – ${civil(overview.ispPeriod.endDate)}` : 'ISP period not recorded'}</small></div></div>
             <div className="scm-heading"><div><div className="scm-eyebrow">Client workspace</div><h1 className="scm-title">Monitoring overview</h1><p className="scm-sub">Plan details and contact findings are shown separately.</p></div><button type="button" className="scm-button scm-button-primary" onClick={() => { setNotice(''); setShowForm(true); }}><Plus size={16} /> Record contact</button></div>
+            <MonitoringScheduleCard schedule={overview.monitoringSchedule} onRefresh={() => void refresh()} />
             <div className="scm-layout"><div className="scm-stack"><section><div className="scm-section-head"><h2>Open follow-ups</h2><span className="scm-tag scm-tag-amber">{overview.openFollowUps.length ? `${overview.openFollowUps.length} ${overview.openFollowUps.length === 1 ? 'needs' : 'need'} action` : 'No open items'}</span></div><div className="scm-panel">{overview.openFollowUps.length ? overview.openFollowUps.map(item => <FollowUpRow key={item.followUpId} followUp={item} onOpen={() => setSelectedFollowUpId(item.followUpId)} />) : <p className="scm-empty">No open follow-ups.</p>}</div></section>
               <section><div className="scm-section-head"><h2>Monitoring contacts</h2><p>Most recent first</p></div><div className="scm-panel">{contacts.length ? contacts.map(item => <div className="scm-row" key={item.contactId}><span className="scm-row-icon"><ClipboardList size={17} /></span><div className="scm-row-body"><strong>{label(item.method)} · {instant(item.contactAt)}</strong><p>{item.summary}</p><small>{item.authorName}</small></div><button type="button" className="scm-button scm-button-small" onClick={() => { setError(''); setSelectedContactId(item.contactId); }}>Open record</button></div>) : <p className="scm-empty">No contacts recorded.</p>}
                 {nextCursor && <div className="border-t border-[#eaf0f1] px-5 py-3"><button type="button" className="scm-back mb-0" disabled={paging} onClick={() => void older()}>{paging ? 'Loading…' : 'Load 20 older contacts'} <ArrowRight size={14} className="inline" /></button></div>}</div></section>
@@ -140,4 +149,9 @@ export default function ClientMonitoringPage() {
               <div className="scm-plan-row"><small>ISP period</small><strong>{overview.ispPeriod ? `${civil(overview.ispPeriod.startDate)} – ${civil(overview.ispPeriod.endDate)}` : 'ISP period not recorded'}</strong></div><div className="scm-plan-note">Service authorization describes the plan. Monitoring records describe what the individual reported and what the SC observed.</div></aside></div>
           </>}
   </main>;
+}
+
+export default function ClientMonitoringPage() {
+  const scope = useAssignmentReviewScope(); const {clientId} = useParams();
+  return <ClientMonitoringWorkspace key={`${scope}:${clientId}`} />;
 }

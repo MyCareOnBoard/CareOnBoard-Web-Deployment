@@ -3,6 +3,7 @@ import "@testing-library/jest-dom/vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import AgencyInfoTab from "./AgencyInfoTab";
+vi.mock('./AssignmentPolicySection', () => ({ default: () => null }));
 import { UserType } from "@/utils/auth/types";
 
 let user = { agencyId: "agency-1", userType: UserType.AGENCY };

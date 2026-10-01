@@ -9,20 +9,25 @@ const unwrap = <T>(response: Envelope<T>): T => {
 const path = (clientId: string) => `${base}/${encodeURIComponent(clientId)}`;
 
 export type ScPeriod = { startDate: string; endDate: string } | null;
+export type MonitoringScheduleStatus = 'not_configured' | 'disabled' | 'not_applicable' | 'unavailable' | 'upcoming' | 'due_soon' | 'due_today' | 'overdue';
+export type MonitoringScheduleSummary = { status: MonitoringScheduleStatus; nextMonitoringDueDate: string | null; overdueDays: number | null; policyRevision: number | null; timezone: string | null; evaluatedAt: string };
+export type MonitoringScheduleDetail = MonitoringScheduleSummary & { latestQualifyingContactAt: string | null; latestQualifyingContactId: string | null; intervalDays: number | null; qualifyingMethods: string[] | null; requireDirectContact: boolean | null };
 export type ScClientSummary = { clientId: string; name: string; program: string; ispPeriod: ScPeriod;
-  lastContactAt: string | null; openFollowUpCount: number; nextFollowUpDueDate: string | null };
+  lastContactAt: string | null; openFollowUpCount: number; nextFollowUpDueDate: string | null; monitoringSchedule?: MonitoringScheduleSummary };
 export type ScContactSummary = { contactId: string; contactAt: string; method: string; summary: string; authorName: string; createdAt: string };
 export type ScContactPage = { items: ScContactSummary[]; nextCursor: string | null };
 export type ScFollowUp = { followUpId: string; contactId: string; issueKey: string; category: string; description: string;
   action: string; responsiblePerson: string; dueDate: string; priority: 'routine' | 'significant' | 'urgent';
   status: 'open' | 'in_progress' | 'completed'; outcome: string; overdue: boolean; createdAt: string;
   updatedAt: string; completedAt: string | null; authorName: string };
+export type ScFollowUpUpdate = { revisionToken: string; changeReason?: string } & Partial<Pick<ScFollowUp, 'action' | 'responsiblePerson' | 'priority' | 'dueDate' | 'status' | 'outcome'>>;
+export type ScFollowUpEventPage = { items: ScFollowUpEvent[]; nextCursor: string | null };
 export type ScFollowUpEvent = { eventId: string; previousStatus: string; previousOutcome: string;
-  status: string; outcome: string; authorName: string; authorRole?: string | null; createdAt: string };
-export type ScFollowUpDetail = ScFollowUp & { revisionToken: string; events: ScFollowUpEvent[] };
+  status: string; outcome: string; authorName: string; authorRole?: string | null; createdAt: string; changedFields?: string[]; previousValues?: Partial<ScFollowUp>; nextValues?: Partial<ScFollowUp>; changeReason?: string };
+export type ScFollowUpDetail = ScFollowUp & { revisionToken: string; events: ScFollowUpEvent[]; nextEventCursor?: string | null };
 export type ScOverview = { clientId: string; name: string; program: string; county: string | null;
   ispPeriod: ScPeriod; scOutcomes: Array<{ id: string; statement: string; services: Array<{ id: string; name: string; provider: string }> }>;
-  openFollowUps: ScFollowUp[]; contacts: ScContactPage; timezone: string };
+  openFollowUps: ScFollowUp[]; contacts: ScContactPage; timezone: string; monitoringSchedule?: MonitoringScheduleDetail };
 export type ScAnswer = { status: string; notReviewedReason?: string; [key: string]: string | boolean | undefined };
 export type ScIssueDecision = { issueKey: string; decision: 'follow_up' | 'no_follow_up'; reason?: string;
   followUp?: { description: string; action: string; responsiblePerson?: string; dueDate: string; priority: 'routine' | 'significant' | 'urgent' } };
@@ -57,6 +62,10 @@ export async function addScContactAmendment(clientId: string, contactId: string,
 export async function getScFollowUp(clientId: string, followUpId: string, signal?: AbortSignal) {
   return unwrap((await axiosClient.get<Envelope<ScFollowUpDetail>>(`${path(clientId)}/follow-ups/${encodeURIComponent(followUpId)}`, { signal })).data);
 }
-export async function updateScFollowUp(clientId: string, followUpId: string, input: { status: ScFollowUp['status']; outcome: string; revisionToken: string }) {
+export async function updateScFollowUp(clientId: string, followUpId: string, input: ScFollowUpUpdate) {
   return unwrap((await axiosClient.patch<Envelope<ScFollowUp & { revisionToken: string }>>(`${path(clientId)}/follow-ups/${encodeURIComponent(followUpId)}`, input)).data);
+}
+
+export async function listScFollowUpEvents(clientId: string, followUpId: string, cursor: string, signal?: AbortSignal) {
+  return unwrap((await axiosClient.get<Envelope<ScFollowUpEventPage>>(`${path(clientId)}/follow-ups/${encodeURIComponent(followUpId)}/events`, { params: { cursor }, signal })).data);
 }

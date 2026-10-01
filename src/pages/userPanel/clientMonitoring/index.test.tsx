@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { beforeEach, expect, it, vi } from 'vitest';
-import { getScOverview, getScContact, listScContacts, addScContactAmendment } from '@/lib/api/sc-monitoring';
+import { getScOverview, getScContact, getScFollowUp, listScContacts, addScContactAmendment } from '@/lib/api/sc-monitoring';
 import ClientMonitoringPage from './index';
 
 const state = vi.hoisted(() => ({ user: { userType: 'employee', applicantType: 'support_coordinator' } as any }));
@@ -18,7 +18,7 @@ beforeEach(() => {
   vi.mocked(getScOverview).mockResolvedValue(overviewFixture);
   vi.mocked(getScContact).mockResolvedValue(contactFixture);
 });
-const renderPage = () => render(<MemoryRouter initialEntries={['/user-panel/clients-and-services/c/monitoring']}><Routes><Route path="/user-panel/clients-and-services/:clientId/monitoring" element={<ClientMonitoringPage />} /><Route path="/user-panel/clients-and-services" element={<div>Caseload</div>} /></Routes></MemoryRouter>);
+const renderPage = (query='') => render(<MemoryRouter initialEntries={['/user-panel/clients-and-services/c/monitoring'+query]}><Routes><Route path="/user-panel/clients-and-services/:clientId/monitoring" element={<ClientMonitoringPage />} /><Route path="/user-panel/clients-and-services" element={<div>Caseload</div>} /></Routes></MemoryRouter>);
 
 it('shows follow-ups before contacts, keeps record action available without plan data, and opens a record', async () => {
   const user = userEvent.setup();
@@ -101,4 +101,18 @@ it('shows a record-shaped skeleton while the selected contact loads', async () =
   await userEvent.click(screen.getByRole('button', { name: 'Open record' }));
   const loading = screen.getByRole('status', { name: 'Loading contact record' });
   expect(loading.querySelectorAll('.animate-pulse').length).toBeGreaterThan(5);
+});
+
+
+it('opens a linked follow-up through the requested client API and clears unavailable sources',async()=> {
+  vi.mocked(getScFollowUp).mockRejectedValue({isAxiosError:true,response:{status:404}});
+  renderPage('?followUpId=linked');
+  expect(await screen.findByText('This client is no longer available in your caseload.')).toBeInTheDocument();
+  expect(getScFollowUp).toHaveBeenCalledWith('c','linked',expect.any(AbortSignal));
+});
+
+it('rejects a malformed follow-up link before requesting a source',async()=> {
+  renderPage('?followUpId=bad%2Fid');
+  await screen.findByText('Alex Morgan');expect(getScFollowUp).not.toHaveBeenCalled();
+  expect(screen.getByText('This follow-up link is invalid.')).toBeInTheDocument();
 });

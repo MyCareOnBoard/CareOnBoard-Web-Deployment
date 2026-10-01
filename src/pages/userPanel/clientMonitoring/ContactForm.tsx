@@ -29,9 +29,10 @@ function NotReviewed({ label, answer, change }: { label: string; answer: Answer;
 }
 
 export default function ContactForm({ overview, onCancel, onSaved, onUnavailable }: {
-  overview: ScOverview; onCancel: () => void; onSaved: () => void; onUnavailable: () => void;
+  overview: ScOverview; onCancel: () => void; onSaved: (input: ScContactInput) => void | Promise<void>; onUnavailable: () => void;
 }) {
   const initial = today();
+  const [planOutcomes] = useState(overview.scOutcomes);
   const [contactDate, setContactDate] = useState(initial.slice(0, 10));
   const [contactTime, setContactTime] = useState(initial.slice(11, 16));
   const [method, setMethod] = useState('phone');
@@ -41,9 +42,9 @@ export default function ContactForm({ overview, onCancel, onSaved, onUnavailable
   const [directContact, setDirectContact] = useState(true);
   const [summary, setSummary] = useState('');
   const [scObservation, setScObservation] = useState('');
-  const services = useMemo(() => overview.scOutcomes.flatMap(outcome => outcome.services), [overview]);
+  const services = useMemo(() => planOutcomes.flatMap(outcome => outcome.services), [planOutcomes]);
   const [serviceAnswers, setServiceAnswers] = useState<Record<string, Answer>>(() => Object.fromEntries(services.map(service => [service.id, { status: 'not_reviewed', notReviewedReason: '' }])));
-  const [goalAnswers, setGoalAnswers] = useState<Record<string, Answer>>(() => Object.fromEntries(overview.scOutcomes.map(goal => [goal.id, { status: 'not_reviewed', notReviewedReason: '' }])));
+  const [goalAnswers, setGoalAnswers] = useState<Record<string, Answer>>(() => Object.fromEntries(planOutcomes.map(goal => [goal.id, { status: 'not_reviewed', notReviewedReason: '' }])));
   const [experience, setExperience] = useState<Answer>({ status: 'not_reviewed', notReviewedReason: '' });
   const [safety, setSafety] = useState<Answer>({ status: 'not_reviewed', notReviewedReason: '' });
   const [changedNeeds, setChangedNeeds] = useState<Answer>({ status: 'not_reviewed', notReviewedReason: '' });
@@ -51,6 +52,13 @@ export default function ContactForm({ overview, onCancel, onSaved, onUnavailable
   const [decisions, setDecisions] = useState<Record<string, Draft>>({});
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [uncertain, setUncertain] = useState(false);
+  const schedule = overview.monitoringSchedule;
+  const eligible = schedule?.qualifyingMethods && schedule.status !== 'disabled' && schedule.status !== 'not_configured' && schedule.status !== 'unavailable';
+  const qualifies = eligible && schedule.qualifyingMethods?.includes(method) && (!schedule.requireDirectContact || directContact);
+  const contactAt = new Date(`${contactDate}T${contactTime}`);
+  const validContactTime = Number.isFinite(contactAt.getTime()) && contactAt <= new Date();
+  const qualification = !eligible ? 'Scheduling is unavailable or disabled. You can still save this contact.' : !validContactTime ? 'Enter a valid contact date and time that has already passed to check qualification.' : qualifies ? 'This contact would qualify under the current monitoring rules. The deadline changes only after saving.' : !schedule.qualifyingMethods?.includes(method) ? 'This method does not qualify for the monitoring schedule.' : 'Direct contact is required to qualify for the monitoring schedule.';
   const issueKeys = [
     ...services.filter(service => ['partial', 'no'].includes(serviceAnswers[service.id]?.status)).map(service => ({ key: `service:${service.id}`, label: `Service delivery · ${service.name}` })),
     ...(['not_satisfied', 'partly'].includes(experience.status) ? [{ key: 'experience', label: 'Client experience' }] : []),
@@ -66,6 +74,7 @@ export default function ContactForm({ overview, onCancel, onSaved, onUnavailable
     event.preventDefault(); setError('');
     const at = new Date(`${contactDate}T${contactTime}`);
     if (!Number.isFinite(at.getTime()) || at > new Date()) { setError('Enter a contact time that has already passed.'); return; }
+    if (uncertain) return;
     if (issueKeys.some(issue => !decisions[issue.key]?.decision)) { setError('Choose an action for each issue.'); return; }
     const issueDecisions: ScIssueDecision[] = issueKeys.map(issue => {
       const draft = decisions[issue.key];
@@ -75,13 +84,14 @@ export default function ContactForm({ overview, onCancel, onSaved, onUnavailable
     });
     const payload: ScContactInput = { contactAt: at.toISOString(), method, location, participants, directContact, purpose, summary,
       scObservation, services: services.map(service => ({ serviceId: service.id, ...cleanAnswer(serviceAnswers[service.id]) })),
-      experience: cleanAnswer(experience), goals: overview.scOutcomes.map(goal => ({ goalId: goal.id, ...cleanAnswer(goalAnswers[goal.id]) })),
+      experience: cleanAnswer(experience), goals: planOutcomes.map(goal => ({ goalId: goal.id, ...cleanAnswer(goalAnswers[goal.id]) })),
       safety: cleanAnswer(safety), changedNeeds: cleanAnswer(changedNeeds), providerIssue: cleanAnswer(providerIssue), issueDecisions,
       ...(issueKeys.length ? {} : { noFollowUpNeeded: true }) };
     setSaving(true);
-    try { await createScContact(overview.clientId, payload); onSaved(); }
+    try { await createScContact(overview.clientId, payload); await onSaved(payload); }
     catch (caught) {
-      if (axios.isAxiosError(caught) && caught.response?.status === 404) onUnavailable();
+      if (axios.isAxiosError(caught) && [403,404].includes(caught.response?.status || 0)) onUnavailable();
+      else if (!axios.isAxiosError(caught) || !caught.response || caught.response.status >= 500) { setUncertain(true); setError('The save result is unknown. Return to monitoring and review contact history before recording it again.'); }
       else setError(axios.isAxiosError(caught) ? caught.response?.data?.error || 'Could not save this contact. Your entries are still here.' : 'Could not save this contact. Your entries are still here.');
     } finally { setSaving(false); }
   };
@@ -99,6 +109,7 @@ export default function ContactForm({ overview, onCancel, onSaved, onUnavailable
         <div className="scm-question"><div className="scm-question-head"><strong>Was {overview.name} contacted directly?</strong></div><Choices label="Direct contact" choices={[{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }]} value={directContact ? 'yes' : 'no'} onChange={value => setDirectContact(value === 'yes')} />
           <p className="scm-help">Record whether information came from the individual or someone else. Times are shown in {Intl.DateTimeFormat().resolvedOptions().timeZone}.</p></div>
       </section>
+      <p role="status" className="scm-note mb-5">{qualification}</p>
       <section className="scm-panel scm-form-card"><div className="scm-section-number">02 / FINDINGS</div><h2>What did you learn?</h2><p>Review only the areas covered in this contact. Use “Not reviewed” when an area was not discussed.</p>
         <div className="scm-question"><div className="scm-question-head"><strong>Service delivery<small>Choose an answer for each authorized service.</small></strong><span className="scm-tag scm-tag-blue">Plan data</span></div>
           {!services.length && <p className="scm-help">No authorized services are recorded. You can still document this contact.</p>}
@@ -109,8 +120,8 @@ export default function ContactForm({ overview, onCancel, onSaved, onUnavailable
         <div className="scm-question"><div className="scm-question-head"><strong>Client experience<small>Record the individual's own answer where available.</small></strong></div><Choices label="Client experience" choices={options.experience} value={experience.status} onChange={status => setExperience({ ...experience, status })} /><NotReviewed label="client experience" answer={experience} change={patch => setExperience({ ...experience, ...patch })} />
           {experience.status !== 'not_reviewed' && <div className="scm-form-grid" style={{ marginTop: 13 }}><label className="scm-field">What the individual said<input value={String(experience.individualWords || '')} onChange={event => setExperience({ ...experience, individualWords: event.target.value })} /></label><label className="scm-field">SC observation<input value={String(experience.scObservation || '')} onChange={event => setExperience({ ...experience, scObservation: event.target.value })} /></label></div>}</div>
         <div className="scm-question"><div className="scm-question-head"><strong>ISP goal progress<small>Progress is separate from delivered service hours.</small></strong><span className="scm-tag scm-tag-blue">Plan goal</span></div>
-          {!overview.scOutcomes.length && <p className="scm-help">No ISP goals are recorded.</p>}
-          {overview.scOutcomes.map(goal => <div key={goal.id} className="mb-5 last:mb-0"><p className="mb-2 text-xs font-bold">{goal.statement}</p><Choices label={`ISP goal: ${goal.statement}`} choices={options.goal} value={goalAnswers[goal.id]?.status} onChange={status => updateGoal(goal.id, { status })} /><NotReviewed label={goal.statement} answer={goalAnswers[goal.id]} change={patch => updateGoal(goal.id, patch)} />
+          {!planOutcomes.length && <p className="scm-help">No ISP goals are recorded.</p>}
+          {planOutcomes.map(goal => <div key={goal.id} className="mb-5 last:mb-0"><p className="mb-2 text-xs font-bold">{goal.statement}</p><Choices label={`ISP goal: ${goal.statement}`} choices={options.goal} value={goalAnswers[goal.id]?.status} onChange={status => updateGoal(goal.id, { status })} /><NotReviewed label={goal.statement} answer={goalAnswers[goal.id]} change={patch => updateGoal(goal.id, patch)} />
             {goalAnswers[goal.id]?.status !== 'not_reviewed' && <div className="scm-form-grid" style={{ marginTop: 13 }}><label className="scm-field">Goal observation<input value={String(goalAnswers[goal.id]?.observation || '')} onChange={event => updateGoal(goal.id, { observation: event.target.value })} /></label><label className="scm-field">Barrier<input value={String(goalAnswers[goal.id]?.barrier || '')} onChange={event => updateGoal(goal.id, { barrier: event.target.value })} /></label></div>}</div>)}</div>
         <div className="scm-question"><div className="scm-question-head"><strong>Health and safety</strong></div><Choices label="Health and safety" choices={options.safety} value={safety.status} onChange={status => setSafety({ ...safety, status })} /><NotReviewed label="health and safety" answer={safety} change={patch => setSafety({ ...safety, ...patch })} />
           {safety.status === 'concern' && <div className="scm-form-grid" style={{ marginTop: 13 }}><label className="scm-field">Concern<input value={String(safety.concern || '')} onChange={event => setSafety({ ...safety, concern: event.target.value })} /></label><label className="scm-field">Immediate action<input value={String(safety.immediateAction || '')} onChange={event => setSafety({ ...safety, immediateAction: event.target.value })} /></label></div>}</div>
@@ -129,7 +140,7 @@ export default function ContactForm({ overview, onCancel, onSaved, onUnavailable
         <label className="scm-field" style={{ marginTop: 20 }}>Contact summary<textarea required value={summary} onChange={event => setSummary(event.target.value)} placeholder="Briefly summarize this contact" /></label>
       </section>
       {error && <p role="alert" className="scm-error">{error}</p>}
-      <div className="scm-form-actions"><button type="button" className="scm-button" onClick={onCancel}>Cancel</button><button type="submit" className="scm-button scm-button-primary" disabled={saving}>{saving ? 'Saving…' : 'Save contact'}</button></div>
+      <div className="scm-form-actions"><button type="button" className="scm-button" onClick={onCancel}>Cancel</button><button type="submit" className="scm-button scm-button-primary" disabled={saving || uncertain}>{saving ? 'Saving…' : 'Save contact'}</button></div>
     </div><aside className="scm-panel scm-review"><h3>In this contact</h3><div className="scm-review-item"><span>1</span>Contact details</div><div className="scm-review-item"><span>2</span>Services, experience, goals, safety, needs and provider</div><div className="scm-review-item"><span>3</span>Action and summary</div><p className="scm-help mt-4 border-t border-[#e7eeee] pt-4">Plan data stays separate from the individual's report and your observations.</p></aside></form>
   </>;
 }
