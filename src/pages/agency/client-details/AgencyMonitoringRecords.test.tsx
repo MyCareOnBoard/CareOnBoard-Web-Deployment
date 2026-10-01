@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router';
 import { beforeEach, expect, it, vi } from 'vitest';
 import AgencyMonitoringRecords from './AgencyMonitoringRecords';
 import * as api from '@/lib/api/sc-agency-monitoring';
+vi.mock('@/hooks/useEffectiveAgencyMode', () => ({ useEffectiveAgencyMode: () => 'sc' }));
 
 vi.mock('@/lib/api/sc-agency-monitoring', () => ({
   getAgencyMonitoringOverview: vi.fn(), listAgencyMonitoringContacts: vi.fn(), listAgencyMonitoringFollowUps: vi.fn(),
@@ -30,6 +31,7 @@ it('shows persisted records without the sample calendar and loads completed only
   render(<MemoryRouter><AgencyMonitoringRecords clientId="c" /></MemoryRouter>);
   expect(screen.getByRole('status', { name: 'Loading monitoring records' })).toBeInTheDocument();
   expect(await screen.findByRole('heading', { name: 'Client monitoring' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Monitoring Settings' })).toBeEnabled();
   expect(screen.getByText('Monthly review')).toBeInTheDocument();
   expect(screen.getByText('Urgent')).toBeInTheDocument();
   expect(screen.queryByText('PA Missing')).not.toBeInTheDocument();
