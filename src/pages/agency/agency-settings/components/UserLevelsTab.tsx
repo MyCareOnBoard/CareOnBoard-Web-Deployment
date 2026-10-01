@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { Search, Plus, Trash2, Pencil, ChevronDown } from "lucide-react";
+import { Search, Plus, Trash2, Pencil, ChevronDown, UsersRound, KeyRound, UserRoundX, UserRoundCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -386,26 +388,30 @@ export default function InternalUsersPage() {
                 <div className="flex w-full flex-shrink-0 items-center sm:ml-auto sm:w-auto">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button type="button" variant="outline" aria-label={`Actions for ${user.name}`} className="h-9 rounded-full px-4 text-[13px] font-normal text-[#4b5563]">
-                        Action
-                        <ChevronDown className="h-4 w-4" />
+                      <Button type="button" variant="outline" aria-label={`Actions for ${user.name}`} className="group h-9 rounded-full px-4 text-[13px] font-medium text-[#4b5563] hover:border-[#00b4b8] hover:bg-[#e6f7f7] hover:text-[#007a7d] data-[state=open]:border-[#00b4b8] data-[state=open]:bg-[#e6f7f7] data-[state=open]:text-[#007a7d]">
+                        Actions
+                        <ChevronDown aria-hidden="true" className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180 motion-reduce:transition-none" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="min-w-[180px] rounded-xl bg-white shadow-lg">
+                    <DropdownMenuContent align="end" sideOffset={8} className="w-60 max-w-[calc(100vw-2rem)] rounded-2xl border-[#e5e7eb] bg-white p-1.5 text-[#10141a] shadow-lg [&_[role=menuitem]]:min-h-10 [&_[role=menuitem]]:cursor-pointer [&_[role=menuitem]]:gap-3 [&_[role=menuitem]]:rounded-lg [&_[role=menuitem]]:px-3 [&_[role=menuitem]]:text-[13px] [&_[role=menuitem]]:font-medium [&_[role=menuitem]]:transition-colors [&_[role=menuitem]]:focus:bg-[#e6f7f7] [&_[role=menuitem]]:focus:text-[#007a7d] [&_svg]:text-current">
+                      <DropdownMenuLabel className="px-3 pb-2 pt-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#6b7280]">Staff actions</DropdownMenuLabel>
                       <DropdownMenuItem disabled={isUpdating} onSelect={() => handleEditClick(user)}>
-                        <Pencil className="h-4 w-4" /> Edit
+                        <Pencil aria-hidden="true" className="h-4 w-4" /> Edit staff member
                       </DropdownMenuItem>
                       {signedInUser?.userType === UserType.AGENCY && <DropdownMenuItem onSelect={() => setAssignmentStaff(user)}>
+                        <UsersRound aria-hidden="true" className="h-4 w-4" />
                         Manage coordinators
                       </DropdownMenuItem>}
                       <DropdownMenuItem onSelect={() => handleResetPasswordClick(user.id, user.name)}>
-                        Reset Password
+                        <KeyRound aria-hidden="true" className="h-4 w-4" /> Reset password
                       </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => handleDeactivateClick(user.id, user.name)}>
+                      <DropdownMenuSeparator className="mx-2 my-1.5 bg-[#eef0f2]" />
+                      <DropdownMenuItem className={user.isActive ? "text-amber-700 focus:!bg-amber-50 focus:!text-amber-800" : "text-[#007a7d]"} onSelect={() => handleDeactivateClick(user.id, user.name)}>
+                        {user.isActive ? <UserRoundX aria-hidden="true" className="h-4 w-4" /> : <UserRoundCheck aria-hidden="true" className="h-4 w-4" />}
                         {user.isActive ? "Deactivate" : "Activate"}
                       </DropdownMenuItem>
-                      <DropdownMenuItem variant="destructive" disabled={isDeleting} onSelect={() => handleDeleteClick(user.id, user.name)}>
-                        <Trash2 className="h-4 w-4" /> Delete
+                      <DropdownMenuItem variant="destructive" className="text-red-600 focus:!bg-red-50 focus:!text-red-700 [&_svg]:!text-current" disabled={isDeleting} onSelect={() => handleDeleteClick(user.id, user.name)}>
+                        <Trash2 aria-hidden="true" className="h-4 w-4" /> Delete staff member
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
