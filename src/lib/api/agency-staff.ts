@@ -163,6 +163,7 @@ export interface AgencyStaffResponse {
 export interface CreateAgencyStaffResponse {
     success: boolean;
     message: string;
+    emailSent?: boolean;
     user: AgencyStaffMember;
 }
 

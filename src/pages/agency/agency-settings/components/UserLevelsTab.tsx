@@ -79,10 +79,11 @@ export default function InternalUsersPage() {
   const handleCreateStaff = async (staffData: StaffFormValues) => {
     try {
       // Create-mode gating guarantees the HR fields are present, so this is safe.
-      await createStaff(staffData as CreateAgencyStaffRequest).unwrap();
+      const result = await createStaff(staffData as CreateAgencyStaffRequest).unwrap();
       toast({
-        title: "Staff member added",
-        description: "They can now sign in with the email and password you set.",
+        title: result.emailSent === false ? "Staff added — email unconfirmed" : "Staff member added",
+        description: result.message,
+        variant: result.emailSent === false ? "warning" : "default",
       });
       setShowAddUserModal(false);
       setEditingStaff(null);
