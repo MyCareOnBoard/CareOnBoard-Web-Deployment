@@ -10,7 +10,7 @@ const path = (clientId: string) => `${base}/${encodeURIComponent(clientId)}`;
 
 export type ScPeriod = { startDate: string; endDate: string } | null;
 export type MonitoringScheduleStatus = 'not_configured' | 'disabled' | 'not_applicable' | 'unavailable' | 'upcoming' | 'due_soon' | 'due_today' | 'overdue';
-export type MonitoringScheduleSummary = { status: MonitoringScheduleStatus; nextMonitoringDueDate: string | null; overdueDays: number | null; policyRevision: number | null; timezone: string | null; evaluatedAt: string };
+export type MonitoringScheduleSummary = { status: MonitoringScheduleStatus; clientStatus?: string | null; nextMonitoringDueDate: string | null; overdueDays: number | null; policyRevision: number | null; timezone: string | null; evaluatedAt: string };
 export type MonitoringScheduleDetail = MonitoringScheduleSummary & { latestQualifyingContactAt: string | null; latestQualifyingContactId: string | null; intervalDays: number | null; qualifyingMethods: string[] | null; requireDirectContact: boolean | null };
 export type ScClientSummary = { clientId: string; name: string; program: string; ispPeriod: ScPeriod;
   lastContactAt: string | null; openFollowUpCount: number; nextFollowUpDueDate: string | null; monitoringSchedule?: MonitoringScheduleSummary };

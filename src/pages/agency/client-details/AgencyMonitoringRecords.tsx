@@ -19,7 +19,7 @@ const label = (value: string) => value.replaceAll('_', ' ').replace(/\b\w/g, let
 const lost = (error: unknown) => axios.isAxiosError(error) && [403, 404].includes(error.response?.status || 0);
 const card = 'rounded-xl border border-[#dce6e7] bg-white shadow-[0_2px_10px_rgba(21,58,61,0.03)]';
 
-function AgencyMonitoringWorkspace({ clientId }: { clientId: string }) {
+function AgencyMonitoringWorkspace({ clientId, clientStatus }: { clientId: string; clientStatus?: string }) {
   const actorScope = useAssignmentReviewScope();
   const [overview, setOverview] = useState<AgencyMonitoringOverview | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'error' | 'unavailable'>('loading');
@@ -101,7 +101,7 @@ function AgencyMonitoringWorkspace({ clientId }: { clientId: string }) {
     <div><p className="text-xs font-bold uppercase tracking-[0.14em] text-[#087b80]">Client details / Monitoring</p><h2 id="agency-monitoring-heading" className="mt-1 text-2xl font-semibold">Client monitoring</h2><p className="mt-1 text-sm text-[#617579]">Review the SC's contacts, concerns, and follow-up work for this client.</p></div>
     {notice && <p role="status" className="rounded-lg border border-[#b5e5d8] bg-[#eaf9f4] px-4 py-2 text-sm text-[#176853]">{notice}</p>}
     {overview.hasAssignedCoordinator === false && <p role="status" className="rounded-lg border border-[#ead5a3] bg-[#fff8e9] px-4 py-3 text-sm text-[#795510]">No SC assigned. Reminders cannot be sent until an SC is assigned.</p>}
-    <MonitoringScheduleCard schedule={overview.monitoringSchedule} onRefresh={() => void refresh()} />
+    <MonitoringScheduleCard schedule={overview.monitoringSchedule ? { ...overview.monitoringSchedule, clientStatus: overview.monitoringSchedule.clientStatus ?? clientStatus } : undefined} onRefresh={() => void refresh()} agencyView />
     <div className="grid gap-3 sm:grid-cols-3">
       <Metric title="Last contact" value={dateTime(overview.lastContactAt)} />
       <Metric title="Active follow-ups" value={String(overview.activeFollowUpCount)} />
@@ -126,6 +126,6 @@ function RowsSkeleton() { return <div role="status" aria-label="Loading complete
 function FollowUpRow({ item, onOpen }: { item: AgencyFollowUpSummary; onOpen: () => void }) { return <article className="p-4 sm:p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><p className="font-semibold">{label(item.category || item.issueKey || 'Follow-up')}</p><p className="mt-1 text-xs text-[#617579]">Due {item.dueDate || 'not set'} · {item.authorName || 'SC'}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.priority === 'urgent' ? 'bg-[#fff0ee] text-[#ab3540]' : item.priority === 'significant' ? 'bg-[#fff4dc] text-[#9d6500]' : 'bg-[#eaf6f6] text-[#087b80]'}`}>{label(item.priority)}</span></div><p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[#526e72]"><span>{label(item.status)}</span>{item.overdue && <span className="font-semibold text-[#b42332]"><TriangleAlert className="mr-1 inline size-3" />Overdue</span>}<span>Responsible: {item.responsiblePerson || 'Current SC'} (informational)</span></p><button type="button" onClick={onOpen} className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-[#008f93] hover:underline focus-visible:outline-2 focus-visible:outline-[#008f93]">View follow-up <ArrowRight className="size-4" /></button></article>; }
 function ContactRow({ item, onOpen }: { item: ScContactSummary; onOpen: () => void }) { return <article className="flex gap-3 p-4 sm:p-5"><span className="grid size-9 shrink-0 place-items-center rounded-lg bg-[#e7f5f5] text-[#008f93]"><MessageSquareText className="size-4" /></span><div className="min-w-0 flex-1"><p className="font-semibold">{label(item.method)} contact</p><p className="mt-1 text-xs text-[#617579]"><Clock3 className="mr-1 inline size-3" />{dateTime(item.contactAt)} · {item.authorName || 'SC'}</p><p className="mt-2 text-sm text-[#425c60]">{item.summary}</p><button type="button" onClick={onOpen} className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-[#008f93] hover:underline focus-visible:outline-2 focus-visible:outline-[#008f93]">View contact <ArrowRight className="size-4" /></button></div></article>; }
 
-export default function AgencyMonitoringRecords({clientId}: {clientId:string}) {
-  const scope = useAssignmentReviewScope(); return <AgencyMonitoringWorkspace key={`${scope}:${clientId}`} clientId={clientId} />;
+export default function AgencyMonitoringRecords({clientId, clientStatus}: {clientId:string; clientStatus?:string}) {
+  const scope = useAssignmentReviewScope(); return <AgencyMonitoringWorkspace key={`${scope}:${clientId}`} clientId={clientId} clientStatus={clientStatus} />;
 }

@@ -19,6 +19,8 @@ interface VoiceEnabledTextareaProps {
   onVoiceAccepted?: (transcript: string) => void;
   id?: string;
   rows?: number;
+  required?: boolean;
+  maxLength?: number;
 }
 
 const VoiceEnabledTextarea: React.FC<VoiceEnabledTextareaProps> = ({
@@ -32,6 +34,8 @@ const VoiceEnabledTextarea: React.FC<VoiceEnabledTextareaProps> = ({
   onVoiceAccepted,
   id,
   rows,
+  required,
+  maxLength,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -89,6 +93,8 @@ const VoiceEnabledTextarea: React.FC<VoiceEnabledTextareaProps> = ({
         ref={textareaRef}
         id={id}
         rows={rows}
+        required={required}
+        maxLength={maxLength}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className={className}

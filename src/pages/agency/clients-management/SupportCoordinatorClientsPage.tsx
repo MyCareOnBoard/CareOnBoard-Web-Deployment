@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Routes } from "@/routes/constants";
 import { useListAgencyClientsQuery } from "@/lib/api/clients";
 import { useAuth } from "@/utils/auth";
+import ScMonitoringSettingsModal from "./ScMonitoringSettingsModal";
 import "./support-coordinator-clients.css";
 
 type Filter = "All clients" | "SP" | "CCP";
@@ -49,9 +50,12 @@ export default function SupportCoordinatorClientsPage() {
     <div className="min-h-[calc(100vh-200px)] px-4 sm:px-6 lg:px-0">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-[28px] font-bold leading-[1.4] text-[#10141a] sm:text-[32px] lg:text-[40px]">Client Management</h1>
-        <Button size="lg" className="h-[52px] gap-2 px-5" onClick={() => navigate(Routes.agency.addClient)}>
-          <Plus className="h-5 w-5" />New Enrollment
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button size="lg" className="h-[52px] gap-2 px-5" onClick={() => navigate(Routes.agency.addClient)}>
+            <Plus className="h-5 w-5" />New Enrollment
+          </Button>
+          <ScMonitoringSettingsModal agencyId={user?.agencyId || ""} />
+        </div>
       </div>
 
       <section aria-labelledby="sc-overview-title" className="mb-7">
@@ -107,7 +111,7 @@ export default function SupportCoordinatorClientsPage() {
               const serviceCount = (client.scOutcomes ?? []).reduce((count, outcome) => count + outcome.services.length, 0);
               const createdAt = client.createdAt;
               const createdDate = createdAt instanceof Date ? createdAt : typeof createdAt === "string" ? new Date(createdAt) : createdAt?._seconds ? new Date(createdAt._seconds * 1000) : null;
-              const openDetails = () => navigate(`${Routes.agency.clientDetails.replace(":clientId", client.id)}?tab=assessment`);
+              const openDetails = () => navigate(Routes.agency.clientDetails.replace(":clientId", client.id));
               return <div role="row" aria-label={`Open details for ${name}`} tabIndex={0} onClick={openDetails} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openDetails(); } }} key={client.id} className="sc-client-grid grid cursor-pointer grid-cols-1 gap-3 border-b border-[#e5e5e6] px-4 py-4 last:border-b-0 hover:bg-[#f9fafb] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#00b4b8] lg:items-center">
                 <div role="cell" className="flex min-w-0 items-center gap-3">
                   <Avatar className="h-10 w-10">{client.profileImage && <AvatarImage src={client.profileImage} alt="" className="object-cover" />}<AvatarFallback className="bg-[#e6f8f8] text-[12px] font-bold text-[#007f84]">{[client.firstName, client.lastName].filter(Boolean).map(part => part?.[0]?.toUpperCase()).join("")}</AvatarFallback></Avatar>

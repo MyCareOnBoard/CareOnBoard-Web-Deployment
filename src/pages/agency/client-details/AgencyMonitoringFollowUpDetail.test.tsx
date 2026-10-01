@@ -1,8 +1,12 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { getAgencyMonitoringFollowUp, updateAgencyMonitoringFollowUp } from '@/lib/api/sc-agency-monitoring';
 import AgencyMonitoringFollowUpDetail from './AgencyMonitoringFollowUpDetail';
+
+const pointerOriginals = new Map<string, PropertyDescriptor | undefined>();
+beforeAll(() => { for (const name of ['hasPointerCapture', 'setPointerCapture', 'releasePointerCapture', 'scrollIntoView']) { pointerOriginals.set(name, Object.getOwnPropertyDescriptor(HTMLElement.prototype, name)); Object.defineProperty(HTMLElement.prototype, name, { configurable: true, value: () => false }); } });
+afterAll(() => { for (const [name, descriptor] of pointerOriginals) { if (descriptor) Object.defineProperty(HTMLElement.prototype, name, descriptor); else Reflect.deleteProperty(HTMLElement.prototype, name); } });
 
 vi.mock('@/lib/api/sc-agency-monitoring', () => ({ getAgencyMonitoringFollowUp: vi.fn(), updateAgencyMonitoringFollowUp: vi.fn() }));
 const detail = { followUpId: 'f', contactId: 'contact', issueKey: 'safety', category: 'safety', description: 'Concern',
@@ -18,7 +22,8 @@ it('requires outcome, saves only status/outcome/revision and reports success', a
   render(<AgencyMonitoringFollowUpDetail clientId="c" followUpId="f" canUpdateFollowUps onBack={vi.fn()} onContact={vi.fn()} onUnavailable={vi.fn()} onSaved={onSaved} />);
   expect((await screen.findAllByText('Call provider'))[0]).toBeInTheDocument();
   expect(screen.getByText(/Urgent follow-up\. Follow your agency's escalation process now/)).toBeInTheDocument();
-  await user.selectOptions(screen.getByLabelText('Status'), 'completed');
+  await user.click(screen.getByRole('combobox', {name:'Status'}));
+  await user.click(screen.getByRole('option', {name:'Completed'}));
   await user.click(screen.getByRole('button', { name: 'Save update' }));
   expect(screen.getByRole('alert')).toHaveTextContent('Add an outcome before completing this follow-up');
   expect(updateAgencyMonitoringFollowUp).not.toHaveBeenCalled();
@@ -41,7 +46,8 @@ it('reloads a changed follow-up before another agency edit', async () => {
   vi.mocked(getAgencyMonitoringFollowUp).mockResolvedValueOnce(detail as any).mockResolvedValueOnce({ ...detail, revisionToken: 'latest' } as any);
   render(<AgencyMonitoringFollowUpDetail clientId="c" followUpId="f" canUpdateFollowUps onBack={vi.fn()} onContact={vi.fn()} onUnavailable={vi.fn()} onSaved={vi.fn()} />);
   (await screen.findAllByText('Call provider'))[0];
-  await user.selectOptions(screen.getByLabelText('Status'), 'in_progress');
+  await user.click(screen.getByRole('combobox', {name:'Status'}));
+  await user.click(screen.getByRole('option', {name:'In progress'}));
   await user.click(screen.getByRole('button', { name: 'Save update' }));
   expect(await screen.findByText('This follow-up changed while you were viewing it. Review the latest details and try again.')).toBeInTheDocument();
   expect(getAgencyMonitoringFollowUp).toHaveBeenCalledTimes(2);
@@ -53,7 +59,8 @@ it('removes the editor if a conflict cannot be reloaded', async () => {
   vi.mocked(getAgencyMonitoringFollowUp).mockResolvedValueOnce(detail as any).mockRejectedValueOnce(new Error('network'));
   render(<AgencyMonitoringFollowUpDetail clientId="c" followUpId="f" canUpdateFollowUps onBack={vi.fn()} onContact={vi.fn()} onUnavailable={vi.fn()} onSaved={vi.fn()} />);
   (await screen.findAllByText('Call provider'))[0];
-  await user.selectOptions(screen.getByLabelText('Status'), 'in_progress');
+  await user.click(screen.getByRole('combobox', {name:'Status'}));
+  await user.click(screen.getByRole('option', {name:'In progress'}));
   await user.click(screen.getByRole('button', { name: 'Save update' }));
   expect(await screen.findByText('Could not load this follow-up. Your draft is still here.')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Save update' })).toBeDisabled();

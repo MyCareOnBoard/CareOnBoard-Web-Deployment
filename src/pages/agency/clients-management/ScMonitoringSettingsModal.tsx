@@ -3,23 +3,38 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Loader2, Settings, X } from 'lucide-react';
+import { Link } from 'react-router';
+import { Routes } from '@/routes/constants';
+import VoiceEnabledTextarea from '@/components/VoiceEnabledTextarea';
+import VoiceInputButton from '@/components/VoiceInputButton';
+import { VoiceRecordingProvider, useVoiceRecording } from '@/contexts/VoiceRecordingContext';
 import { useAssignmentReviewScope } from '@/hooks/useAssignmentReview';
 import { useEffectiveAgencyMode } from '@/hooks/useEffectiveAgencyMode';
+import { useToast } from '@/hooks/use-toast';
 import { getScMonitoringPolicy, saveScMonitoringPolicy, listScMonitoringPolicyEvents, monitoringMethods, type MonitoringPolicyResponse, type MonitoringPolicyInput, type MonitoringPolicyEventPage } from '@/lib/api/sc-monitoring-policy';
-import SettingsSectionCard from './SettingsSectionCard';
 const draftOf = ({ policy }: MonitoringPolicyResponse): MonitoringPolicyInput => ({ expectedRevision: policy.revision, enabled: policy.enabled, intervalDays: policy.intervalDays, qualifyingMethods: [...policy.qualifyingMethods], requireDirectContact: policy.requireDirectContact, remindersEnabled: policy.remindersEnabled, changeReason: '' });
 const statusOf = (error: unknown) => (error as { response?: { status?: number } })?.response?.status;
 const label = (value: string) => value.replaceAll('_', ' ').replace(/^./, first => first.toUpperCase());
-export default function ScMonitoringPolicySection({ agencyId }: { agencyId: string }) {
+export default function ScMonitoringSettingsModal({ agencyId }: { agencyId: string }) {
   const scope = useAssignmentReviewScope(); const mode = useEffectiveAgencyMode();
-  return mode === 'sc' ? <PolicyEditor key={`${scope}:${agencyId}`} agencyId={agencyId} /> : null;
+  const [open, setOpen] = useState(false);
+  if (mode !== 'sc') return null;
+  return <Dialog key={`${scope}:${agencyId}`} open={open} onOpenChange={setOpen}>
+    <DialogTrigger asChild><Button variant="outline" size="icon" className="size-[52px] p-0 hover:border-[#00b4b8] hover:bg-[#e6f7f8] hover:text-[#008f93] focus-visible:ring-[#00b4b8]/25 focus-visible:ring-offset-0" aria-label="Monitoring Settings" title="Monitoring Settings" disabled={!agencyId}><Settings className="h-5 w-5" aria-hidden="true" /></Button></DialogTrigger>
+    {open && <VoiceRecordingProvider pageTitle="SC monitoring settings"><PolicyEditor agencyId={agencyId} onClose={() => setOpen(false)} /></VoiceRecordingProvider>}
+  </Dialog>;
 }
-function PolicyEditor({ agencyId }: { agencyId: string }) {
+function PolicyEditor({ agencyId, onClose }: { agencyId: string; onClose: () => void }) {
+  const { toast } = useToast();
+  const { stopRecording } = useVoiceRecording();
   const [saved, setSaved] = useState<MonitoringPolicyResponse | null>(null);
   const [draft, setDraft] = useState<MonitoringPolicyInput | null>(null);
   const [latest, setLatest] = useState<MonitoringPolicyResponse | null>(null);
   const [conflict, setConflict] = useState(false); const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(''); const [history, setHistory] = useState<MonitoringPolicyEventPage | null>(null);
   const [historyError, setHistoryError] = useState(''); const [historyBusy, setHistoryBusy] = useState(false);
   const alive = useRef(true);
@@ -55,13 +70,17 @@ function PolicyEditor({ agencyId }: { agencyId: string }) {
   }
   async function save() {
     if (!draft || !saved?.canEditPolicy || conflict) return;
-    setBusy(true); setMessage('');
-    try { const value = await saveScMonitoringPolicy(agencyId, draft); if (alive.current) { setSaved(value); setDraft(draftOf(value)); setHistory(null); setMessage('Monitoring policy saved.'); } }
+    setBusy(true); setSaving(true); setMessage('');
+    try { const value = await saveScMonitoringPolicy(agencyId, draft); if (alive.current) { setSaved(value); setDraft(draftOf(value)); setHistory(null); setMessage('Monitoring policy saved.'); toast({ title: 'Monitoring settings saved', description: 'Your agency’s monitoring rules and reminder settings have been updated.', variant: 'success' }); } }
     catch (error) { if (alive.current) {
-      if (denied(error)) { clear(); setMessage('Your access changed. Reload the policy.'); }
-      else if (statusOf(error) === 409) { setConflict(true); setLatest(null); setMessage('Monitoring policy changed. Load the latest rules, review your draft, and reapply changes.'); }
-      else setMessage('Policy could not be saved. Your draft is still here.');
-    } } finally { if (alive.current) setBusy(false); }
+      const saveError = denied(error) ? 'Your access changed. Reload the policy.' : statusOf(error) === 409
+        ? 'Monitoring policy changed. Load the latest rules, review your draft, and reapply changes.'
+        : 'Policy could not be saved. Your draft is still here.';
+      if (denied(error)) clear();
+      else if (statusOf(error) === 409) { setConflict(true); setLatest(null); }
+      setMessage(saveError);
+      toast({ title: 'Monitoring settings could not be saved', description: saveError, variant: 'destructive' });
+    } } finally { if (alive.current) { setBusy(false); setSaving(false); } }
   }
   async function loadHistory(cursor?: string) {
     if (!saved?.canEditPolicy || historyBusy) return;
@@ -73,7 +92,15 @@ function PolicyEditor({ agencyId }: { agencyId: string }) {
   let validTimezone = false;
   try { if (saved?.timezone) { new Intl.DateTimeFormat('en-US', { timeZone: saved.timezone }); validTimezone = true; } } catch { /* Explicit unavailable state below. */ }
   const disabled = busy || conflict || !saved?.canEditPolicy;
-  return <SettingsSectionCard title="Support Coordination monitoring" subtitle="Saved independently of your agency profile">
+  useEffect(() => { if (disabled) stopRecording(); }, [disabled, stopRecording]);
+  return <DialogContent showCloseButton={false}
+    className="left-auto right-4 flex max-h-[90dvh] w-[calc(100vw-32px)] max-w-[500px] translate-x-0 flex-col rounded-[30px] border border-white/30 bg-white shadow-xl sm:right-8 [&_button:focus-visible]:ring-[#00b4b8]/25 [&_button:focus-visible]:ring-offset-0"
+    onEscapeKeyDown={event => { if (busy) event.preventDefault(); }} onInteractOutside={event => { if (busy) event.preventDefault(); }}>
+    <header className="flex shrink-0 items-start justify-between gap-4 p-5 pb-4">
+      <div><DialogTitle className="text-[20px] font-medium leading-[1.6]">Monitoring Settings</DialogTitle><DialogDescription className="mt-1 text-sm">Set monitoring contact rules and reminders for your agency.</DialogDescription></div>
+      <Button type="button" variant="ghost" size="icon-sm" className="shrink-0 bg-[#eff2f3]" aria-label="Close monitoring settings" disabled={busy} onClick={onClose}><X className="size-4" /></Button>
+    </header>
+    <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pb-5">
     {message && <p role="status" className="text-sm">{message}</p>}
     {!saved && <Button type="button" variant="outline" disabled={busy} onClick={() => void load()}>Reload policy</Button>}
     {conflict && saved && <><Button type="button" variant="outline" disabled={busy} onClick={() => void loadLatest()}>Load latest policy</Button>
@@ -82,22 +109,25 @@ function PolicyEditor({ agencyId }: { agencyId: string }) {
         <Button type="button" disabled={busy || !latest.canEditPolicy} onClick={() => { setSaved(latest); setDraft(current => current && ({ ...current, expectedRevision: latest.policy.revision })); setLatest(null); setConflict(false); setMessage('Draft reapplied. Review your changes before saving.'); }}>Reapply my draft</Button></div>}</>}
     {saved && draft && <div className="space-y-4">
       {!saved.canEditPolicy && <p className="text-sm">Only the agency owner can change monitoring rules.</p>}
-      {!validTimezone && <p role="alert" className="text-sm">Set a valid agency time zone before enabling monitoring schedules or reminders. <a href="#agency-timezone" className="underline">View agency time zone</a></p>}
+      {!validTimezone && <p role="alert" className="text-sm">Set a valid agency time zone before enabling monitoring schedules or reminders. <Link to={`${Routes.agency.agencySettings}?tab=agencyInfo#agency-timezone`} className="underline" onClick={onClose}>View agency time zone</Link></p>}
       <p className="text-sm text-muted-foreground">Agency time zone: {saved.timezone || 'Not configured'}</p>
       <Checkbox label="Enable monitoring contact schedules" checked={draft.enabled} disabled={disabled || !validTimezone && !draft.enabled} onChange={event => setDraft({ ...draft, enabled: event.target.checked })} />
-      <label className="block text-sm">Rolling interval (days)<Input type="number" min={1} max={365} step={1} disabled={disabled} value={draft.intervalDays ?? ''} onChange={event => setDraft({ ...draft, intervalDays: event.target.value === '' ? null : Number(event.target.value) })} /></label>
+      <label className="block text-sm">Rolling interval (days)<Input type="number" className="focus-visible:border-[#00b4b8] focus-visible:ring-0" min={1} max={365} step={1} disabled={disabled} value={draft.intervalDays ?? ''} onChange={event => setDraft({ ...draft, intervalDays: event.target.value === '' ? null : Number(event.target.value) })} /></label>
       <p className="text-sm text-muted-foreground">Enter the interval your agency uses, from 1 to 365 days.</p>
-      <fieldset disabled={disabled} className="space-y-2"><legend className="text-sm font-medium">Contact methods that count</legend>{monitoringMethods.map(method => <Checkbox key={method} label={label(method)} checked={draft.qualifyingMethods.includes(method)} onChange={event => setDraft({ ...draft, qualifyingMethods: event.target.checked ? [...draft.qualifyingMethods, method] : draft.qualifyingMethods.filter(value => value !== method) })} />)}</fieldset>
+      <fieldset disabled={disabled} className="space-y-3"><legend className="text-sm font-medium">Contact methods that count</legend><div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">{monitoringMethods.map(method => <Checkbox key={method} label={label(method)} checked={draft.qualifyingMethods.includes(method)} onChange={event => setDraft({ ...draft, qualifyingMethods: event.target.checked ? [...draft.qualifyingMethods, method] : draft.qualifyingMethods.filter(value => value !== method) })} />)}</div></fieldset>
       <Checkbox label="Require direct contact with the client" disabled={disabled} checked={draft.requireDirectContact} onChange={event => setDraft({ ...draft, requireDirectContact: event.target.checked })} />
       <Checkbox label="Send reminders to the assigned SC" disabled={disabled || !validTimezone && !draft.remindersEnabled} checked={draft.remindersEnabled} onChange={event => setDraft({ ...draft, remindersEnabled: event.target.checked })} />
       <p className="text-sm text-muted-foreground">Contact reminders appear in-app. Follow-up reminders can appear in-app and by email, based on the SC's notification preferences. Reminders are available even when contact scheduling is disabled.</p>
       <p className="text-sm text-muted-foreground">SCs may receive reminders for contacts and follow-ups already due. No push alerts are sent.</p>
-      {saved.canEditPolicy && <><label className="block text-sm">Reason for this change<Textarea maxLength={2000} disabled={disabled} value={draft.changeReason} onChange={event => setDraft({ ...draft, changeReason: event.target.value })} /></label>
+      {saved.canEditPolicy && <><div className="space-y-2"><Label htmlFor="sc-monitoring-change-reason">Reason for this change</Label><VoiceEnabledTextarea id="sc-monitoring-change-reason" className="focus-visible:border-[#00b4b8] focus-visible:ring-0" fieldName="Monitoring policy change reason" pageTitle="SC monitoring settings" rows={4} placeholder="Explain why these rules are changing" disabled={disabled} value={draft.changeReason} onChange={value => setDraft(current => current && ({ ...current, changeReason: value.slice(0, 2000) }))} /></div>
         {draft.enabled && <p className="text-sm">These rules apply to all active SC clients. Changing them may move contact deadlines or make a client overdue. Disabling and re-enabling keeps the original baseline.</p>}
-        <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" disabled={busy} onClick={() => { setDraft(draftOf(latest || saved)); if (latest) setSaved(latest); const stillStale = conflict && !latest; setLatest(null); setConflict(stillStale); setMessage(stillStale ? 'Draft discarded. Load the latest policy before editing.' : ''); }}>Cancel changes</Button>
-          <Button type="button" disabled={disabled || (draft.enabled || draft.remindersEnabled) && !validTimezone || draft.enabled && (!Number.isInteger(draft.intervalDays) || !draft.intervalDays || draft.intervalDays < 1 || draft.intervalDays > 365 || !draft.qualifyingMethods.length)} onClick={() => void save()}>{busy ? 'Saving…' : 'Save policy'}</Button></div>
-        <Button type="button" variant="outline" disabled={historyBusy} onClick={() => void loadHistory()}>View policy history</Button>
         {historyError && <p role="alert">{historyError}</p>}{history && <div className="space-y-3">{history.items.length === 0 && <p>No policy changes yet.</p>}{history.items.map(event => <article key={event.eventId} className="rounded border p-3 text-sm"><p>{event.authorName} · {event.createdAt}</p><p>{event.changeReason}</p>{(['enabled', 'intervalDays', 'qualifyingMethods', 'requireDirectContact', 'remindersEnabled'] as const).filter(key => JSON.stringify(event.previousValues[key]) !== JSON.stringify(event.nextValues[key])).map(key => <p key={key}>{({ enabled: 'Schedule', intervalDays: 'Interval (days)', qualifyingMethods: 'Contact methods', requireDirectContact: 'Direct contact required', remindersEnabled: 'Reminders' })[key]}: {String(event.previousValues[key] ?? 'Not set')} → {String(event.nextValues[key] ?? 'Not set')}</p>)}</article>)}{history.nextCursor && <Button type="button" variant="outline" disabled={historyBusy} onClick={() => void loadHistory(history.nextCursor || undefined)}>Load older changes</Button>}</div>}</>}
     </div>}
-  </SettingsSectionCard>;
+    </div>
+    {saved?.canEditPolicy && draft && <footer className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t px-5 py-4">
+      <Button type="button" variant="outline" disabled={historyBusy || busy} onClick={() => void loadHistory()}>View policy history</Button>
+      <Button type="button" className="ml-auto" aria-busy={saving} disabled={disabled || (draft.enabled || draft.remindersEnabled) && !validTimezone || draft.enabled && (!Number.isInteger(draft.intervalDays) || !draft.intervalDays || draft.intervalDays < 1 || draft.intervalDays > 365 || !draft.qualifyingMethods.length)} onClick={() => void save()}>{saving ? <><Loader2 className="size-4 motion-safe:animate-spin" aria-hidden="true" />Saving…</> : 'Save policy'}</Button>
+    </footer>}
+    <VoiceInputButton className="z-[60]" />
+  </DialogContent>;
 }

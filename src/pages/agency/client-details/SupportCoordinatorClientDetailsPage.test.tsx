@@ -2,11 +2,15 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import userEvent from "@testing-library/user-event";
 import { addDays, format, startOfWeek } from "date-fns";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
-import { afterAll, beforeAll, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, expect, it, vi } from "vitest";
+const auth = vi.hoisted(() => ({ user: { uid: 'owner', userType: 'agency', agencyId: 'a', profile: {} } as any }));
+const removeClient = vi.hoisted(() => vi.fn());
+vi.mock('@/utils/auth', () => ({ useAuth: () => ({ user: auth.user }) }));
+beforeEach(() => { auth.user = { uid: 'owner', userType: 'agency', agencyId: 'a', profile: {} }; vi.mocked(updateClient).mockReset(); removeClient.mockReset(); toast.mockClear(); });
 vi.unmock("react-router");
 vi.mock("@/lib/api/clients", () => {
   const updateClient = vi.fn();
-  return { getAgencyClientById: vi.fn(), updateClient, uploadClientDocument: vi.fn(), useUpdateClientMutation: () => [({ clientId, data }: { clientId: string; data: unknown }) => ({ unwrap: async () => { const result = await updateClient(clientId, data); return { data: result, assessmentHistoryEntry: result?.assessmentHistoryEntry }; } })] };
+  return { getAgencyClientById: vi.fn(), updateClient, useDeleteClientMutation: () => [(args: unknown) => ({ unwrap: () => removeClient(args) })], uploadClientDocument: vi.fn(), useUpdateClientMutation: () => [({ clientId, data }: { clientId: string; data: unknown }) => ({ unwrap: async () => { const result = await updateClient(clientId, data); return { success: true, data: result, assessmentHistoryEntry: result?.assessmentHistoryEntry }; } })] };
 });
 const toast = vi.hoisted(() => vi.fn());
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast }) }));
@@ -37,6 +41,166 @@ afterAll(() => {
   else Reflect.deleteProperty(HTMLElement.prototype, "setPointerCapture");
 });
 
+const pendingClient = { id: 'pending-client', agencyId: 'a', firstName: 'Alex', lastName: 'Example', status: 'pending', servicePrograms: ['sc'] } as Client;
+const pendingSchedule = { status: 'not_applicable' as const, clientStatus: 'pending', nextMonitoringDueDate: null, overdueDays: null, policyRevision: 1, timezone: 'UTC', evaluatedAt: '', latestQualifyingContactAt: null, latestQualifyingContactId: null, intervalDays: null, qualifyingMethods: null, requireDirectContact: null };
+const pendingOverview = { clientId: 'pending-client', timezone: 'UTC', canUpdateFollowUps: true, hasAssignedCoordinator: true, lastContactAt: null, activeFollowUpCount: 0, nextFollowUpDueDate: null, activeFollowUps: { items: [], nextCursor: null }, contacts: { items: [], nextCursor: null }, monitoringSchedule: pendingSchedule };
+const activationPage = () => <MemoryRouter initialEntries={['/agency/clients/pending-client?tab=information']}><Routes><Route path="/agency/clients/:clientId" element={<SupportCoordinatorClientDetailsPage />} /><Route path="/agency/clients" element={<p>Client list</p>} /></Routes></MemoryRouter>;
+
+it('opens Client Information first by default and keeps sample clients read-only', () => {
+  render(<MemoryRouter initialEntries={['/agency/clients/182441']}><Routes><Route path="/agency/clients/:clientId" element={<SupportCoordinatorClientDetailsPage />} /></Routes></MemoryRouter>);
+  expect(screen.getByRole('link', { name: 'Client Information' })).toHaveAttribute('aria-current', 'page');
+  expect(screen.getByRole('heading', { name: 'Client Information' })).toBeInTheDocument();
+  expect(screen.getByText(/Preview only. These sample details/)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Edit Client' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Delete client' })).not.toBeInTheDocument();
+});
+
+it('explains pending enrollment using the saved client status with older schedule responses', async () => {
+  vi.mocked(getAgencyClientById).mockResolvedValue(pendingClient);
+  vi.mocked(getAgencyMonitoringOverview).mockResolvedValueOnce({ ...pendingOverview, monitoringSchedule: { ...pendingSchedule, clientStatus: undefined } });
+  render(<MemoryRouter initialEntries={['/agency/clients/pending-client?tab=monitoring']}><Routes><Route path="/agency/clients/:clientId" element={<SupportCoordinatorClientDetailsPage />} /></Routes></MemoryRouter>);
+  expect(await screen.findByRole('heading', { name: 'Monitoring starts when this client is activated' })).toBeInTheDocument();
+});
+
+it('confirms activation, shows a loader, and refreshes monitoring with the saved status', async () => {
+  const user = userEvent.setup();
+  vi.mocked(getAgencyClientById).mockResolvedValue(pendingClient);
+  vi.mocked(getAgencyMonitoringOverview).mockResolvedValueOnce({ ...pendingOverview, monitoringSchedule: { ...pendingSchedule, status: 'overdue', clientStatus: 'active', nextMonitoringDueDate: '2026-10-01', overdueDays: 1 } });
+  let finish!: (client: Client) => void;
+  vi.mocked(updateClient).mockClear().mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  toast.mockClear();
+  render(activationPage());
+  expect(await screen.findByRole('heading', { name: 'Client Information' })).toBeInTheDocument();
+  expect(within(screen.getByRole('navigation', { name: 'Client details tabs' })).getAllByRole('link')[0]).toHaveTextContent('Client Information');
+  expect(within(screen.getByRole('heading', { name: 'Alex Example' }).closest('header')!).queryByRole('button', { name: 'Edit Client' })).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Activate client' }));
+  expect(updateClient).not.toHaveBeenCalled();
+  const dialog = screen.getByRole('dialog', { name: 'Activate this client?' });
+  await user.click(within(dialog).getByRole('button', { name: 'Activate client' }));
+  const saving = within(dialog).getByRole('button', { name: 'Saving…' });
+  expect(saving).toBeDisabled();
+  expect(dialog).toHaveAttribute('aria-busy', 'true');
+  expect(saving.querySelector('.animate-spin')).toBeInTheDocument();
+  expect(updateClient).toHaveBeenCalledWith('pending-client', { status: 'active' });
+  await act(async () => finish({ ...pendingClient, status: 'active' }));
+  await user.click(screen.getByRole('link', { name: 'Monitoring' }));
+  expect(await screen.findByRole('heading', { name: 'Monitoring contact overdue' })).toBeInTheDocument();
+  expect(screen.getByText('active')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Activate client' })).not.toBeInTheDocument();
+  expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Client activated', variant: 'success' }));
+});
+
+it('keeps pending status and shows an error when activation cannot be confirmed', async () => {
+  const user = userEvent.setup();
+  vi.mocked(getAgencyClientById).mockResolvedValue(pendingClient);
+  vi.mocked(updateClient).mockClear().mockRejectedValueOnce(new Error('Network error'));
+  toast.mockClear();
+  render(activationPage());
+  await user.click(await screen.findByRole('button', { name: 'Activate client' }));
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Activate client' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Refresh this page');
+  expect(screen.getByRole('button', { name: 'Activate client' })).toBeDisabled();
+  expect(screen.getAllByText('pending')[0]).toBeInTheDocument();
+  expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Could not confirm client change', variant: 'destructive' }));
+});
+
+it.each([
+  { userType: 'super_admin', agencyId: 'a', profile: {} },
+  { userType: 'agency_staff', agencyId: 'a', profile: { accessList: [], agencyModes: ['sc'] } },
+  { userType: 'agency_staff', agencyId: 'a', profile: { accessList: ['Client Management'], agencyModes: ['ddd'] } },
+  { userType: 'agency', agencyId: 'other', profile: {} },
+  { userType: 'agency', agencyId: 'a', profile: { isActive: false } },
+])('does not offer activation to a restricted actor: %j', async actor => {
+  auth.user = { uid: 'actor', ...actor };
+  vi.mocked(getAgencyClientById).mockResolvedValue(pendingClient);
+  render(activationPage());
+  expect(await screen.findByRole('heading', { name: 'Alex Example' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Activate client' })).not.toBeInTheDocument();
+});
+
+it('allows authorized SC client-management staff and lets them cancel without a write', async () => {
+  auth.user = { uid: 'staff', userType: 'agency_staff', agencyId: 'a', profile: { accessList: ['Client Management'], agencyModes: ['sc'] } };
+  vi.mocked(getAgencyClientById).mockResolvedValue(pendingClient);
+  vi.mocked(updateClient).mockClear();
+  const user = userEvent.setup();
+  render(activationPage());
+  await user.click(await screen.findByRole('button', { name: 'Activate client' }));
+  expect(screen.queryByRole('button', { name: 'Delete client' })).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Not now' }));
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(updateClient).not.toHaveBeenCalled();
+});
+
+it.each([
+  ['active', 'Deactivate client', 'inactive', 'Client deactivated'],
+  ['inactive', 'Activate client', 'active', 'Client activated'],
+] as const)('changes %s client status through the existing API after confirmation', async (status, label, next, title) => {
+  vi.mocked(getAgencyClientById).mockResolvedValue({ ...pendingClient, status });
+  vi.mocked(updateClient).mockResolvedValue({ ...pendingClient, status: next });
+  const user = userEvent.setup();
+  render(activationPage());
+  await user.click(await screen.findByRole('button', { name: label }));
+  expect(updateClient).not.toHaveBeenCalled();
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: label }));
+  await waitFor(() => expect(updateClient).toHaveBeenCalledWith('pending-client', { status: next }));
+  expect(screen.getAllByText(next)[0]).toBeInTheDocument();
+  expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title, variant: 'success' }));
+});
+
+it('uses the existing delete mutation and returns to the client list after archiving', async () => {
+  vi.mocked(getAgencyClientById).mockResolvedValue(pendingClient);
+  removeClient.mockResolvedValue({ success: true, message: 'Client deleted successfully' });
+  const user = userEvent.setup();
+  render(activationPage());
+  await user.click(await screen.findByRole('button', { name: 'Delete client' }));
+  expect(screen.getByText(/archive the client and remove them from active client lists/)).toBeInTheDocument();
+  expect(removeClient).not.toHaveBeenCalled();
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete client' }));
+  expect(await screen.findByText('Client list')).toBeInTheDocument();
+  expect(removeClient).toHaveBeenCalledWith({ clientId: 'pending-client', agencyId: 'a' });
+  expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Client deleted', variant: 'success' }));
+});
+
+it('keeps a confirmed status change when the user switches tabs during saving', async () => {
+  vi.mocked(getAgencyClientById).mockResolvedValue(pendingClient);
+  let finish!: (client: Client) => void;
+  vi.mocked(updateClient).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  const user = userEvent.setup();
+  render(activationPage());
+  await user.click(await screen.findByRole('button', { name: 'Activate client' }));
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Activate client' }));
+  // Simulate navigation that unmounts the modal, such as browser history.
+  fireEvent.click(screen.getByRole('link', { name: 'Planning', hidden: true }));
+  await act(async () => finish({ ...pendingClient, status: 'active' }));
+  expect(screen.getByText('active')).toBeInTheDocument();
+  await user.click(screen.getByRole('link', { name: 'Client Information' }));
+  expect(screen.getByRole('button', { name: 'Deactivate client' })).toBeInTheDocument();
+});
+
+it.each(['archived'] as const)('does not activate clients with status %s', async status => {
+  vi.mocked(getAgencyClientById).mockResolvedValue({ ...pendingClient, status });
+  render(activationPage());
+  expect(await screen.findByRole('heading', { name: 'Alex Example' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Activate client' })).not.toBeInTheDocument();
+});
+
+it('ignores an activation response after the actor scope changes', async () => {
+  vi.mocked(getAgencyClientById).mockResolvedValue(pendingClient);
+  let finish!: (client: Client) => void;
+  vi.mocked(updateClient).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  toast.mockClear();
+  const user = userEvent.setup();
+  const { rerender } = render(activationPage());
+  await user.click(await screen.findByRole('button', { name: 'Activate client' }));
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Activate client' }));
+  auth.user = { uid: 'reviewer', userType: 'super_admin', agencyId: 'a', profile: {} };
+  rerender(activationPage());
+  expect((await screen.findAllByText('pending'))[0]).toBeInTheDocument();
+  await act(async () => finish({ ...pendingClient, status: 'active' }));
+  expect(screen.queryByText('active')).not.toBeInTheDocument();
+  expect(toast).not.toHaveBeenCalled();
+});
+
 it('routes real SC clients to saved monitoring records instead of the sample calendar', async () => {
   vi.mocked(getAgencyClientById).mockResolvedValue({ id: 'real-monitor', firstName: 'Alex', lastName: 'Example', servicePrograms: ['sc'] } as Client);
   render(<MemoryRouter initialEntries={['/agency/clients/real-monitor?tab=monitoring']}>
@@ -56,6 +220,7 @@ it("keeps the client header while routing tabs through the query parameter", asy
   </MemoryRouter>);
 
   expect(screen.getByRole("heading", { name: "Leslie Alexander" })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Activate client' })).not.toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "DDD Assessment & Determination" })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Assessment & Tier" })).toHaveAttribute("aria-current", "page");
   await user.click(screen.getByRole("button", { name: "View NJCAT Document" }));
@@ -400,7 +565,7 @@ it("saves a real client's service under its outcome", async () => {
   </MemoryRouter>);
   expect(screen.getByRole("status", { name: "Loading client details" })).toBeInTheDocument();
   expect(await screen.findByRole("heading", { name: "Alex Example" })).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "Edit Client" })).toHaveAttribute("href", "/agency/clients/edit/real-1");
+  expect(screen.queryByRole("button", { name: "Edit Client" })).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Add service" }));
   const dialog = screen.getByRole("dialog", { name: "Add service" });
   expect(within(dialog).getByRole("combobox", { name: "ISP outcome *" })).toHaveValue("outcome-1");

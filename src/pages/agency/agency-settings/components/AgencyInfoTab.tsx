@@ -47,7 +47,6 @@ import {
 } from "./branding-utils";
 import OperationalSettingsFields from "@/pages/shared/agency/OperationalSettingsFields";
 import AssignmentPolicySection from './AssignmentPolicySection';
-import ScMonitoringPolicySection from './ScMonitoringPolicySection';
 import {
   agencyOperationalToForm,
   OPERATIONAL_FIELD_KEYS,
@@ -1130,7 +1129,6 @@ export default function AgencyInfoTab() {
         </form>
       </Form>
       {agencyId && <AssignmentPolicySection agencyId={agencyId} />}
-      {agencyId && user?.agency?.supportedClientTypes?.includes('sc') && <ScMonitoringPolicySection agencyId={agencyId} />}
     </div>
   );
 }

@@ -19,6 +19,7 @@ import { getAgencyClientById, updateClient, useUpdateClientMutation, type Client
 import { clientDocumentUrl } from "@/pages/shared/client-details/components/ClientDocumentChecklist";
 import { DatePickerField, SignatureField } from "@/pages/shared/client-management/components/forms/formControls";
 import { useToast } from "@/hooks/use-toast";
+import { useAssignmentReviewScope } from "@/hooks/useAssignmentReview";
 import { clients } from "@/pages/agency/clients-management/supportCoordinatorSampleClients";
 import { Routes } from "@/routes/constants";
 import SupportCoordinatorMonitoringTab from "./SupportCoordinatorMonitoringTab";
@@ -26,10 +27,17 @@ import AgencyMonitoringRecords from "./AgencyMonitoringRecords";
 import SupportCoordinatorDocumentsTab from "./SupportCoordinatorDocumentsTab";
 import SupportCoordinatorPcpt from "./SupportCoordinatorPcpt";
 import SupportCoordinatorIsp from "./SupportCoordinatorIsp";
+import SupportCoordinatorClientInformationTab from "./SupportCoordinatorClientInformationTab";
 
+const clientDateLabel = (value?: Client['dateOfBirth']) => {
+  if (!value) return 'Not set';
+  const date = typeof value === 'object' && !(value instanceof Date) ? new Date((value._seconds ?? NaN) * 1000) : typeof value === 'string' ? parseISO(value) : value;
+  return isValid(date) ? format(date, 'MMM d, yyyy') : 'Not set';
+};
 const DigitalSignatureModal = lazy(() => import("@/pages/applicant/application/components/DigitalSignature"));
 
 const tabs = [
+  { id: "information", label: "Client Information" },
   { id: "assessment", label: "Assessment & Tier" },
   { id: "services", label: "Services" },
   { id: "documents", label: "Documents" },
@@ -95,10 +103,16 @@ const sampleAuthorizationWeeks = ["Aug 10–16", "Aug 3–9", "Jul 27–Aug 2", 
 
 export default function SupportCoordinatorClientDetailsPage() {
   const { clientId } = useParams();
+  const scope = useAssignmentReviewScope();
+  return <SupportCoordinatorClientDetailsWorkspace key={`${scope}:${clientId}`} />;
+}
+
+function SupportCoordinatorClientDetailsWorkspace() {
+  const { clientId } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const requestedTab = searchParams.get("tab");
-  const activeTab: Tab = requestedTab === "profile-isp" ? "assessment" : tabs.some(({ id }) => id === requestedTab) ? requestedTab as Tab : "assessment";
+  const activeTab: Tab = requestedTab === "profile-isp" ? "assessment" : requestedTab === "profile" ? "information" : tabs.some(({ id }) => id === requestedTab) ? requestedTab as Tab : "information";
   const pcptOpen = activeTab === "planning" && searchParams.get("view") === "pcpt";
   const ispOpen = activeTab === "planning" && searchParams.get("view") === "isp";
   const sample = clients.find((client) => client.id === clientId);
@@ -203,12 +217,12 @@ export default function SupportCoordinatorClientDetailsPage() {
               <div className="flex flex-wrap items-center gap-2 text-sm text-[#4b5563]">
                 <span>ID: {sample?.id || savedClient?.id}</span><span aria-hidden="true">·</span><span>{county}</span>
                 {program && <Badge variant="outline" className="border-[#2b82ff] text-[#2b82ff]">{program}</Badge>}
+                {savedClient?.status && <Badge variant="outline" className="capitalize">{savedClient.status}</Badge>}
               </div>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <p className="text-sm text-[#10141a]"><strong className="mr-1 text-lg">{sample ? "ISP Active" : "ISP period"}</strong>{period}</p>
-            {savedClient && <Button asChild variant="outline"><Link to={Routes.agency.editClient.replace(":clientId", savedClient.id)}>Edit Client</Link></Button>}
           </div>
         </header>
 
@@ -222,7 +236,10 @@ export default function SupportCoordinatorClientDetailsPage() {
         </nav>}
 
         <main className={pcptOpen || ispOpen ? "pt-5" : "pt-6"}>
-          {pcptOpen ? <SupportCoordinatorPcpt client={savedClient} name={name} clientId={sample?.id || savedClient?.id || ""} period={period} photo={savedClient?.profileImage || (sample?.id === "182441" ? "/user-profile-image.png" : undefined)} backTo={tabLink("planning")} sample={Boolean(sample)} /> : ispOpen ? <SupportCoordinatorIsp client={savedClient} name={name} clientId={sample?.id || savedClient?.id || ""} period={period} program={program} backTo={tabLink("planning")} sample={Boolean(sample)} sampleOutcomes={sampleIspOutcomes} /> : activeTab === "assessment" ? <AssessmentTab key={clientId} tier={tier} lastName={name.split(" ").at(-1) || name} sample={Boolean(sample)} client={savedClient} onSaved={setSavedClient} /> : activeTab === "planning" ? (
+          {activeTab === "information" ? <>
+            {sample && <p className="mb-3 text-sm text-[#617579]">Preview only. These sample details cannot be changed.</p>}
+            <SupportCoordinatorClientInformationTab client={savedClient || { id: sample!.id, firstName: name, countyState: county, tier: sample!.tier.replace("Tier ", ""), servicePrograms: ["sc"], supportCoordinatorName: sample!.coordinator, ispMetadata: { program: sample!.program } }} clientId={clientId || ''} readOnly={Boolean(sample)} formatDate={clientDateLabel} onClientUpdated={updated => { if (updated) setSavedClient(updated); }} />
+          </> : pcptOpen ? <SupportCoordinatorPcpt client={savedClient} name={name} clientId={sample?.id || savedClient?.id || ""} period={period} photo={savedClient?.profileImage || (sample?.id === "182441" ? "/user-profile-image.png" : undefined)} backTo={tabLink("planning")} sample={Boolean(sample)} /> : ispOpen ? <SupportCoordinatorIsp client={savedClient} name={name} clientId={sample?.id || savedClient?.id || ""} period={period} program={program} backTo={tabLink("planning")} sample={Boolean(sample)} sampleOutcomes={sampleIspOutcomes} /> : activeTab === "assessment" ? <AssessmentTab key={clientId} tier={tier} lastName={name.split(" ").at(-1) || name} sample={Boolean(sample)} client={savedClient} onSaved={setSavedClient} /> : activeTab === "planning" ? (
             <section aria-labelledby="sc-planning-heading">
               <div className="mb-6">
                 <h2 id="sc-planning-heading" className="text-2xl font-semibold text-[#10141a]">Person-Centered Planning</h2>
@@ -251,7 +268,7 @@ export default function SupportCoordinatorClientDetailsPage() {
                 </button>)}
               </div>
             </section>
-          ) : activeTab === "services" ? <ServiceAuthorizationTab key={clientId} sample={Boolean(sample)} client={savedClient} onSaved={setSavedClient} /> : activeTab === "monitoring" ? sample ? <SupportCoordinatorMonitoringTab key={clientId} sample /> : <AgencyMonitoringRecords key={clientId} clientId={clientId || ''} /> : activeTab === "documents" ? <SupportCoordinatorDocumentsTab key={clientId} sample={Boolean(sample)} client={savedClient} onSaved={setSavedClient} /> : (
+          ) : activeTab === "services" ? <ServiceAuthorizationTab key={clientId} sample={Boolean(sample)} client={savedClient} onSaved={setSavedClient} /> : activeTab === "monitoring" ? sample ? <SupportCoordinatorMonitoringTab key={clientId} sample /> : <AgencyMonitoringRecords key={`${clientId}:${savedClient?.status}`} clientId={clientId || ''} clientStatus={savedClient?.status} /> : activeTab === "documents" ? <SupportCoordinatorDocumentsTab key={clientId} sample={Boolean(sample)} client={savedClient} onSaved={setSavedClient} /> : (
             <section aria-label={`${tabs.find((tab) => tab.id === activeTab)?.label} tab`} className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-[#d1d5db] px-6 text-center">
               <FileText className="mb-3 h-8 w-8 text-[#008f93]" />
               <h2 className="text-xl font-semibold text-[#10141a]">{tabs.find((tab) => tab.id === activeTab)?.label}</h2>
