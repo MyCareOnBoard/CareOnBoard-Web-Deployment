@@ -39,6 +39,9 @@ export function AddressAutocompleteField({
   placeholder = "Start typing an address…",
   required,
   ariaInvalid,
+  disabled,
+  maxLength,
+  suggestionsClassName,
 }: {
   label: string;
   id?: string;
@@ -48,6 +51,9 @@ export function AddressAutocompleteField({
   placeholder?: string;
   required?: boolean;
   ariaInvalid?: boolean;
+  disabled?: boolean;
+  maxLength?: number;
+  suggestionsClassName?: string;
 }) {
   const autocomplete = useGooglePlacesAutocomplete();
   const { suggestions, isSearching, showSuggestions, setShowSuggestions } = autocomplete;
@@ -59,7 +65,7 @@ export function AddressAutocompleteField({
   const listboxId = useId();
   const optionId = (index: number) => `${listboxId}-opt-${index}`;
 
-  const open = showSuggestions && (isSearching || suggestions.length > 0);
+  const open = !disabled && showSuggestions && (isSearching || suggestions.length > 0);
 
   const closeList = () => {
     setShowSuggestions(false);
@@ -179,6 +185,8 @@ export function AddressAutocompleteField({
             <LineInput
               id={id}
               value={value}
+              disabled={disabled}
+              maxLength={maxLength}
               placeholder={placeholder}
               autoComplete="off"
               readOnly={locating}
@@ -204,7 +212,7 @@ export function AddressAutocompleteField({
             <button
               type="button"
               onClick={handleUseCurrentLocation}
-              disabled={locating}
+              disabled={disabled || locating}
               title="Use my current location"
               aria-label="Use my current location"
               className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-[8px] text-[#5c6368] transition-colors hover:bg-[#00b4b8]/10 hover:text-[#00b4b8] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8]/30 disabled:cursor-not-allowed disabled:opacity-60"
@@ -228,7 +236,7 @@ export function AddressAutocompleteField({
               // Interacting with the input/locate button (the anchor) must not close the list.
               if (anchorRef.current?.contains(e.target as Node)) e.preventDefault();
             }}
-            className="z-[200] max-h-[220px] overflow-y-auto rounded-[10px] border border-[#e2e4e6] bg-white shadow-lg"
+            className={cn("z-[200] max-h-[220px] overflow-y-auto rounded-[10px] border border-[#e2e4e6] bg-white shadow-lg", suggestionsClassName)}
             style={{ width: "var(--radix-popover-trigger-width)" }}
           >
             <div role="listbox" id={listboxId} aria-label={label}>

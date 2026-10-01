@@ -18,9 +18,9 @@ export default function AgencyMonitoringFollowUpDetail({ clientId, followUpId, o
   }, [clientId, followUpId, retry]);
   if (!detail && !error) return <MonitoringDetailSkeleton kind="follow-up" />;
   return <section className="space-y-5 text-[#17383b]">
-    <button type="button" className="scm-back text-sm font-semibold text-[#008f93]" onClick={onBack}>← Back to monitoring</button>
+    <button type="button" className="scm-back text-[15px] font-semibold text-[#008f93]" onClick={onBack}>← Back to monitoring</button>
     {error && <p role="alert">{error}</p>}{!detail && error && <button type="button" onClick={() => setRetry(value => value + 1)}>Try again</button>}
-    {detail && <><div><h1 className="text-2xl font-semibold">{detail.description || 'Follow-up'}</h1><p className="mt-1 text-sm">Recorded by {detail.authorName} · {detail.status.replaceAll('_',' ')}</p><button type="button" className="mt-2 text-sm font-semibold text-[#008f93]" onClick={() => onContact(detail.contactId)}>View contact</button></div>
+    {detail && <><div><h1 className="text-2xl font-semibold">{detail.description || 'Follow-up'}</h1><p className="mt-1 text-[15px]">Recorded by {detail.authorName} · {detail.status.replaceAll('_',' ')}</p><button type="button" className="mt-2 text-[15px] font-semibold text-[#008f93]" onClick={() => onContact(detail.contactId)}>View contact</button></div>
       <FollowUpSummary detail={detail} />
       <FollowUpEditor key={`${clientId}:${followUpId}`} detail={detail} canEdit={canUpdateFollowUps && detail.canUpdateFollowUps} agency
         loadLatest={signal => getAgencyMonitoringFollowUp(clientId, followUpId, signal)} saveUpdate={input => updateAgencyMonitoringFollowUp(clientId, followUpId, input)}

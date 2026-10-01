@@ -1,5 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { format, addDays } from 'date-fns';
 import { createScContact, type ScOverview } from '@/lib/api/sc-monitoring';
@@ -8,6 +9,17 @@ import ContactForm from './ContactForm';
 vi.mock('@/lib/api/sc-monitoring', () => ({ createScContact: vi.fn() }));
 const { toast } = vi.hoisted(() => ({ toast: vi.fn() }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast }) }));
+vi.mock('@/hooks/useGooglePlacesAutocomplete', () => ({
+  useGooglePlacesAutocomplete: () => {
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    return {
+      suggestions: [{ placeId: 'address-1', mainText: '123 Main St', secondaryText: 'Newark, NJ' }],
+      isSearching: false, showSuggestions, setShowSuggestions,
+      handleInputChange: (query: string) => setShowSuggestions(query.length >= 3),
+      selectSuggestion: async () => { setShowSuggestions(false); return { formattedAddress: '123 Main St, Newark, NJ 07102, USA' }; },
+    };
+  },
+}));
 beforeEach(() => vi.clearAllMocks());
 const overview: ScOverview = { clientId: 'c', name: 'Alex Morgan', program: 'SP', county: null, ispPeriod: null,
   scOutcomes: [{ id: 'g', statement: 'Join activities', services: [{ id: 's', name: 'Individual Supports', provider: 'Provider A' }] }],
@@ -38,13 +50,17 @@ it('saves a no-issue contact without stale not-reviewed reasons', async () => {
   render(<ContactForm overview={{ ...overview, scOutcomes: [] }} onCancel={vi.fn()} onSaved={onSaved} onUnavailable={vi.fn()} />);
   await user.type(screen.getByRole('textbox', { name: 'People present' }), 'Alex');
   await user.type(screen.getByRole('textbox', { name: 'Purpose' }), 'Check in');
+  const location = screen.getByRole('combobox', { name: 'Location (if relevant)' });
+  await user.type(location, '123 Main');
+  await user.keyboard('{ArrowDown}{Enter}');
+  expect(location).toHaveValue('123 Main St, Newark, NJ 07102, USA');
   await user.click(screen.getByRole('button', { name: 'Satisfied' }));
   await user.click(screen.getByRole('button', { name: 'No concern' }));
   await user.click(screen.getByRole('button', { name: 'No change' }));
   await user.click(screen.getByRole('button', { name: 'No issue' }));
   await user.type(screen.getByRole('textbox', { name: 'Contact summary' }), 'All well');
   await user.click(screen.getByRole('button', { name: 'Save contact' }));
-  expect(createScContact).toHaveBeenCalledWith('c', expect.objectContaining({ experience: { status: 'satisfied' }, noFollowUpNeeded: true, issueDecisions: [] }));
+  expect(createScContact).toHaveBeenCalledWith('c', expect.objectContaining({ location: '123 Main St, Newark, NJ 07102, USA', experience: { status: 'satisfied' }, noFollowUpNeeded: true, issueDecisions: [] }));
   expect(onSaved).toHaveBeenCalled();
   expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Contact saved', variant: 'success' }));
 });
@@ -69,6 +85,8 @@ it('preserves entries and warns to check history when the contact save result is
   await waitFor(()=>expect(toast).toHaveBeenCalledWith(expect.objectContaining({title:'Check whether the contact was saved',variant:'destructive'})));
   expect(screen.getByLabelText('Contact summary')).toHaveValue('Contact draft');
   expect(screen.getByRole('button',{name:'Save contact'})).toBeDisabled();
+  expect(screen.getByRole('combobox', { name: 'Location (if relevant)' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Use my current location' })).toBeDisabled();
 });
 
 it('does not allow a duplicate contact when the confirmed save succeeds but the page refresh fails',async()=> {

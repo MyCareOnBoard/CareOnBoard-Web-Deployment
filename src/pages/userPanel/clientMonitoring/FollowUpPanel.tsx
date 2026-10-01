@@ -18,9 +18,9 @@ export default function FollowUpPanel({ clientId, followUpId, onBack, onUnavaila
   }, [clientId, followUpId, retry]);
   if (!detail && !error) return <MonitoringDetailSkeleton kind="follow-up" />;
   return <section className="space-y-5 text-[#17383b]">
-    <button type="button" className="scm-back text-sm font-semibold text-[#008f93]" onClick={onBack}>← Back to monitoring overview</button>
+    <button type="button" className="scm-back text-[15px] font-semibold text-[#008f93]" onClick={onBack}>← Back to monitoring overview</button>
     {error && <p role="alert">{error}</p>}{!detail && error && <button type="button" onClick={() => setRetry(value => value + 1)}>Try again</button>}
-    {detail && <><div><h1 className="text-2xl font-semibold">{detail.description || 'Follow-up'}</h1><p className="mt-1 text-sm">Recorded by {detail.authorName} · {detail.status.replaceAll('_',' ')}</p></div>
+    {detail && <><div><h1 className="text-2xl font-semibold">{detail.description || 'Follow-up'}</h1><p className="mt-1 text-[15px]">Recorded by {detail.authorName} · {detail.status.replaceAll('_',' ')}</p></div>
       <FollowUpSummary detail={detail} />
       <FollowUpEditor key={`${clientId}:${followUpId}`} detail={detail} canEdit={true}
         loadLatest={signal => getScFollowUp(clientId, followUpId, signal)} saveUpdate={input => updateScFollowUp(clientId, followUpId, input)}
