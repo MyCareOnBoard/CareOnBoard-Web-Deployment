@@ -34,7 +34,7 @@ describe("SupportCoordinatorManagement", () => {
     expect(screen.getByRole("status", { name: "Loading clients for assignment" })).toBeInTheDocument();
     expect(mocks.listAgencyClients).toHaveBeenCalledWith(expect.objectContaining({ assignment: "available", coordinatorId: "sc-1", brief: true }));
     resolveClients([
-      { id: "available", firstName: "Alex", lastName: "Example", status: "pending", servicePrograms: ["sc"] },
+      { id: "available", firstName: "Alex", lastName: "Example", status: "active", servicePrograms: ["sc"] },
       { id: "current", firstName: "Sam", lastName: "Current", status: "active", supportCoordinatorId: "sc-1", servicePrograms: ["sc"] },
       { id: "other", firstName: "Pat", lastName: "Other", status: "active", supportCoordinatorId: "sc-2", servicePrograms: ["sc"] },
     ]);
@@ -43,15 +43,30 @@ describe("SupportCoordinatorManagement", () => {
     expect(screen.queryByRole("checkbox", { name: "Assign Pat Other" })).not.toBeInTheDocument();
   });
 
-  it("offers pending SC enrollments from the agency client roster for assignment", async () => {
+  it("excludes non-active SC enrollments and lets existing inactive assignments be removed", async () => {
     mocks.listClients.mockReset().mockResolvedValue([]);
-    mocks.listAgencyClients.mockReset().mockResolvedValueOnce([{ id: "pending-1", firstName: "Alex", lastName: "Example", status: "pending", servicePrograms: ["sc"] }]);
+    mocks.listAgencyClients.mockReset().mockResolvedValueOnce([
+      ...["pending", "inactive", "archived", undefined].map((status, index) => ({ id: `unassigned-${index}`, firstName: `Unavailable ${index}`, status, servicePrograms: ["sc"] })),
+      { id: "current", firstName: "Current client", status: "inactive", supportCoordinatorId: "sc-1", servicePrograms: ["sc"] },
+      { id: "active", firstName: "Active client", status: "active", servicePrograms: ["sc"] },
+    ]);
+    mocks.saveScCaseload.mockResolvedValue({});
     mocks.useDSPList.mockReturnValue({ dsps: [{ id: "sc-1", fullName: "Tiara Booker", role: "support_coordinator" }], isLoading: false, error: null });
     const user = userEvent.setup();
 
     render(<MemoryRouter><SupportCoordinatorManagement /></MemoryRouter>);
     await user.click(await screen.findByRole("button", { name: "Assign Clients" }));
-    expect(await screen.findByRole("checkbox", { name: "Assign Alex Example" })).toBeInTheDocument();
+    const current = await screen.findByRole("checkbox", { name: "Assign Current client" });
+    expect(current).toBeChecked();
+    expect(screen.queryByRole("checkbox", { name: /Assign Unavailable/ })).not.toBeInTheDocument();
+    await user.click(current);
+    expect(current).toBeEnabled();
+    await user.click(current);
+    expect(current).toBeChecked();
+    await user.click(current);
+    await user.click(screen.getByRole("checkbox", { name: "Assign Active client" }));
+    await user.click(screen.getByRole("button", { name: "Save Assignment" }));
+    await waitFor(() => expect(mocks.saveScCaseload).toHaveBeenCalledWith("sc-1", ["current"], ["active"]));
   });
 
   it("fetches brief assigned client rows only when a coordinator expands", async () => {
@@ -104,7 +119,7 @@ describe("SupportCoordinatorManagement", () => {
   });
 
   it("shows an error toast when an assignment write fails", async () => {
-    mocks.listAgencyClients.mockReset().mockResolvedValue([{ id: "client-1", firstName: "Leslie", lastName: "Alexander" }]);
+    mocks.listAgencyClients.mockReset().mockResolvedValue([{ id: "client-1", firstName: "Leslie", lastName: "Alexander", status: "active" }]);
     mocks.saveScCaseload.mockRejectedValueOnce(new Error("write failed"));
     mocks.useDSPList.mockReturnValue({ dsps: [{ id: "sc-1", fullName: "Tiara Booker", role: "support_coordinator" }], isLoading: false, error: null });
     const user = userEvent.setup();
@@ -120,7 +135,7 @@ describe("SupportCoordinatorManagement", () => {
 
   it("warns when assignments save but counts cannot refresh", async () => {
     mocks.getClientStats.mockReset().mockResolvedValueOnce({ total: 1, unassigned: 1, caseloadByCoordinator: {} }).mockRejectedValueOnce(new Error("stats failed"));
-    mocks.listAgencyClients.mockReset().mockResolvedValue([{ id: "client-1", firstName: "Leslie", lastName: "Alexander" }]);
+    mocks.listAgencyClients.mockReset().mockResolvedValue([{ id: "client-1", firstName: "Leslie", lastName: "Alexander", status: "active" }]);
     mocks.saveScCaseload.mockResolvedValue({});
     mocks.useDSPList.mockReturnValue({ dsps: [{ id: "sc-1", fullName: "Tiara Booker", role: "support_coordinator" }], isLoading: false, error: null });
     const user = userEvent.setup();
@@ -139,7 +154,7 @@ describe("SupportCoordinatorManagement", () => {
     mocks.getClientStats.mockReset()
       .mockResolvedValueOnce({ total: 1, unassigned: 1, caseloadByCoordinator: {} })
       .mockImplementationOnce(() => new Promise((resolve) => { finishStats = resolve; }));
-    mocks.listAgencyClients.mockReset().mockResolvedValue([{ id: "client-1", firstName: "Leslie", lastName: "Alexander" }]);
+    mocks.listAgencyClients.mockReset().mockResolvedValue([{ id: "client-1", firstName: "Leslie", lastName: "Alexander", status: "active" }]);
     mocks.saveScCaseload.mockResolvedValue({});
     mocks.useDSPList.mockReturnValue({ dsps: [{ id: "sc-1", fullName: "Tiara Booker", role: "support_coordinator" }], isLoading: false, error: null });
     const user = userEvent.setup();

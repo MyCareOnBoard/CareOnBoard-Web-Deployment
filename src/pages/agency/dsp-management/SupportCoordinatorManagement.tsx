@@ -100,7 +100,7 @@ export default function SupportCoordinatorManagement() {
     listAgencyClients({ agencyId, type: "sc", assignment: "available", coordinatorId: assigning.id, coordinatorName: assigning.fullName, brief: true, limit: 100 })
       .then((result) => {
         if (!active) return;
-        const choices = result.filter((client) => (!client.supportCoordinatorId?.trim() && !client.supportCoordinatorName?.trim()) || assignedTo(client, assigning));
+        const choices = result.filter((client) => (client.status === "active" && !client.supportCoordinatorId?.trim() && !client.supportCoordinatorName?.trim()) || assignedTo(client, assigning));
         setAssignmentClients(choices);
         setSelectedIds(choices.filter((client) => assignedTo(client, assigning)).map((client) => client.id));
       }).catch(() => { if (active) setAssignmentError("Unable to load clients for assignment. Close and retry."); })
@@ -251,6 +251,7 @@ export default function SupportCoordinatorManagement() {
         <div className="border-b border-[#e5e7eb] px-5 py-4"><DialogTitle className="text-base font-medium">Assign Clients to {assigning?.fullName}</DialogTitle><DialogDescription className="sr-only">Select up to five clients for this support coordinator.</DialogDescription></div>
         <div className="space-y-3 p-5">
           <p className="text-sm text-[#6b7280]">Assigning clients to <strong className="text-[#10141a]">{assigning?.fullName}</strong>. <span className="text-amber-700">Maximum 5 clients per coordinator.</span></p>
+          <p className="text-sm text-[#6b7280]">Only active clients can be newly assigned. Activate pending clients in Client Information first. Existing assignments can be kept or removed.</p>
           <div className="flex items-center gap-2"><div className="h-1 flex-1 rounded-full bg-[#e5e7eb]"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${selectedIds.length / MAX_CASELOAD * 100}%` }} /></div><span className="text-xs">{selectedIds.length} / {MAX_CASELOAD}</span></div>
           <div className="max-h-[45vh] space-y-2 overflow-y-auto">
             {assignmentLoading ? <div role="status" aria-label="Loading clients for assignment" className="space-y-2">{Array.from({ length: 4 }, (_, index) => <div key={index} className="flex items-center gap-3 rounded-[4px] border border-[#e5e7eb] p-3"><Skeleton className="h-4 w-4" /><Skeleton className="h-8 w-8 rounded-full" /><div className="flex-1 space-y-2"><Skeleton className="h-3 w-32" /><Skeleton className="h-3 w-56 max-w-full" /></div><Skeleton className="h-5 w-12" /></div>)}</div> : assignmentError ? <p role="alert" className="py-6 text-center text-sm text-red-700">{assignmentError}</p> : assignmentClients.length === 0 ? <p className="py-6 text-center text-sm text-[#808081]">No clients to assign.</p> : assignmentClients.map((client) => {
