@@ -8,8 +8,9 @@ import { ArrowRight, ClipboardList, Plus, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/utils/auth';
 import { Routes } from '@/routes/constants';
 import { addScContactAmendment, getScContact, getScOverview, listScContacts,
-  type ScAnswer, type ScContact, type ScContactSummary, type ScOverview, type ScFollowUp } from '@/lib/api/sc-monitoring';
+  type ScContact, type ScContactSummary, type ScOverview, type ScFollowUp } from '@/lib/api/sc-monitoring';
 import ContactForm from './ContactForm';
+import Finding from './Finding';
 import FollowUpPanel from './FollowUpPanel';
 import { MonitoringDetailSkeleton, MonitoringOverviewSkeleton } from './MonitoringSkeleton';
 import './monitoring.css';
@@ -22,12 +23,6 @@ const label = (value: string) => ({ phone: 'Phone contact', home_visit: 'Home vi
 
 function FollowUpRow({ followUp, onOpen }: { followUp: ScFollowUp; onOpen: () => void }) {
   return <div className="scm-row"><span className="scm-row-icon"><AlertCircle size={17} /></span><div className="scm-row-body"><strong>{followUp.description}</strong><p>{status(followUp.category)} · Due {civil(followUp.dueDate)}{followUp.overdue ? ' · Overdue' : ''}</p><div className="mt-2 flex gap-2"><span className={`scm-tag scm-tag-${followUp.priority === 'urgent' ? 'amber' : 'gray'}`}>{status(followUp.priority)}</span><span className="scm-tag scm-tag-gray">{status(followUp.status)}</span></div></div><button type="button" className="scm-button scm-button-small" onClick={onOpen}>View</button></div>;
-}
-
-function Finding({ title, answer, fields = [] }: { title: string; answer: ScAnswer; fields?: Array<[string, string]> }) {
-  return <div className="scm-keyval"><dt>{title}</dt><dd><strong>{status(answer.status)}</strong>
-    {[['notReviewedReason', 'Not reviewed because'], ...fields].filter(([key]) => answer[key] !== undefined && answer[key] !== '').map(([key, caption]) =>
-      <p key={key}>{caption}: {typeof answer[key] === 'boolean' ? answer[key] ? 'Yes' : 'No' : String(answer[key])}</p>)}</dd></div>;
 }
 
 function ContactRecord({ detail, clientName, clientId, onBack, onFollowUp, onUnavailable }: {
