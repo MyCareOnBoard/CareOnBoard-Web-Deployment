@@ -42,6 +42,45 @@ afterAll(() => {
 });
 
 const pendingClient = { id: 'pending-client', agencyId: 'a', firstName: 'Alex', lastName: 'Example', status: 'pending', servicePrograms: ['sc'] } as Client;
+it.each([
+  { documents: undefined, status: "Pending" },
+  { documents: [{ key: "scDocuments", category: "ISP", url: "https://example.com/isp.pdf" }], status: "Pending" },
+  { documents: [{ key: "scDocuments", category: "SDR" }], status: "Pending" },
+  { documents: [{ key: "sdr", url: "invalid" }], status: "Pending" },
+  { documents: [{ key: "scDocuments", category: "SDR", url: "https://example.com/sdr.pdf" }], status: "Received" },
+  { documents: [{ key: "sdr", url: "https://example.com/sdr.pdf" }], status: "Received" },
+])("derives service PA and SDR status from uploaded documents: $documents", async ({ documents, status }) => {
+  const user = userEvent.setup();
+  vi.mocked(getAgencyClientById).mockResolvedValue({
+    ...pendingClient,
+    documents,
+    scOutcomes: [{ id: "outcome-1", statement: "Build skills", services: [
+      { id: "service-1", name: "Coaching", code: "H2020" },
+      { id: "service-2", name: "Respite", code: "H2016" },
+    ] }],
+  } as Client);
+  render(<MemoryRouter initialEntries={["/agency/clients/pending-client?tab=services"]}>
+    <Routes><Route path="/agency/clients/:clientId" element={<SupportCoordinatorClientDetailsPage />} /></Routes>
+  </MemoryRouter>);
+  const rows = await screen.findAllByRole("article");
+  expect(rows).toHaveLength(2);
+  for (const row of rows) {
+    for (const label of ["PA:", "SDR:"]) {
+      const badge = within(row).getByText(label);
+      expect(badge).toHaveTextContent(`${label} ${status}`);
+      expect(badge.querySelector('[aria-hidden="true"]')).toHaveClass(status === "Received" ? "bg-[#00a878]" : "bg-[#d99b20]");
+    }
+  }
+  if (status === "Received") {
+    await user.click(within(rows[0]).getByRole("button", { name: "Actions" }));
+    await user.click(screen.getByRole("menuitem", { name: "View details" }));
+    const details = screen.getByRole("dialog", { name: "Coaching" });
+    expect(within(details).getByText("Received", { exact: true })).toBeInTheDocument();
+    expect(within(details).queryByRole("table")).not.toBeInTheDocument();
+    expect(within(details).queryByText("Prior authorization is pending.")).not.toBeInTheDocument();
+  }
+});
+
 const pendingSchedule = { status: 'not_applicable' as const, clientStatus: 'pending', nextMonitoringDueDate: null, overdueDays: null, policyRevision: 1, timezone: 'UTC', evaluatedAt: '', latestQualifyingContactAt: null, latestQualifyingContactId: null, intervalDays: null, qualifyingMethods: null, requireDirectContact: null };
 const pendingOverview = { clientId: 'pending-client', timezone: 'UTC', canUpdateFollowUps: true, hasAssignedCoordinator: true, lastContactAt: null, activeFollowUpCount: 0, nextFollowUpDueDate: null, activeFollowUps: { items: [], nextCursor: null }, contacts: { items: [], nextCursor: null }, monitoringSchedule: pendingSchedule };
 const activationPage = () => <MemoryRouter initialEntries={['/agency/clients/pending-client?tab=information']}><Routes><Route path="/agency/clients/:clientId" element={<SupportCoordinatorClientDetailsPage />} /><Route path="/agency/clients" element={<p>Client list</p>} /></Routes></MemoryRouter>;

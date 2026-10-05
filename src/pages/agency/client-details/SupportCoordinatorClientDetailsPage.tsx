@@ -398,13 +398,14 @@ function ServiceAuthorizationTab({ sample, client, onSaved }: { sample: boolean;
   const [outcomeId, setOutcomeId] = useState("");
   const [newOutcome, setNewOutcome] = useState("");
   const [saving, setSaving] = useState(false);
+  const sdrStatus = client?.documents?.some(document => (document.key === "sdr" || document.category === "SDR") && clientDocumentUrl(document.url)) ? "Received" : "Pending";
   const services: Service[] = sample ? addedServices : (client?.scOutcomes ?? []).flatMap(outcome => outcome.services.map(service => ({
     name: service.name, code: service.code, provider: service.provider || "—", status: "Review", contact: "—", phone: "—",
     authorization: `${service.startAuthDate?.replace(/^(\d{4})-(\d{2})-(\d{2})$/, "$2/$3/$1") || "—"} → ${service.endAuthDate?.replace(/^(\d{4})-(\d{2})-(\d{2})$/, "$2/$3/$1") || "—"}`,
     units: `${service.totalUnits || "—"} total · ${service.unitType || "—"}`,
     rate: Number(service.clientRate || 0).toLocaleString("en-US", { style: "currency", currency: "USD" }),
     totalCost: (Number(service.totalUnits || 0) * Number(service.clientRate || 0)).toLocaleString("en-US", { style: "currency", currency: "USD" }),
-    frequency: service.frequency || "—", pa: "Pending", sdr: "Pending", source: "Client record", outcome: outcome.statement, outcomeId: outcome.id, record: service,
+    frequency: service.frequency || "—", pa: sdrStatus, sdr: sdrStatus, source: "Client record", outcome: outcome.statement, outcomeId: outcome.id, record: service,
   })));
   const selectedService = preview && typeof preview !== "string" ? preview : null;
   const formOpen = preview === "Add service" || preview === "Edit service";
@@ -558,7 +559,7 @@ function ServiceAuthorizationTab({ sample, client, onSaved }: { sample: boolean;
           </div>
           <div className="mt-2">
             <h3 className="mb-1 text-xs font-semibold uppercase text-[#303741]">Prior authorization history</h3>
-            {selectedService.pa === "Received" ? <div className="overflow-hidden rounded border border-[#e5e7eb]">
+            {sample && selectedService.pa === "Received" ? <div className="overflow-hidden rounded border border-[#e5e7eb]">
               <table className="w-full text-left text-xs">
                 <thead className="bg-[#fafbfc] text-[#303741]"><tr><th scope="col" className="px-2.5 py-1.5">Week</th><th scope="col" className="px-2.5 py-1.5">Status</th><th scope="col" className="px-2.5 py-1.5">Document</th></tr></thead>
                 <tbody>{sampleAuthorizationWeeks.map((week) => <tr key={week} className="border-t border-[#f0f1f3]">
@@ -567,7 +568,7 @@ function ServiceAuthorizationTab({ sample, client, onSaved }: { sample: boolean;
                   <td className="px-2.5 py-1.5"><button type="button" className="cursor-pointer font-medium text-[#008f93] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00b4b8]" aria-label={"View PA document for " + week} onClick={() => setDocumentWeek(week)}>View</button></td>
                 </tr>)}</tbody>
               </table>
-            </div> : <p className="rounded border border-[#e5e7eb] px-3 py-2 text-xs text-[#6b7280]">{selectedService.pa === "Missing" ? "No prior authorization history recorded." : "Prior authorization is pending."}</p>}
+            </div> : <p className="rounded border border-[#e5e7eb] px-3 py-2 text-xs text-[#6b7280]">{selectedService.pa === "Received" ? "Received · SDR document on file. No prior authorization history recorded." : selectedService.pa === "Missing" ? "No prior authorization history recorded." : "Prior authorization is pending."}</p>}
             {documentWeek && <p role="status" className="mt-2 text-xs text-[#6b7280]">Sample PA document for {documentWeek} is not available yet.</p>}
           </div>
           <div className="mt-1">
