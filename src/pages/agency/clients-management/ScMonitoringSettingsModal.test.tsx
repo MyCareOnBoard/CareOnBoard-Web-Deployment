@@ -8,7 +8,7 @@ vi.mock('@/hooks/useAssignmentReview', () => ({ useAssignmentReviewScope: () => 
 vi.mock('@/hooks/useEffectiveAgencyMode', () => ({ useEffectiveAgencyMode: () => 'sc' }));
 const { toast } = vi.hoisted(() => ({ toast: vi.fn() }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast }) }));
-const openSettings = () => { render(<MemoryRouter><Section agencyId="a" /></MemoryRouter>); fireEvent.click(screen.getByRole('button', {name:'Monitoring Settings'})); };
+const openSettings = () => { render(<MemoryRouter><Section clientId="a" /></MemoryRouter>); fireEvent.click(screen.getByRole('button', {name:'Monitoring Settings'})); };
 const policy = { version: 1 as const, revision: 0, enabled: false, intervalDays: null, qualifyingMethods: [], requireDirectContact: false, remindersEnabled: false, activatedAt: null, updatedAt: null, updatedBy: null };
 beforeEach(() => { vi.clearAllMocks(); vi.mocked(getScMonitoringPolicy).mockResolvedValue({ policy, timezone: 'UTC', canEditPolicy: true }); });
 test('unconfigured policy has no active interval and history loads only when opened', async () => {
@@ -90,27 +90,22 @@ test('missing timezone links to Agency Information from the modal',async()=> {
   openSettings();expect(await screen.findByRole('link',{name:'View agency time zone'})).toHaveAttribute('href','/agency/agency-settings?tab=agencyInfo#agency-timezone');
 });
 
-test('client settings inherit by default, save an override and can return to agency settings', async () => {
+test('client settings edit directly and refresh the client monitoring tab after saving', async () => {
   const onSaved=vi.fn();
-  const agencyPolicy={...policy,revision:3,enabled:true,intervalDays:30,qualifyingMethods:['phone']};
-  vi.mocked(getScMonitoringPolicy).mockResolvedValue({policy:agencyPolicy,timezone:'UTC',canEditPolicy:true,source:'agency',overrideRevision:0,agencyRevision:3});
-  vi.mocked(saveScMonitoringPolicy).mockResolvedValue({policy:{...agencyPolicy,revision:1,intervalDays:7},timezone:'UTC',canEditPolicy:true,source:'client',overrideRevision:1,agencyRevision:3});
-  render(<MemoryRouter><Section agencyId="" clientId="c" onSaved={onSaved} /></MemoryRouter>);
+  const clientPolicy={...policy,revision:3,enabled:true,intervalDays:30,qualifyingMethods:['phone']};
+  vi.mocked(getScMonitoringPolicy).mockResolvedValue({policy:clientPolicy,timezone:'UTC',canEditPolicy:true});
+  vi.mocked(saveScMonitoringPolicy).mockResolvedValue({policy:{...clientPolicy,revision:4,intervalDays:7},timezone:'UTC',canEditPolicy:true});
+  render(<MemoryRouter><Section clientId="c" onSaved={onSaved} /></MemoryRouter>);
   fireEvent.click(screen.getByRole('button',{name:'Monitoring Settings'}));
-  const toggle=await screen.findByLabelText('Use client-specific settings');
-  expect(toggle).not.toBeChecked();
-  expect(screen.getByLabelText('Rolling interval (days)')).toBeDisabled();
-  expect(getScMonitoringPolicy).toHaveBeenCalledWith('',expect.any(AbortSignal),'c');
-  fireEvent.click(toggle);
-  fireEvent.change(screen.getByLabelText('Rolling interval (days)'),{target:{value:'7'}});
+  const interval=await screen.findByLabelText('Rolling interval (days)');
+  expect(interval).toBeEnabled();
+  expect(screen.queryByLabelText('Use client-specific settings')).not.toBeInTheDocument();
+  expect(screen.queryByText(/agency settings/i)).not.toBeInTheDocument();
+  expect(getScMonitoringPolicy).toHaveBeenCalledWith('c',expect.any(AbortSignal));
+  fireEvent.change(interval,{target:{value:'7'}});
   fireEvent.change(screen.getByLabelText('Reason for this change'),{target:{value:'Weekly contact'}});
   fireEvent.click(screen.getByRole('button',{name:'Save policy'}));
-  await waitFor(()=>expect(saveScMonitoringPolicy).toHaveBeenCalledWith('',expect.objectContaining({expectedRevision:0,expectedAgencyRevision:3,useAgencyPolicy:false,intervalDays:7}),'c'));
-  await screen.findByText('This client uses its own monitoring settings.');
+  await waitFor(()=>expect(saveScMonitoringPolicy).toHaveBeenCalledWith('c',{expectedRevision:3,enabled:true,intervalDays:7,qualifyingMethods:['phone'],requireDirectContact:false,remindersEnabled:false,changeReason:'Weekly contact'}));
+  await screen.findByText('Monitoring policy saved.');
   expect(onSaved).toHaveBeenCalledTimes(1);
-  fireEvent.change(screen.getByLabelText('Rolling interval (days)'),{target:{value:''}});
-  fireEvent.click(toggle);
-  fireEvent.change(screen.getByLabelText('Reason for this change'),{target:{value:'Return to agency settings'}});
-  fireEvent.click(screen.getByRole('button',{name:'Save policy'}));
-  await waitFor(()=>expect(saveScMonitoringPolicy).toHaveBeenLastCalledWith('',expect.objectContaining({expectedRevision:1,useAgencyPolicy:true,intervalDays:7}),'c'));
 });

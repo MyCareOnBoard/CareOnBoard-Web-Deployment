@@ -1,7 +1,5 @@
 import type { MonitoringScheduleDetail, MonitoringScheduleSummary } from '@/lib/api/sc-monitoring';
 import { Button } from '@/components/ui/button';
-import { Link } from 'react-router';
-import { Routes } from '@/routes/constants';
 
 export function monitoringScheduleLabel(schedule?: MonitoringScheduleSummary) {
   if (schedule?.status === 'not_applicable' && schedule.clientStatus === 'pending') return 'Monitoring starts when this client is activated';
@@ -12,8 +10,7 @@ export default function MonitoringScheduleCard({ schedule, onRefresh, agencyView
   return <section className="mb-5 rounded-xl border border-[#dce6e7] bg-white p-5 text-[15px] text-[#16383b]" aria-label="Monitoring schedule">
     <h2 className="text-[19px] font-semibold">{monitoringScheduleLabel(schedule)}</h2>
     {schedule?.status === 'not_applicable' && <p className="mt-2 text-[15px] text-[#617579]">{schedule.clientStatus === 'pending' ? 'Enrollment is pending. An agency administrator or authorized staff member must review enrollment and activate this client before contact deadlines are calculated.' : schedule.clientStatus === 'inactive' || schedule.clientStatus === 'archived' ? `Client status: ${schedule.clientStatus}. Contact deadlines apply only to active SC clients. Ask your agency administrator to review this client’s status.` : 'Contact deadlines apply only to active clients enrolled in Support Coordination. Ask your agency administrator to review this client’s enrollment and status.'}</p>}
-    {(schedule?.status === 'not_configured' || schedule?.status === 'disabled') && <p className="mt-2 text-[15px] text-[#617579]">{schedule.status === 'not_configured' ? 'Monitoring contact schedules have not been configured for this client.' : 'Monitoring contact schedules are turned off for this client.'} {agencyView ? 'Use Monitoring Settings on this tab for client settings, or Monitoring Settings on Client Management for agency defaults.' : 'Ask the agency owner to review this client’s monitoring settings.'}</p>}
-    {agencyView && (schedule?.status === 'not_configured' || schedule?.status === 'disabled') && <Button asChild variant="outline" className="mt-3 text-[15px]"><Link to={Routes.agency.clients}>Go to Client Management</Link></Button>}
+    {(schedule?.status === 'not_configured' || schedule?.status === 'disabled') && <p className="mt-2 text-[15px] text-[#617579]">{schedule.status === 'not_configured' ? 'Monitoring contact schedules have not been configured for this client.' : 'Monitoring contact schedules are turned off for this client.'} {agencyView ? 'Use Monitoring Settings on this tab to configure this client.' : 'Ask the agency owner to review this client’s monitoring settings.'}</p>}
     {schedule?.nextMonitoringDueDate && <p className="mt-2 font-semibold">Due {schedule.nextMonitoringDueDate}{schedule.status === 'overdue' && ` · ${schedule.overdueDays} ${schedule.overdueDays === 1 ? 'day' : 'days'} overdue`}</p>}
     {schedule?.intervalDays && <p className="mt-2 text-[15px]">Every {schedule.intervalDays} days · {schedule.timezone}. Qualifying methods: {schedule.qualifyingMethods?.map(value => value.replaceAll('_', ' ')).join(', ')}. {schedule.requireDirectContact ? 'Direct contact required.' : 'Direct contact optional.'}</p>}
     {schedule?.latestQualifyingContactAt && <p className="mt-2 text-[15px]">Latest qualifying contact: {new Date(schedule.latestQualifyingContactAt).toLocaleString('en-US', { timeZone: schedule.timezone || 'UTC' })}</p>}

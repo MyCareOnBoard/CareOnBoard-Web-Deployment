@@ -19,9 +19,9 @@ test('pending enrollment explains activation while inactive clients are shown as
   expect(screen.getByText(/Client status: inactive/)).toBeInTheDocument();
 });
 
-test.each(['disabled', 'not_configured'] as const)('agency %s schedule links to the existing settings page', status => {
+test.each(['disabled', 'not_configured'] as const)('agency %s schedule points to client settings on this tab', status => {
   const schedule = { status, clientStatus: 'active', nextMonitoringDueDate: null, overdueDays: null, policyRevision: 1, timezone: 'UTC', evaluatedAt: '', latestQualifyingContactAt: null, latestQualifyingContactId: null, intervalDays: null, qualifyingMethods: null, requireDirectContact: null };
   render(<MemoryRouter><MonitoringScheduleCard schedule={schedule} agencyView /></MemoryRouter>);
-  expect(screen.getByText(/Monitoring Settings on Client Management/)).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Go to Client Management' })).toHaveAttribute('href', '/agency/clients');
+  expect(screen.getByText(/Use Monitoring Settings on this tab/)).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Go to Client Management' })).not.toBeInTheDocument();
 });

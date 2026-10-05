@@ -9,7 +9,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Routes } from "@/routes/constants";
 import { useListAgencyClientsQuery } from "@/lib/api/clients";
 import { useAuth } from "@/utils/auth";
-import ScMonitoringSettingsModal from "./ScMonitoringSettingsModal";
 import "./support-coordinator-clients.css";
 
 type Filter = "All clients" | "SP" | "CCP";
@@ -54,7 +53,6 @@ export default function SupportCoordinatorClientsPage() {
           <Button size="lg" className="h-[52px] gap-2 px-5" onClick={() => navigate(Routes.agency.addClient)}>
             <Plus className="h-5 w-5" />New Enrollment
           </Button>
-          <ScMonitoringSettingsModal agencyId={user?.agencyId || ""} />
         </div>
       </div>
 
