@@ -1,0 +1,26 @@
+@media print {
+  @page sc-plan { margin: 12mm; }
+
+  /* The body-level report avoids clipping by the agency layout and preview scrollers. */
+  html:has(.sc-plan-print),
+  body:has(> .sc-plan-print) {
+    height: auto !important;
+    overflow: visible !important;
+    background: white !important;
+  }
+
+  body:has(> .sc-plan-print) > :not(.sc-plan-print) { display: none !important; }
+  body > .sc-plan-print { display: block !important; color: #1f2937; }
+  .sc-plan-print { page: sc-plan; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .sc-plan-print > article {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+  .sc-plan-print section { break-inside: avoid; }
+  .sc-plan-print h3, .sc-plan-print h4 { break-after: avoid; }
+  .sc-plan-print p { overflow-wrap: anywhere; orphans: 3; widows: 3; }
+}
