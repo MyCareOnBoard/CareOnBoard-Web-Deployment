@@ -4,7 +4,10 @@
   /* The body-level report avoids clipping by the agency layout and preview scrollers. */
   html:has(.sc-plan-print),
   body:has(> .sc-plan-print) {
+    /* Start the named page at the document root, without a preceding default page. */
+    page: sc-plan;
     height: auto !important;
+    min-height: 0 !important;
     overflow: visible !important;
     background: white !important;
   }
