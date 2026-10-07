@@ -4,6 +4,16 @@ export const Routes = {
     mobileAppRedirect: "/app/:agencyId",
     splash: "/splash",
     app: "/",
+    agencyCare: {
+        home: "/agency-care",
+        network: "/agency-care/networks/:networkId/:tab?",
+        invitation: "/agency-care/invitations/:token",
+        reviewQueue: "/agency-care/review-queue",
+        reports: "/agency-care/reports",
+        recovery: "/agency-care/recovery",
+        settings: "/agency-care/settings",
+        notifications: "/agency-care/notifications",
+    },
     applicant: {
         dashboard: "/applicant/dashboard",
         application: "/applicant/application",

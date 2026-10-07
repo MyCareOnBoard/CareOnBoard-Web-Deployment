@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import axios from 'axios';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getAgencyMonitoringContact, type AgencyContactDetail } from '@/lib/api/sc-agency-monitoring';
+
+const MonitoringCareBridge = lazy(() => import('@/features/agency-care/MonitoringCareBridge').then(module => ({ default: module.MonitoringCareBridge })));
 
 const label = (value?: string) => value ? value.replaceAll('_', ' ').replace(/\b\w/g, letter => letter.toUpperCase()) : 'Not recorded';
 const dateTime = (value?: string) => value ? new Date(value).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : 'Not recorded';
@@ -29,6 +31,7 @@ export default function AgencyMonitoringContactDetail({ clientId, contactId, onB
     <button type="button" onClick={onBack} className="inline-flex items-center gap-1 text-sm font-semibold text-[#008f93] hover:underline focus-visible:outline-2 focus-visible:outline-[#008f93]"><ArrowLeft className="size-4" />Back to monitoring</button>
     {error ? <div role="alert" className={panel}><h2 className="font-semibold">Couldn't load this contact</h2><Button variant="outline" className="mt-3" onClick={() => setRetry(current => current + 1)}>Try again</Button></div> : detail && <>
       <div><p className="text-xs font-bold uppercase tracking-[0.14em] text-[#087b80]">Monitoring contact / Read only</p><h2 className="mt-1 text-2xl font-semibold">{dateTime(detail.contactAt)} · {label(detail.method)}</h2><p className="mt-1 text-sm text-[#647b7e]">Recorded by {detail.authorName || 'SC'} · {dateTime(detail.createdAt)}</p></div>
+      <Suspense fallback={<p role="status">Loading care evidence…</p>}><MonitoringCareBridge clientId={clientId} recordKind="contact" recordId={detail.contactId} recordLabel={`Contact · ${dateTime(detail.contactAt)}`} /></Suspense>
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]"><div className="space-y-5">
         <section className={panel}><h3 className="mb-3 text-lg font-semibold">Contact</h3><dl>{field('Date and method', `${dateTime(detail.contactAt)} · ${label(detail.method)}`)}{field('Location', detail.location)}{field('Participants', detail.participants)}{field('Direct contact', detail.directContact)}{field('Purpose', detail.purpose)}{field('Summary', detail.summary)}</dl></section>
         <section className={panel}><h3 className="mb-3 text-lg font-semibold">Findings</h3><div className="space-y-4">

@@ -1,15 +1,18 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { getScFollowUp, updateScFollowUp } from '@/lib/api/sc-monitoring';
 import FollowUpPanel from './FollowUpPanel';
 
 vi.mock('@/lib/api/sc-monitoring', () => ({ getScFollowUp: vi.fn(), updateScFollowUp: vi.fn() }));
+vi.mock('@/features/agency-care/MonitoringCareBridge', () => ({ MonitoringCareBridge: ({ clientId, recordKind, recordId }: { clientId: string; recordKind: string; recordId: string }) => <div>Care evidence for {clientId} {recordKind} {recordId}</div> }));
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv('VITE_AGENCY_CARE_ENABLED', 'false');
   vi.mocked(getScFollowUp).mockResolvedValue({ followUpId: 'f', contactId: 'c', issueKey: 'safety', category: 'safety', description: 'Concern', action: 'Call provider', responsiblePerson: 'Taylor', dueDate: '2026-09-29', priority: 'urgent', status: 'open', outcome: '', overdue: false, createdAt: '2026-09-28T12:00:00Z', updatedAt: '2026-09-28T12:00:00Z', completedAt: null, authorName: 'Taylor', revisionToken: 'observed', events: [] });
   vi.mocked(updateScFollowUp).mockResolvedValue({} as any);
 });
+afterEach(() => vi.unstubAllEnvs());
 
 it('shows a detail-shaped skeleton while the follow-up loads', () => {
   vi.mocked(getScFollowUp).mockReturnValueOnce(new Promise(() => {}));
@@ -22,6 +25,7 @@ it('requires an outcome for completion and refreshes activity after save', async
   const user = userEvent.setup();
   render(<FollowUpPanel clientId="client" followUpId="f" onBack={vi.fn()} onUnavailable={vi.fn()} />);
   (await screen.findAllByText('Call provider'))[0];
+  expect(await screen.findByText('Care evidence for client follow_up f')).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Completed' }));
   await user.click(screen.getByRole('button', { name: 'Save update' }));
   expect(screen.getByText('Add an outcome before completing this follow-up')).toBeInTheDocument();

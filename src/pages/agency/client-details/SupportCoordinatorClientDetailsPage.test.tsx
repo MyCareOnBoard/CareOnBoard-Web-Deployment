@@ -2,11 +2,15 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import userEvent from "@testing-library/user-event";
 import { addDays, format, startOfWeek } from "date-fns";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
-import { afterAll, beforeAll, beforeEach, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
 const auth = vi.hoisted(() => ({ user: { uid: 'owner', userType: 'agency', agencyId: 'a', profile: {} } as any }));
 const removeClient = vi.hoisted(() => vi.fn());
 vi.mock('@/utils/auth', () => ({ useAuth: () => ({ user: auth.user }) }));
-beforeEach(() => { auth.user = { uid: 'owner', userType: 'agency', agencyId: 'a', profile: {} }; vi.mocked(updateClient).mockReset(); removeClient.mockReset(); toast.mockClear(); });
+vi.mock('@/hooks/useEffectiveAgencyMode', () => ({ useEffectiveAgencyMode: () => 'sc' }));
+vi.mock('@/features/agency-care/AgencyCareHome', () => ({ AgencyCareClientEntry: ({ clientId }: { clientId: string }) => <div>Care workspace for {clientId}</div> }));
+vi.mock('@/features/agency-care/AgencyCareSourcePublications', () => ({ AgencyCareSourcePublications: ({ clientId }: { clientId: string }) => <div>Published care documents for {clientId}</div> }));
+beforeEach(() => { vi.stubEnv('VITE_AGENCY_CARE_ENABLED', 'false'); auth.user = { uid: 'owner', userType: 'agency', agencyId: 'a', profile: {} }; vi.mocked(updateClient).mockReset(); removeClient.mockReset(); toast.mockClear(); });
+afterEach(() => vi.unstubAllEnvs());
 vi.unmock("react-router");
 vi.mock("@/lib/api/clients", () => {
   const updateClient = vi.fn();
@@ -42,6 +46,19 @@ afterAll(() => {
 });
 
 const pendingClient = { id: 'pending-client', agencyId: 'a', firstName: 'Alex', lastName: 'Example', status: 'pending', servicePrograms: ['sc'] } as Client;
+it('keeps SC care entry and source publications available with a stale false flag', async () => {
+  vi.mocked(getAgencyClientById).mockResolvedValue({ ...pendingClient, documents: [] });
+  render(
+    <MemoryRouter initialEntries={['/agency/clients/pending-client?tab=documents']}>
+      <Routes>
+        <Route path="/agency/clients/:clientId" element={<SupportCoordinatorClientDetailsPage />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+  expect(await screen.findByText('Published care documents for pending-client')).toBeVisible();
+  expect(await screen.findByText('Care workspace for pending-client')).toBeVisible();
+});
+
 it.each([
   { documents: undefined, status: "Pending" },
   { documents: [{ key: "scDocuments", category: "ISP", url: "https://example.com/isp.pdf" }], status: "Pending" },
@@ -92,6 +109,7 @@ it('opens Client Information first by default and keeps sample clients read-only
   expect(screen.getByText(/Preview only. These sample details/)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Edit Client' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Delete client' })).not.toBeInTheDocument();
+  expect(screen.queryByText('Care workspace for 182441')).not.toBeInTheDocument();
 });
 
 it('explains pending enrollment using the saved client status with older schedule responses', async () => {
@@ -723,6 +741,8 @@ it("shows sample documents and adds an uploaded document to the local preview", 
 
   expect(screen.getByRole("heading", { name: "Document Control" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Leslie Alexander" })).toBeInTheDocument();
+  expect(screen.queryByText('Care workspace for 182441')).not.toBeInTheDocument();
+  expect(screen.queryByText('Published care documents for 182441')).not.toBeInTheDocument();
   const table = screen.getByRole("table");
   expect(within(table).getAllByRole("row")).toHaveLength(7);
   expect(within(table).getByText("NJ ISP — Plan 10.04")).toBeInTheDocument();

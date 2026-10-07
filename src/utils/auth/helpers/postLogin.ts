@@ -7,6 +7,7 @@ import { getSuccessMessage } from '@/utils/auth/helpers/errorMessages'
 import { UserType } from '@/utils/auth/types/user.types'
 import { Routes } from '@/routes/constants'
 import { getDashboardRouteForUserType } from '@/utils/auth/helpers/roleDashboard'
+import { agencyCareReturnTo } from './agencyCareReturnTo'
 
 export type PostLoginToast = (opts: {
   title: string
@@ -21,9 +22,11 @@ export type PostLoginToast = (opts: {
 export async function completePostLogin(
   dispatch: AppDispatch,
   navigate: NavigateFunction,
-  toast: PostLoginToast
+  toast: PostLoginToast,
+  returnTo?: string | null
 ): Promise<void> {
-  await getOnboardingStatus()
+  const user = await getUser()
+  if (user.userType !== UserType.AGENCY_CARE) await getOnboardingStatus()
 
   const successMsg = getSuccessMessage('login')
   toast({
@@ -31,8 +34,13 @@ export async function completePostLogin(
     description: successMsg.description,
   })
 
-  const user = await getUser()
   dispatch(setUser(user))
+
+  const continuation = agencyCareReturnTo(returnTo)
+  if (continuation) {
+    navigate(continuation, { replace: true })
+    return
+  }
 
   if (user.userType !== UserType.APPLICANT) {
     navigate(getDashboardRouteForUserType(user.userType as UserType), { replace: true })

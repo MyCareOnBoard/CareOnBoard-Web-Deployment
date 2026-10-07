@@ -5,7 +5,7 @@ import { Routes } from "@/routes/constants";
 import { handleMfaApiError } from '@/utils/auth/helpers/handleMfaApiError';
 
 /** A request config carrying the one-retry marker the 401 handler sets. */
-type RetryableConfig = InternalAxiosRequestConfig & { _retriedAfter401?: boolean };
+type RetryableConfig = InternalAxiosRequestConfig & { _retriedAfter401?: boolean; _authUid?: string | null };
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -70,19 +70,23 @@ const waitForAuthInit = (): Promise<void> => {
   return authInitPromise;
 };
 
-let cachedToken: { value: string; expiresAt: number } | null = null;
+let cachedToken: { uid: string; value: string; expiresAt: number } | null = null;
 
 export const clearAuthCache = (): void => {
   cachedToken = null;
 };
 
 const getCachedIdToken = async (forceRefresh = false): Promise<string | null> => {
-  if (!forceRefresh && cachedToken && Date.now() < cachedToken.expiresAt - 60_000) {
+  const uid = auth.currentUser?.uid ?? null;
+  if (!forceRefresh && cachedToken && cachedToken.uid === uid && Date.now() < cachedToken.expiresAt - 60_000) {
     return cachedToken.value;
   }
-  const token = await getIdToken();
-  if (token) {
-    cachedToken = { value: token, expiresAt: Date.now() + 55 * 60 * 1000 };
+  const token = await getIdToken(forceRefresh);
+  if ((auth.currentUser?.uid ?? null) !== uid) {
+    throw new axios.CanceledError('The signed-in account changed.');
+  }
+  if (token && uid) {
+    cachedToken = { uid, value: token, expiresAt: Date.now() + 55 * 60 * 1000 };
   }
   return token ?? null;
 };
@@ -93,7 +97,11 @@ axiosClient.interceptors.request.use(
     await waitForAuthInit();
 
     // Get Firebase ID token
+    (config as RetryableConfig)._authUid = auth.currentUser?.uid ?? null;
     const token = await getCachedIdToken();
+    if ((config as RetryableConfig)._authUid !== (auth.currentUser?.uid ?? null)) {
+      throw new axios.CanceledError('The signed-in account changed.');
+    }
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -161,10 +169,16 @@ axiosClient.interceptors.response.use(
           // never reaches the redirect below, so the user sits on a spinner instead of
           // being told to sign in again.
           const retryable = error.config as RetryableConfig | undefined;
+          if (retryable && retryable._authUid !== (auth.currentUser?.uid ?? null)) {
+            return Promise.reject(error);
+          }
           if (retryable && !retryable._retriedAfter401) {
             try {
               cachedToken = null;
               const newToken = await getCachedIdToken(true);
+              if (retryable._authUid !== (auth.currentUser?.uid ?? null)) {
+                return Promise.reject(error);
+              }
               if (newToken) {
                 retryable._retriedAfter401 = true;
                 retryable.headers = retryable.headers ?? {};
@@ -172,6 +186,9 @@ axiosClient.interceptors.response.use(
                 return axiosClient(retryable);
               }
             } catch {
+              if (retryable._authUid !== (auth.currentUser?.uid ?? null)) {
+                return Promise.reject(error);
+              }
               // fall through to redirect
             }
           }

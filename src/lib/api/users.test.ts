@@ -12,6 +12,19 @@ import { getUser } from "./users";
 describe("getUser", () => {
   beforeEach(() => get.mockReset());
 
+  it("maps a limited profile without trusting embedded product privileges", async () => {
+    get.mockResolvedValueOnce({ data: { success: true, user: {
+      uid: 'partner-1', email: 'partner@example.test', fullName: 'Partner Person', userType: 'agency_care',
+      agencyId: 'forged-agency', agency: { id: 'forged-agency' }, payrollEmploymentId: 'forged-payroll',
+      canOpenAgencyPayrollSetup: true, profile: { role: 'admin', accessList: ['Payroll Management'] },
+    } } });
+    const mapped = await getUser();
+    expect(get).toHaveBeenCalledExactlyOnceWith('/users/profile');
+    expect(mapped).toMatchObject({ uid: 'partner-1', userType: 'agency_care', emailVerified: true });
+    for (const field of ['agencyId', 'agency', 'payrollEmploymentId', 'canOpenAgencyPayrollSetup']) expect(mapped).not.toHaveProperty(field);
+    expect(mapped.profile).toEqual({ fullName: 'Partner Person', email: 'partner@example.test' });
+  });
+
   it("preserves the employee profile role for HHA display fallbacks", async () => {
     get.mockResolvedValueOnce({
       data: {

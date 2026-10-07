@@ -36,7 +36,7 @@ export type ScContactInput = { contactAt: string; method: string; location?: str
   services: Array<ScAnswer & { serviceId: string; affectedDates?: string; provider?: string; missed?: string; effect?: string }>;
   servicesNotReviewedReason?: string; experience: ScAnswer; goals: Array<ScAnswer & { goalId: string; observation?: string; barrier?: string }>;
   goalsNotReviewedReason?: string; safety: ScAnswer; changedNeeds: ScAnswer; providerIssue: ScAnswer;
-  issueDecisions: ScIssueDecision[]; noFollowUpNeeded?: boolean };
+  issueDecisions: ScIssueDecision[]; noFollowUpNeeded?: boolean; evidencePublicationIds?: string[]; operationId?: string };
 export type ScContact = ScContactInput & { contactId: string; authorName: string; createdAt: string;
   amendments: Array<{ amendmentId: string; text: string; authorName: string; createdAt: string }>;
   followUps: ScFollowUp[] };

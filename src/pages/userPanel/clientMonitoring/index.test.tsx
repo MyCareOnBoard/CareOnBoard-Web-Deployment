@@ -1,12 +1,14 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router';
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { getScOverview, getScContact, getScFollowUp, listScContacts, addScContactAmendment } from '@/lib/api/sc-monitoring';
 import ClientMonitoringPage from './index';
 
 const state = vi.hoisted(() => ({ user: { userType: 'employee', applicantType: 'support_coordinator' } as any }));
 vi.mock('@/utils/auth', () => ({ useAuth: () => ({ user: state.user }) }));
+vi.mock('@/features/agency-care/AgencyCareHome', () => ({ AgencyCareClientEntry: ({ clientId }: { clientId: string }) => <div>Care workspace for {clientId}</div> }));
+vi.mock('@/features/agency-care/MonitoringCareBridge', () => ({ MonitoringCareBridge: ({ clientId, recordKind, recordId }: { clientId: string; recordKind: string; recordId: string }) => <div>Care evidence for {clientId} {recordKind} {recordId}</div> }));
 vi.mock('@/lib/api/sc-monitoring', () => ({ getScOverview: vi.fn(), getScContact: vi.fn(), listScContacts: vi.fn(), getScFollowUp: vi.fn(), addScContactAmendment: vi.fn() }));
 const overviewFixture: Awaited<ReturnType<typeof getScOverview>> = { clientId: 'c', name: 'Alex Morgan', program: 'SP', county: 'Somerset', ispPeriod: null,
   scOutcomes: [], openFollowUps: [], contacts: { items: [{ contactId: 'one', contactAt: '2026-09-28T12:00:00Z', method: 'phone', summary: 'Checked in', authorName: 'Taylor', createdAt: '2026-09-28T12:00:00Z' }], nextCursor: null }, timezone: 'UTC' };
@@ -14,16 +16,19 @@ const contactFixture: Awaited<ReturnType<typeof getScContact>> = { contactId: 'o
   participants: 'Alex', directContact: true, purpose: 'Review', services: [], goals: [], experience: { status: 'satisfied' }, safety: { status: 'no_concern' }, changedNeeds: { status: 'no_change' }, providerIssue: { status: 'no_issue' }, issueDecisions: [], amendments: [], followUps: [] };
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv('VITE_AGENCY_CARE_ENABLED', 'false');
   state.user = { userType: 'employee', applicantType: 'support_coordinator' };
   vi.mocked(getScOverview).mockResolvedValue(overviewFixture);
   vi.mocked(getScContact).mockResolvedValue(contactFixture);
 });
+afterEach(() => vi.unstubAllEnvs());
 const renderPage = (query='') => render(<MemoryRouter initialEntries={['/user-panel/clients-and-services/c/monitoring'+query]}><Routes><Route path="/user-panel/clients-and-services/:clientId/monitoring" element={<ClientMonitoringPage />} /><Route path="/user-panel/clients-and-services" element={<div>Caseload</div>} /></Routes></MemoryRouter>);
 
 it('shows follow-ups before contacts, keeps record action available without plan data, and opens a record', async () => {
   const user = userEvent.setup();
   renderPage();
   expect(await screen.findByText('Alex Morgan')).toBeInTheDocument();
+  expect(await screen.findByText('Care workspace for c')).toBeInTheDocument();
   expect(screen.getByText('Open follow-ups').compareDocumentPosition(screen.getByText('Monitoring contacts')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(screen.getByText('No ISP goals or authorized services are recorded.')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Record contact' })).toBeInTheDocument();

@@ -31,6 +31,13 @@ describe('handleMfaApiError', () => {
     expect(window.location.href).toBe(Routes.auth.mfaChallenge)
   })
 
+  it('retains the invitation through an enrollment error', () => {
+    window.location.pathname = '/agency-care/invitations/invite-token'
+    window.location.search = '?intent=login'
+    expect(handleMfaApiError(403, { code: 'MFA_ENROLLMENT_REQUIRED' })).toBe(true)
+    expect(window.location.href).toBe('/auth/mfa-enroll?returnTo=%2Fagency-care%2Finvitations%2Finvite-token%3Fintent%3Dlogin')
+  })
+
   it('returns false for non-MFA errors', () => {
     expect(handleMfaApiError(403, { code: 'FORBIDDEN' })).toBe(false)
     expect(handleMfaApiError(401, { code: 'MFA_ENROLLMENT_REQUIRED' })).toBe(false)

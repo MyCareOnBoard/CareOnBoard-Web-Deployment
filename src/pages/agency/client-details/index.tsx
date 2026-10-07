@@ -2,7 +2,7 @@ import {NotificationContext} from '@/components/compliance/NotificationContext';
 import { useEffectiveAgencyMode } from '@/hooks/useEffectiveAgencyMode';
 import { useClientDocumentRefresh } from '@/pages/shared/client-details/hooks/useClientDocumentRefresh';
 import { showClientChecklist } from '@/pages/shared/client-details/components/ClientDocumentChecklist';
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Phone, Edit, ArrowLeft } from "lucide-react";
 import { useParams, useNavigate, useSearchParams } from "react-router";
 import { format } from "date-fns";
@@ -28,6 +28,9 @@ import { useAuth } from "@/utils/auth";
 import { getAgencyClientById, updateClient, type Client, type ClientDocument, type ClientDocumentKey } from "@/lib/api/clients";
 import { Routes } from "@/routes/constants";
 import SupportCoordinatorClientDetailsPage from "./SupportCoordinatorClientDetailsPage";
+
+const AgencyCareClientEntry = lazy(() => import('@/features/agency-care/AgencyCareHome').then(module => ({ default: module.AgencyCareClientEntry })));
+const AgencyCareSourcePublications = lazy(() => import('@/features/agency-care/AgencyCareSourcePublications').then(module => ({ default: module.AgencyCareSourcePublications })));
 
 type ClientDetailsTab = "activity" | "profile" | "services" | "documents" | "family-portal";
 
@@ -232,6 +235,8 @@ function AgencyClientDetailsPage() {
           </h1>
         </div>
         {clientId && (
+          <div className="flex flex-wrap items-center gap-3">
+          {mode && <Suspense fallback={<span role="status" className="text-sm text-[#647b7e]">Loading care connection…</span>}><AgencyCareClientEntry clientId={clientId} program={mode} /></Suspense>}
           <Button
             className="h-[44px] rounded-[60px] px-[16px] py-[12px] gap-2 bg-[#00b4b8] hover:bg-[#00a0a4] text-white flex items-center justify-center font-medium transition-colors"
             onClick={() => navigate(Routes.agency.editClient.replace(":clientId", clientId))}
@@ -239,6 +244,7 @@ function AgencyClientDetailsPage() {
             <Edit className="w-5 h-5 text-white" />
             Edit Client
           </Button>
+          </div>
         )}
       </div>
 
@@ -391,6 +397,13 @@ function AgencyClientDetailsPage() {
           } : undefined}
           onActivateClient={canUpload ? handleActivateClient : undefined}
         />
+        {clientId && mode && (
+          <Suspense fallback={(
+            <p role="status" className="mt-5 text-sm text-[#647b7e]">Loading published care documents…</p>
+          )}>
+            <AgencyCareSourcePublications clientId={clientId} program={mode} />
+          </Suspense>
+        )}
         </>
       )}
       {activeTab === "family-portal" && (

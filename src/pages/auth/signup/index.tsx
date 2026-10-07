@@ -12,7 +12,7 @@
 
 import type React from "react"
 import {useEffect, useState} from "react"
-import {useNavigate, Link, useLocation} from "react-router"
+import {useNavigate, Link, useLocation, Navigate} from "react-router"
 import {Eye, EyeOff} from "lucide-react"
 import {Button} from "@/components/ui/button"
 import {Input} from "@/components/ui/input"
@@ -28,6 +28,7 @@ import {
 import {Routes} from "@/routes/constants";
 import {getAgencyInfo} from "@/lib/api/onboarding"
 import type {ApplicantType} from "@/pages/applicant/application/documentConfig"
+import {agencyCareReturnTo} from "@/utils/auth/helpers/agencyCareReturnTo"
 
 export default function SignUpPage() {
   const [fullName, setFullName] = useState("")
@@ -41,7 +42,10 @@ export default function SignUpPage() {
     password?: string
   }>({});
 
-  const agencyId = new URLSearchParams(useLocation().search).get('agencyId');
+  const query = new URLSearchParams(useLocation().search)
+  const returnTo = agencyCareReturnTo(query.get('returnTo'))
+  const careInvitation = returnTo && /^\/agency-care\/invitations\/[A-Za-z0-9_-]+(?:[?#]|$)/.test(returnTo)
+  const agencyId = careInvitation ? null : query.get('agencyId');
 
   // Applicant type mirrors the agency's supported client types.
   // Default "dsp"; show a DSP/HHA selector only when the agency supports both.
@@ -241,6 +245,12 @@ export default function SignUpPage() {
   // Signup is allowed only once a valid agency has loaded for the agencyId.
   const agencyReady = Boolean(agencyId) && !agencyLoading && !!agencyInfo
   const signupDisabled = loading || !agencyReady
+
+  if (careInvitation) {
+    const invitation = new URL(returnTo, 'https://care.local')
+    invitation.searchParams.set('intent', 'register')
+    return <Navigate to={`${invitation.pathname}${invitation.search}`} replace />
+  }
 
   return (
     <div className="space-y-6">

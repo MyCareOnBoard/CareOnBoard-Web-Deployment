@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import axios from 'axios';
 import { format, parseISO } from 'date-fns';
 import { ArrowRight, Clock, Loader2 } from 'lucide-react';
@@ -15,6 +15,9 @@ import { VoiceRecordingProvider, useVoiceRecording } from '@/contexts/VoiceRecor
 import { useToast } from '@/hooks/use-toast';
 import { createScContact, type ScAnswer, type ScContactInput, type ScIssueDecision, type ScOverview } from '@/lib/api/sc-monitoring';
 import Finding from './Finding';
+import { useAuth } from '@/utils/auth';
+
+const MonitoringDraftEvidence = lazy(() => import('@/features/agency-care/MonitoringCareBridge').then(module => ({ default: module.MonitoringDraftEvidence })));
 
 type Option = { value: string; label: string };
 type Answer = ScAnswer;
@@ -54,7 +57,8 @@ type ContactFormProps = {
   overview: ScOverview; onCancel: () => void; onSaved: (input: ScContactInput) => void | Promise<void>; onUnavailable: () => void;
 };
 export default function ContactForm(props: ContactFormProps) {
-  return <VoiceRecordingProvider pageTitle="SC monitoring contact"><ContactEditor {...props} /><VoiceInputButton /></VoiceRecordingProvider>;
+  const { user } = useAuth();
+  return <VoiceRecordingProvider key={`${user?.uid}:${props.overview.clientId}`} pageTitle="SC monitoring contact"><ContactEditor {...props} /><VoiceInputButton /></VoiceRecordingProvider>;
 }
 function ContactEditor({ overview, onCancel, onSaved, onUnavailable }: ContactFormProps) {
   const { toast } = useToast();
@@ -85,6 +89,10 @@ function ContactEditor({ overview, onCancel, onSaved, onUnavailable }: ContactFo
   const headingRef = useRef<HTMLHeadingElement>(null);
   const errorRef = useRef<HTMLParagraphElement>(null);
   const submitting = useRef(false);
+  const operationId = useRef(crypto.randomUUID());
+  const [evidencePublicationIds, setEvidencePublicationIds] = useState<string[]>([]);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => {
     const target = error ? errorRef.current : headingRef.current;
     target?.focus({ preventScroll: true });
@@ -173,14 +181,18 @@ function ContactEditor({ overview, onCancel, onSaved, onUnavailable }: ContactFo
       scObservation, services: services.map(service => ({ serviceId: service.id, ...cleanAnswer(serviceAnswers[service.id]) })),
       experience: cleanAnswer(experience), goals: planOutcomes.map(goal => ({ goalId: goal.id, ...cleanAnswer(goalAnswers[goal.id]) })),
       safety: cleanAnswer(safety), changedNeeds: cleanAnswer(changedNeeds), providerIssue: cleanAnswer(providerIssue), issueDecisions,
-      ...(issueKeys.length ? {} : { noFollowUpNeeded: true }) };
+      ...(issueKeys.length ? {} : { noFollowUpNeeded: true }),
+      operationId: operationId.current,
+      ...(evidencePublicationIds.length ? { evidencePublicationIds: [...evidencePublicationIds] } : {}) };
     stopRecording(); submitting.current = true; setSaving(true);
     try {
       await createScContact(overview.clientId, payload);
+      if (!mounted.current) return;
       toast({ title: 'Contact saved', description: 'Your monitoring contact and any follow-ups have been recorded.', variant: 'success' });
       try { await onSaved(payload); } catch { setUncertain(true); setError('Contact saved. Return to monitoring and refresh the latest details before recording another contact.'); toast({ title: 'Contact saved; refresh needed', description: 'Latest monitoring details could not load. Review contact history before recording it again.', variant: 'warning' }); }
     }
     catch (caught) {
+      if (!mounted.current) return;
       const response = axios.isAxiosError(caught) ? caught.response : undefined;
       const unavailable = [401,403,404].includes(response?.status || 0);
       const unknownResult = !response || response.status >= 500;
@@ -189,7 +201,7 @@ function ContactEditor({ overview, onCancel, onSaved, onUnavailable }: ContactFo
         : response?.data?.error || 'Could not save this contact. Your entries are still here.';
       setError(message); toast({ title: unknownResult ? 'Check whether the contact was saved' : 'Contact could not be saved', description: message, variant: 'destructive' });
       if (unavailable) onUnavailable(); else if (unknownResult) setUncertain(true);
-    } finally { submitting.current = false; setSaving(false); }
+    } finally { submitting.current = false; if (mounted.current) setSaving(false); }
   };
 
   return <><button type="button" className="scm-back" disabled={saving} onClick={onCancel}>← Back to {overview.name}</button>
@@ -274,6 +286,7 @@ function ContactEditor({ overview, onCancel, onSaved, onUnavailable }: ContactFo
           {issueKeys.map(issue => { const draft = decisions[issue.key]; return <div className="scm-wizard-review-issue" key={issue.key}><h4>{issue.label}</h4>{draft.decision === 'no_follow_up' ? <><p>No follow-up needed</p><p>{draft.reason}</p></> : <><p>{draft.description}</p><p>Action: {draft.action}</p><p>Responsible person: {draft.responsiblePerson || 'Not specified'}</p><p>Due: {draft.dueDate} · Priority: {draft.priority}</p></>}</div>; })}
           <dl><div className="scm-keyval"><dt>SC observation</dt><dd>{scObservation || 'No separate observation recorded.'}</dd></div><div className="scm-keyval"><dt>Contact summary</dt><dd>{summary}</dd></div></dl>
         </section>
+        <Suspense fallback={<p role="status" className="scm-help">Loading care evidence options…</p>}><MonitoringDraftEvidence clientId={overview.clientId} selected={evidencePublicationIds} onChange={setEvidencePublicationIds} /></Suspense>
       </section>}
       </fieldset>
       <div className="scm-wizard-footer"><Button type="button" variant="ghost" disabled={saving} onClick={onCancel}>{uncertain ? 'Return to monitoring' : 'Cancel'}</Button><div><Button type="button" variant="outline" disabled={step === 0 || saving || uncertain} onClick={() => goTo(step - 1)}>Back</Button><Button key={step === 4 ? 'save' : 'continue'} type="submit" disabled={saving || uncertain} aria-busy={saving}>{saving ? <><Loader2 className="size-4 motion-safe:animate-spin" aria-hidden="true" />Saving…</> : step === 4 ? 'Save contact' : <>Continue<ArrowRight className="size-4" aria-hidden="true" /></>}</Button></div></div>

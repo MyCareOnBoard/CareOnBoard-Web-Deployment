@@ -2,7 +2,9 @@ import { Routes } from "@/routes/constants";
 import { UserType } from "@/utils/auth/types/user.types";
 
 export const settingsRouteForUserType = (userType: UserType) =>
-  userType === UserType.SUPER_ADMIN
+  userType === UserType.AGENCY_CARE
+    ? '/agency-care/settings'
+    : userType === UserType.SUPER_ADMIN
     ? Routes.superAdmin.systemSettings
     : userType === UserType.AGENCY || userType === UserType.AGENCY_STAFF
       ? Routes.agency.agencySettings

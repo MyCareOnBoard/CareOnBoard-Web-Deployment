@@ -4,6 +4,16 @@ import { createBrowserRouter } from "react-router";
 import { Routes } from "@/routes/constants";
 import { preloadDirectAgencyPayrollRoute } from "@/routes/preloadDirectPayrollRoute";
 import RouteErrorPage from "@/pages/error/RouteErrorPage";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+const AgencyCareLayout = lazy(() => import('@/features/agency-care/AgencyCareLayout').then(module => ({ default: module.AgencyCareLayout })));
+const AgencyCareHome = lazy(() => import('@/features/agency-care/AgencyCareHome').then(module => ({ default: module.AgencyCareHome })));
+const AgencyCareClientWorkspace = lazy(() => import('@/features/agency-care/AgencyCareClientWorkspace').then(module => ({ default: module.AgencyCareClientWorkspace })));
+const AgencyCareInvitationPage = lazy(() => import('@/features/agency-care/AgencyCarePortal').then(module => ({ default: module.AgencyCareInvitationPage })));
+const AgencyCareReviewQueue = lazy(() => import('@/features/agency-care/AgencyCarePortal').then(module => ({ default: module.AgencyCareReviewQueue })));
+const AgencyCareReports = lazy(() => import('@/features/agency-care/AgencyCarePortal').then(module => ({ default: module.AgencyCareReports })));
+const AgencyCareRecovery = lazy(() => import('@/features/agency-care/AgencyCarePortal').then(module => ({ default: module.AgencyCareRecovery })));
+const AgencyCareSettings = lazy(() => import('@/features/agency-care/AgencyCarePortal').then(module => ({ default: module.AgencyCareSettings })));
+const AgencyCareNotifications = lazy(() => import('@/features/agency-care/AgencyCareNotifications').then(module => ({ default: module.AgencyCareNotifications })));
 const CareerPlanningPage = lazy(() => import('@/pages/agency/goalsAndDocuments/CareerPlanning'));
 const CareerPlanningNotePage = lazy(() => import('@/pages/userPanel/notes/career-planning'));
 
@@ -218,6 +228,22 @@ export const router = createBrowserRouter([
         errorElement: <RouteErrorPage />,
         children: [
     {
+        path: Routes.agencyCare.invitation,
+        Component: AgencyCareInvitationPage,
+    },
+    {
+        element: <ProtectedRoute allowAgencyCare><AgencyCareLayout /></ProtectedRoute>,
+        children: [
+            { path: Routes.agencyCare.home, Component: AgencyCareHome },
+            { path: Routes.agencyCare.network, Component: AgencyCareClientWorkspace },
+            { path: Routes.agencyCare.reviewQueue, Component: AgencyCareReviewQueue },
+            { path: Routes.agencyCare.reports, Component: AgencyCareReports },
+            { path: Routes.agencyCare.recovery, Component: AgencyCareRecovery },
+            { path: Routes.agencyCare.settings, Component: AgencyCareSettings },
+            { path: Routes.agencyCare.notifications, Component: AgencyCareNotifications },
+        ],
+    },
+    {
         path: Routes.root,
         Component: SplashScreen,
     },
@@ -231,7 +257,7 @@ export const router = createBrowserRouter([
     },
     {
         path: Routes.agency.analyticsPrint,
-        Component: AnalyticsPrintPage,
+        element: <ProtectedRoute><AnalyticsPrintPage /></ProtectedRoute>,
     },
     {
         Component: OnboardingLayout,
@@ -289,7 +315,7 @@ export const router = createBrowserRouter([
         Component: FamilyLoginPage,
     },
     {
-        Component: ApplicantDashboardLayout,
+        element: <ProtectedRoute><ApplicantDashboardLayout /></ProtectedRoute>,
         children: [
             {
                 path: Routes.applicant.application,
@@ -322,7 +348,7 @@ export const router = createBrowserRouter([
         ],
     },
     {
-        Component: AgencyDashboardLayout,
+        element: <ProtectedRoute><AgencyDashboardLayout /></ProtectedRoute>,
         children: [
             {
                 path: Routes.agency.dashboard,
@@ -629,7 +655,7 @@ export const router = createBrowserRouter([
         ],
     },
     {
-        Component: UserPanelDashboardLayout,
+        element: <ProtectedRoute><UserPanelDashboardLayout /></ProtectedRoute>,
         children: [
             {
                 path: Routes.userPanel.dashboard,
@@ -777,7 +803,7 @@ export const router = createBrowserRouter([
         ],
     },
     {
-        Component: SuperAdminLayout,
+        element: <ProtectedRoute><SuperAdminLayout /></ProtectedRoute>,
         children: [
             {
                 path: Routes.superAdmin.dashboard,
@@ -976,7 +1002,7 @@ export const router = createBrowserRouter([
         ],
     },
     {
-        Component: FamilyLayout,
+        element: <ProtectedRoute><FamilyLayout /></ProtectedRoute>,
         children: [
             {
                 path: Routes.family.dashboard,

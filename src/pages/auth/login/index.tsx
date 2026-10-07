@@ -15,6 +15,7 @@ import {
   getValidationMessage
 } from "@/utils/auth/helpers/errorMessages"
 import { completePostLogin } from "@/utils/auth/helpers/postLogin"
+import { agencyCareReturnTo, authRouteWithReturnTo } from "@/utils/auth/helpers/agencyCareReturnTo"
 import { useDispatch } from "react-redux"
 import type { AppDispatch } from "@/store/redux/store"
 
@@ -34,7 +35,9 @@ export default function LoginPage() {
   const dispatch = useDispatch<AppDispatch>()
   const { toast } = useToast();
 
-  const agencyId = new URLSearchParams(useLocation().search).get('agencyId');
+  const query = new URLSearchParams(useLocation().search)
+  const agencyId = query.get('agencyId')
+  const returnTo = agencyCareReturnTo(query.get('returnTo'))
 
   const validateEmail = (email: string) => {
     if (!email) {
@@ -106,16 +109,16 @@ export default function LoginPage() {
       const result = await login(email, password)
 
       if (result.status === 'mfa_required') {
-        navigate(Routes.auth.mfaChallenge, { replace: true })
+        navigate(authRouteWithReturnTo(Routes.auth.mfaChallenge, returnTo), { replace: true })
         return
       }
 
       if (result.status === 'mfa_enrollment_required') {
-        navigate(Routes.auth.mfaEnroll, { replace: true })
+        navigate(authRouteWithReturnTo(Routes.auth.mfaEnroll, returnTo), { replace: true })
         return
       }
 
-      await completePostLogin(dispatch, navigate, toast)
+      await completePostLogin(dispatch, navigate, toast, returnTo)
     } catch (error: unknown) {
       const errorMessage = getAuthErrorMessage(error)
 
@@ -227,7 +230,7 @@ export default function LoginPage() {
       <p className="pt-2 text-sm text-center text-slate-600">
         Don't have an account?{" "}
         <Link
-          to={Routes.auth.signup + (agencyId ? `?agencyId=${agencyId}` : "")}
+          to={returnTo ? authRouteWithReturnTo(Routes.auth.signup, returnTo) : Routes.auth.signup + (agencyId ? `?agencyId=${agencyId}` : "")}
           className="text-[#00B4B8] hover:text-[#148a9c] font-semibold"
         >
           Sign Up

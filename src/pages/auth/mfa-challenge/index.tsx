@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import { ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
@@ -10,6 +10,7 @@ import { useAuth } from '@/utils/auth'
 import { MFA_COPY } from '@/utils/auth/copy/mfaCopy'
 import { getAuthErrorMessage } from '@/utils/auth/helpers/errorMessages'
 import { completePostLogin } from '@/utils/auth/helpers/postLogin'
+import { agencyCareReturnTo, authRouteWithReturnTo } from '@/utils/auth/helpers/agencyCareReturnTo'
 import MfaCodeForm from '@/pages/auth/components/MfaCodeForm'
 import { RecaptchaAnchor } from '@/pages/auth/components/RecaptchaAnchor'
 import { AuthStepHeader } from '@/pages/auth/components/AuthStepHeader'
@@ -33,6 +34,7 @@ type ChallengePhase = 'sending' | 'enter-code' | 'send-failed'
 
 export default function MfaChallengePage() {
   const navigate = useNavigate()
+  const returnTo = agencyCareReturnTo(new URLSearchParams(useLocation().search).get('returnTo'))
   const dispatch = useDispatch<AppDispatch>()
   const { toast } = useToast()
   const { logout } = useAuth()
@@ -60,9 +62,9 @@ export default function MfaChallengePage() {
         description: MFA_COPY.errors.sessionExpired,
         variant: 'destructive',
       })
-      navigate(Routes.auth.login, { replace: true })
+      navigate(authRouteWithReturnTo(Routes.auth.login, returnTo), { replace: true })
     }
-  }, [mfaSession, navigate, toast])
+  }, [mfaSession, navigate, toast, returnTo])
 
   const sendCode = useCallback(async () => {
     const session = getMfaResolverSession()
@@ -101,7 +103,7 @@ export default function MfaChallengePage() {
     setError('')
     try {
       await completeMfaSignIn(session.resolver, verificationId, code)
-      await completePostLogin(dispatch, navigate, toast)
+      await completePostLogin(dispatch, navigate, toast, returnTo)
       clearMfaResolverSession()
     } catch (e: unknown) {
       completedRef.current = false
@@ -115,7 +117,7 @@ export default function MfaChallengePage() {
     clearMfaResolverSession()
     clearRecaptchaVerifier()
     await logout()
-    navigate(Routes.auth.login, { replace: true })
+    navigate(authRouteWithReturnTo(Routes.auth.login, returnTo), { replace: true })
   }
 
   if (!mfaSession) {

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import { auth } from '@/lib/firebase'
 import { Routes } from '@/routes/constants'
 import { hasEnrolledMfa } from '@/utils/auth/services/mfaService'
+import { agencyCareReturnTo, authRouteWithReturnTo } from '@/utils/auth/helpers/agencyCareReturnTo'
 
 /**
  * Redirects unauthenticated users to login and users without SMS MFA to enroll.
@@ -10,6 +11,8 @@ import { hasEnrolledMfa } from '@/utils/auth/services/mfaService'
  */
 export function useRequireMfaEnrolled() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const returnTo = agencyCareReturnTo(`${location.pathname}${location.search}`)
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
@@ -23,7 +26,7 @@ export function useRequireMfaEnrolled() {
 
       const current = auth.currentUser
       if (!current) {
-        navigate(Routes.auth.login, { replace: true })
+        navigate(authRouteWithReturnTo(Routes.auth.login, returnTo), { replace: true })
         return
       }
 
@@ -31,7 +34,7 @@ export function useRequireMfaEnrolled() {
       if (cancelled) return
 
       if (!enrolled) {
-        navigate(Routes.auth.mfaEnroll, { replace: true })
+        navigate(authRouteWithReturnTo(Routes.auth.mfaEnroll, returnTo), { replace: true })
         return
       }
 
@@ -42,7 +45,7 @@ export function useRequireMfaEnrolled() {
     return () => {
       cancelled = true
     }
-  }, [navigate])
+  }, [navigate, returnTo])
 
   return { ready }
 }

@@ -22,6 +22,7 @@ function removeStoredUserData(): void {
     console.error("Failed to remove user data:", error)
   }
 }
+const accountChangedError = () => Object.assign(new Error('Your signed-in account changed. Continue with the current account.'), { code: 'auth/account-changed' })
 
 interface AuthContextType {
   user: User | null
@@ -59,70 +60,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const reduxUser = useSelector((state: RootState) => state.auth?.user)
   const [user, setUserState] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
-  const [isInitialized, setIsInitialized] = useState(false)
+  const initializedRef = useRef(false)
   const refreshGenerationRef = useRef(0)
   const firebaseUidRef = useRef<string | null>(auth.currentUser?.uid ?? null)
 
   useEffect(() => {
-    const initAuth = async () => {
-
-      const currentFirebaseUser = await new Promise<import('firebase/auth').User | null>(
-        (resolve) => {
-          const unsub = auth.onAuthStateChanged((u) => { unsub(); resolve(u); });
-        }
-      );
-
-      if (reduxUser) {
-        if (currentFirebaseUser && currentFirebaseUser.uid === reduxUser.uid) {
-          setUserState(reduxUser)
-          setIsInitialized(true)
-          setLoading(false)
-          return
-        }
+    let cancelled = false
+    const restoreProfile = async (currentFirebaseUser: import('firebase/auth').User | null) => {
+      const generation = ++refreshGenerationRef.current
+      // A persisted role is not authority for mounting product layouts.
+      if (!initializedRef.current || firebaseUidRef.current !== currentFirebaseUser?.uid) {
+        clearAuthCache()
+        setUserState(null)
         dispatch(setUser(null))
-      }
-
-      if (currentFirebaseUser) {
-        const user = {
-          uid: currentFirebaseUser.uid,
-          email: currentFirebaseUser.email || '',
-          fullName: currentFirebaseUser.displayName || '',
-          emailVerified: currentFirebaseUser.emailVerified,
-          createdAt: currentFirebaseUser.metadata.creationTime
-            ? new Date(currentFirebaseUser.metadata.creationTime)
-            : new Date(),
-          updatedAt: new Date(),
-          photoURL: currentFirebaseUser.photoURL || undefined,
-          phoneNumber: currentFirebaseUser.phoneNumber || undefined,
-          userType: 'applicant' as any,
-        }
-        setUserState(user)
-        // Do NOT dispatch to Redux here — avoid persisting 'applicant' as the real type.
-      }
-
-      setIsInitialized(true)
-      setLoading(false)
-    }
-
-    initAuth()
-  }, []) // Only run once on mount
-
-  useEffect(() => {
-    return auth.onAuthStateChanged((nextFirebaseUser) => {
-      if (firebaseUidRef.current !== nextFirebaseUser?.uid) {
         clearPayrollOnboardSessions()
         dispatch(checkPayrollApi.util.resetApiState())
-        firebaseUidRef.current = nextFirebaseUser?.uid ?? null
       }
-      refreshGenerationRef.current += 1
-    })
+      firebaseUidRef.current = currentFirebaseUser?.uid ?? null
+      const stillCurrent = () => !cancelled && refreshGenerationRef.current === generation
+        && (auth.currentUser?.uid ?? null) === (currentFirebaseUser?.uid ?? null)
+      if (currentFirebaseUser) {
+        try {
+          const authoritativeUser = await getUser()
+          if (stillCurrent() && authoritativeUser?.uid === currentFirebaseUser.uid) {
+            setUserState(authoritativeUser)
+            dispatch(setUser(authoritativeUser))
+          }
+        } catch {
+          // Auth and enrollment pages remain available; cached product access stays cleared.
+          if (stillCurrent()) setUserState(null)
+        }
+      }
+      if (!stillCurrent()) return
+      initializedRef.current = true
+      setLoading(false)
+    }
+    const unsubscribe = auth.onAuthStateChanged(current => { void restoreProfile(current) })
+    return () => { cancelled = true; unsubscribe() }
   }, [dispatch])
   // Sync local state when Redux state changes (after login/signup)
   useEffect(() => {
-    if (isInitialized) {
+    if (initializedRef.current && (!reduxUser || reduxUser.uid === auth.currentUser?.uid)) {
       setUserState(reduxUser ?? null)
     }
-  }, [reduxUser, isInitialized])
+  }, [reduxUser])
 
   /**
    * Login user with email and password
@@ -135,6 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('[AuthContext] Login failed:', response.error)
       throw new Error(response.error || "Login failed")
     }
+    if ('user' in response && response.user.uid !== auth.currentUser?.uid) throw accountChangedError()
 
     if (response.status === 'success') {
       setUserState(response.user)
@@ -160,27 +142,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('[AuthContext] Signup failed:', response.error)
       throw new Error(response.error || "Registration failed")
     }
+    const registeredUid = response.user.uid
+    if (registeredUid !== auth.currentUser?.uid) throw accountChangedError()
 
     // Create user in backend FIRST (before updating state so presence/heartbeat don't run)
     try {
       const { createUser: createBackendUser } = await import("../api/client")
+      if (registeredUid !== auth.currentUser?.uid) throw accountChangedError()
       await createBackendUser(fullName, agencyId, applicantType)
-      if (auth.currentUser) {
-        const { reload } = await import("firebase/auth")
-        await reload(auth.currentUser)
-      }
+      if (registeredUid !== auth.currentUser?.uid) throw accountChangedError()
+      const { reload } = await import("firebase/auth")
+      const registeredUser = auth.currentUser
+      if (registeredUser?.uid !== registeredUid) throw accountChangedError()
+      await reload(registeredUser)
     } catch (error: any) {
+      if (registeredUid !== auth.currentUser?.uid || error?.code === 'auth/account-changed') throw accountChangedError()
       console.error('[signup] Failed to create user in backend:', error)
       try {
         const { deleteCurrentUser } = await import("../services/authService")
+        if (registeredUid !== auth.currentUser?.uid) throw accountChangedError()
         await deleteCurrentUser()
       } catch (deleteErr: any) {
+        if (deleteErr?.code === 'auth/account-changed') throw deleteErr
         console.error('[signup] Failed to remove Firebase user after backend error:', deleteErr)
       }
       throw error
     }
 
     // Update local state and Redux AFTER backend user is created
+    if (registeredUid !== auth.currentUser?.uid) throw accountChangedError()
     setUserState(response.user)
     dispatch(setUser(response.user))
   }
@@ -247,6 +237,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     ) {
       return null
     }
+    if (nextUser.uid !== startingUid) throw accountChangedError()
 
     if (user?.uid && user.uid !== nextUser.uid) {
       clearPayrollOnboardSessions()

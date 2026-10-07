@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { getAgencyMonitoringFollowUp, updateAgencyMonitoringFollowUp } from '@/lib/api/sc-agency-monitoring';
 import AgencyMonitoringFollowUpDetail from './AgencyMonitoringFollowUpDetail';
 
@@ -9,12 +9,14 @@ beforeAll(() => { for (const name of ['hasPointerCapture', 'setPointerCapture', 
 afterAll(() => { for (const [name, descriptor] of pointerOriginals) { if (descriptor) Object.defineProperty(HTMLElement.prototype, name, descriptor); else Reflect.deleteProperty(HTMLElement.prototype, name); } });
 
 vi.mock('@/lib/api/sc-agency-monitoring', () => ({ getAgencyMonitoringFollowUp: vi.fn(), updateAgencyMonitoringFollowUp: vi.fn() }));
+vi.mock('@/features/agency-care/MonitoringCareBridge', () => ({ MonitoringCareBridge: ({ clientId, recordKind, recordId }: { clientId: string; recordKind: string; recordId: string }) => <div>Care evidence for {clientId} {recordKind} {recordId}</div> }));
 const detail = { followUpId: 'f', contactId: 'contact', issueKey: 'safety', category: 'safety', description: 'Concern',
   action: 'Call provider', responsiblePerson: 'Taylor', dueDate: '2026-09-29', priority: 'urgent', status: 'open', outcome: '',
   overdue: false, createdAt: '2026-09-28T12:00:00Z', updatedAt: '2026-09-28T12:00:00Z', completedAt: null,
   authorName: 'SC', events: [], revisionToken: 'observed', canUpdateFollowUps: true } as const;
 
-beforeEach(() => { vi.clearAllMocks(); vi.mocked(getAgencyMonitoringFollowUp).mockResolvedValue(detail as any); vi.mocked(updateAgencyMonitoringFollowUp).mockResolvedValue({} as any); });
+beforeEach(() => { vi.clearAllMocks(); vi.stubEnv('VITE_AGENCY_CARE_ENABLED', 'false'); vi.mocked(getAgencyMonitoringFollowUp).mockResolvedValue(detail as any); vi.mocked(updateAgencyMonitoringFollowUp).mockResolvedValue({} as any); });
+afterEach(() => vi.unstubAllEnvs());
 
 it('requires outcome, saves only status/outcome/revision and reports success', async () => {
   const user = userEvent.setup();
@@ -37,6 +39,7 @@ it('requires outcome, saves only status/outcome/revision and reports success', a
 it('keeps a scoped super admin read-only', async () => {
   render(<AgencyMonitoringFollowUpDetail clientId="c" followUpId="f" canUpdateFollowUps={false} onBack={vi.fn()} onContact={vi.fn()} onUnavailable={vi.fn()} onSaved={vi.fn()} />);
   expect((await screen.findAllByText('Call provider'))[0]).toBeInTheDocument();
+  expect(await screen.findByText('Care evidence for c follow_up f')).toBeVisible();
   expect(screen.queryByRole('button', { name: 'Save update' })).not.toBeInTheDocument();
 });
 

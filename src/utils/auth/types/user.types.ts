@@ -14,6 +14,7 @@ export enum UserType {
   AGENCY_STAFF = "agency_staff",
   SUPER_ADMIN = "super_admin",
   FAMILY_MEMBER = "family_member",
+  AGENCY_CARE = "agency_care",
 }
 
 export type AgencyScopeMode = "all" | "selected"

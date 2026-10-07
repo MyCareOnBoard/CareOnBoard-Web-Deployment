@@ -8,6 +8,7 @@ const dashboardRoutes: Record<UserType, string> = {
   [UserType.AGENCY_STAFF]: Routes.agency.dashboard,
   [UserType.SUPER_ADMIN]: Routes.superAdmin.dashboard,
   [UserType.FAMILY_MEMBER]: Routes.family.dashboard,
+  [UserType.AGENCY_CARE]: '/agency-care',
 }
 
 export function getDashboardRouteForUserType(userType: UserType): string {

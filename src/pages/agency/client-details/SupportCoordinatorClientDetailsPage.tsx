@@ -20,6 +20,7 @@ import { clientDocumentUrl } from "@/pages/shared/client-details/components/Clie
 import { DatePickerField, SignatureField } from "@/pages/shared/client-management/components/forms/formControls";
 import { useToast } from "@/hooks/use-toast";
 import { useAssignmentReviewScope } from "@/hooks/useAssignmentReview";
+import { useAuth } from '@/utils/auth';
 import { clients } from "@/pages/agency/clients-management/supportCoordinatorSampleClients";
 import { Routes } from "@/routes/constants";
 import SupportCoordinatorMonitoringTab from "./SupportCoordinatorMonitoringTab";
@@ -28,6 +29,9 @@ import SupportCoordinatorDocumentsTab from "./SupportCoordinatorDocumentsTab";
 import SupportCoordinatorPcpt from "./SupportCoordinatorPcpt";
 import SupportCoordinatorIsp from "./SupportCoordinatorIsp";
 import SupportCoordinatorClientInformationTab from "./SupportCoordinatorClientInformationTab";
+
+const AgencyCareClientEntry = lazy(() => import('@/features/agency-care/AgencyCareHome').then(module => ({ default: module.AgencyCareClientEntry })));
+const AgencyCareSourcePublications = lazy(() => import('@/features/agency-care/AgencyCareSourcePublications').then(module => ({ default: module.AgencyCareSourcePublications })));
 
 const clientDateLabel = (value?: Client['dateOfBirth']) => {
   if (!value) return 'Not set';
@@ -108,6 +112,7 @@ export default function SupportCoordinatorClientDetailsPage() {
 }
 
 function SupportCoordinatorClientDetailsWorkspace() {
+  const { user } = useAuth();
   const { clientId } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -222,6 +227,7 @@ function SupportCoordinatorClientDetailsWorkspace() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            {!sample && savedClient?.id && <Suspense fallback={<span role="status" className="text-sm text-[#647b7e]">Loading care connection…</span>}><AgencyCareClientEntry clientId={savedClient.id} program="sc" allowCreate={user?.userType === 'agency'} /></Suspense>}
             <p className="text-sm text-[#10141a]"><strong className="mr-1 text-lg">{sample ? "ISP Active" : "ISP period"}</strong>{period}</p>
           </div>
         </header>
@@ -268,7 +274,18 @@ function SupportCoordinatorClientDetailsWorkspace() {
                 </button>)}
               </div>
             </section>
-          ) : activeTab === "services" ? <ServiceAuthorizationTab key={clientId} sample={Boolean(sample)} client={savedClient} onSaved={setSavedClient} /> : activeTab === "monitoring" ? sample ? <SupportCoordinatorMonitoringTab key={clientId} sample /> : <AgencyMonitoringRecords key={`${clientId}:${savedClient?.status}`} clientId={clientId || ''} clientStatus={savedClient?.status} /> : activeTab === "documents" ? <SupportCoordinatorDocumentsTab key={clientId} sample={Boolean(sample)} client={savedClient} onSaved={setSavedClient} /> : (
+          ) : activeTab === "services" ? <ServiceAuthorizationTab key={clientId} sample={Boolean(sample)} client={savedClient} onSaved={setSavedClient} /> : activeTab === "monitoring" ? sample ? <SupportCoordinatorMonitoringTab key={clientId} sample /> : <AgencyMonitoringRecords key={`${clientId}:${savedClient?.status}`} clientId={clientId || ''} clientStatus={savedClient?.status} /> : activeTab === "documents" ? (
+            <>
+              <SupportCoordinatorDocumentsTab key={clientId} sample={Boolean(sample)} client={savedClient} onSaved={setSavedClient} />
+              {!sample && savedClient?.id && (
+                <Suspense fallback={(
+                  <p role="status" className="mt-5 text-sm text-[#647b7e]">Loading published care documents…</p>
+                )}>
+                  <AgencyCareSourcePublications clientId={savedClient.id} program="sc" />
+                </Suspense>
+              )}
+            </>
+          ) : (
             <section aria-label={`${tabs.find((tab) => tab.id === activeTab)?.label} tab`} className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-[#d1d5db] px-6 text-center">
               <FileText className="mb-3 h-8 w-8 text-[#008f93]" />
               <h2 className="text-xl font-semibold text-[#10141a]">{tabs.find((tab) => tab.id === activeTab)?.label}</h2>

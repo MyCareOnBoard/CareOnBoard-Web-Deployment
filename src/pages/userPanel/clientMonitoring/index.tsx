@@ -1,7 +1,7 @@
 import MonitoringScheduleCard from '@/components/sc-monitoring/MonitoringScheduleCard';
 import { useScMonitoringRefresh } from '@/hooks/useScMonitoringRefresh';
 import { useAssignmentReviewScope } from '@/hooks/useAssignmentReview';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import { ArrowRight, ClipboardList, Plus, AlertCircle } from 'lucide-react';
@@ -14,6 +14,9 @@ import Finding from './Finding';
 import FollowUpPanel from './FollowUpPanel';
 import { MonitoringDetailSkeleton, MonitoringOverviewSkeleton } from './MonitoringSkeleton';
 import './monitoring.css';
+
+const AgencyCareClientEntry = lazy(() => import('@/features/agency-care/AgencyCareHome').then(module => ({ default: module.AgencyCareClientEntry })));
+const MonitoringCareBridge = lazy(() => import('@/features/agency-care/MonitoringCareBridge').then(module => ({ default: module.MonitoringCareBridge })));
 
 const instant = (value: string | null) => value ? new Date(value).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
 const civil = (value: string | null) => value ? new Date(`${value}T12:00:00Z`).toLocaleDateString('en-US', { dateStyle: 'medium', timeZone: 'UTC' }) : '—';
@@ -44,6 +47,7 @@ function ContactRecord({ detail, clientName, clientId, onBack, onFollowUp, onUna
   };
   return <><button type="button" className="scm-back" onClick={onBack}>← Back to {clientName}</button>
     <div className="scm-heading"><div><div className="scm-eyebrow">Monitoring contact · {clientName}</div><h1 className="scm-title">Contact record</h1><p className="scm-sub">{label(saved.method)} · {instant(saved.contactAt)} · {saved.authorName}</p></div><span className="scm-tag scm-tag-green">Saved record</span></div>
+    <Suspense fallback={<p role="status" className="scm-help">Loading care evidence…</p>}><MonitoringCareBridge clientId={clientId} recordKind="contact" recordId={saved.contactId} recordLabel={`Contact · ${instant(saved.contactAt)}`} canManage /></Suspense>
     <div className="scm-layout"><div className="scm-stack">
       <section className="scm-panel scm-detail"><h2>Contact details</h2><dl>
         <div className="scm-keyval"><dt>Method</dt><dd>{label(saved.method)}</dd></div><div className="scm-keyval"><dt>People present</dt><dd>{saved.participants}</dd></div>
@@ -134,6 +138,7 @@ function ClientMonitoringWorkspace() {
         : selectedContactId ? selectedContact ? <ContactRecord detail={selectedContact} clientName={overview.name} clientId={clientId} onBack={() => { setSelectedContactId(null); setSelectedContact(null); }} onFollowUp={setSelectedFollowUpId} onUnavailable={markUnavailable} /> : error ? <button type="button" className="scm-button" onClick={() => { setError(''); setSelectedContactId(null); }}>Back to monitoring overview</button> : <MonitoringDetailSkeleton kind="contact" />
           : <><button type="button" className="scm-back" onClick={() => navigate(Routes.userPanel.clientsAndServices)}>← Back to My Clients</button>
             <div className="scm-panel scm-banner"><span className="scm-avatar">{initials(overview.name)}</span><div><h1>{overview.name}</h1><p>ID {overview.clientId} · {overview.program}{overview.county ? ` · ${overview.county}` : ''}</p></div><div className="scm-banner-period"><strong>Current ISP period</strong><small>{overview.ispPeriod ? `${civil(overview.ispPeriod.startDate)} – ${civil(overview.ispPeriod.endDate)}` : 'ISP period not recorded'}</small></div></div>
+            <Suspense fallback={<p role="status" className="scm-help">Loading care connection…</p>}><AgencyCareClientEntry clientId={overview.clientId} program="sc" allowCreate /></Suspense>
             <div className="scm-heading"><div><div className="scm-eyebrow">Client workspace</div><h1 className="scm-title">Monitoring overview</h1><p className="scm-sub">Plan details and contact findings are shown separately.</p></div><button type="button" className="scm-button scm-button-primary" onClick={() => { setNotice(''); setShowForm(true); }}><Plus size={16} /> Record contact</button></div>
             <MonitoringScheduleCard schedule={overview.monitoringSchedule} onRefresh={() => void refresh()} />
             <div className="scm-layout"><div className="scm-stack"><section><div className="scm-section-head"><h2>Open follow-ups</h2><span className="scm-tag scm-tag-amber">{overview.openFollowUps.length ? `${overview.openFollowUps.length} ${overview.openFollowUps.length === 1 ? 'needs' : 'need'} action` : 'No open items'}</span></div><div className="scm-panel">{overview.openFollowUps.length ? overview.openFollowUps.map(item => <FollowUpRow key={item.followUpId} followUp={item} onOpen={() => setSelectedFollowUpId(item.followUpId)} />) : <p className="scm-empty">No open follow-ups.</p>}</div></section>

@@ -149,6 +149,7 @@ export default function DashboardHeader(
       [UserType.AGENCY]: "agency",
       [UserType.AGENCY_STAFF]: "agency",
       [UserType.SUPER_ADMIN]: "super-admin",
+      [UserType.AGENCY_CARE]: "agency-care",
     }
     return route.replace(':userType', userTypeKeys[userType as UserType] || 'applicant');
   }

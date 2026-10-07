@@ -1,4 +1,5 @@
 import { Routes } from '@/routes/constants'
+import { authRouteWithReturnTo } from './agencyCareReturnTo'
 
 type MfaErrorBody = {
   code?: string
@@ -32,14 +33,14 @@ export function handleMfaApiError(status: number, body: MfaErrorBody): boolean {
 
   if (body.code === 'MFA_ENROLLMENT_REQUIRED') {
     if (!path.startsWith(Routes.auth.mfaEnroll)) {
-      window.location.href = Routes.auth.mfaEnroll
+      window.location.href = authRouteWithReturnTo(Routes.auth.mfaEnroll, `${path}${window.location.search}`)
     }
     return true
   }
 
   if (body.code === 'MFA_VERIFICATION_REQUIRED') {
     if (!path.startsWith(Routes.auth.mfaChallenge)) {
-      window.location.href = Routes.auth.mfaChallenge
+      window.location.href = authRouteWithReturnTo(Routes.auth.mfaChallenge, `${path}${window.location.search}`)
     }
     return true
   }

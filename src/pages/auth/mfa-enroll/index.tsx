@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { ButtonLoader } from '@/components/ui/loader'
@@ -11,6 +11,7 @@ import type { AppDispatch } from '@/store/redux/store'
 import { MFA_COPY } from '@/utils/auth/copy/mfaCopy'
 import { getAuthErrorMessage } from '@/utils/auth/helpers/errorMessages'
 import { completePostLogin } from '@/utils/auth/helpers/postLogin'
+import { agencyCareReturnTo, authRouteWithReturnTo } from '@/utils/auth/helpers/agencyCareReturnTo'
 import MfaCodeForm from '@/pages/auth/components/MfaCodeForm'
 import { RecaptchaAnchor } from '@/pages/auth/components/RecaptchaAnchor'
 import { AuthStepHeader } from '@/pages/auth/components/AuthStepHeader'
@@ -34,6 +35,7 @@ const RECAPTCHA_CONTAINER_ID = 'recaptcha-mfa-enroll'
 
 export default function MfaEnrollPage() {
   const navigate = useNavigate()
+  const returnTo = agencyCareReturnTo(new URLSearchParams(useLocation().search).get('returnTo'))
   const dispatch = useDispatch<AppDispatch>()
   const { toast } = useToast()
 
@@ -48,16 +50,16 @@ export default function MfaEnrollPage() {
     const check = async () => {
       await auth.authStateReady?.()
       if (!auth.currentUser) {
-        navigate(Routes.auth.login, { replace: true })
+        navigate(authRouteWithReturnTo(Routes.auth.login, returnTo), { replace: true })
         return
       }
       if (await hasEnrolledMfa(auth.currentUser)) {
-        navigate(Routes.auth.login, { replace: true })
+        navigate(authRouteWithReturnTo(Routes.auth.login, returnTo), { replace: true })
       }
     }
     void check()
     return () => clearRecaptchaVerifier()
-  }, [navigate])
+  }, [navigate, returnTo])
 
   const requestVerificationCode = useCallback(async () => {
     if (!phone || !isValidPhoneNumber(phone)) {
@@ -88,7 +90,7 @@ export default function MfaEnrollPage() {
         title: 'Two-step sign-in is on',
         description: 'We will text you a code when you sign in.',
       })
-      await completePostLogin(dispatch, navigate, toast)
+      await completePostLogin(dispatch, navigate, toast, returnTo)
     } catch (e: unknown) {
       setError(getAuthErrorMessage(e))
     } finally {

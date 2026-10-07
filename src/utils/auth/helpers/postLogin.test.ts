@@ -45,4 +45,29 @@ describe('completePostLogin applicant routing', () => {
 
     expect(navigate).toHaveBeenCalledWith(Routes.applicant.dashboard, { replace: true })
   })
+
+  it('routes authoritative limited accounts without applicant onboarding requests', async () => {
+    getUser.mockResolvedValue({ uid: 'partner-1', userType: 'agency_care' })
+    getOnboardingStatus.mockRejectedValue(new Error('External accounts cannot use applicant APIs'))
+
+    await completePostLogin(dispatch as never, navigate, toast)
+
+    expect(getOnboardingStatus).not.toHaveBeenCalled()
+    expect(navigate).toHaveBeenCalledWith('/agency-care', { replace: true })
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ payload: expect.objectContaining({ uid: 'partner-1', userType: 'agency_care' }) }))
+  })
+
+  it('preserves an internal identity while continuing a care invitation', async () => {
+    getUser.mockResolvedValue({ uid: 'provider-1', userType: UserType.EMPLOYEE })
+    await completePostLogin(dispatch as never, navigate, toast, '/agency-care/invitations/token?intent=login')
+    expect(getOnboardingStatus).toHaveBeenCalledOnce()
+    expect(navigate).toHaveBeenCalledWith('/agency-care/invitations/token?intent=login', { replace: true })
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ payload: expect.objectContaining({ uid: 'provider-1', userType: UserType.EMPLOYEE }) }))
+  })
+
+  it.each(['https://example.test/agency-care', '//example.test/agency-care', '/agency/dashboard', '/agency-care/../agency', '/agency-care/%2e%2e/agency'])('rejects unsafe continuation %s', async (returnTo) => {
+    getUser.mockResolvedValue({ userType: 'agency_care' })
+    await completePostLogin(dispatch as never, navigate, toast, returnTo)
+    expect(navigate).toHaveBeenCalledWith('/agency-care', { replace: true })
+  })
 })

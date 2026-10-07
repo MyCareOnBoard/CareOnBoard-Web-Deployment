@@ -65,6 +65,21 @@ export async function getUser(): Promise<User> {
 
     const backendUser = response.data.user as any;
 
+    if (backendUser.userType === UserType.AGENCY_CARE) {
+      return {
+        id: backendUser.id || backendUser.uid,
+        uid: backendUser.uid,
+        email: backendUser.email,
+        fullName: backendUser.fullName,
+        emailVerified: resolveEmailVerified(),
+        userType: UserType.AGENCY_CARE,
+        createdAt: backendUser.createdAt,
+        updatedAt: backendUser.updatedAt,
+        phoneNumber: backendUser.phoneNumber,
+        profile: { fullName: backendUser.fullName, email: backendUser.email },
+      };
+    }
+
     // Build clean User object with profile data in the correct location
     const user: User = {
       // Core user fields only

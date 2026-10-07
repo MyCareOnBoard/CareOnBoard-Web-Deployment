@@ -1,12 +1,16 @@
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { format, addDays } from 'date-fns';
 import { createScContact, type ScOverview } from '@/lib/api/sc-monitoring';
 import ContactForm from './ContactForm';
 
 vi.mock('@/lib/api/sc-monitoring', () => ({ createScContact: vi.fn() }));
+vi.mock('@/utils/auth', () => ({ useAuth: () => ({ user: { uid: 'sc-1', userType: 'employee' } }) }));
+vi.mock('@/features/agency-care/MonitoringCareBridge', () => ({
+  MonitoringDraftEvidence: ({ selected, onChange }: { selected: string[]; onChange: (ids: string[]) => void }) => <div><p>Selected evidence: {selected.join(',')}</p><button type="button" onClick={() => onChange(['published-v2'])}>Select approved version 2</button></div>,
+}));
 const { toast } = vi.hoisted(() => ({ toast: vi.fn() }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast }) }));
 vi.mock('@/hooks/useGooglePlacesAutocomplete', () => ({
@@ -20,7 +24,8 @@ vi.mock('@/hooks/useGooglePlacesAutocomplete', () => ({
     };
   },
 }));
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => { vi.clearAllMocks(); vi.stubEnv('VITE_AGENCY_CARE_ENABLED', 'false'); });
+afterEach(() => vi.unstubAllEnvs());
 const overview: ScOverview = { clientId: 'c', name: 'Alex Morgan', program: 'SP', county: null, ispPeriod: null,
   scOutcomes: [{ id: 'g', statement: 'Join activities', services: [{ id: 's', name: 'Individual Supports', provider: 'Provider A' }] }],
   openFollowUps: [], contacts: { items: [], nextCursor: null }, timezone: 'UTC' };
@@ -87,6 +92,45 @@ it('saves a no-issue contact without stale not-reviewed reasons', async () => {
   expect(createScContact).toHaveBeenCalledWith('c', expect.objectContaining({ purpose: 'Updated purpose', location: '123 Main St, Newark, NJ 07102, USA', experience: { status: 'satisfied' }, noFollowUpNeeded: true, issueDecisions: [] }));
   expect(onSaved).toHaveBeenCalled();
   expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Contact saved', variant: 'success' }));
+});
+
+it('stages exact evidence only at review and saves it atomically with one contact operation', async () => {
+  vi.mocked(createScContact).mockResolvedValue({ contactId: 'new', followUpIds: [] });
+  const { rerender } = render(<ContactForm overview={{ ...overview, scOutcomes: [] }} onCancel={vi.fn()} onSaved={vi.fn()} onUnavailable={vi.fn()} />);
+  expect(screen.queryByRole('button', { name: 'Select approved version 2' })).not.toBeInTheDocument();
+  completeEmptyPlan();
+  fireEvent.click(await screen.findByRole('button', { name: 'Select approved version 2' }));
+  expect(createScContact).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Save contact' }));
+  await waitFor(() => expect(createScContact).toHaveBeenCalledWith('c', expect.objectContaining({ evidencePublicationIds: ['published-v2'], operationId: expect.any(String) })));
+  rerender(<ContactForm overview={{ ...overview, clientId: 'other-client', scOutcomes: [] }} onCancel={vi.fn()} onSaved={vi.fn()} onUnavailable={vi.fn()} />);
+  expect(screen.getByLabelText('Who took part in the contact?')).toHaveValue('');
+  expect(screen.queryByText('Selected evidence: published-v2')).not.toBeInTheDocument();
+});
+
+it('discards a late evidence save completion after changing the client', async () => {
+  let finishSave!: (value: { contactId: string; followUpIds: string[] }) => void;
+  vi.mocked(createScContact).mockReturnValueOnce(new Promise(resolve => { finishSave = resolve; }));
+  const onSaved = vi.fn();
+  const { rerender } = render(<ContactForm overview={{ ...overview, scOutcomes: [] }} onCancel={vi.fn()} onSaved={onSaved} onUnavailable={vi.fn()} />);
+  completeEmptyPlan();
+  fireEvent.click(await screen.findByRole('button', { name: 'Select approved version 2' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save contact' }));
+  rerender(<ContactForm overview={{ ...overview, clientId: 'other-client', scOutcomes: [] }} onCancel={vi.fn()} onSaved={onSaved} onUnavailable={vi.fn()} />);
+  await act(async () => finishSave({ contactId: 'old-contact', followUpIds: [] }));
+  expect(onSaved).not.toHaveBeenCalled();
+  expect(screen.getByLabelText('Who took part in the contact?')).toHaveValue('');
+  expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ title: 'Contact saved' }));
+});
+
+it('keeps care evidence and contact operation metadata available with a stale false flag', async () => {
+  vi.mocked(createScContact).mockResolvedValue({ contactId: 'new', followUpIds: [] });
+  render(<ContactForm overview={{ ...overview, scOutcomes: [] }} onCancel={vi.fn()} onSaved={vi.fn()} onUnavailable={vi.fn()} />);
+  completeEmptyPlan();
+  fireEvent.click(await screen.findByRole('button', { name: 'Select approved version 2' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save contact' }));
+  await waitFor(() => expect(createScContact).toHaveBeenCalledOnce());
+  expect(vi.mocked(createScContact).mock.calls[0][1]).toMatchObject({ evidencePublicationIds: ['published-v2'], operationId: expect.any(String) });
 });
 
 
@@ -175,4 +219,5 @@ it('prevents duplicate submissions while saving and lets a rejected request be c
   vi.mocked(createScContact).mockResolvedValueOnce({ contactId: 'new', followUpIds: [] });
   fireEvent.click(screen.getByRole('button', { name: 'Save contact' }));
   await waitFor(() => expect(createScContact).toHaveBeenCalledTimes(2));
+  expect(vi.mocked(createScContact).mock.calls[1][1].operationId).toBe(vi.mocked(createScContact).mock.calls[0][1].operationId);
 });
