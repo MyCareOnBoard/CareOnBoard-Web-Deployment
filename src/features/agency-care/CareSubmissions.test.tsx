@@ -11,6 +11,8 @@ import {
   validateCareVersion,
 } from "./CareSubmissions";
 
+const { toast } = vi.hoisted(() => ({ toast: vi.fn() }));
+vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast }) }));
 vi.mock("@/lib/api/agencyCare", () => ({
   agencyCareApi: {
     relationships: vi.fn(),
@@ -19,6 +21,7 @@ vi.mock("@/lib/api/agencyCare", () => ({
     createSubmission: vi.fn(),
     addVersion: vi.fn(),
     sourceDocuments: vi.fn(),
+    shareSourceDocument: vi.fn(),
     sourceLinks: vi.fn(),
     publicationOperation: vi.fn(),
   },
@@ -65,6 +68,7 @@ const props = {
   refreshNetwork: vi.fn(),
 };
 beforeEach(() => {
+  toast.mockClear();
   vi.mocked(agencyCareApi.sourceLinks).mockResolvedValue({
     items: [],
     nextCursor: null,
@@ -182,6 +186,13 @@ it("creates a first destination operation only for a confirmed original audience
   expect(
     vi.mocked(agencyCareApi.publicationOperation).mock.calls.at(-1)![1],
   ).not.toHaveProperty("destinationOperationId");
+  await waitFor(() =>
+    expect(toast).toHaveBeenCalledWith({
+      title: "Publication queued",
+      description: "Check publication status for the result.",
+      variant: "success",
+    }),
+  );
 });
 
 it("reauthorizes only the displayed current confirmed program and source client after acknowledgement", async () => {
@@ -283,6 +294,7 @@ it("requires a rejection reason and submits the exact displayed version and revi
   expect(
     await screen.findByText("A reason or instruction is required."),
   ).toBeVisible();
+  expect(toast).not.toHaveBeenCalled();
   fireEvent.change(screen.getByLabelText("Reason or instructions"), {
     target: { value: "Service date requires confirmation." },
   });
@@ -301,6 +313,10 @@ it("requires a rejection reason and submits the exact displayed version and revi
       expect.objectContaining({ agencyKey: "external:provider" }),
     ),
   );
+  expect(toast).toHaveBeenCalledWith({
+    title: "Version rejected",
+    variant: "success",
+  });
 });
 
 it("keeps a new update summary empty instead of copying private monitoring findings", async () => {
@@ -353,6 +369,176 @@ it("rejects date rollover, active file content and empty files before submission
       summary: "Actual service summary",
     }),
   ).toBeNull();
+});
+
+it("validates the document dropzone and saves its selected file as a draft version", async () => {
+  vi.mocked(agencyCareApi.relationships).mockResolvedValue({
+    items: [
+      {
+        agencyKey: "internal:sc-agency",
+        name: "SC agency",
+        kind: "internal",
+        state: "active",
+        revision: 1,
+      },
+      {
+        agencyKey: "external:care-provider",
+        name: "Care provider",
+        kind: "external",
+        state: "active",
+        revision: 1,
+      },
+      {
+        agencyKey: "external:former-provider",
+        name: "Former provider",
+        kind: "external",
+        state: "suspended",
+        revision: 1,
+      },
+    ],
+    nextCursor: null,
+  });
+  const serverDraft: CareSubmission = {
+    ...item,
+    kind: "document",
+    category: "service_report",
+    reviewStatus: "draft",
+    revision: 0,
+  };
+  vi.mocked(agencyCareApi.createSubmission).mockResolvedValue(serverDraft);
+  vi.mocked(agencyCareApi.addVersion).mockResolvedValue(serverDraft);
+  const onSaved = vi.fn();
+  render(
+    <CareSubmissionForm
+      {...props}
+      kind="document"
+      onClose={() => {}}
+      onSaved={onSaved}
+    />,
+  );
+  const upload = screen.getByLabelText("Document file");
+  fireEvent.change(upload, {
+    target: { files: [new File(["<html>"], "care.html", { type: "text/html" })] },
+  });
+  expect(screen.getByText("Choose a PDF, PNG or JPEG file.")).toBeVisible();
+  expect(agencyCareApi.createSubmission).not.toHaveBeenCalled();
+  const file = new File(["report contents"], "progress.pdf", {
+    type: "application/pdf",
+  });
+  fireEvent.change(upload, { target: { files: [file] } });
+  expect(screen.getByText("progress.pdf")).toBeVisible();
+  expect(
+    screen.queryByText("Choose a PDF, PNG or JPEG file."),
+  ).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Title"), {
+    target: { value: "Progress report" },
+  });
+  const coordinator = await screen.findByLabelText("SC agency");
+  const provider = screen.getByLabelText("Care provider");
+  expect(coordinator).not.toBeChecked();
+  expect(provider).not.toBeChecked();
+  expect(screen.queryByLabelText("Former provider")).not.toBeInTheDocument();
+  expect(screen.getByText("0 agencies selected")).toBeVisible();
+  fireEvent.click(coordinator);
+  fireEvent.click(provider);
+  expect(screen.getByText("2 agencies selected")).toBeVisible();
+  fireEvent.click(coordinator);
+  expect(coordinator).not.toBeChecked();
+  expect(provider).toBeChecked();
+  expect(screen.getByText("1 agency selected")).toBeVisible();
+  fireEvent.submit(
+    screen.getByRole("button", { name: "Save draft version" }).closest("form")!,
+  );
+  await waitFor(() => expect(onSaved).toHaveBeenCalledWith(serverDraft));
+  expect(toast).toHaveBeenCalledWith({
+    title: "Draft version saved",
+    variant: "success",
+  });
+  expect(agencyCareApi.createSubmission).toHaveBeenCalledWith(
+    network.id,
+    expect.objectContaining({
+      kind: "document",
+      category: "service_report",
+      audience: ["external:care-provider"],
+    }),
+    expect.objectContaining({ agencyKey: props.agencyKey }),
+  );
+  const [submissionId, formData, options] = vi
+    .mocked(agencyCareApi.addVersion)
+    .mock.calls.at(-1)!;
+  expect(submissionId).toBe(serverDraft.id);
+  expect(formData).toBeInstanceOf(FormData);
+  expect((formData as FormData).get("file")).toBe(file);
+  expect(
+    JSON.parse(String((formData as FormData).get("metadata"))),
+  ).toMatchObject({ expectedRevision: 0 });
+  expect(options).toMatchObject({ agencyKey: props.agencyKey });
+});
+
+it("reports an authorized source document as submitted for review rather than approved or published", async () => {
+  vi.mocked(agencyCareApi.sourceDocuments).mockResolvedValue({
+    items: [{ id: "source-report", title: "Source report", fileName: "source-report.pdf", category: "service_report" }],
+    nextCursor: null,
+  });
+  vi.mocked(agencyCareApi.shareSourceDocument).mockResolvedValue(item);
+  const onSaved = vi.fn();
+  render(
+    <CareSubmissionForm
+      {...props}
+      kind="document"
+      sourceDocumentId="source-report"
+      onClose={() => {}}
+      onSaved={onSaved}
+    />,
+  );
+  fireEvent.change(screen.getByLabelText("Title"), {
+    target: { value: "Source report" },
+  });
+  fireEvent.click(await screen.findByLabelText("SC agency"));
+  fireEvent.submit(
+    screen.getByRole("button", { name: "Share source document" }).closest("form")!,
+  );
+  await waitFor(() => expect(onSaved).toHaveBeenCalledWith(item));
+  expect(toast).toHaveBeenCalledWith({
+    title: "Source document submitted for review",
+    variant: "success",
+  });
+});
+
+it("explains when there are no active care audience choices and keeps an empty selection blocked", async () => {
+  vi.mocked(agencyCareApi.relationships).mockResolvedValue({
+    items: [
+      {
+        agencyKey: "external:former-provider",
+        name: "Former provider",
+        state: "suspended",
+        revision: 1,
+      },
+    ],
+    nextCursor: null,
+  });
+  render(
+    <CareSubmissionForm
+      {...props}
+      kind="document"
+      onClose={() => {}}
+      onSaved={() => {}}
+    />,
+  );
+  await screen.findByText(
+    "No active agencies are available in this list. Check this client's connections in Care team before sharing.",
+  );
+  expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Title"), {
+    target: { value: "Progress report" },
+  });
+  fireEvent.submit(
+    screen.getByRole("button", { name: "Save draft version" }).closest("form")!,
+  );
+  expect(
+    screen.getByText("Select the authorized audience for this submission."),
+  ).toBeVisible();
+  expect(agencyCareApi.createSubmission).not.toHaveBeenCalled();
 });
 
 it("keeps saved metadata locked when only the content step must be retried", async () => {

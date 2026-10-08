@@ -12,6 +12,14 @@ export type CareAccess = {
   permissionRevision?: string | number;
 };
 export type CarePage<T> = { items: T[]; nextCursor: string | null };
+export type CareDashboardClient = {
+  networkId: string;
+  clientName: string;
+  lifecycle: string;
+  pendingDocuments: number;
+  pendingUpdates: number;
+  publicationActionCount: number | null;
+};
 export type CareRequestOptions = {
   signal?: AbortSignal;
   agencyKey?: string;
@@ -79,6 +87,8 @@ export type CareAgency = {
   verificationStatus?: string;
   serviceTypes?: string[];
   contact?: string;
+  city?: string;
+  state?: string;
 };
 export type CareMember = CareAccess & {
   uid: string;
@@ -130,6 +140,7 @@ export type CareInvitation = {
   purpose: "client_connection" | "organization_member";
   status: string;
   recipientEmail?: string;
+  recipientMode?: "agency_administrators";
   agencyName?: string;
   createdAt?: string;
   expiresAt?: string;
@@ -156,6 +167,7 @@ export type CareInvitationPreview = {
   client?: { name: string };
   organization?: { name: string; agencyKey?: string };
   recipientEmailMasked?: string;
+  recipientMode?: "agency_administrators";
   canAccept?: boolean;
   agencyKey?: string;
   requiresOrganizationRegistration?: boolean;
@@ -530,7 +542,7 @@ export const agencyCareApi = {
     networkId: string,
     input: {
       agencyKey?: string;
-      recipientEmail: string;
+      recipientEmail?: string;
       recipientName?: string;
       agencyName?: string;
       operationId: string;
@@ -904,6 +916,8 @@ export const agencyCareApi = {
       undefined,
       options,
     ),
+  dashboard: (options?: CareRequestOptions) =>
+    request<CarePage<CareDashboardClient>>("get", "/dashboard", undefined, options),
   reports: (options?: CareRequestOptions) =>
     request<
       CarePage<{

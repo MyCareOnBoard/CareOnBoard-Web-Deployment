@@ -232,6 +232,7 @@ function PublicationCorrection({
         },
         { agencyKey, signal },
       ),
+      { title: action === "retract" ? "Publication retracted" : "Publication marked as corrected" },
     );
     if (saved) onSaved();
   }

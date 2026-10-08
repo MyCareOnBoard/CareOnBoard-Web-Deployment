@@ -1,12 +1,17 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import {
   Link,
-  NavLink,
   Outlet,
+  useLocation,
   useNavigate,
   useSearchParams,
 } from "react-router";
 import { Button } from "@/components/ui/button";
+import { DashboardHeaderFrame, HeaderActionButton, UserAvatar } from "@/components/DashboardHeader";
+import DashboardSidebar, { type NavItem } from "@/components/DashboardSidebar";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
+import { Bell, CheckSquare, ChevronDown, FileBarChart, LayoutDashboard, LogOut, RotateCcw, Settings, Users } from "lucide-react";
 import { useAuth } from "@/utils/auth/context/AuthContext";
 import {
   agencyCareApi,
@@ -14,8 +19,8 @@ import {
   type CareOrganization,
 } from "@/lib/api/agencyCare";
 import { useScopedRequest } from "./hooks";
-import { CareFailure, CareLoad } from "./ui";
-import { CareNotificationProvider } from "./CareNotifications";
+import { CareFailure, CareLoad, careLabel } from "./ui";
+import { CareNotificationButton, CareNotificationProvider } from "./CareNotifications";
 import "./agency-care.css";
 
 type CareContext = {
@@ -41,6 +46,8 @@ export function AgencyCareLayout({
 }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [collapsed] = useSidebarCollapsed();
   const [search] = useSearchParams();
   const uid = user?.uid ?? "";
   const me = useScopedRequest(
@@ -49,36 +56,63 @@ export function AgencyCareLayout({
     Boolean(uid),
   );
   const [selected, setSelected] = useState(() => search.get("agencyKey") || "");
-  if (!uid)
-    return (
-      <div className="agency-care">
+  const organization =
+    me.data?.organizations.find((item) => item.agencyKey === selected) ??
+    me.data?.organizations[0];
+  const scope = organization ? `${uid}|${organization.agencyKey}|${me.data?.permissionRevision}` : "";
+  const userRole = organization ? careLabel(organization.role) : "Agency Care";
+  const navItems: NavItem[] = [
+    { label: "Dashboard", path: "/agency-care", icon: LayoutDashboard },
+    { label: "Clients", path: "/agency-care/clients", icon: Users },
+    { label: "Review queue", path: "/agency-care/review-queue", icon: CheckSquare },
+    { label: "Reports", path: "/agency-care/reports", icon: FileBarChart },
+    { label: "Notifications", path: "/agency-care/notifications", icon: Bell },
+    { label: "Publication recovery", path: "/agency-care/recovery", icon: RotateCcw },
+    ...(organization?.kind === "external" ? [{ label: "Settings", path: "/agency-care/settings", icon: Settings }] : []),
+  ];
+  // Client workspace routes belong to Clients, while the root is the dashboard.
+  const activePath = location.pathname.startsWith("/agency-care/networks/") ? "/agency-care/clients" : navItems.slice(1).find((item) =>
+    location.pathname === item.path || location.pathname.startsWith(`${item.path}/`),
+  )?.path ?? "/agency-care";
+  const changeOrganization = (agencyKey: string) => {
+    if (agencyKey === organization?.agencyKey) return;
+    setSelected(agencyKey);
+    navigate("/agency-care");
+  };
+  const organizationSelect = embedded && organization && (
+    <div className="ac-dashboard-organization">
+      {me.data && me.data.organizations.length > 1 ? (
+      <label>
+      <span className="block text-[11px] font-medium text-[#687173] mb-1">Current organization</span>
+      <select
+        value={organization.agencyKey}
+        onChange={(event) => changeOrganization(event.target.value)}
+      >
+        {me.data?.organizations.map((item) => (
+          <option key={item.agencyKey} value={item.agencyKey}>{item.name}</option>
+        ))}
+      </select>
+      </label>
+      ) : (
+        <div>
+          <span className="block text-[11px] font-medium text-[#687173]">Current organization</span>
+          <strong className="block truncate text-sm text-[#10141a]" title={organization.name}>{organization.name}</strong>
+        </div>
+      )}
+    </div>
+  );
+  const content = !uid ? (
         <CareFailure
           message="Sign in to open Agency Care."
           onRetry={() => window.location.reload()}
         />
-      </div>
-    );
-  if (me.loading)
-    return (
-      <div className="agency-care">
-        <CareLoad />
-      </div>
-    );
-  if (me.error || !me.data)
-    return (
-      <div className="agency-care">
+  ) : me.loading ? <CareLoad /> : me.error || !me.data ? (
         <CareFailure
           message={me.error || "Agency Care is unavailable."}
           onRetry={me.reload}
         />
-      </div>
-    );
-  const organization =
-    me.data.organizations.find((item) => item.agencyKey === selected) ??
-    me.data.organizations[0];
-  if (!organization)
-    return (
-      <div className="agency-care">
+  ) : !organization ? (
+      <div>
         <h1>Agency Care</h1>
         <p>
           Your account has no active care organization membership. Accept an
@@ -88,8 +122,73 @@ export function AgencyCareLayout({
           Sign out
         </Button>
       </div>
-    );
-  const scope = `${uid}|${organization.agencyKey}|${me.data.permissionRevision}`;
+  ) : children ?? <Outlet />;
+  const careContent = (
+    <div className={`agency-care${embedded ? " ac-embedded" : " ac-dashboard-content"}`}>
+      <div className="ac-module-bar">
+        <Link className="ac-brand" to="/agency-care">Agency Care</Link>
+        {embedded && <div className="ac-organization">{organizationSelect}</div>}
+        {embedded && me.data?.restrictedPortal && <Button variant="outline" onClick={() => void logout()}>Sign out</Button>}
+      </div>
+      {embedded && (
+        <nav className="ac-global-nav" aria-label="Agency Care">
+          {navItems.map((item) => <Link key={item.path} className={activePath === item.path ? "active" : undefined} aria-current={activePath === item.path ? "page" : undefined} to={item.path!}>{item.label}</Link>)}
+        </nav>
+      )}
+      <div className="ac-content" key={scope}>{content}</div>
+    </div>
+  );
+  const dashboard = embedded ? careContent : (
+    <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
+      <DashboardHeaderFrame>
+        <div className="flex items-center gap-[10px]">
+          {organization?.kind === "external" && <HeaderActionButton icon={Settings} ariaLabel="Agency settings" onClick={() => navigate("/agency-care/settings")} />}
+          <CareNotificationButton />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" aria-label={`Account menu for ${user?.fullName || "User"}`} className="flex items-center gap-3 rounded-[60px] border border-white/30 bg-white/50 p-[5px] backdrop-blur-[22px] hover:bg-white/60 transition-colors cursor-pointer">
+                <UserAvatar userName={user?.fullName} userImage={user?.photoURL || user?.profilePicture} />
+                <div className="hidden min-w-0 pr-2 xl:block text-left">
+                  <p className="max-w-40 truncate text-sm font-medium leading-tight text-[#10141a]">{user?.fullName || "User"}</p>
+                  <p className="mt-0.5 max-w-40 truncate text-[11px] font-medium leading-tight text-[#687173]">{userRole}</p>
+                </div>
+                <ChevronDown className="h-4 w-4 text-[#808081] mr-2" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[280px] max-w-[calc(100vw-32px)] z-[100] bg-[#f3f6f7] border-[#e5e5e6] rounded-xl p-0">
+              <div className="border-b border-[#dde5e6] px-4 py-3">
+                <p className="truncate text-sm font-semibold text-[#10141a]">{user?.fullName || "User"}</p>
+                <p className="mt-1 truncate text-xs font-medium text-[#687173]">{userRole}</p>
+              </div>
+              {organization && (
+                <div className="border-b border-[#dde5e6] py-2">
+                  <DropdownMenuLabel className="px-4 text-[11px] text-[#687173]">Current organization</DropdownMenuLabel>
+                  {me.data && me.data.organizations.length > 1 ? (
+                    <DropdownMenuRadioGroup aria-label="Current organization" value={organization.agencyKey} onValueChange={changeOrganization}>
+                      {me.data.organizations.map((item) => (
+                        <DropdownMenuRadioItem key={item.agencyKey} value={item.agencyKey} className="mx-2 min-h-11 cursor-pointer pr-2 text-[#10141a]">
+                          <span className="min-w-0 break-words whitespace-normal">{item.name}</span>
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  ) : (
+                    <p className="px-4 pb-1 break-words text-sm font-medium text-[#10141a]" title={organization.name}>{organization.name}</p>
+                  )}
+                </div>
+              )}
+              {organization?.kind === "external" && <DropdownMenuItem className="cursor-pointer gap-3 px-4 py-2" onSelect={() => navigate("/agency-care/settings")}><Settings className="h-4 w-4" />Settings</DropdownMenuItem>}
+              <DropdownMenuItem onSelect={() => void logout()} className="cursor-pointer gap-3 px-4 py-2 text-[#d53411]"><LogOut className="h-4 w-4" />Logout</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </DashboardHeaderFrame>
+      <DashboardSidebar navItems={navItems} activePath={activePath} />
+      <main className={`ml-0 ${collapsed ? "md:ml-[112px]" : "md:ml-[240px]"} pt-[130px] pb-10 transition-[margin] duration-200`}>
+        <div className="px-4 md:px-8">{careContent}</div>
+      </main>
+    </div>
+  );
+  if (!uid || me.loading || me.error || !me.data || !organization) return dashboard;
   return (
     <Context.Provider
       value={{
@@ -106,49 +205,7 @@ export function AgencyCareLayout({
         scope={scope}
         agencyKey={organization.agencyKey}
       >
-        <div className={`agency-care${embedded ? " ac-embedded" : ""}`}>
-          <div className="ac-module-bar">
-            <Link className="ac-brand" to="/agency-care">
-              Agency Care
-            </Link>
-            <label className="ac-organization">
-              <span className="sr-only">Current organization</span>
-              <select
-                value={organization.agencyKey}
-                onChange={(event) => {
-                  setSelected(event.target.value);
-                  navigate("/agency-care");
-                }}
-              >
-                {me.data.organizations.map((item) => (
-                  <option key={item.agencyKey} value={item.agencyKey}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {me.data.restrictedPortal && (
-              <Button variant="outline" onClick={() => void logout()}>
-                Sign out
-              </Button>
-            )}
-          </div>
-          <nav className="ac-global-nav" aria-label="Agency Care">
-            <NavLink end to="/agency-care">
-              Clients
-            </NavLink>
-            <NavLink to="/agency-care/review-queue">Review queue</NavLink>
-            <NavLink to="/agency-care/reports">Reports</NavLink>
-            <NavLink to="/agency-care/notifications">Notifications</NavLink>
-            <NavLink to="/agency-care/recovery">Publication recovery</NavLink>
-            {organization.kind === "external" && (
-              <NavLink to="/agency-care/settings">Agency settings</NavLink>
-            )}
-          </nav>
-          <main className="ac-content" key={scope}>
-            {children ?? <Outlet />}
-          </main>
-        </div>
+        {dashboard}
       </CareNotificationProvider>
     </Context.Provider>
   );

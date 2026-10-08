@@ -97,6 +97,7 @@ const allNavItems: AgencyNavItem[] = [
     },
     { label: "Task Management", path: Routes.agency.tasks, icon: ClipboardList, accessKey: "DSP Management" },
     { label: "Client Management", path: Routes.agency.clients, icon: UsersRound, accessKey: "Client Management" },
+    { label: "Agency Care", path: Routes.agencyCare.home, icon: Network },
     { label: "Applicants Directory", path: Routes.agency.applicantDirectory, icon: ApplicantDirectoryIcon, accessKey: "Applicant Directory" },
     { label: "AI Automation", path: Routes.agency.aiAutomation, icon: AiIcon, accessKey: "AI Automation" },
     { label: "Compliance Alerts", path: Routes.agency.complianceAlerts, icon: ShieldAlert, accessKey: "Compliance Alerts" },

@@ -6,8 +6,10 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
+import { HeaderActionButton } from "@/components/DashboardHeader";
+import BellIcon from "@/assets/icons/bell.svg?react";
 import { agencyCareApi, type CareNotification } from "@/lib/api/agencyCare";
 import { careError, useScopedMutation } from "./hooks";
 import {
@@ -27,7 +29,8 @@ export function careNotificationDestination(value?: string): string | null {
     const url = new URL(value, "https://care.invalid");
     if (
       url.origin !== "https://care.invalid" ||
-      url.pathname.startsWith("/agency-care/invitations/")
+      (url.pathname.startsWith("/agency-care/invitations/") &&
+        !/^\/agency-care\/invitations\/[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(url.pathname))
     )
       return null;
     return url.pathname + url.search + url.hash;
@@ -113,6 +116,23 @@ type Inbox = ReturnType<typeof useCareNotificationPoll> & {
   saveError: string;
 };
 const Context = createContext<Inbox | null>(null);
+export function CareNotificationButton() {
+  const inbox = useContext(Context);
+  const navigate = useNavigate();
+  const unreadCount = inbox?.items.filter((item) => item.status === "unread").length ?? 0;
+  return (
+    <div className="relative">
+      <HeaderActionButton
+        icon={BellIcon}
+        ariaLabel={unreadCount ? `Care notifications (${unreadCount} unread)` : "Care notifications"}
+        onClick={() => navigate("/agency-care/notifications")}
+      />
+      {unreadCount > 0 && (
+        <span aria-hidden="true" className="absolute right-[9px] top-[9px] h-[10px] w-[10px] rounded-full bg-[#d53411] border-2 border-[#eef4f5]" />
+      )}
+    </div>
+  );
+}
 export function CareNotificationProvider({
   scope,
   agencyKey,

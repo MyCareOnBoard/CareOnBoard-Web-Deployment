@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { agencyCareApi } from "@/lib/api/agencyCare";
 import type { CareWorkspaceProps } from "./AgencyCareClientWorkspace";
+import { TeamForm } from "./CareTeam";
 import { hasCapability, useScopedRequest } from "./hooks";
 import {
   CareEmpty,
@@ -15,11 +16,11 @@ import {
   careLabel,
 } from "./ui";
 
-export function CareOverviewPage({
-  network,
-  scope,
-  agencyKey,
-}: CareWorkspaceProps) {
+export function CareOverviewPage(props: CareWorkspaceProps) {
+  const { network, scope, agencyKey } = props;
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const canInvite = hasCapability(network, "invite");
+  const canReview = hasCapability(network, "review");
   const summary = useScopedRequest(scope, (signal) =>
     agencyCareApi.overview(network.id, { agencyKey, signal }),
   );
@@ -30,11 +31,21 @@ export function CareOverviewPage({
         title="Care overview"
         description="Review the care information and actions that need your attention."
         actions={
-          hasCapability(network, "review") && (
-            <Button asChild>
-              <Link to="/agency-care/review-queue">Review pending items</Link>
-            </Button>
-          )
+          <>
+            {canReview && (
+              <Button asChild>
+                <Link to="/agency-care/review-queue">Review pending items</Link>
+              </Button>
+            )}
+            {canInvite && (
+              <Button
+                variant={canReview ? "outline" : "default"}
+                onClick={() => setInviteOpen(true)}
+              >
+                Add an agency
+              </Button>
+            )}
+          </>
         }
       />
       <div className="ac-actions">
@@ -143,6 +154,18 @@ export function CareOverviewPage({
             )}
           </>
         )
+      )}
+      {inviteOpen && canInvite && (
+        <TeamForm
+          {...props}
+          modal={{ kind: "invite" }}
+          onClose={() => setInviteOpen(false)}
+          onSaved={() => {
+            setInviteOpen(false);
+            summary.reload();
+            props.refreshNetwork();
+          }}
+        />
       )}
     </div>
   );

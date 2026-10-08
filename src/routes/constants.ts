@@ -6,6 +6,7 @@ export const Routes = {
     app: "/",
     agencyCare: {
         home: "/agency-care",
+        clients: "/agency-care/clients",
         network: "/agency-care/networks/:networkId/:tab?",
         invitation: "/agency-care/invitations/:token",
         reviewQueue: "/agency-care/review-queue",

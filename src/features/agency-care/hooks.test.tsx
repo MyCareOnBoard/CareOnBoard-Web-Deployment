@@ -1,6 +1,10 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { hasCapability, useScopedRequest, useScopedMutation } from "./hooks";
+
+const toast = vi.hoisted(() => vi.fn());
+vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast }) }));
+beforeEach(() => toast.mockClear());
 
 const deferred = <T,>() => {
   let resolve!: (value: T) => void;
@@ -23,14 +27,16 @@ describe("Agency Care scoped access and requests", () => {
       });
     });
     expect(result.current.uncertain).toBe(true);
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning", title: "Check the action's status" }));
     act(() => result.current.reset());
     await act(async () => {
       await result.current.run(async (operationId) => {
         ids.push(operationId);
         return "receipt";
-      });
+      }, { title: "Saved" });
     });
     expect(ids[1]).toBe(ids[0]);
+    expect(toast).toHaveBeenLastCalledWith({ title: "Saved", variant: "success" });
   });
   it("does not infer a capability from a role, a missing projection, or another capability", () => {
     expect(hasCapability(undefined, "review")).toBe(false);
@@ -92,7 +98,7 @@ describe("Agency Care scoped access and requests", () => {
       save = result.current.run(async (_operationId, signal) => {
         expect(signal.aborted).toBe(false);
         return pending.promise;
-      });
+      }, { title: "Saved" });
     });
     rerender({ scope: "user|external:two|mary" });
     await act(async () => {
@@ -101,5 +107,28 @@ describe("Agency Care scoped access and requests", () => {
     });
     expect(onSaved).not.toHaveBeenCalled();
     expect(result.current.saving).toBe(false);
+    expect(toast).not.toHaveBeenCalled();
+  });
+
+  it("shows one success toast only after a confirmed action and ignores duplicate clicks", async () => {
+    const pending = deferred<string>();
+    const action = vi.fn(() => pending.promise);
+    const { result } = renderHook(() => useScopedMutation("user|agency|client"));
+    let saved!: Promise<string | undefined>;
+    act(() => { saved = result.current.run(action, { title: "Invitation created", description: "Delivery is queued." }); });
+    await act(async () => { expect(await result.current.run(action, { title: "Duplicate" })).toBeUndefined(); });
+    expect(toast).not.toHaveBeenCalled();
+    expect(action).toHaveBeenCalledOnce();
+    await act(async () => { pending.resolve("receipt"); await saved; });
+    expect(toast).toHaveBeenCalledExactlyOnceWith({ title: "Invitation created", description: "Delivery is queued.", variant: "success" });
+  });
+
+  it("uses a destructive toast for a rejected action without exposing backend error details", async () => {
+    const { result } = renderHook(() => useScopedMutation("user|agency|client"));
+    await act(async () => {
+      await result.current.run(async () => { throw { response: { status: 409, data: { error: "Private backend detail" } } }; }, { title: "Saved" });
+    });
+    expect(result.current.uncertain).toBe(false);
+    expect(toast).toHaveBeenCalledExactlyOnceWith({ title: "Action could not be completed", description: "This record changed. Refresh it before trying again.", variant: "destructive" });
   });
 });

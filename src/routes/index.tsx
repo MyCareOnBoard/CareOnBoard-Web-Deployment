@@ -7,6 +7,7 @@ import RouteErrorPage from "@/pages/error/RouteErrorPage";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 const AgencyCareLayout = lazy(() => import('@/features/agency-care/AgencyCareLayout').then(module => ({ default: module.AgencyCareLayout })));
 const AgencyCareHome = lazy(() => import('@/features/agency-care/AgencyCareHome').then(module => ({ default: module.AgencyCareHome })));
+const AgencyCareDashboard = lazy(() => import('@/features/agency-care/AgencyCareDashboard').then(module => ({ default: module.AgencyCareDashboard })));
 const AgencyCareClientWorkspace = lazy(() => import('@/features/agency-care/AgencyCareClientWorkspace').then(module => ({ default: module.AgencyCareClientWorkspace })));
 const AgencyCareInvitationPage = lazy(() => import('@/features/agency-care/AgencyCarePortal').then(module => ({ default: module.AgencyCareInvitationPage })));
 const AgencyCareReviewQueue = lazy(() => import('@/features/agency-care/AgencyCarePortal').then(module => ({ default: module.AgencyCareReviewQueue })));
@@ -234,7 +235,8 @@ export const router = createBrowserRouter([
     {
         element: <ProtectedRoute allowAgencyCare><AgencyCareLayout /></ProtectedRoute>,
         children: [
-            { path: Routes.agencyCare.home, Component: AgencyCareHome },
+            { path: Routes.agencyCare.home, Component: AgencyCareDashboard },
+            { path: Routes.agencyCare.clients, Component: AgencyCareHome },
             { path: Routes.agencyCare.network, Component: AgencyCareClientWorkspace },
             { path: Routes.agencyCare.reviewQueue, Component: AgencyCareReviewQueue },
             { path: Routes.agencyCare.reports, Component: AgencyCareReports },

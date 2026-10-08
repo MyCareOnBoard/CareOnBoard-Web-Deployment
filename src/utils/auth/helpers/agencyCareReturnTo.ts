@@ -2,7 +2,9 @@
 export function agencyCareReturnTo(value: string | null | undefined): string | null {
   if (!value || /[\\\u0000-\u0020]/.test(value)) return null
   const path = value.split(/[?#]/, 1)[0]
-  if (!/^\/agency-care(?:\/[A-Za-z0-9_-]+)*\/?$/.test(path)) return null
+  const canonicalRoute = /^\/agency-care(?:\/[A-Za-z0-9_-]+)*\/?$/.test(path)
+  const signedInvitation = /^\/agency-care\/invitations\/[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\/?$/.test(path)
+  if (!canonicalRoute && !signedInvitation) return null
   return value
 }
 

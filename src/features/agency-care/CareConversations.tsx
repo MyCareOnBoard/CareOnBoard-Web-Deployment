@@ -716,20 +716,22 @@ function NewConversation({
       );
       return;
     }
-    const saved = await mutation.run((operationId, signal) =>
-      agencyCareApi.createConversation(
-        network.id,
-        {
-          title: title.trim(),
-          type,
-          members: selected.map((item) => ({
-            uid: item.uid,
-            agencyKey: item.agencyKey,
-          })),
-          operationId,
-        },
-        { agencyKey, signal },
-      ),
+    const saved = await mutation.run(
+      (operationId, signal) =>
+        agencyCareApi.createConversation(
+          network.id,
+          {
+            title: title.trim(),
+            type,
+            members: selected.map((item) => ({
+              uid: item.uid,
+              agencyKey: item.agencyKey,
+            })),
+            operationId,
+          },
+          { agencyKey, signal },
+        ),
+      { title: "Conversation created" },
     );
     if (saved) onCreated(saved);
   }

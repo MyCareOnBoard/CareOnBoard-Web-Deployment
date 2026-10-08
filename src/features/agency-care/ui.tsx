@@ -56,16 +56,25 @@ export function CareStatus({ children }: { children: ReactNode }) {
 export function CareInvitationDelivery({
   delivery,
   showResendHint = false,
+  recipientMode,
 }: {
   delivery: CareInvitation["delivery"];
   showResendHint?: boolean;
+  recipientMode?: CareInvitation["recipientMode"];
 }) {
   const uncertain =
     delivery?.status === "failed" &&
     ["ambiguous_provider_result", "ambiguous_expired_lease"].includes(
       delivery.reason || "",
     );
-  const labels = {
+  const labels = recipientMode === "agency_administrators" ? {
+    pending: "Administrator notifications pending.",
+    processing: "Preparing administrator notifications.",
+    succeeded: "Administrator notifications queued. Acceptance is separate.",
+    failed: "Administrator notification delivery failed.",
+    cancelled: "Administrator notification delivery cancelled.",
+    unavailable: "Administrator notification status unavailable.",
+  } : {
     pending: "Invitation email queued.",
     processing: "Sending invitation email.",
     succeeded: "Email sent. Acceptance is separate.",
@@ -155,6 +164,7 @@ export function CareFormDialog({
   children,
   onClose,
   busy = false,
+  className = "",
 }: {
   open: boolean;
   title: string;
@@ -162,6 +172,7 @@ export function CareFormDialog({
   children: ReactNode;
   onClose: () => void;
   busy?: boolean;
+  className?: string;
 }) {
   const restoreFocus = useCareDialogFocus(open);
   return (
@@ -172,7 +183,8 @@ export function CareFormDialog({
       }}
     >
       <DialogContent
-        className="ac-dialog w-[min(94vw,680px)] max-h-[88dvh] overflow-y-auto p-6"
+        className={`ac-dialog w-[min(94vw,680px)] max-h-[88dvh] overflow-y-auto p-6 ${className}`}
+        aria-busy={busy}
         onEscapeKeyDown={(event) => {
           if (busy) event.preventDefault();
         }}
@@ -242,6 +254,7 @@ export function careDate(value?: string | null) {
       });
 }
 export function careLabel(value: string) {
+  if (/^(hha|ddd|sc)$/i.test(value)) return value.toUpperCase();
   return value
     .replace(/_/g, " ")
     .replace(/^\w/, (letter) => letter.toUpperCase());

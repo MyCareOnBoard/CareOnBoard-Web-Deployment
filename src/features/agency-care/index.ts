@@ -1,5 +1,6 @@
 export { AgencyCareLayout, useAgencyCare } from "./AgencyCareLayout";
 export { AgencyCareHome, AgencyCareClientEntry } from "./AgencyCareHome";
+export { AgencyCareDashboard } from "./AgencyCareDashboard";
 export { AgencyCareClientWorkspace } from "./AgencyCareClientWorkspace";
 export {
   AgencyCareInvitationPage,

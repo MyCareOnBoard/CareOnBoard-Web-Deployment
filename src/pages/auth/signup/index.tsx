@@ -44,7 +44,7 @@ export default function SignUpPage() {
 
   const query = new URLSearchParams(useLocation().search)
   const returnTo = agencyCareReturnTo(query.get('returnTo'))
-  const careInvitation = returnTo && /^\/agency-care\/invitations\/[A-Za-z0-9_-]+(?:[?#]|$)/.test(returnTo)
+  const careInvitation = returnTo && /^\/agency-care\/invitations\/[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)?\/?(?:[?#]|$)/.test(returnTo)
   const agencyId = careInvitation ? null : query.get('agencyId');
 
   // Applicant type mirrors the agency's supported client types.

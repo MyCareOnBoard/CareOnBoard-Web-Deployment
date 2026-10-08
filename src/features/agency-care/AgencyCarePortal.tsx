@@ -371,6 +371,7 @@ function ExternalProfileForm({
         },
         { agencyKey, signal },
       ),
+      { title: "Organization profile updated" },
     );
     if (result) onSaved();
   }
@@ -502,6 +503,12 @@ function ExternalMembers({
             { name: name.trim(), email: email.trim(), role, operationId },
             { agencyKey, signal },
           ),
+      remove
+        ? { title: "Member removed" }
+        : {
+            title: "Member invitation created",
+            description: "Delivery is queued. Membership begins after the invitation is accepted.",
+          },
     );
     if (result) {
       setInvite(false);
@@ -569,6 +576,12 @@ function ExternalMembers({
                                       },
                                       { agencyKey, signal },
                                     ),
+                                    action === "resend"
+                                      ? {
+                                          title: "Replacement invitation created",
+                                          description: "Delivery is queued. The previous invitation is no longer valid.",
+                                        }
+                                      : { title: "Invitation revoked" },
                                   )
                                 )
                                   list.reload();
@@ -720,7 +733,7 @@ export function AgencyCareInvitationPage() {
   const [search] = useSearchParams();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [agencyKey, setAgencyKey] = useState("");
+  const [agencyKey, setAgencyKey] = useState(search.get("agencyKey") || "");
   const [confirmed, setConfirmed] = useState(false);
   const [registration, setRegistration] = useState(
     search.get("intent") === "register",
@@ -745,8 +758,17 @@ export function AgencyCareInvitationPage() {
   );
   const mutation = useScopedMutation(scope);
   const memberInvitation = preview.data?.purpose === "organization_member";
+  const internalInvitation = preview.data?.recipientMode === "agency_administrators";
   useEffect(() => {
-    setAgencyKey("");
+    const target = preview.data?.agencyKey;
+    if (internalInvitation && target && !agencyKey &&
+        me.data?.organizations.some((item) => item.agencyKey === target)) {
+      setAgencyKey(target);
+      setConfirmed(false);
+    }
+  }, [internalInvitation, preview.data?.agencyKey, agencyKey, me.data]);
+  useEffect(() => {
+    setAgencyKey(search.get("agencyKey") || "");
     setConfirmed(false);
     setRegistration(search.get("intent") === "register");
     setDeclined(false);
@@ -772,6 +794,7 @@ export function AgencyCareInvitationPage() {
         agencyKey: memberInvitation ? undefined : selected,
         signal,
       }),
+      { title: "Invitation accepted" },
     );
     if (result) {
       const acceptedOrganization =
@@ -794,13 +817,14 @@ export function AgencyCareInvitationPage() {
         agencyKey: memberInvitation ? undefined : selected,
         signal,
       }),
+      { title: "Invitation declined" },
     );
     if (result) {
       setDeclined(true);
       navigate("/agency-care", { replace: true });
     }
   }
-  const returnTo = `/agency-care/invitations/${encodeURIComponent(token)}`;
+  const returnTo = `/agency-care/invitations/${encodeURIComponent(token)}${selected ? `?agencyKey=${encodeURIComponent(selected)}` : ""}`;
   return (
     <main className="agency-care ac-invitation">
       <CareHeading
@@ -835,7 +859,7 @@ export function AgencyCareInvitationPage() {
                 {careLabel(preview.data.status).toLowerCase()}. Use your current
                 workspace or request a fresh invitation.
               </CareNotice>
-            ) : registration ? (
+            ) : registration && !internalInvitation ? (
               <AgencyCareRegistrationForm
                 token={token}
                 needsOrganization={
@@ -852,8 +876,9 @@ export function AgencyCareInvitationPage() {
             ) : !user ? (
               <CarePanel title="Continue securely">
                 <p>
-                  Sign in with the intended recipient’s account to see the
-                  invitation details.
+                  {internalInvitation
+                    ? "Sign in with the invited agency's administrator account to review this connection."
+                    : "Sign in with the intended recipient’s account to see the invitation details."}
                 </p>
                 <div className="ac-actions">
                   <Button asChild>
@@ -863,12 +888,12 @@ export function AgencyCareInvitationPage() {
                       Sign in
                     </Link>
                   </Button>
-                  <Button
+                  {!internalInvitation && <Button
                     variant="outline"
                     onClick={() => setRegistration(true)}
                   >
                     Create an Agency Care account
-                  </Button>
+                  </Button>}
                 </div>
               </CarePanel>
             ) : (
@@ -922,6 +947,11 @@ export function AgencyCareInvitationPage() {
                       ))}
                     </select>
                   </label>
+                ) : internalInvitation ? (
+                  <CareNotice>
+                    This invitation is for an existing CareOnBoard agency. Sign
+                    in with its administrator account to review the connection.
+                  </CareNotice>
                 ) : (
                   <CareNotice>
                     Complete invitation-bound account registration before
@@ -966,6 +996,7 @@ export function AgencyCareInvitationPage() {
                     disabled={
                       mutation.saving ||
                       mutation.uncertain ||
+                      (internalInvitation && preview.data.canAccept !== true) ||
                       (!memberInvitation && !selected)
                     }
                     onClick={() => void decline()}

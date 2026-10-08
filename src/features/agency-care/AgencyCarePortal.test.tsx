@@ -1,13 +1,16 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { AgencyCareInvitationPage, AgencyCareSettings } from "./AgencyCarePortal";
 import { agencyCareApi } from "@/lib/api/agencyCare";
 import { useAgencyCare } from "./AgencyCareLayout";
 
+vi.mock("react-router", async () => await vi.importActual("react-router"));
 const authState = vi.hoisted(() => ({
   user: { uid: "existing-user", emailVerified: true },
 }));
+const toast = vi.hoisted(() => vi.fn());
+vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast }) }));
 vi.mock("@/utils/auth/context/AuthContext", () => ({
   useAuth: () => authState,
 }));
@@ -59,8 +62,18 @@ vi.mock("@/lib/api/agencyCare", () => ({
     externalProfile: vi.fn(),
     members: vi.fn(),
     memberInvitations: vi.fn(),
+    invitationAccept: vi.fn(),
   },
 }));
+
+const defaultMe = vi.mocked(agencyCareApi.me).getMockImplementation()!;
+const defaultPreview = vi.mocked(agencyCareApi.invitationPreview).getMockImplementation()!;
+afterEach(() => {
+  vi.mocked(agencyCareApi.me).mockImplementation(defaultMe);
+  vi.mocked(agencyCareApi.invitationPreview).mockImplementation(defaultPreview);
+  authState.user = { uid: "existing-user", emailVerified: true };
+  vi.clearAllMocks();
+});
 
 it("offers invitation-bound membership terms for an existing account with an existing organization", async () => {
   render(
@@ -84,6 +97,48 @@ it("offers invitation-bound membership terms for an existing account with an exi
   expect(
     screen.queryByLabelText("Organization you represent"),
   ).not.toBeInTheDocument();
+});
+
+it("selects the invited internal agency and requires explicit acceptance by its current administrator", async () => {
+  authState.user = { uid: "existing-user", emailVerified: true };
+  vi.mocked(agencyCareApi.me).mockResolvedValue({
+    uid: "existing-user",
+    restrictedPortal: false,
+    organizations: [
+      { id: "other", agencyKey: "internal:other", name: "Other agency", kind: "internal", role: "administrator" },
+      { id: "invited", agencyKey: "internal:invited", name: "Invited agency", kind: "internal", role: "administrator" },
+    ],
+    permissionRevision: 1,
+  });
+  vi.mocked(agencyCareApi.invitationPreview).mockImplementation(async (_token, options) => ({
+    valid: true, status: "pending", purpose: "client_connection", recipientMode: "agency_administrators",
+    agencyKey: "internal:invited", canAccept: options?.agencyKey === "internal:invited",
+  }));
+  vi.mocked(agencyCareApi.invitationAccept).mockResolvedValue({ networkId: "network", agencyKey: "internal:invited", status: "accepted" });
+  render(<MemoryRouter initialEntries={["/agency-care/invitations/payload.signature"]}>
+    <Routes>
+      <Route path="/agency-care/invitations/:token" element={<AgencyCareInvitationPage />} />
+      <Route path="/agency-care/networks/:networkId/overview" element={<div>Accepted workspace</div>} />
+    </Routes>
+  </MemoryRouter>);
+  await waitFor(() => expect(screen.getByLabelText("Organization you represent")).toHaveValue("internal:invited"));
+  const accept = screen.getByRole("button", { name: "Accept invitation" });
+  expect(accept).toBeDisabled();
+  expect(agencyCareApi.invitationAccept).not.toHaveBeenCalled();
+  expect(toast).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("checkbox"));
+  await waitFor(() => expect(accept).toBeEnabled());
+  fireEvent.change(screen.getByLabelText("Organization you represent"), { target: { value: "internal:other" } });
+  expect(await screen.findByRole("checkbox")).not.toBeChecked();
+  await waitFor(() => expect(screen.getByRole("button", { name: "Decline invitation" })).toBeDisabled());
+  expect(agencyCareApi.invitationAccept).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByLabelText("Organization you represent"), { target: { value: "internal:invited" } });
+  fireEvent.click(await screen.findByRole("checkbox"));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Accept invitation" })).toBeEnabled());
+  fireEvent.click(screen.getByRole("button", { name: "Accept invitation" }));
+  await screen.findByText("Accepted workspace");
+  expect(agencyCareApi.invitationAccept).toHaveBeenCalledWith("payload.signature", expect.any(String), expect.objectContaining({ agencyKey: "internal:invited" }));
+  expect(toast).toHaveBeenCalledExactlyOnceWith({ title: "Invitation accepted", variant: "success" });
 });
 
 it("starts at the first page when switching between members and member invitations", async () => {

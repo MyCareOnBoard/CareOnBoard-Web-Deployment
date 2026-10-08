@@ -141,6 +141,8 @@ function NavLinkButton({
     <button
       type="button"
       title={collapsed ? label : undefined}
+      aria-label={label}
+      aria-current={isActive ? "page" : undefined}
       onClick={() => navigate(path)}
       className={cn(
         "flex h-[52px] w-full items-center rounded-[60px] text-sm font-semibold backdrop-blur-[22px] transition cursor-pointer",
@@ -157,9 +159,11 @@ function NavLinkButton({
 export default function DashboardSidebar({
   navItems,
   footer,
+  activePath: activePathOverride,
 }: {
   footer?: ReactNode;
   navItems: NavItem[];
+  activePath?: string;
 }) {
   const location = useLocation();
   const [collapsed, toggleCollapsed] = useSidebarCollapsed();
@@ -176,8 +180,8 @@ export default function DashboardSidebar({
   }, [location.pathname, isMobile]);
 
   const activePath = useMemo(
-    () => resolveActiveNavPath(location.pathname, navItems),
-    [location.pathname, navItems]
+    () => activePathOverride ?? resolveActiveNavPath(location.pathname, navItems),
+    [activePathOverride, location.pathname, navItems]
   );
 
   return (
@@ -190,6 +194,7 @@ export default function DashboardSidebar({
         />
       )}
       <aside
+        inert={isMobile && !drawerOpen}
         className={cn(
           "fixed top-[98px] bottom-0 left-0 z-50 overflow-y-auto overflow-x-hidden space-y-3 pr-3 bg-[#eef4f5] scrollbar-hide shadow-xl",
           "transition-transform duration-200 md:top-[130px] md:bottom-4 md:pr-0 md:left-[42.5px] md:z-40 md:translate-x-0 md:shadow-none md:transition-[width]",

@@ -23,7 +23,7 @@ import { UserType } from "@/utils/auth/types/user.types";
 import { settingsRouteForUserType } from "./dashboardHeaderRoutes";
 
 
-function HeaderActionButton({ icon: Icon, ariaLabel, onClick }: { icon: ComponentType<{ className?: string }>; ariaLabel: string; onClick?: () => void }) {
+export function HeaderActionButton({ icon: Icon, ariaLabel, onClick }: { icon: ComponentType<{ className?: string }>; ariaLabel: string; onClick?: () => void }) {
   return (
     <button
       type="button"
@@ -68,6 +68,30 @@ export function UserAvatar({ userName, userImage }: { userName?: string; userIma
         setImageError(true);
       }}
     />
+  );
+}
+
+// Shared dashboard chrome without the native panel's notification requests.
+export function DashboardHeaderFrame({ centerContent, children }: { centerContent?: ReactNode; children: ReactNode }) {
+  return (
+    <header className="fixed left-0 right-0 top-0 z-50 h-[98px] bg-[#eef4f5]">
+      <div className="mx-auto flex h-full max-w-[1440px] items-center justify-between px-8">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            aria-label="Open navigation menu"
+            onClick={toggleDrawer}
+            className="grid h-[42px] w-[42px] place-items-center rounded-[50px] text-[#808081] cursor-pointer hover:bg-white/50 transition-colors md:hidden"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+          <LogoNameIcon className="hidden w-[226px] md:block" />
+          <LogoMarkIcon className="w-auto h-9 md:hidden" />
+        </div>
+        {centerContent && <div className="flex items-center">{centerContent}</div>}
+        {children}
+      </div>
+    </header>
   );
 }
 
@@ -169,25 +193,7 @@ export default function DashboardHeader(
   }
 
   return (
-    <header className="fixed left-0 right-0 top-0 z-50 h-[98px] bg-[#eef4f5]">
-      <div className="mx-auto flex h-full max-w-[1440px] items-center justify-between px-8">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            aria-label="Open navigation menu"
-            onClick={toggleDrawer}
-            className="grid h-[42px] w-[42px] place-items-center rounded-[50px] text-[#808081] cursor-pointer hover:bg-white/50 transition-colors md:hidden"
-          >
-            <Menu className="w-6 h-6" />
-          </button>
-          <LogoNameIcon className="hidden w-[226px] md:block" />
-          <LogoMarkIcon className="w-auto h-9 md:hidden" />
-        </div>
-
-        {centerContent && (
-          <div className="flex items-center">{centerContent}</div>
-        )}
-
+    <DashboardHeaderFrame centerContent={centerContent}>
         {actions ?? (
           <div className="flex items-center gap-[10px]">
             {getCareConnectDashboardUrl() && (
@@ -406,7 +412,6 @@ export default function DashboardHeader(
             </DropdownMenu>
           </div>
         )}
-      </div>
-    </header>
+    </DashboardHeaderFrame>
   );
 }

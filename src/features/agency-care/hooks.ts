@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CareAccess } from "@/lib/api/agencyCare";
+import { useToast, type Toast } from "@/hooks/use-toast";
 
 export function hasCapability(
   resource: CareAccess | null | undefined,
@@ -62,6 +63,7 @@ export function useScopedRequest<T>(
 }
 
 export function useScopedMutation(scope: string) {
+  const { toast } = useToast();
   const currentScope = useRef(scope);
   currentScope.current = scope;
   const active = useRef<AbortController | null>(null);
@@ -83,6 +85,7 @@ export function useScopedMutation(scope: string) {
   const run = useCallback(
     async <T>(
       action: (operationId: string, signal: AbortSignal) => Promise<T>,
+      success?: Pick<Toast, "title" | "description">,
     ): Promise<T | undefined> => {
       if (
         active.current ||
@@ -101,6 +104,7 @@ export function useScopedMutation(scope: string) {
           return undefined;
         operation.current = null;
         setState({ scope, saving: false, error: "", uncertain: false });
+        if (success) toast({ ...success, variant: "success" });
         return data;
       } catch (error) {
         if (!controller.signal.aborted && currentScope.current === scope) {
@@ -108,13 +112,19 @@ export function useScopedMutation(scope: string) {
             ?.status;
           const uncertain = status === undefined || status >= 500;
           if (!uncertain) operation.current = null;
+          const message = uncertain
+            ? "The result of this action is unknown. Refresh the record and check its history before attempting another action."
+            : careError(error);
           setState({
             scope,
             saving: false,
             uncertain,
-            error: uncertain
-              ? "The result of this action is unknown. Refresh the record and check its history before attempting another action."
-              : careError(error),
+            error: message,
+          });
+          toast({
+            title: uncertain ? "Check the action's status" : "Action could not be completed",
+            description: message,
+            variant: uncertain ? "warning" : "destructive",
           });
         }
         return undefined;
@@ -122,7 +132,7 @@ export function useScopedMutation(scope: string) {
         if (active.current === controller) active.current = null;
       }
     },
-    [scope, state.scope, state.uncertain],
+    [scope, state.scope, state.uncertain, toast],
   );
   const reset = useCallback(() => {
     if (!active.current) {

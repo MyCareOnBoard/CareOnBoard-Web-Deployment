@@ -10,6 +10,15 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+it("loads a care dashboard page with its selected organization, cursor and cancellation", async () => {
+  vi.mocked(axiosClient.request).mockResolvedValueOnce({ data: { success: true, data: { items: [], nextCursor: null } } } as never);
+  const signal = new AbortController().signal;
+  await agencyCareApi.dashboard({ agencyKey: "internal:sc", cursor: "next", signal });
+  expect(axiosClient.request).toHaveBeenCalledWith(expect.objectContaining({
+    method: "get", url: "/agencyCare/dashboard", params: { agencyKey: "internal:sc", cursor: "next" }, signal,
+  }));
+});
+
 it("sends organization selection and cancellation on exact-version commands and rejects malformed envelopes", async () => {
   const signal = new AbortController().signal;
   vi.mocked(axiosClient.request).mockResolvedValueOnce({

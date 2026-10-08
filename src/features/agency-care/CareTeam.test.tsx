@@ -9,6 +9,8 @@ import { expect, it, vi } from "vitest";
 import { agencyCareApi, type CareNetwork } from "@/lib/api/agencyCare";
 import { CareTeamPage } from "./CareTeam";
 
+const toast = vi.hoisted(() => vi.fn());
+vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast }) }));
 vi.mock("@/lib/api/clients", () => ({ listClients: vi.fn() }));
 vi.mock("./AgencyCareLayout", () => ({
   useAgencyCare: () => ({
@@ -20,6 +22,15 @@ vi.mock("@/lib/api/agencyCare", () => ({
     relationships: vi.fn().mockResolvedValue({ items: [], nextCursor: null }),
     invitations: vi.fn().mockResolvedValue({
       items: [
+        {
+          id: "internal-sent",
+          purpose: "client_connection",
+          agencyName: "Internal care agency",
+          recipientMode: "agency_administrators",
+          status: "pending",
+          revision: 1,
+          delivery: { status: "succeeded" },
+        },
         {
           id: "sent",
           purpose: "client_connection",
@@ -82,6 +93,9 @@ it("separates sent email from acceptance and explains uncertain delivery without
     />,
   );
   fireEvent.click(screen.getByRole("button", { name: "Invitations" }));
+  const internal = within((await screen.findByText("Internal care agency")).closest("li")!);
+  expect(internal.getByText("Administrator notifications queued. Acceptance is separate.")).toBeVisible();
+  expect(internal.queryByText("Email sent. Acceptance is separate.")).not.toBeInTheDocument();
   const sent = within(
     (await screen.findByText("sent@example.test")).closest("li")!,
   );
@@ -116,6 +130,7 @@ it("separates sent email from acceptance and explains uncertain delivery without
       expect.objectContaining({ agencyKey: "internal:sc-agency" }),
     ),
   );
+  await waitFor(() => expect(toast).toHaveBeenCalledWith({ title: "Replacement invitation created", description: "Delivery is queued. The previous invitation is no longer valid.", variant: "success" }));
 });
 
 it("shows an existing grant member when they are outside the current candidate page", async () => {

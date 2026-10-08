@@ -98,6 +98,7 @@ function MonitoringCareBridgeState({
         },
         { agencyKey, signal },
       ),
+      { title: "Care link removed" },
     );
     if (saved) {
       setRemove(null);
@@ -448,6 +449,7 @@ function SavedEvidencePicker({
         },
         { agencyKey, signal },
       ),
+      { title: correction ? "Evidence link corrected" : "Approved evidence linked" },
     );
     if (saved) onSaved();
   }
@@ -720,7 +722,7 @@ function PartnerRequestForm({
         },
         options,
       );
-    });
+    }, { title: "Partner request created" });
     if (saved) onSaved();
   }
   return (
@@ -871,6 +873,7 @@ function MonitoringCompleteDialogState({
         status: "completed",
         outcome: outcome.trim(),
       }),
+      { title: "Follow-up completed", description: "The SC outcome has been recorded." },
     );
     if (result) {
       setOutcome("");

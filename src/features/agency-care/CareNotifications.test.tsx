@@ -101,7 +101,9 @@ it("aborts an old organization and rejects its late notification response", asyn
   expect(result.current.items).toEqual([row]);
 });
 
-it("uses only care destinations and never redeems an invitation from a notification URL", () => {
+it("allows signed invitation review links and rejects other non-care destinations", () => {
+  expect(careNotificationDestination("/agency-care/invitations/payload.signature?agencyKey=internal%3Atarget"))
+    .toBe("/agency-care/invitations/payload.signature?agencyKey=internal%3Atarget");
   expect(
     careNotificationDestination(
       "/agency-care/networks/n/documents?submission=s",
@@ -112,6 +114,7 @@ it("uses only care destinations and never redeems an invitation from a notificat
     "//other.example",
     "/employeePortal/private",
     "/agency-care/invitations/token",
+    "/agency-care/invitations/payload.signature/accept",
     "/agency-care/\\other.example",
   ])
     expect(careNotificationDestination(url)).toBeNull();

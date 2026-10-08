@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router";
+import { UploadCloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { FileUpload } from "@/components/ui/file-upload";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -351,12 +353,14 @@ export function CareSubmissionDetail(
       return;
     }
     if (
-      await mutation.run((operationId, signal) =>
-        agencyCareApi.submit(
-          submissionId,
-          { versionId: draft.id, expectedRevision: item.revision, operationId },
-          { agencyKey, signal },
-        ),
+      await mutation.run(
+        (operationId, signal) =>
+          agencyCareApi.submit(
+            submissionId,
+            { versionId: draft.id, expectedRevision: item.revision, operationId },
+            { agencyKey, signal },
+          ),
+        { title: "Version submitted for review" },
       )
     )
       refresh();
@@ -427,6 +431,17 @@ export function CareSubmissionDetail(
         },
         options,
       );
+    }, {
+      title: publication
+        ? "Publication queued"
+        : decision === "approve"
+          ? "Version approved"
+          : decision === "reject"
+            ? "Version rejected"
+            : decision === "request_revision"
+              ? "Revision requested"
+              : "Submission archived",
+      ...(publication && { description: "Check publication status for the result." }),
     });
     if (saved) refresh();
   }
@@ -990,6 +1005,11 @@ export function CareSubmissionForm({
     `${scope}|submission-audience`,
     (signal) => agencyCareApi.relationships(network.id, { agencyKey, signal }),
   );
+  const availableAudience =
+    relationships.data?.items.filter((item) => item.state === "active") || [];
+  const selectedAudienceCount = availableAudience.filter((item) =>
+    audience.includes(item.agencyKey),
+  ).length;
   const sourceDocuments = useScopedRequest(
     `${scope}|source-documents`,
     (signal) =>
@@ -1075,6 +1095,12 @@ export function CareSubmissionForm({
       );
       formData.append("file", file!);
       return agencyCareApi.addVersion(target.id, formData, options);
+    }, {
+      title: mode === "share"
+        ? "Source document submitted for review"
+        : correction
+          ? "Correction draft version saved"
+          : "Draft version saved",
     });
     if (saved) onSaved(saved);
   }
@@ -1091,6 +1117,7 @@ export function CareSubmissionForm({
   return (
     <CareFormDialog
       open
+      className="ac-form-dialog"
       title={
         correction
           ? "Prepare a linked correction"
@@ -1106,204 +1133,286 @@ export function CareSubmissionForm({
       onClose={close}
       busy={mutation.saving}
     >
-      <form onSubmit={(event) => void save(event)} className="ac-stack">
-        {kind === "document" &&
-          !existing &&
-          hasCapability(network, "manage") && (
-            <label className="ac-field">
-              <span>Document source</span>
-              <select
-                value={mode}
-                disabled={Boolean(draft)}
-                onChange={(event) => setMode(event.target.value as typeof mode)}
-              >
-                <option value="upload">Upload a new care file</option>
-                <option value="share">
-                  Share an existing authorized source document
-                </option>
-              </select>
-            </label>
-          )}
-        <div className="ac-form-grid">
-          <label className="ac-field">
-            <span>Title</span>
-            <Input
-              required
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              maxLength={160}
-              disabled={Boolean(draft)}
-            />
-          </label>
-          <label className="ac-field">
-            <span>Category</span>
-            <select
-              value={category}
-              onChange={(event) => setCategory(event.target.value)}
-              disabled={Boolean(draft)}
-            >
-              {(kind === "document"
-                ? [
-                    "service_report",
-                    "progress_report",
-                    "assessment",
-                    "care_plan",
-                    "incident_documentation",
-                    "supporting_document",
-                    "other_authorized_record",
-                  ]
-                : ["service_update"]
-              ).map((value) => (
-                <option key={value} value={value}>
-                  {careLabel(value)}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        {mode === "share" ? (
-          sourceDocuments.loading ? (
-            <CareLoad rows={1} />
-          ) : sourceDocuments.error ? (
-            <CareFailure
-              message={sourceDocuments.error}
-              onRetry={sourceDocuments.reload}
-            />
-          ) : (
-            <label className="ac-field">
-              <span>Existing authorized source document</span>
-              <select
-                required
-                value={sourceId}
-                onChange={(event) => {
-                  setSourceId(event.target.value);
-                  const chosen = sourceDocuments.data?.items.find(
-                    (item) => item.id === event.target.value,
-                  );
-                  if (chosen) {
-                    setTitle(chosen.title);
-                    setCategory(chosen.category);
+      <form onSubmit={(event) => void save(event)} className="ac-dialog-form">
+        <div className="ac-dialog-body">
+          <fieldset className="ac-stack" disabled={mutation.saving}>
+            {kind === "document" &&
+              !existing &&
+              hasCapability(network, "manage") && (
+                <div className="ac-field">
+                  <label htmlFor="care-document-source">Document source</label>
+                  <select
+                    id="care-document-source"
+                    value={mode}
+                    disabled={Boolean(draft)}
+                    onChange={(event) => setMode(event.target.value as typeof mode)}
+                  >
+                    <option value="upload">Upload a new care file</option>
+                    <option value="share">
+                      Share an existing authorized source document
+                    </option>
+                  </select>
+                </div>
+              )}
+            {kind === "document" && mode === "upload" && (
+              <div className="ac-field">
+                <span>Document file</span>
+                <FileUpload
+                  required
+                  aria-label="Document file"
+                  accept=".pdf,.png,.jpg,.jpeg"
+                  onFilesSelected={(files) => {
+                    if (mutation.saving) return;
+                    const selected = files?.[0] || null;
+                    setFile(selected);
+                    setFormError(
+                      selected
+                        ? validateCareVersion("document", { file: selected }) || ""
+                        : "",
+                    );
+                  }}
+                  icon={
+                    <span className="flex size-10 items-center justify-center rounded-full bg-white text-[#59636e]">
+                      <UploadCloud className="size-5" aria-hidden="true" />
+                    </span>
                   }
-                }}
-              >
-                <option value="">Choose the source document</option>
-                {sourceDocuments.data?.items.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.title} · {item.fileName}
-                  </option>
-                ))}
-              </select>
-              <small>
-                Its current source authorization and selected care audience are
-                checked before a private snapshot is created.
-              </small>
-            </label>
-          )
-        ) : kind === "document" ? (
-          <label className="ac-field">
-            <span>File</span>
-            <Input
-              required
-              type="file"
-              accept="application/pdf,image/png,image/jpeg"
-              onChange={(event) => setFile(event.target.files?.[0] || null)}
-            />
-            <small>PDF, PNG or JPEG · Maximum 10 MiB</small>
-            {file && (
-              <small>
-                {file.name} · {Math.round(file.size / 1024)} KB
-              </small>
-            )}
-          </label>
-        ) : (
-          <>
-            <label className="ac-field">
-              <span>Service date</span>
-              <Input
-                required
-                type="date"
-                value={serviceDate}
-                onChange={(event) => setServiceDate(event.target.value)}
-              />
-            </label>
-            <label className="ac-field">
-              <span>Service summary</span>
-              <Textarea
-                required
-                value={summary}
-                maxLength={5000}
-                onChange={(event) => setSummary(event.target.value)}
-              />
-            </label>
-            <label className="ac-field">
-              <span>Related service reference (optional)</span>
-              <Input
-                value={reference}
-                maxLength={200}
-                onChange={(event) => setReference(event.target.value)}
-              />
-            </label>
-          </>
-        )}
-        {!existing || correction ? (
-          <fieldset>
-            <legend>Selected care audience</legend>
-            {relationships.loading ? (
-              <CareLoad rows={1} />
-            ) : relationships.error ? (
-              <CareFailure
-                message={relationships.error}
-                onRetry={relationships.reload}
-              />
-            ) : (
-              <div className="ac-check-list">
-                {relationships.data?.items
-                  .filter((item) => item.state === "active")
-                  .map((item) => (
-                    <label key={item.agencyKey}>
-                      <input
-                        type="checkbox"
-                        disabled={Boolean(draft)}
-                        checked={audience.includes(item.agencyKey)}
-                        onChange={(event) =>
-                          setAudience((current) =>
-                            event.target.checked
-                              ? [...current, item.agencyKey]
-                              : current.filter(
-                                  (value) => value !== item.agencyKey,
-                                ),
-                          )
-                        }
-                      />
-                      {item.name}
-                    </label>
-                  ))}
+                  label={
+                    <span className="flex min-w-0 flex-col gap-1">
+                      <span className="break-all text-[#17292d]">
+                        {file ? (
+                          file.name
+                        ) : (
+                          <>
+                            <span className="font-medium text-[#006c73]">
+                              Click to upload
+                            </span>{" "}
+                            or drag and drop
+                          </>
+                        )}
+                      </span>
+                      <span className="text-xs text-[#59636e]">
+                        {file
+                          ? `${Math.round(file.size / 1024)} KB · Click to replace`
+                          : "PDF, PNG or JPEG · Maximum 10 MiB"}
+                      </span>
+                    </span>
+                  }
+                  className="min-h-32 max-w-none border-dashed bg-[#f7f7f8] px-4 py-5 [&>span]:min-w-0 [&>span]:flex-col [&>span]:gap-2 [&>span]:text-center"
+                />
               </div>
             )}
+            <div className="ac-form-grid">
+              <label className="ac-field">
+                <span>Title</span>
+                <Input
+                  required
+                  value={title}
+                  placeholder={
+                    kind === "document"
+                      ? "e.g. Monthly progress report"
+                      : "e.g. Service visit update"
+                  }
+                  onChange={(event) => setTitle(event.target.value)}
+                  maxLength={160}
+                  disabled={Boolean(draft)}
+                />
+              </label>
+              <div className="ac-field">
+                <label htmlFor="care-submission-category">Category</label>
+                <select
+                  id="care-submission-category"
+                  value={category}
+                  onChange={(event) => setCategory(event.target.value)}
+                  disabled={Boolean(draft)}
+                >
+                  {(kind === "document"
+                    ? [
+                      "service_report",
+                      "progress_report",
+                      "assessment",
+                      "care_plan",
+                      "incident_documentation",
+                      "supporting_document",
+                      "other_authorized_record",
+                    ]
+                    : ["service_update"]
+                  ).map((value) => (
+                    <option key={value} value={value}>
+                      {careLabel(value)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            {mode === "share" ? (
+              sourceDocuments.loading ? (
+                <CareLoad rows={1} />
+              ) : sourceDocuments.error ? (
+                <CareFailure
+                  message={sourceDocuments.error}
+                  onRetry={sourceDocuments.reload}
+                />
+              ) : (
+                <div className="ac-field">
+                  <label htmlFor="care-source-document">Existing authorized source document</label>
+                  <select
+                    id="care-source-document"
+                    aria-describedby="care-source-document-help"
+                    required
+                    value={sourceId}
+                    onChange={(event) => {
+                      setSourceId(event.target.value);
+                      const chosen = sourceDocuments.data?.items.find(
+                        (item) => item.id === event.target.value,
+                      );
+                      if (chosen) {
+                        setTitle(chosen.title);
+                        setCategory(chosen.category);
+                      }
+                    }}
+                  >
+                    <option value="">Choose the source document</option>
+                    {sourceDocuments.data?.items.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.title} · {item.fileName}
+                      </option>
+                    ))}
+                  </select>
+                  <small id="care-source-document-help">
+                    Its current source authorization and selected care audience are
+                    checked before a private snapshot is created.
+                  </small>
+                </div>
+              )
+            ) : kind === "care_update" ? (
+              <>
+                <label className="ac-field">
+                  <span>Service date</span>
+                  <Input
+                    required
+                    type="date"
+                    value={serviceDate}
+                    onChange={(event) => setServiceDate(event.target.value)}
+                  />
+                </label>
+                <label className="ac-field">
+                  <span>Service summary</span>
+                  <Textarea
+                    required
+                    value={summary}
+                    maxLength={5000}
+                    onChange={(event) => setSummary(event.target.value)}
+                  />
+                </label>
+                <label className="ac-field">
+                  <span>Related service reference (optional)</span>
+                  <Input
+                    value={reference}
+                    maxLength={200}
+                    onChange={(event) => setReference(event.target.value)}
+                  />
+                </label>
+              </>
+            ) : null}
+            {!existing || correction ? (
+              <fieldset
+                className="ac-audience"
+                aria-describedby="care-submission-audience-help"
+              >
+                <legend>Selected care audience</legend>
+                <p id="care-submission-audience-help" className="ac-muted">
+                  Choose the connected agencies who should receive this{" "}
+                  {kind === "document" ? "document" : "update"}.
+                </p>
+                {relationships.loading ? (
+                  <CareLoad rows={1} />
+                ) : relationships.error ? (
+                  <CareFailure
+                    message={relationships.error}
+                    onRetry={relationships.reload}
+                  />
+                ) : availableAudience.length ? (
+                  <>
+                    <div className="ac-audience-options">
+                      {availableAudience.map((item) => (
+                        <label
+                          className="ac-audience-option"
+                          key={item.agencyKey}
+                        >
+                          <input
+                            type="checkbox"
+                            aria-label={item.name}
+                            disabled={Boolean(draft)}
+                            checked={audience.includes(item.agencyKey)}
+                            onChange={(event) =>
+                              setAudience((current) =>
+                                event.target.checked
+                                  ? [...current, item.agencyKey]
+                                  : current.filter(
+                                    (value) => value !== item.agencyKey,
+                                  ),
+                              )
+                            }
+                          />
+                          <span className="ac-audience-details">
+                            <strong>{item.name}</strong>
+                            <small>
+                              {item.kind === "internal"
+                                ? "CareOnBoard agency"
+                                : item.kind === "external"
+                                  ? "External care agency"
+                                  : "Connected care agency"}
+                            </small>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                    <p className="ac-muted" aria-live="polite">
+                      {selectedAudienceCount}{" "}
+                      {selectedAudienceCount === 1 ? "agency" : "agencies"}{" "}
+                      selected
+                    </p>
+                  </>
+                ) : (
+                  <CareNotice>
+                    No active agencies are available in this list. Check this
+                    client's connections in Care team before sharing.
+                  </CareNotice>
+                )}
+              </fieldset>
+            ) : (
+              <p className="ac-muted">
+                The submission’s previously authorized audience stays attached to
+                this draft revision.
+              </p>
+            )}
+            <CareNotice>
+              {mode === "share"
+                ? "Only an already authorized source document can be shared. Source access and the selected care audience are rechecked."
+                : "Saving creates an unsubmitted draft version. Review the exact version and audience before explicitly submitting it."}
+              {correction &&
+                " The prior approval and publication remain in history."}
+            </CareNotice>
+            {draft && !existing && (
+              <CareNotice>
+                This draft’s title, category and audience are already saved. Retry
+                the file or service summary step to finish this draft version.
+              </CareNotice>
+            )}
+            {(formError || mutation.error) && (
+              <CareNotice danger>{formError || mutation.error}</CareNotice>
+            )}
           </fieldset>
-        ) : (
-          <p className="ac-muted">
-            The submission’s previously authorized audience stays attached to
-            this draft revision.
-          </p>
-        )}
-        <CareNotice>
-          {mode === "share"
-            ? "Only an already authorized source document can be shared. Source access and the selected care audience are rechecked."
-            : "Saving creates an unsubmitted draft version. Review the exact version and audience before explicitly submitting it."}
-          {correction &&
-            " The prior approval and publication remain in history."}
-        </CareNotice>
-        {draft && !existing && (
-          <CareNotice>
-            This draft’s title, category and audience are already saved. Retry
-            the file or service summary step to finish this draft version.
-          </CareNotice>
-        )}
-        {(formError || mutation.error) && (
-          <CareNotice danger>{formError || mutation.error}</CareNotice>
-        )}
-        <div className="ac-actions">
+        </div>
+        <div className="ac-dialog-footer">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={mutation.saving}
+            onClick={close}
+          >
+            Cancel
+          </Button>
           <Button
             type="submit"
             disabled={
@@ -1315,14 +1424,6 @@ export function CareSubmissionForm({
               : mode === "share"
                 ? "Share source document"
                 : "Save draft version"}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={mutation.saving}
-            onClick={close}
-          >
-            Cancel
           </Button>
         </div>
       </form>

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import AgencyDashboardLayout from "./AgencyLayout";
 
 const routing = vi.hoisted(() => ({ pathname: "/agency/billing/payroll-management", search: "", navigate: vi.fn() }));
-const state = vi.hoisted(() => ({ user: { uid: "staff", fullName: "Sam", userType: "agency_staff", profile: { accessList: [] }, agency: { supportedClientTypes: ["ddd"] } } as any }));
+const state = vi.hoisted(() => ({ mode: "ddd" as "ddd" | "hha" | "sc", user: { uid: "staff", fullName: "Sam", userType: "agency_staff", profile: { accessList: [] }, agency: { supportedClientTypes: ["ddd"] } } as any }));
 vi.mock("react-router", async () => {
   const actual = await vi.importActual<typeof import("react-router")>("react-router");
   return {
@@ -25,7 +25,7 @@ vi.mock("@/components/DashboardHeader", () => ({
 vi.mock("@/components/DashboardSidebar", () => ({ default: ({ navItems }: any) => <nav>{navItems.map((item: any) => <div key={item.label}><span data-path={item.path}>{item.label}</span>{item.children?.map((child: any) => <span key={child.path} data-child-path={child.path}>{child.label}</span>)}</div>)}</nav> }));
 vi.mock("@/components/AnnouncementBanner", () => ({ default: () => <div /> }));
 vi.mock("@/hooks/useSidebarCollapsed", () => ({ useSidebarCollapsed: () => [false] }));
-vi.mock("@/hooks/useEffectiveAgencyMode", () => ({ useEffectiveAgencyMode: () => "ddd" }));
+vi.mock("@/hooks/useEffectiveAgencyMode", () => ({ useEffectiveAgencyMode: () => state.mode }));
 
 const DIRECT_BILLING_ROUTE_CASES = [
   { path: "/agency/billing/financial-overview", view: "Billing Overview", implied: undefined, unrelated: "Payroll View" },
@@ -40,6 +40,7 @@ const DIRECT_BILLING_ROUTE_CASES = [
 
 describe("AgencyDashboardLayout billing authorization", () => {
   beforeEach(() => {
+    state.mode = "ddd";
     routing.pathname = "/agency/billing/payroll-management";
     routing.navigate.mockReset();
     state.user = { uid: "staff", fullName: "Sam", userType: "agency_staff", profile: { accessList: [] }, agency: { supportedClientTypes: ["ddd"] } };
@@ -223,6 +224,21 @@ describe('Compliance Alerts source entry', () => {
     render(<MemoryRouter><AgencyDashboardLayout><p>Workspace child</p></AgencyDashboardLayout></MemoryRouter>);
     expect(!!screen.queryByText('Workspace child')).toBe(allowed);
     expect(!!screen.queryByText('Compliance Alerts')).toBe(allowed);
+  });
+});
+
+describe("Agency Care navigation", () => {
+  it.each(["sc", "ddd", "hha"] as const)("shows the care dashboard destination in the %s agency panel", (mode) => {
+    routing.pathname = "/agency/dashboard";
+    routing.search = "";
+    state.mode = mode;
+    state.user = { uid: "owner", userType: "agency", agency: { supportedClientTypes: [mode] } };
+
+    render(<MemoryRouter><AgencyDashboardLayout /></MemoryRouter>);
+
+    const item = screen.getByText("Agency Care");
+    expect(item).toHaveAttribute("data-path", "/agency-care");
+    expect(item.parentElement?.previousElementSibling).toHaveTextContent("Client Management");
   });
 });
 

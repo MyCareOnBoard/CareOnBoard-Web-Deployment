@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { auth } from '@/lib/firebase'
 import { Routes } from '@/routes/constants'
@@ -12,40 +12,44 @@ import { agencyCareReturnTo, authRouteWithReturnTo } from '@/utils/auth/helpers/
 export function useRequireMfaEnrolled() {
   const navigate = useNavigate()
   const location = useLocation()
-  const returnTo = agencyCareReturnTo(`${location.pathname}${location.search}`)
-  const [ready, setReady] = useState(false)
+  const currentUser = auth.currentUser
+  const returnTo = useRef<string | null>(null)
+  returnTo.current = agencyCareReturnTo(`${location.pathname}${location.search}`)
+  const redirect = useRef(navigate)
+  redirect.current = navigate
+  const [verifiedUser, setVerifiedUser] = useState<typeof currentUser>(null)
 
   useEffect(() => {
     let cancelled = false
 
     const check = async () => {
-      setReady(false)
+      setVerifiedUser(null)
       await auth.authStateReady?.()
 
-      if (cancelled) return
+      if (cancelled || auth.currentUser !== currentUser) return
 
       const current = auth.currentUser
       if (!current) {
-        navigate(authRouteWithReturnTo(Routes.auth.login, returnTo), { replace: true })
+        redirect.current(authRouteWithReturnTo(Routes.auth.login, returnTo.current), { replace: true })
         return
       }
 
       const enrolled = await hasEnrolledMfa(current)
-      if (cancelled) return
+      if (cancelled || auth.currentUser !== current) return
 
       if (!enrolled) {
-        navigate(authRouteWithReturnTo(Routes.auth.mfaEnroll, returnTo), { replace: true })
+        redirect.current(authRouteWithReturnTo(Routes.auth.mfaEnroll, returnTo.current), { replace: true })
         return
       }
 
-      setReady(true)
+      setVerifiedUser(current)
     }
 
     void check()
     return () => {
       cancelled = true
     }
-  }, [navigate, returnTo])
+  }, [currentUser])
 
-  return { ready }
+  return { ready: currentUser !== null && verifiedUser === currentUser }
 }

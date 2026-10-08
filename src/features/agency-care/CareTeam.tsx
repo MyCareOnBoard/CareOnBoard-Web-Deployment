@@ -1,7 +1,9 @@
 import { useState, type FormEvent } from "react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useDebounce } from "@/hooks/useDebounce";
 import { listClients } from "@/lib/api/clients";
 import {
   agencyCareApi,
@@ -213,6 +215,7 @@ export function CareTeamPage(props: CareWorkspaceProps) {
                       <p>Expires {careDate(target.expiresAt)}</p>
                       <CareInvitationDelivery
                         delivery={target.delivery}
+                        recipientMode={target.recipientMode}
                         showResendHint={
                           hasCapability(network, "invite") &&
                           target.status === "pending"
@@ -238,6 +241,7 @@ export function CareTeamPage(props: CareWorkspaceProps) {
                                     },
                                     { agencyKey, signal },
                                   ),
+                                  { title: "Replacement invitation created", description: "Delivery is queued. The previous invitation is no longer valid." },
                                 )
                               )
                                 data.reload();
@@ -260,6 +264,7 @@ export function CareTeamPage(props: CareWorkspaceProps) {
                                     },
                                     { agencyKey, signal },
                                   ),
+                                  { title: "Invitation revoked" },
                                 )
                               )
                                 data.reload();
@@ -301,7 +306,7 @@ export function CareTeamPage(props: CareWorkspaceProps) {
   );
 }
 
-function TeamForm({
+export function TeamForm({
   network,
   scope,
   agencyKey,
@@ -318,6 +323,7 @@ function TeamForm({
   const [queryInput, setQueryInput] = useState("");
   const [query, setQuery] = useState("");
   const [selectedAgency, setSelectedAgency] = useState("");
+  const internalInvitation = selectedAgency.startsWith("internal:");
   const [recipientName, setRecipientName] = useState("");
   const [email, setEmail] = useState("");
   const [agencyName, setAgencyName] = useState("");
@@ -345,11 +351,13 @@ function TeamForm({
   );
   const [confirmed, setConfirmed] = useState(false);
   const [formError, setFormError] = useState("");
+  const directoryQuery = useDebounce(queryInput.trim());
+  const waitingForSearch = directoryQuery !== queryInput.trim();
   const directory = useScopedRequest(
-    `${scope}|directory|${query}`,
+    `${scope}|directory|${directoryQuery}`,
     (signal) =>
-      agencyCareApi.directory({ agencyKey, query, signal, limit: 25 }),
-    modal.kind === "invite" && query.length >= 2,
+      agencyCareApi.directory({ agencyKey, query: directoryQuery, signal, limit: 25 }),
+    modal.kind === "invite" && directoryQuery.length >= 2 && !waitingForSearch,
   );
   const localClients = useScopedRequest(
     `${scope}|local-clients|${query}`,
@@ -388,7 +396,7 @@ function TeamForm({
     setFormError("");
     if (
       modal.kind === "invite" &&
-      (!email.trim() ||
+      ((!internalInvitation && !email.trim()) ||
         (!selectedAgency && (!agencyName.trim() || !recipientName.trim())))
     ) {
       setFormError(
@@ -418,7 +426,7 @@ function TeamForm({
           selectedAgency
             ? {
                 agencyKey: selectedAgency,
-                recipientEmail: email.trim(),
+                ...(!internalInvitation ? { recipientEmail: email.trim() } : {}),
                 operationId,
               }
             : {
@@ -475,6 +483,17 @@ function TeamForm({
         },
         options,
       );
+    }, {
+      title: modal.kind === "invite"
+        ? "Invitation created"
+        : modal.kind === "relationship"
+          ? { suspend: "Agency connection suspended", resume: "Agency connection resumed", revoke: "Agency connection revoked", expire: "Agency connection expired" }[action]
+          : modal.kind === "grant"
+            ? "Client access updated"
+            : modal.target?.state === "confirmed"
+              ? "Client record connection withdrawn"
+              : modal.target ? "Client record connection confirmed" : "Client record connection proposed",
+      description: modal.kind === "invite" ? "Delivery is queued. The agency must accept the connection before access is added." : undefined,
     });
     if (result) onSaved();
   }
@@ -485,359 +504,409 @@ function TeamForm({
       description={`${network.client.name} · ${organization.name}`}
       onClose={onClose}
       busy={mutation.saving}
+      className="ac-form-dialog"
     >
-      <form onSubmit={(event) => void submit(event)} className="ac-stack">
-        {modal.kind === "invite" && (
-          <>
-            <div className="ac-actions">
-              <label className="ac-field">
-                <span>Find an existing agency</span>
-                <Input
-                  value={queryInput}
-                  onChange={(event) => setQueryInput(event.target.value)}
-                  maxLength={80}
-                />
-              </label>
-              <Button
-                variant="outline"
-                type="button"
-                disabled={queryInput.trim().length < 2}
-                onClick={() => setQuery(queryInput.trim())}
-              >
-                Search
-              </Button>
-            </div>
-            {directory.loading ? (
-              <CareLoad rows={1} />
-            ) : directory.error ? (
-              <CareFailure
-                message={directory.error}
-                onRetry={directory.reload}
-              />
-            ) : (
-              directory.data && (
-                <label className="ac-field">
-                  <span>Matching verified organization</span>
-                  <select
-                    value={selectedAgency}
-                    onChange={(event) => setSelectedAgency(event.target.value)}
-                  >
-                    <option value="">Invite an external agency instead</option>
-                    {directory.data.items.map((item) => (
-                      <option key={item.agencyKey} value={item.agencyKey}>
-                        {item.name} · {item.verificationStatus || item.kind}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )
-            )}
-            {selectedAgency && (
-              <label className="ac-field">
-                <span>Intended recipient work email</span>
-                <Input
-                  required
-                  type="email"
-                  value={email}
-                  maxLength={254}
-                  onChange={(event) => setEmail(event.target.value)}
-                />
-                <small>
-                  The intended recipient must verify this email before accepting
-                  for the selected organization.
-                </small>
-              </label>
-            )}
-            {!selectedAgency && (
-              <div className="ac-form-grid">
-                <label className="ac-field">
-                  <span>External agency name</span>
-                  <Input
-                    required
-                    value={agencyName}
-                    onChange={(event) => setAgencyName(event.target.value)}
-                    maxLength={160}
-                  />
-                </label>
-                <label className="ac-field">
-                  <span>Recipient name</span>
-                  <Input
-                    required
-                    value={recipientName}
-                    onChange={(event) => setRecipientName(event.target.value)}
-                    maxLength={120}
-                  />
-                </label>
-                <label className="ac-field">
-                  <span>Recipient work email</span>
-                  <Input
-                    required
-                    type="email"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    maxLength={254}
-                  />
-                </label>
-              </div>
-            )}
-            <CareNotice>
-              The recipient verifies their identity and accepts this client
-              connection. An invitation alone does not grant access.
-            </CareNotice>
-          </>
-        )}
-        {modal.kind === "relationship" && (
-          <>
-            <p>
-              <strong>{modal.target.name}</strong> ·{" "}
-              {careLabel(modal.target.state)}
-            </p>
-            <label className="ac-field">
-              <span>Action</span>
-              <select
-                value={action}
-                onChange={(event) =>
-                  setAction(event.target.value as typeof action)
-                }
-              >
-                {modal.target.allowedActions?.map((value) => (
-                  <option value={value} key={value}>
-                    {value === "expire"
-                      ? "Expire connection now"
-                      : `${careLabel(value)} connection`}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <CareNotice>
-              Revoked or expired connections require a fresh invitation and new
-              client grants. Previous history does not restore access
-              automatically.
-            </CareNotice>
-          </>
-        )}
-        {modal.kind === "grant" && (
-          <>
-            {members.loading ? (
-              <CareLoad rows={1} />
-            ) : members.error ? (
-              <CareFailure message={members.error} onRetry={members.reload} />
-            ) : (
+      <form onSubmit={(event) => void submit(event)} className="ac-dialog-form">
+        <div className="ac-dialog-body">
+          <fieldset disabled={mutation.saving} className="ac-stack">
+            {modal.kind === "invite" && (
               <>
-                <label className="ac-field">
-                  <span>Current organization member</span>
-                  <select
-                    required
-                    disabled={Boolean(modal.target)}
-                    value={uid}
+                <div className="ac-field">
+                  <label htmlFor="care-agency-search">Find an existing agency</label>
+                  <Input
+                    id="care-agency-search"
+                    type="search"
+                    value={queryInput}
                     onChange={(event) => {
-                      const member = members.data?.items.find(
-                        (item) => item.uid === event.target.value,
-                      );
-                      setUid(event.target.value);
-                      setSelectedMember(member || null);
-                      setCapabilities((current) =>
-                        current.filter((value) =>
-                          (
-                            member?.allowedCapabilities || [
-                              "view",
-                              "send",
-                              "submit",
-                            ]
-                          ).includes(value),
-                        ),
-                      );
+                      setQueryInput(event.target.value);
+                      setSelectedAgency("");
                     }}
-                  >
-                    <option value="">Choose a permitted member</option>
-                    {uid &&
-                      !members.data?.items.some((member) => member.uid === uid) && (
-                        <option value={uid}>
-                          {selectedMember?.name || modal.target?.name || uid}
-                          {selectedMember
-                            ? ` · ${selectedMember.email || selectedMember.role || uid}`
-                            : modal.target?.name
-                              ? ` · ${uid}`
-                              : ""}
-                        </option>
-                      )}
-                    {members.data?.items.map((member) => (
-                      <option key={member.uid} value={member.uid}>
-                        {member.name} · {member.email || member.role}
-                      </option>
-                    ))}
-                  </select>
-                  <small>
-                    Current membership and the permitted client capabilities are
-                    verified before assignment.
-                  </small>
-                </label>
-                <CarePager
-                  cursor={members.data?.nextCursor}
-                  disabled={mutation.saving}
-                  onNext={(value) => {
-                    const member = members.data?.items.find(
-                      (item) => item.uid === uid,
-                    );
-                    if (member) setSelectedMember(member);
-                    setMemberCursor(value);
-                  }}
-                />
-              </>
-            )}
-            <fieldset>
-              <legend>Client capabilities</legend>
-              <div className="ac-check-list">
-                {(
-                  members.data?.items.find((member) => member.uid === uid)
-                    ?.allowedCapabilities ||
-                  selectedMember?.allowedCapabilities || ["view", "send", "submit"]
-                ).map((value) => (
-                  <label key={value}>
-                    <input
-                      type="checkbox"
-                      checked={capabilities.includes(value)}
-                      onChange={(event) =>
-                        setCapabilities((current) =>
-                          event.target.checked
-                            ? [...current, value]
-                            : current.filter((item) => item !== value),
-                        )
-                      }
-                    />
-                    {careLabel(value)}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-            <CareNotice>
-              Only capabilities within your own management authority can be
-              assigned. Rejoining members require fresh grants.
-            </CareNotice>
-          </>
-        )}
-        {modal.kind === "source" && (
-          <>
-            {modal.target ? (
-              <dl className="ac-details">
-                <dt>Care client</dt>
-                <dd>{network.client.name}</dd>
-                <dt>Existing destination client</dt>
-                <dd>{modal.target.clientName || modal.target.clientId}</dd>
-                <dt>Programs</dt>
-                <dd>{modal.target.programs.join(", ")}</dd>
-                <dt>Connection state</dt>
-                <dd>{careLabel(modal.target.state)}</dd>
-              </dl>
-            ) : organization.kind === "internal" ? (
-              <>
-                <div className="ac-actions">
-                  <label className="ac-field">
-                    <span>Find your existing client record</span>
-                    <Input
-                      value={queryInput}
-                      onChange={(event) => setQueryInput(event.target.value)}
-                      maxLength={80}
-                    />
-                  </label>
-                  <Button
-                    variant="outline"
-                    type="button"
-                    onClick={() => setQuery(queryInput.trim())}
-                    disabled={queryInput.trim().length < 2}
-                  >
-                    Search
-                  </Button>
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") event.preventDefault();
+                    }}
+                    maxLength={80}
+                    placeholder="Search by agency name"
+                    aria-describedby="agency-search-help"
+                  />
+                  <small id="agency-search-help">Type at least 2 characters. Results appear as you type.</small>
                 </div>
-                {localClients.loading ? (
+                {queryInput.trim().length >= 2 && (waitingForSearch || directory.loading) ? (
                   <CareLoad rows={1} />
-                ) : localClients.error ? (
+                ) : directory.error ? (
                   <CareFailure
-                    message={localClients.error}
-                    onRetry={localClients.reload}
+                    message={directory.error}
+                    onRetry={directory.reload}
                   />
                 ) : (
-                  <label className="ac-field">
-                    <span>Existing client record</span>
-                    <select
-                      required
-                      value={clientId}
-                      onChange={(event) => setClientId(event.target.value)}
-                    >
-                      <option value="">Select a record</option>
-                      {localClients.data?.map((client) => (
-                        <option key={client.id} value={client.id}>
-                          {[client.firstName, client.lastName]
-                            .filter(Boolean)
-                            .join(" ")}{" "}
-                          · {(client.servicePrograms || []).join(", ")}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  directory.data && (directory.data.items.length ? (
+                    <fieldset className="ac-agency-results">
+                      <legend>Matching agencies</legend>
+                      <div className="ac-agency-result-list">
+                        {directory.data.items.map((item) => (
+                          <label key={item.agencyKey} className="ac-agency-result">
+                            <input
+                              type="radio"
+                              name="agency-result"
+                              value={item.agencyKey}
+                              checked={selectedAgency === item.agencyKey}
+                              onChange={() => setSelectedAgency(item.agencyKey)}
+                              aria-label={`Select ${item.name}`}
+                            />
+                            <span className="ac-agency-result-details">
+                              <strong>{item.name}</strong>
+                              <small>{[item.city, item.state].filter(Boolean).join(", ") || "Location not provided"}</small>
+                              <small>{item.kind === "internal" ? "CareOnBoard agency" : "External agency"} · {item.id}</small>
+                              {Boolean(item.serviceTypes?.length) && <small>{item.serviceTypes?.map(careLabel).join(" · ")}</small>}
+                            </span>
+                            {item.verificationStatus && <CareStatus>{careLabel(item.verificationStatus)}</CareStatus>}
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                  ) : (
+                    <p className="ac-muted" role="status">No matching agencies. Try another name or invite an external agency below.</p>
+                  ))
+                )}
+                {selectedAgency && (
+                  <div className="ac-dialog-section ac-stack">
+                    <div className="ac-actions">
+                      <strong>{internalInvitation ? "Invitation delivery" : "Invitation recipient"}</strong>
+                      <Button type="button" variant="ghost" onClick={() => setSelectedAgency("")}>Clear selection</Button>
+                    </div>
+                    {internalInvitation ? (
+                      <CareNotice>
+                        The agency's administrators and owner, along with platform
+                        administrators, will receive in-app notifications and email.
+                        An authorized agency administrator or owner must review and
+                        accept the connection.
+                      </CareNotice>
+                    ) : <div className="ac-field">
+                      <label htmlFor="care-invitation-email">Intended recipient work email</label>
+                      <Input
+                        id="care-invitation-email"
+                        aria-describedby="care-invitation-email-help"
+                        required
+                        type="email"
+                        value={email}
+                        maxLength={254}
+                        placeholder="name@agency.com"
+                        onChange={(event) => setEmail(event.target.value)}
+                      />
+                      <small id="care-invitation-email-help">
+                        The intended recipient must verify this email before accepting
+                        for the selected organization.
+                      </small>
+                    </div>}
+                  </div>
+                )}
+                {!selectedAgency && (
+                  <div className="ac-dialog-section">
+                    <h3>Or invite an external agency</h3>
+                    <p className="ac-muted">Enter the agency and contact details to send a client connection invitation.</p>
+                    <div className="ac-form-grid">
+                      <label className="ac-field">
+                        <span>External agency name</span>
+                        <Input
+                          required
+                          value={agencyName}
+                          onChange={(event) => setAgencyName(event.target.value)}
+                          maxLength={160}
+                          placeholder="Agency name"
+                        />
+                      </label>
+                      <label className="ac-field">
+                        <span>Recipient name</span>
+                        <Input
+                          required
+                          value={recipientName}
+                          onChange={(event) => setRecipientName(event.target.value)}
+                          maxLength={120}
+                          placeholder="Full name"
+                        />
+                      </label>
+                      <label className="ac-field ac-field-full">
+                        <span>Recipient work email</span>
+                        <Input
+                          required
+                          type="email"
+                          value={email}
+                          onChange={(event) => setEmail(event.target.value)}
+                          maxLength={254}
+                          placeholder="name@agency.com"
+                        />
+                      </label>
+                    </div>
+                  </div>
+                )}
+                <CareNotice>
+                  The recipient verifies their identity and accepts this client
+                  connection. An invitation alone does not grant access.
+                </CareNotice>
+              </>
+            )}
+            {modal.kind === "relationship" && (
+              <>
+                <p>
+                  <strong>{modal.target.name}</strong> ·{" "}
+                  {careLabel(modal.target.state)}
+                </p>
+                <label className="ac-field">
+                  <span>Action</span>
+                  <select
+                    value={action}
+                    onChange={(event) =>
+                      setAction(event.target.value as typeof action)
+                    }
+                  >
+                    {modal.target.allowedActions?.map((value) => (
+                      <option value={value} key={value}>
+                        {value === "expire"
+                          ? "Expire connection now"
+                          : `${careLabel(value)} connection`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <CareNotice>
+                  Revoked or expired connections require a fresh invitation and new
+                  client grants. Previous history does not restore access
+                  automatically.
+                </CareNotice>
+              </>
+            )}
+            {modal.kind === "grant" && (
+              <>
+                {members.loading ? (
+                  <CareLoad rows={1} />
+                ) : members.error ? (
+                  <CareFailure message={members.error} onRetry={members.reload} />
+                ) : (
+                  <>
+                    <label className="ac-field">
+                      <span>Current organization member</span>
+                      <select
+                        required
+                        disabled={Boolean(modal.target)}
+                        value={uid}
+                        onChange={(event) => {
+                          const member = members.data?.items.find(
+                            (item) => item.uid === event.target.value,
+                          );
+                          setUid(event.target.value);
+                          setSelectedMember(member || null);
+                          setCapabilities((current) =>
+                            current.filter((value) =>
+                              (
+                                member?.allowedCapabilities || [
+                                  "view",
+                                  "send",
+                                  "submit",
+                                ]
+                              ).includes(value),
+                            ),
+                          );
+                        }}
+                      >
+                        <option value="">Choose a permitted member</option>
+                        {uid &&
+                          !members.data?.items.some((member) => member.uid === uid) && (
+                            <option value={uid}>
+                              {selectedMember?.name || modal.target?.name || uid}
+                              {selectedMember
+                                ? ` · ${selectedMember.email || selectedMember.role || uid}`
+                                : modal.target?.name
+                                  ? ` · ${uid}`
+                                  : ""}
+                            </option>
+                          )}
+                        {members.data?.items.map((member) => (
+                          <option key={member.uid} value={member.uid}>
+                            {member.name} · {member.email || member.role}
+                          </option>
+                        ))}
+                      </select>
+                      <small>
+                        Current membership and the permitted client capabilities are
+                        verified before assignment.
+                      </small>
+                    </label>
+                    <CarePager
+                      cursor={members.data?.nextCursor}
+                      disabled={mutation.saving}
+                      onNext={(value) => {
+                        const member = members.data?.items.find(
+                          (item) => item.uid === uid,
+                        );
+                        if (member) setSelectedMember(member);
+                        setMemberCursor(value);
+                      }}
+                    />
+                  </>
                 )}
                 <fieldset>
-                  <legend>Programs to confirm</legend>
+                  <legend>Client capabilities</legend>
                   <div className="ac-check-list">
-                    {["ddd", "hha"].map((value) => (
+                    {(
+                      members.data?.items.find((member) => member.uid === uid)
+                        ?.allowedCapabilities ||
+                      selectedMember?.allowedCapabilities || ["view", "send", "submit"]
+                    ).map((value) => (
                       <label key={value}>
                         <input
                           type="checkbox"
-                          checked={programs.includes(value)}
+                          checked={capabilities.includes(value)}
                           onChange={(event) =>
-                            setPrograms((current) =>
+                            setCapabilities((current) =>
                               event.target.checked
                                 ? [...current, value]
                                 : current.filter((item) => item !== value),
                             )
                           }
                         />
-                        {value.toUpperCase()}
+                        {careLabel(value)}
                       </label>
                     ))}
                   </div>
                 </fieldset>
+                <CareNotice>
+                  Only capabilities within your own management authority can be
+                  assigned. Rejoining members require fresh grants.
+                </CareNotice>
               </>
-            ) : (
-              <CareNotice>
-                An external care organization can participate without an
-                operational client record.
-              </CareNotice>
             )}
-            <label className="ac-check">
-              <input
-                type="checkbox"
-                required
-                checked={confirmed}
-                onChange={(event) => setConfirmed(event.target.checked)}
-              />
-              <span>
-                {modal.target?.state === "confirmed"
-                  ? "I confirm withdrawal of this destination connection. Existing publication receipts remain in history."
-                  : "I verified that these records refer to the same individual. The other agency must confirm before publication."}
-              </span>
-            </label>
-          </>
-        )}
-        {(modal.kind === "relationship" ||
-          modal.kind === "grant" ||
-          (modal.kind === "source" && modal.target?.state === "confirmed")) && (
-          <label className="ac-field">
-            <span>Reason{modal.kind === "grant" ? " (optional)" : ""}</span>
-            <Textarea
-              required={modal.kind !== "grant"}
-              value={reason}
-              onChange={(event) => setReason(event.target.value)}
-              maxLength={2000}
-            />
-          </label>
-        )}
-        {(formError || mutation.error) && (
-          <CareNotice danger>{formError || mutation.error}</CareNotice>
-        )}
-        <div className="ac-actions">
+            {modal.kind === "source" && (
+              <>
+                {modal.target ? (
+                  <dl className="ac-details">
+                    <dt>Care client</dt>
+                    <dd>{network.client.name}</dd>
+                    <dt>Existing destination client</dt>
+                    <dd>{modal.target.clientName || modal.target.clientId}</dd>
+                    <dt>Programs</dt>
+                    <dd>{modal.target.programs.join(", ")}</dd>
+                    <dt>Connection state</dt>
+                    <dd>{careLabel(modal.target.state)}</dd>
+                  </dl>
+                ) : organization.kind === "internal" ? (
+                  <>
+                    <div className="ac-actions">
+                      <label className="ac-field">
+                        <span>Find your existing client record</span>
+                        <Input
+                          value={queryInput}
+                          onChange={(event) => setQueryInput(event.target.value)}
+                          maxLength={80}
+                        />
+                      </label>
+                      <Button
+                        variant="outline"
+                        type="button"
+                        onClick={() => setQuery(queryInput.trim())}
+                        disabled={queryInput.trim().length < 2}
+                      >
+                        Search
+                      </Button>
+                    </div>
+                    {localClients.loading ? (
+                      <CareLoad rows={1} />
+                    ) : localClients.error ? (
+                      <CareFailure
+                        message={localClients.error}
+                        onRetry={localClients.reload}
+                      />
+                    ) : (
+                      <label className="ac-field">
+                        <span>Existing client record</span>
+                        <select
+                          required
+                          value={clientId}
+                          onChange={(event) => setClientId(event.target.value)}
+                        >
+                          <option value="">Select a record</option>
+                          {localClients.data?.map((client) => (
+                            <option key={client.id} value={client.id}>
+                              {[client.firstName, client.lastName]
+                                .filter(Boolean)
+                                .join(" ")}{" "}
+                              · {(client.servicePrograms || []).join(", ")}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                    <fieldset>
+                      <legend>Programs to confirm</legend>
+                      <div className="ac-check-list">
+                        {["ddd", "hha"].map((value) => (
+                          <label key={value}>
+                            <input
+                              type="checkbox"
+                              checked={programs.includes(value)}
+                              onChange={(event) =>
+                                setPrograms((current) =>
+                                  event.target.checked
+                                    ? [...current, value]
+                                    : current.filter((item) => item !== value),
+                                )
+                              }
+                            />
+                            {value.toUpperCase()}
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                  </>
+                ) : (
+                  <CareNotice>
+                    An external care organization can participate without an
+                    operational client record.
+                  </CareNotice>
+                )}
+                <label className="ac-check">
+                  <input
+                    type="checkbox"
+                    required
+                    checked={confirmed}
+                    onChange={(event) => setConfirmed(event.target.checked)}
+                  />
+                  <span>
+                    {modal.target?.state === "confirmed"
+                      ? "I confirm withdrawal of this destination connection. Existing publication receipts remain in history."
+                      : "I verified that these records refer to the same individual. The other agency must confirm before publication."}
+                  </span>
+                </label>
+              </>
+            )}
+            {(modal.kind === "relationship" ||
+              modal.kind === "grant" ||
+              (modal.kind === "source" && modal.target?.state === "confirmed")) && (
+                <label className="ac-field">
+                  <span>Reason{modal.kind === "grant" ? " (optional)" : ""}</span>
+                  <Textarea
+                    required={modal.kind !== "grant"}
+                    value={reason}
+                    onChange={(event) => setReason(event.target.value)}
+                    maxLength={2000}
+                  />
+                </label>
+              )}
+            {(formError || mutation.error) && (
+              <CareNotice danger>{formError || mutation.error}</CareNotice>
+            )}
+          </fieldset>
+        </div>
+        <div className="ac-dialog-footer">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={mutation.saving}
+            onClick={onClose}
+          >
+            Cancel
+          </Button>
           <Button
             type="submit"
+            aria-busy={mutation.saving}
             disabled={
               mutation.saving ||
               mutation.uncertain ||
@@ -848,21 +917,14 @@ function TeamForm({
                 organization.kind === "external")
             }
           >
+            {mutation.saving && <Loader2 className="size-4 motion-safe:animate-spin" aria-hidden="true" />}
             {mutation.saving
-              ? "Saving…"
+              ? modal.kind === "invite" ? "Sending invitation…" : "Saving…"
               : modal.kind === "invite"
                 ? "Send invitation"
                 : modal.kind === "source" && modal.target?.state === "confirmed"
                   ? "Withdraw connection"
                   : "Confirm"}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={mutation.saving}
-            onClick={onClose}
-          >
-            Cancel
           </Button>
         </div>
       </form>

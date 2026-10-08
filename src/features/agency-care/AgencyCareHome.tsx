@@ -24,7 +24,7 @@ export function AgencyCareHome() {
   return (
     <div className="ac-stack">
       <CareHeading
-        title="Agency Care"
+        title="Clients"
         description="Open a client’s care workspace to coordinate with their care team."
       />
       {list.loading ? (
@@ -90,6 +90,7 @@ export function AgencyCareClientEntry({
   async function create() {
     const data = await mutation.run((operationId, signal) =>
       agencyCareApi.createNetwork(clientId, operationId, { agencyKey, signal }),
+      { title: "Care workspace created" },
     );
     if (data)
       navigate(
