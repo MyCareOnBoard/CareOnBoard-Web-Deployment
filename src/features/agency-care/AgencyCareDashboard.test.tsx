@@ -32,7 +32,7 @@ it("loads through empty filtered pages and deduplicates client totals before dis
   expect(agencyCareApi.dashboard).toHaveBeenNthCalledWith(2, expect.objectContaining({ agencyKey: "internal:sc", cursor: "page2", signal: expect.any(AbortSignal) }));
   expect(agencyCareApi.dashboard).toHaveBeenNthCalledWith(3, expect.objectContaining({ cursor: "page3" }));
   expect(screen.getByRole("link", { name: "View all clients" })).toHaveAttribute("href", "/agency-care/clients");
-  expect(screen.getByRole("link", { name: "John Smith" })).toHaveAttribute("href", "/agency-care/networks/one/overview");
+  expect(screen.getByRole("link", { name: "Open workspace for John Smith" })).toHaveAttribute("href", "/agency-care/networks/one/overview");
 });
 
 it("keeps unavailable publication stats hidden and uses a true empty state", async () => {

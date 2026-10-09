@@ -1,8 +1,9 @@
-import { NavLink, useParams } from "react-router";
+import { Link, NavLink, useParams } from "react-router";
+import { ChevronRight } from "lucide-react";
 import { agencyCareApi, type CareNetwork } from "@/lib/api/agencyCare";
 import { useAgencyCare } from "./AgencyCareLayout";
 import { hasCapability, useScopedRequest } from "./hooks";
-import { CareFailure, CareLoad, CareStatus } from "./ui";
+import { CareAvatar, CareFailure, CareLoad, CareStatus } from "./ui";
 import { CareOverviewPage, CareActivityPage } from "./CareOverview";
 import { CareTeamPage } from "./CareTeam";
 import { CareConversationsPage } from "./CareConversations";
@@ -59,10 +60,13 @@ export function AgencyCareClientWorkspace() {
   ];
   return (
     <div className="ac-stack">
+      <nav className="ac-breadcrumb" aria-label="Breadcrumb">
+        <Link to="/agency-care/clients">Agency Care</Link>
+        <ChevronRight aria-hidden="true" />
+        <span aria-current="page">{network.data.client.name}</span>
+      </nav>
       <header className="ac-client-header">
-        <span className="ac-avatar" aria-hidden="true">
-          {network.data.client.name.slice(0, 1)}
-        </span>
+        <CareAvatar name={network.data.client.name} />
         <div>
           <h1>{network.data.client.name}</h1>
           <p>Client care workspace</p>

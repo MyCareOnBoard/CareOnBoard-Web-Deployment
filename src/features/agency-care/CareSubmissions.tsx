@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router";
-import { UploadCloud } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ClipboardCheck, FileText, LoaderCircle, Plus, UploadCloud } from "lucide-react";
 import { FileUpload } from "@/components/ui/file-upload";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +17,7 @@ import {
   type CarePreview,
 } from "./ProtectedDocumentPreview";
 import {
+  CareButton as Button,
   CareEmpty,
   CareFailure,
   CareFormDialog,
@@ -66,6 +66,7 @@ export function CareSubmissionsPage(
   const [searchInput, setSearchInput] = useState("");
   const [create, setCreate] = useState(search.get("create") === "1");
   const selected = search.get("submission") || "";
+  const requestedVersionId = search.get("version") || "";
   const list = useScopedRequest(
     `${scope}|${kind}|${cursor}|${status}|${query}`,
     (signal) =>
@@ -88,6 +89,7 @@ export function CareSubmissionsPage(
       <CareSubmissionDetail
         {...props}
         submissionId={selected}
+        requestedVersionId={requestedVersionId}
         onBack={() => setSearch({})}
       />
     );
@@ -103,6 +105,7 @@ export function CareSubmissionsPage(
         actions={
           hasCapability(network, "submit") && (
             <Button onClick={() => setCreate(true)}>
+              <Plus size={16} aria-hidden="true" />
               {kind === "document" ? "Add a document" : "Submit an update"}
             </Button>
           )
@@ -110,7 +113,7 @@ export function CareSubmissionsPage(
       />
       <CarePanel>
         <form
-          className="ac-filter"
+          className="ac-filter ac-filter-bar"
           onSubmit={(event) => {
             event.preventDefault();
             setQuery(searchInput.trim());
@@ -166,9 +169,11 @@ export function CareSubmissionsPage(
               <ul className="ac-list">
                 {list.data.items.map((item) => (
                   <li key={item.id}>
-                    <div>
-                      <strong>{item.title}</strong>
-                      <p>
+                    <div className="ac-row-main">
+                      <span className="ac-row-icon" aria-hidden="true">{kind === "document" ? <FileText size={18} /> : <ClipboardCheck size={18} />}</span>
+                      <div className="ac-row-copy">
+                        <strong>{item.title}</strong>
+                        <p>
                         {careLabel(item.category)} ·{" "}
                         {item.draftVersionId
                           ? "Draft version available"
@@ -176,7 +181,8 @@ export function CareSubmissionsPage(
                         {item.syncStatus
                           ? ` · Publication: ${careLabel(item.syncStatus)}`
                           : ""}
-                      </p>
+                        </p>
+                      </div>
                     </div>
                     <CareStatus>{careLabel(item.reviewStatus)}</CareStatus>
                     <Button variant="outline" onClick={() => open(item.id)}>
@@ -213,11 +219,32 @@ export function CareSubmissionsPage(
 }
 
 export function CareSubmissionDetail(
-  props: CareWorkspaceProps & { submissionId: string; onBack: () => void },
+  props: CareWorkspaceProps & {
+    submissionId: string;
+    requestedVersionId?: string;
+    onBack: () => void;
+  },
 ) {
-  const { submissionId, network, scope, agencyKey, onBack } = props;
+  const {
+    submissionId,
+    network,
+    scope,
+    agencyKey,
+    onBack,
+    requestedVersionId = "",
+  } = props;
   const detail = useScopedRequest(`${scope}|${submissionId}`, (signal) =>
     agencyCareApi.submission(submissionId, { agencyKey, signal }),
+  );
+  const linkedVersion = useScopedRequest(
+    `${scope}|${submissionId}|notification-version|${requestedVersionId}`,
+    (signal) =>
+      agencyCareApi.versions(submissionId, {
+        agencyKey,
+        version: requestedVersionId,
+        signal,
+      }),
+    Boolean(requestedVersionId && detail.data?.networkId === network.id),
   );
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyCursor, setHistoryCursor] = useState("");
@@ -271,6 +298,10 @@ export function CareSubmissionDetail(
     );
   const item = detail.data;
   const current = item.currentVersion;
+  const notificationVersion = linkedVersion.data?.items.find(
+    (version) => version.id === requestedVersionId,
+  );
+  const notificationIsCurrent = Boolean(notificationVersion && current?.id === notificationVersion.id);
   const draft = item.draftVersion;
   const newDestinations =
     destinations.data?.items
@@ -468,6 +499,36 @@ export function CareSubmissionDetail(
         )}
       </div>
       {item.reviewComment && <CareNotice>{item.reviewComment}</CareNotice>}
+      {requestedVersionId && !notificationIsCurrent && (
+        <CarePanel title="Version linked to your notification">
+          {linkedVersion.loading ? (
+            <CareLoad rows={1} />
+          ) : linkedVersion.error ? (
+            <CareFailure
+              message={linkedVersion.error}
+              onRetry={linkedVersion.reload}
+            />
+          ) : notificationVersion ? (
+            <div className="ac-stack">
+              <CareNotice>
+                This notification refers to version {notificationVersion.number}.
+                This version is read-only. Review actions below apply to the
+                current submitted version.
+              </CareNotice>
+              <strong>Version {notificationVersion.number}</strong>
+              <VersionContents
+                version={notificationVersion}
+                onPreview={() => showFile(notificationVersion)}
+              />
+            </div>
+          ) : (
+            <CareEmpty title="This version is no longer available">
+              The linked version may have been removed or your access changed.
+              Current submission details remain below.
+            </CareEmpty>
+          )}
+        </CarePanel>
+      )}
       <div className="ac-two-columns">
         <div className="ac-stack">
           <CarePanel
@@ -477,6 +538,11 @@ export function CareSubmissionDetail(
                 : "Submission draft"
             }
           >
+            {notificationIsCurrent && (
+              <CareNotice>
+                This is the version linked to your notification.
+              </CareNotice>
+            )}
             {current ? (
               <VersionContents
                 version={current}
@@ -736,6 +802,7 @@ export function CareSubmissionDetail(
         />
       )}
       <CareFormDialog
+      className="ac-form-dialog"
         open={Boolean(decision || publication || archiveOpen)}
         title={
           decision
@@ -754,7 +821,8 @@ export function CareSubmissionDetail(
         }}
         busy={mutation.saving}
       >
-        <form className="ac-stack" onSubmit={(event) => void decide(event)}>
+        <form className="ac-dialog-form" onSubmit={(event) => void decide(event)}>
+        <fieldset className="ac-dialog-body ac-stack" disabled={mutation.saving}>
           <CareNotice>
             {decision === "approve"
               ? "This decision approves the exact current submitted version. Authorized publication runs separately."
@@ -874,7 +942,20 @@ export function CareSubmissionDetail(
           </label>
           {formError && <CareNotice danger>{formError}</CareNotice>}
           {mutation.error && <CareNotice danger>{mutation.error}</CareNotice>}
-          <div className="ac-actions">
+        </fieldset>
+        <div className="ac-dialog-footer">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={mutation.saving}
+              onClick={() => {
+                setDecision(null);
+                setPublication(null);
+                setArchiveOpen(false);
+              }}
+            >
+              Cancel
+            </Button>
             <Button
               type="submit"
               disabled={
@@ -889,19 +970,8 @@ export function CareSubmissionDetail(
                 )
               }
             >
+              {mutation.saving && <LoaderCircle size={16} aria-hidden="true" className="motion-safe:animate-spin" />}
               {mutation.saving ? "Saving…" : "Confirm action"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={mutation.saving}
-              onClick={() => {
-                setDecision(null);
-                setPublication(null);
-                setArchiveOpen(false);
-              }}
-            >
-              Cancel
             </Button>
           </div>
         </form>
@@ -1172,32 +1242,32 @@ export function CareSubmissionForm({
                     );
                   }}
                   icon={
-                    <span className="flex size-10 items-center justify-center rounded-full bg-white text-[#59636e]">
+                    <span className="ac-upload-icon flex size-10 items-center justify-center rounded-full">
                       <UploadCloud className="size-5" aria-hidden="true" />
                     </span>
                   }
                   label={
                     <span className="flex min-w-0 flex-col gap-1">
-                      <span className="break-all text-[#17292d]">
+                      <span className="ac-upload-title break-all">
                         {file ? (
                           file.name
                         ) : (
                           <>
-                            <span className="font-medium text-[#006c73]">
+                            <span className="ac-upload-state font-medium">
                               Click to upload
                             </span>{" "}
                             or drag and drop
                           </>
                         )}
                       </span>
-                      <span className="text-xs text-[#59636e]">
+                      <span className="ac-upload-help text-xs">
                         {file
                           ? `${Math.round(file.size / 1024)} KB · Click to replace`
                           : "PDF, PNG or JPEG · Maximum 10 MiB"}
                       </span>
                     </span>
                   }
-                  className="min-h-32 max-w-none border-dashed bg-[#f7f7f8] px-4 py-5 [&>span]:min-w-0 [&>span]:flex-col [&>span]:gap-2 [&>span]:text-center"
+                  className="ac-upload min-h-32 max-w-none border-dashed px-4 py-5 [&>span]:min-w-0 [&>span]:flex-col [&>span]:gap-2 [&>span]:text-center"
                 />
               </div>
             )}
@@ -1419,6 +1489,7 @@ export function CareSubmissionForm({
               mutation.saving || mutation.uncertain || relationships.loading
             }
           >
+            {mutation.saving && <LoaderCircle size={16} aria-hidden="true" className="motion-safe:animate-spin" />}
             {mutation.saving
               ? "Saving…"
               : mode === "share"

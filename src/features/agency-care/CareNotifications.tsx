@@ -7,12 +7,13 @@ import {
   type ReactNode,
 } from "react";
 import { Link, useNavigate } from "react-router";
-import { Button } from "@/components/ui/button";
+import { Bell, Check, ClipboardCheck, FileText, LoaderCircle, Mail, MessageCircle, RefreshCw, RotateCcw, Users } from "lucide-react";
 import { HeaderActionButton } from "@/components/DashboardHeader";
 import BellIcon from "@/assets/icons/bell.svg?react";
 import { agencyCareApi, type CareNotification } from "@/lib/api/agencyCare";
 import { careError, useScopedMutation } from "./hooks";
 import {
+  CareButton as Button,
   CareEmpty,
   CareFailure,
   CareHeading,
@@ -21,6 +22,7 @@ import {
   CareStatus,
   careDate,
 } from "./ui";
+import "./notifications.css";
 
 export function careNotificationDestination(value?: string): string | null {
   if (!value || !value.startsWith("/agency-care/") || value.includes("\\"))
@@ -29,6 +31,7 @@ export function careNotificationDestination(value?: string): string | null {
     const url = new URL(value, "https://care.invalid");
     if (
       url.origin !== "https://care.invalid" ||
+      !url.pathname.startsWith("/agency-care/") ||
       (url.pathname.startsWith("/agency-care/invitations/") &&
         !/^\/agency-care\/invitations\/[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(url.pathname))
     )
@@ -172,6 +175,8 @@ export function CareNotificationProvider({
 
 export function AgencyCareNotifications() {
   const inbox = useContext(Context);
+  const [filter, setFilter] = useState<"all" | "unread">("all");
+  const [readingId, setReadingId] = useState<string | null>(null);
   if (!inbox)
     return (
       <CareFailure
@@ -179,13 +184,20 @@ export function AgencyCareNotifications() {
         onRetry={() => window.location.reload()}
       />
     );
+  const unreadCount = inbox.items.filter((item) => item.status === "unread").length;
+  const visibleItems = filter === "unread" ? inbox.items.filter((item) => item.status === "unread") : inbox.items;
+  const markRead = async (id: string) => {
+    setReadingId(id);
+    try { await inbox.read(id); } finally { setReadingId(current => current === id ? null : current); }
+  };
   return (
-    <div className="ac-stack">
+    <div className="ac-stack ac-inbox">
       <CareHeading
         title="Care notifications"
-        description="Recent notifications for the selected organization and your current client access."
+        description="Care updates, invitations and requests available to your agency."
         actions={
-          <Button variant="outline" onClick={inbox.retry}>
+          <Button variant="outline" disabled={inbox.loading} onClick={inbox.retry}>
+            <RefreshCw size={16} aria-hidden="true" />
             Refresh
           </Button>
         }
@@ -195,53 +207,77 @@ export function AgencyCareNotifications() {
       ) : inbox.error ? (
         <CareFailure message={inbox.error} onRetry={inbox.retry} />
       ) : (
-        <CarePanel title="Latest notifications">
-          {inbox.items.length ? (
-            <div className="ac-list">
-              {inbox.items.map((item) => {
+        <CarePanel>
+          <div className="ac-inbox-toolbar">
+            <div className="ac-inbox-filters" role="group" aria-label="Notification filters" aria-describedby="care-notification-count-scope">
+              <Button variant="ghost" aria-pressed={filter === "all"} onClick={() => setFilter("all")}>All <span>{inbox.items.length}</span></Button>
+              <Button variant="ghost" aria-pressed={filter === "unread"} onClick={() => setFilter("unread")}>Unread <span>{unreadCount}</span></Button>
+            </div>
+            <p className="ac-inbox-result-count" role="status">{visibleItems.length} {filter === "unread" ? "unread" : "recent"} {visibleItems.length === 1 ? "notification" : "notifications"}</p>
+          </div>
+          <p className="ac-inbox-scope" id="care-notification-count-scope">Counts cover your loaded notifications, up to the 50 most recent available to you.</p>
+          {visibleItems.length ? (
+            <ul className="ac-inbox-list" aria-label="Care notifications">
+              {visibleItems.map((item) => {
                 const destination = careNotificationDestination(item.actionUrl);
+                const Icon = notificationIcon(destination);
+                const actionLabel = notificationActionLabel(destination);
+                const unread = item.status === "unread";
+                const markingRead = inbox.saving && readingId === item.id;
                 return (
-                  <article className="ac-list-row" key={item.id}>
-                    <div className="ac-stack">
-                      <div className="ac-actions">
-                        <strong>{item.title}</strong>
-                        <CareStatus>{item.status}</CareStatus>
+                  <li key={item.id}>
+                  <article className={`ac-inbox-row${unread ? " ac-inbox-unread" : ""}`} aria-labelledby={`care-notice-${item.id}`}>
+                    <span className="ac-inbox-icon" aria-hidden="true"><Icon size={20} /></span>
+                    <div className="ac-inbox-copy">
+                      <div className="ac-inbox-title">
+                        <h3 id={`care-notice-${item.id}`}>{item.title}</h3>
+                        {item.priority === "urgent" && <CareStatus tone="danger">Urgent</CareStatus>}
+                        {item.priority === "high" && <CareStatus tone="warning">High priority</CareStatus>}
                       </div>
                       <p>{item.message}</p>
-                      <small>{careDate(item.createdAt)}</small>
+                      <div className="ac-inbox-meta">
+                        <time dateTime={item.createdAt}>{careDate(item.createdAt)}</time>
+                        <span className={`ac-inbox-read-state${unread ? " ac-inbox-read-state-unread" : ""}`}>{unread ? <span className="ac-inbox-unread-dot" aria-hidden="true" /> : <Check size={12} aria-hidden="true" />}{unread ? "Unread" : item.status === "read" ? "Read" : item.status === "archived" ? "Archived" : "Deleted"}</span>
+                      </div>
                     </div>
-                    <div className="ac-actions">
+                    <div className="ac-inbox-actions">
                       {destination && (
                         <Button asChild variant="outline">
                           <Link
                             to={destination}
+                            aria-label={`${actionLabel}: ${item.title}`}
                             onClick={() => void inbox.read(item.id)}
                           >
-                            Open item
+                            {actionLabel}
                           </Link>
                         </Button>
                       )}
-                      {item.status === "unread" && (
+                      {unread && (
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           disabled={inbox.saving}
-                          onClick={() => void inbox.read(item.id)}
+                          aria-label={`Mark read: ${item.title}`}
+                          aria-busy={markingRead}
+                          onClick={() => void markRead(item.id)}
                         >
-                          Mark read
+                          {markingRead && <LoaderCircle size={14} aria-hidden="true" className="motion-safe:animate-spin" />}{markingRead ? "Marking read…" : "Mark read"}
                         </Button>
                       )}
                     </div>
                   </article>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           ) : (
-            <CareEmpty title="No care notifications">
-              New care activity will appear here when it is available to your
-              organization.
-            </CareEmpty>
+            <div className="ac-inbox-empty">
+              <span className="ac-inbox-empty-icon" aria-hidden="true">{filter === "unread" && inbox.items.length ? <Check size={26} /> : <Bell size={26} />}</span>
+              <CareEmpty title={filter === "unread" && inbox.items.length ? "No unread notifications" : "No notifications yet"}>
+                {filter === "unread" && inbox.items.length ? "You’ve read your recent care notifications. Switch to All to revisit them." : "Care activity available to your agency will appear here."}
+              </CareEmpty>
+              {filter === "unread" && inbox.items.length > 0 && <Button variant="outline" onClick={() => setFilter("all")}>View all notifications</Button>}
+            </div>
           )}
-          <small>Shows up to 50 recent notifications.</small>
         </CarePanel>
       )}
       {inbox.saveError && (
@@ -249,4 +285,35 @@ export function AgencyCareNotifications() {
       )}
     </div>
   );
+}
+
+function notificationIcon(destination: string | null) {
+  if (!destination) return Bell;
+  const path = new URL(destination, "https://care.invalid").pathname;
+  if (path.startsWith("/agency-care/invitations/")) return Mail;
+  if (path.endsWith("/conversations")) return MessageCircle;
+  if (path.endsWith("/documents")) return FileText;
+  if (path.endsWith("/updates")) return ClipboardCheck;
+  if (path.endsWith("/team")) return Users;
+  if (path.endsWith("/recovery")) return RotateCcw;
+  return Bell;
+}
+
+function notificationActionLabel(destination: string | null) {
+  if (!destination) return "Open item";
+  const url = new URL(destination, "https://care.invalid");
+  if (url.pathname.startsWith("/agency-care/invitations/")) return "Review invitation";
+  if (url.pathname.endsWith("/documents")) return url.searchParams.get("submission") ? "Open document" : "View documents";
+  if (url.pathname.endsWith("/updates")) return url.searchParams.get("submission") ? "View update" : "View updates";
+  if (url.pathname.endsWith("/conversations")) return url.searchParams.get("conversation") ? "Open conversation" : "View conversations";
+  if (url.pathname.endsWith("/team")) {
+    if (url.searchParams.get("section") === "invitations") return "View invitation";
+    if (url.searchParams.get("section") === "relationships") return "View agency connection";
+    if (url.searchParams.get("section") === "grants" && url.searchParams.has("staff")) return "View staff assignment";
+    return "View care team";
+  }
+  if (url.pathname.endsWith("/recovery")) return "View publication status";
+  if (url.pathname.endsWith("/activity")) return "View care activity";
+  if (url.pathname.endsWith("/settings")) return "Open agency settings";
+  return "Open item";
 }

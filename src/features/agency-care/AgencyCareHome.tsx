@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { Button } from "@/components/ui/button";
+import { ArrowRight, LoaderCircle } from "lucide-react";
 import { useAuth } from "@/utils/auth/context/AuthContext";
 import { agencyCareApi } from "@/lib/api/agencyCare";
 import { useAgencyCare } from "./AgencyCareLayout";
 import { useScopedMutation, useScopedRequest } from "./hooks";
 import {
+  CareButton as Button,
+  CareAvatar,
   CareEmpty,
   CareFailure,
   CareHeading,
@@ -35,22 +37,28 @@ export function AgencyCareHome() {
         <>
           <CarePanel title="Your connected clients">
             {list.data?.items.length ? (
-              <div className="ac-client-grid">
+              <ul className="ac-list">
                 {list.data.items.map((network) => (
-                  <Link
-                    className="ac-client-card"
-                    to={`/agency-care/networks/${encodeURIComponent(network.id)}/overview`}
-                    key={network.id}
-                  >
-                    <span className="ac-avatar" aria-hidden="true">
-                      {network.client.name.slice(0, 1)}
-                    </span>
-                    <strong>{network.client.name}</strong>
+                  <li className="ac-person-row" key={network.id}>
+                    <div className="ac-row-main">
+                      <CareAvatar name={network.client.name} />
+                      <div className="ac-row-copy">
+                        <strong>{network.client.name}</strong>
+                        <small>Client care workspace</small>
+                      </div>
+                    </div>
                     <CareStatus>{network.lifecycle}</CareStatus>
-                    <span>Open care workspace →</span>
-                  </Link>
+                    <Button asChild variant="outline">
+                      <Link
+                        to={`/agency-care/networks/${encodeURIComponent(network.id)}/overview`}
+                        aria-label={`Open care workspace for ${network.client.name}`}
+                      >
+                        Open workspace <ArrowRight aria-hidden="true" size={16} />
+                      </Link>
+                    </Button>
+                  </li>
                 ))}
-              </div>
+              </ul>
             ) : (
               <CareEmpty title="No connected clients yet">
                 Your agency administrator must grant access to a connected
@@ -116,7 +124,8 @@ export function AgencyCareClientEntry({
           onClick={() => void create()}
           disabled={mutation.saving || mutation.uncertain}
         >
-          Create care workspace
+          {mutation.saving && <LoaderCircle size={16} aria-hidden="true" className="motion-safe:animate-spin" />}
+          {mutation.saving ? "Creating workspace…" : "Create care workspace"}
         </Button>
       ) : (
         <p className="ac-muted">

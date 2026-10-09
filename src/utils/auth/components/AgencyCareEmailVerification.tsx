@@ -3,7 +3,8 @@ import { reload, sendEmailVerification } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { clearAuthCache } from '@/lib/axios'
 import { useAuth } from '@/utils/auth/context/AuthContext'
-import { Button } from '@/components/ui/button'
+import { LoaderCircle } from 'lucide-react'
+import { CareButton as Button, CareNotice } from '@/features/agency-care/ui'
 
 /** Verifies the current Firebase identity without applicant onboarding or changing the care URL. */
 export function AgencyCareEmailVerification({ onVerified }: { onVerified: () => void }) {
@@ -47,15 +48,15 @@ export function AgencyCareEmailVerification({ onVerified }: { onVerified: () => 
     }
   }
 
-  return <section className="mx-auto my-8 w-full max-w-xl rounded-xl border border-[#d7dddd] bg-white p-6 text-[#10141a]" aria-label="Agency Care email verification">
+  return <section className="agency-care ac-panel ac-auth-verification mx-auto my-8 w-full max-w-xl" aria-label="Agency Care email verification">
     <h2 className="mb-3 text-2xl font-semibold">Verify your email</h2>
-    <p className="mb-2 text-sm text-[#596065]">Verify the email on your existing account before opening Agency Care. Your account and current invitation stay in place.</p>
+    <p className="mb-2 text-sm ac-muted">Verify the email on your existing account before opening Agency Care. Your account and current invitation stay in place.</p>
     {auth.currentUser?.email && <p className="mb-5 break-all text-sm font-medium">{auth.currentUser.email}</p>}
-    {sent && <p role="status" className="mb-4 text-sm text-[#2d7758]">Verification email sent. Open the link, then return here to check verification.</p>}
-    {error && <p role="alert" className="mb-4 text-sm text-red-700">{error}</p>}
+    {sent && <p role="status" className="ac-muted mb-4 text-sm">Verification email sent. Open the link, then return here to check verification.</p>}
+    {error && <CareNotice danger>{error}</CareNotice>}
     <div className="flex flex-wrap gap-3">
       <Button variant="outline" disabled={busy} onClick={() => void verify(false)}>{sent ? 'Resend verification email' : 'Send verification email'}</Button>
-      <Button disabled={busy} onClick={() => void verify(true)}>{busy ? 'Please wait…' : 'Check email verification'}</Button>
+      <Button aria-busy={busy} disabled={busy} onClick={() => void verify(true)}>{busy && <LoaderCircle aria-hidden="true" className="size-4 motion-safe:animate-spin" />}{busy ? 'Please wait…' : 'Check email verification'}</Button>
     </div>
   </section>
 }

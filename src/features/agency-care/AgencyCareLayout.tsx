@@ -6,7 +6,6 @@ import {
   useNavigate,
   useSearchParams,
 } from "react-router";
-import { Button } from "@/components/ui/button";
 import { DashboardHeaderFrame, HeaderActionButton, UserAvatar } from "@/components/DashboardHeader";
 import DashboardSidebar, { type NavItem } from "@/components/DashboardSidebar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -19,7 +18,7 @@ import {
   type CareOrganization,
 } from "@/lib/api/agencyCare";
 import { useScopedRequest } from "./hooks";
-import { CareFailure, CareLoad, careLabel } from "./ui";
+import { CareButton as Button, CareFailure, CareLoad, careLabel } from "./ui";
 import { CareNotificationButton, CareNotificationProvider } from "./CareNotifications";
 import "./agency-care.css";
 
@@ -74,6 +73,7 @@ export function AgencyCareLayout({
   const activePath = location.pathname.startsWith("/agency-care/networks/") ? "/agency-care/clients" : navItems.slice(1).find((item) =>
     location.pathname === item.path || location.pathname.startsWith(`${item.path}/`),
   )?.path ?? "/agency-care";
+  const clientWorkspace = location.pathname.startsWith("/agency-care/networks/");
   const changeOrganization = (agencyKey: string) => {
     if (agencyKey === organization?.agencyKey) return;
     setSelected(agencyKey);
@@ -125,11 +125,11 @@ export function AgencyCareLayout({
   ) : children ?? <Outlet />;
   const careContent = (
     <div className={`agency-care${embedded ? " ac-embedded" : " ac-dashboard-content"}`}>
-      <div className="ac-module-bar">
+      {!clientWorkspace && <div className="ac-module-bar">
         <Link className="ac-brand" to="/agency-care">Agency Care</Link>
         {embedded && <div className="ac-organization">{organizationSelect}</div>}
         {embedded && me.data?.restrictedPortal && <Button variant="outline" onClick={() => void logout()}>Sign out</Button>}
-      </div>
+      </div>}
       {embedded && (
         <nav className="ac-global-nav" aria-label="Agency Care">
           {navItems.map((item) => <Link key={item.path} className={activePath === item.path ? "active" : undefined} aria-current={activePath === item.path ? "page" : undefined} to={item.path!}>{item.label}</Link>)}
@@ -139,14 +139,14 @@ export function AgencyCareLayout({
     </div>
   );
   const dashboard = embedded ? careContent : (
-    <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
+    <div className="ac-shell relative min-h-screen overflow-x-hidden">
       <DashboardHeaderFrame>
         <div className="flex items-center gap-[10px]">
           {organization?.kind === "external" && <HeaderActionButton icon={Settings} ariaLabel="Agency settings" onClick={() => navigate("/agency-care/settings")} />}
           <CareNotificationButton />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button type="button" aria-label={`Account menu for ${user?.fullName || "User"}`} className="flex items-center gap-3 rounded-[60px] border border-white/30 bg-white/50 p-[5px] backdrop-blur-[22px] hover:bg-white/60 transition-colors cursor-pointer">
+              <button type="button" aria-label={`Account menu for ${user?.fullName || "User"}`} className="ac-account-trigger">
                 <UserAvatar userName={user?.fullName} userImage={user?.photoURL || user?.profilePicture} />
                 <div className="hidden min-w-0 pr-2 xl:block text-left">
                   <p className="max-w-40 truncate text-sm font-medium leading-tight text-[#10141a]">{user?.fullName || "User"}</p>
@@ -155,7 +155,7 @@ export function AgencyCareLayout({
                 <ChevronDown className="h-4 w-4 text-[#808081] mr-2" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-[280px] max-w-[calc(100vw-32px)] z-[100] bg-[#f3f6f7] border-[#e5e5e6] rounded-xl p-0">
+            <DropdownMenuContent align="end" className="ac-account-menu w-[280px] max-w-[calc(100vw-32px)] z-[100] rounded-xl p-0">
               <div className="border-b border-[#dde5e6] px-4 py-3">
                 <p className="truncate text-sm font-semibold text-[#10141a]">{user?.fullName || "User"}</p>
                 <p className="mt-1 truncate text-xs font-medium text-[#687173]">{userRole}</p>
@@ -177,12 +177,12 @@ export function AgencyCareLayout({
                 </div>
               )}
               {organization?.kind === "external" && <DropdownMenuItem className="cursor-pointer gap-3 px-4 py-2" onSelect={() => navigate("/agency-care/settings")}><Settings className="h-4 w-4" />Settings</DropdownMenuItem>}
-              <DropdownMenuItem onSelect={() => void logout()} className="cursor-pointer gap-3 px-4 py-2 text-[#d53411]"><LogOut className="h-4 w-4" />Logout</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => void logout()} className="ac-account-logout cursor-pointer gap-3 px-4 py-2"><LogOut className="h-4 w-4" />Logout</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </DashboardHeaderFrame>
-      <DashboardSidebar navItems={navItems} activePath={activePath} />
+      <DashboardSidebar navItems={navItems} activePath={activePath} footer={organization && <div className="ac-sidebar-context"><strong>Agency Care</strong>{organization.name}</div>} />
       <main className={`ml-0 ${collapsed ? "md:ml-[112px]" : "md:ml-[240px]"} pt-[130px] pb-10 transition-[margin] duration-200`}>
         <div className="px-4 md:px-8">{careContent}</div>
       </main>

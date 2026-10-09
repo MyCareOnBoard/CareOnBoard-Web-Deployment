@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
-import { Button } from "@/components/ui/button";
+import { ClipboardCheck, Download, FileText, LoaderCircle, Mail, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/utils/auth/context/AuthContext";
@@ -17,6 +17,9 @@ import {
 import { useAgencyCare } from "./AgencyCareLayout";
 import { hasCapability, useScopedMutation, useScopedRequest } from "./hooks";
 import {
+  CareButton as Button,
+  CareAvatar,
+  CarePerson,
   CareEmpty,
   CareFailure,
   CareFormDialog,
@@ -71,12 +74,15 @@ function SubmissionQueue({ recovery = false }: { recovery?: boolean }) {
               <ul className="ac-list">
                 {list.data.items.map((item) => (
                   <li key={item.id}>
-                    <div>
+                    <div className="ac-row-main">
+                      <span className="ac-row-icon" aria-hidden="true">{item.kind === "document" ? <FileText size={18} /> : <ClipboardCheck size={18} />}</span>
+                      <div className="ac-row-copy">
                       <strong>{item.title}</strong>
-                      <p>
-                        {careLabel(item.reviewStatus)} · Publication:{" "}
-                        {careLabel(item.syncStatus || "not_required")}
-                      </p>
+                      <div className="ac-actions ac-row-meta">
+                        <CareStatus>{careLabel(item.reviewStatus)}</CareStatus>
+                        <small>Publication: {careLabel(item.syncStatus || "not_required")}</small>
+                      </div>
+                      </div>
                     </div>
                     <Button asChild variant="outline">
                       <Link to={destination(item)}>
@@ -170,10 +176,11 @@ export function AgencyCareReports() {
     <div className="ac-stack">
       <CareHeading
         title="Care reports"
-        description="Permission-filtered coordination and review summaries."
+        description="Review coordination and publication across your connected clients."
         actions={
           report.data && (
             <Button variant="outline" onClick={exportRows}>
+              <Download size={16} aria-hidden="true" />
               Export displayed rows
             </Button>
           )
@@ -201,17 +208,18 @@ export function AgencyCareReports() {
                     {report.data.items.map((item) => (
                       <tr key={item.networkId}>
                         <td>
-                          <Link
-                            to={`/agency-care/networks/${encodeURIComponent(item.networkId)}/overview`}
-                          >
-                            {item.clientName}
-                          </Link>
+                          <div className="ac-row-main">
+                            <CareAvatar size="sm" name={item.clientName} />
+                            <Link to={`/agency-care/networks/${encodeURIComponent(item.networkId)}/overview`}>
+                              {item.clientName}
+                            </Link>
+                          </div>
                         </td>
                         <td>{item.activeAgencies}</td>
                         <td>{item.pendingReviewCount}</td>
                         <td>
                           {item.publicationActionCount ?? "Not available"}
-                          <details>
+                          <details className="ac-report-details">
                             <summary>More coordination metrics</summary>
                             <dl className="ac-details">
                               <dt>Revision requests</dt>
@@ -267,9 +275,12 @@ export function AgencyCareSettings() {
   );
   if (organization.kind !== "external")
     return (
+      <div className="ac-stack">
+      <CareHeading title="Agency settings" description={organization.name} />
       <CareNotice>
         Manage your existing agency profile through its current agency panel.
       </CareNotice>
+      </div>
     );
   return (
     <div className="ac-stack">
@@ -277,26 +288,29 @@ export function AgencyCareSettings() {
         title="Agency settings"
         description={`${organization.name} · Limited care organization`}
       />
-      <div className="ac-actions">
+      <nav className="ac-subtabs" aria-label="Agency settings views">
         <Button
+          aria-current={tab === "profile" ? "page" : undefined}
           variant={tab === "profile" ? "default" : "outline"}
           onClick={() => setTab("profile")}
         >
           Agency profile
         </Button>
         <Button
+          aria-current={tab === "members" ? "page" : undefined}
           variant={tab === "members" ? "default" : "outline"}
           onClick={() => setTab("members")}
         >
           Members
         </Button>
         <Button
+          aria-current={tab === "invitations" ? "page" : undefined}
           variant={tab === "invitations" ? "default" : "outline"}
           onClick={() => setTab("invitations")}
         >
           Member invitations
         </Button>
-      </div>
+      </nav>
       {profile.loading ? (
         <CareLoad />
       ) : profile.error ? (
@@ -448,9 +462,12 @@ function ExternalProfileForm({
         />
       )}
       {canEdit && (
+        <div className="ac-form-actions">
         <Button type="submit" disabled={mutation.saving || mutation.uncertain}>
-          Save profile changes
+          {mutation.saving && <LoaderCircle size={16} aria-hidden="true" className="motion-safe:animate-spin" />}
+          {mutation.saving ? "Saving profile…" : "Save profile changes"}
         </Button>
+        </div>
       )}
     </form>
   );
@@ -526,7 +543,7 @@ function ExternalMembers({
         title={invitations ? "Member invitations" : "Agency members"}
         actions={
           canManage && (
-            <Button onClick={() => setInvite(true)}>Invite member</Button>
+            <Button onClick={() => setInvite(true)}><Plus size={16} aria-hidden="true" />Invite member</Button>
           )
         }
       >
@@ -542,7 +559,9 @@ function ExternalMembers({
                   const entry = item as CareInvitation;
                   return (
                     <li key={entry.id}>
-                      <div>
+                      <div className="ac-row-main">
+                        <span className="ac-row-icon" aria-hidden="true"><Mail size={18} /></span>
+                        <div className="ac-row-copy">
                         <strong>
                           {entry.recipientEmail || "Invited member"}
                         </strong>
@@ -556,6 +575,7 @@ function ExternalMembers({
                             canManage && entry.status === "pending"
                           }
                         />
+                        </div>
                       </div>
                       {canManage && entry.status === "pending" && (
                         <div className="ac-actions">
@@ -598,12 +618,9 @@ function ExternalMembers({
                 const entry = item as CareMember;
                 return (
                   <li key={entry.uid}>
-                    <div>
-                      <strong>{entry.name}</strong>
-                      <p>
-                        {entry.email} · {entry.role} · {entry.status}
-                      </p>
-                    </div>
+                    <CarePerson name={entry.name} detail={entry.email} />
+                    <CareStatus tone="neutral">{careLabel(entry.role || "member")}</CareStatus>
+                    <CareStatus>{entry.status || "active"}</CareStatus>
                     {entry.lastAdministrator ? (
                       <small>Last active administrator</small>
                     ) : (
@@ -634,6 +651,7 @@ function ExternalMembers({
         )}
       </CarePanel>
       <CareFormDialog
+      className="ac-form-dialog"
         open={invite || Boolean(remove)}
         title={
           remove
@@ -647,7 +665,8 @@ function ExternalMembers({
         }}
         busy={mutation.saving}
       >
-        <form className="ac-stack" onSubmit={(event) => void save(event)}>
+        <form className="ac-dialog-form" onSubmit={(event) => void save(event)}>
+        <fieldset className="ac-dialog-body ac-stack" disabled={mutation.saving}>
           {remove ? (
             <>
               <CareNotice>
@@ -703,13 +722,8 @@ function ExternalMembers({
             </>
           )}
           {mutation.error && <CareNotice danger>{mutation.error}</CareNotice>}
-          <div className="ac-actions">
-            <Button
-              type="submit"
-              disabled={mutation.saving || mutation.uncertain}
-            >
-              {remove ? "Remove membership" : "Send member invitation"}
-            </Button>
+        </fieldset>
+        <div className="ac-dialog-footer">
             <Button
               type="button"
               variant="outline"
@@ -720,6 +734,13 @@ function ExternalMembers({
               disabled={mutation.saving}
             >
               Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={mutation.saving || mutation.uncertain}
+            >
+              {mutation.saving && <LoaderCircle size={16} aria-hidden="true" className="motion-safe:animate-spin" />}
+              {mutation.saving ? "Saving…" : remove ? "Remove membership" : "Send member invitation"}
             </Button>
           </div>
         </form>
@@ -978,19 +999,7 @@ export function AgencyCareInvitationPage() {
                     ? "Joining gives no automatic client grant."
                     : "Joining the care workspace does not create or merge an operational client record. A source-record link requires separate confirmation."}
                 </CareNotice>
-                <div className="ac-actions">
-                  <Button
-                    disabled={
-                      !confirmed ||
-                      (!memberInvitation && !selected) ||
-                      preview.data.canAccept !== true ||
-                      mutation.saving ||
-                      mutation.uncertain
-                    }
-                    onClick={() => void accept()}
-                  >
-                    Accept invitation
-                  </Button>
+                <div className="ac-form-actions">
                   <Button
                     variant="outline"
                     disabled={
@@ -1002,6 +1011,18 @@ export function AgencyCareInvitationPage() {
                     onClick={() => void decline()}
                   >
                     Decline invitation
+                  </Button>
+                  <Button
+                    disabled={
+                      !confirmed ||
+                      (!memberInvitation && !selected) ||
+                      preview.data.canAccept !== true ||
+                      mutation.saving ||
+                      mutation.uncertain
+                    }
+                    onClick={() => void accept()}
+                  >
+                    Accept invitation
                   </Button>
                 </div>
                 {mutation.error && (

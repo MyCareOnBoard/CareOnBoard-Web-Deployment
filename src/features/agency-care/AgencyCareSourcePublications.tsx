@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Button } from "@/components/ui/button";
+import { ClipboardCheck, FileText, LoaderCircle } from "lucide-react";
 import { useAuth } from "@/utils/auth/context/AuthContext";
 import {
   agencyCareApi,
@@ -12,6 +12,7 @@ import {
   type CarePreview,
 } from "./ProtectedDocumentPreview";
 import {
+  CareButton as Button,
   CareEmpty,
   CareFailure,
   CareLoad,
@@ -80,7 +81,9 @@ function SourcePublications({
               const fileName = item.fileName || item.file?.fileName;
               return (
                 <li key={item.id}>
-                  <div>
+                  <div className="ac-row-main">
+                    <span className="ac-row-icon" aria-hidden="true">{fileName ? <FileText size={18} /> : <ClipboardCheck size={18} />}</span>
+                    <div className="ac-row-copy">
                     <strong>{item.title}</strong>
                     <p>
                       {item.versionNumber
@@ -94,6 +97,7 @@ function SourcePublications({
                         {item.body.serviceDate} · {item.body.summary}
                       </p>
                     )}
+                    </div>
                   </div>
                   <div className="ac-actions">
                     {item.unavailable ? (
@@ -238,13 +242,15 @@ function PublicationCorrection({
   }
   return (
     <CareFormDialog
+      className="ac-form-dialog"
       open
       title="Correct a published source record"
       description={`${item.title} · Exact version ${item.versionNumber || ""}`}
       onClose={onClose}
       busy={mutation.saving}
     >
-      <form className="ac-stack" onSubmit={(event) => void submit(event)}>
+      <form className="ac-dialog-form" onSubmit={(event) => void submit(event)}>
+        <fieldset className="ac-dialog-body ac-stack" disabled={mutation.saving}>
         <CareNotice>
           The original approved version, decision and receipt remain in history.
           Retraction makes this source copy unavailable; marking a correction
@@ -319,7 +325,16 @@ function PublicationCorrection({
         {(error || mutation.error) && (
           <CareNotice danger>{error || mutation.error}</CareNotice>
         )}
-        <div className="ac-actions">
+        </fieldset>
+        <div className="ac-dialog-footer">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={mutation.saving}
+            onClick={onClose}
+          >
+            Cancel
+          </Button>
           <Button
             type="submit"
             disabled={
@@ -329,15 +344,8 @@ function PublicationCorrection({
               (action === "mark_corrected" && !replacement)
             }
           >
-            Save source correction
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={mutation.saving}
-            onClick={onClose}
-          >
-            Cancel
+            {mutation.saving && <LoaderCircle size={16} aria-hidden="true" className="motion-safe:animate-spin" />}
+            {mutation.saving ? "Saving correction…" : "Save source correction"}
           </Button>
         </div>
       </form>

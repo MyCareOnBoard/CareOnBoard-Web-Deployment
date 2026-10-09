@@ -57,6 +57,7 @@ export interface DocumentPreviewModalProps {
   fileName?: string;
   isLoading?: boolean;
   error?: string | null;
+  className?: string;
 }
 
 export function DocumentPreviewModal({
@@ -67,6 +68,7 @@ export function DocumentPreviewModal({
   fileName,
   isLoading = false,
   error,
+  className = "",
 }: DocumentPreviewModalProps) {
   const [mediaError, setMediaError] = useState(false);
   const kind = useMemo(() => previewKind(fileName, url ?? undefined), [fileName, url]);
@@ -82,7 +84,7 @@ export function DocumentPreviewModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className="flex h-[min(88vh,900px)] w-[min(94vw,1100px)] max-w-none flex-col gap-0 overflow-hidden p-0"
+        className={`flex h-[min(88vh,900px)] w-[min(94vw,1100px)] max-w-none flex-col gap-0 overflow-hidden p-0 ${className}`}
         onContextMenu={(event) => event.preventDefault()}
       >
         <DialogHeader className="flex-row items-center justify-between gap-4 border-b border-[#e2e6e6] px-5 py-4 text-left">
@@ -101,7 +103,7 @@ export function DocumentPreviewModal({
           </DialogClose>
         </DialogHeader>
 
-        <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-[#edf1f2] p-3 sm:p-5">
+        <div data-slot="document-preview-body" className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-[#edf1f2] p-3 sm:p-5">
           {isLoading ? (
             <div className="flex items-center gap-3 text-sm font-medium text-[#596065]" role="status">
               <Loader2 className="h-5 w-5 animate-spin text-[#008f92]" aria-hidden="true" />

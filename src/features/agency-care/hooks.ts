@@ -67,7 +67,11 @@ export function useScopedMutation(scope: string) {
   const currentScope = useRef(scope);
   currentScope.current = scope;
   const active = useRef<AbortController | null>(null);
-  const operation = useRef<{ scope: string; id: string } | null>(null);
+  const operation = useRef<{
+    scope: string;
+    id: string;
+    uncertain: boolean;
+  } | null>(null);
   const [state, setState] = useState({
     scope,
     saving: false,
@@ -96,7 +100,11 @@ export function useScopedMutation(scope: string) {
       const controller = new AbortController();
       active.current = controller;
       if (operation.current?.scope !== scope)
-        operation.current = { scope, id: crypto.randomUUID() };
+        operation.current = {
+          scope,
+          id: crypto.randomUUID(),
+          uncertain: false,
+        };
       setState({ scope, saving: true, error: "", uncertain: false });
       try {
         const data = await action(operation.current.id, controller.signal);
@@ -110,8 +118,14 @@ export function useScopedMutation(scope: string) {
         if (!controller.signal.aborted && currentScope.current === scope) {
           const status = (error as { response?: { status?: number } })?.response
             ?.status;
-          const uncertain = status === undefined || status >= 500;
-          if (!uncertain) operation.current = null;
+          // A rejected retry cannot establish whether the original command committed.
+          const uncertain =
+            operation.current?.uncertain === true ||
+            status === undefined ||
+            status >= 500;
+          if (uncertain && operation.current)
+            operation.current.uncertain = true;
+          else operation.current = null;
           const message = uncertain
             ? "The result of this action is unknown. Refresh the record and check its history before attempting another action."
             : careError(error);
@@ -122,7 +136,9 @@ export function useScopedMutation(scope: string) {
             error: message,
           });
           toast({
-            title: uncertain ? "Check the action's status" : "Action could not be completed",
+            title: uncertain
+              ? "Check the action's status"
+              : "Action could not be completed",
             description: message,
             variant: uncertain ? "warning" : "destructive",
           });
@@ -137,7 +153,7 @@ export function useScopedMutation(scope: string) {
   const reset = useCallback(() => {
     if (!active.current) {
       // An unknown outcome must retry the same server command receipt.
-      if (!(state.scope === scope && state.uncertain)) operation.current = null;
+      if (!operation.current?.uncertain) operation.current = null;
       setState({ scope, saving: false, error: "", uncertain: false });
     }
   }, [scope, state.scope, state.uncertain]);

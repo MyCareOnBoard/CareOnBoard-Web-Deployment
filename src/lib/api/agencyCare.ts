@@ -7,6 +7,7 @@ export type CareCapability =
   | "send"
   | "submit"
   | "invite";
+export type CareRole = "dsp" | "caregiver" | "support_coordinator" | "support_supervisor" | "agency_contact";
 export type CareAccess = {
   capabilities?: string[];
   permissionRevision?: string | number;
@@ -31,6 +32,9 @@ export type CareRequestOptions = {
   clientId?: string;
   program?: string;
   afterSequence?: number;
+  event?: string;
+  message?: string;
+  version?: string;
 };
 export type CareOrganization = {
   agencyKey: string;
@@ -53,6 +57,7 @@ export type CareNetwork = CareAccess & {
   lifecycle: string;
   revision: number;
   reviewer: boolean;
+  isSourceCoordinator?: boolean;
 };
 export type CareOverview = {
   unreadScope?: string;
@@ -99,7 +104,23 @@ export type CareMember = CareAccess & {
   status?: string;
   lastAdministrator?: boolean;
   revision?: number;
+  grantRevision?: number;
   allowedCapabilities?: string[];
+  employeeId?: string;
+  membershipId?: string;
+  jobRole?: string | null;
+  eligibleCareRoles?: CareRole[];
+  careRole?: CareRole | null;
+  isPrimaryContact?: boolean;
+  isSourceCoordinator?: boolean;
+  canMessage?: boolean;
+  assignment?: CareGrant | null;
+};
+export type CareStaffRoster = CarePage<CareMember> & {
+  relationshipRevision: number;
+  acceptanceId?: string;
+  primaryContactUid: string | null;
+  allowedCapabilities: string[];
 };
 export type CareSourceLink = {
   clientId: string;
@@ -124,6 +145,7 @@ export type CareRelationship = CareAccess & {
   revision: number;
   expiresAt?: string;
   members?: CareMember[];
+  primaryContactUid?: string | null;
   sourceLinks?: CareSourceLink[];
 };
 export type CareGrant = {
@@ -134,6 +156,17 @@ export type CareGrant = {
   revision: number;
   state?: string;
   acceptanceId?: string;
+  employeeId?: string;
+  membershipId?: string;
+  jobRole?: string | null;
+  eligibleCareRoles?: CareRole[];
+  allowedCapabilities?: string[];
+  careRole?: CareRole | null;
+  protectedAuthority?: boolean;
+  effective?: boolean;
+  grantId?: string;
+  isPrimaryContact?: boolean;
+  relationshipRevision?: number;
 };
 export type CareInvitation = {
   id: string;
@@ -182,9 +215,11 @@ export type CareConversation = CareAccess & {
     agencyKey: string;
     acceptanceId?: string;
     name?: string;
+    careRole?: CareRole;
   }>;
   latestSequence: number;
   unreadCount?: number;
+  updatedAt?: string;
   sourceContext?: { url: string; label: string };
 };
 export type CareMessage = {
@@ -194,6 +229,7 @@ export type CareMessage = {
   senderUid: string;
   senderAgencyKey: string;
   senderName?: string;
+  senderCareRole?: CareRole;
   createdAt: string;
   attachmentVersionIds?: string[];
   inReplyToMessageId?: string;
@@ -202,6 +238,7 @@ export type CareMessage = {
     versionId: string;
     fileName: string;
     title: string;
+    kind?: "document" | "care_update";
   }>;
 };
 export type CareAttachmentCandidate = {
@@ -265,6 +302,7 @@ export type CareSubmission = CareAccess & {
 export type CareEvent = {
   id: string;
   action: string;
+  title?: string;
   createdAt: string;
   actorName?: string;
   description?: string;
@@ -611,7 +649,14 @@ export const agencyCareApi = {
   grant: (
     networkId: string,
     uid: string,
-    input: Command & { agencyKey: string; capabilities: string[] },
+    input: Command & {
+      agencyKey: string;
+      capabilities: string[];
+      careRole?: CareRole;
+      employeeId?: string;
+      isPrimaryContact?: boolean;
+      expectedRelationshipRevision?: number;
+    },
     options?: CareRequestOptions,
   ) =>
     request<CareGrant>(
@@ -975,7 +1020,7 @@ export const agencyCareApi = {
       options,
     ),
   networkMembers: (networkId: string, options?: CareRequestOptions) =>
-    request<CarePage<CareMember>>(
+    request<CareStaffRoster>(
       "get",
       `${networkPath(networkId)}/members`,
       undefined,

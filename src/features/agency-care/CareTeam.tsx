@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router";
 import { Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -16,8 +16,11 @@ import {
 } from "@/lib/api/agencyCare";
 import { useAgencyCare } from "./AgencyCareLayout";
 import type { CareWorkspaceProps } from "./AgencyCareClientWorkspace";
+import { CareStaffAssignments } from "./CareStaffAssignments";
+import { careRoleLabel } from "./ui";
 import { hasCapability, useScopedMutation, useScopedRequest } from "./hooks";
 import {
+  CareButton as Button,
   CareEmpty,
   CareFailure,
   CareFormDialog,
@@ -27,6 +30,7 @@ import {
   CareNotice,
   CarePager,
   CarePanel,
+  CarePerson,
   CareStatus,
   careDate,
   careLabel,
@@ -39,8 +43,27 @@ type TeamModal =
   | { kind: "source"; target?: CareSourceLink };
 export function CareTeamPage(props: CareWorkspaceProps) {
   const { network, scope, agencyKey } = props;
-  const [section, setSection] = useState("relationships");
-  const [cursor, setCursor] = useState("");
+  const { organization } = useAgencyCare();
+  const manage = hasCapability(network, "manage");
+  const [search, setSearch] = useSearchParams();
+  const requestedSection = search.get("section");
+  const restrictedInvitation = requestedSection === "invitations" && !manage;
+  const section = ["grants", "relationships", "invitations", "source"].includes(requestedSection || "") && !restrictedInvitation ? requestedSection! : "grants";
+  const notificationTarget = restrictedInvitation || section === "source" ? "" : search.get(section === "relationships" ? "agency" : section === "invitations" ? "invitation" : "staff") || "";
+  const pageKey = `${section}|${notificationTarget}`;
+  const [page, setPage] = useState({ key: pageKey, cursor: "" });
+  const cursor = page.key === pageKey ? page.cursor : "";
+  function setCursor(value: string) { setPage({ key: pageKey, cursor: value }); }
+  function setSection(value: string) {
+    setSearch(current => {
+      const next = new URLSearchParams(current);
+      next.set("section", value);
+      ["agency", "invitation", "staff"].forEach(key => next.delete(key));
+      return next;
+    });
+    setPage({ key: "", cursor: "" });
+  }
+  const [assignRequested, setAssignRequested] = useState(false);
   const [modal, setModal] = useState<TeamModal | null>(null);
   const data = useScopedRequest<
     CarePage<CareRelationship | CareGrant | CareSourceLink | CareInvitation>
@@ -56,9 +79,18 @@ export function CareTeamPage(props: CareWorkspaceProps) {
               cursor,
               signal,
             }),
+    section !== "grants",
   );
   const mutation = useScopedMutation(`${scope}|${section}`);
-  const manage = hasCapability(network, "manage");
+  const notificationRow = data.data?.items.find(item => section === "relationships"
+    ? (item as CareRelationship).agencyKey === notificationTarget
+    : section === "invitations" && (item as CareInvitation).id === notificationTarget);
+  const notificationRef = useRef<HTMLLIElement | null>(null);
+  useEffect(() => {
+    if (!notificationTarget || !notificationRow) return;
+    notificationRef.current?.scrollIntoView?.({ block: "center" });
+    notificationRef.current?.focus({ preventScroll: true });
+  }, [section, notificationTarget, Boolean(notificationRow), cursor]);
   function refresh() {
     data.reload();
     props.refreshNetwork();
@@ -67,25 +99,29 @@ export function CareTeamPage(props: CareWorkspaceProps) {
     <div className="ac-stack">
       <CareHeading
         title="Care team"
-        description="Manage this client’s connected agencies and permitted people."
+        description="People and agencies supporting this client’s care."
         actions={
-          hasCapability(network, "invite") && (
-            <Button onClick={() => setModal({ kind: "invite" })}>
+          <div className="ac-actions">
+          {hasCapability(network, "invite") && (
+            <Button variant={manage ? "outline" : "default"} onClick={() => setModal({ kind: "invite" })}>
               Add an agency
             </Button>
-          )
+          )}
+          {manage && organization.role === "administrator" && <Button onClick={() => { setSection("grants"); setAssignRequested(true); }}>Assign staff</Button>}
+          </div>
         }
       />
-      <div className="ac-actions" role="group" aria-label="Care team views">
+      <div className="ac-subtabs" role="group" aria-label="Care team views">
         {[
+          ["grants", "My agency’s staff"],
           ["relationships", "Connected agencies"],
-          ["invitations", "Invitations"],
-          ["grants", "Client access"],
+          ...(manage ? [["invitations", "Invitations"]] : []),
           ["source", "Client record connections"],
         ].map(([value, label]) => (
           <Button
             key={value}
             variant={section === value ? "default" : "outline"}
+            aria-pressed={section === value}
             onClick={() => {
               setSection(value);
               setCursor("");
@@ -95,7 +131,21 @@ export function CareTeamPage(props: CareWorkspaceProps) {
           </Button>
         ))}
       </div>
-      {data.loading ? (
+      {restrictedInvitation && search.get("invitation") && <CareNotice>The invitation referenced by this notification is unavailable with your current access. Your current agency team is shown below.</CareNotice>}
+      {notificationTarget && ["relationships", "invitations"].includes(section) && !data.loading && !data.error && <CareNotice>
+        <p>{notificationRow ? "The record referenced by your notification is highlighted below. These are its current details." : data.data?.nextCursor
+          ? `The ${section === "relationships" ? "agency" : "invitation"} referenced by this notification is not on this page. Use Next page to check more current records.`
+          : `The ${section === "relationships" ? "agency" : "invitation"} referenced by this notification is not shown in the current results. Access or status may have changed.`}</p>
+        {!notificationRow && cursor && <Button type="button" variant="link" onClick={() => setCursor("")}>Back to first page</Button>}
+      </CareNotice>}
+      {section === "grants" ? <CareStaffAssignments
+        {...props}
+        highlightedUid={notificationTarget}
+        openRequested={assignRequested}
+        onRequestHandled={() => setAssignRequested(false)}
+        onAdvancedAccess={manage && organization.kind === "internal" && network.sourceClient.agencyId === organization.id
+          ? (target) => setModal({ kind: "grant", target }) : undefined}
+      /> : data.loading ? (
         <CareLoad />
       ) : data.error ? (
         <CareFailure message={data.error} onRetry={data.reload} />
@@ -103,14 +153,7 @@ export function CareTeamPage(props: CareWorkspaceProps) {
         <CarePanel
           title={careLabel(section)}
           actions={
-            section === "grants" && manage ? (
-              <Button
-                variant="outline"
-                onClick={() => setModal({ kind: "grant" })}
-              >
-                Assign permitted user
-              </Button>
-            ) : section === "source" && manage ? (
+            section === "source" && manage ? (
               <Button
                 variant="outline"
                 onClick={() => setModal({ kind: "source" })}
@@ -131,7 +174,7 @@ export function CareTeamPage(props: CareWorkspaceProps) {
                 if (section === "relationships") {
                   const target = item as CareRelationship;
                   return (
-                    <li key={target.agencyKey}>
+                    <li key={target.agencyKey} ref={notificationTarget === target.agencyKey ? notificationRef : undefined} tabIndex={notificationTarget === target.agencyKey ? -1 : undefined} className={notificationTarget === target.agencyKey ? "ac-notification-target" : undefined}>
                       <div>
                         <strong>{target.name}</strong>
                         <p>
@@ -140,6 +183,13 @@ export function CareTeamPage(props: CareWorkspaceProps) {
                             ? `Expires ${careDate(target.expiresAt)}`
                             : "Client connection"}
                         </p>
+                        {Boolean(target.members?.length) && <ul className="ac-shared-team">
+                          {target.members!.map((member) => <li key={member.uid}>
+                            <CarePerson name={member.name} detail={member.isSourceCoordinator ? "Formally assigned Support Coordinator" : careRoleLabel(member.careRole)} />
+                            {member.isSourceCoordinator && <CareStatus>Assigned SC</CareStatus>}
+                            {member.isPrimaryContact && <CareStatus>Agency primary contact</CareStatus>}
+                          </li>)}
+                        </ul>}
                       </div>
                       <CareStatus>{careLabel(target.state)}</CareStatus>
                       {manage && Boolean(target.allowedActions?.length) && (
@@ -150,29 +200,6 @@ export function CareTeamPage(props: CareWorkspaceProps) {
                           }
                         >
                           Manage connection
-                        </Button>
-                      )}
-                    </li>
-                  );
-                }
-                if (section === "grants") {
-                  const target = item as CareGrant;
-                  return (
-                    <li key={target.uid}>
-                      <div>
-                        <strong>{target.name || target.uid}</strong>
-                        <p>
-                          {target.capabilities.join(", ") ||
-                            "No current client capabilities"}{" "}
-                          · {target.state || "Current grant"}
-                        </p>
-                      </div>
-                      {manage && (
-                        <Button
-                          variant="outline"
-                          onClick={() => setModal({ kind: "grant", target })}
-                        >
-                          Edit access
                         </Button>
                       )}
                     </li>
@@ -205,7 +232,7 @@ export function CareTeamPage(props: CareWorkspaceProps) {
                 }
                 const target = item as CareInvitation;
                 return (
-                  <li key={target.id}>
+                  <li key={target.id} ref={notificationTarget === target.id ? notificationRef : undefined} tabIndex={notificationTarget === target.id ? -1 : undefined} className={notificationTarget === target.id ? "ac-notification-target" : undefined}>
                     <div>
                       <strong>
                         {target.agencyName ||

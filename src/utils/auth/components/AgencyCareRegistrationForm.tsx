@@ -3,14 +3,14 @@ import { Link, useNavigate } from 'react-router'
 import { createUserWithEmailAndPassword, reload, sendEmailVerification, updateProfile } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import axiosClient, { clearAuthCache } from '@/lib/axios'
-import { Button } from '@/components/ui/button'
+import { LoaderCircle } from 'lucide-react'
+import { CareButton as Button, CareNotice } from '@/features/agency-care/ui'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/utils/auth'
 import { hasEnrolledMfa } from '@/utils/auth/services/mfaService'
 import { authRouteWithReturnTo } from '@/utils/auth/helpers/agencyCareReturnTo'
 import { Routes } from '@/routes/constants'
-import { authInputClass, authPrimaryButtonClass } from '@/pages/auth/components/authFormStyles'
 
 interface AgencyCareRegistrationFormProps {
   token: string
@@ -97,17 +97,17 @@ function RegistrationFields({ token, needsOrganization = false, onRegistered }: 
     }
   }
 
-  return <form onSubmit={submit} className="space-y-4">
-    <div className="space-y-2"><Label htmlFor="care-register-name">Full name</Label><Input id="care-register-name" autoComplete="name" required value={fullName} onChange={(event) => setFullName(event.target.value)} className={authInputClass} /></div>
-    {needsOrganization && <div className="space-y-2"><Label htmlFor="care-register-agency">Agency name</Label><Input id="care-register-agency" autoComplete="organization" required value={agencyName} onChange={(event) => setAgencyName(event.target.value)} className={authInputClass} /></div>}
+  return <form onSubmit={submit} className="ac-stack ac-auth-form">
+    <div className="space-y-2"><Label htmlFor="care-register-name">Full name</Label><Input id="care-register-name" autoComplete="name" required value={fullName} onChange={(event) => setFullName(event.target.value)} className="ac-auth-input" /></div>
+    {needsOrganization && <div className="space-y-2"><Label htmlFor="care-register-agency">Agency name</Label><Input id="care-register-agency" autoComplete="organization" required value={agencyName} onChange={(event) => setAgencyName(event.target.value)} className="ac-auth-input" /></div>}
     {stage === 'create' ? <>
-      <div className="space-y-2"><Label htmlFor="care-register-email">Email</Label><Input id="care-register-email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} className={authInputClass} /></div>
-      <div className="space-y-2"><Label htmlFor="care-register-password">Password</Label><Input id="care-register-password" type="password" autoComplete="new-password" required minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} className={authInputClass} /></div>
-    </> : <p className="text-sm text-slate-600">Continue as {auth.currentUser?.email}. {auth.currentUser?.emailVerified ? 'Your email is verified.' : 'Open the verification link in your email, then check below.'}</p>}
-    <label className="flex items-start gap-2 text-sm text-slate-600"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} className="mt-1 accent-[#00B4B8]" />I agree to the Agency Care terms and privacy policy (October 7, 2026).</label>
-    {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-    <p className="text-sm text-slate-600">Already have an account? <Link to={authRouteWithReturnTo(Routes.auth.login, returnTo)} className="text-[#00B4B8] hover:underline">Sign in</Link></p>
-    <Button type="submit" disabled={busy} className={authPrimaryButtonClass}>{busy ? 'Please wait…' : stage === 'create' ? 'Create account' : auth.currentUser?.emailVerified ? 'Continue with this account' : 'Check email verification'}</Button>
+      <div className="space-y-2"><Label htmlFor="care-register-email">Email</Label><Input id="care-register-email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} className="ac-auth-input" /></div>
+      <div className="space-y-2"><Label htmlFor="care-register-password">Password</Label><Input id="care-register-password" type="password" autoComplete="new-password" required minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} className="ac-auth-input" /></div>
+    </> : <p className="text-sm ac-muted">Continue as {auth.currentUser?.email}. {auth.currentUser?.emailVerified ? 'Your email is verified.' : 'Open the verification link in your email, then check below.'}</p>}
+    <label className="flex items-start gap-2 text-sm ac-muted"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} className="mt-1" />I agree to the Agency Care terms and privacy policy (October 7, 2026).</label>
+    {error && <CareNotice danger>{error}</CareNotice>}
+    <p className="text-sm ac-muted">Already have an account? <Link to={authRouteWithReturnTo(Routes.auth.login, returnTo)} className="ac-auth-link hover:underline">Sign in</Link></p>
+    <Button type="submit" aria-busy={busy} disabled={busy}>{busy && <LoaderCircle aria-hidden="true" className="size-4 motion-safe:animate-spin" />}{busy ? 'Please wait…' : stage === 'create' ? 'Create account' : auth.currentUser?.emailVerified ? 'Continue with this account' : 'Check email verification'}</Button>
     {stage === 'verify' && !auth.currentUser?.emailVerified && <Button type="button" variant="outline" disabled={busy} onClick={async () => {
       if (!auth.currentUser || pending.current) return
       pending.current = true

@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Link } from "react-router";
-import { Button } from "@/components/ui/button";
+import { Link, useSearchParams } from "react-router";
+import { Building2, ClipboardCheck, Clock3, FileText, MessageCircle, Plus } from "lucide-react";
 import { agencyCareApi } from "@/lib/api/agencyCare";
 import type { CareWorkspaceProps } from "./AgencyCareClientWorkspace";
 import { TeamForm } from "./CareTeam";
 import { hasCapability, useScopedRequest } from "./hooks";
 import {
+  CareButton as Button,
   CareEmpty,
   CareFailure,
   CareHeading,
@@ -42,6 +43,7 @@ export function CareOverviewPage(props: CareWorkspaceProps) {
                 variant={canReview ? "outline" : "default"}
                 onClick={() => setInviteOpen(true)}
               >
+                <Plus size={16} aria-hidden="true" />
                 Add an agency
               </Button>
             )}
@@ -52,10 +54,10 @@ export function CareOverviewPage(props: CareWorkspaceProps) {
         {hasCapability(network, "submit") && (
           <>
             <Button asChild variant="outline">
-              <Link to={`${base}/documents?create=1`}>Share a document</Link>
+              <Link to={`${base}/documents?create=1`}><FileText size={16} aria-hidden="true" />Share a document</Link>
             </Button>
             <Button asChild variant="outline">
-              <Link to={`${base}/updates?create=1`}>Submit an update</Link>
+              <Link to={`${base}/updates?create=1`}><ClipboardCheck size={16} aria-hidden="true" />Submit an update</Link>
             </Button>
           </>
         )}
@@ -95,9 +97,14 @@ export function CareOverviewPage(props: CareWorkspaceProps) {
                 <ul className="ac-list">
                   {summary.data.pendingActions.map((action) => (
                     <li key={action.id}>
-                      <div>
-                        <strong>{action.title}</strong>
-                        {action.description && <p>{action.description}</p>}
+                      <div className="ac-row-main">
+                        <span className="ac-row-icon" aria-hidden="true">
+                          {action.conversationId ? <MessageCircle size={18} /> : action.submissionId ? <FileText size={18} /> : <Building2 size={18} />}
+                        </span>
+                        <div className="ac-row-copy">
+                          <strong>{action.title}</strong>
+                          {action.description && <p>{action.description}</p>}
+                        </div>
                       </div>
                       <Button asChild variant="outline">
                         <Link
@@ -176,14 +183,17 @@ export function CareActivityPage({
   agencyKey,
 }: CareWorkspaceProps) {
   const [cursor, setCursor] = useState("");
-  const activity = useScopedRequest(`${scope}|${cursor}`, (signal) =>
-    agencyCareApi.activity(network.id, { agencyKey, cursor, signal }),
+  const [search] = useSearchParams();
+  const selectedEvent = search.get("event") || "";
+  const activity = useScopedRequest(`${scope}|${selectedEvent}|${cursor}`, (signal) =>
+    agencyCareApi.activity(network.id, { agencyKey, ...(selectedEvent ? { event: selectedEvent } : { cursor }), signal }),
   );
   return (
     <div className="ac-stack">
       <CareHeading
         title="Care activity"
-        description="Authorized events and changes in this client’s care workspace."
+        description={selectedEvent ? "The care activity linked to your notification." : "Authorized events and changes in this client’s care workspace."}
+        actions={selectedEvent && <Button asChild variant="outline"><Link to={`?agencyKey=${encodeURIComponent(agencyKey)}`}>View all activity</Link></Button>}
       />
       {activity.loading ? (
         <CareLoad />
@@ -191,27 +201,30 @@ export function CareActivityPage({
         <CareFailure message={activity.error} onRetry={activity.reload} />
       ) : (
         <>
-          <CarePanel title="Recent activity">
+          <CarePanel title={selectedEvent ? "Notification details" : "Recent activity"}>
             {activity.data?.items.length ? (
               <ol className="ac-timeline">
                 {activity.data.items.map((event) => (
                   <li key={event.id}>
-                    <strong>{careLabel(event.action)}</strong>
-                    <p>{event.description}</p>
-                    <small>
-                      {event.actorName ? `${event.actorName} · ` : ""}
-                      {careDate(event.createdAt)}
-                    </small>
+                    <span className="ac-timeline-marker" aria-hidden="true"><Clock3 size={15} /></span>
+                    <div className="ac-timeline-copy">
+                      <strong>{event.title || careLabel(event.action)}</strong>
+                      <p>{event.description}</p>
+                      <small>
+                        {event.actorName ? `${event.actorName} · ` : ""}
+                        {careDate(event.createdAt)}
+                      </small>
+                    </div>
                   </li>
                 ))}
               </ol>
             ) : (
-              <CareEmpty title="No visible activity">
-                Care events within your authorized audience appear here.
+              <CareEmpty title={selectedEvent ? "This activity is no longer available" : "No visible activity"}>
+                {selectedEvent ? "The event may have been removed or your access changed. View all activity to see the events currently available to you." : "Care events within your authorized audience appear here."}
               </CareEmpty>
             )}
           </CarePanel>
-          <CarePager cursor={activity.data?.nextCursor} onNext={setCursor} />
+          {!selectedEvent && <CarePager cursor={activity.data?.nextCursor} onNext={setCursor} />}
         </>
       )}
     </div>

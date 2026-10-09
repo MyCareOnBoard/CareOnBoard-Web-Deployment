@@ -1,0 +1,45 @@
+.agency-care .ac-staff-intro { margin-bottom: 18px; }
+.agency-care .ac-staff-note { font-size: 12px; }
+.agency-care .ac-staff-summary { display: flex; flex-wrap: wrap; gap: 24px; margin-bottom: 16px; }
+.agency-care .ac-staff-summary small, .agency-care .ac-staff-summary strong { display: block; }
+.agency-care .ac-staff-summary small { color: var(--ac-muted); margin-bottom: 4px; }
+.agency-care .ac-staff-table-wrap { overflow-x: auto; }
+.agency-care .ac-staff-table { width: 100%; border-collapse: collapse; text-align: left; }
+.agency-care .ac-staff-table th { padding: 10px 16px; background: var(--ac-hover); color: var(--ac-muted); font-size: 12px; font-weight: 500; }
+.agency-care .ac-staff-table td { padding: 16px; border-top: 1px solid var(--ac-border); vertical-align: middle; }
+.agency-care .ac-staff-table td:last-child { text-align: right; }
+.agency-care .ac-staff-table td .ac-status { margin-top: 5px; }
+.agency-care .ac-staff-source { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--ac-border); margin-bottom: 14px; }
+.ac-staff-dialog .ac-staff-search { display: flex; align-items: center; gap: 8px; }
+.ac-staff-dialog .ac-staff-search > svg { color: var(--ac-muted); flex-shrink: 0; }
+.ac-staff-dialog .ac-staff-search input { min-width: 0; }
+.ac-staff-dialog .ac-staff-search button { flex-shrink: 0; padding: 8px; }
+.ac-staff-dialog .ac-staff-roster { display: grid; gap: 8px; }
+.ac-staff-dialog .ac-staff-candidate { display: flex; align-items: center; gap: 12px; border: 1px solid var(--ac-border); border-radius: 12px; padding: 12px; cursor: pointer; }
+.ac-staff-dialog .ac-staff-candidate:has(input:disabled) { cursor: default; background: var(--ac-hover); }
+.ac-staff-dialog .ac-staff-candidate .ac-person { flex: 1; min-width: 0; }
+.ac-staff-dialog input[type=radio], .ac-staff-dialog input[type=checkbox] { accent-color: var(--ac-teal); width: 18px; height: 18px; flex-shrink: 0; }
+.ac-staff-dialog .ac-staff-selected { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border-radius: 12px; background: var(--ac-hover); }
+.ac-staff-dialog .ac-staff-presets { display: grid; gap: 8px; }
+.ac-staff-dialog .ac-staff-preset { display: flex; align-items: flex-start; gap: 10px; border: 1px solid var(--ac-border); border-radius: 12px; padding: 12px; cursor: pointer; }
+.ac-staff-dialog .ac-staff-preset:has(input:checked) { background: var(--ac-soft); border-color: var(--ac-teal); }
+.ac-staff-dialog .ac-staff-preset input, .ac-staff-dialog .ac-staff-primary input { margin-top: 3px; }
+.ac-staff-dialog .ac-staff-preset strong, .ac-staff-dialog .ac-staff-preset small, .ac-staff-dialog .ac-staff-primary small { display: block; }
+.ac-staff-dialog .ac-staff-preset small, .ac-staff-dialog .ac-staff-primary small { color: var(--ac-muted); margin-top: 3px; }
+.ac-staff-dialog .ac-staff-primary { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.ac-staff-dialog .ac-staff-remove { color: var(--ac-danger); justify-self: start; }
+.ac-staff-dialog .ac-dialog-footer > small { margin-right: auto; color: var(--ac-muted); }
+@media (max-width: 600px) {
+  .agency-care .ac-staff-table thead { display: none; }
+  .agency-care .ac-staff-table tr { display: block; padding: 14px; border-top: 1px solid var(--ac-border); }
+  .agency-care .ac-staff-table td { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border: 0; }
+  .agency-care .ac-staff-table td[data-label]::before { content: attr(data-label); color: var(--ac-muted); font-size: 12px; }
+  .agency-care .ac-staff-table td:last-child { justify-content: flex-end; }
+  .ac-staff-dialog .ac-staff-candidate { flex-wrap: wrap; }
+  .ac-staff-dialog .ac-staff-candidate .ac-person { min-width: 160px; }
+  .ac-staff-dialog .ac-dialog-footer > small { flex-basis: 100%; }
+}
+.agency-care .ac-shared-team { list-style:none; padding:12px 0 0; display:grid; gap:12px; }
+.agency-care .ac-shared-team > li { display:flex; align-items:center; gap:12px; border:0; padding:0; }
+.agency-care .ac-notification-target { background:var(--ac-soft); outline:2px solid var(--ac-teal); outline-offset:3px; scroll-margin-top:130px; }
+.agency-care li.ac-notification-target, .agency-care div.ac-notification-target { border-radius:10px; padding-inline:12px; }

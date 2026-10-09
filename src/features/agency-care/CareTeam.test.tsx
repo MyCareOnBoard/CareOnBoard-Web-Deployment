@@ -5,7 +5,9 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { expect, it, vi } from "vitest";
+import type { ReactNode } from "react";
+import { Link, MemoryRouter } from "react-router";
+import { beforeEach, expect, it, vi } from "vitest";
 import { agencyCareApi, type CareNetwork } from "@/lib/api/agencyCare";
 import { CareTeamPage } from "./CareTeam";
 
@@ -14,9 +16,26 @@ vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast }) }));
 vi.mock("@/lib/api/clients", () => ({ listClients: vi.fn() }));
 vi.mock("./AgencyCareLayout", () => ({
   useAgencyCare: () => ({
-    organization: { id: "sc-agency", kind: "internal", name: "SC agency" },
+    organization: { id: "sc-agency", kind: "internal", name: "SC agency", role: "administrator" },
   }),
 }));
+
+function renderTeam(children: ReactNode, entry = "/agency-care/networks/care-network/team") {
+  return render(<MemoryRouter initialEntries={[entry]}>{children}</MemoryRouter>);
+}
+const notificationNetwork: CareNetwork = {
+  id: "care-network", sourceClient: { clientId: "client", agencyId: "sc-agency", program: "sc" },
+  client: { id: "client", name: "Client" }, lifecycle: "active", revision: 1, reviewer: false,
+  capabilities: ["view", "invite", "manage"],
+};
+function notificationTeam(network = notificationNetwork) {
+  return <CareTeamPage network={network} scope="uid|internal:sc-agency|care-network" agencyKey="internal:sc-agency" refreshNetwork={() => {}} />;
+}
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(agencyCareApi.relationships).mockResolvedValue({ items: [], nextCursor: null });
+  vi.mocked(agencyCareApi.grants).mockResolvedValue({ items: [], nextCursor: null });
+});
 vi.mock("@/lib/api/agencyCare", () => ({
   agencyCareApi: {
     relationships: vi.fn().mockResolvedValue({ items: [], nextCursor: null }),
@@ -67,7 +86,7 @@ vi.mock("@/lib/api/agencyCare", () => ({
       nextCursor: null,
     }),
     invitationAction: vi.fn().mockResolvedValue({ id: "replacement" }),
-    grants: vi.fn(),
+    grants: vi.fn().mockResolvedValue({ items: [], nextCursor: null }),
     networkMembers: vi.fn(),
     grant: vi.fn(),
   },
@@ -82,9 +101,9 @@ it("separates sent email from acceptance and explains uncertain delivery without
     revision: 1,
     permissionRevision: 1,
     reviewer: false,
-    capabilities: ["view", "invite"],
+    capabilities: ["view", "invite", "manage"],
   };
-  render(
+  renderTeam(
     <CareTeamPage
       network={network}
       scope="uid|internal:sc-agency|care-network"
@@ -147,6 +166,9 @@ it("shows an existing grant member when they are outside the current candidate p
     nextCursor: null,
   });
   vi.mocked(agencyCareApi.networkMembers).mockResolvedValue({
+    relationshipRevision: 1,
+    primaryContactUid: null,
+    allowedCapabilities: ["view", "send"],
     items: [
       {
         uid: "first-member",
@@ -167,7 +189,7 @@ it("shows an existing grant member when they are outside the current candidate p
     reviewer: false,
     capabilities: ["view", "manage"],
   };
-  render(
+  renderTeam(
     <CareTeamPage
       network={network}
       scope="uid|internal:sc-agency|care-network"
@@ -175,8 +197,7 @@ it("shows an existing grant member when they are outside the current candidate p
       refreshNetwork={() => {}}
     />,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Client access" }));
-  fireEvent.click(await screen.findByRole("button", { name: "Edit access" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Edit authorized access" }));
   const dialog = within(await screen.findByRole("dialog"));
   const member = await dialog.findByRole("combobox");
   expect(member).toHaveValue("later-member");
@@ -191,6 +212,9 @@ it("assigns client access to a permitted member from a later page", async () => 
   vi.mocked(agencyCareApi.grants).mockResolvedValue({ items: [], nextCursor: null });
   vi.mocked(agencyCareApi.networkMembers).mockImplementation(
     async (_networkId, options) => ({
+      relationshipRevision: 1,
+      primaryContactUid: null,
+      allowedCapabilities: ["view", "send"],
       items: [
         {
           uid: options?.cursor ? "later-member" : "first-member",
@@ -221,7 +245,7 @@ it("assigns client access to a permitted member from a later page", async () => 
     reviewer: false,
     capabilities: ["view", "manage"],
   };
-  render(
+  renderTeam(
     <CareTeamPage
       network={network}
       scope="uid|internal:sc-agency|care-network"
@@ -229,9 +253,8 @@ it("assigns client access to a permitted member from a later page", async () => 
       refreshNetwork={() => {}}
     />,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Client access" }));
   fireEvent.click(
-    await screen.findByRole("button", { name: "Assign permitted user" }),
+    await screen.findByRole("button", { name: "Manage other authorized client access" }),
   );
   const dialog = within(await screen.findByRole("dialog"));
   const member = await dialog.findByRole("combobox");
@@ -264,4 +287,75 @@ it("assigns client access to a permitted member from a later page", async () => 
       expect.objectContaining({ agencyKey: "internal:sc-agency" }),
     ),
   );
+});
+
+it("keeps employee team navigation read-only and omits the administrator-only invitations view", async () => {
+  const network: CareNetwork = {
+    id: "care-network", sourceClient: { clientId: "client", agencyId: "sc-agency", program: "sc" },
+    client: { id: "client", name: "Client" }, lifecycle: "active", revision: 1, reviewer: false, capabilities: ["view"],
+  };
+  renderTeam(<CareTeamPage network={network} scope="employee|internal:sc-agency|care-network" agencyKey="internal:sc-agency" refreshNetwork={() => {}} />);
+  expect(screen.getByRole("button", { name: "My agency’s staff" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Connected agencies" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Client record connections" })).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Invitations" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Assign staff" })).not.toBeInTheDocument();
+  await screen.findByText("No additional staff assigned");
+});
+
+it("opens a notification's agency view, explains an off-page target and focuses only the authorized matching row", async () => {
+  vi.mocked(agencyCareApi.relationships).mockImplementation(async (_network, options) => ({
+    items: [{ agencyKey: options?.cursor ? "internal:partner" : "internal:other", name: options?.cursor ? "Partner agency" : "Other agency", kind: "internal", state: "active", revision: 1 }],
+    nextCursor: options?.cursor ? null : "team-next",
+  }));
+  renderTeam(notificationTeam(), "/agency-care/networks/care-network/team?agencyKey=internal:sc-agency&section=relationships&agency=internal:partner");
+  expect(screen.getByRole("button", { name: "Connected agencies" })).toHaveAttribute("aria-pressed", "true");
+  expect(await screen.findByText(/agency referenced by this notification is not on this page/)).toBeVisible();
+  expect(screen.getByText("Other agency").closest("li")).not.toHaveClass("ac-notification-target");
+  expect(agencyCareApi.grants).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+  const row = (await screen.findByText("Partner agency")).closest("li")!;
+  expect(row).toHaveClass("ac-notification-target");
+  await waitFor(() => expect(row).toHaveFocus());
+  expect(agencyCareApi.relationships).toHaveBeenLastCalledWith("care-network", expect.objectContaining({ agencyKey: "internal:sc-agency", cursor: "team-next" }));
+  expect(agencyCareApi.invitationAction).not.toHaveBeenCalled();
+});
+
+it("opens the exact invitation and shows its current status rather than a stale notification state", async () => {
+  vi.mocked(agencyCareApi.invitations).mockResolvedValue({ items: [{ id: "old-invitation", purpose: "client_connection", agencyName: "Invited agency", status: "expired", revision: 4 }], nextCursor: null });
+  renderTeam(<><Link to="?section=invitations&invitation=old-invitation">Open invitation notice</Link>{notificationTeam()}</>);
+  expect(screen.getByRole("button", { name: "My agency’s staff" })).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(screen.getByRole("link", { name: "Open invitation notice" }));
+  const row = (await screen.findByText("Invited agency")).closest("li")!;
+  expect(screen.getByRole("button", { name: "Invitations" })).toHaveAttribute("aria-pressed", "true");
+  expect(row).toHaveClass("ac-notification-target");
+  expect(within(row).getByText("Expired")).toBeVisible();
+  expect(within(row).queryByRole("button", { name: "Resend" })).not.toBeInTheDocument();
+  await waitFor(() => expect(row).toHaveFocus());
+  fireEvent.click(screen.getByRole("button", { name: "Connected agencies" }));
+  await screen.findByText("No records in this view");
+  expect(screen.queryByText(/record referenced by your notification is highlighted/)).not.toBeInTheDocument();
+  expect(agencyCareApi.invitationAction).not.toHaveBeenCalled();
+});
+
+it("keeps inaccessible invitation links in the current employee team without requesting administrator data", async () => {
+  renderTeam(notificationTeam({ ...notificationNetwork, capabilities: ["view"] }), "/agency-care/networks/care-network/team?section=invitations&invitation=private-invitation");
+  expect(await screen.findByText(/invitation referenced by this notification is unavailable with your current access/)).toBeVisible();
+  expect(screen.getByRole("button", { name: "My agency’s staff" })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.queryByRole("button", { name: "Invitations" })).not.toBeInTheDocument();
+  await screen.findByText("No additional staff assigned");
+  expect(agencyCareApi.invitations).not.toHaveBeenCalled();
+  expect(agencyCareApi.grants).not.toHaveBeenCalled();
+  expect(agencyCareApi.networkMembers).not.toHaveBeenCalled();
+});
+
+it("routes a staff notification to the read-only own team and never loads an assignment form", async () => {
+  vi.mocked(agencyCareApi.relationships).mockResolvedValue({ items: [{ agencyKey: "internal:sc-agency", name: "SC agency", state: "active", revision: 1, members: [{ uid: "staff", agencyKey: "internal:sc-agency", name: "Assigned colleague", careRole: "dsp" }] }], nextCursor: null });
+  renderTeam(notificationTeam({ ...notificationNetwork, capabilities: ["view"] }), "/agency-care/networks/care-network/team?section=grants&staff=staff");
+  const row = (await screen.findByText("Assigned colleague")).closest("li")!;
+  expect(row).toHaveClass("ac-notification-target");
+  await waitFor(() => expect(row).toHaveFocus());
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(agencyCareApi.grants).not.toHaveBeenCalled();
+  expect(agencyCareApi.networkMembers).not.toHaveBeenCalled();
 });

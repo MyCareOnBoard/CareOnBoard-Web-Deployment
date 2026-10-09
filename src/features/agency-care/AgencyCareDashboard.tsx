@@ -1,9 +1,9 @@
 import { Link } from "react-router";
-import { Button } from "@/components/ui/button";
+import { ArrowRight, RefreshCw } from "lucide-react";
 import { agencyCareApi, type CareDashboardClient } from "@/lib/api/agencyCare";
 import { useAgencyCare } from "./AgencyCareLayout";
 import { useScopedRequest } from "./hooks";
-import { CareEmpty, CareFailure, CareHeading, CareLoad, CarePanel, CareStatus } from "./ui";
+import { CareButton as Button, CarePerson, CareEmpty, CareFailure, CareHeading, CareLoad, CarePanel, CareStatus } from "./ui";
 
 export function AgencyCareDashboard() {
   const { scope, agencyKey, organization } = useAgencyCare();
@@ -36,7 +36,7 @@ export function AgencyCareDashboard() {
   ];
   return (
     <div className="ac-stack">
-      <CareHeading title="Dashboard" description={`${organization.name} · Your connected care at a glance.`} actions={<Button variant="outline" onClick={dashboard.reload}>Refresh</Button>} />
+      <CareHeading title="Dashboard" description={`${organization.name} · Your connected care at a glance.`} actions={<Button variant="outline" onClick={dashboard.reload}><RefreshCw size={16} aria-hidden="true" />Refresh</Button>} />
       {dashboard.loading ? <CareLoad /> : dashboard.error ? <CareFailure message={dashboard.error} onRetry={dashboard.reload} /> : (
         <>
           <div className="ac-metrics">
@@ -48,7 +48,7 @@ export function AgencyCareDashboard() {
               </div>
             ))}
           </div>
-          <small>Counts include the clients and submissions available to your current access. Publication issues cover clients you can review.</small>
+          <small className="ac-muted">Counts include the clients and submissions available to your current access. Publication issues cover clients you can review.</small>
           {reviewClients.length > 0 && (reviewablePending + publicationActions > 0) && (
             <CarePanel title="Needs attention">
               <div className="ac-actions">
@@ -59,14 +59,19 @@ export function AgencyCareDashboard() {
           )}
           <CarePanel title="Client workspaces" actions={<Button asChild variant="outline"><Link to="/agency-care/clients">View all clients</Link></Button>}>
             {clients.length ? (
-              <div className="ac-list">
+              <ul className="ac-list">
                 {clients.slice(0, 5).map((client) => (
-                  <div className="ac-list-row" key={client.networkId}>
-                    <Link to={`/agency-care/networks/${encodeURIComponent(client.networkId)}/overview`}>{client.clientName}</Link>
+                  <li className="ac-person-row" key={client.networkId}>
+                    <CarePerson name={client.clientName} detail={`${client.pendingDocuments} documents · ${client.pendingUpdates} updates awaiting review`} />
                     <CareStatus>{client.lifecycle}</CareStatus>
-                  </div>
+                    <Button asChild variant="ghost">
+                      <Link to={`/agency-care/networks/${encodeURIComponent(client.networkId)}/overview`} aria-label={`Open workspace for ${client.clientName}`}>
+                        Open workspace <ArrowRight size={16} aria-hidden="true" />
+                      </Link>
+                    </Button>
+                  </li>
                 ))}
-              </div>
+              </ul>
             ) : <CareEmpty title="No connected clients yet">Your dashboard will show care activity when you have access to a connected client.</CareEmpty>}
           </CarePanel>
         </>

@@ -85,6 +85,7 @@ export function ProtectedDocumentPreview({
   const restoreFocus = useCareDialogFocus(Boolean(item));
   return (
     <DocumentPreviewModal
+      className="ac-dialog ac-document-preview"
       open={Boolean(item)}
       onOpenChange={(open) => {
         if (!open) {

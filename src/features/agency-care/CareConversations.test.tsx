@@ -94,3 +94,80 @@ it("starts no hidden request and clears the previous conversation before a scope
   );
   expect(result.current.items).toEqual([message]);
 });
+
+it("loads the notification's historical message and resumes latest polling after leaving the anchor", async () => {
+  const { result, rerender } = renderHook(
+    ({ anchor }) =>
+      useActiveConversation(
+        "uid|agency|client",
+        "conversation",
+        "external:p",
+        anchor,
+      ),
+    { initialProps: { anchor: "m1" } },
+  );
+  await flush();
+  expect(agencyCareApi.messages).toHaveBeenLastCalledWith(
+    "conversation",
+    expect.objectContaining({ message: "m1", agencyKey: "external:p" }),
+  );
+  expect(result.current.history).toBe(true);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(15_000);
+  });
+  expect(agencyCareApi.messages).toHaveBeenCalledTimes(1);
+  rerender({ anchor: "" });
+  expect(result.current.items).toEqual([]);
+  await flush();
+  expect(result.current.history).toBe(false);
+  expect(agencyCareApi.messages).toHaveBeenLastCalledWith(
+    "conversation",
+    expect.not.objectContaining({ message: "m1" }),
+  );
+});
+
+it("clears content when the referenced message is no longer accessible", async () => {
+  vi.mocked(agencyCareApi.messages).mockRejectedValueOnce({
+    response: { status: 404 },
+  });
+  const { result } = renderHook(() =>
+    useActiveConversation(
+      "uid|agency|client",
+      "conversation",
+      "external:p",
+      "removed",
+    ),
+  );
+  await flush();
+  expect(result.current.items).toEqual([]);
+  expect(result.current.loading).toBe(false);
+  expect(result.current.error).toBe(
+    "This item is unavailable with your current access.",
+  );
+  expect(result.current.history).toBe(true);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(15_000);
+  });
+  expect(agencyCareApi.messages).toHaveBeenCalledTimes(1);
+});
+
+it("returns to the latest bounded window after a failed incremental poll", async () => {
+  const { result } = renderHook(() =>
+    useActiveConversation("uid|agency|client", "conversation", "external:p"),
+  );
+  await flush();
+  vi.mocked(agencyCareApi.messages).mockRejectedValueOnce({
+    response: { status: 503 },
+  });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(5000);
+  });
+  expect(result.current.items).toEqual([]);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(5000);
+  });
+  expect(
+    vi.mocked(agencyCareApi.messages).mock.calls.at(-1)![1],
+  ).not.toHaveProperty("afterSequence");
+  expect(result.current.items).toEqual([message]);
+});

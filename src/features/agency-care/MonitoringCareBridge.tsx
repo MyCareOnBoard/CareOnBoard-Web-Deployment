@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router";
-import { Button } from "@/components/ui/button";
+import { LoaderCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/utils/auth/context/AuthContext";
@@ -17,6 +17,7 @@ import {
   type CarePreview,
 } from "./ProtectedDocumentPreview";
 import {
+  CareButton as Button,
   CareEmpty,
   CareFailure,
   CareFormDialog,
@@ -282,13 +283,15 @@ function MonitoringCareBridgeState({
         />
       )}
       <CareFormDialog
+        className="ac-form-dialog"
         open={Boolean(remove)}
         title="Remove evidence link"
         description={recordLabel || "This saved monitoring record"}
         onClose={() => setRemove(null)}
         busy={mutation.saving}
       >
-        <form className="ac-stack" onSubmit={(event) => void unlink(event)}>
+        <form className="ac-dialog-form" onSubmit={(event) => void unlink(event)}>
+          <fieldset className="ac-dialog-body ac-stack" disabled={mutation.saving}>
           <CareNotice>
             The original link, approved version, source receipt and private
             history stay recorded. Removal changes only this link’s current
@@ -304,13 +307,8 @@ function MonitoringCareBridgeState({
             />
           </label>
           {mutation.error && <CareNotice danger>{mutation.error}</CareNotice>}
-          <div className="ac-actions">
-            <Button
-              type="submit"
-              disabled={mutation.saving || mutation.uncertain}
-            >
-              Remove link
-            </Button>
+          </fieldset>
+          <div className="ac-dialog-footer">
             <Button
               type="button"
               variant="outline"
@@ -318,6 +316,10 @@ function MonitoringCareBridgeState({
               onClick={() => setRemove(null)}
             >
               Keep link
+            </Button>
+            <Button type="submit" variant="destructive" disabled={mutation.saving || mutation.uncertain}>
+              {mutation.saving && <LoaderCircle aria-hidden="true" className="motion-safe:animate-spin" />}
+              Remove link
             </Button>
           </div>
         </form>
@@ -428,10 +430,12 @@ function SavedEvidencePicker({
     candidates.data?.items.filter(
       (item) => item.sourceClientId === target.clientId,
     ) || [];
+  const chosen = !candidates.loading && !candidates.error ? eligible.find((item) =>
+    item.publicationId === selected && item.eligible !== false && item.publicationId !== correction?.publicationId,
+  ) : undefined;
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const chosen = eligible.find((item) => item.publicationId === selected);
-    if (!chosen || chosen.eligible === false || (correction && !reason.trim()))
+    if (!chosen || (correction && !reason.trim()))
       return;
     const saved = await mutation.run((operationId, signal) =>
       agencyCareApi.linkEvidence(
@@ -455,6 +459,7 @@ function SavedEvidencePicker({
   }
   return (
     <CareFormDialog
+      className="ac-form-dialog"
       open
       title={correction ? "Correct evidence link" : "Add approved evidence"}
       description={
@@ -464,7 +469,8 @@ function SavedEvidencePicker({
       onClose={onClose}
       busy={mutation.saving}
     >
-      <form className="ac-stack" onSubmit={(event) => void save(event)}>
+      <form className="ac-dialog-form" onSubmit={(event) => void save(event)}>
+        <fieldset className="ac-dialog-body ac-stack" disabled={mutation.saving}>
         <CareNotice>
           {correction
             ? "The old link and exact target stay in private history. A correction records its removal and appends the newly selected approved publication."
@@ -482,7 +488,7 @@ function SavedEvidencePicker({
             excluded={correction?.publicationId}
           />
         )}
-        <CarePager cursor={candidates.data?.nextCursor} onNext={setCursor} />
+        <CarePager cursor={candidates.data?.nextCursor} onNext={(next) => { setSelected(""); setCursor(next); }} />
         {correction && (
           <label className="ac-field">
             <span>Correction reason</span>
@@ -495,13 +501,8 @@ function SavedEvidencePicker({
           </label>
         )}
         {mutation.error && <CareNotice danger>{mutation.error}</CareNotice>}
-        <div className="ac-actions">
-          <Button
-            type="submit"
-            disabled={!selected || mutation.saving || mutation.uncertain}
-          >
-            {correction ? "Record correction" : "Link selected version"}
-          </Button>
+        </fieldset>
+        <div className="ac-dialog-footer">
           <Button
             type="button"
             variant="outline"
@@ -509,6 +510,10 @@ function SavedEvidencePicker({
             onClick={onClose}
           >
             Cancel
+          </Button>
+          <Button type="submit" disabled={!chosen || Boolean(correction && !reason.trim()) || mutation.saving || mutation.uncertain}>
+            {mutation.saving && <LoaderCircle aria-hidden="true" className="motion-safe:animate-spin" />}
+            {correction ? "Record correction" : "Link selected version"}
           </Button>
         </div>
       </form>
@@ -574,11 +579,14 @@ export function MonitoringDraftEvidence({
         </div>
       </CarePanel>
       <CareFormDialog
+        className="ac-form-dialog"
         open={open}
         title="Select evidence for this contact draft"
         description="The selection is staged until the complete contact is saved."
         onClose={() => setOpen(false)}
       >
+        <div className="ac-dialog-form">
+        <div className="ac-dialog-body ac-stack">
         {candidates.loading ? (
           <CareLoad rows={1} />
         ) : candidates.error ? (
@@ -592,11 +600,13 @@ export function MonitoringDraftEvidence({
             onSelect={setChoice}
           />
         )}
-        <CarePager cursor={candidates.data?.nextCursor} onNext={setCursor} />
-        <div className="ac-actions">
+        <CarePager cursor={candidates.data?.nextCursor} onNext={(next) => { setChoice(""); setCursor(next); }} />
+        </div>
+        <div className="ac-dialog-footer">
+          <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
           <Button
             type="button"
-            disabled={!choice}
+            disabled={candidates.loading || Boolean(candidates.error) || !eligible.some((item) => item.publicationId === choice && item.eligible !== false && !selected.includes(item.publicationId))}
             onClick={() => {
               if (
                 eligible.some(
@@ -612,13 +622,7 @@ export function MonitoringDraftEvidence({
           >
             Stage this exact version
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setOpen(false)}
-          >
-            Cancel
-          </Button>
+        </div>
         </div>
       </CareFormDialog>
     </div>
@@ -640,6 +644,7 @@ function PartnerRequestForm({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { user } = useAuth();
   const network = useScopedRequest(`${scope}|request-network`, (signal) =>
     agencyCareApi.networkForClient(target.clientId, "sc", {
       agencyKey,
@@ -661,7 +666,10 @@ function PartnerRequestForm({
     team.data?.items
       .filter((item) => item.state === "active")
       .flatMap((item) =>
-        (item.members || []).map((member) => ({
+        (item.members || []).filter((member) =>
+          (member.canMessage === true || (member.canMessage === undefined && member.capabilities?.includes("send"))) &&
+          !(member.uid === user?.uid && item.agencyKey === agencyKey),
+        ).map((member) => ({
           ...member,
           agencyKey: item.agencyKey,
           agencyName: item.name,
@@ -727,13 +735,15 @@ function PartnerRequestForm({
   }
   return (
     <CareFormDialog
+      className="ac-form-dialog"
       open
       title="Ask a care partner"
       description={recordLabel || "Selected monitoring question"}
       onClose={onClose}
       busy={mutation.saving}
     >
-      <form className="ac-stack" onSubmit={(event) => void send(event)}>
+      <form className="ac-dialog-form" onSubmit={(event) => void send(event)}>
+        <fieldset className="ac-dialog-body ac-stack" disabled={mutation.saving}>
         {network.loading || team.loading || conversations.loading ? (
           <CareLoad rows={1} />
         ) : network.error || team.error || conversations.error ? (
@@ -812,7 +822,9 @@ function PartnerRequestForm({
         {(error || mutation.error) && (
           <CareNotice danger>{error || mutation.error}</CareNotice>
         )}
-        <div className="ac-actions">
+        </fieldset>
+        <div className="ac-dialog-footer">
+          <Button type="button" variant="outline" disabled={mutation.saving} onClick={onClose}>Cancel</Button>
           <Button
             type="submit"
             disabled={
@@ -822,15 +834,8 @@ function PartnerRequestForm({
               mutation.uncertain
             }
           >
+            {mutation.saving && <LoaderCircle aria-hidden="true" className="motion-safe:animate-spin" />}
             Send selected request
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={mutation.saving}
-            onClick={onClose}
-          >
-            Cancel
           </Button>
         </div>
       </form>
@@ -882,13 +887,15 @@ function MonitoringCompleteDialogState({
   }
   return (
     <CareFormDialog
+      className="ac-form-dialog"
       open={open}
       title="Record outcome and complete follow-up"
       description={label}
       onClose={onClose}
       busy={mutation.saving}
     >
-      <form className="ac-stack" onSubmit={(event) => void complete(event)}>
+      <form className="ac-dialog-form" onSubmit={(event) => void complete(event)}>
+        <fieldset className="ac-dialog-body ac-stack" disabled={mutation.saving}>
         <CareNotice>
           Review the supporting information and record the SC outcome
           explicitly. Care messages do not complete this monitoring action or
@@ -904,20 +911,15 @@ function MonitoringCompleteDialogState({
           />
         </label>
         {mutation.error && <CareNotice danger>{mutation.error}</CareNotice>}
-        <div className="ac-actions">
+        </fieldset>
+        <div className="ac-dialog-footer">
+          <Button type="button" variant="outline" disabled={mutation.saving} onClick={onClose}>Cancel</Button>
           <Button
             type="submit"
             disabled={!outcome.trim() || mutation.saving || mutation.uncertain}
           >
+            {mutation.saving && <LoaderCircle aria-hidden="true" className="motion-safe:animate-spin" />}
             Record outcome and complete
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={mutation.saving}
-            onClick={onClose}
-          >
-            Cancel
           </Button>
         </div>
       </form>

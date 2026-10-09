@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { agencyCareApi, type CareInvitation, type CareNetwork } from "@/lib/api/agencyCare";
-import { CareOverviewPage } from "./CareOverview";
+import { CareActivityPage, CareOverviewPage } from "./CareOverview";
 
 const toast = vi.hoisted(() => vi.fn());
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast }) }));
@@ -12,7 +12,7 @@ vi.mock("./AgencyCareLayout", () => ({
 }));
 vi.mock("@/lib/api/clients", () => ({ listClients: vi.fn() }));
 vi.mock("@/lib/api/agencyCare", () => ({
-  agencyCareApi: { overview: vi.fn(), invite: vi.fn(), directory: vi.fn(), networkMembers: vi.fn() },
+  agencyCareApi: { activity: vi.fn(), overview: vi.fn(), invite: vi.fn(), directory: vi.fn(), networkMembers: vi.fn() },
 }));
 const network: CareNetwork = {
   id: "care-network", sourceClient: { clientId: "client", agencyId: "sc", program: "sc" },
@@ -28,6 +28,21 @@ beforeEach(() => {
   vi.mocked(agencyCareApi.directory).mockReset().mockResolvedValue({ items: [], nextCursor: null });
 });
 afterEach(() => vi.useRealTimers());
+
+it("opens an exact authorized activity from a notification with its description", async () => {
+  vi.mocked(agencyCareApi.activity).mockResolvedValueOnce({ items: [{ id: "event-old", action: "USER_GRANT_CHANGED", title: "Care staff assignment updated", description: "The client care assignment was changed.", createdAt: "2026-10-09" }], nextCursor: null });
+  render(<MemoryRouter initialEntries={["/activity?event=event-old"]}><CareActivityPage {...props} /></MemoryRouter>);
+  expect(await screen.findByText("The client care assignment was changed.")).toBeVisible();
+  expect(screen.getByText("Care staff assignment updated")).toBeVisible();
+  expect(agencyCareApi.activity).toHaveBeenCalledWith(network.id, expect.objectContaining({ event: "event-old", agencyKey: props.agencyKey }));
+  expect(screen.getByRole("link", { name: "View all activity" })).toHaveAttribute("href", "/activity?agencyKey=internal%3Asc");
+});
+
+it("explains when an activity notification target is no longer available", async () => {
+  vi.mocked(agencyCareApi.activity).mockResolvedValueOnce({ items: [], nextCursor: null });
+  render(<MemoryRouter initialEntries={["/activity?event=removed"]}><CareActivityPage {...props} /></MemoryRouter>);
+  expect(await screen.findByRole("heading", { name: "This activity is no longer available" })).toBeVisible();
+});
 
 it("opens the existing invitation modal from overview and submits for this client and organization", async () => {
   render(<MemoryRouter><CareOverviewPage {...props} /></MemoryRouter>);
