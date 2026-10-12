@@ -1,7 +1,37 @@
 import { useState } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
-import { CareFailure, CareFormDialog, CarePager, CareRoleBadge } from "./ui";
+import { CareFailure, CareFormDialog, CareInvitationDelivery, CarePager, CareRoleBadge } from "./ui";
+
+it.each([
+  ["invitation_url_unavailable", "The invitation link is not configured."],
+  ["invitation_transport_unavailable", "The email service is not configured."],
+  ["invitation_signing_unavailable", "Secure invitation verification is not configured."],
+  ["invitation_configuration_unavailable", "Invitation email delivery is not configured."],
+])("explains external delivery configuration failure %s before resending", (reason, explanation) => {
+  const { rerender } = render(<CareInvitationDelivery delivery={{ status: "failed", reason }} showResendHint />);
+  expect(screen.getByText(explanation)).toBeInTheDocument();
+  expect(screen.getByText("Ask a platform administrator to fix delivery configuration before using Resend.")).toBeInTheDocument();
+  rerender(<CareInvitationDelivery delivery={{ status: "pending", reason, nextAttemptAt: "2026-10-12T12:00:00Z" }} showResendHint />);
+  expect(screen.getByText(explanation)).toBeInTheDocument();
+  expect(screen.queryByText("Invitation email queued.")).not.toBeInTheDocument();
+  expect(screen.queryByText(/Next delivery attempt:/)).not.toBeInTheDocument();
+});
+
+it("retains ordinary provider failure and internal administrator notification copy", () => {
+  const { rerender } = render(<CareInvitationDelivery delivery={{ status: "failed", reason: "provider_rejected" }} />);
+  expect(screen.getByText("Email delivery failed.")).toBeInTheDocument();
+  expect(screen.queryByText(/platform administrator/)).not.toBeInTheDocument();
+  rerender(<CareInvitationDelivery recipientMode="agency_administrators" delivery={{ status: "failed", reason: "invitation_configuration_unavailable" }} />);
+  expect(screen.getByText("Administrator notification delivery failed.")).toBeInTheDocument();
+  expect(screen.queryByText(/platform administrator/)).not.toBeInTheDocument();
+});
+
+it("retains uncertain email delivery and replacement invitation guidance", () => {
+  render(<CareInvitationDelivery delivery={{ status: "failed", reason: "ambiguous_provider_result" }} showResendHint />);
+  expect(screen.getByText("Email delivery uncertain.")).toBeInTheDocument();
+  expect(screen.getByText("Resend creates a replacement invitation.")).toBeInTheDocument();
+});
 
 it("reserves the SC badge for coordinators and leaves unrecorded roles unlabeled", () => {
   render(<>

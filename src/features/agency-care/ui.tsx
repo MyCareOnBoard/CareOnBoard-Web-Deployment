@@ -104,6 +104,16 @@ export function CareInvitationDelivery({
     ["ambiguous_provider_result", "ambiguous_expired_lease"].includes(
       delivery.reason || "",
     );
+  const configurationLabels: Record<string, string> = {
+    invitation_url_unavailable: "The invitation link is not configured.",
+    invitation_transport_unavailable: "The email service is not configured.",
+    invitation_signing_unavailable: "Secure invitation verification is not configured.",
+    invitation_configuration_unavailable: "Invitation email delivery is not configured.",
+  };
+  const configurationLabel = configurationLabels[delivery?.reason || ""];
+  const configurationBlocked = recipientMode !== "agency_administrators" &&
+    (delivery?.status === "pending" || delivery?.status === "failed") &&
+    typeof configurationLabel === "string";
   const labels = recipientMode === "agency_administrators" ? {
     pending: "Administrator notifications pending.",
     processing: "Preparing administrator notifications.",
@@ -122,14 +132,19 @@ export function CareInvitationDelivery({
   return (
     <div className="ac-muted">
       <p>
-        {uncertain
+        {configurationBlocked
+          ? configurationLabel
+          : uncertain
           ? "Email delivery uncertain."
           : labels[delivery?.status || "unavailable"]}
       </p>
+      {configurationBlocked && (
+        <p>Ask a platform administrator to fix delivery configuration before using Resend.</p>
+      )}
       {uncertain && showResendHint && (
         <p>Resend creates a replacement invitation.</p>
       )}
-      {delivery?.status === "pending" && delivery.nextAttemptAt && (
+      {!configurationBlocked && delivery?.status === "pending" && delivery.nextAttemptAt && (
         <p>Next delivery attempt: {careDate(delivery.nextAttemptAt)}</p>
       )}
     </div>
