@@ -73,6 +73,13 @@ export default function FamilyLoginPage() {
     const [inlineError, setInlineError] = useState("")
     const [resendSeconds, setResendSeconds] = useState(0)
     const resendTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+    const linkPendingRef = useRef(false)
+    const mountedRef = useRef(false)
+
+    useEffect(() => {
+        mountedRef.current = true
+        return () => { mountedRef.current = false }
+    }, [])
 
     const startResendCountdown = useCallback(() => {
         setResendSeconds(RESEND_COOLDOWN_SEC)
@@ -131,15 +138,20 @@ export default function FamilyLoginPage() {
      * routes in: the portal only trusts the server's answer about who this is.
      */
     const finishSignIn = useCallback(async (onFailure: () => void) => {
+        const uid = auth.currentUser?.uid
+        const tenantId = auth.tenantId
+        if (!uid) return
         try {
             const response = await axiosClient.post<{ success: boolean; data: User }>(
                 "/familyPortal/verify"
             )
+            if (!mountedRef.current || auth.currentUser?.uid !== uid || auth.tenantId !== tenantId) return
 
             const user = response.data.data
             dispatch(setUser({...user, userType: UserType.FAMILY_MEMBER}))
             navigate(Routes.family.dashboard, {replace: true})
         } catch (err: unknown) {
+            if (!mountedRef.current || auth.currentUser?.uid !== uid || auth.tenantId !== tenantId) return
             const axiosErr = err as { response?: { status?: number; data?: { message?: string } }; message?: string }
             const status = axiosErr.response?.status
             const serverMsg = axiosErr.response?.data?.message
@@ -162,7 +174,7 @@ export default function FamilyLoginPage() {
             // record, and leaving it signed in would strand the app in a state the
             // route guards read as "logged in".
             await signOut(auth)
-            onFailure()
+            if (mountedRef.current && !auth.currentUser && auth.tenantId === tenantId) onFailure()
         }
     }, [dispatch, navigate, toast])
 
@@ -247,34 +259,38 @@ export default function FamilyLoginPage() {
         let cancelled = false
 
         const completeLink = async () => {
-            if (!(await isFamilyEmailLink())) return
-            if (cancelled) return
-
-            const stored = readPendingEmail()
-            const address = stored || window.prompt("Confirm the email address this link was sent to") || ""
-            if (!EMAIL_PATTERN.test(address.trim())) {
-                setMethod("email")
-                setPhase("enter-email")
-                setInlineError("We could not confirm which address this link was for. Please request a new one.")
-                return
-            }
-
-            setMethod("email")
-            setPhase("completing-link")
-            setVerifying(true)
+            let redemptionStarted = false
             try {
+                if (!(await isFamilyEmailLink()) || cancelled || linkPendingRef.current) return
+                linkPendingRef.current = true
+                redemptionStarted = true
+                const stored = readPendingEmail()
+                const address = window.prompt("Confirm the email address this link was sent to", stored || "") || ""
+                setMethod("email")
+                if (!EMAIL_PATTERN.test(address.trim())) {
+                    setPhase("enter-email")
+                    setInlineError("We could not confirm which address this link was for. Please request a new one.")
+                    return
+                }
+                setPhase("completing-link")
+                setVerifying(true)
                 await completeEmailLinkSignIn(address.trim())
+                if (!mountedRef.current) return
                 // Drop the one-time code from the address bar so a refresh does not
                 // replay a link Firebase has already spent.
                 window.history.replaceState({}, document.title, window.location.pathname)
-                if (!cancelled) await finishSignIn(() => setPhase("enter-email"))
+                await finishSignIn(() => setPhase("enter-email"))
             } catch {
-                if (!cancelled) {
+                if (mountedRef.current && (!cancelled || redemptionStarted)) {
+                    setMethod("email")
                     setInlineError("That sign-in link has expired or has already been used. Request a new one.")
                     setPhase("enter-email")
                 }
             } finally {
-                if (!cancelled) setVerifying(false)
+                if (redemptionStarted) {
+                    linkPendingRef.current = false
+                    if (mountedRef.current) setVerifying(false)
+                }
             }
         }
 

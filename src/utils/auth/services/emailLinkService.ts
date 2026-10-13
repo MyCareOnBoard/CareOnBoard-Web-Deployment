@@ -10,6 +10,7 @@
  * `attachPassword`, and use it on later visits.
  */
 import { auth } from '@/lib/firebase'
+import { emailActionProblem } from '@/utils/auth/helpers/emailAction'
 
 /**
  * Firebase completes the sign-in on a page it navigates back to, and requires
@@ -74,7 +75,26 @@ export async function completeEmailLinkSignIn(
   email: string,
   href: string = window.location.href
 ): Promise<import('firebase/auth').UserCredential> {
-  const { signInWithEmailLink } = await import('firebase/auth')
+  const { parseActionCodeURL, signInWithEmailLink } = await import('firebase/auth')
+  const action = parseActionCodeURL(href)
+  if (!action || action.operation !== 'EMAIL_SIGNIN') throw new Error('This sign-in link is invalid. Request a new one.')
+  const params = new URLSearchParams({ mode: 'signIn', oobCode: action.code, apiKey: action.apiKey })
+  if (action.tenantId) params.set('tenantId', action.tenantId)
+  if (action.languageCode) params.set('lang', action.languageCode)
+  let raw = new URL(href).searchParams
+  let wrapper = raw.get('deep_link_id') ? 'deep_link_id' : 'link'
+  // The SDK unwraps up to two alternating wrappers but collapses duplicate parameters.
+  for (let depth = 0; depth < 3; depth++) {
+    const problem = raw.has('mode') && emailActionProblem(raw)
+    if (problem) throw new Error(problem)
+    if (raw.getAll('link').length > 1 || raw.getAll('deep_link_id').length > 1) throw new Error('This sign-in link is invalid. Request a new one.')
+    const nested = raw.get(wrapper)
+    if (!nested || depth === 2) break
+    raw = new URL(nested).searchParams
+    wrapper = wrapper === 'link' ? 'deep_link_id' : 'link'
+  }
+  const problem = emailActionProblem(params)
+  if (problem) throw new Error(problem)
   const credential = await signInWithEmailLink(auth, email.trim().toLowerCase(), href)
   clearPendingEmail()
   return credential

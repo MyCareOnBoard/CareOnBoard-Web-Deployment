@@ -5,8 +5,12 @@ import { beforeEach, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({ check: vi.fn(), apply: vi.fn(), reload: vi.fn(), clear: vi.fn(), current: null as any }))
 vi.mock('react-router', async () => await vi.importActual('react-router'))
 vi.mock('firebase/auth', () => ({ checkActionCode: mocks.check, applyActionCode: mocks.apply, reload: mocks.reload }))
-vi.mock('@/lib/firebase', () => ({ auth: { get currentUser() { return mocks.current }, authStateReady: async () => {} } }))
+vi.mock('@/lib/firebase', () => ({ auth: { app: { options: { apiKey: 'project-key', projectId: 'care-on-board' } }, tenantId: null, get currentUser() { return mocks.current }, authStateReady: async () => {} } }))
 vi.mock('@/lib/axios', () => ({ clearAuthCache: mocks.clear }))
+vi.mock('@/utils/auth/helpers/emailAction', async () => {
+  const actual = await vi.importActual('@/utils/auth/helpers/emailAction')
+  return { ...actual, getEmailActionAuth: () => ({ tenantId: null }) }
+})
 import AuthActionPage from './index'
 
 function Destination() {
@@ -28,9 +32,82 @@ beforeEach(() => {
   mocks.reload.mockResolvedValue(undefined)
 })
 
-it('opens the existing reset form with the original one-time code', async () => {
-  openAction('mode=resetPassword&oobCode=private-code&apiKey=project-key')
-  expect((await screen.findByTestId('destination')).textContent).toBe('/auth/reset-password?mode=resetPassword&oobCode=private-code&apiKey=project-key')
+it('opens the existing reset form preserving all Firebase query parameters', async () => {
+  const query = 'mode=resetPassword&oobCode=private-code&apiKey=project-key&continueUrl=https%3A%2F%2Fapp.joincareonboard.com%2Fauth%2Flogin&lang=es&tenantId=tenant-a'
+  openAction(query)
+  const destination = (await screen.findByTestId('destination')).textContent!
+  expect(destination.startsWith('/auth/reset-password?')).toBe(true)
+  expect(new URLSearchParams(destination.split('?')[1])).toEqual(new URLSearchParams(query))
+  expect(mocks.apply).not.toHaveBeenCalled()
+})
+
+it.each([
+  ['revertSecondFactorAddition', 'REVERT_SECOND_FACTOR_ADDITION', 'Remove added factor', 'Added factor removed'],
+  ['verifyAndChangeEmail', 'VERIFY_AND_CHANGE_EMAIL', 'Confirm email change', 'Email changed'],
+])('checks and confirms %s without a signed-in session', async (mode, operation, button, heading) => {
+  mocks.check.mockResolvedValue({ operation, data: { email: 'member@example.test', previousEmail: 'old@example.test', multiFactorInfo: { factorId: 'phone', displayName: 'Unrecognized phone' } } })
+  openAction(`mode=${mode}&oobCode=synthetic-code`)
+  const confirm = await screen.findByRole('button', { name: button })
+  expect(mocks.apply).not.toHaveBeenCalled()
+  fireEvent.click(confirm)
+  await screen.findByRole('heading', { name: heading })
+  expect(mocks.apply).toHaveBeenCalledOnce()
+})
+
+it('hands email-link sign-in to the existing family flow only on confirmation', async () => {
+  mocks.check.mockResolvedValue({ operation: 'EMAIL_SIGNIN', data: {} })
+  const query = 'mode=signIn&oobCode=synthetic-code&apiKey=project-key&lang=en'
+  openAction(query)
+  fireEvent.click(await screen.findByRole('button', { name: 'Continue to family sign-in' }))
+  expect((await screen.findByTestId('destination')).textContent).toBe(`/auth/family-login?${query}`)
+  expect(mocks.apply).not.toHaveBeenCalled()
+})
+
+it.each(['recoverEmail', 'revertSecondFactorAddition', 'verifyAndChangeEmail', 'signIn'])('rejects operation mismatch for %s', async mode => {
+  openAction(`mode=${mode}&oobCode=synthetic-code`)
+  expect(await screen.findByRole('alert')).toHaveTextContent(/does not match/i)
+  expect(mocks.apply).not.toHaveBeenCalled()
+})
+
+it('blocks duplicate confirmations and cannot redeem again after success', async () => {
+  let finish!: () => void
+  mocks.apply.mockReturnValue(new Promise<void>(resolve => { finish = resolve }))
+  openAction('mode=verifyEmail&oobCode=synthetic-code')
+  const button = await screen.findByRole('button', { name: 'Verify email' })
+  fireEvent.click(button)
+  fireEvent.click(button)
+  expect(mocks.apply).toHaveBeenCalledOnce()
+  finish()
+  await screen.findByRole('heading', { name: 'Email verified' })
+  expect(screen.queryByRole('button', { name: 'Verify email' })).not.toBeInTheDocument()
+})
+
+it('removes confirmation when a checked code expires at redemption', async () => {
+  mocks.apply.mockRejectedValue({ code: 'auth/expired-action-code' })
+  openAction('mode=verifyEmail&oobCode=synthetic-code')
+  fireEvent.click(await screen.findByRole('button', { name: 'Verify email' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent(/expired/i)
+  expect(screen.queryByRole('button', { name: 'Verify email' })).not.toBeInTheDocument()
+})
+
+it.each(['verifyEmail', 'recoverEmail', 'revertSecondFactorAddition', 'verifyAndChangeEmail', 'signIn'])('handles invalid or reused codes for %s without redemption', async mode => {
+  mocks.check.mockRejectedValue({ code: 'auth/invalid-action-code' })
+  openAction(`mode=${mode}&oobCode=synthetic-code`)
+  expect(await screen.findByRole('alert')).toHaveTextContent(/invalid or has already been used/i)
+  expect(mocks.apply).not.toHaveBeenCalled()
+})
+
+it.each(['verifyEmail', 'recoverEmail', 'revertSecondFactorAddition', 'verifyAndChangeEmail', 'signIn'])('handles expired codes for %s without redemption', async mode => {
+  mocks.check.mockRejectedValue({ code: 'auth/expired-action-code' })
+  openAction(`mode=${mode}&oobCode=synthetic-code`)
+  expect(await screen.findByRole('alert')).toHaveTextContent(/expired/i)
+  expect(mocks.apply).not.toHaveBeenCalled()
+})
+
+it.each(['mode=verifyEmail&oobCode=synthetic-code&apiKey=foreign', 'mode=verifyEmail&oobCode=synthetic-code&mode=recoverEmail'])('blocks wrong projects and duplicate parameters before SDK requests', async query => {
+  openAction(query)
+  await screen.findByRole('alert')
+  expect(mocks.check).not.toHaveBeenCalled()
   expect(mocks.apply).not.toHaveBeenCalled()
 })
 
@@ -58,7 +135,7 @@ it.each(['https://evil.example/phish', '//evil.example/phish', 'https://app.join
 })
 
 it('refreshes only the matching signed-in identity after verification', async () => {
-  mocks.current = { uid: 'member', email: 'member@example.test', getIdToken: vi.fn().mockResolvedValue('fresh') }
+  mocks.current = { uid: 'member', tenantId: null, email: 'member@example.test', getIdToken: vi.fn().mockResolvedValue('fresh') }
   openAction('mode=verifyEmail&oobCode=private-code')
   fireEvent.click(await screen.findByRole('button', { name: 'Verify email' }))
   await screen.findByRole('heading', { name: 'Email verified' })
@@ -76,7 +153,7 @@ it('explains expired links without applying them', async () => {
 
 it.each(['mode=unsupported&oobCode=private-code', 'mode=verifyEmail'])('rejects malformed links %s', async query => {
   openAction(query)
-  expect(await screen.findByRole('alert')).toHaveTextContent(/invalid/i)
+  expect(await screen.findByRole('alert')).toHaveTextContent(/invalid|missing|not supported/i)
   expect(mocks.check).not.toHaveBeenCalled()
   expect(mocks.apply).not.toHaveBeenCalled()
 })
@@ -117,7 +194,7 @@ it('retries checking the same link after a connection failure', async () => {
 
 it('refreshes the recovered identity that still has its changed email address', async () => {
   mocks.check.mockResolvedValue({ operation: 'RECOVER_EMAIL', data: { email: 'original@example.test', previousEmail: 'changed@example.test' } })
-  mocks.current = { uid: 'member', email: 'changed@example.test', getIdToken: vi.fn().mockResolvedValue('fresh') }
+  mocks.current = { uid: 'member', tenantId: null, email: 'changed@example.test', getIdToken: vi.fn().mockResolvedValue('fresh') }
   openAction('mode=recoverEmail&oobCode=recovery-code')
   fireEvent.click(await screen.findByRole('button', { name: 'Restore email' }))
   await screen.findByRole('heading', { name: 'Email restored' })

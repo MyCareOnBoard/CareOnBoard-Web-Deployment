@@ -9,34 +9,34 @@
  * - Shows user email being reset
  * - Password strength validation
  * - Confirms password with Firebase
- * - Redirects to login after success
+ * - Offers a safe continuation after success
  */
 
 import type React from "react"
-import { useState, useEffect } from "react"
-import { useSearchParams, useNavigate, Link } from "react-router"
-import { verifyPasswordResetCode, confirmPasswordReset } from "firebase/auth"
-import { auth } from "@/lib/firebase"
+import { useState, useEffect, useRef } from "react"
+import { useSearchParams, Link } from "react-router"
+import { checkActionCode, verifyPasswordResetCode, confirmPasswordReset, type Auth } from "firebase/auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ButtonLoader } from "@/components/ui/loader"
 import { Eye, EyeOff, CheckCircle2, XCircle } from "lucide-react"
-import { toast } from "sonner"
-import { 
-  getAuthErrorMessage, 
-  getSuccessMessage,
-  getValidationMessage,
-} from "@/utils/auth/helpers/errorMessages"
+import { getAuthErrorMessage, getValidationMessage } from "@/utils/auth/helpers/errorMessages"
+import { continuationPath, emailActionError, emailActionProblem, getEmailActionAuth } from "@/utils/auth/helpers/emailAction"
 import {Routes} from "@/routes/constants";
 
 export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams()
-  const navigate = useNavigate()
+  const query = searchParams.toString()
   const [loading, setLoading] = useState(false)
   const [verifying, setVerifying] = useState(true)
   const [email, setEmail] = useState<string>("")
   const [isValidCode, setIsValidCode] = useState(false)
+  const [complete, setComplete] = useState(false)
+  const [error, setError] = useState("")
+  const [retryable, setRetryable] = useState(false)
+  const [attempt, setAttempt] = useState(0)
+  const [checkedQuery, setCheckedQuery] = useState<string | null>(null)
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -48,33 +48,62 @@ export default function ResetPasswordPage() {
 
   const oobCode = searchParams.get("oobCode")
   const mode = searchParams.get("mode")
+  const continuePath = continuationPath(searchParams.get("continueUrl"))
+  const pending = useRef(false)
+  const generation = useRef(0)
+  const actionAuth = useRef<Auth | null>(null)
 
   useEffect(() => {
-    verifyResetCode()
-  }, [oobCode])
-
-  const verifyResetCode = async () => {
-    if (!oobCode || mode !== "resetPassword") {
-      toast.error("Invalid or missing reset link")
+    const current = ++generation.current
+    const params = new URLSearchParams(query)
+    pending.current = false
+    actionAuth.current = null
+    setLoading(false)
+    setVerifying(true)
+    setIsValidCode(false)
+    setComplete(false)
+    setCheckedQuery(null)
+    setError("")
+    setRetryable(false)
+    setEmail("")
+    setPassword("")
+    setConfirmPassword("")
+    setShowPassword(false)
+    setShowConfirmPassword(false)
+    setErrors({})
+    const problem = emailActionProblem(params) || (params.get('mode') !== 'resetPassword' ? 'This email action does not match a password reset.' : '')
+    if (problem) {
+      setError(problem)
       setVerifying(false)
-      return
+    } else {
+      void (async () => {
+        try {
+          const context = getEmailActionAuth(params)
+          const code = params.get('oobCode')!
+          // The installed SDK's reset-code verifier does not enforce the action operation.
+          const info = await checkActionCode(context, code)
+          if (generation.current !== current) return
+          if (info.operation !== 'PASSWORD_RESET') {
+            setError('This email action does not match a password reset.')
+            return
+          }
+          const userEmail = await verifyPasswordResetCode(context, code)
+          if (generation.current !== current) return
+          actionAuth.current = context
+          setEmail(userEmail)
+          setCheckedQuery(query)
+          setIsValidCode(true)
+        } catch (cause) {
+          if (generation.current !== current) return
+          setError(emailActionError(cause))
+          setRetryable((cause as { code?: string })?.code === 'auth/network-request-failed')
+        } finally {
+          if (generation.current === current) setVerifying(false)
+        }
+      })()
     }
-
-    try {
-      // Verify the password reset code is valid
-      const userEmail = await verifyPasswordResetCode(auth, oobCode)
-      setEmail(userEmail)
-      setIsValidCode(true)
-      setVerifying(false)
-    } catch (error: any) {
-      console.error("[ResetPassword] Code verification error:", error)
-
-      const errorMessage = getAuthErrorMessage(error)
-      toast.error(errorMessage)
-      setVerifying(false)
-      setIsValidCode(false)
-    }
-  }
+    return () => { generation.current++ }
+  }, [query, attempt])
 
   const validatePassword = (value: string): string | undefined => {
     if (!value) return getValidationMessage('password', 'required')
@@ -130,6 +159,7 @@ export default function ResetPasswordPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (pending.current || complete || !isValidCode || checkedQuery !== query || !oobCode || mode !== 'resetPassword' || !actionAuth.current) return
 
     // Validate all fields
     const passwordError = validatePassword(password)
@@ -144,41 +174,43 @@ export default function ResetPasswordPage() {
         password: passwordError,
         confirmPassword: confirmError,
       })
-      toast.error(getValidationMessage('form', 'invalid'))
       return
     }
 
-    if (!oobCode) {
-      toast.error("Invalid reset code. Please request a new password reset link.")
-      return
-    }
-
+    const current = generation.current
+    pending.current = true
     setLoading(true)
+    setError("")
 
     try {
-      // Confirm the password reset with the new password
-      await confirmPasswordReset(auth, oobCode, password)
-
-      console.log("[ResetPassword] Password reset successful")
-      const successMsg = getSuccessMessage('passwordResetComplete')
-      toast.success(successMsg.description)
-
-      // Redirect to login after a short delay
-      setTimeout(() => {
-        navigate(Routes.auth.login)
-      }, 2000)
-    } catch (error: any) {
-      console.error("[ResetPassword] Password reset error:", error)
-
-      const errorMessage = getAuthErrorMessage(error)
-      toast.error(errorMessage)
+      await confirmPasswordReset(actionAuth.current, oobCode, password)
+      if (generation.current !== current) return
+      setComplete(true)
+      setPassword("")
+      setConfirmPassword("")
+    } catch (cause) {
+      if (generation.current !== current) return
+      const code = (cause as { code?: string })?.code
+      if (code === 'auth/weak-password' || code === 'auth/password-does-not-meet-requirements') {
+        setErrors({ password: getAuthErrorMessage({ code: 'auth/weak-password' }) })
+      } else {
+        setError(emailActionError(cause))
+        if (code !== 'auth/network-request-failed' && code !== 'auth/too-many-requests') {
+          setIsValidCode(false)
+          setPassword("")
+          setConfirmPassword("")
+        }
+      }
     } finally {
-      setLoading(false)
+      if (generation.current === current) {
+        pending.current = false
+        setLoading(false)
+      }
     }
   }
 
   // Verifying state
-  if (verifying) {
+  if (verifying || (isValidCode && checkedQuery !== query)) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="text-center">
@@ -187,6 +219,17 @@ export default function ResetPasswordPage() {
         </div>
       </div>
     )
+  }
+
+  if (complete) {
+    return <div className="flex items-center justify-center min-h-screen px-4">
+      <div className="max-w-md w-full bg-white rounded-2xl p-8 text-center">
+        <CheckCircle2 className="w-12 h-12 text-green-600 mx-auto mb-4" aria-hidden="true" />
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Password updated</h1>
+        <p className="text-gray-600 mb-8">Your password has been changed. You can now sign in with your new password.</p>
+        <Button asChild className="w-full h-12 rounded-2xl bg-[#17a2b8] hover:bg-[#148a9c]"><Link to={continuePath}>Continue</Link></Button>
+      </div>
+    </div>
   }
 
   // Invalid code state
@@ -199,14 +242,11 @@ export default function ResetPasswordPage() {
               <XCircle className="w-8 h-8 text-red-600" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Invalid Reset Link</h2>
-            <p className="text-gray-600 mb-8">
-              This password reset link is invalid or has expired. Please request a new one.
-            </p>
-            <Link to={Routes.auth.forgotPassword}>
-              <Button className="w-full h-12 rounded-2xl bg-[#17a2b8] hover:bg-[#148a9c] mb-4">
-                Request New Reset Link
-              </Button>
-            </Link>
+            <p role="alert" className="text-gray-600 mb-8">{error || 'This password reset link is invalid or has already been used. Please request a new one.'}</p>
+            {retryable && <Button className="w-full mb-4" onClick={() => setAttempt(value => value + 1)}>Try again</Button>}
+            <Button asChild className="w-full h-12 rounded-2xl bg-[#17a2b8] hover:bg-[#148a9c] mb-4">
+              <Link to={Routes.auth.forgotPassword}>Request New Reset Link</Link>
+            </Button>
             <Link
               to={Routes.auth.login}
               className="inline-block text-sm text-[#17a2b8] hover:text-[#148a9c] font-medium"
@@ -231,6 +271,7 @@ export default function ResetPasswordPage() {
           </p>
         </div>
 
+        {error && <p role="alert" className="mb-4 text-sm text-red-600">{error}</p>}
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* New Password Field */}
           <div className="space-y-2">
@@ -240,6 +281,9 @@ export default function ResetPasswordPage() {
             <div className="relative">
               <Input
                 id="password"
+                autoComplete="new-password"
+                aria-invalid={Boolean(errors.password)}
+                aria-describedby={errors.password ? 'password-error' : undefined}
                 type={showPassword ? "text" : "password"}
                 placeholder="Enter new password"
                 value={password}
@@ -253,6 +297,9 @@ export default function ResetPasswordPage() {
               />
               <button
                 type="button"
+                aria-label={showPassword ? 'Hide new password' : 'Show new password'}
+                aria-pressed={showPassword}
+                disabled={loading}
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
@@ -286,7 +333,7 @@ export default function ResetPasswordPage() {
               </div>
             )}
 
-            {errors.password && <p className="text-sm text-red-600">{errors.password}</p>}
+            {errors.password && <p id="password-error" role="alert" className="text-sm text-red-600">{errors.password}</p>}
 
             <div className="space-y-1">
               <p className="text-xs text-gray-500">Password must contain:</p>
@@ -335,6 +382,9 @@ export default function ResetPasswordPage() {
             <div className="relative">
               <Input
                 id="confirmPassword"
+                autoComplete="new-password"
+                aria-invalid={Boolean(errors.confirmPassword)}
+                aria-describedby={errors.confirmPassword ? 'confirm-password-error' : undefined}
                 type={showConfirmPassword ? "text" : "password"}
                 placeholder="Confirm new password"
                 value={confirmPassword}
@@ -348,6 +398,9 @@ export default function ResetPasswordPage() {
               />
               <button
                 type="button"
+                aria-label={showConfirmPassword ? 'Hide password confirmation' : 'Show password confirmation'}
+                aria-pressed={showConfirmPassword}
+                disabled={loading}
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                 className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
@@ -359,7 +412,7 @@ export default function ResetPasswordPage() {
               </button>
             </div>
             {errors.confirmPassword && (
-              <p className="text-sm text-red-600">{errors.confirmPassword}</p>
+              <p id="confirm-password-error" role="alert" className="text-sm text-red-600">{errors.confirmPassword}</p>
             )}
             {!errors.confirmPassword &&
               confirmPassword &&
@@ -375,6 +428,7 @@ export default function ResetPasswordPage() {
             type="submit"
             className="w-full h-12 rounded-2xl bg-[#17a2b8] hover:bg-[#148a9c] text-base font-semibold mt-6"
             disabled={loading || !!errors.password || !!errors.confirmPassword}
+            aria-busy={loading}
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">
