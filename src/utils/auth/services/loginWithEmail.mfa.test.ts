@@ -122,4 +122,32 @@ describe('loginWithEmail MFA branching', () => {
     const result = await loginWithEmail('a@b.com', 'pass')
     expect(result.status).toBe('error')
   })
+
+  it.each([
+    { response: { status: 404 } },
+    { response: { status: 401, data: { code: 'USER_PROFILE_NOT_FOUND' } } },
+    { response: { status: 401, data: { error: 'Unauthorized - User not found' } } },
+  ])('returns only the Firebase identity for a missing product profile: %j', async (error) => {
+    signInWithEmailAndPassword.mockResolvedValue({
+      user: { uid: 'external-1', email: 'external@example.com', metadata: { creationTime: '2020-01-01' } },
+    })
+    getUser.mockRejectedValue(error)
+
+    expect(await loginWithEmail('external@example.com', 'secret')).toEqual({
+      status: 'profile_required',
+      uid: 'external-1',
+    })
+    expect(getUser).toHaveBeenCalledWith({ allowMissingProfile: true })
+    expect(hasEnrolledMfa).not.toHaveBeenCalled()
+  })
+
+  it('does not treat an invalid token as a missing profile', async () => {
+    signInWithEmailAndPassword.mockResolvedValue({
+      user: { uid: 'external-1', email: 'external@example.com', metadata: {} },
+    })
+    getUser.mockRejectedValue({ response: { status: 401, data: { error: 'Unauthorized - Invalid token' } } })
+
+    expect(await loginWithEmail('external@example.com', 'secret')).toMatchObject({ status: 'error' })
+    expect(hasEnrolledMfa).not.toHaveBeenCalled()
+  })
 })

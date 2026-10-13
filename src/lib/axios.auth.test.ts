@@ -1,4 +1,4 @@
-import { beforeEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { InternalAxiosRequestConfig } from 'axios'
 const state = vi.hoisted(() => ({ uid: 'provider-1' as string | null, getToken: vi.fn() }))
 vi.mock('@/utils/auth/services/authService', () => ({ getIdToken: state.getToken }))
@@ -8,6 +8,35 @@ import axiosClient, { clearAuthCache } from './axios'
 
 const adapter = vi.fn(async (config: InternalAxiosRequestConfig) => ({ data: {}, status: 200, statusText: 'OK', headers: {}, config }))
 beforeEach(() => { clearAuthCache(); adapter.mockClear(); state.uid = 'provider-1'; state.getToken.mockReset().mockResolvedValue('provider-token') })
+afterEach(() => { window.history.replaceState(null, '', '/') })
+
+it.each([
+  { code: 'USER_PROFILE_NOT_FOUND' },
+  { error: 'Unauthorized - User not found' },
+])('allows a profile bootstrap probe to report unfinished registration without retry: %j', async data => {
+  window.history.replaceState(null, '', '/auth/login')
+  const profileAdapter = vi.fn(async (config: InternalAxiosRequestConfig) => {
+    throw { isAxiosError: true, response: { status: 401, data }, config }
+  })
+  const options = { adapter: profileAdapter, allowMissingProfile: true }
+  await expect(axiosClient.get('/users/profile', options)).rejects.toMatchObject({ response: { status: 401 } })
+  expect(profileAdapter).toHaveBeenCalledOnce()
+  expect(state.getToken).toHaveBeenCalledOnce()
+})
+
+it.each([
+  { url: '/users/profile', data: { error: 'Unauthorized - Invalid token' } },
+  { url: '/agency/private', data: { code: 'USER_PROFILE_NOT_FOUND' } },
+])('keeps normal token recovery for $url even when the bootstrap flag is set', async ({ url, data }) => {
+  window.history.replaceState(null, '', '/auth/login')
+  const rejectedAdapter = vi.fn(async (config: InternalAxiosRequestConfig) => {
+    throw { isAxiosError: true, response: { status: 401, data }, config }
+  })
+  const options = { adapter: rejectedAdapter, allowMissingProfile: true }
+  await expect(axiosClient.get(url, options)).rejects.toMatchObject({ response: { status: 401 } })
+  expect(rejectedAdapter).toHaveBeenCalledTimes(2)
+  expect(state.getToken).toHaveBeenNthCalledWith(2, true)
+})
 
 it('uses the new account token instead of a cached provider token after UID changes', async () => {
   await axiosClient.get('/users/profile', { adapter })

@@ -10,6 +10,22 @@ describe('loginProfileError', () => {
     expect(isMissingProfileError({ response: { status: 404 } })).toBe(true)
   })
 
+  it.each([
+    { code: 'USER_PROFILE_NOT_FOUND' },
+    { error: 'Unauthorized - User not found' },
+  ])('recognizes the specific missing-profile 401: %j', data => {
+    expect(isMissingProfileError({ response: { status: 401, data } })).toBe(true)
+  })
+
+  it.each([
+    { error: 'Unauthorized - Invalid token' },
+    { error: 'Unauthorized - No token provided' },
+    { code: 'USER_DISABLED' },
+    {},
+  ])('does not treat other 401s as unfinished registration: %j', data => {
+    expect(isMissingProfileError({ response: { status: 401, data } })).toBe(false)
+  })
+
   it('treats 500 as unexpected', () => {
     expect(isMissingProfileError({ response: { status: 500 } })).toBe(false)
   })

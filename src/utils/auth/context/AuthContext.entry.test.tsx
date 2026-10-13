@@ -133,6 +133,21 @@ describe.sequential("AuthProvider authenticated entry", () => {
     });
   });
 
+  it("keeps an identity without a profile on public setup pages without publishing a role", async () => {
+    mocks.getUser.mockRejectedValueOnce({ response: { status: 401, data: { code: 'USER_PROFILE_NOT_FOUND' } } });
+    const view = render(<AuthProvider><div>Invitation setup</div><Probe /></AuthProvider>);
+    await emitAuthState(mocks.currentFirebaseUser);
+    await waitFor(() => expect(authContext.loading).toBe(false));
+
+    expect(mocks.getUser).toHaveBeenCalledWith({ allowMissingProfile: true });
+    expect(view.getByText('Invitation setup')).toBeInTheDocument();
+    expect(authContext.user).toBeNull();
+    expect(mocks.currentFirebaseUser?.uid).toBe('staff-1');
+    expect(mocks.dispatch).toHaveBeenCalledWith({ type: 'auth/setUser', payload: null });
+    expect(mocks.dispatch.mock.calls.filter(([action]) => action.type === 'auth/setUser')
+      .every(([action]) => action.payload === null)).toBe(true);
+  });
+
   it("finishes local logout cleanup without loading the action service chunk", async () => {
     render(<AuthProvider><Probe /></AuthProvider>);
     await emitAuthState(mocks.currentFirebaseUser);
@@ -146,6 +161,34 @@ describe.sequential("AuthProvider authenticated entry", () => {
 
     expect(localStorage.getItem("auth_user")).toBeNull();
     expect(mocks.purge).toHaveBeenCalledOnce();
+  });
+
+  it("clears a previously published role when the same identity loses its profile", async () => {
+    render(<AuthProvider><Probe /></AuthProvider>);
+    await emitAuthState(mocks.currentFirebaseUser);
+    await waitFor(() => expect(authContext.user?.userType).toBe('employee'));
+    mocks.getUser.mockRejectedValueOnce({ response: { status: 401, data: { code: 'USER_PROFILE_NOT_FOUND' } } });
+    await emitAuthState(mocks.currentFirebaseUser);
+    expect(authContext.user).toBeNull();
+    expect(mocks.dispatch).toHaveBeenLastCalledWith({ type: 'auth/setUser', payload: null });
+  });
+
+  it("clears a pending identity's old role and ignores an earlier successful bootstrap", async () => {
+    render(<AuthProvider><Probe /></AuthProvider>);
+    await emitAuthState(mocks.currentFirebaseUser);
+    await waitFor(() => expect(authContext.user?.userType).toBe('employee'));
+    let resolveEarlier!: (profile: unknown) => void;
+    mocks.getUser.mockReturnValueOnce(new Promise(resolve => { resolveEarlier = resolve; }));
+    await emitAuthState(mocks.currentFirebaseUser);
+    mocks.loginWithEmail.mockResolvedValueOnce({ status: 'profile_required', uid: 'staff-1' });
+    await act(async () => {
+      await expect(authContext.login('staff-1@example.com', 'synthetic-password')).resolves.toEqual({ status: 'profile_required', uid: 'staff-1' });
+    });
+    expect(authContext.user).toBeNull();
+    expect(mocks.dispatch).toHaveBeenLastCalledWith({ type: 'auth/setUser', payload: null });
+    await act(async () => resolveEarlier({ uid: 'staff-1', userType: 'employee' }));
+    expect(authContext.user).toBeNull();
+    expect(mocks.dispatch).toHaveBeenLastCalledWith({ type: 'auth/setUser', payload: null });
   });
 
   it("revalidates a cached product role before rendering protected children", async () => {

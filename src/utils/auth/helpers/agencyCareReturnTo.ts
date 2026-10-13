@@ -8,6 +8,13 @@ export function agencyCareReturnTo(value: string | null | undefined): string | n
   return value
 }
 
+export function agencyCareInvitationReturnTo(value: string | null | undefined): string | null {
+  const returnTo = agencyCareReturnTo(value)
+  return returnTo && /^\/agency-care\/invitations\/[^/]+\/?$/.test(returnTo.split(/[?#]/, 1)[0])
+    ? returnTo
+    : null
+}
+
 export function authRouteWithReturnTo(route: string, value: string | null | undefined): string {
   const returnTo = agencyCareReturnTo(value)
   return returnTo ? `${route}?returnTo=${encodeURIComponent(returnTo)}` : route

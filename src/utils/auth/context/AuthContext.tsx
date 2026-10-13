@@ -81,14 +81,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         && (auth.currentUser?.uid ?? null) === (currentFirebaseUser?.uid ?? null)
       if (currentFirebaseUser) {
         try {
-          const authoritativeUser = await getUser()
+          const authoritativeUser = await getUser({ allowMissingProfile: true })
           if (stillCurrent() && authoritativeUser?.uid === currentFirebaseUser.uid) {
             setUserState(authoritativeUser)
             dispatch(setUser(authoritativeUser))
           }
         } catch {
           // Auth and enrollment pages remain available; cached product access stays cleared.
-          if (stillCurrent()) setUserState(null)
+          if (stillCurrent()) {
+            setUserState(null)
+            dispatch(setUser(null))
+          }
         }
       }
       if (!stillCurrent()) return
@@ -116,10 +119,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('[AuthContext] Login failed:', response.error)
       throw new Error(response.error || "Login failed")
     }
-    if ('user' in response && response.user.uid !== auth.currentUser?.uid) throw accountChangedError()
+    const responseUid = 'user' in response ? response.user.uid : 'uid' in response ? response.uid : null
+    if (responseUid && responseUid !== auth.currentUser?.uid) throw accountChangedError()
 
     if (response.status === 'success') {
       setUserState(response.user)
+    } else if (response.status === 'profile_required') {
+      refreshGenerationRef.current += 1
+      setUserState(null)
+      dispatch(setUser(null))
     }
 
     return response

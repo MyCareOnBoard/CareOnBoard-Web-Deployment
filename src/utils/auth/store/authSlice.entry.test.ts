@@ -116,6 +116,18 @@ describe.sequential("authSlice entry loading", () => {
     expect(action.payload).toEqual({ uid: "staff-1", fullName: "Staff One" });
   });
 
+  it("keeps a profile-less Firebase identity out of product user state", async () => {
+    mocks.loginWithEmail.mockResolvedValue({ status: "profile_required", uid: "external-1" });
+
+    const action = await runThunk(loginUser({ email: "external@example.com", password: "secret" }));
+    const state = authReducer(undefined, action);
+
+    expect(action.type).toBe("auth/login/rejected");
+    expect(state.user).toBeNull();
+    expect(state.isAuthenticated).toBe(false);
+    expect(state.error).toMatch(/setup is incomplete.*invitation/i);
+  });
+
   it("preserves logout rejection payload and reducer state", async () => {
     mocks.signOut.mockRejectedValue(new Error("Provider logout failed"));
 

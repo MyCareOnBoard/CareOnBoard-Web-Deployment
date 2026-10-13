@@ -4,6 +4,7 @@ export type LoginResult =
   | { status: 'success'; user: User }
   | { status: 'mfa_required' }
   | { status: 'mfa_enrollment_required'; user: User }
+  | { status: 'profile_required'; uid: string }
 
 export type LoginErrorResult = {
   status: 'error'

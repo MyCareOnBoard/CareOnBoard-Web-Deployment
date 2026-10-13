@@ -15,7 +15,7 @@ import {
   getValidationMessage
 } from "@/utils/auth/helpers/errorMessages"
 import { completePostLogin } from "@/utils/auth/helpers/postLogin"
-import { agencyCareReturnTo, authRouteWithReturnTo } from "@/utils/auth/helpers/agencyCareReturnTo"
+import { agencyCareInvitationReturnTo, agencyCareReturnTo, authRouteWithReturnTo } from "@/utils/auth/helpers/agencyCareReturnTo"
 import { useDispatch } from "react-redux"
 import type { AppDispatch } from "@/store/redux/store"
 
@@ -107,6 +107,22 @@ export default function LoginPage() {
 
     try {
       const result = await login(email, password)
+
+      if (result.status === 'profile_required') {
+        const invitation = agencyCareInvitationReturnTo(returnTo)
+        if (invitation) {
+          const destination = new URL(invitation, window.location.origin)
+          destination.searchParams.set('intent', 'register')
+          navigate(`${destination.pathname}${destination.search}${destination.hash}`, { replace: true })
+        } else {
+          toast({
+            title: "Unable to log in",
+            description: "Your account setup is incomplete. Reopen your Agency Care invitation to finish registration, or contact your administrator.",
+            variant: "destructive",
+          })
+        }
+        return
+      }
 
       if (result.status === 'mfa_required') {
         navigate(authRouteWithReturnTo(Routes.auth.mfaChallenge, returnTo), { replace: true })

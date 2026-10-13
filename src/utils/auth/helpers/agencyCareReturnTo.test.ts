@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { agencyCareReturnTo, authRouteWithReturnTo } from "./agencyCareReturnTo";
+import { agencyCareInvitationReturnTo, agencyCareReturnTo, authRouteWithReturnTo } from "./agencyCareReturnTo";
 
 describe("Agency Care authentication continuation", () => {
   const invitation = "/agency-care/invitations/eyJpZCI6Imludml0ZSJ9.signature_123-abc?agencyKey=internal%3Addd-agency";
@@ -16,6 +16,15 @@ describe("Agency Care authentication continuation", () => {
   it("preserves existing canonical care destinations", () => {
     for (const value of ["/agency-care", "/agency-care/clients", "/agency-care/networks/network-1/overview?agencyKey=internal%3Addd-agency"]) {
       expect(agencyCareReturnTo(value)).toBe(value);
+    }
+  });
+
+  it("allows pending identities to resume only a canonical invitation", () => {
+    expect(agencyCareInvitationReturnTo(invitation)).toBe(invitation);
+    expect(agencyCareInvitationReturnTo("/agency-care/invitations/token-1/"))
+      .toBe("/agency-care/invitations/token-1/");
+    for (const value of ["/agency-care", "/agency-care/invitations", "/agency-care/invitations/token-1/extra", "https://untrusted.example/agency-care/invitations/token-1", "/agency-care/invitations/../clients", null]) {
+      expect(agencyCareInvitationReturnTo(value)).toBeNull();
     }
   });
 

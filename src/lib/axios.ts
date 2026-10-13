@@ -1,11 +1,14 @@
-import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
+import axios, { AxiosInstance, AxiosRequestConfig, InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 import { getIdToken } from '@/utils/auth/services/authService';
 import { auth } from '@/lib/firebase';
 import { Routes } from "@/routes/constants";
 import { handleMfaApiError } from '@/utils/auth/helpers/handleMfaApiError';
+import { isMissingProfileError } from '@/utils/auth/helpers/loginProfileError';
+
+export type AuthRequestConfig = AxiosRequestConfig & { allowMissingProfile?: boolean };
 
 /** A request config carrying the one-retry marker the 401 handler sets. */
-type RetryableConfig = InternalAxiosRequestConfig & { _retriedAfter401?: boolean; _authUid?: string | null };
+type RetryableConfig = InternalAxiosRequestConfig & AuthRequestConfig & { _retriedAfter401?: boolean; _authUid?: string | null };
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -170,6 +173,11 @@ axiosClient.interceptors.response.use(
           // being told to sign in again.
           const retryable = error.config as RetryableConfig | undefined;
           if (retryable && retryable._authUid !== (auth.currentUser?.uid ?? null)) {
+            return Promise.reject(error);
+          }
+          // Invitation signup has a Firebase identity before its application profile exists.
+          if (retryable?.allowMissingProfile === true && retryable.method === 'get'
+            && retryable.url === '/users/profile' && isMissingProfileError(error)) {
             return Promise.reject(error);
           }
           if (retryable && !retryable._retriedAfter401) {

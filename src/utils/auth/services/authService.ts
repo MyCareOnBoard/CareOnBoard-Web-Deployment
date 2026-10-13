@@ -67,11 +67,11 @@ export async function loginWithEmail(
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password)
     const firebaseUser = userCredential.user
-    let user = transformFirebaseUser(firebaseUser)
+    let user: User
 
     try {
-      const profile = await getUser()
-      user = { ...user, ...profile, uid: profile.uid || user.uid }
+      const profile = await getUser({ allowMissingProfile: true })
+      user = { ...transformFirebaseUser(firebaseUser), ...profile, uid: profile.uid || firebaseUser.uid }
       if (
         profile.userType === UserType.APPLICANT &&
         !profile.otpVerified
@@ -83,7 +83,7 @@ export async function loginWithEmail(
       // factor gets 403 MFA_ENROLLMENT_REQUIRED on its first /profile. Route to
       // enrollment (not an error) — /profile loads once MFA is enrolled.
       if (isMfaEnrollmentRequiredError(profileError)) {
-        return { status: 'mfa_enrollment_required', user }
+        return { status: 'mfa_enrollment_required', user: transformFirebaseUser(firebaseUser) }
       }
       if (!isMissingProfileError(profileError)) {
         console.error('[loginWithEmail] Unexpected profile load failure:', profileError)
@@ -92,7 +92,7 @@ export async function loginWithEmail(
           error: getLoginProfileErrorMessage(profileError),
         }
       }
-      console.warn('[loginWithEmail] Profile not found, continuing login flow')
+      return { status: 'profile_required', uid: firebaseUser.uid }
     }
 
     if (!(await hasEnrolledMfa(firebaseUser))) {

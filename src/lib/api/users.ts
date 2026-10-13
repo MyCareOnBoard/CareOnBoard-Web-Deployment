@@ -1,5 +1,5 @@
 
-import axiosClient from '../axios';
+import axiosClient, { type AuthRequestConfig } from '../axios';
 import { User } from '@/utils/auth/types/user.types';
 import { Employee } from '@/utils/auth/types/user.types';
 import { UserType } from '@/utils/auth/types/user.types';
@@ -55,9 +55,10 @@ export interface ListEmployeesResponse {
  * Used during onboarding to check if data exists
  * @returns Promise with user data
  */
-export async function getUser(): Promise<User> {
+export async function getUser(options?: Pick<AuthRequestConfig, 'allowMissingProfile'>): Promise<User> {
   try {
-    const response = await axiosClient.get<UserResponse>("/users/profile");
+    const config: AuthRequestConfig | undefined = options;
+    const response = await axiosClient.get<UserResponse>("/users/profile", config);
 
     if (!response.data.success || !response.data.user) {
       throw new Error("Invalid response format from server");
@@ -193,7 +194,7 @@ export async function getUser(): Promise<User> {
     return user;
   } catch (err: any) {
     // Re-throw with more context
-    if (err.response?.status === 404) {
+    if (err.response?.status === 404 && options?.allowMissingProfile !== true) {
       throw new Error("Profile not found. Please complete your onboarding first.");
     }
     console.error('Failed to get user profile:', err);

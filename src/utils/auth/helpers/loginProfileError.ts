@@ -1,15 +1,20 @@
 type AxiosLikeError = {
-  response?: { status?: number; data?: { code?: string } }
+  response?: { status?: number; data?: { code?: string; error?: string } }
   message?: string
 }
 
 /**
- * Profile missing (404) — fall through to MFA routing.
- * Everything else is unexpected and should surface as login error.
+ * Missing application profiles can resume setup without granting a product role.
+ * Accept the legacy response while the backend's explicit code rolls out.
  */
 export function isMissingProfileError(error: unknown): boolean {
   const err = error as AxiosLikeError
-  return err.response?.status === 404
+  return err.response?.status === 404 || (
+    err.response?.status === 401 && (
+      err.response.data?.code === 'USER_PROFILE_NOT_FOUND' ||
+      err.response.data?.error === 'Unauthorized - User not found'
+    )
+  )
 }
 
 /**

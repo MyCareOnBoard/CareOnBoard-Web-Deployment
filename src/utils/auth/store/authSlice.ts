@@ -34,6 +34,9 @@ export const loginUser = createAsyncThunk(
     if (result.status === 'mfa_enrollment_required') {
       return rejectWithValue({ code: 'MFA_ENROLLMENT_REQUIRED' })
     }
+    if (result.status === 'profile_required') {
+      return rejectWithValue('Your account setup is incomplete. Reopen your Agency Care invitation to finish registration, or contact your administrator.')
+    }
     return rejectWithValue(result.error || 'Login failed')
   }
 )

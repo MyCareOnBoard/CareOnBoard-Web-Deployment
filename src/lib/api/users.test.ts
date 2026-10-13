@@ -12,6 +12,12 @@ import { getUser } from "./users";
 describe("getUser", () => {
   beforeEach(() => get.mockReset());
 
+  it("preserves a missing profile response so a bootstrap probe can resume registration", async () => {
+    const missing = { response: { status: 404, data: { error: 'User not found' } } };
+    get.mockRejectedValueOnce(missing);
+    await expect(getUser({ allowMissingProfile: true })).rejects.toBe(missing);
+  });
+
   it("maps a limited profile without trusting embedded product privileges", async () => {
     get.mockResolvedValueOnce({ data: { success: true, user: {
       uid: 'partner-1', email: 'partner@example.test', fullName: 'Partner Person', userType: 'agency_care',
@@ -19,7 +25,7 @@ describe("getUser", () => {
       canOpenAgencyPayrollSetup: true, profile: { role: 'admin', accessList: ['Payroll Management'] },
     } } });
     const mapped = await getUser();
-    expect(get).toHaveBeenCalledExactlyOnceWith('/users/profile');
+    expect(get).toHaveBeenCalledExactlyOnceWith('/users/profile', undefined);
     expect(mapped).toMatchObject({ uid: 'partner-1', userType: 'agency_care', emailVerified: true });
     for (const field of ['agencyId', 'agency', 'payrollEmploymentId', 'canOpenAgencyPayrollSetup']) expect(mapped).not.toHaveProperty(field);
     expect(mapped.profile).toEqual({ fullName: 'Partner Person', email: 'partner@example.test' });
