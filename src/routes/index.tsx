@@ -230,10 +230,6 @@ export const router = createBrowserRouter([
         errorElement: <RouteErrorPage />,
         children: [
     {
-        path: Routes.agencyCare.invitation,
-        Component: AgencyCareInvitationPage,
-    },
-    {
         element: <ProtectedRoute allowAgencyCare><AgencyCareLayout /></ProtectedRoute>,
         children: [
             { path: Routes.agencyCare.home, Component: AgencyCareDashboard },
@@ -286,6 +282,10 @@ export const router = createBrowserRouter([
     {
         Component: AuthLayout,
         children: [
+            {
+                path: Routes.agencyCare.invitation,
+                Component: AgencyCareInvitationPage,
+            },
             {
                 path: Routes.auth.login,
                 Component: LoginPage,

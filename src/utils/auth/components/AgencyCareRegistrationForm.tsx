@@ -12,10 +12,12 @@ import { hasEnrolledMfa } from '@/utils/auth/services/mfaService'
 import { sendCustomVerificationEmail } from '@/utils/auth/services/authEmailService'
 import { authRouteWithReturnTo } from '@/utils/auth/helpers/agencyCareReturnTo'
 import { Routes } from '@/routes/constants'
+import type { CareInvitationPreview } from '@/lib/api/agencyCare'
 
 interface AgencyCareRegistrationFormProps {
   token: string
   needsOrganization?: boolean
+  invitationDetails?: CareInvitationPreview['registrationDetails']
   onRegistered: () => void | Promise<void>
 }
 
@@ -24,12 +26,12 @@ export function AgencyCareRegistrationForm(props: AgencyCareRegistrationFormProp
   return <RegistrationFields key={props.token} {...props} />
 }
 
-function RegistrationFields({ token, needsOrganization = false, onRegistered }: AgencyCareRegistrationFormProps) {
+function RegistrationFields({ token, needsOrganization = false, invitationDetails, onRegistered }: AgencyCareRegistrationFormProps) {
   const navigate = useNavigate()
   const { refreshProfile } = useAuth()
-  const [fullName, setFullName] = useState(auth.currentUser?.displayName || '')
-  const [agencyName, setAgencyName] = useState('')
-  const [email, setEmail] = useState(auth.currentUser?.email || '')
+  const [fullName, setFullName] = useState(invitationDetails?.fullName || auth.currentUser?.displayName || '')
+  const [agencyName, setAgencyName] = useState(invitationDetails?.agencyName || '')
+  const [email, setEmail] = useState(invitationDetails?.email || auth.currentUser?.email || '')
   const [password, setPassword] = useState('')
   const [consent, setConsent] = useState(false)
   const [stage, setStage] = useState<'create' | 'verify'>(auth.currentUser ? 'verify' : 'create')
@@ -99,10 +101,10 @@ function RegistrationFields({ token, needsOrganization = false, onRegistered }: 
   }
 
   return <form onSubmit={submit} className="ac-stack ac-auth-form">
-    <div className="space-y-2"><Label htmlFor="care-register-name">Full name</Label><Input id="care-register-name" autoComplete="name" required value={fullName} onChange={(event) => setFullName(event.target.value)} className="ac-auth-input" /></div>
-    {needsOrganization && <div className="space-y-2"><Label htmlFor="care-register-agency">Agency name</Label><Input id="care-register-agency" autoComplete="organization" required value={agencyName} onChange={(event) => setAgencyName(event.target.value)} className="ac-auth-input" /></div>}
+    <div className="space-y-2"><Label htmlFor="care-register-name">Full name</Label><Input id="care-register-name" autoComplete="name" required value={fullName} readOnly={Boolean(invitationDetails)} onChange={invitationDetails ? undefined : (event) => setFullName(event.target.value)} className="ac-auth-input" /></div>
+    {needsOrganization && <div className="space-y-2"><Label htmlFor="care-register-agency">Agency name</Label><Input id="care-register-agency" autoComplete="organization" required value={agencyName} readOnly={Boolean(invitationDetails)} onChange={invitationDetails ? undefined : (event) => setAgencyName(event.target.value)} className="ac-auth-input" /></div>}
     {stage === 'create' ? <>
-      <div className="space-y-2"><Label htmlFor="care-register-email">Email</Label><Input id="care-register-email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} className="ac-auth-input" /></div>
+      <div className="space-y-2"><Label htmlFor="care-register-email">Email</Label><Input id="care-register-email" type="email" autoComplete="email" required value={email} readOnly={Boolean(invitationDetails)} onChange={invitationDetails ? undefined : (event) => setEmail(event.target.value)} className="ac-auth-input" /></div>
       <div className="space-y-2"><Label htmlFor="care-register-password">Password</Label><Input id="care-register-password" type="password" autoComplete="new-password" required minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} className="ac-auth-input" /></div>
     </> : <p className="text-sm ac-muted">Continue as {auth.currentUser?.email}. {auth.currentUser?.emailVerified ? 'Your email is verified.' : 'Open the verification link in your email, then check below.'}</p>}
     <label className="flex items-start gap-2 text-sm ac-muted"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} className="mt-1" />I agree to the Agency Care terms and privacy policy (October 7, 2026).</label>

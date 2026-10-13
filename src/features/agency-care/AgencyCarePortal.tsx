@@ -846,6 +846,9 @@ export function AgencyCareInvitationPage() {
     }
   }
   const returnTo = `/agency-care/invitations/${encodeURIComponent(token)}${selected ? `?agencyKey=${encodeURIComponent(selected)}` : ""}`;
+  const invitationDetails = preview.data?.registrationDetails;
+  const missingRegistrationDetails = preview.data?.requiresOrganizationRegistration &&
+    (!invitationDetails?.fullName || !invitationDetails.agencyName || !invitationDetails.email);
   return (
     <main className="agency-care ac-invitation">
       <CareHeading
@@ -881,8 +884,12 @@ export function AgencyCareInvitationPage() {
                 workspace or request a fresh invitation.
               </CareNotice>
             ) : registration && !internalInvitation ? (
+              missingRegistrationDetails ? <CareNotice danger>
+                This invitation is missing signup details. Ask the sender to create a new invitation.
+              </CareNotice> :
               <AgencyCareRegistrationForm
                 token={token}
+                invitationDetails={invitationDetails}
                 needsOrganization={
                   preview.data.purpose === "client_connection" &&
                   (preview.data.requiresOrganizationRegistration === true ||

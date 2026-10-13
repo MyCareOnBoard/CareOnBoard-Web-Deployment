@@ -19,7 +19,7 @@
   --ac-shadow: 0 12px 45px #001c3526;
   color: var(--ac-text);
 }
-.dark :is(.agency-care, .ac-dialog, .ac-shell, .ac-account-menu) {
+.dark :is(.agency-care:not(.ac-invitation), .ac-dialog, .ac-shell, .ac-account-menu) {
   --ac-bg: #152729;
   --ac-panel: #1c3235;
   --ac-text: #e6f2f3;
@@ -498,9 +498,17 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.ac-invitation {
-  max-width: 850px;
-  margin: 24px auto;
+.agency-care.ac-invitation {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+}
+.ac-invitation .ac-heading h1 {
+  font-size: 30px;
+  color: #0f172a;
 }
 .ac-entry,
 .ac-bridge {
@@ -1103,13 +1111,25 @@
   background: transparent;
   font-weight: 600;
 }
-.ac-auth-form .ac-auth-input {
-  min-height: 44px;
-  border: 1px solid var(--ac-border);
-  border-radius: 10px;
-  color: var(--ac-text);
-  background: var(--ac-panel);
-  font: inherit;
+.ac-invitation .ac-auth-form input.ac-auth-input {
+  min-height: 48px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  color: #0f172a;
+  background: #f8fafc;
+  font-size: 16px;
+}
+.ac-invitation .ac-auth-form > .ac-button {
+  min-height: 48px;
+  border-radius: 16px;
+  font-size: 16px;
+}
+.ac-invitation .ac-auth-form > .ac-button[data-care-variant="default"] {
+  background: #00b4b8;
+  box-shadow: 0 12px 24px rgba(0, 180, 184, 0.25);
+}
+.ac-invitation .ac-auth-form > .ac-button[data-care-variant="default"]:hover {
+  background: #148a9c;
 }
 .ac-auth-form label {
   color: var(--ac-text);

@@ -204,6 +204,7 @@ export type CareInvitationPreview = {
   canAccept?: boolean;
   agencyKey?: string;
   requiresOrganizationRegistration?: boolean;
+  registrationDetails?: { fullName: string; agencyName: string; email: string };
 };
 export type CareConversation = CareAccess & {
   id: string;

@@ -41,6 +41,23 @@ describe('invitation-bound registration', () => {
     await waitFor(() => expect(mocks.post).toHaveBeenCalledWith('/agencyCare/invitations/invite-token/register', expect.objectContaining({ organization: { name: 'Partner Services', contactName: 'Partner Person' }, termsVersion: '2026-10-07', privacyVersion: '2026-10-07', operationId: expect.any(String) })))
     expect(mocks.navigate).toHaveBeenCalledWith('/auth/mfa-enroll?returnTo=%2Fagency-care%2Finvitations%2Finvite-token', { replace: true })
   })
+  it('prefills and locks the invitation identity while leaving the password editable', async () => {
+    render(<MemoryRouter><AgencyCareRegistrationForm token="invite-token" needsOrganization invitationDetails={{ fullName: 'Invited Person', agencyName: 'Invited Agency', email: 'invited@example.test' }} onRegistered={vi.fn()} /></MemoryRouter>)
+    for (const [label, value] of [['Full name', 'Invited Person'], ['Agency name', 'Invited Agency'], ['Email', 'invited@example.test']]) {
+      expect(screen.getByLabelText(label)).toHaveValue(value)
+      expect(screen.getByLabelText(label)).toHaveAttribute('readonly')
+      fireEvent.change(screen.getByLabelText(label), { target: { value: 'Changed value' } })
+    }
+    expect(screen.getByLabelText('Password')).not.toHaveAttribute('readonly')
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } })
+    fireEvent.click(screen.getByLabelText(/I agree/))
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    await waitFor(() => expect(mocks.verify).toHaveBeenCalledOnce())
+    expect(mocks.create).toHaveBeenCalledWith(expect.anything(), 'invited@example.test', 'password123')
+    mocks.current.emailVerified = true
+    fireEvent.click(screen.getByRole('button', { name: 'Check email verification' }))
+    await waitFor(() => expect(mocks.post).toHaveBeenCalledWith('/agencyCare/invitations/invite-token/register', expect.objectContaining({ organization: { name: 'Invited Agency', contactName: 'Invited Person' } })))
+  })
   it('resends through the custom sender with the same invitation continuation', async () => {
     mocks.current = { uid: 'existing-provider', displayName: 'Provider Person', email: 'provider@example.test', emailVerified: false }
     render(<MemoryRouter><AgencyCareRegistrationForm token="signed.token" onRegistered={vi.fn()} /></MemoryRouter>)

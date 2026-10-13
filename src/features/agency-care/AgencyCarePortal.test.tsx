@@ -4,10 +4,11 @@ import { afterEach, expect, it, vi } from "vitest";
 import { AgencyCareInvitationPage, AgencyCareSettings } from "./AgencyCarePortal";
 import { agencyCareApi } from "@/lib/api/agencyCare";
 import { useAgencyCare } from "./AgencyCareLayout";
+import AuthLayout from "@/layouts/AuthLayout";
 
 vi.mock("react-router", async () => await vi.importActual("react-router"));
 const authState = vi.hoisted(() => ({
-  user: { uid: "existing-user", emailVerified: true },
+  user: { uid: "existing-user", emailVerified: true } as { uid: string; emailVerified: boolean } | null,
 }));
 const toast = vi.hoisted(() => vi.fn());
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast }) }));
@@ -22,13 +23,16 @@ vi.mock("@/utils/auth/components/AgencyCareRegistrationForm", () => ({
   AgencyCareRegistrationForm: ({
     token,
     needsOrganization,
+    invitationDetails,
   }: {
     token: string;
     needsOrganization?: boolean;
+    invitationDetails?: { fullName: string; agencyName: string; email: string };
   }) => (
     <div>
       Membership terms for {token}: organization fields{" "}
       {needsOrganization ? "shown" : "omitted"}
+      {invitationDetails && <span>{invitationDetails.fullName} · {invitationDetails.agencyName} · {invitationDetails.email}</span>}
     </div>
   ),
 }));
@@ -73,6 +77,34 @@ afterEach(() => {
   vi.mocked(agencyCareApi.invitationPreview).mockImplementation(defaultPreview);
   authState.user = { uid: "existing-user", emailVerified: true };
   vi.clearAllMocks();
+});
+
+it("shows invited signup details inside the shared auth side-and-form layout", async () => {
+  authState.user = null;
+  vi.mocked(agencyCareApi.invitationPreview).mockResolvedValue({
+    valid: true, status: "pending", purpose: "client_connection", requiresOrganizationRegistration: true,
+    registrationDetails: { fullName: "Invited Person", agencyName: "Invited Agency", email: "invited@example.test" },
+  });
+  render(<MemoryRouter initialEntries={["/agency-care/invitations/new-token?intent=register"]}>
+    <Routes><Route element={<AuthLayout />}>
+      <Route path="/agency-care/invitations/:token" element={<AgencyCareInvitationPage />} />
+    </Route></Routes>
+  </MemoryRouter>);
+  expect(await screen.findByText("Invited Person · Invited Agency · invited@example.test")).toBeVisible();
+  expect(screen.getByRole("heading", { name: "Welcome to CareOnboard Application Portal" })).toBeInTheDocument();
+});
+
+it("requires a new invitation when old signup details are incomplete", async () => {
+  authState.user = null;
+  vi.mocked(agencyCareApi.invitationPreview).mockResolvedValue({
+    valid: true, status: "pending", purpose: "client_connection", requiresOrganizationRegistration: true,
+    registrationDetails: { fullName: "", agencyName: "", email: "invited@example.test" },
+  });
+  render(<MemoryRouter initialEntries={["/agency-care/invitations/old-token?intent=register"]}>
+    <Routes><Route path="/agency-care/invitations/:token" element={<AgencyCareInvitationPage />} /></Routes>
+  </MemoryRouter>);
+  expect(await screen.findByRole("alert")).toHaveTextContent("Ask the sender to create a new invitation.");
+  expect(screen.queryByText(/Membership terms for/)).not.toBeInTheDocument();
 });
 
 it("offers invitation-bound membership terms for an existing account with an existing organization", async () => {
