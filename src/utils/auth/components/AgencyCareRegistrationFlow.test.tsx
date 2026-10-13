@@ -40,13 +40,14 @@ vi.mock('@/features/payroll/api/checkPayrollApi', () => ({
 }))
 vi.mock('@/features/payroll/onboard/payrollOnboardSession', () => ({ clearPayrollOnboardSessions: vi.fn() }))
 
-import axiosClient, { clearAuthCache } from '@/lib/axios'
+import axiosClient, { axiosClientWithoutAuth, clearAuthCache } from '@/lib/axios'
 import authReducer from '@/utils/auth/store/authSlice'
 import { AuthProvider, useAuth } from '@/utils/auth/context/AuthContext'
 import { AgencyCareRegistrationForm } from './AgencyCareRegistrationForm'
 
 const invitationPath = '/agency-care/invitations/invite-token'
 const originalAdapter = axiosClient.defaults.adapter
+const originalEmailAdapter = axiosClientWithoutAuth.defaults.adapter
 let authContext: ReturnType<typeof useAuth>
 
 function Probe() {
@@ -66,6 +67,7 @@ function identity(emailVerified = false): FirebaseUser {
 describe('invitation registration across AuthProvider and the real profile interceptor', () => {
   let profileExists: boolean
   let requests: InternalAxiosRequestConfig[]
+  let emailRequests: InternalAxiosRequestConfig[]
   let missingProfileBody: { error: string; code?: string }
   let publishedRoles: Array<string | undefined>
   let redirect: ReturnType<typeof vi.fn>
@@ -85,6 +87,7 @@ describe('invitation registration across AuthProvider and the real profile inter
     clearAuthCache()
     profileExists = false
     requests = []
+    emailRequests = []
     missingProfileBody = { error: 'Unauthorized - User not found' }
     publishedRoles = []
     redirect = vi.fn()
@@ -101,6 +104,13 @@ describe('invitation registration across AuthProvider and the real profile inter
       return typeof value === 'function' ? value.bind(target) : value
     } }))
     vi.spyOn(console, 'error').mockImplementation(() => {})
+    axiosClientWithoutAuth.defaults.adapter = async config => {
+      emailRequests.push(config)
+      expect(config.url).toBe('/authEmail/verification')
+      expect(config.headers.Authorization).toBe('Bearer invited-partner-token')
+      expect(JSON.parse(config.data)).toEqual({ continuePath: invitationPath })
+      return { config, headers: {}, status: 200, statusText: 'OK', data: { success: true } }
+    }
     axiosClient.defaults.adapter = async config => {
       requests.push(config)
       expect(config.headers.Authorization).toBe('Bearer invited-partner-token')
@@ -124,6 +134,7 @@ describe('invitation registration across AuthProvider and the real profile inter
 
   afterEach(() => {
     axiosClient.defaults.adapter = originalAdapter
+    axiosClientWithoutAuth.defaults.adapter = originalEmailAdapter
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
   })
@@ -166,7 +177,8 @@ describe('invitation registration across AuthProvider and the real profile inter
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } })
     fireEvent.click(screen.getByLabelText(/I agree/))
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
-    await waitFor(() => expect(firebase.verify).toHaveBeenCalledOnce())
+    await waitFor(() => expect(emailRequests).toHaveLength(1))
+    expect(firebase.verify).not.toHaveBeenCalled()
     await waitFor(() => expect(requests.length).toBeGreaterThan(0))
     await act(async () => {})
     expect(redirect).not.toHaveBeenCalled()

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { createUserWithEmailAndPassword, reload, sendEmailVerification, updateProfile } from 'firebase/auth'
+import { createUserWithEmailAndPassword, reload, updateProfile } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import axiosClient, { clearAuthCache } from '@/lib/axios'
 import { LoaderCircle } from 'lucide-react'
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/utils/auth'
 import { hasEnrolledMfa } from '@/utils/auth/services/mfaService'
+import { sendCustomVerificationEmail } from '@/utils/auth/services/authEmailService'
 import { authRouteWithReturnTo } from '@/utils/auth/helpers/agencyCareReturnTo'
 import { Routes } from '@/routes/constants'
 
@@ -60,7 +61,7 @@ function RegistrationFields({ token, needsOrganization = false, onRegistered }: 
         await updateProfile(user, { displayName: fullName.trim() })
         if (!mounted.current || auth.currentUser?.uid !== user.uid) return
         setStage('verify')
-        await sendEmailVerification(user)
+        await sendCustomVerificationEmail(user, returnTo)
         return
       }
       const current = auth.currentUser
@@ -113,7 +114,7 @@ function RegistrationFields({ token, needsOrganization = false, onRegistered }: 
       pending.current = true
       setBusy(true)
       setError('')
-      try { await sendEmailVerification(auth.currentUser) } catch { setError('Unable to resend the verification email. Please try again.') } finally { pending.current = false; setBusy(false) }
+      try { await sendCustomVerificationEmail(auth.currentUser, returnTo) } catch (cause) { if (mounted.current) setError(cause instanceof Error ? cause.message : 'Unable to resend the verification email. Please try again.') } finally { pending.current = false; if (mounted.current) setBusy(false) }
     }}>Resend verification email</Button>}
   </form>
 }

@@ -9,7 +9,6 @@ import { auth } from '@/lib/firebase'
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  sendPasswordResetEmail as firebaseSendPasswordResetEmail,
   signOut,
   updateProfile,
   verifyPasswordResetCode,
@@ -156,11 +155,12 @@ export async function registerWithEmail(fullName: string, email: string, passwor
 }
 
 /**
- * Send password reset email using Firebase
+ * Send a custom password reset email using the backend delivery service
  */
 export async function sendPasswordResetEmail(email: string): Promise<{ success: boolean; error?: string }> {
   try {
-    await firebaseSendPasswordResetEmail(auth, email)
+    const { sendCustomPasswordResetEmail } = await import('./authEmailService')
+    await sendCustomPasswordResetEmail(email)
 
     return {
       success: true,

@@ -104,12 +104,9 @@ export const resetPassword = createAsyncThunk(
   'auth/resetPassword',
   async (email: string, { rejectWithValue }) => {
     try {
-      const [{ sendPasswordResetEmail: firebaseSendPasswordResetEmail }, { auth }] =
-        await Promise.all([
-          import('firebase/auth'),
-          import('@/lib/firebase'),
-        ])
-      await firebaseSendPasswordResetEmail(auth, email)
+      const { sendPasswordResetEmail } = await import('../services/authService')
+      const result = await sendPasswordResetEmail(email)
+      if (!result.success) return rejectWithValue(result.error || 'Password reset failed')
     } catch (error: any) {
       return rejectWithValue(error.message || 'Password reset failed')
     }

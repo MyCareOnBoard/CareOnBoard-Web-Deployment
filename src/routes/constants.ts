@@ -214,6 +214,7 @@ export const Routes = {
         signup: "/auth/signup",
         forgotPassword: "/auth/forgot-password",
         resetPassword: "/auth/reset-password",
+        action: "/auth/action",
         mfaEnroll: "/auth/mfa-enroll",
         mfaChallenge: "/auth/mfa-challenge",
         familyLogin: "/auth/family-login",

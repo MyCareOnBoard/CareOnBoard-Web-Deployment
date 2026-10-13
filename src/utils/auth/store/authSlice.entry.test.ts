@@ -23,7 +23,6 @@ vi.mock("firebase/auth", () => {
     createUserWithEmailAndPassword: mocks.createUserWithEmailAndPassword,
     signOut: mocks.signOut,
     updateProfile: mocks.updateProfile,
-    sendPasswordResetEmail: mocks.sendPasswordResetEmail,
   };
 });
 
@@ -37,6 +36,7 @@ vi.mock("@/utils/auth/services/authService", () => {
   return {
     loginWithEmail: mocks.loginWithEmail,
     transformFirebaseUser: mocks.transformFirebaseUser,
+    sendPasswordResetEmail: mocks.sendPasswordResetEmail,
   };
 });
 
@@ -140,8 +140,8 @@ describe.sequential("authSlice entry loading", () => {
     expect(state.error).toBe("Provider logout failed");
   });
 
-  it("keeps reset and auth-state thunks wired to their original boundaries", async () => {
-    mocks.sendPasswordResetEmail.mockResolvedValue(undefined);
+  it("shares custom reset sending while preserving the auth-state boundary", async () => {
+    mocks.sendPasswordResetEmail.mockResolvedValue({ success: true });
     const firebaseUser = { uid: "staff-2" };
     const transformedUser = { uid: "staff-2", fullName: "Staff Two" };
     const unsubscribe = vi.fn();
@@ -155,12 +155,18 @@ describe.sequential("authSlice entry loading", () => {
     const checkAction = await runThunk(checkAuthState());
 
     expect(mocks.sendPasswordResetEmail).toHaveBeenCalledWith(
-      mocks.auth,
       "staff@example.com",
     );
     expect(resetAction.type).toBe("auth/resetPassword/fulfilled");
     expect(checkAction.type).toBe("auth/checkState/fulfilled");
     expect(checkAction.payload).toEqual(transformedUser);
     expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+
+  it("rejects a custom reset send failure with its actionable message", async () => {
+    mocks.sendPasswordResetEmail.mockResolvedValue({ success: false, error: "Email delivery is temporarily unavailable." });
+    const action = await runThunk(resetPassword("staff@example.com"));
+    expect(action.type).toBe("auth/resetPassword/rejected");
+    expect(action.payload).toBe("Email delivery is temporarily unavailable.");
   });
 });

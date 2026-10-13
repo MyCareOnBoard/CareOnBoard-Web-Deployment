@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { reload, sendEmailVerification } from 'firebase/auth'
+import { reload } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { clearAuthCache } from '@/lib/axios'
 import { useAuth } from '@/utils/auth/context/AuthContext'
 import { LoaderCircle } from 'lucide-react'
 import { CareButton as Button, CareNotice } from '@/features/agency-care/ui'
+import { sendCustomVerificationEmail } from '@/utils/auth/services/authEmailService'
+import { agencyCareReturnTo } from '@/utils/auth/helpers/agencyCareReturnTo'
 
 /** Verifies the current Firebase identity without applicant onboarding or changing the care URL. */
 export function AgencyCareEmailVerification({ onVerified }: { onVerified: () => void }) {
@@ -25,7 +27,7 @@ export function AgencyCareEmailVerification({ onVerified }: { onVerified: () => 
     setError('')
     try {
       if (!check) {
-        await sendEmailVerification(current)
+        await sendCustomVerificationEmail(current, agencyCareReturnTo(`${window.location.pathname}${window.location.search}`) || undefined)
         if (stillCurrent()) setSent(true)
         return
       }
@@ -40,8 +42,8 @@ export function AgencyCareEmailVerification({ onVerified }: { onVerified: () => 
       clearAuthCache()
       await refreshProfile()
       if (stillCurrent()) onVerified()
-    } catch {
-      if (stillCurrent()) setError(check ? 'Could not confirm verification. Check your connection and try again.' : 'Could not send the verification email. Please wait and try again.')
+    } catch (cause) {
+      if (stillCurrent()) setError(check ? 'Could not confirm verification. Check your connection and try again.' : cause instanceof Error ? cause.message : 'Could not send the verification email. Please wait and try again.')
     } finally {
       pending.current = false
       if (mounted.current) setBusy(false)

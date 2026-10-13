@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router'
 const mocks = vi.hoisted(() => ({ current: null as any, create: vi.fn(), verify: vi.fn(), reload: vi.fn(), post: vi.fn(), refresh: vi.fn(), navigate: vi.fn(), enrolled: vi.fn() }))
 vi.mock('@/lib/firebase', () => ({ auth: { get currentUser() { return mocks.current } } }))
-vi.mock('firebase/auth', () => ({ createUserWithEmailAndPassword: mocks.create, sendEmailVerification: mocks.verify, reload: mocks.reload, updateProfile: vi.fn() }))
+vi.mock('firebase/auth', () => ({ createUserWithEmailAndPassword: mocks.create, sendEmailVerification: vi.fn(), reload: mocks.reload, updateProfile: vi.fn() }))
+vi.mock('@/utils/auth/services/authEmailService', () => ({ sendCustomVerificationEmail: mocks.verify }))
 vi.mock('@/lib/axios', () => ({ default: { post: mocks.post }, clearAuthCache: vi.fn() }))
 vi.mock('@/utils/auth', () => ({ useAuth: () => ({ refreshProfile: mocks.refresh }) }))
 vi.mock('@/utils/auth/services/mfaService', () => ({ hasEnrolledMfa: mocks.enrolled }))
@@ -30,6 +31,7 @@ describe('invitation-bound registration', () => {
     fireEvent.click(screen.getByLabelText(/I agree/))
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
     await waitFor(() => expect(mocks.verify).toHaveBeenCalledOnce())
+    expect(mocks.verify).toHaveBeenCalledWith(mocks.current, '/agency-care/invitations/invite-token')
     expect(mocks.post).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Check email verification' }))
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Verify your email'))
@@ -38,6 +40,20 @@ describe('invitation-bound registration', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Check email verification' }))
     await waitFor(() => expect(mocks.post).toHaveBeenCalledWith('/agencyCare/invitations/invite-token/register', expect.objectContaining({ organization: { name: 'Partner Services', contactName: 'Partner Person' }, termsVersion: '2026-10-07', privacyVersion: '2026-10-07', operationId: expect.any(String) })))
     expect(mocks.navigate).toHaveBeenCalledWith('/auth/mfa-enroll?returnTo=%2Fagency-care%2Finvitations%2Finvite-token', { replace: true })
+  })
+  it('resends through the custom sender with the same invitation continuation', async () => {
+    mocks.current = { uid: 'existing-provider', displayName: 'Provider Person', email: 'provider@example.test', emailVerified: false }
+    render(<MemoryRouter><AgencyCareRegistrationForm token="signed.token" onRegistered={vi.fn()} /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: 'Resend verification email' }))
+    await waitFor(() => expect(mocks.verify).toHaveBeenCalledWith(mocks.current, '/agency-care/invitations/signed.token'))
+  })
+
+  it('shows the actionable custom sender error on resend', async () => {
+    mocks.current = { uid: 'existing-provider', displayName: 'Provider Person', email: 'provider@example.test', emailVerified: false }
+    mocks.verify.mockRejectedValueOnce(new Error('Too many email requests. Please wait a few minutes before trying again.'))
+    render(<MemoryRouter><AgencyCareRegistrationForm token="invite-token" onRegistered={vi.fn()} /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: 'Resend verification email' }))
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Too many email requests'))
   })
   it('resumes a verified signed-in identity without creating a different account', async () => {
     mocks.current = { uid: 'existing-provider', displayName: 'Provider Person', email: 'provider@example.test', emailVerified: true }
