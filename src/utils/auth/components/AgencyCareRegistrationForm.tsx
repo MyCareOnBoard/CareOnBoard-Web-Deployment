@@ -8,11 +8,13 @@ import { CareButton as Button, CareNotice } from '@/features/agency-care/ui'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/utils/auth'
+import { useToast } from '@/hooks/use-toast'
 import { hasEnrolledMfa } from '@/utils/auth/services/mfaService'
 import { sendCustomVerificationEmail } from '@/utils/auth/services/authEmailService'
 import { authRouteWithReturnTo } from '@/utils/auth/helpers/agencyCareReturnTo'
 import { Routes } from '@/routes/constants'
 import type { CareInvitationPreview } from '@/lib/api/agencyCare'
+import { AgencyCareVerificationNotice } from './AgencyCareVerificationNotice'
 
 interface AgencyCareRegistrationFormProps {
   token: string
@@ -29,12 +31,14 @@ export function AgencyCareRegistrationForm(props: AgencyCareRegistrationFormProp
 function RegistrationFields({ token, needsOrganization = false, invitationDetails, onRegistered }: AgencyCareRegistrationFormProps) {
   const navigate = useNavigate()
   const { refreshProfile } = useAuth()
+  const { toast } = useToast()
   const [fullName, setFullName] = useState(invitationDetails?.fullName || auth.currentUser?.displayName || '')
   const [agencyName, setAgencyName] = useState(invitationDetails?.agencyName || '')
   const [email, setEmail] = useState(invitationDetails?.email || auth.currentUser?.email || '')
   const [password, setPassword] = useState('')
   const [consent, setConsent] = useState(false)
   const [stage, setStage] = useState<'create' | 'verify'>(auth.currentUser ? 'verify' : 'create')
+  const [emailSentToUid, setEmailSentToUid] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const pending = useRef(false)
@@ -64,6 +68,9 @@ function RegistrationFields({ token, needsOrganization = false, invitationDetail
         if (!mounted.current || auth.currentUser?.uid !== user.uid) return
         setStage('verify')
         await sendCustomVerificationEmail(user, returnTo)
+        if (!mounted.current || auth.currentUser?.uid !== user.uid) return
+        setEmailSentToUid(user.uid)
+        toast({ title: 'Account created', description: `Verification email sent to ${user.email || email.trim()}. Check your inbox to continue.`, variant: 'success' })
         return
       }
       const current = auth.currentUser
@@ -101,22 +108,32 @@ function RegistrationFields({ token, needsOrganization = false, invitationDetail
   }
 
   return <form onSubmit={submit} className="ac-stack ac-auth-form">
+    {stage === 'verify' && !auth.currentUser?.emailVerified && <AgencyCareVerificationNotice email={auth.currentUser?.email} sent={emailSentToUid === auth.currentUser?.uid} />}
+    {(stage === 'create' || !invitationDetails) && <>
     <div className="space-y-2"><Label htmlFor="care-register-name">Full name</Label><Input id="care-register-name" autoComplete="name" required value={fullName} readOnly={Boolean(invitationDetails)} onChange={invitationDetails ? undefined : (event) => setFullName(event.target.value)} className="ac-auth-input" /></div>
     {needsOrganization && <div className="space-y-2"><Label htmlFor="care-register-agency">Agency name</Label><Input id="care-register-agency" autoComplete="organization" required value={agencyName} readOnly={Boolean(invitationDetails)} onChange={invitationDetails ? undefined : (event) => setAgencyName(event.target.value)} className="ac-auth-input" /></div>}
+    </>}
     {stage === 'create' ? <>
       <div className="space-y-2"><Label htmlFor="care-register-email">Email</Label><Input id="care-register-email" type="email" autoComplete="email" required value={email} readOnly={Boolean(invitationDetails)} onChange={invitationDetails ? undefined : (event) => setEmail(event.target.value)} className="ac-auth-input" /></div>
       <div className="space-y-2"><Label htmlFor="care-register-password">Password</Label><Input id="care-register-password" type="password" autoComplete="new-password" required minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} className="ac-auth-input" /></div>
-    </> : <p className="text-sm ac-muted">Continue as {auth.currentUser?.email}. {auth.currentUser?.emailVerified ? 'Your email is verified.' : 'Open the verification link in your email, then check below.'}</p>}
+    </> : auth.currentUser?.emailVerified && <p className="text-sm ac-muted">Continue as {auth.currentUser.email}. Your email is verified.</p>}
     <label className="flex items-start gap-2 text-sm ac-muted"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} className="mt-1" />I agree to the Agency Care terms and privacy policy (October 7, 2026).</label>
     {error && <CareNotice danger>{error}</CareNotice>}
     <p className="text-sm ac-muted">Already have an account? <Link to={authRouteWithReturnTo(Routes.auth.login, returnTo)} className="ac-auth-link hover:underline">Sign in</Link></p>
     <Button type="submit" aria-busy={busy} disabled={busy}>{busy && <LoaderCircle aria-hidden="true" className="size-4 motion-safe:animate-spin" />}{busy ? 'Please wait…' : stage === 'create' ? 'Create account' : auth.currentUser?.emailVerified ? 'Continue with this account' : 'Check email verification'}</Button>
     {stage === 'verify' && !auth.currentUser?.emailVerified && <Button type="button" variant="outline" disabled={busy} onClick={async () => {
-      if (!auth.currentUser || pending.current) return
+      const current = auth.currentUser
+      if (!current || pending.current) return
+      const stillCurrent = () => mounted.current && auth.currentUser?.uid === current.uid
       pending.current = true
       setBusy(true)
       setError('')
-      try { await sendCustomVerificationEmail(auth.currentUser, returnTo) } catch (cause) { if (mounted.current) setError(cause instanceof Error ? cause.message : 'Unable to resend the verification email. Please try again.') } finally { pending.current = false; if (mounted.current) setBusy(false) }
+      try {
+        await sendCustomVerificationEmail(current, returnTo)
+        if (!stillCurrent()) return
+        setEmailSentToUid(current.uid)
+        toast({ title: 'Verification email sent', description: `Check ${current.email || 'your inbox'} and open the verification link to continue.`, variant: 'success' })
+      } catch (cause) { if (stillCurrent()) setError(cause instanceof Error ? cause.message : 'Unable to resend the verification email. Please try again.') } finally { pending.current = false; if (mounted.current) setBusy(false) }
     }}>Resend verification email</Button>}
   </form>
 }

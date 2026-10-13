@@ -3,16 +3,20 @@ import { reload } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { clearAuthCache } from '@/lib/axios'
 import { useAuth } from '@/utils/auth/context/AuthContext'
+import { useToast } from '@/hooks/use-toast'
 import { LoaderCircle } from 'lucide-react'
 import { CareButton as Button, CareNotice } from '@/features/agency-care/ui'
 import { sendCustomVerificationEmail } from '@/utils/auth/services/authEmailService'
 import { agencyCareReturnTo } from '@/utils/auth/helpers/agencyCareReturnTo'
+import { AgencyCareVerificationNotice } from './AgencyCareVerificationNotice'
 
 /** Verifies the current Firebase identity without applicant onboarding or changing the care URL. */
 export function AgencyCareEmailVerification({ onVerified }: { onVerified: () => void }) {
   const { refreshProfile } = useAuth()
+  const { toast } = useToast()
   const [busy, setBusy] = useState(false)
-  const [sent, setSent] = useState(false)
+  const [sentToUid, setSentToUid] = useState<string | null>(null)
+  const sent = sentToUid === auth.currentUser?.uid
   const [error, setError] = useState('')
   const pending = useRef(false)
   const mounted = useRef(true)
@@ -28,7 +32,10 @@ export function AgencyCareEmailVerification({ onVerified }: { onVerified: () => 
     try {
       if (!check) {
         await sendCustomVerificationEmail(current, agencyCareReturnTo(`${window.location.pathname}${window.location.search}`) || undefined)
-        if (stillCurrent()) setSent(true)
+        if (stillCurrent()) {
+          setSentToUid(current.uid)
+          toast({ title: 'Verification email sent', description: `Check ${current.email || 'your inbox'} and open the verification link to continue.`, variant: 'success' })
+        }
         return
       }
       await reload(current)
@@ -50,11 +57,8 @@ export function AgencyCareEmailVerification({ onVerified }: { onVerified: () => 
     }
   }
 
-  return <section className="agency-care ac-panel ac-auth-verification mx-auto my-8 w-full max-w-xl" aria-label="Agency Care email verification">
-    <h2 className="mb-3 text-2xl font-semibold">Verify your email</h2>
-    <p className="mb-2 text-sm ac-muted">Verify the email on your existing account before opening Agency Care. Your account and current invitation stay in place.</p>
-    {auth.currentUser?.email && <p className="mb-5 break-all text-sm font-medium">{auth.currentUser.email}</p>}
-    {sent && <p role="status" className="ac-muted mb-4 text-sm">Verification email sent. Open the link, then return here to check verification.</p>}
+  return <section className="agency-care ac-panel ac-auth-verification ac-stack mx-auto my-8 w-full max-w-xl" aria-label="Agency Care email verification">
+    <AgencyCareVerificationNotice email={auth.currentUser?.email} sent={sent} />
     {error && <CareNotice danger>{error}</CareNotice>}
     <div className="flex flex-wrap gap-3">
       <Button variant="outline" disabled={busy} onClick={() => void verify(false)}>{sent ? 'Resend verification email' : 'Send verification email'}</Button>

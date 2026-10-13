@@ -178,6 +178,8 @@ describe('invitation registration across AuthProvider and the real profile inter
     fireEvent.click(screen.getByLabelText(/I agree/))
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
     await waitFor(() => expect(emailRequests).toHaveLength(1))
+    expect(await screen.findByRole('heading', { name: 'Check your email' })).toBeVisible()
+    expect(screen.getByText('partner@example.test', { selector: 'strong' })).toBeVisible()
     expect(firebase.verify).not.toHaveBeenCalled()
     await waitFor(() => expect(requests.length).toBeGreaterThan(0))
     await act(async () => {})

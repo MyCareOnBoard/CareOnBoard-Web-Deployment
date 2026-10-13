@@ -1176,6 +1176,45 @@
   background: var(--ac-panel);
   border-radius: 15px;
 }
+.ac-verification-notice {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--ac-border);
+  border-radius: 16px;
+  background: var(--ac-soft);
+  overflow-wrap: anywhere;
+}
+.ac-verification-notice-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ac-teal);
+}
+.ac-verification-notice-heading > svg {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+.ac-verification-notice h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+.ac-verification-email {
+  min-width: 0;
+  font-size: 16px;
+  color: var(--ac-text);
+}
+.ac-verification-notice p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ac-text);
+}
+.ac-verification-notice .ac-verification-hint {
+  color: var(--ac-muted);
+}
 .ac-upload {
   border-color: var(--ac-border);
   background: var(--ac-hover);
