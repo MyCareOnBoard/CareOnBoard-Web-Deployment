@@ -630,6 +630,35 @@
 .ac-dialog-footer > button[type="submit"]:hover {
   background: var(--ac-primary-hover);
 }
+.ac-invite-modes {
+  display: flex;
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid var(--ac-border);
+  border-radius: 14px;
+  background: var(--ac-hover);
+}
+.ac-invite-modes > .ac-button[data-care-variant] {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  color: var(--ac-muted);
+  background: transparent;
+}
+.ac-invite-modes > .ac-button[data-care-variant]:hover {
+  color: var(--ac-teal);
+  background: var(--ac-soft);
+}
+.ac-invite-modes > .ac-button[data-care-variant][aria-pressed="true"] {
+  color: var(--ac-teal);
+  background: var(--ac-panel);
+  box-shadow: 0 2px 8px #102f3a0a;
+}
+.ac-dialog .ac-invite-details {
+  border-top: 0;
+  padding-top: 0;
+}
 .ac-agency-results legend {
   margin-bottom: 10px;
   font-size: 14px;

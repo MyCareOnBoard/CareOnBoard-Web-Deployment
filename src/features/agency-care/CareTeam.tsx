@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router";
-import { Loader2 } from "lucide-react";
+import { Building2, Globe2, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -347,10 +347,11 @@ export function TeamForm({
 }) {
   const { organization } = useAgencyCare();
   const mutation = useScopedMutation(`${scope}|${modal.kind}`);
+  const [invitationMode, setInvitationMode] = useState<"existing" | "external">("existing");
   const [queryInput, setQueryInput] = useState("");
   const [query, setQuery] = useState("");
   const [selectedAgency, setSelectedAgency] = useState("");
-  const internalInvitation = selectedAgency.startsWith("internal:");
+  const internalInvitation = invitationMode === "existing" && selectedAgency.startsWith("internal:");
   const [recipientName, setRecipientName] = useState("");
   const [email, setEmail] = useState("");
   const [agencyName, setAgencyName] = useState("");
@@ -384,7 +385,7 @@ export function TeamForm({
     `${scope}|directory|${directoryQuery}`,
     (signal) =>
       agencyCareApi.directory({ agencyKey, query: directoryQuery, signal, limit: 25 }),
-    modal.kind === "invite" && directoryQuery.length >= 2 && !waitingForSearch,
+    modal.kind === "invite" && invitationMode === "existing" && directoryQuery.length >= 2 && !waitingForSearch,
   );
   const localClients = useScopedRequest(
     `${scope}|local-clients|${query}`,
@@ -423,11 +424,14 @@ export function TeamForm({
     setFormError("");
     if (
       modal.kind === "invite" &&
-      ((!internalInvitation && !email.trim()) ||
-        (!selectedAgency && (!agencyName.trim() || !recipientName.trim())))
+      (invitationMode === "existing"
+        ? !selectedAgency || (!internalInvitation && !email.trim())
+        : !agencyName.trim() || !recipientName.trim() || !email.trim())
     ) {
       setFormError(
-        "Select an existing agency or enter the external agency and recipient details.",
+        invitationMode === "existing"
+          ? "Select an agency and provide a recipient email if required."
+          : "Enter the agency name, recipient name, and work email.",
       );
       return;
     }
@@ -450,7 +454,7 @@ export function TeamForm({
       if (modal.kind === "invite")
         return agencyCareApi.invite(
           network.id,
-          selectedAgency
+          invitationMode === "existing"
             ? {
                 agencyKey: selectedAgency,
                 ...(!internalInvitation ? { recipientEmail: email.trim() } : {}),
@@ -538,6 +542,15 @@ export function TeamForm({
           <fieldset disabled={mutation.saving} className="ac-stack">
             {modal.kind === "invite" && (
               <>
+                <div className="ac-invite-modes" role="group" aria-label="Agency invitation type">
+                  <Button type="button" variant="ghost" aria-pressed={invitationMode === "existing"} disabled={mutation.uncertain} onClick={() => { setInvitationMode("existing"); setFormError(""); }}>
+                    <Building2 aria-hidden="true" />Existing agency
+                  </Button>
+                  <Button type="button" variant="ghost" aria-pressed={invitationMode === "external"} disabled={mutation.uncertain} onClick={() => { setInvitationMode("external"); setFormError(""); }}>
+                    <Globe2 aria-hidden="true" />External agency
+                  </Button>
+                </div>
+                {invitationMode === "existing" && <>
                 <div className="ac-field">
                   <label htmlFor="care-agency-search">Find an existing agency</label>
                   <Input
@@ -591,7 +604,7 @@ export function TeamForm({
                       </div>
                     </fieldset>
                   ) : (
-                    <p className="ac-muted" role="status">No matching agencies. Try another name or invite an external agency below.</p>
+                    <p className="ac-muted" role="status">No matching agencies. Try another name or choose External agency.</p>
                   ))
                 )}
                 {selectedAgency && (
@@ -626,10 +639,11 @@ export function TeamForm({
                     </div>}
                   </div>
                 )}
-                {!selectedAgency && (
-                  <div className="ac-dialog-section">
-                    <h3>Or invite an external agency</h3>
-                    <p className="ac-muted">Enter the agency and contact details to send a client connection invitation.</p>
+                </>}
+                {invitationMode === "external" && (
+                  <div className="ac-dialog-section ac-invite-details">
+                    <h3>Agency and contact details</h3>
+                    <p className="ac-muted">Invite an agency that isn't already in the directory.</p>
                     <div className="ac-form-grid">
                       <label className="ac-field">
                         <span>External agency name</span>
@@ -937,6 +951,7 @@ export function TeamForm({
             disabled={
               mutation.saving ||
               mutation.uncertain ||
+              (modal.kind === "invite" && invitationMode === "existing" && !selectedAgency) ||
               (modal.kind === "grant" &&
                 (members.loading || Boolean(members.error) || !uid)) ||
               (modal.kind === "source" &&

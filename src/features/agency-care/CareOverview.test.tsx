@@ -50,6 +50,11 @@ it("opens the existing invitation modal from overview and submits for this clien
   fireEvent.click(screen.getByRole("button", { name: "Add an agency" }));
   const dialog = within(screen.getByRole("dialog", { name: "Invite an agency" }));
   expect(dialog.getByText("John Smith · Test SC")).toBeVisible();
+  expect(dialog.getByRole("button", { name: "Existing agency" })).toHaveAttribute("aria-pressed", "true");
+  expect(dialog.queryByLabelText("External agency name")).not.toBeInTheDocument();
+  fireEvent.click(dialog.getByRole("button", { name: "External agency" }));
+  expect(dialog.getByRole("button", { name: "External agency" })).toHaveAttribute("aria-pressed", "true");
+  expect(dialog.queryByRole("searchbox")).not.toBeInTheDocument();
   fireEvent.change(dialog.getByLabelText("External agency name"), { target: { value: "Helping Hands" } });
   fireEvent.change(dialog.getByLabelText("Recipient name"), { target: { value: "Sarah Thompson" } });
   fireEvent.change(dialog.getByLabelText("Recipient work email"), { target: { value: "sarah@example.test" } });
@@ -75,6 +80,48 @@ it("keeps the invitation action and open modal behind the current invite capabil
 });
 
 const matchingAgency = { agencyKey: "internal:helping", id: "helping", name: "Helping Hands", kind: "internal" as const, city: "Newark", state: "NJ", verificationStatus: "verified", serviceTypes: ["hha", "Ddd", "sc", "home_health"] };
+
+it("preserves external details across switches but requires an existing agency selection", async () => {
+  render(<MemoryRouter><CareOverviewPage {...props} /></MemoryRouter>);
+  await screen.findByRole("heading", { name: "No pending care actions" });
+  fireEvent.click(screen.getByRole("button", { name: "Add an agency" }));
+  const dialog = within(screen.getByRole("dialog"));
+  fireEvent.click(dialog.getByRole("button", { name: "External agency" }));
+  fireEvent.change(dialog.getByLabelText("External agency name"), { target: { value: "New agency" } });
+  fireEvent.change(dialog.getByLabelText("Recipient name"), { target: { value: "Invited person" } });
+  fireEvent.change(dialog.getByLabelText("Recipient work email"), { target: { value: "invited@example.test" } });
+  fireEvent.click(dialog.getByRole("button", { name: "Existing agency" }));
+  expect(dialog.queryByLabelText("External agency name")).not.toBeInTheDocument();
+  expect(dialog.getByRole("button", { name: "Send invitation" })).toBeDisabled();
+  fireEvent.submit(dialog.getByRole("button", { name: "Send invitation" }).closest("form")!);
+  expect(agencyCareApi.invite).not.toHaveBeenCalled();
+  fireEvent.click(dialog.getByRole("button", { name: "External agency" }));
+  expect(dialog.getByLabelText("External agency name")).toHaveValue("New agency");
+  expect(dialog.getByLabelText("Recipient name")).toHaveValue("Invited person");
+  expect(dialog.getByLabelText("Recipient work email")).toHaveValue("invited@example.test");
+});
+
+it("sends external details instead of a hidden existing agency selection", async () => {
+  vi.useFakeTimers();
+  vi.mocked(agencyCareApi.directory).mockResolvedValue({ items: [matchingAgency], nextCursor: null });
+  await act(async () => { render(<MemoryRouter><CareOverviewPage {...props} /></MemoryRouter>); });
+  fireEvent.click(screen.getByRole("button", { name: "Add an agency" }));
+  const dialog = within(screen.getByRole("dialog"));
+  fireEvent.change(dialog.getByRole("searchbox"), { target: { value: "Helping" } });
+  await act(() => vi.advanceTimersByTimeAsync(300));
+  fireEvent.click(dialog.getByRole("radio", { name: "Select Helping Hands" }));
+  const signal = vi.mocked(agencyCareApi.directory).mock.calls[0][0]!.signal!;
+  fireEvent.click(dialog.getByRole("button", { name: "External agency" }));
+  expect(signal.aborted).toBe(true);
+  expect(dialog.queryByRole("searchbox")).not.toBeInTheDocument();
+  fireEvent.change(dialog.getByLabelText("External agency name"), { target: { value: "New agency" } });
+  fireEvent.change(dialog.getByLabelText("Recipient name"), { target: { value: "Invited person" } });
+  fireEvent.change(dialog.getByLabelText("Recipient work email"), { target: { value: "invited@example.test" } });
+  await act(async () => { fireEvent.click(dialog.getByRole("button", { name: "Send invitation" })); });
+  expect(agencyCareApi.invite).toHaveBeenCalledWith("care-network", {
+    agencyName: "New agency", recipientName: "Invited person", recipientEmail: "invited@example.test", operationId: expect.any(String),
+  }, expect.objectContaining({ agencyKey: "internal:sc" }));
+});
 
 it("debounces typing, prevents Enter from submitting, and invites the selected agency card", async () => {
   vi.useFakeTimers();

@@ -58,6 +58,72 @@ beforeEach(() => {
   vi.mocked(agencyCareApi.grant).mockResolvedValue(grant());
 });
 
+it.each([false, true])("shows the assigned Support Coordinator in the staff table without an empty team (grant present: %s)", async (hasGrant) => {
+  vi.mocked(agencyCareApi.relationships).mockResolvedValue({ items: [{
+    agencyKey, name: "Provider agency", state: "active", revision: 7,
+    members: [{ ...person, name: "Assigned coordinator", careRole: "support_coordinator", isSourceCoordinator: true }],
+  }], nextCursor: null });
+  if (hasGrant) vi.mocked(agencyCareApi.grants).mockResolvedValue({ items: [grant({ careRole: "support_coordinator" })], nextCursor: null });
+  mount();
+  expect(await screen.findByText("Assigned SC")).toBeVisible();
+  const table = within(screen.getByRole("table"));
+  const row = table.getByText("Assigned coordinator").closest("tr")!;
+  expect(row).toBeVisible();
+  expect(table.getAllByRole("row")).toHaveLength(2);
+  expect(within(row).getByText("Managed in agency panel")).toBeVisible();
+  expect(within(row).queryByRole("button")).not.toBeInTheDocument();
+  expect(screen.queryByText("No staff assigned yet")).not.toBeInTheDocument();
+  expect(screen.queryByText("No additional staff assigned")).not.toBeInTheDocument();
+  expect(screen.queryByText("No active assignments on this page")).not.toBeInTheDocument();
+});
+
+it("keeps the empty-team message when no coordinator or other staff is assigned", async () => {
+  mount();
+  expect(await screen.findByText("No staff assigned yet")).toBeVisible();
+});
+
+it("keeps the coordinator table through empty grant pages, including the final page", async () => {
+  vi.mocked(agencyCareApi.relationships).mockResolvedValue({ items: [{
+    agencyKey, name: "Provider agency", state: "active", revision: 7,
+    members: [{ ...person, careRole: "support_coordinator", isSourceCoordinator: true }],
+  }], nextCursor: null });
+  vi.mocked(agencyCareApi.grants).mockImplementation(async (_network, options) => ({
+    items: [grant({ state: "revoked" })], nextCursor: options?.cursor ? null : "grants-next",
+  }));
+  mount();
+  expect(await screen.findByRole("table")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+  await waitFor(() => expect(agencyCareApi.grants).toHaveBeenLastCalledWith("network", expect.objectContaining({ cursor: "grants-next" })));
+  expect(await screen.findByRole("table")).toBeVisible();
+  expect(screen.getByText("Assigned SC")).toBeVisible();
+  expect(screen.queryByText("No staff assigned yet")).not.toBeInTheDocument();
+});
+
+it("shows the coordinator and additional staff together in one table", async () => {
+  vi.mocked(agencyCareApi.relationships).mockResolvedValue({ items: [{
+    agencyKey, name: "Provider agency", state: "active", revision: 7,
+    members: [{ ...person, uid: "source-sc", name: "Assigned coordinator", careRole: "support_coordinator", isSourceCoordinator: true }, person],
+  }], nextCursor: null });
+  vi.mocked(agencyCareApi.grants).mockResolvedValue({ items: [grant()], nextCursor: null });
+  mount();
+  const table = within(await screen.findByRole("table"));
+  expect(table.getByText("Assigned coordinator")).toBeVisible();
+  expect(table.getByText("Jordan Reed")).toBeVisible();
+  expect(table.getAllByRole("row")).toHaveLength(3);
+});
+
+it("keeps empty assignment-page guidance without a coordinator, including the final page", async () => {
+  vi.mocked(agencyCareApi.grants).mockImplementation(async (_network, options) => ({
+    items: [grant({ state: "revoked" })], nextCursor: options?.cursor ? null : "grants-next",
+  }));
+  mount();
+  expect(await screen.findByText("No active assignments on this page")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+  await waitFor(() => expect(agencyCareApi.grants).toHaveBeenLastCalledWith("network", expect.objectContaining({ cursor: "grants-next" })));
+  expect(await screen.findByText("No active assignments on this page")).toBeVisible();
+  expect(screen.queryByText("No staff assigned yet")).not.toBeInTheDocument();
+});
+
 it("assigns one verified provider employee with care role, bounded access, optional contact and both revisions", async () => {
   const { refreshNetwork } = mount();
   const dialog = await openNew();
