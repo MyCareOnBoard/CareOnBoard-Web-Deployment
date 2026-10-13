@@ -1,5 +1,5 @@
 import type React from "react"
-import { createContext, useContext, useEffect, useRef, useState } from "react"
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react"
 import { useDispatch, useSelector } from "react-redux"
 import type { AppDispatch, RootState } from "@/store/redux/store"
 import { persistor } from "@/store/redux/store"
@@ -11,7 +11,7 @@ import { auth } from "@/lib/firebase";
 import { clearAuthCache } from "@/lib/axios";
 import { getUser } from "@/lib/api/users";
 import { clearMfaResolverSession } from "../services/mfaSessionStore";
-import type { User } from "../types/user.types"
+import { UserType, type User } from "../types/user.types"
 import { checkPayrollApi } from "@/features/payroll/api/checkPayrollApi"
 import { clearPayrollOnboardSessions } from "@/features/payroll/onboard/payrollOnboardSession"
 
@@ -40,6 +40,7 @@ interface AuthContextType {
   createUser: (fullName: string) => Promise<void>
   getToken: (forceRefresh?: boolean) => Promise<string | null>
   refreshProfile: () => Promise<User | null>
+  acceptFamilyProfile: (nextUser: User) => void
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType)
@@ -107,6 +108,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUserState(reduxUser ?? null)
     }
   }, [reduxUser])
+
+  const acceptFamilyProfile = useCallback((nextUser: User) => {
+    if (!auth.currentUser || nextUser.uid !== auth.currentUser.uid) throw accountChangedError()
+    if (nextUser.userType !== UserType.FAMILY_MEMBER) throw new Error('The verified profile is not a family member.')
+    // Family verification creates the profile while an earlier bootstrap may still be missing it.
+    refreshGenerationRef.current += 1
+    setUserState(nextUser)
+    dispatch(setUser(nextUser))
+  }, [dispatch])
 
   /**
    * Login user with email and password
@@ -267,6 +277,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     getToken,
     createUser,
     refreshProfile,
+    acceptFamilyProfile,
   }
 
   // Show loader while checking auth state

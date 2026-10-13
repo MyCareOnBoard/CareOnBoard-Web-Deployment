@@ -2,7 +2,6 @@ import React, {useCallback, useEffect, useRef, useState} from "react"
 import {useNavigate} from "react-router"
 import {signOut} from "firebase/auth"
 import {Loader2} from "lucide-react"
-import {useDispatch} from "react-redux"
 import PhoneInput, {isValidPhoneNumber} from "react-phone-number-input"
 import "react-phone-number-input/style.css"
 import {Button} from "@/components/ui/button"
@@ -12,10 +11,8 @@ import {useToast} from "@/hooks/use-toast"
 import {auth} from "@/lib/firebase"
 import axiosClient from "@/lib/axios"
 import {Routes} from "@/routes/constants"
-import {setUser} from "@/utils/auth/store/authSlice"
-import {UserType} from "@/utils/auth/types/user.types"
+import {useAuth} from "@/utils/auth/context/AuthContext"
 import type {User} from "@/utils/auth/types/user.types"
-import type {AppDispatch} from "@/store/redux/store"
 import {
     createRecaptchaVerifier,
     clearRecaptchaVerifier,
@@ -33,7 +30,7 @@ import {
 } from "@/utils/auth/services/emailLinkService"
 import {RecaptchaAnchor} from "@/pages/auth/components/RecaptchaAnchor"
 import OtpBoxInput from "./OtpBoxInput"
-import type {ConfirmationResult} from "firebase/auth"
+import type {ConfirmationResult, User as FirebaseUser} from "firebase/auth"
 import QRCode from "react-qr-code";
 
 const RECAPTCHA_CONTAINER_ID = "recaptcha-family-login"
@@ -55,7 +52,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export default function FamilyLoginPage() {
     const navigate = useNavigate()
-    const dispatch = useDispatch<AppDispatch>()
+    const {acceptFamilyProfile} = useAuth()
     const {toast} = useToast()
 
     const [method, setMethod] = useState<Method>("phone")
@@ -137,21 +134,23 @@ export default function FamilyLoginPage() {
      * Everything after Firebase has accepted the credential, shared by all three
      * routes in: the portal only trusts the server's answer about who this is.
      */
-    const finishSignIn = useCallback(async (onFailure: () => void) => {
-        const uid = auth.currentUser?.uid
-        const tenantId = auth.tenantId
-        if (!uid) return
+    const finishSignIn = useCallback(async (expectedUser: FirebaseUser, onFailure: () => void) => {
+        const uid = expectedUser.uid
+        const tenantId = expectedUser.tenantId
+        const isCurrent = () => mountedRef.current && auth.currentUser?.uid === uid
+            && auth.currentUser.tenantId === tenantId && auth.tenantId === tenantId
+        if (!isCurrent()) return
         try {
             const response = await axiosClient.post<{ success: boolean; data: User }>(
                 "/familyPortal/verify"
             )
-            if (!mountedRef.current || auth.currentUser?.uid !== uid || auth.tenantId !== tenantId) return
+            if (!isCurrent()) return
 
             const user = response.data.data
-            dispatch(setUser({...user, userType: UserType.FAMILY_MEMBER}))
+            acceptFamilyProfile(user)
             navigate(Routes.family.dashboard, {replace: true})
         } catch (err: unknown) {
-            if (!mountedRef.current || auth.currentUser?.uid !== uid || auth.tenantId !== tenantId) return
+            if (!isCurrent()) return
             const axiosErr = err as { response?: { status?: number; data?: { message?: string } }; message?: string }
             const status = axiosErr.response?.status
             const serverMsg = axiosErr.response?.data?.message
@@ -176,7 +175,7 @@ export default function FamilyLoginPage() {
             await signOut(auth)
             if (mountedRef.current && !auth.currentUser && auth.tenantId === tenantId) onFailure()
         }
-    }, [dispatch, navigate, toast])
+    }, [acceptFamilyProfile, navigate, toast])
 
     const handleSignIn = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -184,8 +183,8 @@ export default function FamilyLoginPage() {
         setVerifying(true)
         setInlineError("")
         try {
-            await completePhoneSignIn(confirmationResult, otpCode)
-            await finishSignIn(() => {
+            const credential = await completePhoneSignIn(confirmationResult, otpCode)
+            await finishSignIn(credential.user, () => {
                 clearRecaptchaVerifier()
                 setOtpCode("")
                 setConfirmationResult(null)
@@ -235,8 +234,8 @@ export default function FamilyLoginPage() {
         setInlineError("")
         setVerifying(true)
         try {
-            await signInWithPassword(address, password)
-            await finishSignIn(() => {
+            const credential = await signInWithPassword(address, password)
+            await finishSignIn(credential.user, () => {
                 setPassword("")
                 setPhase("enter-email")
             })
@@ -274,12 +273,12 @@ export default function FamilyLoginPage() {
                 }
                 setPhase("completing-link")
                 setVerifying(true)
-                await completeEmailLinkSignIn(address.trim())
+                const credential = await completeEmailLinkSignIn(address.trim())
                 if (!mountedRef.current) return
                 // Drop the one-time code from the address bar so a refresh does not
                 // replay a link Firebase has already spent.
                 window.history.replaceState({}, document.title, window.location.pathname)
-                await finishSignIn(() => setPhase("enter-email"))
+                await finishSignIn(credential.user, () => setPhase("enter-email"))
             } catch {
                 if (mountedRef.current && (!cancelled || redemptionStarted)) {
                     setMethod("email")

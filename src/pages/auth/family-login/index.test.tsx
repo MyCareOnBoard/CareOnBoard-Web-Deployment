@@ -3,17 +3,16 @@ import { act, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
-  detect: vi.fn(), complete: vi.fn(), read: vi.fn(), navigate: vi.fn(), dispatch: vi.fn(),
+  detect: vi.fn(), complete: vi.fn(), read: vi.fn(), navigate: vi.fn(), accept: vi.fn(),
   toast: vi.fn(), post: vi.fn(), signOut: vi.fn(),
-  auth: { currentUser: { uid: 'family-member' } as { uid: string } | null, tenantId: null as string | null },
+  auth: { currentUser: { uid: 'family-member', tenantId: null } as { uid: string; tenantId?: string | null } | null, tenantId: null as string | null },
 }))
 vi.mock('react-router', () => ({ useNavigate: () => mocks.navigate }))
-vi.mock('react-redux', () => ({ useDispatch: () => mocks.dispatch }))
+vi.mock('@/utils/auth/context/AuthContext', () => ({ useAuth: () => ({ acceptFamilyProfile: mocks.accept }) }))
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: mocks.toast }) }))
 vi.mock('@/lib/firebase', () => ({ auth: mocks.auth }))
 vi.mock('firebase/auth', () => ({ signOut: mocks.signOut }))
 vi.mock('@/lib/axios', () => ({ default: { post: mocks.post } }))
-vi.mock('@/utils/auth/store/authSlice', () => ({ setUser: (user: unknown) => ({ type: 'setUser', payload: user }) }))
 vi.mock('@/utils/auth/services/emailLinkService', () => ({
   isFamilyEmailLink: mocks.detect, completeEmailLinkSignIn: mocks.complete, readPendingEmail: mocks.read,
   sendFamilySignInLink: vi.fn(), signInWithPassword: vi.fn(),
@@ -27,10 +26,10 @@ beforeEach(() => {
   vi.clearAllMocks()
   window.history.replaceState({}, '', '/auth/family-login')
   mocks.detect.mockResolvedValue(true)
-  mocks.complete.mockResolvedValue({ user: { uid: 'family-member' } })
+  mocks.complete.mockResolvedValue({ user: { uid: 'family-member', tenantId: null } })
   mocks.read.mockReturnValue('stored@example.test')
-  mocks.post.mockResolvedValue({ data: { data: { id: 'family-member' } } })
-  mocks.auth.currentUser = { uid: 'family-member' }
+  mocks.post.mockResolvedValue({ data: { data: { uid: 'family-member', userType: 'family_member' } } })
+  mocks.auth.currentUser = { uid: 'family-member', tenantId: null }
   mocks.auth.tenantId = null
   mocks.signOut.mockImplementation(async () => { mocks.auth.currentUser = null })
   vi.spyOn(window, 'prompt').mockReturnValue('confirmed@example.test')
@@ -76,7 +75,7 @@ it('keeps one pending redemption when the effect runs again', async () => {
   await act(async () => {})
   expect(mocks.complete).toHaveBeenCalledOnce()
   expect(window.prompt).toHaveBeenCalledOnce()
-  await act(async () => { resolve({ user: { uid: 'family-member' } }) })
+  await act(async () => { resolve({ user: { uid: 'family-member', tenantId: null } }) })
   await waitFor(() => expect(mocks.post).toHaveBeenCalledOnce())
 })
 
@@ -101,32 +100,52 @@ it('does not navigate after the family page unmounts during sign-in', async () =
   const view = render(<FamilyLoginPage />)
   await waitFor(() => expect(mocks.complete).toHaveBeenCalledOnce())
   view.unmount()
-  await act(async () => { resolve({ user: { uid: 'family-member' } }) })
+  await act(async () => { resolve({ user: { uid: 'family-member', tenantId: null } }) })
   expect(mocks.post).not.toHaveBeenCalled()
   expect(mocks.navigate).not.toHaveBeenCalled()
 })
 
-it.each(['unmounted', 'changed identity', 'changed tenant'])('ignores backend success after the page is %s', async change => {
+it.each(['identity', 'tenant', 'configured tenant'])('does not verify or sign out a replacement %s when an old credential completes', async change => {
+  let resolve!: (value: unknown) => void
+  mocks.complete.mockReturnValue(new Promise(done => { resolve = done }))
+  mocks.post.mockRejectedValue({ response: { status: 403 } })
+  render(<FamilyLoginPage />)
+  await waitFor(() => expect(mocks.complete).toHaveBeenCalledOnce())
+  if (change === 'configured tenant') mocks.auth.tenantId = 'replacement-tenant'
+  else mocks.auth.currentUser = change === 'identity'
+    ? { uid: 'replacement-member', tenantId: null }
+    : { uid: 'family-member', tenantId: 'replacement-tenant' }
+
+  await act(async () => { resolve({ user: { uid: 'family-member', tenantId: null } }) })
+
+  expect(mocks.post).not.toHaveBeenCalled()
+  expect(mocks.signOut).not.toHaveBeenCalled()
+  expect(mocks.navigate).not.toHaveBeenCalled()
+})
+
+it.each(['unmounted', 'changed identity', 'changed tenant', 'changed user tenant'])('ignores backend success after the page is %s', async change => {
   let resolve!: (value: unknown) => void
   mocks.post.mockReturnValue(new Promise(done => { resolve = done }))
   const view = render(<FamilyLoginPage />)
   await waitFor(() => expect(mocks.post).toHaveBeenCalledOnce())
   if (change === 'unmounted') view.unmount()
   else if (change === 'changed identity') mocks.auth.currentUser = { uid: 'new-family-member' }
+  else if (change === 'changed user tenant') mocks.auth.currentUser = { uid: 'family-member', tenantId: 'new-tenant' }
   else mocks.auth.tenantId = 'new-tenant'
-  await act(async () => { resolve({ data: { data: { id: 'family-member' } } }) })
-  expect(mocks.dispatch).not.toHaveBeenCalled()
+  await act(async () => { resolve({ data: { data: { uid: 'family-member', userType: 'family_member' } } }) })
+  expect(mocks.accept).not.toHaveBeenCalled()
   expect(mocks.navigate).not.toHaveBeenCalled()
   expect(mocks.signOut).not.toHaveBeenCalled()
 })
 
-it.each(['unmounted', 'changed identity', 'changed tenant'])('ignores backend failure after the page is %s', async change => {
+it.each(['unmounted', 'changed identity', 'changed tenant', 'changed user tenant'])('ignores backend failure after the page is %s', async change => {
   let reject!: (value: unknown) => void
   mocks.post.mockReturnValue(new Promise((_, fail) => { reject = fail }))
   const view = render(<FamilyLoginPage />)
   await waitFor(() => expect(mocks.post).toHaveBeenCalledOnce())
   if (change === 'unmounted') view.unmount()
   else if (change === 'changed identity') mocks.auth.currentUser = { uid: 'new-family-member' }
+  else if (change === 'changed user tenant') mocks.auth.currentUser = { uid: 'family-member', tenantId: 'new-tenant' }
   else mocks.auth.tenantId = 'new-tenant'
   await act(async () => { reject({ response: { status: 403 } }) })
   expect(mocks.toast).not.toHaveBeenCalled()

@@ -67,6 +67,13 @@ export async function isFamilyEmailLink(href: string = window.location.href): Pr
   return isSignInWithEmailLink(auth, href)
 }
 
+function rawEmailLinkParams(href: string): URLSearchParams {
+  // Match the SDK's first question mark, including action queries inside a fragment.
+  const queryStart = href.indexOf('?')
+  const fragmentStart = href.indexOf('#', queryStart)
+  return new URLSearchParams(href.substring(queryStart, fragmentStart > 0 ? fragmentStart : undefined))
+}
+
 /**
  * Finish a link sign-in.
  * @param email the address the link was sent to
@@ -81,7 +88,7 @@ export async function completeEmailLinkSignIn(
   const params = new URLSearchParams({ mode: 'signIn', oobCode: action.code, apiKey: action.apiKey })
   if (action.tenantId) params.set('tenantId', action.tenantId)
   if (action.languageCode) params.set('lang', action.languageCode)
-  let raw = new URL(href).searchParams
+  let raw = rawEmailLinkParams(href)
   let wrapper = raw.get('deep_link_id') ? 'deep_link_id' : 'link'
   // The SDK unwraps up to two alternating wrappers but collapses duplicate parameters.
   for (let depth = 0; depth < 3; depth++) {
@@ -90,7 +97,7 @@ export async function completeEmailLinkSignIn(
     if (raw.getAll('link').length > 1 || raw.getAll('deep_link_id').length > 1) throw new Error('This sign-in link is invalid. Request a new one.')
     const nested = raw.get(wrapper)
     if (!nested || depth === 2) break
-    raw = new URL(nested).searchParams
+    raw = rawEmailLinkParams(nested)
     wrapper = wrapper === 'link' ? 'deep_link_id' : 'link'
   }
   const problem = emailActionProblem(params)

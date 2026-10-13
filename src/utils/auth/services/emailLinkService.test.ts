@@ -52,6 +52,25 @@ it('preserves a valid SDK-parsed nested link when completing sign-in', async () 
   expect(mocks.complete).toHaveBeenCalledWith(mocks.auth, 'member@example.test', href)
 })
 
+it('preserves a valid SDK-supported action query inside the fragment', async () => {
+  const href = link().replace('?', '#?')
+  await completeEmailLinkSignIn('member@example.test', href)
+  expect(mocks.complete).toHaveBeenCalledWith(mocks.auth, 'member@example.test', href)
+})
+
+it.each(['mode=signIn', 'oobCode=synthetic-other', 'apiKey=project-key'])('rejects duplicate %s in a fragment action query before signing in', async duplicate => {
+  const href = link(`&${duplicate}`).replace('?', '#?')
+  await expect(completeEmailLinkSignIn('member@example.test', href)).rejects.toThrow()
+  expect(mocks.complete).not.toHaveBeenCalled()
+})
+
+it.each(['link', 'deep_link_id'])('rejects duplicate action codes inside fragment-based %s wrappers', async wrapper => {
+  const inner = link('&oobCode=synthetic-other').replace('?', '#?')
+  const href = `https://app.joincareonboard.com/auth/family-login#?${wrapper}=${encodeURIComponent(inner)}`
+  await expect(completeEmailLinkSignIn('member@example.test', href)).rejects.toThrow()
+  expect(mocks.complete).not.toHaveBeenCalled()
+})
+
 it.each(['link', 'deep_link_id'])('rejects duplicate raw parameters inside an SDK-supported nested wrapper', async wrapper => {
   const href = `https://app.joincareonboard.com/auth/family-login?${wrapper}=${encodeURIComponent(link('&oobCode=synthetic-code'))}`
   await expect(completeEmailLinkSignIn('member@example.test', href)).rejects.toThrow()
