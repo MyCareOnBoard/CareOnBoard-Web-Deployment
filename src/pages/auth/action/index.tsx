@@ -130,7 +130,7 @@ export default function AuthActionPage() {
   const text = ACTION_TEXT[mode || ''] || ACTION_TEXT.verifyEmail
   return <section className="space-y-6" aria-label="Email account action">
     <AuthStepHeader
-      title={complete ? text.complete : text.title}
+      title={mode === 'resetPassword' ? 'Invalid Reset Link' : complete ? text.complete : text.title}
       description={complete ? text.success : state === 'ready' ? text.description : retryable ? 'We could not check your link. Please try again.' : 'Request a new email to continue.'}
     />
     {email && !complete && <p className="break-all text-sm font-medium text-slate-700">{email}</p>}

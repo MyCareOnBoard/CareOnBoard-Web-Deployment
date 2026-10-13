@@ -41,6 +41,14 @@ it('opens the existing reset form preserving all Firebase query parameters', asy
   expect(mocks.apply).not.toHaveBeenCalled()
 })
 
+it.each(['mode=resetPassword', 'mode=resetPassword&oobCode='])('labels a reset link with no code as an invalid reset link: %s', async query => {
+  openAction(query)
+  expect(await screen.findByRole('heading', { name: 'Invalid Reset Link' })).toBeInTheDocument()
+  expect(screen.getByRole('alert')).toHaveTextContent(/missing/i)
+  expect(mocks.check).not.toHaveBeenCalled()
+  expect(mocks.apply).not.toHaveBeenCalled()
+})
+
 it.each([
   ['revertSecondFactorAddition', 'REVERT_SECOND_FACTOR_ADDITION', 'Remove added factor', 'Added factor removed'],
   ['verifyAndChangeEmail', 'VERIFY_AND_CHANGE_EMAIL', 'Confirm email change', 'Email changed'],
