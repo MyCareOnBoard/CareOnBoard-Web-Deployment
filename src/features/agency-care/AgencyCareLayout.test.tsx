@@ -8,8 +8,9 @@ import { closeDrawer } from "@/hooks/useSidebarDrawer";
 
 vi.mock("react-router", async () => await vi.importActual("react-router"));
 const logout = vi.hoisted(() => vi.fn());
+const account = vi.hoisted(() => ({ uid: 'sc-user', fullName: 'Test SC', userType: 'agency' }));
 vi.mock("@/utils/auth/context/AuthContext", () => ({
-  useAuth: () => ({ user: { uid: "sc-user", fullName: "Test SC", userType: "agency" }, logout }),
+  useAuth: () => ({ user: account, logout }),
 }));
 vi.mock("@/lib/hooks/useNotifications", () => ({
   useNotifications: vi.fn(() => { throw new Error("Native notifications must not mount in Agency Care"); }),
@@ -34,6 +35,7 @@ function renderLayout(path = "/agency-care/networks/client/overview", embedded =
   return render(<MemoryRouter initialEntries={[path]}><AgencyCareLayout embedded={embedded}><CareContent /></AgencyCareLayout></MemoryRouter>);
 }
 beforeEach(() => {
+  Object.assign(account, { uid: 'sc-user', fullName: 'Test SC', userType: 'agency' });
   vi.clearAllMocks();
   localStorage.clear();
   closeDrawer();
@@ -43,6 +45,40 @@ beforeEach(() => {
   }));
 });
 afterEach(() => vi.restoreAllMocks());
+
+it.each(['agency', 'agency_staff'])('shows identity in the header and returns an internal %s user to the agency panel', async userType => {
+  Object.assign(account, { fullName: 'Avery Harper', userType });
+  renderLayout();
+  await screen.findByTestId('care-scope');
+  const trigger = screen.getByRole('button', { name: 'Account menu for Avery Harper' });
+  expect(within(trigger).getByText('Avery Harper')).toBeInTheDocument();
+  expect(within(trigger).getByText('Administrator')).toBeInTheDocument();
+  fireEvent.pointerDown(trigger);
+  const menu = within(screen.getByRole('menu'));
+  expect(menu.queryByText('Avery Harper')).not.toBeInTheDocument();
+  expect(menu.queryByText('Administrator')).not.toBeInTheDocument();
+  fireEvent.click(menu.getByRole('menuitem', { name: 'Back to agency panel' }));
+  expect(screen.getByTestId('care-scope')).toHaveTextContent('/agency/dashboard');
+});
+
+it('does not offer an agency panel while an external organization is selected', async () => {
+  renderLayout('/agency-care?agencyKey=external%3Apartner');
+  await screen.findByTestId('care-scope');
+  fireEvent.pointerDown(screen.getByRole('button', { name: 'Account menu for Test SC' }));
+  const menu = within(screen.getByRole('menu'));
+  expect(menu.queryByRole('menuitem', { name: 'Back to agency panel' })).not.toBeInTheDocument();
+  expect(menu.getByRole('menuitem', { name: 'Settings' })).toBeInTheDocument();
+  expect(menu.getByRole('menuitem', { name: 'Logout' })).toBeInTheDocument();
+});
+
+it.each(['employee', 'agency_care'])('does not send a %s account into the agency panel', async userType => {
+  account.userType = userType;
+  vi.mocked(agencyCareApi.me).mockResolvedValueOnce({ ...me, restrictedPortal: userType === 'agency_care' });
+  renderLayout();
+  await screen.findByTestId('care-scope');
+  fireEvent.pointerDown(screen.getByRole('button', { name: 'Account menu for Test SC' }));
+  expect(screen.queryByRole('menuitem', { name: 'Back to agency panel' })).not.toBeInTheDocument();
+});
 
 it("uses the shared chrome, navigates and highlights care sections without native product requests", async () => {
   renderLayout();

@@ -790,6 +790,14 @@
   background: var(--ac-panel);
   color: var(--ac-text);
   cursor: pointer;
+  min-width: 0;
+}
+.ac-account-trigger > :first-child,
+.ac-header-actions > button:not(.ac-account-trigger) {
+  flex-shrink: 0;
+}
+.ac-account-identity {
+  max-width: 160px;
 }
 .ac-account-trigger:hover {
   background: var(--ac-hover);
@@ -1221,6 +1229,21 @@
   }
 }
 @media (max-width: 700px) {
+  .ac-shell > header > div {
+    padding-inline: 16px;
+    gap: 8px;
+  }
+  .ac-header-actions,
+  .ac-account-trigger {
+    gap: 8px;
+  }
+  .ac-account-trigger {
+    padding-right: 8px;
+  }
+  .ac-account-identity {
+    max-width: clamp(64px, 28vw, 130px);
+    padding-right: 0;
+  }
   .ac-chat-grid,
   .ac-form-grid {
     grid-template-columns: minmax(0, 1fr);

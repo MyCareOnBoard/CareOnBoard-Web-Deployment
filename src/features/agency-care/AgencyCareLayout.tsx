@@ -10,8 +10,10 @@ import { DashboardHeaderFrame, HeaderActionButton, UserAvatar } from "@/componen
 import DashboardSidebar, { type NavItem } from "@/components/DashboardSidebar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
-import { Bell, CheckSquare, ChevronDown, FileBarChart, LayoutDashboard, LogOut, RotateCcw, Settings, Users } from "lucide-react";
+import { ArrowLeft, Bell, CheckSquare, ChevronDown, FileBarChart, LayoutDashboard, LogOut, RotateCcw, Settings, Users } from "lucide-react";
 import { useAuth } from "@/utils/auth/context/AuthContext";
+import { UserType } from "@/utils/auth/types/user.types";
+import { Routes } from "@/routes/constants";
 import {
   agencyCareApi,
   type CareMe,
@@ -60,6 +62,8 @@ export function AgencyCareLayout({
     me.data?.organizations[0];
   const scope = organization ? `${uid}|${organization.agencyKey}|${me.data?.permissionRevision}` : "";
   const userRole = organization ? careLabel(organization.role) : "Agency Care";
+  const canReturnToAgency = organization?.kind === "internal" && me.data?.restrictedPortal === false
+    && (user?.userType === UserType.AGENCY || user?.userType === UserType.AGENCY_STAFF);
   const navItems: NavItem[] = [
     { label: "Dashboard", path: "/agency-care", icon: LayoutDashboard },
     { label: "Clients", path: "/agency-care/clients", icon: Users },
@@ -141,25 +145,21 @@ export function AgencyCareLayout({
   const dashboard = embedded ? careContent : (
     <div className="ac-shell relative min-h-screen overflow-x-hidden">
       <DashboardHeaderFrame>
-        <div className="flex items-center gap-[10px]">
-          {organization?.kind === "external" && <HeaderActionButton icon={Settings} ariaLabel="Agency settings" onClick={() => navigate("/agency-care/settings")} />}
+        <div className="ac-header-actions flex min-w-0 items-center gap-[10px]">
+          {organization?.kind === "external" && <div className="hidden shrink-0 sm:block"><HeaderActionButton icon={Settings} ariaLabel="Agency settings" onClick={() => navigate("/agency-care/settings")} /></div>}
           <CareNotificationButton />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button type="button" aria-label={`Account menu for ${user?.fullName || "User"}`} className="ac-account-trigger">
+              <button type="button" aria-label={`Account menu for ${user?.fullName || "User"}`} aria-description={userRole} className="ac-account-trigger">
                 <UserAvatar userName={user?.fullName} userImage={user?.photoURL || user?.profilePicture} />
-                <div className="hidden min-w-0 pr-2 xl:block text-left">
-                  <p className="max-w-40 truncate text-sm font-medium leading-tight text-[#10141a]">{user?.fullName || "User"}</p>
-                  <p className="mt-0.5 max-w-40 truncate text-[11px] font-medium leading-tight text-[#687173]">{userRole}</p>
+                <div className="ac-account-identity min-w-0 pr-2 text-left">
+                  <p className="max-w-40 truncate text-sm font-medium leading-tight text-[#10141a]" title={user?.fullName || "User"}>{user?.fullName || "User"}</p>
+                  <p className="mt-0.5 max-w-40 truncate text-[11px] font-medium leading-tight text-[#687173]" title={userRole}>{userRole}</p>
                 </div>
-                <ChevronDown className="h-4 w-4 text-[#808081] mr-2" />
+                <ChevronDown className="h-4 w-4 shrink-0 text-[#808081]" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="ac-account-menu w-[280px] max-w-[calc(100vw-32px)] z-[100] rounded-xl p-0">
-              <div className="border-b border-[#dde5e6] px-4 py-3">
-                <p className="truncate text-sm font-semibold text-[#10141a]">{user?.fullName || "User"}</p>
-                <p className="mt-1 truncate text-xs font-medium text-[#687173]">{userRole}</p>
-              </div>
               {organization && (
                 <div className="border-b border-[#dde5e6] py-2">
                   <DropdownMenuLabel className="px-4 text-[11px] text-[#687173]">Current organization</DropdownMenuLabel>
@@ -176,6 +176,7 @@ export function AgencyCareLayout({
                   )}
                 </div>
               )}
+              {canReturnToAgency && <DropdownMenuItem className="cursor-pointer gap-3 px-4 py-2" onSelect={() => navigate(Routes.agency.dashboard)}><ArrowLeft className="h-4 w-4" />Back to agency panel</DropdownMenuItem>}
               {organization?.kind === "external" && <DropdownMenuItem className="cursor-pointer gap-3 px-4 py-2" onSelect={() => navigate("/agency-care/settings")}><Settings className="h-4 w-4" />Settings</DropdownMenuItem>}
               <DropdownMenuItem onSelect={() => void logout()} className="ac-account-logout cursor-pointer gap-3 px-4 py-2"><LogOut className="h-4 w-4" />Logout</DropdownMenuItem>
             </DropdownMenuContent>
