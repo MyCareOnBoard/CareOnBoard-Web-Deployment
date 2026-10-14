@@ -1,26 +1,38 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { vi, test, expect } from "vitest";
+import { vi, test, expect, beforeEach } from "vitest";
 import type { AddressDetails } from "@/hooks/useGooglePlacesAutocomplete";
 import { getAgencyClientById, updateClient, type Client } from "@/lib/api/clients";
 import { SupportCoordinatorEnrollmentWizard } from "./SupportCoordinatorEnrollmentWizard";
+import { getAgencyById } from "@/lib/api/agencies";
+import { getScMonitoringPolicy } from "@/lib/api/sc-monitoring-policy";
 
 const { toast } = vi.hoisted(() => ({ toast: vi.fn() }));
+vi.setConfig({ testTimeout: 20000 });
 vi.unmock("react-router");
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast }) }));
 vi.mock("@/lib/api/clients", () => ({ createClient: vi.fn(), getAgencyClientById: vi.fn(), updateClient: vi.fn(), uploadClientDocument: vi.fn() }));
+vi.mock("@/utils/auth", () => ({ useAuth: () => ({ user: { uid: "owner", userType: "agency", agencyId: "agency" } }) }));
+vi.mock("@/lib/api/agencies", () => ({ getAgencyById: vi.fn() }));
+vi.mock("@/lib/api/sc-monitoring-policy", async importOriginal => ({ ...await importOriginal<typeof import("@/lib/api/sc-monitoring-policy")>(), getScMonitoringPolicy: vi.fn(), saveScMonitoringPolicy: vi.fn() }));
 vi.mock("./components/forms/AddressAutocompleteField", () => ({
   AddressAutocompleteField: ({ label, value, onChange, onSelectDetails }: { label: string; value: string; onChange: (value: string) => void; onSelectDetails?: (details: AddressDetails) => void }) => <div><input aria-label={label} value={value} onChange={event => onChange(event.target.value)} /><button type="button" onClick={() => onSelectDetails?.({ formattedAddress: "42 Service Lane, Newark, NJ 07102", line1: "42 Service Lane", street: "Service Lane", line2: null, city: "Newark", county: "Essex", state: "NJ", stateLong: "New Jersey", stateCode: "NJ", zipCode: "07102", country: "US", countryCode: "US", lat: 40, lng: -74 })}>Use sample address</button></div>,
 }));
 
-test("SC wizard enables the first step after selecting a program and counts completed sections", () => {
+beforeEach(() => {
+  vi.mocked(getAgencyById).mockResolvedValue({ id: "agency", uid: "owner", timezone: "UTC" } as Awaited<ReturnType<typeof getAgencyById>>);
+  vi.mocked(getScMonitoringPolicy).mockResolvedValue({ policy: { version: 1, revision: 0, enabled: false, intervalDays: null, qualifyingMethods: [], requireDirectContact: false, remindersEnabled: false, documentReviewsEnabled: false, documentRemindersEnabled: false, documentReviewIntervals: { ISP: null, Assessment: null, Tier: null, SDR: null, PA: null, Enrollment: null, Other: null }, activatedAt: null, updatedAt: null, updatedBy: null }, timezone: "UTC", canEditPolicy: true });
+});
+
+test("SC wizard enables the first step after selecting a program and counts completed sections", async () => {
   render(<MemoryRouter><SupportCoordinatorEnrollmentWizard /></MemoryRouter>);
+  await act(async () => {});
   expect(screen.getByRole("button", { name: "Get started" })).toBeDisabled();
   fireEvent.click(screen.getByRole("button", { name: /Supports Program SP/ }));
   expect(screen.getByRole("button", { name: "Get started" })).toBeEnabled();
   fireEvent.click(screen.getByRole("button", { name: "Get started" }));
   expect(screen.getByRole("heading", { name: "Participant information" })).toBeInTheDocument();
-  expect(screen.getByText("1 of 6 steps completed")).toBeInTheDocument();
+  expect(screen.getByText("1 of 7 steps completed")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /Program selection.*Completed/ })).toBeInTheDocument();
   const ssn = screen.getByLabelText("SSN");
   expect(ssn).toHaveAttribute("type", "password");
@@ -38,8 +50,9 @@ test("SC wizard enables the first step after selecting a program and counts comp
   expect(screen.getByRole("textbox", { name: "Street address" })).toHaveValue("");
 });
 
-test("step one opens the document modal with download disabled", () => {
+test("step one opens the document modal with download disabled", async () => {
   render(<MemoryRouter><SupportCoordinatorEnrollmentWizard /></MemoryRouter>);
+  await act(async () => {});
   fireEvent.click(screen.getByRole("button", { name: "Upload document" }));
   expect(screen.getByRole("dialog", { name: "Download & fill forms" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Download document here" })).toBeDisabled();

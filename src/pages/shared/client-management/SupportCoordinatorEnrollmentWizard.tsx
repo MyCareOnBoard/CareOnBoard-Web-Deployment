@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
-import { useNavigate, useParams } from "react-router";
+import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
+import { Link, useNavigate, useParams } from "react-router";
 import { format, parseISO } from "date-fns";
 import { Eye, EyeOff, Info, Loader2, Upload, UploadCloud, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,16 +9,24 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { FileUpload } from "@/components/ui/file-upload";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import MonitoringPolicyFields from "@/components/sc-monitoring/MonitoringPolicyFields";
 import { normalizeSignaturePayload } from "@/pages/agency/billing/claims/utils/claimReportSignatureUtils";
 import { AddressAutocompleteField } from "./components/forms/AddressAutocompleteField";
 import { DatePickerField, SignatureField } from "./components/forms/formControls";
 import type { AddressDetails } from "@/hooks/useGooglePlacesAutocomplete";
 import { createClient, getAgencyClientById, updateClient, uploadClientDocument, type Client, type ClientOutcome, type CreateClientRequest, type ScEnrollment } from "@/lib/api/clients";
 import { useToast } from "@/hooks/use-toast";
+import { useAssignmentReviewScope } from "@/hooks/useAssignmentReview";
+import { getAgencyById } from "@/lib/api/agencies";
+import { documentReviewTypes, getScMonitoringPolicy, saveScMonitoringPolicy, type MonitoringPolicyResponse } from "@/lib/api/sc-monitoring-policy";
+import { createMonitoringDraft, monitoringSettingsEqual, monitoringValidationError, type MonitoringPolicyDraft } from "@/lib/sc-monitoring-policy-draft";
+import { useAuth } from "@/utils/auth";
 import { Routes } from "@/routes/constants";
 import "./support-coordinator-enrollment.css";
 
-const steps = ["Program selection", "Participant information", "Guardian / representative", "Medicaid & eligibility", "Enrollment agreement", "Review & sign"] as const;
+const steps = ["Program selection", "Participant information", "Guardian / representative", "Medicaid & eligibility", "Monitoring settings", "Enrollment agreement", "Review & sign"] as const;
+const monitoringStep = 4, agreementStep = 5, reviewStep = 6;
 const DigitalSignatureModal = lazy(() => import("@/pages/applicant/application/components/DigitalSignature"));
 const eligibilityItems = [
   { key: "medicaid", title: "Active NJ Medicaid (NJ FamilyCare) eligibility confirmed", detail: "Required for all DDD waiver programs." },
@@ -64,10 +72,31 @@ function Field({ label, children, required = false, className = "" }: { label: s
   return <label className={`sc-enrollment-field ${className}`}><span>{label}{required && <span aria-hidden="true"> *</span>}</span>{children}</label>;
 }
 
+function MonitoringSummary({ draft }: { draft: MonitoringPolicyDraft }) {
+  const documents = documentReviewTypes.filter(type => draft.documentReviewIntervals[type] !== null).map(type => `${type}: every ${draft.documentReviewIntervals[type]} days`).join(" · ");
+  return <dl className="grid gap-2 text-sm">
+    <div><dt className="font-medium">Contact schedule</dt><dd className="text-[#617579]">{draft.enabled ? `Every ${draft.intervalDays} days · ${draft.qualifyingMethods.map(method => method.replaceAll("_", " ")).join(", ")}${draft.requireDirectContact ? " · Direct client contact required" : ""}` : "Off"}</dd></div>
+    <div><dt className="font-medium">Client document monitoring</dt><dd className="text-[#617579]">{draft.documentReviewsEnabled ? documents || "Choose a document interval" : "Off"}</dd></div>
+    <div><dt className="font-medium">SC reminders</dt><dd className="text-[#617579]">Contact: {draft.remindersEnabled ? "On" : "Off"} · Documents: {draft.documentRemindersEnabled ? "On" : "Off"}</dd></div>
+  </dl>;
+}
+
 export function SupportCoordinatorEnrollmentWizard({ isEditMode = false }: { isEditMode?: boolean }) {
+  const scope = useAssignmentReviewScope();
+  const { user } = useAuth();
+  const { clientId } = useParams<{ clientId: string }>();
+  return <EnrollmentWizard key={JSON.stringify([scope, user?.agency?.id, isEditMode, clientId || "new"])} isEditMode={isEditMode} />;
+}
+
+function EnrollmentWizard({ isEditMode }: { isEditMode: boolean }) {
   const navigate = useNavigate();
   const { clientId } = useParams<{ clientId: string }>();
+  const { user } = useAuth();
   const { toast } = useToast();
+  const agencyId = user?.agencyId || user?.agency?.id || (user?.userType === "agency" ? user.uid : "");
+  const alive = useRef(true);
+  const submitting = useRef(false);
+  const savedRecord = useRef<{ id: string; attachmentErrors: string[] } | null>(null);
   const [form, setForm] = useState<Form>(initialForm);
   const [existingClient, setExistingClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(isEditMode);
@@ -83,19 +112,69 @@ export function SupportCoordinatorEnrollmentWizard({ isEditMode = false }: { isE
   const [showSSN, setShowSSN] = useState(false);
   const [signatureTarget, setSignatureTarget] = useState<"participant" | "guardian" | "family" | null>(null);
   const [step, setStep] = useState(0);
-  const [completed, setCompleted] = useState<boolean[]>(Array(6).fill(false));
-  const [visited, setVisited] = useState<boolean[]>([true, false, false, false, false, false]);
+  const [completed, setCompleted] = useState<boolean[]>(Array(steps.length).fill(false));
+  const [visited, setVisited] = useState<boolean[]>(steps.map((_, index) => index === 0));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [monitoringDraft, setMonitoringDraft] = useState(createMonitoringDraft);
+  const [monitoringBaseline, setMonitoringBaseline] = useState<MonitoringPolicyDraft | null>(null);
+  const [monitoringContext, setMonitoringContext] = useState<Pick<MonitoringPolicyResponse, "timezone" | "canEditPolicy"> | null>(null);
+  const [monitoringLoading, setMonitoringLoading] = useState(true);
+  const [monitoringLoadError, setMonitoringLoadError] = useState(false);
+  const [monitoringLoadAttempt, setMonitoringLoadAttempt] = useState(0);
+  const [policyConflict, setPolicyConflict] = useState<MonitoringPolicyResponse | null>(null);
+  const [savedClientId, setSavedClientId] = useState<string | null>(null);
+  const [policySaveFailed, setPolicySaveFailed] = useState(false);
+  const [createResultUnknown, setCreateResultUnknown] = useState(false);
+  const monitoringChanged = Boolean(monitoringBaseline && !monitoringSettingsEqual(monitoringDraft, monitoringBaseline));
+  let validTimezone = false;
+  try { if (monitoringContext?.timezone) { new Intl.DateTimeFormat("en-US", { timeZone: monitoringContext.timezone }); validTimezone = true; } } catch { /* Allow schedules to remain off. */ }
   const completedCount = completed.filter(Boolean).length;
   const progress = Math.round(completedCount / steps.length * 100);
   const pendingOutcome = form.outcomes.find(outcome => outcome.id === pendingOutcomeId);
   const name = form.firstName.trim() ? `${isEditMode ? "Editing" : "Enrolling"} ${form.firstName.trim()} ${form.lastName.trim()}`.trim() : isEditMode ? "Edit client" : "New client enrollment";
   useEffect(() => {
+    alive.current = true;
+    return () => { alive.current = false; };
+  }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    setMonitoringLoading(true);
+    setMonitoringLoadError(false);
+    const load = async () => {
+      try {
+        let context: Pick<MonitoringPolicyResponse, "timezone" | "canEditPolicy">;
+        let draft: MonitoringPolicyDraft;
+        if (isEditMode) {
+          if (!clientId) throw new Error("Missing client");
+          const response = await getScMonitoringPolicy(clientId, controller.signal);
+          context = response;
+          draft = createMonitoringDraft(response.policy);
+        } else {
+          if (!agencyId) throw new Error("Missing agency");
+          const agency = await getAgencyById(agencyId);
+          context = { timezone: agency.timezone || null, canEditPolicy: user?.userType === "agency" && agency.uid === user.uid };
+          draft = createMonitoringDraft();
+        }
+        if (controller.signal.aborted) return;
+        setMonitoringContext(context);
+        setMonitoringBaseline(draft);
+        setMonitoringDraft(draft);
+      } catch {
+        if (!controller.signal.aborted) setMonitoringLoadError(true);
+      } finally {
+        if (!controller.signal.aborted) setMonitoringLoading(false);
+      }
+    };
+    void load();
+    return () => controller.abort();
+  }, [agencyId, clientId, isEditMode, monitoringLoadAttempt, user?.uid, user?.userType]);
+  useEffect(() => {
     if (!isEditMode) return;
     if (!clientId) { setLoadError(true); setLoading(false); return; }
     const controller = new AbortController();
     getAgencyClientById(clientId, { mode: "sc", signal: controller.signal }).then(client => {
+      if (controller.signal.aborted) return;
       const enrollment = client.scEnrollment;
       if (!enrollment) { setLoadError(true); return; }
       const dob = client.dateOfBirth;
@@ -113,8 +192,8 @@ export function SupportCoordinatorEnrollmentWizard({ isEditMode = false }: { isE
         participantSignature: enrollment.participantSignature, guardianSignature: enrollment.guardianSignature || "", familySignature: enrollment.familySignature || "",
         participantSignatureImage: enrollment.participantSignatureImage, guardianSignatureImage: enrollment.guardianSignatureImage || "", familySignatureImage: enrollment.familySignatureImage || "", signedOn: enrollment.signedOn,
       });
-      setCompleted(Array(6).fill(true));
-      setVisited(Array(6).fill(true));
+      setCompleted(Array(steps.length).fill(true));
+      setVisited(Array(steps.length).fill(true));
     }).catch(() => { if (!controller.signal.aborted) setLoadError(true); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
@@ -181,28 +260,88 @@ export function SupportCoordinatorEnrollmentWizard({ isEditMode = false }: { isE
     }
   };
 
+  const monitoringError = () => {
+    if (monitoringLoading || monitoringLoadError || !monitoringContext || !monitoringBaseline) return "Load monitoring settings before saving the client.";
+    const invalid = monitoringChanged ? monitoringValidationError(monitoringDraft, monitoringContext.timezone) : null;
+    if (invalid) return invalid;
+    if (monitoringChanged && !monitoringContext.canEditPolicy) return "Only the agency owner can change monitoring rules.";
+    if (isEditMode && monitoringChanged && !monitoringDraft.changeReason.trim()) return "Add a reason for this policy change.";
+    return null;
+  };
+  const policyInput = () => ({ ...monitoringDraft, changeReason: isEditMode ? monitoringDraft.changeReason.trim() : "Initial monitoring setup during enrollment" });
+  const finishSave = (savedId: string) => {
+    const missing = savedRecord.current?.attachmentErrors || [];
+    toast(missing.length ? { title: "Client saved with missing attachments", description: `The ${missing.join(" and ")} could not be attached. Add it from the client record.`, variant: "destructive" } : { title: isEditMode ? "Client updated" : "Enrollment saved", description: isEditMode ? "Client changes were saved." : "A pending client record was created.", variant: "success" });
+    navigate(Routes.agency.clientDetails.replace(":clientId", savedId));
+  };
+  const policyFailure = (cause: unknown) => {
+    const response = cause as { response?: { data?: { error?: string; message?: string } } };
+    setPolicySaveFailed(true);
+    goTo(monitoringStep);
+    setError(response.response?.data?.error || response.response?.data?.message || "Monitoring settings could not be saved. Retry to check the latest policy and save your draft.");
+    toast({ title: "Client saved; monitoring settings were not saved.", description: "Your settings are still here. Retry monitoring settings for the saved client.", variant: "destructive" });
+  };
+  const retryMonitoring = async () => {
+    const record = savedRecord.current;
+    if (!record || submitting.current || createResultUnknown || policyConflict) return;
+    submitting.current = true;
+    setSaving(true);
+    setError("");
+    try {
+      // Reconcile an uncertain previous PUT before sending another mutation.
+      const latest = await getScMonitoringPolicy(record.id);
+      if (!alive.current) return;
+      setMonitoringContext(latest);
+      const latestDraft = createMonitoringDraft(latest.policy);
+      if (monitoringSettingsEqual(monitoringDraft, latestDraft)) { finishSave(record.id); return; }
+      if (!latest.canEditPolicy) { setError("Only the agency owner can change monitoring rules. The client is saved. Retry after your policy access is restored, or open the saved client."); return; }
+      if (latest.policy.revision !== monitoringDraft.expectedRevision) {
+        setPolicyConflict(latest);
+        setError("Monitoring settings changed since you loaded them. Review the latest settings before reapplying your draft.");
+        return;
+      }
+      const invalidLatest = monitoringValidationError(monitoringDraft, latest.timezone);
+      if (invalidLatest) { setError(invalidLatest); return; }
+      if (isEditMode && !monitoringDraft.changeReason.trim()) { setError("Add a reason for this policy change."); return; }
+      await saveScMonitoringPolicy(record.id, policyInput());
+      if (alive.current) finishSave(record.id);
+    } catch (cause) {
+      if (alive.current) policyFailure(cause);
+    } finally {
+      submitting.current = false;
+      if (alive.current) setSaving(false);
+    }
+  };
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if ((step === 1 || step === 5) && (Boolean(form.periodStartDate) !== Boolean(form.periodEndDate) || (form.periodStartDate && form.periodEndDate < form.periodStartDate))) {
+    if (submitting.current || createResultUnknown) return;
+    if (savedRecord.current) { await retryMonitoring(); return; }
+    if ((step === 1 || step === reviewStep) && (Boolean(form.periodStartDate) !== Boolean(form.periodEndDate) || (form.periodStartDate && form.periodEndDate < form.periodStartDate))) {
       if (step !== 1) goTo(1);
       setError("Enter both ISP period dates, with the end date on or after the start date.");
       return;
     }
     if (step === 1 && !form.dob) { setError("Select the participant's date of birth to continue."); return; }
     if (step === 1 && (!form.address || !form.city || !form.state || !form.zip)) { setError("Select an address from the suggestions to fill the address fields."); return; }
-    if (step === 4 && !form.agreementSummaryReviewed) { setError("Review the agreement overview to continue."); return; }
-    if (step < 5) {
+    if (step === monitoringStep || step === reviewStep) {
+      const invalid = monitoringError();
+      if (invalid) { goTo(monitoringStep); setError(invalid); return; }
+    }
+    if (step === agreementStep && !form.agreementSummaryReviewed) { setError("Review the agreement overview to continue."); return; }
+    if (step < reviewStep) {
       setCompleted(previous => previous.map((value, index) => index === step ? true : value));
       goTo(step + 1);
       return;
     }
-    const firstIncomplete = completed.slice(0, 5).findIndex(value => !value);
+    const firstIncomplete = completed.slice(0, reviewStep).findIndex(value => !value);
     if (firstIncomplete !== -1) { goTo(firstIncomplete); setError(`Complete ${steps[firstIncomplete]} before submitting.`); return; }
     if (!form.program) { goTo(0); return; }
-    if (!form.agreementSummaryReviewed) { goTo(4); setError("Review the agreement overview before saving."); return; }
+    if (!form.agreementSummaryReviewed) { goTo(agreementStep); setError("Review the agreement overview before saving."); return; }
     if (form.outcomes.some(outcome => outcome.services.length > 0 && !outcome.statement.trim())) { goTo(2); setError("An outcome with attached services needs a statement."); return; }
     if (!form.participantSignatureImage || (form.hasGuardian && !form.guardianSignatureImage) || (form.familyMemberParticipates && !form.familySignatureImage)) { setError("Capture each required signature before submitting."); return; }
     if (!form.signedOn) { setError("Select the date of signature before submitting."); return; }
+    submitting.current = true;
     setSaving(true);
     setError("");
     const enrollment: ScEnrollment = {
@@ -239,36 +378,56 @@ export function SupportCoordinatorEnrollmentWizard({ isEditMode = false }: { isE
       scOutcomes: form.outcomes.map(outcome => ({ ...outcome, statement: outcome.statement.trim() })).filter(outcome => outcome.statement),
     };
     try {
-      const savedId = isEditMode ? clientId! : (await createClient(payload)).id;
+      let savedId: string;
       if (isEditMode) {
+        savedId = clientId!;
         const { type: _type, servicePrograms: _servicePrograms, status: _status, ...changes } = payload;
         await updateClient(savedId, changes);
+      } else {
+        const created = await createClient(payload);
+        if (!created?.id || typeof created.id !== "string") throw new Error("Client create result unavailable");
+        savedId = created.id;
       }
+      if (!alive.current) return;
       const attachmentErrors: string[] = [];
+      // Retain the acknowledged ID before any attachment or policy request can fail.
+      savedRecord.current = { id: savedId, attachmentErrors };
+      setSavedClientId(savedId);
       if (photoFile) {
         try {
           const uploaded = await uploadClientDocument(savedId, "client-photo", photoFile);
+          if (!alive.current) return;
           await updateClient(savedId, { profileImage: uploaded.url });
         } catch {
           attachmentErrors.push("photo");
         }
       }
+      if (!alive.current) return;
       if (document) {
         try {
           const uploaded = await uploadClientDocument(savedId, "consent-and-releases", document);
+          if (!alive.current) return;
           await updateClient(savedId, { documents: [...(existingClient?.documents || []), { key: "consents", title: "Enrollment document", fileName: uploaded.fileName, url: uploaded.url }] });
         } catch {
           attachmentErrors.push("document");
         }
       }
-      toast(attachmentErrors.length ? { title: "Client saved with missing attachments", description: `The ${attachmentErrors.join(" and ")} could not be attached. Add it from the client record.`, variant: "destructive" } : { title: isEditMode ? "Client updated" : "Enrollment saved", description: isEditMode ? "Client changes were saved." : "A pending client record was created.", variant: "success" });
-      navigate(Routes.agency.clientDetails.replace(":clientId", savedId));
+      if (!alive.current) return;
+      if (monitoringChanged) await saveScMonitoringPolicy(savedId, policyInput());
+      if (alive.current) finishSave(savedId);
     } catch (cause: unknown) {
-      const response = cause as { response?: { data?: { error?: string; message?: string } } };
+      if (!alive.current) return;
+      if (savedRecord.current) { policyFailure(cause); return; }
+      const response = cause as { response?: { status?: number; data?: { error?: string; message?: string } } };
+      if (!isEditMode && (!response.response?.status || response.response.status >= 500 || response.response.status === 408)) {
+        setCreateResultUnknown(true);
+        setError("The client save could not be confirmed. Check the client list before starting another enrollment to avoid creating a duplicate.");
+        return;
+      }
       const message = response.response?.data?.error || response.response?.data?.message || "Enrollment could not be saved. Please try again.";
       setError(message);
       toast({ title: isEditMode ? "Could not update client" : "Could not save enrollment", description: message, variant: "destructive" });
-    } finally { setSaving(false); }
+    } finally { submitting.current = false; if (alive.current) setSaving(false); }
   };
 
   if (loading) return <div role="status" aria-label="Loading client enrollment" className="sc-enrollment-layout">
@@ -291,12 +450,12 @@ export function SupportCoordinatorEnrollmentWizard({ isEditMode = false }: { isE
     <aside className="sc-enrollment-sidebar" aria-label="Enrollment progress">
       <div className="sc-enrollment-welcome">
         <div><p className="sc-enrollment-welcome-title">{name} <span aria-hidden="true">👋</span></p><p className="sc-enrollment-welcome-subtitle">{isEditMode ? "Review and update the client enrollment." : "Follow the steps to complete enrollment."}</p></div>
-        <div className="sc-enrollment-ring" style={{ "--progress": `${progress}%` } as CSSProperties} aria-label={`${completedCount} of 6 steps completed, ${progress}%`}><span>{progress}%</span></div>
+        <div className="sc-enrollment-ring" style={{ "--progress": `${progress}%` } as CSSProperties} aria-label={`${completedCount} of ${steps.length} steps completed, ${progress}%`}><span>{progress}%</span></div>
       </div>
-      <p className="sc-enrollment-count">{completedCount} of 6 steps completed</p>
+      <p className="sc-enrollment-count">{completedCount} of {steps.length} steps completed</p>
       <nav aria-label="Enrollment steps">{steps.map((label, index) => {
         const status = completed[index] ? "Completed" : index === step ? "In progress" : visited[index] ? "Needs attention" : "Not started";
-        return <button key={label} type="button" className="sc-enrollment-step" aria-current={index === step ? "step" : undefined} disabled={index > step && !completed[index]} onClick={() => goTo(index)}>
+        return <button key={label} type="button" className="sc-enrollment-step" aria-current={index === step ? "step" : undefined} disabled={saving || Boolean(savedClientId) || createResultUnknown || index > step && !completed[index]} onClick={() => goTo(index)}>
           <span className={index === step ? "current" : completed[index] ? "done" : ""}>{label}</span><span className={`sc-enrollment-status ${status.toLowerCase().replace(" ", "-")}`}>{status}</span>
         </button>;
       })}</nav>
@@ -309,10 +468,12 @@ export function SupportCoordinatorEnrollmentWizard({ isEditMode = false }: { isE
         "Enter the participant's identity, contact details, and program IDs.",
         "Add a guardian or family member who will take part in the enrollment agreement.",
         "Review Medicaid and waiver readiness before services begin.",
+        "Choose contact schedules, document review intervals, and reminders. Monitoring can stay off.",
         "Review the program terms with the participant before signing.",
         "Confirm the participant's signature and submit the enrollment.",
-      ][step]}</p></div><span className="sc-enrollment-step-number">Step {step + 1} of 6</span></div>
+      ][step]}</p></div><span className="sc-enrollment-step-number">Step {step + 1} of {steps.length}</span></div>
       <form onSubmit={submit} className="sc-enrollment-form">
+        <fieldset className="contents" disabled={saving || createResultUnknown || Boolean(savedClientId) && step !== monitoringStep}>
         {step === 0 && <div className="sc-enrollment-card">
           <p className="sc-enrollment-intro">Select the program for this participant. Both programs are administered by the NJ Division of Developmental Disabilities.</p>
           <div className="sc-enrollment-programs">{([
@@ -383,26 +544,73 @@ export function SupportCoordinatorEnrollmentWizard({ isEditMode = false }: { isE
           <span><strong>{item.title}</strong>{"detail" in item && <small>{item.detail}</small>}</span><Checkbox checked={form.eligibility[item.key]} onChange={event => update("eligibility", { ...form.eligibility, [item.key]: event.target.checked })} aria-label={item.title} />
         </div>)}<div className="sc-enrollment-note"><strong>Readiness check</strong><span>Unchecked items will remain outstanding. The client record will be saved as pending until eligibility and documents are confirmed.</span></div></div>}
 
-        {step === 4 && <div className="sc-enrollment-card sc-enrollment-agreement">
+        {step === monitoringStep && <div className="sc-enrollment-card space-y-5 text-sm">
+          {monitoringLoading ? <div role="status" aria-label="Loading monitoring settings" className="space-y-6">
+            <span className="sr-only">Loading monitoring settings…</span>
+            <Skeleton className="h-9 w-full" />
+            {[0, 1, 2].map(section => <div key={section} className="space-y-3" aria-hidden="true"><Skeleton className="h-5 w-48" /><Skeleton className="h-4 w-3/4" /><Skeleton className={section === 1 ? "h-72 w-full rounded-lg" : "h-28 w-full rounded-lg"} /></div>)}
+          </div> : monitoringLoadError || !monitoringContext ? <div className="space-y-3">
+            <p role="alert">Monitoring policy could not be loaded. Reload before continuing.</p>
+            <Button type="button" variant="outline" onClick={() => setMonitoringLoadAttempt(value => value + 1)}>Reload policy</Button>
+          </div> : <>
+            <p className="flex flex-wrap items-center justify-between gap-2 text-[#617579]"><span>Agency time zone</span><span className="rounded-full bg-[#eff6f6] px-2.5 py-1 font-medium text-[#335d61]">{monitoringContext.timezone || "Not configured"}</span></p>
+            {!monitoringContext.canEditPolicy && <p className="rounded-lg bg-[#f7fbfb] px-3 py-2 text-[#617579]">Only the agency owner can change monitoring rules.</p>}
+            {!validTimezone && <p className="rounded-lg bg-[#fff8e9] px-3 py-2 text-[#795510]">Set a valid agency time zone before enabling schedules, document reviews, or reminders. <Link to={`${Routes.agency.agencySettings}?tab=agencyInfo#agency-timezone`} className="font-medium underline">View agency time zone</Link></p>}
+            {policyConflict && <div role="alert" className="space-y-3 rounded-lg border border-[#e5c58a] bg-[#fff8e9] p-3 text-[#795510]">
+              <p className="font-medium">The latest policy is revision {policyConflict.policy.revision}.</p>
+              <MonitoringSummary draft={createMonitoringDraft(policyConflict.policy)} />
+              <p>Your draft is retained below. Reapplying it will replace the latest settings when you retry.</p>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" disabled={saving} onClick={() => {
+                  setMonitoringBaseline(createMonitoringDraft(policyConflict.policy));
+                  setMonitoringDraft(current => ({ ...current, expectedRevision: policyConflict.policy.revision }));
+                  setPolicyConflict(null);
+                  setError("");
+                }}>Reapply my draft</Button>
+                <Button type="button" variant="outline" disabled={saving} onClick={() => { if (savedClientId) finishSave(savedClientId); }}>Use latest settings</Button>
+              </div>
+            </div>}
+            <MonitoringPolicyFields draft={monitoringDraft} timezone={monitoringContext.timezone} disabled={saving || !monitoringContext.canEditPolicy || Boolean(policyConflict)} onChange={draft => {
+              setMonitoringDraft(draft);
+              if (!isEditMode && !savedClientId) setCompleted(previous => previous.map((done, index) => index >= monitoringStep ? false : done));
+              setError("");
+            }} />
+            {isEditMode && monitoringContext.canEditPolicy && <div className="space-y-2 border-t border-[#e6eeee] pt-5">
+              <label htmlFor="sc-enrollment-monitoring-reason" className="font-medium">Reason for this change{monitoringChanged && <span aria-hidden="true"> *</span>}</label>
+              <Textarea id="sc-enrollment-monitoring-reason" aria-label="Reason for this change" rows={3} maxLength={2000} placeholder="Explain why these rules are changing" disabled={saving || Boolean(policyConflict)} value={monitoringDraft.changeReason} onChange={event => { setMonitoringDraft(current => ({ ...current, changeReason: event.target.value })); setError(""); }} />
+            </div>}
+            {!savedClientId && <p className="text-xs text-[#617579]">These settings will be saved with your final enrollment submission. Contact schedules apply when the client is active.</p>}
+          </>}
+        </div>}
+
+        {step === agreementStep && <div className="sc-enrollment-card sc-enrollment-agreement">
           <div className="sc-enrollment-agreement-header"><small>DDD · NJ FamilyCare Comprehensive Demonstration</small><h2>Participant enrollment agreement overview</h2><span>{form.program === "CCP" ? "Community Care Program" : "Supports Program"} · NJ Division of Developmental Disabilities</span></div>
           <ol>{agreementTerms.map(term => <li key={term}>{term}</li>)}</ol>
           <div className="sc-enrollment-accept"><Checkbox checked={form.agreementSummaryReviewed} onChange={event => update("agreementSummaryReviewed", event.target.checked)} aria-label="I have reviewed the enrollment overview" /><span>I have reviewed this overview with the participant. The formal agreement must be completed separately.</span></div>
         </div>}
 
-        {step === 5 && <div className="sc-enrollment-card sc-enrollment-sections">
+        {step === reviewStep && <div className="sc-enrollment-card sc-enrollment-sections">
           <div className="sc-enrollment-agreement-header">Enter each full name and capture each signature to acknowledge this enrollment overview.</div>
+          <section><h2>Monitoring settings</h2>{monitoringLoading || monitoringLoadError ? <p>Monitoring settings need to be loaded before saving.</p> : <MonitoringSummary draft={monitoringDraft} />}</section>
           <section><h2>Participant signature</h2><div className="sc-enrollment-grid two"><Field label="Full name" required><Input value={form.participantSignature} onChange={event => update("participantSignature", event.target.value)} placeholder="Type participant's full name" required /></Field><div className={`sc-enrollment-signature-field ${!form.participantSignatureImage && error.includes("required signature") ? "invalid" : ""}`}><span>Signature *</span><SignatureField value={form.participantSignatureImage} onOpen={() => setSignatureTarget("participant")} onClear={() => update("participantSignatureImage", "")} ariaLabel="Participant signature" required /></div></div></section>
           {form.hasGuardian && <section><h2>Guardian signature</h2><div className="sc-enrollment-grid two"><Field label="Full name" required><Input value={form.guardianSignature} onChange={event => update("guardianSignature", event.target.value)} placeholder="Type guardian's full name" required /></Field><div className={`sc-enrollment-signature-field ${!form.guardianSignatureImage && error.includes("required signature") ? "invalid" : ""}`}><span>Signature *</span><SignatureField value={form.guardianSignatureImage} onOpen={() => setSignatureTarget("guardian")} onClear={() => update("guardianSignatureImage", "")} ariaLabel="Guardian signature" required /></div></div></section>}
           {form.familyMemberParticipates && <section><h2>Family member signature</h2><div className="sc-enrollment-grid two"><Field label="Full name" required><Input value={form.familySignature} onChange={event => update("familySignature", event.target.value)} placeholder="Type family member's full name" required /></Field><div className={`sc-enrollment-signature-field ${!form.familySignatureImage && error.includes("required signature") ? "invalid" : ""}`}><span>Signature *</span><SignatureField value={form.familySignatureImage} onOpen={() => setSignatureTarget("family")} onClear={() => update("familySignatureImage", "")} ariaLabel="Family member signature" required /></div></div></section>}
           <section><h2>Date of signature</h2><div className="sc-enrollment-date"><DatePickerField id="sc-signature-date" label="Date" required ariaInvalid={!form.signedOn && error.includes("date of signature")} maxDate={new Date()} value={form.signedOn ? parseISO(form.signedOn) : undefined} onChange={date => update("signedOn", date ? format(date, "yyyy-MM-dd") : "")} /></div></section>
           <div className="sc-enrollment-note"><span>{isEditMode ? "Changes to the enrollment record will be saved. Formal enrollment still requires the completed program agreement and eligibility approval." : "This creates a pending client record. Formal enrollment still requires the completed program agreement and eligibility approval."}</span></div>
         </div>}
+        </fieldset>
 
+        {policySaveFailed && savedClientId && <div role="status" className="mt-4 space-y-2 rounded-lg border border-[#e5c58a] bg-[#fff8e9] p-3 text-sm text-[#795510]">
+          <p className="font-medium">Client saved; monitoring settings were not saved.</p>
+          <p>Retry saves only the monitoring settings. Your enrollment and attachments will not be submitted again.</p>
+          <Link to={Routes.agency.clientDetails.replace(":clientId", savedClientId)} className="font-medium underline">Open saved client</Link>
+        </div>}
         {error && <p role="alert" className="sc-enrollment-error">{error}</p>}
+        {createResultUnknown && <Button type="button" variant="outline" onClick={() => navigate(Routes.agency.clients)}>Back to clients</Button>}
         <div className="sc-enrollment-actions">
-          {step === 0 ? <Button type="button" variant="outline" onClick={() => navigate(isEditMode && clientId ? Routes.agency.clientDetails.replace(":clientId", clientId) : Routes.agency.clients)} disabled={saving}>Cancel</Button> : <Button type="button" variant="outline" className="sc-enrollment-back" onClick={() => goTo(step - 1)} disabled={saving}>Go back</Button>}
-          {step === 0 && <Button type="button" variant="outline" className="sc-enrollment-upload" onClick={() => { setPendingDocument(document); setUploadError(""); setUploadOpen(true); }}><Upload size={16} />{document ? document.name : "Upload document"}</Button>}
-          <Button type="submit" disabled={saving || (step === 0 && !form.program)}>{saving ? <><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />Saving…</> : step === 5 ? isEditMode ? "Save changes" : "Submit enrollment" : step === 0 ? isEditMode ? "Continue editing" : "Get started" : "Continue"}</Button>
+          {!savedClientId && (step === 0 ? <Button type="button" variant="outline" onClick={() => navigate(isEditMode && clientId ? Routes.agency.clientDetails.replace(":clientId", clientId) : Routes.agency.clients)} disabled={saving}>Cancel</Button> : <Button type="button" variant="outline" className="sc-enrollment-back" onClick={() => goTo(step - 1)} disabled={saving || createResultUnknown}>Go back</Button>)}
+          {step === 0 && <Button type="button" variant="outline" className="sc-enrollment-upload" disabled={saving} onClick={() => { setPendingDocument(document); setUploadError(""); setUploadOpen(true); }}><Upload size={16} />{document ? document.name : "Upload document"}</Button>}
+          <Button type="submit" disabled={saving || createResultUnknown || Boolean(policyConflict) || (step === 0 && !form.program)}>{saving ? <><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />Saving…</> : savedClientId ? "Retry monitoring settings" : step === reviewStep ? isEditMode ? "Save changes" : "Submit enrollment" : step === 0 ? isEditMode ? "Continue editing" : "Get started" : "Continue"}</Button>
         </div>
       </form>
     </main>

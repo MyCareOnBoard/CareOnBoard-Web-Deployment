@@ -158,3 +158,14 @@ test('document review settings are disabled for read-only users', async () => {
   expect(await screen.findByLabelText('Enable recurring document reviews')).toBeDisabled();
   expect(screen.getByLabelText('ISP review interval (days)')).toBeDisabled();
 });
+
+test('invalid contact intervals are blocked even while contact schedules are off', async () => {
+  openSettings();
+  const interval = await screen.findByLabelText('Rolling interval (days)');
+  for (const value of ['0', '366', '1.5']) {
+    fireEvent.change(interval, { target: { value } });
+    expect(screen.getByRole('button', { name: 'Save policy' })).toBeDisabled();
+  }
+  fireEvent.change(interval, { target: { value: '' } });
+  expect(screen.getByRole('button', { name: 'Save policy' })).toBeEnabled();
+});

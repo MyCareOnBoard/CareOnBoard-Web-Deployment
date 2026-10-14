@@ -1,12 +1,10 @@
 import { useScMonitoringRefresh } from '@/hooks/useScMonitoringRefresh';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Bell, Clock3, FileText, Loader2, Settings, X } from 'lucide-react';
+import { Loader2, Settings, X } from 'lucide-react';
 import { Link } from 'react-router';
 import { Routes } from '@/routes/constants';
 import VoiceEnabledTextarea from '@/components/VoiceEnabledTextarea';
@@ -15,9 +13,10 @@ import { VoiceRecordingProvider, useVoiceRecording } from '@/contexts/VoiceRecor
 import { useAssignmentReviewScope } from '@/hooks/useAssignmentReview';
 import { useEffectiveAgencyMode } from '@/hooks/useEffectiveAgencyMode';
 import { useToast } from '@/hooks/use-toast';
-import { getScMonitoringPolicy, saveScMonitoringPolicy, listScMonitoringPolicyEvents, monitoringMethods, documentReviewTypes, emptyDocumentReviewIntervals, type DocumentReviewIntervals, type MonitoringPolicyResponse, type MonitoringPolicyInput, type MonitoringPolicyEvent, type MonitoringPolicyEventPage } from '@/lib/api/sc-monitoring-policy';
-type PolicyDraft = MonitoringPolicyInput & { documentReviewsEnabled: boolean; documentRemindersEnabled: boolean; documentReviewIntervals: DocumentReviewIntervals };
-const draftOf = ({ policy }: MonitoringPolicyResponse): PolicyDraft => ({ expectedRevision: policy.revision, enabled: policy.enabled, intervalDays: policy.intervalDays, qualifyingMethods: [...policy.qualifyingMethods], requireDirectContact: policy.requireDirectContact, remindersEnabled: policy.remindersEnabled, documentReviewsEnabled: policy.documentReviewsEnabled ?? false, documentRemindersEnabled: policy.documentRemindersEnabled ?? false, documentReviewIntervals: { ...emptyDocumentReviewIntervals(), ...policy.documentReviewIntervals }, changeReason: '' });
+import MonitoringPolicyFields from '@/components/sc-monitoring/MonitoringPolicyFields';
+import { createMonitoringDraft, monitoringValidationError, type MonitoringPolicyDraft } from '@/lib/sc-monitoring-policy-draft';
+import { getScMonitoringPolicy, saveScMonitoringPolicy, listScMonitoringPolicyEvents, documentReviewTypes, type MonitoringPolicyResponse, type MonitoringPolicyEvent, type MonitoringPolicyEventPage } from '@/lib/api/sc-monitoring-policy';
+const draftOf = ({ policy }: MonitoringPolicyResponse): MonitoringPolicyDraft => createMonitoringDraft(policy);
 const statusOf = (error: unknown) => (error as { response?: { status?: number } })?.response?.status;
 const label = (value: string) => value.replaceAll('_', ' ').replace(/^./, first => first.toUpperCase());
 export default function ScMonitoringSettingsModal({ clientId, onSaved }: { clientId: string; onSaved?: () => void }) {
@@ -33,7 +32,7 @@ function PolicyEditor({ clientId, onSaved, onClose }: { clientId: string; onSave
   const { toast } = useToast();
   const { stopRecording } = useVoiceRecording();
   const [saved, setSaved] = useState<MonitoringPolicyResponse | null>(null);
-  const [draft, setDraft] = useState<PolicyDraft | null>(null);
+  const [draft, setDraft] = useState<MonitoringPolicyDraft | null>(null);
   const [latest, setLatest] = useState<MonitoringPolicyResponse | null>(null);
   const [conflict, setConflict] = useState(false); const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -74,7 +73,7 @@ function PolicyEditor({ clientId, onSaved, onClose }: { clientId: string; onSave
     finally { if (alive.current) setBusy(false); }
   }
   async function save() {
-    if (!draft || !saved?.canEditPolicy || conflict || busy || submitting.current) return;
+    if (!draft || !saved?.canEditPolicy || conflict || busy || submitting.current || monitoringValidationError(draft, saved.timezone)) return;
     submitting.current = true;
     setBusy(true); setSaving(true); setMessage('');
     try { const value = await saveScMonitoringPolicy(clientId, draft); if (alive.current) { setSaved(value); setDraft(draftOf(value)); setHistory(null); setMessage('Monitoring policy saved.'); onSaved?.(); toast({ title: 'Monitoring settings saved', description: 'Monitoring rules and reminder settings for this client have been updated.', variant: 'success' }); } }
@@ -99,12 +98,6 @@ function PolicyEditor({ clientId, onSaved, onClose }: { clientId: string; onSave
   try { if (saved?.timezone) { new Intl.DateTimeFormat('en-US', { timeZone: saved.timezone }); validTimezone = true; } } catch { /* Explicit unavailable state below. */ }
   const disabled = busy || conflict || !saved?.canEditPolicy;
   useEffect(() => { if (disabled) stopRecording(); }, [disabled, stopRecording]);
-  const invalidDocumentIntervals = draft && documentReviewTypes.some(type => {
-    const days = draft.documentReviewIntervals[type];
-    return days !== null && (!Number.isInteger(days) || days < 1 || days > 365);
-  });
-  const noDocumentIntervals = draft && !documentReviewTypes.some(type => draft.documentReviewIntervals[type] !== null);
-  const needsTimezone = draft && (draft.enabled || draft.remindersEnabled || draft.documentReviewsEnabled || draft.documentRemindersEnabled);
   return <DialogContent showCloseButton={false}
     className="left-auto right-4 flex max-h-[90dvh] w-[calc(100vw-32px)] max-w-[600px] translate-x-0 flex-col overflow-hidden rounded-[26px] border border-[#dce8e8] bg-white text-[#16383b] shadow-xl sm:right-8 [&_label]:relative [&_button:focus-visible]:ring-[#00b4b8]/25 [&_button:focus-visible]:ring-offset-0"
     onEscapeKeyDown={event => { if (saving) event.preventDefault(); }} onInteractOutside={event => { if (saving) event.preventDefault(); }}>
@@ -127,42 +120,14 @@ function PolicyEditor({ clientId, onSaved, onClose }: { clientId: string; onSave
         {!saved.canEditPolicy && <p className="rounded-lg bg-[#f7f9f9] px-3 py-2">Only the agency owner can change monitoring rules.</p>}
         {!validTimezone && <p role="alert" className="rounded-lg bg-[#fff8e9] px-3 py-2 text-[#795510]">Set a valid agency time zone before enabling monitoring schedules, document reviews, or reminders. <Link to={`${Routes.agency.agencySettings}?tab=agencyInfo#agency-timezone`} className="font-medium underline" onClick={onClose}>View agency time zone</Link></p>}
       </div>
-      <section aria-labelledby="sc-contact-policy-heading" className="space-y-4 border-t border-[#e6eeee] pt-5">
-      <div><h3 id="sc-contact-policy-heading" className="flex items-center gap-2 text-base font-semibold"><Clock3 className="size-4 text-[#008f93]" aria-hidden="true" />Contact schedule</h3><p className="mt-1 text-sm text-[#617579]">Choose how often qualifying client contact is needed.</p></div>
-      <Checkbox label="Enable monitoring contact schedules" checked={draft.enabled} disabled={disabled || !validTimezone && !draft.enabled} onChange={event => setDraft({ ...draft, enabled: event.target.checked })} />
-      <div className="flex flex-wrap items-end justify-between gap-3"><label className="block max-w-full text-sm font-medium">Rolling interval (days)<Input type="number" className="mt-1.5 w-40 focus-visible:border-[#00b4b8] focus-visible:ring-0" min={1} max={365} step={1} disabled={disabled} value={draft.intervalDays ?? ''} onChange={event => setDraft({ ...draft, intervalDays: event.target.value === '' ? null : Number(event.target.value) })} /></label><p className="pb-2 text-xs text-[#617579]">1–365 days between qualifying contacts</p></div>
-      <fieldset disabled={disabled} className="space-y-3"><legend className="mb-2 text-sm font-medium">Contact methods that count</legend><div className="grid grid-cols-1 gap-x-6 gap-y-3 min-[400px]:grid-cols-2">{monitoringMethods.map(method => <Checkbox key={method} label={label(method)} labelClassName="font-normal" className="size-5 rounded" checked={draft.qualifyingMethods.includes(method)} onChange={event => setDraft({ ...draft, qualifyingMethods: event.target.checked ? [...draft.qualifyingMethods, method] : draft.qualifyingMethods.filter(value => value !== method) })} />)}</div></fieldset>
-      <Checkbox label="Require direct contact with the client" disabled={disabled} checked={draft.requireDirectContact} onChange={event => setDraft({ ...draft, requireDirectContact: event.target.checked })} />
-      {draft.enabled && <p className="text-xs leading-5 text-[#617579]">Changing this interval can move contact deadlines. Disabling and re-enabling keeps the original baseline.</p>}
-      </section>
-      <section aria-labelledby="sc-document-policy-heading" className="space-y-4 border-t border-[#e6eeee] pt-5">
-        <div><h3 id="sc-document-policy-heading" className="flex items-center gap-2 text-base font-semibold"><FileText className="size-4 text-[#008f93]" aria-hidden="true" />Client document monitoring</h3><p className="mt-1 text-sm leading-5 text-[#617579]">Set a review cadence for each document type. The SC marks each file reviewed to start its next interval.</p></div>
-        <Checkbox label="Enable recurring document reviews" disabled={disabled || !validTimezone && !draft.documentReviewsEnabled} checked={draft.documentReviewsEnabled} onChange={event => setDraft({ ...draft, documentReviewsEnabled: event.target.checked })} />
-        <div className="overflow-hidden rounded-xl border border-[#e0eaea]">
-          <div className="flex items-center justify-between gap-3 bg-[#f7fbfb] px-3 py-2 text-xs font-medium text-[#526e72]"><span>Document type</span><span>Review every</span></div>
-          {documentReviewTypes.map(type => <div key={type} className="flex items-center justify-between gap-3 border-t border-[#e6eeee] px-3 py-2.5">
-            <label htmlFor={`sc-document-interval-${type}`} className="min-w-0 text-sm font-medium">{type}</label>
-            <div className="flex shrink-0 items-center gap-2"><Input id={`sc-document-interval-${type}`} aria-label={`${type} review interval (days)`} type="number" min={1} max={365} step={1} placeholder="Off" className="h-9 w-20 text-right focus-visible:border-[#00b4b8] focus-visible:ring-0" disabled={disabled || !draft.documentReviewsEnabled} value={draft.documentReviewIntervals[type] ?? ''} onChange={event => setDraft({ ...draft, documentReviewIntervals: { ...draft.documentReviewIntervals, [type]: event.target.value === '' ? null : Number(event.target.value) } })} /><span className="text-xs text-[#617579]">days</span></div>
-          </div>)}
-        </div>
-        <p className="text-xs leading-5 text-[#617579]">Use 1–365 days, or leave a type blank to turn it off. New files need a first review. The SC's recorded review starts the next interval.</p>
-        {draft.documentReviewsEnabled && noDocumentIntervals && <p role="status" className="text-sm text-[#795510]">Add an interval for at least one document type.</p>}
-        {invalidDocumentIntervals && <p role="alert" className="text-sm text-[#b42332]">Document review intervals must be whole numbers from 1 to 365.</p>}
-      </section>
-      <section aria-labelledby="sc-reminder-policy-heading" className="space-y-4 border-t border-[#e6eeee] pt-5">
-      <div><h3 id="sc-reminder-policy-heading" className="flex items-center gap-2 text-base font-semibold"><Bell className="size-4 text-[#008f93]" aria-hidden="true" />SC reminders</h3><p className="mt-1 text-sm text-[#617579]">Choose which reminders the assigned SC receives.</p></div>
-      <Checkbox label="Send reminders to the assigned SC" disabled={disabled || !validTimezone && !draft.remindersEnabled} checked={draft.remindersEnabled} onChange={event => setDraft({ ...draft, remindersEnabled: event.target.checked })} />
-      <p className="text-xs leading-5 text-[#617579]">Contact reminders appear in-app. Follow-up reminders can also arrive by email, based on the SC's notification preferences.</p>
-      <Checkbox label="Send document review reminders to the assigned SC" disabled={disabled || !validTimezone && !draft.documentRemindersEnabled} checked={draft.documentRemindersEnabled} onChange={event => setDraft({ ...draft, documentRemindersEnabled: event.target.checked })} />
-      <p className="text-xs leading-5 text-[#617579]">Document reminders appear in-app when a review is due. Notification preferences apply. Turning reminders on can notify the SC about reviews already due.</p>
-      </section>
+      <MonitoringPolicyFields draft={draft} onChange={setDraft} disabled={disabled} timezone={saved.timezone} />
       {saved.canEditPolicy && <section className="space-y-4 border-t border-[#e6eeee] pt-5"><div className="space-y-2"><Label htmlFor="sc-monitoring-change-reason">Reason for this change</Label><VoiceEnabledTextarea id="sc-monitoring-change-reason" className="focus-visible:border-[#00b4b8] focus-visible:ring-0" fieldName="Monitoring policy change reason" pageTitle="SC monitoring settings" rows={3} placeholder="Explain why these rules are changing" disabled={disabled} value={draft.changeReason} onChange={value => setDraft(current => current && ({ ...current, changeReason: value.slice(0, 2000) }))} /></div>
         {historyError && <p role="alert" className="text-sm text-[#b42332]">{historyError}</p>}{historyBusy && <p role="status" className="text-sm text-[#617579]">Loading policy history…</p>}{history && <div className="space-y-3">{history.items.length === 0 && <p className="text-sm">No policy changes yet.</p>}{history.items.map(event => <article key={event.eventId} className="space-y-1.5 border-l border-[#d7e6e6] pl-3 text-sm"><p className="font-medium">{event.authorName} <span className="font-normal text-[#617579]">· {event.createdAt}</span></p><p className="break-words text-[#526e72]">{event.changeReason}</p><PolicyChanges event={event} /></article>)}{history.nextCursor && <Button type="button" variant="outline" disabled={historyBusy} onClick={() => void loadHistory(history.nextCursor || undefined)}>Load older changes</Button>}</div>}</section>}
     </div>}
     </div>}
     {saved?.canEditPolicy && draft && <footer className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t px-5 py-4">
       <Button type="button" variant="outline" disabled={historyBusy || busy} onClick={() => void loadHistory()}>View policy history</Button>
-      <Button type="button" className="ml-auto" aria-busy={saving} disabled={disabled || Boolean(needsTimezone && !validTimezone || invalidDocumentIntervals || draft.documentReviewsEnabled && noDocumentIntervals || draft.enabled && (!Number.isInteger(draft.intervalDays) || !draft.intervalDays || draft.intervalDays < 1 || draft.intervalDays > 365 || !draft.qualifyingMethods.length))} onClick={() => void save()}>{saving ? <><Loader2 className="size-4 motion-safe:animate-spin" aria-hidden="true" />Saving…</> : 'Save policy'}</Button>
+      <Button type="button" className="ml-auto" aria-busy={saving} disabled={disabled || Boolean(monitoringValidationError(draft, saved.timezone))} onClick={() => void save()}>{saving ? <><Loader2 className="size-4 motion-safe:animate-spin" aria-hidden="true" />Saving…</> : 'Save policy'}</Button>
     </footer>}
     <VoiceInputButton className="z-[60]" />
   </DialogContent>;
