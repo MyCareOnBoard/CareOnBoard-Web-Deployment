@@ -10,6 +10,8 @@ const { toast } = vi.hoisted(() => ({ toast: vi.fn() }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast }) }));
 const openSettings = () => { render(<MemoryRouter><Section clientId="a" /></MemoryRouter>); fireEvent.click(screen.getByRole('button', {name:'Monitoring Settings'})); };
 const policy = { version: 1 as const, revision: 0, enabled: false, intervalDays: null, qualifyingMethods: [], requireDirectContact: false, remindersEnabled: false, activatedAt: null, updatedAt: null, updatedBy: null };
+const documentSettings = { documentReviewsEnabled: false, documentRemindersEnabled: false,
+  documentReviewIntervals: { ISP: null, Assessment: null, Tier: null, SDR: null, PA: null, Enrollment: null, Other: null } };
 beforeEach(() => { vi.clearAllMocks(); vi.mocked(getScMonitoringPolicy).mockResolvedValue({ policy, timezone: 'UTC', canEditPolicy: true }); });
 test('unconfigured policy has no active interval and history loads only when opened', async () => {
   vi.mocked(listScMonitoringPolicyEvents).mockResolvedValue({ items: [], nextCursor: null });
@@ -31,7 +33,7 @@ test('policy save is independent and contains every configuration field', async 
   fireEvent.click(await screen.findByLabelText('Send reminders to the assigned SC'));
   fireEvent.change(screen.getByLabelText('Reason for this change'), { target: { value: 'Enable reminders' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save policy' }));
-  await waitFor(() => expect(saveScMonitoringPolicy).toHaveBeenCalledWith('a', { expectedRevision: 0, enabled: false, intervalDays: null, qualifyingMethods: [], requireDirectContact: false, remindersEnabled: true, changeReason: 'Enable reminders' }));
+  await waitFor(() => expect(saveScMonitoringPolicy).toHaveBeenCalledWith('a', { expectedRevision: 0, enabled: false, intervalDays: null, qualifyingMethods: [], requireDirectContact: false, remindersEnabled: true, changeReason: 'Enable reminders', ...documentSettings }));
   const savingButton = screen.getByRole('button', { name: 'Saving…' });
   expect(savingButton).toBeDisabled();
   expect(savingButton).toHaveAttribute('aria-busy', 'true');
@@ -105,7 +107,54 @@ test('client settings edit directly and refresh the client monitoring tab after 
   fireEvent.change(interval,{target:{value:'7'}});
   fireEvent.change(screen.getByLabelText('Reason for this change'),{target:{value:'Weekly contact'}});
   fireEvent.click(screen.getByRole('button',{name:'Save policy'}));
-  await waitFor(()=>expect(saveScMonitoringPolicy).toHaveBeenCalledWith('c',{expectedRevision:3,enabled:true,intervalDays:7,qualifyingMethods:['phone'],requireDirectContact:false,remindersEnabled:false,changeReason:'Weekly contact'}));
+  await waitFor(()=>expect(saveScMonitoringPolicy).toHaveBeenCalledWith('c',{expectedRevision:3,enabled:true,intervalDays:7,qualifyingMethods:['phone'],requireDirectContact:false,remindersEnabled:false,changeReason:'Weekly contact',...documentSettings}));
   await screen.findByText('Monitoring policy saved.');
   expect(onSaved).toHaveBeenCalledTimes(1);
+});
+
+test('initial policy fetch and retry show form skeletons instead of a premature reload action', async () => {
+  let rejectLoad!: (error: unknown) => void;
+  vi.mocked(getScMonitoringPolicy).mockImplementationOnce(() => new Promise((_, reject) => { rejectLoad = reject; }));
+  openSettings();
+  expect(screen.getByRole('status', { name: 'Loading monitoring settings' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Reload policy' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Save policy' })).not.toBeInTheDocument();
+  await act(async () => rejectLoad(new Error('Offline')));
+  expect(await screen.findByRole('button', { name: 'Reload policy' })).toBeEnabled();
+  expect(screen.queryByRole('status', { name: 'Loading monitoring settings' })).not.toBeInTheDocument();
+  let resolveRetry!: (value: Awaited<ReturnType<typeof getScMonitoringPolicy>>) => void;
+  vi.mocked(getScMonitoringPolicy).mockImplementationOnce(() => new Promise(resolve => { resolveRetry = resolve; }));
+  fireEvent.click(screen.getByRole('button', { name: 'Reload policy' }));
+  expect(screen.getByRole('status', { name: 'Loading monitoring settings' })).toBeInTheDocument();
+  await act(async () => resolveRetry({ policy, timezone: 'UTC', canEditPolicy: true }));
+  expect(await screen.findByLabelText('Enable recurring document reviews')).toBeInTheDocument();
+});
+
+test('per-type document reviews require an interval and save independently of contacts', async () => {
+  vi.mocked(saveScMonitoringPolicy).mockResolvedValue({ policy: { ...policy, revision: 1 }, timezone: 'UTC', canEditPolicy: true });
+  openSettings();
+  fireEvent.click(await screen.findByLabelText('Enable recurring document reviews'));
+  const save = screen.getByRole('button', { name: 'Save policy' });
+  expect(save).toBeDisabled();
+  const interval = screen.getByLabelText('ISP review interval (days)');
+  for (const value of ['0', '366', '1.5']) {
+    fireEvent.change(interval, { target: { value } });
+    expect(save).toBeDisabled();
+  }
+  fireEvent.change(interval, { target: { value: '30' } });
+  fireEvent.click(screen.getByLabelText('Send document review reminders to the assigned SC'));
+  fireEvent.change(screen.getByLabelText('Reason for this change'), { target: { value: 'Monthly ISP review' } });
+  expect(save).toBeEnabled();
+  fireEvent.click(save);
+  await waitFor(() => expect(saveScMonitoringPolicy).toHaveBeenCalledWith('a', expect.objectContaining({
+    enabled: false, remindersEnabled: false, documentReviewsEnabled: true, documentRemindersEnabled: true,
+    documentReviewIntervals: { ISP: 30, Assessment: null, Tier: null, SDR: null, PA: null, Enrollment: null, Other: null },
+  })));
+});
+
+test('document review settings are disabled for read-only users', async () => {
+  vi.mocked(getScMonitoringPolicy).mockResolvedValue({ policy, timezone: 'UTC', canEditPolicy: false });
+  openSettings();
+  expect(await screen.findByLabelText('Enable recurring document reviews')).toBeDisabled();
+  expect(screen.getByLabelText('ISP review interval (days)')).toBeDisabled();
 });

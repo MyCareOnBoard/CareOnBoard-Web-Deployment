@@ -22,3 +22,21 @@ it('routes client settings and history and rejects invalid policy responses', as
   vi.mocked(axiosClient.get).mockResolvedValue({ data: { success: true, data: { ...data, policy: { ...policy, revision: -1 } } } });
   await expect(getScMonitoringPolicy('c')).rejects.toThrow('Monitoring policy unavailable.');
 });
+
+it('defaults legacy document settings to off and rejects malformed review intervals', async () => {
+  const policy = { version: 1, revision: 0, enabled: false, intervalDays: null, qualifyingMethods: [], requireDirectContact: false, remindersEnabled: false, activatedAt: null, updatedAt: null, updatedBy: null };
+  const data = { policy, timezone: 'UTC', canEditPolicy: true };
+  vi.mocked(axiosClient.get).mockResolvedValue({ data: { success: true, data } });
+  expect((await getScMonitoringPolicy('c')).policy).toMatchObject({ documentReviewsEnabled: false, documentRemindersEnabled: false,
+    documentReviewIntervals: { ISP: null, Assessment: null, Tier: null, SDR: null, PA: null, Enrollment: null, Other: null } });
+  const intervals = { ISP: 30, Assessment: null, Tier: null, SDR: null, PA: null, Enrollment: null, Other: null };
+  for (const fields of [
+    { documentReviewsEnabled: true },
+    { documentReviewsEnabled: true, documentRemindersEnabled: false, documentReviewIntervals: { ...intervals, ISP: 1.5 } },
+    { documentReviewsEnabled: true, documentRemindersEnabled: false, documentReviewIntervals: { ...intervals, Unknown: 30 } },
+    { documentReviewsEnabled: true, documentRemindersEnabled: false, documentReviewIntervals: { ...intervals, ISP: null } },
+  ]) {
+    vi.mocked(axiosClient.get).mockResolvedValue({ data: { success: true, data: { ...data, policy: { ...policy, ...fields } } } });
+    await expect(getScMonitoringPolicy('c')).rejects.toThrow('Monitoring policy unavailable.');
+  }
+});

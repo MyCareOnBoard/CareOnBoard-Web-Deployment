@@ -4,12 +4,15 @@ import { MemoryRouter } from 'react-router';
 import { beforeEach, expect, it, vi } from 'vitest';
 import AgencyMonitoringRecords from './AgencyMonitoringRecords';
 import * as api from '@/lib/api/sc-agency-monitoring';
+import { getDocumentReviews } from '@/lib/api/sc-document-reviews';
 vi.mock('@/hooks/useEffectiveAgencyMode', () => ({ useEffectiveAgencyMode: () => 'sc' }));
 
 vi.mock('@/lib/api/sc-agency-monitoring', () => ({
   getAgencyMonitoringOverview: vi.fn(), listAgencyMonitoringContacts: vi.fn(), listAgencyMonitoringFollowUps: vi.fn(),
   getAgencyMonitoringContact: vi.fn(), getAgencyMonitoringFollowUp: vi.fn(), updateAgencyMonitoringFollowUp: vi.fn(),
 }));
+vi.mock('@/lib/api/sc-document-reviews', () => ({ getDocumentReviews: vi.fn(), markDocumentReviewed: vi.fn(), getDocumentReviewEvents: vi.fn() }));
+vi.mock('../clients-management/ScMonitoringSettingsModal', () => ({ default: ({ onSaved }: { onSaved: () => void }) => <button onClick={onSaved}>Monitoring Settings</button> }));
 
 const overview = {
   clientId: 'c', timezone: 'UTC', canUpdateFollowUps: true, lastContactAt: '2026-09-25T12:00:00Z',
@@ -24,6 +27,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(api.getAgencyMonitoringOverview).mockResolvedValue(overview as unknown as api.AgencyMonitoringOverview);
   vi.mocked(api.listAgencyMonitoringFollowUps).mockResolvedValue({ items: [], nextCursor: null });
+  vi.mocked(getDocumentReviews).mockResolvedValue({ enabled: false, remindersEnabled: false, timezone: 'UTC', items: [] });
 });
 
 it('shows persisted records without the sample calendar and loads completed only on selection', async () => {
@@ -32,6 +36,8 @@ it('shows persisted records without the sample calendar and loads completed only
   expect(screen.getByRole('status', { name: 'Loading monitoring records' })).toBeInTheDocument();
   expect(await screen.findByRole('heading', { name: 'Client monitoring' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Monitoring Settings' })).toBeEnabled();
+  expect(screen.getByRole('region', { name: 'Document reviews' })).toHaveTextContent('Read-only');
+  expect(getDocumentReviews).toHaveBeenCalledWith('c', true, expect.any(AbortSignal));
   expect(screen.getByText('Monthly review')).toBeInTheDocument();
   expect(screen.getByText('Urgent')).toBeInTheDocument();
   expect(screen.queryByText('PA Missing')).not.toBeInTheDocument();
@@ -79,4 +85,12 @@ it('explains that unassigned clients do not receive SC reminders',async()=> {
   vi.mocked(api.getAgencyMonitoringOverview).mockResolvedValue({...overview,hasAssignedCoordinator:false} as unknown as api.AgencyMonitoringOverview);
   render(<MemoryRouter><AgencyMonitoringRecords clientId="c" /></MemoryRouter>);
   expect(await screen.findByText('No SC assigned. Reminders cannot be sent until an SC is assigned.')).toBeInTheDocument();
+});
+
+it('refreshes document review settings and the overview after a settings save', async () => {
+  render(<MemoryRouter><AgencyMonitoringRecords clientId="c" /></MemoryRouter>);
+  await screen.findByText('Monthly review');
+  await userEvent.click(screen.getByRole('button', { name: 'Monitoring Settings' }));
+  await waitFor(() => expect(getDocumentReviews).toHaveBeenCalledTimes(2));
+  expect(api.getAgencyMonitoringOverview).toHaveBeenCalledTimes(2);
 });

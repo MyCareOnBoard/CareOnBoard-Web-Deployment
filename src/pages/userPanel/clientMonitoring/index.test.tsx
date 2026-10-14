@@ -4,12 +4,14 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { getScOverview, getScContact, getScFollowUp, listScContacts, addScContactAmendment } from '@/lib/api/sc-monitoring';
 import ClientMonitoringPage from './index';
+import { getDocumentReviews, markDocumentReviewed, type DocumentReviewItem } from '@/lib/api/sc-document-reviews';
 
 const state = vi.hoisted(() => ({ user: { userType: 'employee', applicantType: 'support_coordinator' } as any }));
 vi.mock('@/utils/auth', () => ({ useAuth: () => ({ user: state.user }) }));
 vi.mock('@/features/agency-care/AgencyCareHome', () => ({ AgencyCareClientEntry: ({ clientId }: { clientId: string }) => <div>Care workspace for {clientId}</div> }));
 vi.mock('@/features/agency-care/MonitoringCareBridge', () => ({ MonitoringCareBridge: ({ clientId, recordKind, recordId }: { clientId: string; recordKind: string; recordId: string }) => <div>Care evidence for {clientId} {recordKind} {recordId}</div> }));
 vi.mock('@/lib/api/sc-monitoring', () => ({ getScOverview: vi.fn(), getScContact: vi.fn(), listScContacts: vi.fn(), getScFollowUp: vi.fn(), addScContactAmendment: vi.fn() }));
+vi.mock('@/lib/api/sc-document-reviews', () => ({ getDocumentReviews: vi.fn(), markDocumentReviewed: vi.fn(), getDocumentReviewEvents: vi.fn() }));
 const overviewFixture: Awaited<ReturnType<typeof getScOverview>> = { clientId: 'c', name: 'Alex Morgan', program: 'SP', county: 'Somerset', ispPeriod: null,
   scOutcomes: [], openFollowUps: [], contacts: { items: [{ contactId: 'one', contactAt: '2026-09-28T12:00:00Z', method: 'phone', summary: 'Checked in', authorName: 'Taylor', createdAt: '2026-09-28T12:00:00Z' }], nextCursor: null }, timezone: 'UTC' };
 const contactFixture: Awaited<ReturnType<typeof getScContact>> = { contactId: 'one', contactAt: '2026-09-28T12:00:00Z', method: 'phone', summary: 'Checked in', authorName: 'Taylor', createdAt: '2026-09-28T12:00:00Z',
@@ -20,6 +22,7 @@ beforeEach(() => {
   state.user = { userType: 'employee', applicantType: 'support_coordinator' };
   vi.mocked(getScOverview).mockResolvedValue(overviewFixture);
   vi.mocked(getScContact).mockResolvedValue(contactFixture);
+  vi.mocked(getDocumentReviews).mockResolvedValue({ enabled: false, remindersEnabled: false, timezone: 'UTC', items: [] });
 });
 afterEach(() => vi.unstubAllEnvs());
 const renderPage = (query='') => render(<MemoryRouter initialEntries={['/user-panel/clients-and-services/c/monitoring'+query]}><Routes><Route path="/user-panel/clients-and-services/:clientId/monitoring" element={<ClientMonitoringPage />} /><Route path="/user-panel/clients-and-services" element={<div>Caseload</div>} /></Routes></MemoryRouter>);
@@ -32,6 +35,8 @@ it('shows follow-ups before contacts, keeps record action available without plan
   expect(screen.getByText('Open follow-ups').compareDocumentPosition(screen.getByText('Monitoring contacts')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(screen.getByText('No ISP goals or authorized services are recorded.')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Record contact' })).toBeInTheDocument();
+  expect(screen.getByRole('region', { name: 'Document reviews' })).toBeInTheDocument();
+  expect(getDocumentReviews).toHaveBeenCalledWith('c', false, expect.any(AbortSignal));
   await user.click(screen.getByRole('button', { name: 'Open record' }));
   expect(await screen.findByText('Contact record')).toBeInTheDocument();
 });
@@ -40,6 +45,18 @@ it('keeps the SC route unavailable to another employee role', () => {
   state.user = { userType: 'employee', applicantType: 'dsp' };
   renderPage();
   expect(getScOverview).not.toHaveBeenCalled();
+});
+
+it('refreshes the monitoring workspace after an explicit document review', async () => {
+  const document: DocumentReviewItem = { reference: 'isp', title: 'ISP document', fileName: 'isp.pdf', url: 'https://files.example/isp.pdf', category: 'ISP', intervalDays: 30,
+    status: 'needs_first_review', lastReviewedAt: null, reviewedByName: null, nextReviewDueDate: null, revision: 0 };
+  vi.mocked(getDocumentReviews).mockResolvedValue({ enabled: true, remindersEnabled: false, timezone: 'UTC', items: [document] });
+  vi.mocked(markDocumentReviewed).mockResolvedValue({ ...document, revision: 1, status: 'upcoming', lastReviewedAt: '2026-10-14T12:00:00Z', reviewedByName: 'Taylor', nextReviewDueDate: '2026-11-13' });
+  renderPage();
+  await userEvent.click(await screen.findByRole('button', { name: 'Mark ISP document reviewed' }));
+  await screen.findByText('ISP document: review recorded.');
+  expect(getScOverview).toHaveBeenCalledTimes(2);
+  expect(getDocumentReviews).toHaveBeenCalledTimes(2);
 });
 
 it('loads older contacts only when requested', async () => {

@@ -1,4 +1,5 @@
 import MonitoringScheduleCard from '@/components/sc-monitoring/MonitoringScheduleCard';
+import DocumentReviewsPanel from '@/components/sc-monitoring/DocumentReviewsPanel';
 import { useScMonitoringRefresh } from '@/hooks/useScMonitoringRefresh';
 import { useAssignmentReviewScope } from '@/hooks/useAssignmentReview';
 import { useCallback, useEffect, useState } from 'react';
@@ -32,6 +33,7 @@ function AgencyMonitoringWorkspace({ clientId, clientStatus }: { clientId: strin
   const [pageError, setPageError] = useState('');
   const [selected, setSelected] = useState<{ kind: 'contact' | 'followUp'; id: string } | null>(null);
   const [notice, setNotice] = useState('');
+  const [documentReviewRefresh, setDocumentReviewRefresh] = useState(0);
 
   const refresh = useCallback(async (signal?: AbortSignal, reset = false) => {
     if (reset) { setOverview(null); setSelected(null); setState('loading'); }
@@ -99,10 +101,11 @@ function AgencyMonitoringWorkspace({ clientId, clientStatus }: { clientId: strin
 
   const followUps = view === 'active' ? overview.activeFollowUps : completed;
   return <section aria-labelledby="agency-monitoring-heading" className="space-y-5 text-[15px] text-[#16383b] [&_button]:text-[15px]">
-    <div className="flex items-start justify-between gap-4"><div><p className="text-[13px] font-bold uppercase tracking-[0.14em] text-[#087b80]">Client details / Monitoring</p><h2 id="agency-monitoring-heading" className="mt-1 text-2xl font-semibold">Client monitoring</h2><p className="mt-1 text-[15px] text-[#617579]">Review the SC's contacts, concerns, and follow-up work for this client.</p></div><ScMonitoringSettingsModal clientId={clientId} onSaved={() => void refresh()} /></div>
+    <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-[13px] font-bold uppercase tracking-[0.14em] text-[#087b80]">Client details / Monitoring</p><h2 id="agency-monitoring-heading" className="mt-1 text-2xl font-semibold">Client monitoring</h2><p className="mt-1 text-[15px] text-[#617579]">Review the SC's contacts, concerns, and follow-up work for this client.</p></div><ScMonitoringSettingsModal clientId={clientId} onSaved={() => { setDocumentReviewRefresh(value => value + 1); void refresh(); }} /></div>
     {notice && <p role="status" className="rounded-lg border border-[#b5e5d8] bg-[#eaf9f4] px-4 py-2 text-[15px] text-[#176853]">{notice}</p>}
     {overview.hasAssignedCoordinator === false && <p role="status" className="rounded-lg border border-[#ead5a3] bg-[#fff8e9] px-4 py-3 text-[15px] text-[#795510]">No SC assigned. Reminders cannot be sent until an SC is assigned.</p>}
     <MonitoringScheduleCard schedule={overview.monitoringSchedule ? { ...overview.monitoringSchedule, clientStatus: overview.monitoringSchedule.clientStatus ?? clientStatus } : undefined} onRefresh={() => void refresh()} agencyView />
+    <DocumentReviewsPanel clientId={clientId} agencyView refreshKey={documentReviewRefresh} />
     <div className="grid gap-3 sm:grid-cols-3">
       <Metric title="Last contact" value={dateTime(overview.lastContactAt)} />
       <Metric title="Active follow-ups" value={String(overview.activeFollowUpCount)} />
