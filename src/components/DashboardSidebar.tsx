@@ -27,7 +27,7 @@ const iconClassName = (isActive: boolean) =>
     "h-5 w-5 shrink-0",
     isActive
       ? "[&_*]:stroke-white [&_*]:fill-transparent [&_path]:stroke-white [&_path]:fill-transparent [&_circle]:stroke-white [&_circle]:fill-transparent [&_rect]:stroke-white [&_rect]:fill-transparent"
-      : "[&_*]:stroke-[#808081] [&_*]:fill-transparent [&_path]:stroke-[#808081] [&_path]:fill-transparent [&_circle]:stroke-[#808081] [&_circle]:fill-transparent [&_rect]:stroke-[#808081] [&_rect]:fill-transparent"
+      : "[&_*]:stroke-[#808081] [&_*]:fill-transparent [&_path]:stroke-[#808081] [&_path]:fill-transparent [&_circle]:stroke-[#808081] [&_circle]:fill-transparent [&_rect]:stroke-[#808081] [&_rect]:fill-transparent dark:[&_*]:stroke-[#9aa4a8] dark:[&_path]:stroke-[#9aa4a8] dark:[&_circle]:stroke-[#9aa4a8] dark:[&_rect]:stroke-[#9aa4a8]"
   );
 
 function NavGroup({
@@ -57,7 +57,7 @@ function NavGroup({
         onClick={() => path && navigate(path)}
         className={cn(
           "flex h-[52px] w-full items-center justify-center rounded-[60px] transition cursor-pointer",
-          isGroupActive ? "bg-[#00b4b8]" : "text-[#808081] hover:bg-white/40"
+          isGroupActive ? "bg-[#00b4b8]" : "text-[#808081] hover:bg-white/40 dark:text-[#9aa4a8] dark:hover:bg-white/5"
         )}
       >
         <Icon className={iconClassName(isGroupActive)} />
@@ -77,7 +77,7 @@ function NavGroup({
         onClick={onToggle}
         className={cn(
           "flex h-[52px] w-full items-center gap-3 rounded-[60px] px-4 text-sm font-semibold backdrop-blur-[22px] transition cursor-pointer",
-          isGroupActive ? "font-medium text-white" : "font-medium text-[#808081] hover:bg-white/40"
+          isGroupActive ? "font-medium text-white" : "font-medium text-[#808081] hover:bg-white/40 dark:text-[#9aa4a8] dark:hover:bg-white/5"
         )}
       >
         <Icon className={iconClassName(isGroupActive)} />
@@ -85,7 +85,7 @@ function NavGroup({
         <ChevronDown
           className={cn(
             "h-4 w-4 shrink-0 transition-transform duration-200",
-            isGroupActive ? "text-white" : "text-[#808081]",
+            isGroupActive ? "text-white" : "text-[#808081] dark:text-[#9aa4a8]",
             isExpanded && "rotate-180"
           )}
         />
@@ -107,7 +107,7 @@ function NavGroup({
                     ? "bg-[#009a9e] text-white"
                     : isGroupActive
                       ? "text-white/90 hover:bg-white/15"
-                      : "text-[#808081] hover:bg-white/40"
+                      : "text-[#808081] hover:bg-white/40 dark:text-[#9aa4a8] dark:hover:bg-white/5"
                 )}
               >
                 <span className="flex-1">{child.label}</span>
@@ -147,7 +147,7 @@ function NavLinkButton({
       className={cn(
         "flex h-[52px] w-full items-center rounded-[60px] text-sm font-semibold backdrop-blur-[22px] transition cursor-pointer",
         collapsed ? "justify-center" : "gap-3 px-4",
-        isActive ? "bg-[#00b4b8] font-medium text-white" : "font-medium text-[#808081] hover:bg-white/40"
+        isActive ? "bg-[#00b4b8] font-medium text-white" : "font-medium text-[#808081] hover:bg-white/40 dark:text-[#9aa4a8] dark:hover:bg-white/5"
       )}
     >
       <Icon className={iconClassName(isActive)} />
@@ -196,7 +196,7 @@ export default function DashboardSidebar({
       <aside
         inert={isMobile && !drawerOpen}
         className={cn(
-          "fixed top-[98px] bottom-0 left-0 z-50 overflow-y-auto overflow-x-hidden space-y-3 pr-3 bg-[#eef4f5] scrollbar-hide shadow-xl",
+          "fixed top-[98px] bottom-0 left-0 z-50 overflow-y-auto overflow-x-hidden space-y-3 pr-3 bg-[#eef4f5] dark:bg-[#10141a] scrollbar-hide shadow-xl",
           "transition-transform duration-200 md:top-[130px] md:bottom-4 md:pr-0 md:left-[42.5px] md:z-40 md:translate-x-0 md:shadow-none md:transition-[width]",
           drawerOpen ? "translate-x-0" : "-translate-x-full",
           effectiveCollapsed ? "w-[64px]" : "w-[256px] md:w-[200px]"
@@ -208,7 +208,7 @@ export default function DashboardSidebar({
           title={effectiveCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-label={effectiveCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           className={cn(
-            "hidden h-[44px] w-full items-center rounded-[60px] text-[13px] font-medium text-[#808081] transition cursor-pointer hover:bg-white/40 md:flex",
+            "hidden h-[44px] w-full items-center rounded-[60px] text-[13px] font-medium text-[#808081] dark:text-[#9aa4a8] transition cursor-pointer hover:bg-white/40 dark:hover:bg-white/5 md:flex",
             effectiveCollapsed ? "justify-center" : "gap-3 px-4"
           )}
         >

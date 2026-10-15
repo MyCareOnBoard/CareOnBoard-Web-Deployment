@@ -5,19 +5,22 @@ import DashboardDocuments, {type DashboardDocument} from './DashboardDocuments';
 const item = (type: string, patch: Partial<DashboardDocument> = {}): DashboardDocument =>
     ({type, label: type, fileUrl: 'https://example.com/document.pdf', status: 'Current', id: type, ...patch});
 const props = {loading: false, error: false, onRetry: vi.fn(), onUpload: vi.fn(), onView: vi.fn()};
+// Radix's TabsTrigger activates on mousedown (and keyboard/focus), not click — see
+// @radix-ui/react-tabs's TabsTrigger implementation.
+const activateTab = (tab: HTMLElement) => fireEvent.mouseDown(tab, {button: 0});
 
 describe('grouped dashboard documents', () => {
-    it('prioritizes issues and opens only the first group by default', () => {
+    it('prioritizes issues and shows the first group tab by default', () => {
         render(<DashboardDocuments {...props} documents={[item('Photo ID'), item('Resume', {fileUrl: '', status: 'Not uploaded'}), item('License', {status: 'expired', expiryLabel: 'Sep 1, 2026'})]}/>);
-        const headers = screen.getAllByRole('heading', {level: 4});
-        expect(headers.map(header => header.textContent)).toEqual(['Needs attention 1', 'Not uploaded 1', 'Current 1']);
-        expect(headers[0].closest('details')!.open).toBe(true);
-        expect(headers[1].closest('details')!.open).toBe(false);
+        const tabs = screen.getAllByRole('tab');
+        expect(tabs.map(tab => tab.textContent)).toEqual(['Needs attention 1', 'Not uploaded 1', 'Current 1']);
+        expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
+        expect(tabs[1]).toHaveAttribute('aria-selected', 'false');
         fireEvent.click(screen.getByRole('button', {name: 'Replace License'}));
         expect(props.onUpload).toHaveBeenCalledWith('License');
         fireEvent.click(screen.getByRole('button', {name: 'View License'}));
         expect(props.onView).toHaveBeenCalledWith('https://example.com/document.pdf');
-        fireEvent.click(headers[1].closest('summary')!);
+        activateTab(tabs[1]);
         fireEvent.click(screen.getByRole('button', {name: 'Upload Resume'}));
         expect(props.onUpload).toHaveBeenCalledWith('Resume');
     });
@@ -46,7 +49,7 @@ describe('grouped dashboard documents', () => {
         fireEvent.click(screen.getByRole('button', {name: 'Retry documents'}));
         expect(props.onRetry).toHaveBeenCalledOnce();
         rerender(<DashboardDocuments {...props} documents={[item('Diploma', {status: 'Updating expiry status…'})]}/>);
-        expect(screen.getByRole('heading', {name: 'Checking status 1'})).toBeVisible();
-        expect(screen.queryByRole('heading', {name: 'Current 1'})).not.toBeInTheDocument();
+        expect(screen.getByRole('tab', {name: 'Checking status 1'})).toBeVisible();
+        expect(screen.queryByRole('tab', {name: 'Current 1'})).not.toBeInTheDocument();
     });
 });

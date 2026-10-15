@@ -1,5 +1,59 @@
 @import "tailwindcss";
 
+/*
+ * Bridges the design tokens below into real Tailwind utilities.
+ *
+ * Tailwind v4 only generates color utilities (bg-background, text-muted-foreground,
+ * border-input, ...) from an `@theme` block — it does NOT read tailwind.config.js
+ * unless an `@config` directive points at it, and this project has neither. That file's
+ * `theme.extend.colors` has therefore never actually been live; every component already
+ * written against these semantic names (button.tsx, alert-dialog.tsx, and 80+ others)
+ * was silently getting no styling from them. `inline` because every value here is itself
+ * a reference to another custom property (see :root below), not a literal.
+ */
+@theme inline {
+  --color-main: var(--main-color);
+  --color-teal: var(--main-color);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-grey-200: var(--grey-200);
+  --color-grey-800: var(--grey-800);
+  --color-border: var(--border);
+  --color-input: var(--input-bg);
+  --color-ring: var(--ring);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  /* Not one of the original Figma tokens; added so bg-popover/text-popover-foreground
+     (used by dropdown-menu.tsx, calendar.tsx, and any future shadcn component that
+     assumes it) resolve to something instead of silently doing nothing. */
+  --color-popover: var(--card);
+  --color-popover-foreground: var(--card-foreground);
+  --radius-lg: var(--radius-lg);
+  --radius-md: var(--radius-md);
+  --radius-sm: var(--radius-sm);
+}
+
+/*
+ * Dark mode is opt-in via a `.dark` class on <html> (see ThemeProvider.tsx), not the
+ * OS's color-scheme preference — by default Tailwind v4's `dark:` variant follows system
+ * preference, which would make dark mode un-toggleable and override the light default.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
     /* Primary Colors from Figma */
     --main-color: #00b4b8;
@@ -52,6 +106,45 @@
     --radius-sm: 10px;
 
     font-family: "Urbanist", system-ui, sans-serif;
+    color-scheme: light;
+}
+
+/*
+ * Dark palette. Brand/semantic hues (--main-color, --red, --blue, --green, the grey
+ * scale) stay the same in both modes — they already read fine against a dark surface.
+ * Only the surface/text pairs that assume a white page change here.
+ */
+:root.dark {
+    --background: #10141a;
+    --foreground: #f4f6f7;
+    --card: #1b232b;
+    --card-foreground: #f4f6f7;
+    --border: rgba(255, 255, 255, 0.1);
+
+    --input-bg: #1b232b;
+    --input-border: rgba(255, 255, 255, 0.16);
+    --input-text: #f4f6f7;
+    --input-placeholder: #6b7680;
+    --input-error-border: #ff6b5e;
+    --input-error-text: #ff6b5e;
+
+    --ring: var(--main-color);
+    --primary: var(--main-color);
+    --primary-foreground: var(--white);
+    --secondary: rgba(255, 255, 255, 0.06);
+    --secondary-foreground: #f4f6f7;
+    --muted: rgba(255, 255, 255, 0.06);
+    --muted-foreground: #9aa4a8;
+    --accent: rgba(255, 255, 255, 0.07);
+    --accent-foreground: #f4f6f7;
+    --destructive: #ff6b5e;
+    --destructive-foreground: var(--white);
+    --success: #3ecb7a;
+    --success-foreground: #0b1d12;
+    --info: #5b9dff;
+    --info-foreground: #0b1420;
+
+    color-scheme: dark;
 }
 
 body {
@@ -191,4 +284,76 @@ body.auth-layout-active .PhoneInput {
 
 body.auth-layout-active .PhoneInputInput {
   min-width: 0;
+}
+
+/*
+ * Dark-mode safety net for page-level content this pass did not retrofit file by file.
+ *
+ * `text-[#10141a]` (and the slate-900/gray-900 aliases used the same way) is this
+ * codebase's de facto "page ink" color, written directly on hundreds of page components
+ * instead of through a token, on the assumption that the page canvas is always white.
+ * Now that dark mode exists, those are genuinely invisible: dark text on a dark page.
+ *
+ * These rules are deliberately left OUTSIDE any @layer. Tailwind's own utilities (every
+ * class below, including the dark: ones added by hand elsewhere in this pass) live inside
+ * `@layer utilities`, and per the CSS cascade-layers spec, unlayered rules always win over
+ * layered ones regardless of selector specificity or source order. That lets this override
+ * Tailwind's generated `.text-[#10141a]{color:#10141a}` without `!important` and without
+ * editing every file — and it's harmless where a title was already correctly paired with
+ * its own `dark:text-*`, since both rules agree on the same light color.
+ *
+ * Scope is deliberately narrow to avoid recoloring text that is SUPPOSED to stay dark:
+ *  - h1: reserved in this codebase for the one title that sits directly on the page
+ *    canvas (confirmed: no modal/dialog in the app uses <h1>), never a label inside a
+ *    still-light hardcoded card.
+ *  - Elsewhere, only text sitting on a background that is ITSELF theme-aware (bg-card,
+ *    bg-popover, bg-background, bg-muted, bg-accent — all real, dark-flipping tokens as of
+ *    this pass) is corrected. Text inside a hardcoded `bg-white` card is left alone on
+ *    purpose: that card also stays light in dark mode, so dark text on it is still correct.
+ *  Residual risk: a `bg-white` sub-card nested inside one of those dark-aware containers
+ *  would also get its text recolored by the descendant rule below, which would be wrong for
+ *  that one case. Flag it if you hit it and it can be scoped further.
+ */
+.dark h1:is(.text-\[\#10141a\], .text-\[\#10141A\], .text-slate-900, .text-gray-900) {
+  color: #f4f6f7;
+}
+
+.dark :is(.bg-card, .bg-popover, .bg-background, .bg-muted, .bg-accent):is(.text-\[\#10141a\], .text-\[\#10141A\], .text-slate-900, .text-gray-900),
+.dark :is(.bg-card, .bg-popover, .bg-background, .bg-muted, .bg-accent) :is(.text-\[\#10141a\], .text-\[\#10141A\], .text-slate-900, .text-gray-900) {
+  color: #f4f6f7;
+}
+
+/*
+ * Second recurring case: ~70 page files use a translucent "frosted glass" card —
+ * bg-white/NN or bg-[rgba(255,255,255,0.NN)] plus backdrop-blur — written assuming the
+ * page behind it is always light. It still composites correctly in dark mode (that's
+ * the nature of translucency), but at low opacity it composites DARK: e.g. white at 30%
+ * over this dark page background (#10141a) renders at roughly rgb(89,89,89) — a charcoal
+ * card, not a light one — so hardcoded dark-ink text inside it is dark-on-dark again.
+ *
+ * Scoped to the specific opacities where the math actually crosses into poor contrast
+ * for #10141a text (computed against this page's dark background, WCAG AA is 4.5:1):
+ *   30% -> ~89/255,  ~1.8:1      40% -> ~113/255, ~2.1:1      50% -> ~137/255, ~2.6:1
+ *   55% -> ~149/255, ~2.9:1      60% -> ~160/255, ~3.3:1
+ * all fail AA against dark ink. 70%+ (~184/255, ~4.0:1 and climbing) is borderline-to-fine
+ * and is left alone deliberately: forcing light text there would risk the opposite bug
+ * (light-on-near-white) for cards that are actually still fine as-is. `~=` matches a
+ * whole class token, not a substring, so it won't also catch e.g. a hypothetical
+ * `bg-white/300` spacing-style class.
+ */
+.dark :is(
+    [class~="bg-white/20"], [class~="bg-white/25"], [class~="bg-white/30"],
+    [class~="bg-white/40"], [class~="bg-white/50"], [class~="bg-white/55"], [class~="bg-white/60"],
+    [class~="bg-[rgba(255,255,255,0.3)]"], [class~="bg-[rgba(255,255,255,0.4)]"],
+    [class~="bg-[rgba(255,255,255,0.45)]"], [class~="bg-[rgba(255,255,255,0.5)]"],
+    [class~="bg-[rgba(255,255,255,0.55)]"]
+  ):is(.text-\[\#10141a\], .text-\[\#10141A\], .text-slate-900, .text-gray-900),
+.dark :is(
+    [class~="bg-white/20"], [class~="bg-white/25"], [class~="bg-white/30"],
+    [class~="bg-white/40"], [class~="bg-white/50"], [class~="bg-white/55"], [class~="bg-white/60"],
+    [class~="bg-[rgba(255,255,255,0.3)]"], [class~="bg-[rgba(255,255,255,0.4)]"],
+    [class~="bg-[rgba(255,255,255,0.45)]"], [class~="bg-[rgba(255,255,255,0.5)]"],
+    [class~="bg-[rgba(255,255,255,0.55)]"]
+  ) :is(.text-\[\#10141a\], .text-\[\#10141A\], .text-slate-900, .text-gray-900) {
+  color: #f4f6f7;
 }

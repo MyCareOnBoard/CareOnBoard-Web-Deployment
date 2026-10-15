@@ -6,6 +6,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import {Routes} from "@/routes/constants";
 import DashboardHeader from "@/components/DashboardHeader";
 import DashboardSidebar, {NavItem} from "@/components/DashboardSidebar";
+import {ScrollToTopButton} from "@/components/ScrollToTopButton";
 import {useSidebarCollapsed} from "@/hooks/useSidebarCollapsed";
 import {UserType} from "@/utils/auth/types/user.types";
 import {
@@ -150,7 +151,7 @@ export default function SuperAdminLayout({children}: { children?: ReactNode }) {
 
   return (
     <ProtectedRoute>
-    <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
+    <div className="relative min-h-screen bg-[#eef4f5] dark:bg-[#10141a] overflow-x-hidden">
       <DashboardHeader
         userName={user?.fullName}
         userImage={user?.profilePicture || user?.photo || user?.photoURL || user?.profile?.profilePicture}
@@ -162,6 +163,7 @@ export default function SuperAdminLayout({children}: { children?: ReactNode }) {
       <main className={`ml-0 ${collapsed ? "md:ml-[112px]" : "md:ml-[240px]"} pt-[130px] pb-10 transition-[margin] duration-200`}>
         <div className="px-8">{canRenderCurrentRoute ? (children ?? <Outlet/>) : null}</div>
       </main>
+      <ScrollToTopButton />
     </div>
     </ProtectedRoute>
   );

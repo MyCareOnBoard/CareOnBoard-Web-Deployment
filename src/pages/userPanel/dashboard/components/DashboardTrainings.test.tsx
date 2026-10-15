@@ -12,6 +12,9 @@ const props = {loading: false, error: false, hasMore: false, assessmentIncomplet
     onLoadMore: vi.fn(), onRetry: vi.fn(),
     renderTraining: (item: TrainingData) => <input aria-label={`Certificate for ${item.name}`}/>,
 };
+// Radix's TabsTrigger activates on mousedown (and keyboard/focus), not click — see
+// @radix-ui/react-tabs's TabsTrigger implementation.
+const activateTab = (tab: HTMLElement) => fireEvent.mouseDown(tab, {button: 0});
 
 describe('focused dashboard trainings', () => {
     it('shows a layout skeleton initially and keeps rows during refresh', () => {
@@ -23,49 +26,65 @@ describe('focused dashboard trainings', () => {
         expect(screen.getByRole('status', {name: 'Loading trainings'})).toBeInTheDocument();
     });
 
-    it('puts urgent courses first and preserves drafts across grouped rows', () => {
+    it('puts urgent courses first and preserves drafts across grouped tabs', () => {
         render(<DashboardTrainings {...props} trainings={[
             training('Later', {dueDateKey: '2026-12-28'}),
             training('Urgent', {deadlineState: 'overdue', dueDateKey: '2026-09-01'}),
             training('Pending', {reviewState: 'awaiting_review'}),
             training('Accepted', {deadlineState: 'satisfied'}),
         ]}/>);
-        const rows = screen.getAllByRole('button').filter(button => button.hasAttribute('aria-expanded'));
-        expect(rows[0]).toHaveTextContent('Urgent');
+        // The most urgent group ("Overdue", containing "Urgent") is the active tab by default.
+        const tabs = screen.getAllByRole('tab');
+        expect(tabs[0]).toHaveTextContent('Overdue');
+        expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
+
+        const urgentRow = screen.getByRole('button', {name: /Urgent,/});
         const draft = screen.getByRole('textbox', {name: 'Certificate for Urgent'});
         fireEvent.change(draft, {target: {value: 'draft.pdf'}});
-        fireEvent.click(rows[0]);
+        fireEvent.click(urgentRow);
         expect(draft).not.toBeVisible();
-        fireEvent.click(rows[0]);
+        fireEvent.click(urgentRow);
         expect(draft).toHaveValue('draft.pdf');
-        expect(screen.getByRole('heading', {name: 'In review1'})).toBeVisible();
-        fireEvent.click(screen.getByRole('heading', {name: 'In review1'}).closest('summary')!);
+
+        // Switch to the "In review" tab and expand Pending there.
+        const reviewTab = screen.getByRole('tab', {name: /In review/});
+        activateTab(reviewTab);
+        expect(reviewTab).toHaveAttribute('aria-selected', 'true');
         fireEvent.click(screen.getByRole('button', {name: /Pending, Upcoming/}));
         expect(screen.getByRole('button', {name: /Pending, Upcoming/})).toBeVisible();
-        expect(draft).not.toBeVisible();
-        fireEvent.click(rows[0]);
+
+        // Back on "Overdue", re-expanding Urgent restores the draft — it was hidden, not lost.
+        const overdueTab = screen.getByRole('tab', {name: /Overdue/});
+        activateTab(overdueTab);
+        expect(overdueTab).toHaveAttribute('aria-selected', 'true');
+        fireEvent.click(urgentRow);
         expect(draft).toBeVisible();
         expect(draft).toHaveValue('draft.pdf');
-        expect(screen.getByRole('heading', {name: 'Approved1'})).toBeVisible();
-        fireEvent.click(screen.getByRole('heading', {name: 'Approved1'}).closest('summary')!);
+
+        const approvedTab = screen.getByRole('tab', {name: /Approved/});
+        activateTab(approvedTab);
+        expect(approvedTab).toHaveAttribute('aria-selected', 'true');
         expect(screen.getByRole('button', {name: /Accepted, Accepted/})).toBeVisible();
     });
 
-    it('collapses status groups without losing an upload draft', () => {
+    it('preserves an upload draft when switching away from its group tab', () => {
         render(<DashboardTrainings {...props} trainings={[training('Urgent', {deadlineState: 'overdue'}), training('Later')]}/>);
         const draft = screen.getByRole('textbox', {name: 'Certificate for Urgent'});
         fireEvent.change(draft, {target: {value: 'certificate.pdf'}});
-        const summary = screen.getByRole('heading', {name: 'Overdue1'}).closest('summary')!;
-        const group = summary.closest('details')!;
-        expect(group.open).toBe(true);
-        fireEvent.click(summary);
-        expect(group.open).toBe(false);
+        const tabs = screen.getAllByRole('tab');
+        expect(tabs[0]).toHaveTextContent('Overdue');
+        expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
+
+        const upcomingTab = screen.getByRole('tab', {name: /Upcoming/});
+        activateTab(upcomingTab);
+        expect(upcomingTab).toHaveAttribute('aria-selected', 'true');
         expect(draft).not.toBeVisible();
-        expect(summary).toBeVisible();
-        fireEvent.click(summary);
-        expect(group.open).toBe(true);
-        expect(draft).toHaveValue('certificate.pdf');
+
+        const overdueTab = screen.getByRole('tab', {name: /Overdue/});
+        activateTab(overdueTab);
+        expect(overdueTab).toHaveAttribute('aria-selected', 'true');
         expect(draft).toBeVisible();
+        expect(draft).toHaveValue('certificate.pdf');
     });
 
     it('does not confuse expired accepted evidence or an unassessed policy with approval', () => {

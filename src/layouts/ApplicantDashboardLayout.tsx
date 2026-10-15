@@ -16,6 +16,7 @@ import CogIcon from "@/assets/icons/cog.svg?react";
 import HomeIcon from "@/assets/icons/home.svg?react";
 import { Megaphone } from "lucide-react"
 import AnnouncementBanner from "@/components/AnnouncementBanner";
+import {ScrollToTopButton} from "@/components/ScrollToTopButton";
 import {roleLabel} from "@/lib/roleLabel";
 
 
@@ -58,7 +59,7 @@ export default function ApplicantDashboardLayout({children}: { children?: ReactN
 
   return (
     <ProtectedRoute>
-    <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
+    <div className="relative min-h-screen bg-[#eef4f5] dark:bg-[#10141a] overflow-x-hidden">
       <DashboardHeader
         userName={user?.fullName}
         userImage={(user as any)?.profileImage || user?.photoURL}
@@ -71,6 +72,7 @@ export default function ApplicantDashboardLayout({children}: { children?: ReactN
         <AnnouncementBanner endpoint="/applicantPortal/announcements" viewAllPath={Routes.applicant.announcements} />
         <div className="px-8">{children ?? <Outlet/>}</div>
       </main>
+      <ScrollToTopButton />
     </div>
     </ProtectedRoute>
   );

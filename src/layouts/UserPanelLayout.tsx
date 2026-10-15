@@ -21,6 +21,7 @@ import SupportIcon from "@/assets/icons/support.svg?react";
 import CommunityInclusionIcon from "@/assets/icons/community-inclusion.svg?react";
 import { Sun, Megaphone } from "lucide-react"
 import AnnouncementBanner from "@/components/AnnouncementBanner";
+import { ScrollToTopButton } from "@/components/ScrollToTopButton";
 import { roleLabel } from "@/lib/roleLabel";
 
 const navItems: NavItem[] = [
@@ -75,7 +76,7 @@ export default function UserPanelDashboardLayout({ children }: { children?: Reac
 
   return (
     <ProtectedRoute>
-    {user?.userType !== UserType.EMPLOYEE ? <Navigate to={Routes.auth.login} replace /> : <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
+    {user?.userType !== UserType.EMPLOYEE ? <Navigate to={Routes.auth.login} replace /> : <div className="relative min-h-screen bg-[#eef4f5] dark:bg-[#10141a] overflow-x-hidden">
       <DashboardHeader
         userName={user?.fullName}
         userImage={(user as any)?.profileImage || user?.photoURL}
@@ -88,6 +89,7 @@ export default function UserPanelDashboardLayout({ children }: { children?: Reac
         <AnnouncementBanner endpoint="/employeePortal/announcements" viewAllPath={Routes.userPanel.announcements} />
         <div className="px-8">{excludedPage ? <Navigate to={Routes.userPanel.dashboard} replace /> : isSc && location.pathname === Routes.userPanel.shiftManagement ? <Navigate to={Routes.userPanel.manualShiftManagement} replace /> : children ?? <Outlet />}</div>
       </main>
+      <ScrollToTopButton />
     </div>}
     </ProtectedRoute>
   );
