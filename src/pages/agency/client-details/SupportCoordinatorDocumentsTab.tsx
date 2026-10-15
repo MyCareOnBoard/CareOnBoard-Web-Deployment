@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DatePickerField } from "@/pages/shared/client-management/components/forms/formControls";
 import { updateClient, uploadClientDocument, type Client, type ClientDocument } from "@/lib/api/clients";
+import { SC_DOCUMENT_CATEGORIES as documentTypes, SC_DOCUMENT_SOURCES as sources } from "@/lib/sc-client-documents";
 import { clientDocumentUrl } from "@/pages/shared/client-details/components/ClientDocumentChecklist";
 import { useToast } from "@/hooks/use-toast";
 
@@ -34,8 +35,6 @@ const sampleDocuments: Document[] = [
   { name: "Participant Enrollment Agreement", type: "Enrollment", version: "1", status: "Current", effective: "11/01/2003", expires: "—", source: "CAREONBOARD" },
 ];
 
-const documentTypes = ["ISP", "Assessment", "Tier", "SDR", "PA", "Enrollment", "Other"];
-const sources = ["DDD / iRecord", "DDD / State record", "iRecord", "CareOnBoard", "Other"];
 const dateFormat = { month: "2-digit", day: "2-digit", year: "numeric" } as const;
 const allowedTypes = ["application/pdf", "image/png", "image/jpeg"];
 const maxFileSize = 10 * 1024 * 1024;

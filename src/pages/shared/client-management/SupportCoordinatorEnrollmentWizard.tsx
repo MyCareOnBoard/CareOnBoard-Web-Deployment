@@ -1,11 +1,10 @@
 import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { format, parseISO } from "date-fns";
-import { Eye, EyeOff, Info, Loader2, Upload, UploadCloud, X } from "lucide-react";
+import { Eye, EyeOff, Info, Loader2, UploadCloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog, ConfirmDialogContent } from "@/components/ui/confirm-dialog";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { FileUpload } from "@/components/ui/file-upload";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,7 +14,11 @@ import { normalizeSignaturePayload } from "@/pages/agency/billing/claims/utils/c
 import { AddressAutocompleteField } from "./components/forms/AddressAutocompleteField";
 import { DatePickerField, SignatureField } from "./components/forms/formControls";
 import type { AddressDetails } from "@/hooks/useGooglePlacesAutocomplete";
-import { createClient, getAgencyClientById, updateClient, uploadClientDocument, type Client, type ClientOutcome, type CreateClientRequest, type ScEnrollment } from "@/lib/api/clients";
+import { createClient, getAgencyClientById, updateClient, uploadClientDocument, type Client, type ClientDocument, type ClientOutcome, type CreateClientRequest, type ScEnrollment } from "@/lib/api/clients";
+import ScImportFromFilePanel, { type ScImportReview } from "./components/ScImportFromFilePanel";
+import ScEnrollmentDocumentsStep from "./components/ScEnrollmentDocumentsStep";
+import { mergeScExtractionBatch } from "./utils/mergeScExtractionBatch";
+import { createScPendingDocument, mergeScPendingDocuments, scPendingDocumentsError, toScClientDocument, type ScPendingDocument } from "./utils/scEnrollmentDocuments";
 import { useToast } from "@/hooks/use-toast";
 import { useAssignmentReviewScope } from "@/hooks/useAssignmentReview";
 import { getAgencyById } from "@/lib/api/agencies";
@@ -25,8 +28,8 @@ import { useAuth } from "@/utils/auth";
 import { Routes } from "@/routes/constants";
 import "./support-coordinator-enrollment.css";
 
-const steps = ["Program selection", "Participant information", "Guardian / representative", "Medicaid & eligibility", "Monitoring settings", "Enrollment agreement", "Review & sign"] as const;
-const monitoringStep = 4, agreementStep = 5, reviewStep = 6;
+const steps = ["Program selection", "Participant information", "Guardian / representative", "Medicaid & eligibility", "Documents", "Monitoring settings", "Enrollment agreement", "Review & sign"] as const;
+const documentsStep = 4, monitoringStep = 5, agreementStep = 6, reviewStep = 7;
 const DigitalSignatureModal = lazy(() => import("@/pages/applicant/application/components/DigitalSignature"));
 const eligibilityItems = [
   { key: "medicaid", title: "Active NJ Medicaid (NJ FamilyCare) eligibility confirmed", detail: "Required for all DDD waiver programs." },
@@ -104,11 +107,8 @@ function EnrollmentWizard({ isEditMode }: { isEditMode: boolean }) {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState("");
   const [photoError, setPhotoError] = useState("");
-  const [document, setDocument] = useState<File | null>(null);
+  const [pendingDocuments, setPendingDocuments] = useState<ScPendingDocument[]>([]);
   const [pendingOutcomeId, setPendingOutcomeId] = useState<string | null>(null);
-  const [pendingDocument, setPendingDocument] = useState<File | null>(null);
-  const [uploadOpen, setUploadOpen] = useState(false);
-  const [uploadError, setUploadError] = useState("");
   const [showSSN, setShowSSN] = useState(false);
   const [signatureTarget, setSignatureTarget] = useState<"participant" | "guardian" | "family" | null>(null);
   const [step, setStep] = useState(0);
@@ -220,16 +220,45 @@ function EnrollmentWizard({ isEditMode }: { isEditMode: boolean }) {
     setError("");
   };
   const goTo = (target: number) => { setStep(target); setVisited(previous => previous.map((value, index) => value || index === target)); setError(""); window.scrollTo({ top: 0, behavior: "smooth" }); };
-  const selectDocument = (files: FileList | null) => {
-    const file = files?.[0];
-    if (!file) return;
-    if (!["application/pdf", "image/png", "image/jpeg"].includes(file.type) || file.size > 10 * 1024 * 1024) {
-      setPendingDocument(null);
-      setUploadError("Choose a PDF, PNG, or JPG file under 10 MB.");
-      return;
+  const applyImport = (extraction: ScImportReview, { overwrite, files }: { overwrite: boolean; files: Record<string, File> }) => {
+    if (saving || createResultUnknown || savedRecord.current) return;
+    const merged = mergeScExtractionBatch(form, extraction.documents, { overwrite });
+    if (merged.blocked) return;
+    if (merged.changedFields.length) {
+      setForm({ ...merged.form, agreementSummaryReviewed: false, participantSignature: "", guardianSignature: "", familySignature: "", participantSignatureImage: "", guardianSignatureImage: "", familySignatureImage: "", signedOn: "" });
+      setCompleted(previous => previous.map((done, index) => index === monitoringStep ? done : false));
     }
-    setPendingDocument(file);
-    setUploadError("");
+    setPendingDocuments(previous => mergeScPendingDocuments(previous, Object.entries(files).map(([key, file]) => ({ file, documentType: extraction.documents.find(document => document.fileKey === key)?.extraction.detectedDocumentType ?? "other" }))));
+    setCompleted(previous => previous.map((done, index) => index === documentsStep ? false : done));
+    setError("");
+  };
+  const documentDraftChanged = () => {
+    setCompleted(previous => previous.map((done, index) => index === documentsStep ? false : done));
+    setError("");
+  };
+  const addDocumentFiles = (files: File[]) => {
+    if (saving || createResultUnknown || savedRecord.current) return;
+    const validFiles: File[] = [];
+    const errors: string[] = [];
+    for (const file of files) {
+      const invalid = scPendingDocumentsError([createScPendingDocument(file)]);
+      if (invalid) errors.push(invalid); else validFiles.push(file);
+    }
+    if (validFiles.length) {
+      setPendingDocuments(previous => mergeScPendingDocuments(previous, validFiles.map(file => ({ file }))));
+      documentDraftChanged();
+    }
+    setError([...new Set(errors)].join(" "));
+  };
+  const changeDocument = (file: File, patch: Partial<Omit<ScPendingDocument, "file" | "documentType">>) => {
+    if (saving || createResultUnknown || savedRecord.current) return;
+    setPendingDocuments(previous => previous.map(document => document.file === file ? { ...document, ...patch } : document));
+    documentDraftChanged();
+  };
+  const removeDocument = (file: File) => {
+    if (saving || createResultUnknown || savedRecord.current) return;
+    setPendingDocuments(previous => previous.filter(document => document.file !== file));
+    documentDraftChanged();
   };
   const selectPhoto = (files: FileList | null) => {
     const file = files?.[0];
@@ -324,6 +353,10 @@ function EnrollmentWizard({ isEditMode }: { isEditMode: boolean }) {
     }
     if (step === 1 && !form.dob) { setError("Select the participant's date of birth to continue."); return; }
     if (step === 1 && (!form.address || !form.city || !form.state || !form.zip)) { setError("Select an address from the suggestions to fill the address fields."); return; }
+    if (step === documentsStep || step === reviewStep) {
+      const invalid = scPendingDocumentsError(pendingDocuments);
+      if (invalid) { goTo(documentsStep); setError(invalid); return; }
+    }
     if (step === monitoringStep || step === reviewStep) {
       const invalid = monitoringError();
       if (invalid) { goTo(monitoringStep); setError(invalid); return; }
@@ -403,13 +436,23 @@ function EnrollmentWizard({ isEditMode }: { isEditMode: boolean }) {
         }
       }
       if (!alive.current) return;
-      if (document) {
-        try {
-          const uploaded = await uploadClientDocument(savedId, "consent-and-releases", document);
+      if (pendingDocuments.length) {
+        const documents: ClientDocument[] = [...(existingClient?.documents || [])];
+        let uploadedCount = 0;
+        for (const item of pendingDocuments) {
+          try {
+            const uploaded = await uploadClientDocument(savedId, "support-coordination", item.file);
+            if (!alive.current) return;
+            documents.push(toScClientDocument(item, uploaded));
+            uploadedCount++;
+          } catch {
+            attachmentErrors.push(item.file.name);
+          }
           if (!alive.current) return;
-          await updateClient(savedId, { documents: [...(existingClient?.documents || []), { key: "consents", title: "Enrollment document", fileName: uploaded.fileName, url: uploaded.url }] });
-        } catch {
-          attachmentErrors.push("document");
+        }
+        if (uploadedCount) {
+          try { await updateClient(savedId, { documents }); }
+          catch { attachmentErrors.push("document links"); }
         }
       }
       if (!alive.current) return;
@@ -468,6 +511,7 @@ function EnrollmentWizard({ isEditMode }: { isEditMode: boolean }) {
         "Enter the participant's identity, contact details, and program IDs.",
         "Add a guardian or family member who will take part in the enrollment agreement.",
         "Review Medicaid and waiver readiness before services begin.",
+        "Add client documents now or continue without them. Unknown dates can stay blank.",
         "Choose contact schedules, document review intervals, and reminders. Monitoring can stay off.",
         "Review the program terms with the participant before signing.",
         "Confirm the participant's signature and submit the enrollment.",
@@ -544,6 +588,8 @@ function EnrollmentWizard({ isEditMode }: { isEditMode: boolean }) {
           <span><strong>{item.title}</strong>{"detail" in item && <small>{item.detail}</small>}</span><Checkbox checked={form.eligibility[item.key]} onChange={event => update("eligibility", { ...form.eligibility, [item.key]: event.target.checked })} aria-label={item.title} />
         </div>)}<div className="sc-enrollment-note"><strong>Readiness check</strong><span>Unchecked items will remain outstanding. The client record will be saved as pending until eligibility and documents are confirmed.</span></div></div>}
 
+        {step === documentsStep && <ScEnrollmentDocumentsStep documents={pendingDocuments} existingDocuments={existingClient?.documents ?? []} disabled={saving || createResultUnknown || Boolean(savedClientId)} onAddFiles={addDocumentFiles} onChangeDocument={changeDocument} onRemoveDocument={removeDocument} renderAutofillAction={document => <ScImportFromFilePanel form={form} onApply={applyImport} pendingDocuments={[]} onRemoveDocument={removeDocument} initialFiles={{ "pending-file": document.file }} triggerLabel="Use for autofill" triggerAriaLabel={`Use ${document.file.name} for autofill`} triggerClassName="h-10 rounded-lg border-[#dce6e7] px-3 text-[12px] text-[#087b80] hover:bg-[#eaf6f6]" disabled={saving || createResultUnknown || Boolean(savedClientId)} />} />}
+
         {step === monitoringStep && <div className="sc-enrollment-card space-y-5 text-sm">
           {monitoringLoading ? <div role="status" aria-label="Loading monitoring settings" className="space-y-6">
             <span className="sr-only">Loading monitoring settings…</span>
@@ -591,6 +637,7 @@ function EnrollmentWizard({ isEditMode }: { isEditMode: boolean }) {
 
         {step === reviewStep && <div className="sc-enrollment-card sc-enrollment-sections">
           <div className="sc-enrollment-agreement-header">Enter each full name and capture each signature to acknowledge this enrollment overview.</div>
+          <section aria-label="Documents summary"><div className="mb-3 flex flex-wrap items-center justify-between gap-3"><h2 className="!mb-0">Documents</h2><Button type="button" variant="ghost" className="h-9 px-3 text-[12px] text-[#087b80]" onClick={() => goTo(documentsStep)}>Review documents</Button></div><p className="text-sm text-[#617579]">{pendingDocuments.length ? `${pendingDocuments.length} document${pendingDocuments.length === 1 ? "" : "s"} ready to attach` : "No new documents added. Documents can be added later from the client record."}{Boolean(existingClient?.documents?.length) && ` ${existingClient!.documents!.length} existing document${existingClient!.documents!.length === 1 ? "" : "s"} retained.`}</p>{pendingDocuments.length > 0 && <ul className="mt-3 divide-y divide-[#e6edee]">{pendingDocuments.map((document, index) => <li key={index} className="flex flex-wrap items-start justify-between gap-2 py-2 text-sm"><span className="min-w-0 flex-1 break-words">{document.title || document.file.name}</span><span className="rounded-md bg-[#eaf6f6] px-2 py-0.5 text-[11px] text-[#087b80]">{document.category}</span></li>)}</ul>}</section>
           <section><h2>Monitoring settings</h2>{monitoringLoading || monitoringLoadError ? <p>Monitoring settings need to be loaded before saving.</p> : <MonitoringSummary draft={monitoringDraft} />}</section>
           <section><h2>Participant signature</h2><div className="sc-enrollment-grid two"><Field label="Full name" required><Input value={form.participantSignature} onChange={event => update("participantSignature", event.target.value)} placeholder="Type participant's full name" required /></Field><div className={`sc-enrollment-signature-field ${!form.participantSignatureImage && error.includes("required signature") ? "invalid" : ""}`}><span>Signature *</span><SignatureField value={form.participantSignatureImage} onOpen={() => setSignatureTarget("participant")} onClear={() => update("participantSignatureImage", "")} ariaLabel="Participant signature" required /></div></div></section>
           {form.hasGuardian && <section><h2>Guardian signature</h2><div className="sc-enrollment-grid two"><Field label="Full name" required><Input value={form.guardianSignature} onChange={event => update("guardianSignature", event.target.value)} placeholder="Type guardian's full name" required /></Field><div className={`sc-enrollment-signature-field ${!form.guardianSignatureImage && error.includes("required signature") ? "invalid" : ""}`}><span>Signature *</span><SignatureField value={form.guardianSignatureImage} onOpen={() => setSignatureTarget("guardian")} onClear={() => update("guardianSignatureImage", "")} ariaLabel="Guardian signature" required /></div></div></section>}
@@ -609,7 +656,7 @@ function EnrollmentWizard({ isEditMode }: { isEditMode: boolean }) {
         {createResultUnknown && <Button type="button" variant="outline" onClick={() => navigate(Routes.agency.clients)}>Back to clients</Button>}
         <div className="sc-enrollment-actions">
           {!savedClientId && (step === 0 ? <Button type="button" variant="outline" onClick={() => navigate(isEditMode && clientId ? Routes.agency.clientDetails.replace(":clientId", clientId) : Routes.agency.clients)} disabled={saving}>Cancel</Button> : <Button type="button" variant="outline" className="sc-enrollment-back" onClick={() => goTo(step - 1)} disabled={saving || createResultUnknown}>Go back</Button>)}
-          {step === 0 && <Button type="button" variant="outline" className="sc-enrollment-upload" disabled={saving} onClick={() => { setPendingDocument(document); setUploadError(""); setUploadOpen(true); }}><Upload size={16} />{document ? document.name : "Upload document"}</Button>}
+          {step === 0 && <ScImportFromFilePanel form={form} onApply={applyImport} pendingDocuments={pendingDocuments} onRemoveDocument={removeDocument} disabled={saving || createResultUnknown || Boolean(savedClientId)} />}
           <Button type="submit" disabled={saving || createResultUnknown || Boolean(policyConflict) || (step === 0 && !form.program)}>{saving ? <><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />Saving…</> : savedClientId ? "Retry monitoring settings" : step === reviewStep ? isEditMode ? "Save changes" : "Submit enrollment" : step === 0 ? isEditMode ? "Continue editing" : "Get started" : "Continue"}</Button>
         </div>
       </form>
@@ -623,16 +670,6 @@ function EnrollmentWizard({ isEditMode }: { isEditMode: boolean }) {
         onConfirm={() => { if (pendingOutcomeId) update("outcomes", form.outcomes.filter(outcome => outcome.id !== pendingOutcomeId)); setPendingOutcomeId(null); }}
       />
     </ConfirmDialog>
-    <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
-      <DialogContent showCloseButton={false} className="sc-enrollment-modal w-[min(92vw,440px)] p-5 sm:p-6">
-        <div className="flex items-start justify-between gap-3"><DialogTitle className="text-[18px] leading-tight">Download & fill forms</DialogTitle><Button type="button" variant="ghost" size="icon" className="sc-enrollment-modal-close h-7 w-7 rounded-full bg-[#f2f4f6]" aria-label="Close upload dialog" onClick={() => setUploadOpen(false)}><X size={16} /></Button></div>
-        <div className="mt-4"><p className="text-[12px] font-semibold text-[#10141a]">Upload your filled forms here</p><DialogDescription className="mt-1 text-[12px] leading-normal">Choose a completed enrollment document. It will be attached when you submit enrollment.</DialogDescription></div>
-        <FileUpload label={pendingDocument ? pendingDocument.name : "Click to upload or drag and drop"} icon={<span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#59636e]"><UploadCloud size={19} /></span>} accept=".pdf,.png,.jpg,.jpeg" onFilesSelected={selectDocument} className="sc-enrollment-dropzone mt-4 min-h-[112px] max-w-none border-0 bg-[#f7f7f8]" />
-        <p className="mt-1 text-center text-[11px] text-[#777f89]">PDF, PNG, or JPG · Max 10 MB</p>
-        {uploadError && <p role="alert" className="mt-2 text-[12px] text-[#b42318]">{uploadError}</p>}
-        <div className="mt-5 flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" className="h-9 rounded-lg px-3 text-[12px]" disabled>Download document here</Button><Button type="button" className="h-9 rounded-lg px-3 text-[12px]" disabled={!pendingDocument} onClick={() => { setDocument(pendingDocument); setUploadOpen(false); }}>Upload document</Button></div>
-      </DialogContent>
-    </Dialog>
     {signatureTarget && <Suspense fallback={null}><DigitalSignatureModal isOpen setIsOpen={open => { if (!open) setSignatureTarget(null); }} useCase="sc-enrollment" skipBackend onSave={saveSignature} disclaimer="This captures an acknowledgement of the enrollment overview. The formal participant enrollment agreement must be completed separately." /></Suspense>}
   </div>;
 }

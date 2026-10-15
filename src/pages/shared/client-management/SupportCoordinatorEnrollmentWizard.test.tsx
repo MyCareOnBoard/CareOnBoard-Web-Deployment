@@ -32,7 +32,7 @@ test("SC wizard enables the first step after selecting a program and counts comp
   expect(screen.getByRole("button", { name: "Get started" })).toBeEnabled();
   fireEvent.click(screen.getByRole("button", { name: "Get started" }));
   expect(screen.getByRole("heading", { name: "Participant information" })).toBeInTheDocument();
-  expect(screen.getByText("1 of 7 steps completed")).toBeInTheDocument();
+  expect(screen.getByText("1 of 8 steps completed")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /Program selection.*Completed/ })).toBeInTheDocument();
   const ssn = screen.getByLabelText("SSN");
   expect(ssn).toHaveAttribute("type", "password");
@@ -50,13 +50,13 @@ test("SC wizard enables the first step after selecting a program and counts comp
   expect(screen.getByRole("textbox", { name: "Street address" })).toHaveValue("");
 });
 
-test("step one opens the document modal with download disabled", async () => {
+test("step one opens the document importer without changing the wizard layout", async () => {
   render(<MemoryRouter><SupportCoordinatorEnrollmentWizard /></MemoryRouter>);
   await act(async () => {});
   fireEvent.click(screen.getByRole("button", { name: "Upload document" }));
-  expect(screen.getByRole("dialog", { name: "Download & fill forms" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Download document here" })).toBeDisabled();
-  expect(screen.getByRole("button", { name: "Upload document" })).toBeDisabled();
+  expect(screen.getByRole("dialog", { name: "Import client document" })).toBeInTheDocument();
+  expect(screen.getByText(/completed NJCAT/)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
 });
 
 test("participant photo upload previews the selected image and rejects other files", async () => {

@@ -11,15 +11,18 @@ import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import ImportFileRow, { formatFileSize } from "./ImportFileRow";
 
 const LOW_CONFIDENCE = 0.85;
 
 const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
+const MAX_BATCH_FILES = 5;
 const ALLOWED_IMPORT_MIME = new Set([
   "application/pdf",
   "application/x-pdf",
@@ -30,12 +33,6 @@ const ALLOWED_IMPORT_MIME = new Set([
 ]);
 
 const DEFAULT_ACCEPT = ".pdf,application/pdf,image/jpeg,image/png,image/webp";
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 function validateImportFile(file: File): string | null {
   if (file.size > MAX_IMPORT_BYTES) {
@@ -50,7 +47,10 @@ function validateImportFile(file: File): string | null {
 
 export type ImportSlot = { id: string; label: string; accept?: string };
 
-export type DocumentImportDialogProps = {
+type ImportExtractionResult = Pick<ClientExtractionResponse, "warnings" | "fieldConfidences"> & { detectedDocumentType: string };
+type ImportContext = { overwrite: boolean; files: Record<string, File> };
+
+export type DocumentImportDialogProps<T extends ImportExtractionResult = ClientExtractionResponse> = {
   triggerLabel: string;
   triggerLabelMobile?: string;
   triggerAriaLabel?: string;
@@ -61,23 +61,30 @@ export type DocumentImportDialogProps = {
   slots: ImportSlot[];
   /** Single-slot panels extract immediately on pick; multi-slot use an explicit Extract button. */
   autoExtractOnPick?: boolean;
-  onExtract: (files: Record<string, File>) => Promise<ClientExtractionResponse>;
+  multipleFiles?: boolean;
+  onExtract: (files: Record<string, File>, options: { signal: AbortSignal; onProgress?: (message: string) => void }) => Promise<T>;
   onApply: (
-    extraction: ClientExtractionResponse,
-    ctx: { overwrite: boolean; files: Record<string, File> },
+    extraction: T,
+    ctx: ImportContext,
   ) => void;
   /** Returns client-side warnings to show in the review step (typically merge localWarnings). */
   computePreviewWarnings?: (
-    extraction: ClientExtractionResponse,
-    ctx: { overwrite: boolean; files: Record<string, File> },
+    extraction: T,
+    ctx: ImportContext,
   ) => string[];
+  renderReview?: (extraction: T, ctx: ImportContext) => React.ReactNode;
+  canApply?: (extraction: T, ctx: ImportContext) => boolean;
+  onAttachOnly?: (files: Record<string, File>) => void;
+  documentTypeLabels?: Record<string, string>;
+  triggerClassName?: string;
+  disabled?: boolean;
   /** Files already attached to the target doc slots, shown pre-filled each time the modal opens. */
   initialFiles?: Record<string, File>;
 };
 
 type ModalStep = "pick" | "review";
 
-export default function DocumentImportDialog({
+export default function DocumentImportDialog<T extends ImportExtractionResult = ClientExtractionResponse>({
   triggerLabel,
   triggerLabelMobile,
   triggerAriaLabel,
@@ -85,34 +92,54 @@ export default function DocumentImportDialog({
   pickDescription,
   slots,
   autoExtractOnPick = false,
+  multipleFiles = false,
   onExtract,
   onApply,
   computePreviewWarnings,
+  renderReview,
+  canApply,
+  onAttachOnly,
+  documentTypeLabels,
+  triggerClassName,
+  disabled = false,
   initialFiles,
-}: DocumentImportDialogProps) {
+}: DocumentImportDialogProps<T>) {
   const backToPickRef = useRef<HTMLButtonElement>(null);
+  const activeRequest = useRef<AbortController | null>(null);
+  const nextFileKey = useRef(0);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [modalStep, setModalStep] = useState<ModalStep>("pick");
   const [busy, setBusy] = useState(false);
+  const [progressMessage, setProgressMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [canAttachOriginal, setCanAttachOriginal] = useState(false);
   const [overwrite, setOverwrite] = useState(false);
-  const [extraction, setExtraction] = useState<ClientExtractionResponse | null>(null);
+  const [extraction, setExtraction] = useState<T | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<Record<string, File>>({});
   const [previewLocalWarnings, setPreviewLocalWarnings] = useState<string[]>([]);
   const [dragActiveSlot, setDragActiveSlot] = useState<string | null>(null);
 
-  const isSingleAutoExtract = autoExtractOnPick && slots.length === 1;
+  const isSingleAutoExtract = !multipleFiles && autoExtractOnPick && slots.length === 1;
+  const showSingleDropzone = slots.length === 1 && (isSingleAutoExtract || multipleFiles);
   const selectedEntries = Object.entries(selectedFiles);
   const selectedCount = selectedEntries.length;
 
   const resetPickState = useCallback(() => {
+    activeRequest.current?.abort();
+    activeRequest.current = null;
     setError(null);
+    setCanAttachOriginal(false);
     setExtraction(null);
     setSelectedFiles({});
     setBusy(false);
+    setProgressMessage("");
+    nextFileKey.current = 0;
     setDragActiveSlot(null);
     setPreviewLocalWarnings([]);
+    setOverwrite(false);
   }, []);
+
+  useEffect(() => () => { activeRequest.current?.abort(); }, []);
 
   // Pre-fill the slots with any files already attached to the target doc slots
   // so the pick step shows what's there instead of empty pickers.
@@ -153,6 +180,8 @@ export default function DocumentImportDialog({
 
   const runExtract = useCallback(
     async (files: Record<string, File>) => {
+      if (activeRequest.current || disabled) return;
+      setCanAttachOriginal(false);
       for (const file of Object.values(files)) {
         const validation = validateImportFile(file);
         if (validation) {
@@ -166,24 +195,52 @@ export default function DocumentImportDialog({
       }
 
       setBusy(true);
+      setProgressMessage("");
       setError(null);
       setSelectedFiles(files);
+      const controller = new AbortController();
+      activeRequest.current = controller;
       try {
-        const res = await onExtract(files);
+        const res = await onExtract(files, { signal: controller.signal, onProgress: message => {
+          if (!controller.signal.aborted && activeRequest.current === controller) setProgressMessage(message);
+        } });
+        if (controller.signal.aborted || activeRequest.current !== controller) return;
         setExtraction(res);
         setModalStep("review");
       } catch (e: unknown) {
+        if (controller.signal.aborted || activeRequest.current !== controller) return;
         const msg = formatGeminiExtractError(e);
         setError(msg || "We couldn't read that file. Try again or pick a different document.");
+        setCanAttachOriginal(true);
       } finally {
-        setBusy(false);
+        if (activeRequest.current === controller) {
+          activeRequest.current = null;
+          setBusy(false);
+        }
       }
     },
-    [onExtract],
+    [onExtract, disabled],
   );
+
+  const pickMultipleFiles = (files: File[]) => {
+    if (busy || disabled) return;
+    setCanAttachOriginal(false);
+    const next = { ...selectedFiles };
+    const errors: string[] = [];
+    for (const file of files) {
+      const validation = validateImportFile(file);
+      if (validation) { errors.push(`${file.name}: ${validation}`); continue; }
+      if (Object.values(next).some(existing => existing.name === file.name && existing.size === file.size && existing.lastModified === file.lastModified)) continue;
+      if (Object.keys(next).length >= MAX_BATCH_FILES) { errors.push(`Select up to ${MAX_BATCH_FILES} files per import.`); break; }
+      next[`file-${nextFileKey.current++}`] = file;
+    }
+    setSelectedFiles(next);
+    setError(errors.length ? [...new Set(errors)].join(" ") : null);
+  };
 
   const pickSlotFile = useCallback(
     (slotId: string, file: File) => {
+      setCanAttachOriginal(false);
       const validation = validateImportFile(file);
       if (validation) {
         setError(validation);
@@ -200,6 +257,7 @@ export default function DocumentImportDialog({
   );
 
   const removeSlotFile = useCallback((slotId: string) => {
+    setCanAttachOriginal(false);
     setSelectedFiles((prev) => {
       const next = { ...prev };
       delete next[slotId];
@@ -214,10 +272,10 @@ export default function DocumentImportDialog({
   }, [resetPickState, seedInitialFiles]);
 
   const applyImport = useCallback(() => {
-    if (!extraction || selectedCount === 0) return;
+    if (disabled || !extraction || selectedCount === 0 || (canApply && !canApply(extraction, { overwrite, files: selectedFiles }))) return;
     onApply(extraction, { overwrite, files: selectedFiles });
     closeImportModal();
-  }, [extraction, selectedCount, onApply, overwrite, selectedFiles, closeImportModal]);
+  }, [disabled, extraction, selectedCount, canApply, onApply, overwrite, selectedFiles, closeImportModal]);
 
   const reviewLines =
     extraction?.warnings
@@ -233,19 +291,19 @@ export default function DocumentImportDialog({
   const detectedLabel =
     selectedCount > 1
       ? selectedEntries
-          .map(([id]) => slots.find((s) => s.id === id)?.label ?? id)
+          .map(([id, file]) => multipleFiles ? file.name : slots.find((s) => s.id === id)?.label ?? id)
           .join(", ")
       : extraction?.detectedDocumentType != null
-        ? DOCUMENT_TYPE_LABELS[extraction.detectedDocumentType] ?? extraction.detectedDocumentType
+        ? documentTypeLabels?.[extraction.detectedDocumentType] ?? (DOCUMENT_TYPE_LABELS as Record<string, string>)[extraction.detectedDocumentType] ?? extraction.detectedDocumentType
         : "—";
   const detectedLabelPrefix = selectedCount > 1 ? "Documents processed" : "Detected document";
 
-  const busyMessage =
+  const busyMessage = progressMessage || (
     selectedCount > 0
       ? `Reading ${selectedEntries
           .map(([, f]) => `${f.name} (${formatFileSize(f.size)})`)
           .join(" and ")}. This usually takes 30-60 seconds.`
-      : "Reading document. This usually takes 30-60 seconds.";
+      : "Reading document. This usually takes 30-60 seconds.");
 
   const showDialogReadyHint =
     Boolean(extraction) && reviewLines.length === 0 && lowConfidence.length === 0;
@@ -262,7 +320,8 @@ export default function DocumentImportDialog({
         type="button"
         variant="outline"
         aria-label={triggerAriaLabel ?? triggerLabel}
-        className="h-11 min-h-[44px] shrink-0 rounded-[12px] border-[#00b4b8] px-3 text-[#00b4b8] hover:bg-[#e6fafa] sm:px-4"
+        className={triggerClassName ?? "h-11 min-h-[44px] shrink-0 rounded-[12px] border-[#00b4b8] px-3 text-[#00b4b8] hover:bg-[#e6fafa] sm:px-4"}
+        disabled={disabled}
         onClick={openImportModal}
       >
         <FileUp className="mr-2 h-4 w-4 shrink-0" aria-hidden="true" />
@@ -271,17 +330,17 @@ export default function DocumentImportDialog({
       </Button>
 
       <Dialog open={importModalOpen} onOpenChange={handleMainDialogOpenChange}>
-        <DialogContent className="flex max-h-[90vh] w-[min(96vw,560px)] flex-col gap-4 p-5">
+        <DialogContent className={cn("flex max-h-[90vh] w-[min(96vw,560px)] flex-col gap-4 p-5", multipleFiles && modalStep === "review" && "w-[min(96vw,720px)]")}>
           <DialogHeader className="shrink-0 space-y-1 text-left">
             <DialogTitle className="text-lg font-semibold text-[#10141a]">
               {modalStep === "pick" && dialogTitlePick}
               {modalStep === "review" && "Review extracted information"}
             </DialogTitle>
-            {modalStep === "pick" && pickDescription ? pickDescription : null}
+            <DialogDescription className="sr-only">Choose a document and review its extracted information before applying it to the form.</DialogDescription>
+            {modalStep === "pick" && !multipleFiles && pickDescription ? pickDescription : null}
             {modalStep === "review" ? (
               <p className="text-[12px] text-muted-foreground">
-                {detectedLabelPrefix}:{" "}
-                <span className="font-medium text-foreground">{detectedLabel}</span>
+                {multipleFiles ? `${selectedCount} ${selectedCount === 1 ? "document" : "documents"} selected · Review values by source below` : <>{detectedLabelPrefix}: <span className="font-medium text-foreground">{detectedLabel}</span></>}
               </p>
             ) : null}
           </DialogHeader>
@@ -291,18 +350,20 @@ export default function DocumentImportDialog({
             {modalStep === "review" ? "Step 2 of 2: Review extracted information" : ""}
           </span>
 
-          <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+          <div key={multipleFiles ? modalStep : undefined} className="min-h-0 flex-1 overflow-y-auto pr-1">
             {modalStep === "pick" ? (
               <div className="space-y-4">
-                {isSingleAutoExtract ? (
+                {multipleFiles ? pickDescription : null}
+                {showSingleDropzone ? (
                   <SingleDropzone
                     accept={singleSlot.accept ?? DEFAULT_ACCEPT}
                     busy={busy}
+                    multiple={multipleFiles}
                     dragActive={dragActiveSlot === singleSlot.id}
                     onDragStateChange={(active) =>
                       setDragActiveSlot(active ? singleSlot.id : null)
                     }
-                    onPick={(file) => pickSlotFile(singleSlot.id, file)}
+                    onPick={files => multipleFiles ? pickMultipleFiles(files) : files[0] && pickSlotFile(singleSlot.id, files[0])}
                   />
                 ) : (
                   <div className="space-y-3">
@@ -328,6 +389,17 @@ export default function DocumentImportDialog({
                   </div>
                 )}
 
+                {multipleFiles && selectedCount > 0 ? <section className="space-y-2.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-[13px] font-semibold text-[#10141a]">Selected documents</h3>
+                    <span className="rounded-full bg-[#edf3f4] px-2.5 py-1 text-[11px] font-semibold tabular-nums text-[#4b6266]">{selectedCount} / {MAX_BATCH_FILES} files</span>
+                  </div>
+                  <ul aria-label="Selected documents" className="space-y-2">
+                    {selectedEntries.map(([key, file]) => <ImportFileRow key={key} file={file} disabled={busy} removeLabel={`Remove selected ${file.name}`} onRemove={() => removeSlotFile(key)} />)}
+                  </ul>
+                  <p className="text-[12px] leading-5 text-[#617579]">Files are read in this order. Review suggestions before applying.</p>
+                </section> : null}
+
                 <div className="space-y-1" aria-live="polite">
                   {busy ? (
                     <p className="text-[12px] text-[#5c6368]">{busyMessage}</p>
@@ -337,13 +409,16 @@ export default function DocumentImportDialog({
                       {error}
                     </p>
                   ) : null}
+                  {error && canAttachOriginal && !busy && selectedCount > 0 && onAttachOnly ? (
+                    <div className="space-y-2"><p className="break-all text-[12px]">{selectedEntries.map(([, file]) => file.name).join(", ")} can attach without changing form values.</p><Button type="button" variant="outline" disabled={disabled} onClick={() => { onAttachOnly(selectedFiles); closeImportModal(); }}>Attach without autofill</Button></div>
+                  ) : null}
                 </div>
               </div>
             ) : null}
 
             {modalStep === "review" ? (
               <div className="space-y-4">
-                <div className="flex items-center gap-2">
+                <div className={cn("flex items-center gap-2", multipleFiles && "rounded-xl border border-[#dce6e7] bg-[#f6f9f9] px-4 py-3")}>
                   <Checkbox
                     id="import-overwrite-modal"
                     checked={overwrite}
@@ -352,8 +427,11 @@ export default function DocumentImportDialog({
                     }
                     label="Replace fields I've already filled in"
                     labelClassName="text-[13px] font-normal"
+                    className={multipleFiles ? "mr-2 shrink-0 rounded-md" : undefined}
                   />
                 </div>
+
+                {extraction && renderReview ? renderReview(extraction, { overwrite, files: selectedFiles }) : null}
 
                 {previewLocalWarnings.length > 0 ? (
                   <div>
@@ -405,7 +483,7 @@ export default function DocumentImportDialog({
                   </div>
                 ) : null}
 
-                {showDialogReadyHint ? (
+                {showDialogReadyHint && !renderReview ? (
                   <p className="rounded-md border border-emerald-200 bg-emerald-50/90 px-3 py-2 text-[12px] text-emerald-950">
                     Looks good. Review the form in the wizard, then click Apply to form.
                   </p>
@@ -464,7 +542,7 @@ export default function DocumentImportDialog({
                   type="button"
                   className="h-11 min-h-[44px] shrink-0 bg-[#00b4b8] hover:bg-[#009ea1]"
                   onClick={applyImport}
-                  disabled={!extraction || selectedCount === 0}
+                  disabled={disabled || !extraction || selectedCount === 0 || Boolean(canApply && !canApply(extraction, { overwrite, files: selectedFiles }))}
                 >
                   Apply to form
                 </Button>
@@ -480,15 +558,17 @@ export default function DocumentImportDialog({
 function SingleDropzone({
   accept,
   busy,
+  multiple = false,
   dragActive,
   onDragStateChange,
   onPick,
 }: {
   accept: string;
   busy: boolean;
+  multiple?: boolean;
   dragActive: boolean;
   onDragStateChange: (active: boolean) => void;
-  onPick: (file: File) => void;
+  onPick: (files: File[]) => void;
 }) {
   return (
     <div
@@ -520,8 +600,8 @@ function SingleDropzone({
         e.stopPropagation();
         onDragStateChange(false);
         if (busy) return;
-        const file = e.dataTransfer.files?.[0];
-        if (file) onPick(file);
+        const files = Array.from(e.dataTransfer.files || []);
+        if (files.length) onPick(multiple ? files : files.slice(0, 1));
       }}
       role="presentation"
     >
@@ -546,12 +626,13 @@ function SingleDropzone({
           id="client-import-file-modal"
           type="file"
           accept={accept}
+          multiple={multiple}
           className="sr-only"
           disabled={busy}
           onChange={(ev) => {
-            const file = ev.target.files?.[0];
+            const files = Array.from(ev.target.files || []);
             ev.target.value = "";
-            if (file) onPick(file);
+            if (files.length) onPick(multiple ? files : files.slice(0, 1));
           }}
         />
         <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#00b4b8]/12 text-[#00b4b8] ring-1 ring-[#00b4b8]/15">
@@ -562,7 +643,7 @@ function SingleDropzone({
           )}
         </div>
         <div className="max-w-[18rem] space-y-1">
-          <p className="text-[16px] font-semibold text-[#10141a]">Drop file here</p>
+          <p className="text-[16px] font-semibold text-[#10141a]">{multiple ? "Drop files here" : "Drop file here"}</p>
           <p className="text-[13px] leading-snug text-[#5c6368]">
             or browse from your device{busy ? ". Reading your document…" : ""}
           </p>
@@ -577,12 +658,12 @@ function SingleDropzone({
             </span>
           ))}
           <span className="rounded-full border border-[#e6e7e8] bg-white/80 px-2.5 py-1 text-[11px] font-medium text-[#5c6368] shadow-[0_1px_2px_rgba(16,20,26,0.04)]">
-            Max 10 MB
+            {multiple ? "Up to 5 files · 10 MB each" : "Max 10 MB"}
           </span>
         </div>
         {!busy ? (
           <span className="inline-flex items-center rounded-[60px] border border-[#00b4b8] bg-white px-5 py-2.5 text-sm font-semibold text-[#00b4b8] shadow-sm ring-offset-background transition-colors group-hover:bg-[#e6fafa]">
-            Choose file
+            {multiple ? "Choose files" : "Choose file"}
           </span>
         ) : null}
       </label>
