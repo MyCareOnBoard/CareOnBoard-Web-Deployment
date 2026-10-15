@@ -112,19 +112,22 @@ function parseAddressComponents(
 }
 
 async function fetchPlaceDetails(
-    placeId: string
+    placeId: string,
+    signal?: AbortSignal
 ): Promise<AddressDetails | null> {
-    if (!window.google?.maps?.importLibrary) {
+    if (signal?.aborted || !window.google?.maps?.importLibrary) {
         return null;
     }
 
     try {
         const { Place } = await window.google.maps.importLibrary("places");
+        if (signal?.aborted) return null;
         const place = new Place({ id: placeId });
         
         await place.fetchFields({
             fields: ["addressComponents", "formattedAddress", "location"],
         });
+        if (signal?.aborted) return null;
 
         const components = place.addressComponents ?? [];
         const parsed = parseAddressComponents(components);
@@ -144,36 +147,60 @@ async function fetchPlaceDetails(
 }
 
 /** Fetches autocomplete for the query, then fills details from the top result (same Places flow as manual search). */
-export async function fetchFirstPlaceDetailsForQuery(query: string): Promise<AddressDetails | null> {
+export async function fetchFirstPlaceDetailsForQuery(
+    query: string,
+    { signal }: { signal?: AbortSignal } = {}
+): Promise<AddressDetails | null> {
+    if (signal?.aborted) throw new DOMException("Address matching cancelled.", "AbortError");
     const q = query.trim();
     if (q.length < 3) return null;
 
-    const tryAutocompleteAndDetails = async (): Promise<AddressDetails | null> => {
-        if (!window.google?.maps?.importLibrary) return null;
-        try {
-            const { AutocompleteSuggestion } = await window.google.maps.importLibrary("places");
-            const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
-                input: q,
-            });
-            const firstId = suggestions[0]?.placePrediction?.placeId;
-            if (!firstId) return null;
-            return fetchPlaceDetails(firstId);
-        } catch {
-            return null;
-        }
-    };
-
-    let result = await tryAutocompleteAndDetails();
-    if (result) return result;
-
-    const deadline = Date.now() + 12000;
-    while (Date.now() < deadline) {
-        await new Promise((r) => setTimeout(r, 300));
-        result = await tryAutocompleteAndDetails();
-        if (result) return result;
-    }
-
-    return null;
+    return new Promise((resolve, reject) => {
+        const lookupController = new AbortController();
+        let settled = false;
+        let readinessTimer: ReturnType<typeof setTimeout> | undefined;
+        let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+        const cleanup = () => {
+            clearTimeout(readinessTimer);
+            clearTimeout(deadlineTimer);
+            lookupController.abort();
+            signal?.removeEventListener("abort", onAbort);
+        };
+        const onAbort = () => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            reject(new DOMException("Address matching cancelled.", "AbortError"));
+        };
+        const complete = (details: AddressDetails | null) => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            resolve(details);
+        };
+        const lookup = async () => {
+            if (settled || signal?.aborted) return;
+            const maps = window.google?.maps;
+            if (!maps?.importLibrary) {
+                readinessTimer = setTimeout(lookup, 300);
+                return;
+            }
+            try {
+                const { AutocompleteSuggestion } = await maps.importLibrary("places");
+                if (settled || signal?.aborted) return;
+                const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({ input: q });
+                if (settled || signal?.aborted) return;
+                const firstId = suggestions[0]?.placePrediction?.placeId;
+                const details = firstId ? await fetchPlaceDetails(firstId, lookupController.signal) : null;
+                if (!settled && !signal?.aborted) complete(details);
+            } catch {
+                if (!settled && !signal?.aborted) complete(null);
+            }
+        };
+        signal?.addEventListener("abort", onAbort, { once: true });
+        deadlineTimer = setTimeout(() => complete(null), 12000);
+        void lookup();
+    });
 }
 
 export function useGooglePlacesAutocomplete(): UseGooglePlacesAutocompleteReturn {

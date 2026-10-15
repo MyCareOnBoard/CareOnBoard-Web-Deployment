@@ -72,7 +72,7 @@ export type DocumentImportDialogProps<T extends ImportExtractionResult = ClientE
     extraction: T,
     ctx: ImportContext,
   ) => string[];
-  renderReview?: (extraction: T, ctx: ImportContext) => React.ReactNode;
+  renderReview?: (extraction: T, ctx: ImportContext, updateExtraction: (extraction: T) => void) => React.ReactNode;
   canApply?: (extraction: T, ctx: ImportContext) => boolean;
   onAttachOnly?: (files: Record<string, File>) => void;
   documentTypeLabels?: Record<string, string>;
@@ -431,7 +431,7 @@ export default function DocumentImportDialog<T extends ImportExtractionResult = 
                   />
                 </div>
 
-                {extraction && renderReview ? renderReview(extraction, { overwrite, files: selectedFiles }) : null}
+                {extraction && renderReview ? renderReview(extraction, { overwrite, files: selectedFiles }, setExtraction) : null}
 
                 {previewLocalWarnings.length > 0 ? (
                   <div>

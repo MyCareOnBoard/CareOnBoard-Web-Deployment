@@ -8,7 +8,10 @@ import { formatGeminiExtractError } from "../utils/formatGeminiExtractError";
 import DocumentImportDialog from "./extraction/DocumentImportDialog";
 import ImportFileRow from "./extraction/ImportFileRow";
 import { cn } from "@/lib/utils";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useGoogleMapsDemand } from "@/providers/GoogleMapsProvider";
 import type { ScPendingDocument } from "../utils/scEnrollmentDocuments";
+import { matchScExtractedAddress } from "../utils/matchScExtractedAddress";
 
 export type ScImportReview = ScClientExtractionBatch & {
   detectedDocumentType: "batch";
@@ -35,6 +38,7 @@ export default function ScImportFromFilePanel<T extends ScImportFormValues>({ fo
   triggerAriaLabel?: string;
   triggerClassName?: string;
 }) {
+  useGoogleMapsDemand();
   const pendingCount = pendingDocuments.length;
   const onExtract = useCallback(async (files: Record<string, File>, { signal, onProgress }: { signal: AbortSignal; onProgress?: (message: string) => void }): Promise<ScImportReview> => {
     const documents: ScClientExtractionBatch["documents"] = [], failures: ScImportReview["failures"] = [];
@@ -45,7 +49,10 @@ export default function ScImportFromFilePanel<T extends ScImportFormValues>({ fo
       try {
         const result = await extractScClientOnboardingViaApi(file, { signal });
         if (signal.aborted) throw new DOMException("Import cancelled", "AbortError");
-        documents.push({ fileKey, extraction: { ...result, sourceDocument: { ...result.sourceDocument, fileName: file.name }, fieldConfidences: result.fieldConfidences.map(({ valuePreview: _value, sourceSnippet: _snippet, label: _label, ...field }) => field) } });
+        if (result.draft.address) onProgress?.(`Matching the primary address in ${file.name} with Google Places…`);
+        const addressMatch = await matchScExtractedAddress(result.draft, { signal });
+        if (signal.aborted) throw new DOMException("Import cancelled", "AbortError");
+        documents.push({ fileKey, addressMatch, extraction: { ...result, sourceDocument: { ...result.sourceDocument, fileName: file.name }, fieldConfidences: result.fieldConfidences.map(({ valuePreview: _value, sourceSnippet: _snippet, label: _label, ...field }) => field) } });
       } catch (error) {
         if (signal.aborted) throw error;
         const reference = (error as { response?: { data?: { extractionJobId?: unknown } } } | null)?.response?.data?.extractionJobId;
@@ -60,14 +67,14 @@ export default function ScImportFromFilePanel<T extends ScImportFormValues>({ fo
   const canApply = useCallback((extraction: ScImportReview, { overwrite }: { overwrite: boolean }) => !mergeScExtractionBatch(form, extraction.documents, { overwrite }).blocked, [form]);
 
   return <DocumentImportDialog<ScImportReview>
-    triggerLabel={triggerLabel ?? (pendingCount ? `Upload document (${pendingCount})` : "Upload document")}
-    triggerLabelMobile={triggerLabel ?? (pendingCount ? `Upload document (${pendingCount})` : "Upload document")}
-    triggerAriaLabel={triggerAriaLabel ?? "Upload document"}
+    triggerLabel={triggerLabel ?? (pendingCount ? `Autofill from documents (${pendingCount})` : "Autofill from documents")}
+    triggerLabelMobile={triggerLabel ?? (pendingCount ? `Autofill from documents (${pendingCount})` : "Autofill from documents")}
+    triggerAriaLabel={triggerAriaLabel ?? "Autofill from documents"}
     triggerClassName={triggerClassName ?? "sc-enrollment-upload"}
     initialFiles={initialFiles}
     dialogTitlePick="Import client document"
     pickDescription={<div className="w-full space-y-4 text-[13px] leading-relaxed text-[#617579]">
-      <p>Select up to 5 different files, including an ISP, completed NJCAT, DDD application, enrollment agreement, or supporting document. Review suggestions before applying them. Originals attach when you save the client.</p>
+      <p>Select up to 5 different files, including an ISP, completed NJCAT, DDD application, enrollment agreement, or supporting document. Review extracted information and Google Places address matches before applying them. Originals attach when you save the client.</p>
       {pendingCount > 0 && <section aria-label="Documents ready to attach" className="space-y-2.5">
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-[13px] font-semibold text-[#10141a]">Documents ready to attach</h3>
@@ -88,7 +95,7 @@ export default function ScImportFromFilePanel<T extends ScImportFormValues>({ fo
     canApply={canApply}
     disabled={disabled}
     documentTypeLabels={documentTypeLabels}
-    renderReview={(extraction, { overwrite, files }) => {
+    renderReview={(extraction, { overwrite, files }, updateExtraction) => {
       const preview = mergeScExtractionBatch(form, extraction.documents, { overwrite });
       return <section aria-label="Extracted field values" className="space-y-5 text-[13px]">
         <div className="flex items-start gap-3 px-1">
@@ -108,9 +115,20 @@ export default function ScImportFromFilePanel<T extends ScImportFormValues>({ fo
             </div>
             <span className="shrink-0 rounded-full border border-[#dce6e7] bg-white px-2 py-1 text-[11px] font-medium tabular-nums text-[#4b6266]">{document.rows.length} fields</span>
           </header>
+          {document.addressMatch && <section aria-label={`Primary address match for ${files[document.fileKey]?.name}`} className="space-y-3 border-b border-[#e6edee] bg-[#f6fbfb] px-4 py-4">
+            <h4 className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold text-[#087b80]">Primary address match</span><span className="text-[12px] font-normal text-[#5f6368]" style={{ fontFamily: "Roboto, Arial, sans-serif" }}>Google Maps</span></h4>
+            <dl className="space-y-3 text-[12px] leading-5">
+              <div><dt className="text-[#617579]">From document</dt><dd className="font-medium text-[#10141a] [overflow-wrap:anywhere]">{document.addressMatch.query || "Incomplete address"}</dd></div>
+              {document.addressMatch.suggestion && <div><dt className="text-[#617579]">Google match</dt><dd className="font-medium text-[#10141a] [overflow-wrap:anywhere]">{document.addressMatch.suggestion.address}, {document.addressMatch.suggestion.city}, {document.addressMatch.suggestion.state} {document.addressMatch.suggestion.zip}</dd></div>}
+            </dl>
+            {document.addressMatch.suggestion ? <>
+              <Checkbox label="Use this Google address match" labelClassName="text-[12px] font-medium" className="mr-2 shrink-0 rounded-md" checked={document.addressMatch.selected} disabled={disabled} onChange={event => updateExtraction({ ...extraction, documents: extraction.documents.map(item => item.fileKey === document.fileKey && item.addressMatch ? { ...item, addressMatch: { ...item.addressMatch, selected: event.target.checked } } : item) })} />
+              <p className="text-[12px] leading-5 text-[#617579]">Confirm the street, apartment or unit, and ZIP code before applying. Existing address fields stay unless replacement is selected.</p>
+            </> : <p role="status" className="text-[12px] leading-5 text-[#617579]">Google Places could not match a complete US address. The address will stay unchanged. You can apply other fields and select the address in Participant information.</p>}
+          </section>}
           {document.rows.length ? <dl className="divide-y divide-[#e6edee]">
           {document.rows.map(row => {
-            const evidence = document.extraction.fieldConfidences.find(field => field.path.replace(/^draft\./, "") === row.key);
+            const evidence = document.addressMatch && ["address", "city", "county", "state", "zip", "addressSearch"].includes(row.key) ? undefined : document.extraction.fieldConfidences.find(field => field.path.replace(/^draft\./, "") === row.key);
             let action = row.currentValue === row.extractedValue ? "Already matches" : "Keep current / earlier value";
             if (row.willApply) action = row.key === "outcomes" ? "Will add" : !row.extractedValue ? "Will clear" : row.currentValue ? "Will replace" : "Will fill";
             return <div key={row.key} className="grid gap-2 px-4 py-3.5 sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.4fr)] sm:gap-5">
@@ -128,7 +146,7 @@ export default function ScImportFromFilePanel<T extends ScImportFormValues>({ fo
               </dd>
             </div>;
           })}
-        </dl> : <p className="px-4 py-4 text-[13px] leading-5 text-[#617579]">No supported onboarding fields were found. This original will attach without autofill.</p>}
+        </dl> : <p className="px-4 py-4 text-[13px] leading-5 text-[#617579]">{document.addressMatch ? "No onboarding fields are selected for autofill. This original will still attach when you save." : "No supported onboarding fields were found. This original will attach without autofill."}</p>}
         </section>)}
         {extraction.failures.length > 0 && <section aria-label="Files without extraction" className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950">
           <h3 className="flex items-center gap-2 font-semibold"><AlertTriangle className="size-4 shrink-0" aria-hidden="true" />Files that need attention</h3>

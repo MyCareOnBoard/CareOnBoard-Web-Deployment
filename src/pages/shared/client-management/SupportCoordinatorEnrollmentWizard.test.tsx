@@ -50,10 +50,12 @@ test("SC wizard enables the first step after selecting a program and counts comp
   expect(screen.getByRole("textbox", { name: "Street address" })).toHaveValue("");
 });
 
-test("step one opens the document importer without changing the wizard layout", async () => {
-  render(<MemoryRouter><SupportCoordinatorEnrollmentWizard /></MemoryRouter>);
+test("step one opens document autofill from the heading", async () => {
+  const { container } = render(<MemoryRouter><SupportCoordinatorEnrollmentWizard /></MemoryRouter>);
   await act(async () => {});
-  fireEvent.click(screen.getByRole("button", { name: "Upload document" }));
+  const trigger = screen.getByRole("button", { name: "Autofill from documents" });
+  expect(container.querySelector(".sc-enrollment-heading")).toContainElement(trigger);
+  fireEvent.click(trigger);
   expect(screen.getByRole("dialog", { name: "Import client document" })).toBeInTheDocument();
   expect(screen.getByText(/completed NJCAT/)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();

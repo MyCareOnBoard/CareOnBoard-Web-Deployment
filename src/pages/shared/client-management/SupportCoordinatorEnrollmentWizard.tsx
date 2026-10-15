@@ -515,7 +515,10 @@ function EnrollmentWizard({ isEditMode }: { isEditMode: boolean }) {
         "Choose contact schedules, document review intervals, and reminders. Monitoring can stay off.",
         "Review the program terms with the participant before signing.",
         "Confirm the participant's signature and submit the enrollment.",
-      ][step]}</p></div><span className="sc-enrollment-step-number">Step {step + 1} of {steps.length}</span></div>
+      ][step]}</p></div><div className="sc-enrollment-heading-actions">
+        {step === 0 && <ScImportFromFilePanel form={form} onApply={applyImport} pendingDocuments={pendingDocuments} onRemoveDocument={removeDocument} disabled={saving || createResultUnknown || Boolean(savedClientId)} />}
+        <span className="sc-enrollment-step-number">Step {step + 1} of {steps.length}</span>
+      </div></div>
       <form onSubmit={submit} className="sc-enrollment-form">
         <fieldset className="contents" disabled={saving || createResultUnknown || Boolean(savedClientId) && step !== monitoringStep}>
         {step === 0 && <div className="sc-enrollment-card">
@@ -655,8 +658,7 @@ function EnrollmentWizard({ isEditMode }: { isEditMode: boolean }) {
         {error && <p role="alert" className="sc-enrollment-error">{error}</p>}
         {createResultUnknown && <Button type="button" variant="outline" onClick={() => navigate(Routes.agency.clients)}>Back to clients</Button>}
         <div className="sc-enrollment-actions">
-          {!savedClientId && (step === 0 ? <Button type="button" variant="outline" onClick={() => navigate(isEditMode && clientId ? Routes.agency.clientDetails.replace(":clientId", clientId) : Routes.agency.clients)} disabled={saving}>Cancel</Button> : <Button type="button" variant="outline" className="sc-enrollment-back" onClick={() => goTo(step - 1)} disabled={saving || createResultUnknown}>Go back</Button>)}
-          {step === 0 && <ScImportFromFilePanel form={form} onApply={applyImport} pendingDocuments={pendingDocuments} onRemoveDocument={removeDocument} disabled={saving || createResultUnknown || Boolean(savedClientId)} />}
+          {!savedClientId && (step === 0 ? <Button type="button" variant="outline" className="sc-enrollment-back" onClick={() => navigate(isEditMode && clientId ? Routes.agency.clientDetails.replace(":clientId", clientId) : Routes.agency.clients)} disabled={saving}>Cancel</Button> : <Button type="button" variant="outline" className="sc-enrollment-back" onClick={() => goTo(step - 1)} disabled={saving || createResultUnknown}>Go back</Button>)}
           <Button type="submit" disabled={saving || createResultUnknown || Boolean(policyConflict) || (step === 0 && !form.program)}>{saving ? <><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />Saving…</> : savedClientId ? "Retry monitoring settings" : step === reviewStep ? isEditMode ? "Save changes" : "Submit enrollment" : step === 0 ? isEditMode ? "Continue editing" : "Get started" : "Continue"}</Button>
         </div>
       </form>

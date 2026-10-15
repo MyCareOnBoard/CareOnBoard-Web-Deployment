@@ -142,7 +142,7 @@ test("imported originals appear with detected categories and unknown dates, and 
   vi.mocked(getAgencyClientById).mockResolvedValue({ ...client, phone: "" });
   await editDocuments();
   fireEvent.click(screen.getByRole("button", { name: /^Program selection/ }));
-  fireEvent.click(screen.getByRole("button", { name: "Upload document" }));
+  fireEvent.click(screen.getByRole("button", { name: "Autofill from documents" }));
   const picker = screen.getByRole("dialog", { name: "Import client document" });
   const file = new File(["%PDF-1.7"], "NJCAT.pdf", { type: "application/pdf" });
   fireEvent.change(picker.querySelector('input[type="file"]')!, { target: { files: [file] } });

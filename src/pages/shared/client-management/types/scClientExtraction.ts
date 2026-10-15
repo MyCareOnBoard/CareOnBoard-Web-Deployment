@@ -20,6 +20,15 @@ export interface ScClientExtractionResponse {
 export interface ScClientExtractionDocument {
   fileKey: string;
   extraction: ScClientExtractionResponse;
+  addressMatch?: ScAddressMatch;
+}
+
+export type ScAddressSuggestion = Record<"address" | "city" | "county" | "state" | "zip", string>;
+
+export interface ScAddressMatch {
+  query: string;
+  suggestion: ScAddressSuggestion | null;
+  selected: boolean;
 }
 
 export interface ScClientExtractionBatch {

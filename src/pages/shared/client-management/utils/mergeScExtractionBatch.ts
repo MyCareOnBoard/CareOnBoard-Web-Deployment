@@ -1,5 +1,6 @@
 import type { ScClientExtractionDocument, ScClientExtractionDraft, ScImportStringField } from "../types/scClientExtraction";
 import { mergeScExtractionDraft, type ScImportFormValues, type ScImportPreviewRow } from "./mergeScExtractionDraft";
+import { isCompleteScAddressSuggestion } from "./matchScExtractedAddress";
 
 const identityFields = ["firstName", "middleName", "lastName", "dddId", "medicaidId", "dob", "ssn"] as const;
 const addressFields = ["address", "city", "county", "state", "zip"] as const;
@@ -31,10 +32,18 @@ export function mergeScExtractionBatch<T extends ScImportFormValues>(
     if (typeof empty[key] === "string") (empty as Record<string, unknown>)[key] = "";
   }
   const prepared = documents.map(document => {
-    const review = mergeScExtractionDraft(form, document.extraction, options);
-    const normalized = mergeScExtractionDraft(empty, document.extraction, { overwrite: true });
+    let extraction = document.extraction;
+    if (document.addressMatch) {
+      const draft = { ...extraction.draft };
+      for (const key of addressFields) delete draft[key];
+      const { selected, suggestion } = document.addressMatch;
+      if (selected && isCompleteScAddressSuggestion(suggestion)) Object.assign(draft, suggestion);
+      extraction = { ...extraction, draft };
+    }
+    const review = mergeScExtractionDraft(form, extraction, options);
+    const normalized = mergeScExtractionDraft(empty, extraction, { overwrite: true });
     const fileName = document.extraction.sourceDocument.fileName || document.fileKey;
-    return { ...document, fileName, review, normalized, warnings: review.warnings.map(warning => `${fileName}: ${warning}`) };
+    return { ...document, extraction, fileName, review, normalized, warnings: review.warnings.map(warning => `${fileName}: ${warning}`) };
   });
 
   let blocked = prepared.some(document => document.review.blocked);
@@ -110,6 +119,7 @@ export function mergeScExtractionBatch<T extends ScImportFormValues>(
   const previews = prepared.map((document, index): ScImportBatchPreview => ({
     fileKey: document.fileKey,
     extraction: document.extraction,
+    addressMatch: document.addressMatch,
     rows: document.review.rows.map(row => ({
       ...row,
       willApply: !blocked && changedFields.includes(row.key) && (row.key === "outcomes"

@@ -4,6 +4,7 @@ import { beforeEach, expect, test, vi } from "vitest";
 import { getAgencyById } from "@/lib/api/agencies";
 import { getAgencyClientById, updateClient, uploadClientDocument, type Client } from "@/lib/api/clients";
 import { extractScClientOnboardingViaApi } from "@/lib/api/sc-client-extraction";
+import { fetchFirstPlaceDetailsForQuery, type AddressDetails } from "@/hooks/useGooglePlacesAutocomplete";
 import { SupportCoordinatorEnrollmentWizard } from "./SupportCoordinatorEnrollmentWizard";
 import type { ScClientExtractionResponse } from "./types/scClientExtraction";
 
@@ -14,12 +15,14 @@ vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: vi.fn() }) }));
 vi.mock("@/lib/api/agencies", () => ({ getAgencyById: vi.fn() }));
 vi.mock("@/lib/api/clients", () => ({ createClient: vi.fn(), getAgencyClientById: vi.fn(), updateClient: vi.fn(), uploadClientDocument: vi.fn() }));
 vi.mock("@/lib/api/sc-client-extraction", () => ({ extractScClientOnboardingViaApi: vi.fn() }));
+vi.mock("@/hooks/useGooglePlacesAutocomplete", () => ({ fetchFirstPlaceDetailsForQuery: vi.fn() }));
 vi.mock("@/lib/api/sc-monitoring-policy", async original => ({ ...await original<typeof import("@/lib/api/sc-monitoring-policy")>(), getScMonitoringPolicy: vi.fn().mockResolvedValue({ policy: { version: 1, revision: 0, enabled: false, intervalDays: null, qualifyingMethods: [], requireDirectContact: false, remindersEnabled: false, documentReviewsEnabled: false, documentRemindersEnabled: false, documentReviewIntervals: { ISP: null, Assessment: null, Tier: null, SDR: null, PA: null, Enrollment: null, Other: null } }, timezone: "UTC", canEditPolicy: true }), saveScMonitoringPolicy: vi.fn() }));
 vi.mock("./components/forms/AddressAutocompleteField", () => ({ AddressAutocompleteField: ({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) => <input aria-label={label} value={value} onChange={event => onChange(event.target.value)} /> }));
 
 const njcat: ScClientExtractionResponse = {
-  detectedDocumentType: "njcat", draft: { firstName: "Alex", lastName: "Example", dob: "1990-01-02", dddId: "DDD123", address: "42 Service Lane", city: "Newark", county: "Essex", state: "NJ", zip: "07102", gender: "male", guardianName: "Sam Example", guardianRelationship: "guardian", phone: "2015550123" }, fieldConfidences: [], warnings: [], sourceDocument: { fileName: "NJCAT.pdf", mimeType: "application/pdf", fileSize: 8 },
+  detectedDocumentType: "njcat", draft: { firstName: "Alex", lastName: "Example", dob: "1990-01-02", dddId: "DDD123", address: "42 Service Ln", city: "Newark", county: "Essex", state: "NJ", zip: "07102", gender: "male", guardianName: "Sam Example", guardianRelationship: "guardian", phone: "2015550123" }, fieldConfidences: [], warnings: [], sourceDocument: { fileName: "NJCAT.pdf", mimeType: "application/pdf", fileSize: 8 },
 };
+const googleAddress: AddressDetails = { formattedAddress: "42 Service Lane, Newark, NJ 07102, USA", street: "42 Service Lane", line1: "42 Service Lane", line2: null, city: "Newark", county: "Essex County", state: "New Jersey", stateLong: "New Jersey", stateCode: "NJ", zipCode: "07102", country: "United States", countryCode: "US", lat: 40, lng: -74 };
 const client = {
   id: "client-1", firstName: "Alex", lastName: "Example", dateOfBirth: "1990-01-02", dddId: "DDD123", status: "active", phone: "2015550123",
   primaryAddress: { address: "42 Service Lane, Newark, NJ 07102", line1: "42 Service Lane", city: "Newark", state: "NJ", postalCode: "07102", countyState: "Essex" },
@@ -29,6 +32,7 @@ const client = {
 
 beforeEach(() => {
   vi.mocked(extractScClientOnboardingViaApi).mockReset().mockResolvedValue(njcat);
+  vi.mocked(fetchFirstPlaceDetailsForQuery).mockReset().mockResolvedValue(googleAddress);
   vi.mocked(getAgencyById).mockResolvedValue({ id: "agency", uid: "owner", timezone: "UTC" } as Awaited<ReturnType<typeof getAgencyById>>);
   vi.mocked(getAgencyClientById).mockResolvedValue(client);
   vi.mocked(updateClient).mockReset().mockResolvedValue(client);
@@ -36,7 +40,7 @@ beforeEach(() => {
 });
 
 async function importFile(name = "NJCAT.pdf") {
-  fireEvent.click(screen.getByRole("button", { name: "Upload document" }));
+  fireEvent.click(screen.getByRole("button", { name: "Autofill from documents" }));
   const dialog = screen.getByRole("dialog");
   fireEvent.change(dialog.querySelector('input[type="file"]')!, { target: { files: [new File(["%PDF-1.7"], name, { type: "application/pdf" })] } });
   const extract = within(dialog).queryByRole("button", { name: "Extract information" });
@@ -53,12 +57,18 @@ test("reviews NJCAT values before applying, preserves selected program and leave
   expect(within(dialog).getByText("DDD123")).toBeInTheDocument();
   expect(screen.queryByText("Enrolling Alex Example")).not.toBeInTheDocument();
   expect(within(dialog).getByRole("checkbox", { name: "Replace fields I've already filled in" })).not.toBeChecked();
+  const addressReview = within(dialog).getByRole("region", { name: "Primary address match for NJCAT.pdf" });
+  expect(within(addressReview).getByText("42 Service Ln, Newark, NJ 07102")).toBeInTheDocument();
+  expect(within(addressReview).getByText("42 Service Lane, Newark, NJ 07102")).toBeInTheDocument();
+  expect(within(addressReview).getByRole("checkbox", { name: "Use this Google address match" })).toBeChecked();
+  expect(fetchFirstPlaceDetailsForQuery).toHaveBeenCalledWith("42 Service Ln, Newark, NJ 07102", expect.objectContaining({ signal: expect.any(AbortSignal) }));
   fireEvent.click(within(dialog).getByRole("button", { name: "Apply to form" }));
   expect(screen.getByText("Enrolling Alex Example")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /Supports Program SP/ })).toHaveAttribute("aria-pressed", "true");
   fireEvent.click(screen.getByRole("button", { name: "Get started" }));
   expect(screen.getByRole("textbox", { name: /First name/ })).toHaveValue("Alex");
   expect(screen.getByRole("textbox", { name: "Street address" })).toHaveValue("42 Service Lane");
+  expect(screen.getByRole("textbox", { name: "County" })).toHaveValue("Essex County");
   expect(screen.getByRole("textbox", { name: "Medicaid ID" })).toHaveValue("");
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   expect(screen.getByRole("checkbox", { name: "This participant has a legal guardian or authorized representative" })).not.toBeChecked();
@@ -133,13 +143,13 @@ test("removing a pending original keeps reviewed field values", async () => {
   await act(async () => {});
   const dialog = await importFile();
   fireEvent.click(within(dialog).getByRole("button", { name: "Apply to form" }));
-  fireEvent.click(screen.getByRole("button", { name: "Upload document" }));
+  fireEvent.click(screen.getByRole("button", { name: "Autofill from documents" }));
   const picker = screen.getByRole("dialog", { name: "Import client document" });
   fireEvent.click(within(picker).getByRole("button", { name: "Remove NJCAT.pdf attachment" }));
   expect(within(picker).queryByRole("button", { name: "Remove NJCAT.pdf attachment" })).not.toBeInTheDocument();
   fireEvent.click(within(picker).getByRole("button", { name: "Cancel" }));
   expect(screen.getByText("Enrolling Alex Example")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Upload document" })).toHaveTextContent("Upload document");
+  expect(screen.getByRole("button", { name: "Autofill from documents" })).toHaveTextContent("Autofill from documents");
   expect(uploadClientDocument).not.toHaveBeenCalled();
 });
 
@@ -149,7 +159,7 @@ test("one selection reviews both ISP and NJCAT before applying complementary fie
     : njcat);
   render(<MemoryRouter><SupportCoordinatorEnrollmentWizard /></MemoryRouter>);
   await act(async () => {});
-  fireEvent.click(screen.getByRole("button", { name: "Upload document" }));
+  fireEvent.click(screen.getByRole("button", { name: "Autofill from documents" }));
   const picker = screen.getByRole("dialog", { name: "Import client document" });
   fireEvent.change(picker.querySelector('input[type="file"]')!, { target: { files: [new File(["%PDF-1.7"], "ISP.pdf", { type: "application/pdf" }), new File(["%PDF-1.7"], "NJCAT.pdf", { type: "application/pdf" })] } });
   fireEvent.click(within(picker).getByRole("button", { name: "Extract information" }));
@@ -173,7 +183,7 @@ test("a failed file is reported beside successful extraction without losing eith
   });
   render(<MemoryRouter><SupportCoordinatorEnrollmentWizard /></MemoryRouter>);
   await act(async () => {});
-  fireEvent.click(screen.getByRole("button", { name: "Upload document" }));
+  fireEvent.click(screen.getByRole("button", { name: "Autofill from documents" }));
   const picker = screen.getByRole("dialog", { name: "Import client document" });
   fireEvent.change(picker.querySelector('input[type="file"]')!, { target: { files: [new File(["%PDF-1.7"], "NJCAT.pdf", { type: "application/pdf" }), new File(["%PDF-1.7"], "Unreadable.pdf", { type: "application/pdf" })] } });
   fireEvent.click(within(picker).getByRole("button", { name: "Extract information" }));
@@ -183,8 +193,81 @@ test("a failed file is reported beside successful extraction without losing eith
   expect(within(failed).getByText(/original will attach without autofill/)).toBeInTheDocument();
   expect(within(failed).getByText(/Reference: 12345678-1234-4234-8234-123456789012/)).toBeInTheDocument();
   fireEvent.click(within(review).getByRole("button", { name: "Apply to form" }));
-  fireEvent.click(screen.getByRole("button", { name: "Upload document" }));
+  fireEvent.click(screen.getByRole("button", { name: "Autofill from documents" }));
   const pending = screen.getByRole("region", { name: "Documents ready to attach" });
   expect(within(pending).getByText("NJCAT.pdf")).toBeInTheDocument();
   expect(within(pending).getByText("Unreadable.pdf")).toBeInTheDocument();
+});
+
+test("skipping the Google match applies other information without importing the raw address", async () => {
+  render(<MemoryRouter><SupportCoordinatorEnrollmentWizard /></MemoryRouter>);
+  await act(async () => {});
+  fireEvent.click(screen.getByRole("button", { name: /Supports Program SP/ }));
+  const review = await importFile();
+  const match = within(review).getByRole("region", { name: "Primary address match for NJCAT.pdf" });
+  fireEvent.click(within(match).getByRole("checkbox", { name: "Use this Google address match" }));
+  expect(within(review).queryByText("Street address", { selector: "dt span" })).not.toBeInTheDocument();
+  fireEvent.click(within(review).getByRole("button", { name: "Apply to form" }));
+  expect(screen.getByText("Enrolling Alex Example")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Get started" }));
+  expect(screen.getByRole("textbox", { name: "Street address" })).toHaveValue("");
+  expect(screen.getByRole("textbox", { name: "Primary address search" })).toHaveValue("");
+  expect(screen.getByRole("textbox", { name: "County" })).toHaveValue("");
+});
+
+test("an unavailable Google match leaves the address unchanged while other fields can apply", async () => {
+  vi.mocked(fetchFirstPlaceDetailsForQuery).mockResolvedValue(null);
+  render(<MemoryRouter><SupportCoordinatorEnrollmentWizard /></MemoryRouter>);
+  await act(async () => {});
+  fireEvent.click(screen.getByRole("button", { name: /Supports Program SP/ }));
+  const review = await importFile();
+  expect(within(review).getByText(/Google Places could not match a complete US address/)).toBeInTheDocument();
+  expect(within(review).queryByRole("checkbox", { name: "Use this Google address match" })).not.toBeInTheDocument();
+  fireEvent.click(within(review).getByRole("button", { name: "Apply to form" }));
+  fireEvent.click(screen.getByRole("button", { name: "Get started" }));
+  expect(screen.getByRole("textbox", { name: /First name/ })).toHaveValue("Alex");
+  expect(screen.getByRole("textbox", { name: "Street address" })).toHaveValue("");
+});
+
+test("a Google match preserves the existing address unless replacement is selected", async () => {
+  vi.mocked(fetchFirstPlaceDetailsForQuery).mockResolvedValue({ ...googleAddress, line1: "120 Broad Street", street: "120 Broad Street", city: "Trenton", county: "Mercer County", zipCode: "08608" });
+  render(<MemoryRouter initialEntries={["/edit/client-1"]}><Routes><Route path="/edit/:clientId" element={<SupportCoordinatorEnrollmentWizard isEditMode />} /></Routes></MemoryRouter>);
+  await screen.findByText("Editing Alex Example");
+  fireEvent.click(screen.getByRole("button", { name: /Program selection.*Completed/ }));
+  let review = await importFile();
+  expect(within(review).getByRole("checkbox", { name: "Replace fields I've already filled in" })).not.toBeChecked();
+  fireEvent.click(within(review).getByRole("button", { name: "Apply to form" }));
+  fireEvent.click(screen.getByRole("button", { name: "Continue editing" }));
+  expect(screen.getByRole("textbox", { name: "Street address" })).toHaveValue("42 Service Lane");
+  expect(screen.getByRole("textbox", { name: "City" })).toHaveValue("Newark");
+  expect(screen.getByRole("textbox", { name: "County" })).toHaveValue("Essex");
+  fireEvent.click(screen.getByRole("button", { name: /Program selection.*Completed/ }));
+  review = await importFile();
+  fireEvent.click(within(review).getByRole("checkbox", { name: "Replace fields I've already filled in" }));
+  fireEvent.click(within(review).getByRole("button", { name: "Apply to form" }));
+  fireEvent.click(screen.getByRole("button", { name: "Continue editing" }));
+  expect(screen.getByRole("textbox", { name: "Street address" })).toHaveValue("120 Broad Street");
+  expect(screen.getByRole("textbox", { name: "City" })).toHaveValue("Trenton");
+  expect(screen.getByRole("textbox", { name: "County" })).toHaveValue("Mercer County");
+  expect(screen.getByRole("textbox", { name: "ZIP code" })).toHaveValue("08608");
+});
+
+test("closing during Google matching cancels the lookup and ignores its late result", async () => {
+  let finishMatch!: (details: AddressDetails) => void;
+  vi.mocked(fetchFirstPlaceDetailsForQuery).mockImplementation(() => new Promise(resolve => { finishMatch = resolve; }));
+  render(<MemoryRouter><SupportCoordinatorEnrollmentWizard /></MemoryRouter>);
+  await act(async () => {});
+  fireEvent.click(screen.getByRole("button", { name: "Autofill from documents" }));
+  const picker = screen.getByRole("dialog");
+  fireEvent.change(picker.querySelector('input[type="file"]')!, { target: { files: [new File(["%PDF-1.7"], "NJCAT.pdf", { type: "application/pdf" })] } });
+  fireEvent.click(within(picker).getByRole("button", { name: "Extract information" }));
+  await waitFor(() => expect(fetchFirstPlaceDetailsForQuery).toHaveBeenCalledOnce());
+  const signal = vi.mocked(fetchFirstPlaceDetailsForQuery).mock.calls[0][1]?.signal;
+  fireEvent.click(within(picker).getByRole("button", { name: "Cancel" }));
+  expect(signal?.aborted).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Autofill from documents" }));
+  await act(async () => { finishMatch(googleAddress); });
+  expect(screen.getByRole("dialog", { name: "Import client document" })).toBeInTheDocument();
+  expect(screen.queryByRole("dialog", { name: "Review extracted information" })).not.toBeInTheDocument();
+  expect(screen.queryByText("Enrolling Alex Example")).not.toBeInTheDocument();
 });

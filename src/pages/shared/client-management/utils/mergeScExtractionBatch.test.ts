@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ScClientExtractionResponse } from "../types/scClientExtraction";
+import type { ScAddressMatch, ScClientExtractionResponse } from "../types/scClientExtraction";
 import type { ScImportFormValues } from "./mergeScExtractionDraft";
 import { mergeScExtractionBatch } from "./mergeScExtractionBatch";
 
@@ -166,5 +166,58 @@ describe("mergeScExtractionBatch", () => {
   it("returns an unchanged form for an empty batch", () => {
     const initial = form();
     expect(mergeScExtractionBatch(initial, [])).toEqual({ form: initial, previews: [], warnings: [], blocked: false, changedFields: [] });
+  });
+
+  it("previews and applies only the reviewed Google match while retaining source metadata", () => {
+    const original = document("isp", { address: "20 Main St", phone: "2015551111" });
+    const addressMatch: ScAddressMatch = { query: "20 Main St", selected: true, suggestion: { ...address, county: "Essex County" } };
+    const selected = { ...original, addressMatch };
+    const result = mergeScExtractionBatch(form(), [selected]);
+    expect(result.form).toMatchObject({ ...address, county: "Essex County", addressSearch: "20 Main Street, Newark, NJ 07102", phone: "2015551111" });
+    expect(result.previews[0].addressMatch).toBe(addressMatch);
+    const appliedRows = result.previews[0].rows.filter(row => row.willApply);
+    for (const row of appliedRows) expect(result.form[row.key as keyof ScImportFormValues]).toBe(row.extractedValue);
+    expect(original.extraction.draft.address).toBe("20 Main St");
+    expect(original.extraction.draft.city).toBeUndefined();
+  });
+
+  it.each([
+    { query: "20 Main St", selected: false, suggestion: { ...address, county: "Essex" } },
+    { query: "20 Main St", selected: false, suggestion: null },
+    { query: "20 Main St", selected: true, suggestion: null },
+    { query: "20 Main St", selected: true, suggestion: { ...address, county: "Essex", zip: "" } },
+  ] satisfies ScAddressMatch[])("skips every raw address field when the match is unavailable, incomplete, or deselected", addressMatch => {
+    const result = mergeScExtractionBatch(form(), [{ ...document("isp", { ...address, county: "Raw county", phone: "2015551111" }), addressMatch }], { overwrite: true });
+    expect(result.form).toMatchObject({ address: "", city: "", state: "", zip: "", county: "", addressSearch: "", phone: "2015551111" });
+    expect(result.previews[0].rows.map(row => row.key)).toEqual(["phone"]);
+    expect(result.changedFields).toEqual(["phone"]);
+  });
+
+  it("preserves entered address fields by default and previews explicit replacement", () => {
+    const initial = form({ addressSearch: "10 First Street, Trenton, NJ 08608", address: "10 First Street", city: "Trenton", county: "Mercer County", state: "NJ", zip: "08608" });
+    const selected = { ...document("isp", { address: "20 Main St" }), addressMatch: { query: "20 Main St", selected: true, suggestion: { ...address, county: "Essex County" } } };
+    const kept = mergeScExtractionBatch(initial, [selected]);
+    expect(kept.form).toEqual(initial);
+    expect(kept.previews[0].rows.every(row => !row.willApply)).toBe(true);
+    const replaced = mergeScExtractionBatch(initial, [selected], { overwrite: true });
+    expect(replaced.form).toMatchObject({ ...address, county: "Essex County" });
+    expect(replaced.previews[0].rows.find(row => row.key === "address")).toMatchObject({ currentValue: "10 First Street", extractedValue: "20 Main Street", willApply: true });
+  });
+
+  it("fills a compatible partial current address from Google and preserves conflicting partial entries", () => {
+    const selected = { ...document("isp", { address: "20 Main St" }), addressMatch: { query: "20 Main St", selected: true, suggestion: { ...address, county: "Essex County" } } };
+    expect(mergeScExtractionBatch(form({ address: "20 Main Street" }), [selected]).form).toMatchObject({ ...address, county: "Essex County" });
+    const partial = form({ address: "10 First Street" });
+    expect(mergeScExtractionBatch(partial, [selected]).form).toEqual(partial);
+  });
+
+  it("retains first-document precedence for competing reviewed Google addresses", () => {
+    const result = mergeScExtractionBatch(form(), [
+      { ...document("isp", { address: "20 Main St" }), addressMatch: { query: "20 Main St", selected: true, suggestion: { ...address, county: "Essex County" } } },
+      { ...document("njcat", { address: "99 Park St" }), addressMatch: { query: "99 Park St", selected: true, suggestion: { ...address, address: "99 Park Street", county: "Other County" } } },
+    ], { overwrite: true });
+    expect(result.form).toMatchObject({ ...address, county: "Essex County" });
+    expect(result.previews[1].rows.every(row => !row.willApply)).toBe(true);
+    expect(result.warnings.join(" ")).toMatch(/Street address differs/);
   });
 });
