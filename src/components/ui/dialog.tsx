@@ -60,7 +60,7 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-1/2 left-1/2 z-50 -translate-x-1/2 -translate-y-1/2 shadow-xl bg-white rounded-2xl",
+          "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-1/2 left-1/2 z-50 -translate-x-1/2 -translate-y-1/2 shadow-xl bg-white dark:bg-[#1b232b] rounded-2xl",
           className
         )}
         {...props}
@@ -107,7 +107,7 @@ function DialogTitle({
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn("text-2xl font-semibold leading-[38px] text-[var(--color-black)]", className)}
+      className={cn("text-2xl font-semibold leading-[38px] text-[#10141a] dark:text-[#f4f6f7]", className)}
       {...props}
     />
   )
@@ -120,7 +120,7 @@ function DialogDescription({
   return (
     <DialogPrimitive.Description
       data-slot="dialog-description"
-      className={cn("text-base leading-[1.6] text-[#808081]", className)}
+      className={cn("text-base leading-[1.6] text-[#808081] dark:text-[#9aa4a8]", className)}
       {...props}
     />
   )

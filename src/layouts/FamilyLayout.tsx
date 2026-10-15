@@ -19,6 +19,7 @@ import { selectUser, selectIsAuthenticated } from "@/utils/auth/store/authSelect
 import { useAuth } from "@/utils/auth"
 import axiosClient from "@/lib/axios"
 import AnnouncementBanner from "@/components/AnnouncementBanner"
+import { ThemeToggle } from "@/components/ThemeToggle"
 
 function getGreeting(): { text: string; emoji: string } {
   const h = new Date().getHours()
@@ -108,7 +109,7 @@ export default function FamilyLayout() {
     : null
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#f0f4f6]">
+    <div className="flex h-screen overflow-hidden bg-[#f0f4f6] dark:bg-[#10141a]">
       {/* ── Sidebar ── */}
       <aside className="flex w-64 flex-shrink-0 flex-col" style={{ backgroundColor: "#063E3F" }}>
         {/* Logo */}
@@ -222,40 +223,41 @@ export default function FamilyLayout() {
       {/* ── Main area ── */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Top bar */}
-        <header className="flex h-16 flex-shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6">
+        <header className="flex h-16 flex-shrink-0 items-center justify-between border-b border-slate-200 dark:border-white/10 bg-white dark:bg-[#1b232b] px-6">
           <div>
-            <p className="text-[15px] font-semibold text-slate-900">
+            <p className="text-[15px] font-semibold text-slate-900 dark:text-[#f4f6f7]">
               {greeting}, {firstName}. {emoji}
             </p>
             {clientFullName && (
-              <p className="text-[12px] text-slate-400">
+              <p className="text-[12px] text-slate-400 dark:text-[#9aa4a8]">
                 Here's what's happening with{" "}
-                <span className="font-semibold text-slate-600">{client?.firstName}</span> today.
+                <span className="font-semibold text-slate-600 dark:text-[#d7dcdd]">{client?.firstName}</span> today.
               </p>
             )}
           </div>
           <div className="flex items-center gap-3">
+            <ThemeToggle className="h-8 w-8 border-slate-200 bg-transparent text-slate-400 backdrop-blur-none hover:bg-transparent hover:border-slate-300 hover:text-slate-600 dark:border-white/10 dark:text-[#9aa4a8] dark:hover:border-white/20 dark:hover:text-[#f4f6f7]" />
             <button
               type="button"
               aria-label="Notifications"
-              className="relative flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-slate-400 transition-colors hover:border-slate-300 hover:text-slate-600"
+              className="relative flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-slate-400 transition-colors hover:border-slate-300 hover:text-slate-600 dark:border-white/10 dark:text-[#9aa4a8] dark:hover:border-white/20 dark:hover:text-[#f4f6f7]"
             >
               <Bell className="h-4 w-4" />
               <span
-                className="absolute right-1 top-1 h-2 w-2 rounded-full border border-white"
+                className="absolute right-1 top-1 h-2 w-2 rounded-full border border-white dark:border-[#1b232b]"
                 style={{ backgroundColor: "#00B4B8" }}
               />
             </button>
             <div className="flex items-center gap-2">
               <Avatar name={user.fullName || "U"} size="sm" />
-              <span className="text-[13px] font-medium text-slate-700">{user.fullName}</span>
-              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+              <span className="text-[13px] font-medium text-slate-700 dark:text-[#e5e9ea]">{user.fullName}</span>
+              <ChevronDown className="h-3.5 w-3.5 text-slate-400 dark:text-[#9aa4a8]" />
             </div>
           </div>
         </header>
 
         {/* Scrollable page area */}
-        <main className="flex-1 overflow-y-auto p-6 bg-white">
+        <main className="flex-1 overflow-y-auto p-6 bg-white dark:bg-[#10141a]">
           <AnnouncementBanner
             endpoint="/familyPortal/announcements"
             viewAllPath={Routes.family.announcements}

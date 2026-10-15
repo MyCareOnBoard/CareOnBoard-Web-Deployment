@@ -1,11 +1,11 @@
 import type { SaveEmployeeDocumentResponse } from './types';
 import { useGetDocumentComplianceQuery, useComplianceDateRefresh } from '@/pages/agency/compliance-alerts/api';
 import { complianceLabel, civilDateLabel } from '@/pages/agency/compliance-alerts/apiTypes';
-import React, {useState, useCallback, useEffect} from "react";
+import React, {useState, useCallback, useEffect, useMemo, useRef} from "react";
 import {useNavigate, useSearchParams} from "react-router";
-import {X} from "lucide-react";
+import {AlertCircle, Pencil, X} from "lucide-react";
 import {Button} from "@/components/ui/button";
-import DashboardDocuments from './components/DashboardDocuments';
+import DashboardDocuments, {groupFor} from './components/DashboardDocuments';
 import {auth} from "@/lib/firebase";
 import {Toggle} from "@/components/ui/toggle";
 
@@ -26,8 +26,19 @@ import {useDispatch} from "react-redux";
 import {toast} from "sonner";
 import type {TrainingData} from '@/pages/agency/trainings/trainingApi';
 import TrainingCertificate from '@/pages/agency/trainings/TrainingCertificate';
-import DashboardTrainings from './components/DashboardTrainings';
+import DashboardTrainings, {groupOrder, trainingGroup} from './components/DashboardTrainings';
 import {parseISO} from 'date-fns';
+
+function getGreeting(): { text: string; emoji: string } {
+    const h = new Date().getHours();
+    if (h < 12) return {text: "Good morning", emoji: "🌅"};
+    if (h < 17) return {text: "Good afternoon", emoji: "☀️"};
+    return {text: "Good evening", emoji: "🌙"};
+}
+
+// Groups ahead of "In review" in groupOrder are the ones worth surfacing on the
+// dashboard header — overdue/expired/required items, not informational ones.
+const urgentTrainingGroups = new Set(groupOrder.slice(0, groupOrder.indexOf('In review')));
 
 
 export default function UserPanelDashboardPage() {
@@ -45,6 +56,10 @@ export default function UserPanelDashboardPage() {
     const [trainingCursor, setTrainingCursor] = useState<string>();
     const [trainings, setTrainings] = useState<TrainingData[]>([]);
     const [pendingTraining, setPendingTraining] = useState<string | null>(null);
+    const documentsSectionRef = useRef<HTMLDivElement>(null);
+    const trainingsSectionRef = useRef<HTMLDivElement>(null);
+    const scrollToSection = (ref: React.RefObject<HTMLDivElement | null>) =>
+        ref.current?.scrollIntoView({behavior: "smooth", block: "start"});
 
 
     const [searchParams] = useSearchParams();
@@ -145,6 +160,25 @@ export default function UserPanelDashboardPage() {
         }
 
     }, [employeeDocuments, compliance, complianceError]);
+
+    const dashboardDocuments = useMemo(() => userPanelDocumentTypes.map(type => {
+        const document = getDocument(type.value);
+        return {type: type.value, label: type.label, fileUrl: document.fileUrl, status: document.status,
+            id: 'id' in document ? document.id : undefined,
+            documentId: 'documentId' in document ? document.documentId : undefined,
+            reasonCode: 'reasonCode' in document ? document.reasonCode : undefined,
+            expiryLabel: 'expiryDateKey' in document && document.expiryDateKey ? civilDateLabel(document.expiryDateKey)
+                : document.expiryDate ? formatDate(document.expiryDate) : undefined};
+    }), [getDocument]);
+
+    const documentsNeedingAttention = useMemo(
+        () => dashboardDocuments.filter(doc => groupFor(doc) === 'Needs attention').length,
+        [dashboardDocuments]
+    );
+    const trainingsNeedingAttention = useMemo(
+        () => trainings.filter(training => urgentTrainingGroups.has(trainingGroup(training))).length,
+        [trainings]
+    );
 
     const calculateAge = (dateOfBirth: string) => {
         const today = new Date();
@@ -251,123 +285,125 @@ export default function UserPanelDashboardPage() {
         }
     }, [trainingPage, trainingCursor]);
 
+    const greeting = getGreeting();
+
     return (
         <div className="min-h-[calc(100vh-200px)]">
-            {/* Header */}
-            <div className="mb-8">
-                <h1 className="text-[40px] font-bold leading-[1.4] text-[#10141a]">
-                    Dashboard
-                </h1>
-            </div>
-
-            {/* Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-[480px_1fr] gap-6">
-                {/* Left Column - Profile Card */}
-                <div className="space-y-6">
-                    {/* Profile Card */}
-                    <div className="bg-[#FFFFFF4D] rounded-[20px] p-6 shadow-sm flex justify-start">
-                        <div className="flex items-start justify-between mb-4 w-full">
-                            <div className="flex items-center gap-4 h-full">
-                                {/* Profile Image */}
-                                {currentUser?.photoURL ? (
-                                    <div>
-                                        <img
-                                            src={currentUser?.photoURL}
-                                            alt={employeeInfo?.fullName}
-                                            className="w-[180px] h-full rounded-xl object-cover"
-                                        />
-                                    </div>
-                                ) : (
-                                    <div
-                                        className="w-[180px] h-full rounded-xl bg-gradient-to-br from-[#00b4b8] to-[#0090a8] flex items-center justify-center text-white text-6xl font-bold">
-                                        {employeeInfo?.fullName?.charAt(0) || "U"}
-                                    </div>
-                                )}
-                            </div>
+            {/* Row 1: Profile + Documents */}
+            <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6 items-start">
+                {/* Left Column */}
+                {/* Header */}
+                <div>
+                <div className="mb-8">
+                    <h1 className="text-[30px] font-bold leading-[1.4] text-[#10141a]">
+                        {greeting.text}, {employeeInfo?.fullName?.split(" ")[0] || "there"}. {greeting.emoji}
+                    </h1>
+                    {(documentsNeedingAttention > 0 || trainingsNeedingAttention > 0) && (
+                        <div className="flex flex-wrap items-center gap-2 mt-3">
+                            {documentsNeedingAttention > 0 && (
+                                <button type="button" onClick={() => scrollToSection(documentsSectionRef)}
+                                    className="inline-flex items-center gap-1.5 rounded-full bg-[#fff0eb] px-3 py-1.5 text-sm font-medium text-[#b3371c] transition-colors hover:bg-[#ffe3d8] cursor-pointer">
+                                    <AlertCircle size={14} aria-hidden="true"/>
+                                    {documentsNeedingAttention} document{documentsNeedingAttention === 1 ? '' : 's'} need attention
+                                </button>
+                            )}
+                            {trainingsNeedingAttention > 0 && (
+                                <button type="button" onClick={() => scrollToSection(trainingsSectionRef)}
+                                    className="inline-flex items-center gap-1.5 rounded-full bg-[#fff3d6] px-3 py-1.5 text-sm font-medium text-[#8a5200] transition-colors hover:bg-[#ffe9b8] cursor-pointer">
+                                    <AlertCircle size={14} aria-hidden="true"/>
+                                    {trainingsNeedingAttention} training{trainingsNeedingAttention === 1 ? '' : 's'} need attention
+                                </button>
+                            )}
                         </div>
-                        <div className={"w-full"}>
-                            {/* User Info */}
-                            {/* ID Badge */}
-                            <div className={"flex justify-between items-center mb-6"}>
-                                <div
-                                    className="bg-[#F0FAF4] border border-[#0EAF52] text-[#0EAF52] text-sm font-semibold px-2 py-1 rounded-full">
-                                    ID-{employeeInfo?.profile?.tagId}
-                                </div>
-                                <svg onClick={goToProfile} className={"cursor-pointer"} width="40" height="40"
-                                     viewBox="0 0 40 40"
-                                     fill="none"
-                                     xmlns="http://www.w3.org/2000/svg">
-                                    <rect width="40" height="40" rx="20" fill="white" fill-opacity="0.5"/>
-                                    <rect x="0.5" y="0.5" width="39" height="39" rx="19.5" stroke="white"
-                                          stroke-opacity="0.3"/>
-                                    <path
-                                        d="M22.6692 18.2761L16.9315 24.0139L15.9886 23.0711L21.7264 17.3333H16.6692V16H24.0025V23.3333H22.6692V18.2761Z"
-                                        fill="#10141A"/>
-                                </svg>
-
+                    )}
+                </div>
+                {/* Profile Card */}
+                <div className="bg-[#FFFFFF4D] rounded-[20px] p-6 shadow-sm">
+                    {/* Identity */}
+                    <div className="flex items-start gap-4">
+                        {currentUser?.photoURL ? (
+                            <img
+                                src={currentUser.photoURL}
+                                alt={employeeInfo?.fullName}
+                                className="object-cover w-20 h-20 rounded-full shrink-0"
+                            />
+                        ) : (
+                            <div
+                                className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-2xl font-bold text-white">
+                                {employeeInfo?.fullName?.charAt(0) || "U"}
                             </div>
-                            <div className="space-y-2 mb-4">
-                                <h2 className="text-[24px] font-bold text-[#10141a]">
-                                    {employeeInfo?.fullName || "User Name"}
-                                </h2>
-                                <p className="text-[14px] text-[#808081]">
-                                    {employeeInfo?.role?.toUpperCase() || "No role assigned"} • {employeeInfo?.dateOfBirth ? calculateAge(employeeInfo?.dateOfBirth) + ' yrs old' : ''}
+                        )}
+                        <div className="flex-1 min-w-0">
+                            <div
+                                className="mb-1 inline-block rounded-full border border-[#0EAF52] bg-[#F0FAF4] px-2 py-0.5 text-xs font-semibold text-[#0EAF52]">
+                                ID-{employeeInfo?.profile?.tagId}
+                            </div>
+                            <h2 className="truncate text-[20px] font-bold text-[#10141a]">
+                                {employeeInfo?.fullName || "User Name"}
+                            </h2>
+                            <p className="text-[13px] text-[#808081]">
+                                {employeeInfo?.role?.toUpperCase() || "No role assigned"} • {employeeInfo?.dateOfBirth ? calculateAge(employeeInfo?.dateOfBirth) + ' yrs old' : ''}
+                            </p>
+                            {employeeInfo?.hireDate && (
+                                <p className="text-[13px] text-[#808081]">
+                                    Hiring Date: {formatDate(employeeInfo?.hireDate)}
                                 </p>
-                                <p className="text-[14px] text-[#808081]">
-                                    {employeeInfo?.hireDate
-                                        ? `Hiring Date: ${formatDate(employeeInfo?.hireDate)}`
-                                        : ""
-                                    }
-                                </p>
-                            </div>
-
-                            {/* Work Availability Badge */}
-                            <div className={"flex items-center justify-between mb-4"}>
-                                <span className="text-[#808081]">Work Availability</span>
-                                <Toggle
-                                    className={"h-8 w-14"}
-                                    aria-label="Work availability"
-                                    disabled={savingAvailability}
-                                    aria-busy={savingAvailability}
-                                    pressed={workAvailability}
-                                    onPressedChange={handleWorkAvailabilityChange}
-                                />
-                            </div>
+                            )}
                         </div>
                     </div>
 
-                    <DashboardTrainings key={user?.uid} trainings={trainings} loading={isTrainingLoading} error={trainingError}
-                        hasMore={!!trainingPage?.nextCursor} assessmentIncomplete={trainingPage?.summary?.policyAssessmentComplete === false}
-                        onLoadMore={() => setTrainingCursor(trainingPage?.nextCursor ?? undefined)} onRetry={() => {void refreshTrainings();}}
-                        renderTraining={training => <>
-                            {training.requiresCertificate && <TrainingCertificate training={training} dashboard showPolicySummary={false} onUploaded={certificate => {
-                                setTrainings(current => current.map(item => item.id === training.id ? {...item, ...certificate} : item));
-                                dispatch(userPanelDashboardApi.util.invalidateTags([{type: 'EmployeeTrainings', id: 'SELF'}]));
-                                toast.success(certificate.approved ? 'Certificate saved and approved' : 'Certificate submitted for agency review');
-                            }}/>}
-                            {!training.requiresCertificate && training.source !== 'policy' && <Button type="button" variant="outline"
-                                onClick={() => handleToggle(training.id || '')} disabled={pendingTraining !== null}
-                                aria-label={`${approvalStates[training.id ?? ''] ? 'Mark incomplete' : 'Mark complete'} ${training.name}`}>
-                                {approvalStates[training.id ?? ''] ? 'Mark incomplete' : 'Mark complete'}
-                            </Button>}
-                        </>}/>
+                    {/* Actions */}
+                    <div className="mt-5 flex items-center justify-between gap-3 border-t border-[#e5e5e6] pt-4">
+                        <button type="button" onClick={goToProfile}
+                            className="inline-flex cursor-pointer items-center gap-1.5 text-sm font-medium text-[#596065] transition-colors hover:text-[#10141a]">
+                            <Pencil size={15} aria-hidden="true"/>
+                            Edit profile
+                        </button>
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-[#808081]">Available for work</span>
+                            <Toggle
+                                className={"h-8 w-14"}
+                                aria-label="Work availability"
+                                disabled={savingAvailability}
+                                aria-busy={savingAvailability}
+                                pressed={workAvailability}
+                                onPressedChange={handleWorkAvailabilityChange}
+                            />
+                        </div>
+                    </div>
                 </div>
-                <DashboardDocuments key={user?.uid} documents={userPanelDocumentTypes.map(type => {
-                    const document = getDocument(type.value);
-                    return {type: type.value, label: type.label, fileUrl: document.fileUrl, status: document.status,
-                        id: 'id' in document ? document.id : undefined,
-                        documentId: 'documentId' in document ? document.documentId : undefined,
-                        reasonCode: 'reasonCode' in document ? document.reasonCode : undefined,
-                        expiryLabel: 'expiryDateKey' in document && document.expiryDateKey ? civilDateLabel(document.expiryDateKey)
-                            : document.expiryDate ? formatDate(document.expiryDate) : undefined};
-                })} loading={documentsLoading} error={documentsError} focusDocumentId={focusDocumentId}
-                    onRetry={() => {void refreshDocuments();}} onView={handleOpenDocument}
-                    onUpload={type => {setUploadDocumentType(type); setIsDocumentUploadModalOpen(true);}}>
-                    {(complianceError || compliance?.syncStatus === 'error') && <p role="alert" className="text-sm text-[#d53411]">We couldn't load document expiry status. Try again. Last checked: {compliance?.evaluatedAt ? new Date(compliance.evaluatedAt).toLocaleString() : 'Not yet checked'}. <button type="button" onClick={() => refreshCompliance()}>Retry</button></p>}
-                    {pending && <p role="status" className="text-sm text-[#808081]">Document saved. Updating expiry status…</p>}
-                    {(pending && !withinUploadWindow) && <p className="text-sm text-[#808081]">Last checked: {compliance?.evaluatedAt ? new Date(compliance.evaluatedAt).toLocaleString() : 'Not yet checked'}. <button type="button" onClick={() => refreshCompliance()}>Refresh</button></p>}
-                    {!documentsLoading && !documentsError && focusDocumentId && !employeeDocuments.some(doc => doc.id === focusDocumentId || doc.documentId === focusDocumentId) && <p role="status">This document is unavailable or you no longer have access. <button type="button" onClick={() => navigate(Routes.userPanel.dashboard)}>Back to documents</button></p>}
-                </DashboardDocuments>
+                </div>
+                {/* Right Column - Documents */}
+                <div ref={documentsSectionRef} className="min-w-0 rounded-[20px] border border-[#dce7e9] bg-white/70 p-4 sm:p-6">
+                    <DashboardDocuments key={user?.uid} documents={dashboardDocuments}
+                        loading={documentsLoading} error={documentsError} focusDocumentId={focusDocumentId}
+                        onRetry={() => {void refreshDocuments();}} onView={handleOpenDocument}
+                        onUpload={type => {setUploadDocumentType(type); setIsDocumentUploadModalOpen(true);}}>
+                        {(complianceError || compliance?.syncStatus === 'error') && <p role="alert" className="text-sm text-[#d53411]">We couldn't load document expiry status. Try again. Last checked: {compliance?.evaluatedAt ? new Date(compliance.evaluatedAt).toLocaleString() : 'Not yet checked'}. <button type="button" onClick={() => refreshCompliance()}>Retry</button></p>}
+                        {pending && <p role="status" className="text-sm text-[#808081]">Document saved. Updating expiry status…</p>}
+                        {(pending && !withinUploadWindow) && <p className="text-sm text-[#808081]">Last checked: {compliance?.evaluatedAt ? new Date(compliance.evaluatedAt).toLocaleString() : 'Not yet checked'}. <button type="button" onClick={() => refreshCompliance()}>Refresh</button></p>}
+                        {!documentsLoading && !documentsError && focusDocumentId && !employeeDocuments.some(doc => doc.id === focusDocumentId || doc.documentId === focusDocumentId) && <p role="status">This document is unavailable or you no longer have access. <button type="button" onClick={() => navigate(Routes.userPanel.dashboard)}>Back to documents</button></p>}
+                    </DashboardDocuments>
+                </div>
+            </div>
+
+            {/* Row 2: Trainings, full width */}
+            <div ref={trainingsSectionRef} className="mt-6 min-w-0 rounded-[20px] border border-[#dce7e9] bg-white/70 p-4 sm:p-6">
+                <DashboardTrainings key={user?.uid} trainings={trainings} loading={isTrainingLoading} error={trainingError}
+                    hasMore={!!trainingPage?.nextCursor} assessmentIncomplete={trainingPage?.summary?.policyAssessmentComplete === false}
+                    onLoadMore={() => setTrainingCursor(trainingPage?.nextCursor ?? undefined)} onRetry={() => {void refreshTrainings();}}
+                    renderTraining={training => <>
+                        {training.requiresCertificate && <TrainingCertificate training={training} dashboard showPolicySummary={false} onUploaded={certificate => {
+                            setTrainings(current => current.map(item => item.id === training.id ? {...item, ...certificate} : item));
+                            dispatch(userPanelDashboardApi.util.invalidateTags([{type: 'EmployeeTrainings', id: 'SELF'}]));
+                            toast.success(certificate.approved ? 'Certificate saved and approved' : 'Certificate submitted for agency review');
+                        }}/>}
+                        {!training.requiresCertificate && training.source !== 'policy' && <Button type="button" variant="outline"
+                            onClick={() => handleToggle(training.id || '')} disabled={pendingTraining !== null}
+                            aria-label={`${approvalStates[training.id ?? ''] ? 'Mark incomplete' : 'Mark complete'} ${training.name}`}>
+                            {approvalStates[training.id ?? ''] ? 'Mark incomplete' : 'Mark complete'}
+                        </Button>}
+                    </>}/>
             </div>
             {isDocumentUploadModalOpen && <UserPanelDocumentUpload
                 initialDocumentType={uploadDocumentType}
@@ -389,7 +425,7 @@ export default function UserPanelDashboardPage() {
                             animate={{scale: 1, opacity: 1}}
                             exit={{scale: 0.9, opacity: 0}}
                             transition={{duration: 0.25}}
-                            className="bg-white shadow-lg rounded-xl max-w-md mt-6"
+                            className="max-w-md mt-6 bg-white shadow-lg rounded-xl"
                         >
                             <div className={"flex space-x-4 px-6 py-6"}>
                                 <div className={"flex justify-center items-center bg-[#FFDCD4] rounded-sm px-3 py-2"}>
@@ -405,7 +441,7 @@ export default function UserPanelDashboardPage() {
                                         <h4 className="text-lg font-semibold">Document not supported</h4>
                                         <button
                                             onClick={() => setError(false)}
-                                            className="cursor-pointer text-gray-400 hover:text-gray-600 transition-colors"
+                                            className="text-gray-400 transition-colors cursor-pointer hover:text-gray-600"
                                             aria-label="Close modal"
                                         >
                                             <X className="w-5 h-5"/>
@@ -433,7 +469,7 @@ export default function UserPanelDashboardPage() {
                             animate={{scale: 1, opacity: 1}}
                             exit={{scale: 0.9, opacity: 0}}
                             transition={{duration: 0.25}}
-                            className="px-10 py-4 text-center bg-white shadow-lg rounded-xl max-w-sm flex flex-col justify-center"
+                            className="flex flex-col justify-center max-w-sm px-10 py-4 text-center bg-white shadow-lg rounded-xl"
                         >
                             <div className={"flex justify-center mb-3"}>
                                 <svg width="100" height="100" viewBox="0 0 100 100" fill="none"
@@ -467,7 +503,7 @@ export default function UserPanelDashboardPage() {
                             animate={{scale: 1, opacity: 1}}
                             exit={{scale: 0.9, opacity: 0}}
                             transition={{duration: 0.25}}
-                            className="px-10 py-4 text-center bg-white shadow-lg rounded-xl max-w-sm flex flex-col justify-center"
+                            className="flex flex-col justify-center max-w-sm px-10 py-4 text-center bg-white shadow-lg rounded-xl"
                         >
                             <div className={"flex justify-center mb-3"}>
                                 <svg width="100" height="100" viewBox="0 0 100 100" fill="none"
@@ -503,7 +539,7 @@ export default function UserPanelDashboardPage() {
                             animate={{scale: 1, opacity: 1}}
                             exit={{scale: 0.9, opacity: 0}}
                             transition={{duration: 0.25}}
-                            className="px-10 py-4 text-center bg-white shadow-lg rounded-xl max-w-sm flex flex-col justify-center"
+                            className="flex flex-col justify-center max-w-sm px-10 py-4 text-center bg-white shadow-lg rounded-xl"
                         >
                             <div className={"flex justify-center mb-3"}>
                                 <svg width="100" height="100" viewBox="0 0 100 100" fill="none"
@@ -538,7 +574,7 @@ export default function UserPanelDashboardPage() {
                             animate={{scale: 1, opacity: 1}}
                             exit={{scale: 0.9, opacity: 0}}
                             transition={{duration: 0.25}}
-                            className="px-10 py-4 text-center bg-white shadow-lg rounded-xl max-w-sm flex flex-col justify-center"
+                            className="flex flex-col justify-center max-w-sm px-10 py-4 text-center bg-white shadow-lg rounded-xl"
                         >
                             <h4 className="text-2xl font-semibold">
                                 CareOnboard would like to access your location
@@ -546,14 +582,14 @@ export default function UserPanelDashboardPage() {
                             <p className="mt-1 text-sm text-gray-500">
                                 The device will use location in the background
                             </p>
-                            <div className="flex items-center px-3 mt-6 mb-3 w-full">
+                            <div className="flex items-center w-full px-3 mt-6 mb-3">
                                 <Button
-                                    className="w-full px-6 text-white font-medium bg-teal-500 hover:bg-teal-600 rounded-full transition-colors"
+                                    className="w-full px-6 font-medium text-white transition-colors bg-teal-500 rounded-full hover:bg-teal-600"
                                 >
                                     Okay
                                 </Button>
                             </div>
-                            <div className="flex items-center px-3 w-full">
+                            <div className="flex items-center w-full px-3">
                                 <Button
                                     className="w-full px-6 text-white font-medium bg-[#B2B2B3] hover:bg-[#B2B2B3] rounded-full transition-colors"
                                 >

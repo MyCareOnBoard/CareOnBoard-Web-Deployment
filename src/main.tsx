@@ -6,6 +6,7 @@ import {Provider} from "react-redux";
 import { PersistGate } from "redux-persist/integration/react";
 import {persistor, store} from "./store/redux/store";
 import { AuthProvider } from "@/utils/auth";
+import { ThemeProvider } from "@/providers/ThemeProvider";
 import { GoogleMapsProvider } from "@/providers/GoogleMapsProvider";
 import { GlobalPresenceManager } from "@/providers/GlobalPresenceManager";
 import { Toaster } from "sonner";
@@ -13,16 +14,18 @@ import "@fontsource/urbanist";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <Provider store={store}>
-      <PersistGate loading={null} persistor={persistor}>
-        <AuthProvider>
-          <GoogleMapsProvider>
-            <GlobalPresenceManager />
-            <App/>
-            <Toaster position="top-right" richColors />
-          </GoogleMapsProvider>
-        </AuthProvider>
-      </PersistGate>
-    </Provider>
+    <ThemeProvider>
+      <Provider store={store}>
+        <PersistGate loading={null} persistor={persistor}>
+          <AuthProvider>
+            <GoogleMapsProvider>
+              <GlobalPresenceManager />
+              <App/>
+              <Toaster position="top-right" richColors />
+            </GoogleMapsProvider>
+          </AuthProvider>
+        </PersistGate>
+      </Provider>
+    </ThemeProvider>
   </React.StrictMode>,
 );

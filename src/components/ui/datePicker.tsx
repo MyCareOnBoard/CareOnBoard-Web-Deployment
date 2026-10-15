@@ -58,10 +58,10 @@ export default function CustomDatePicker(
                     </InputGroup>
                 </button>
             </PopoverTrigger>
-            <PopoverContent align={align} className="mt-3 w-auto border-none bg-white p-0 shadow-lg">
+            <PopoverContent align={align} className="mt-3 w-auto border-none bg-white dark:bg-[#1b232b] p-0 shadow-lg">
                 <Calendar
                     mode="single"
-                    className="bg-white"
+                    className="bg-white dark:bg-[#1b232b]"
                     captionLayout="dropdown"
                     startMonth={startMonth ?? new Date(1924, 0)}
                     endMonth={endMonth ?? new Date()}

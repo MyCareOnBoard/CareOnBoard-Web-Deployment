@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import BellIcon from "@/assets/icons/bell.svg?react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import CogIcon from "@/assets/icons/cog.svg?react";
 import LogoNameIcon from "@/assets/icons/green-green-logo.svg?react";
 import LogoMarkIcon from "@/assets/icons/logo.svg?react";
@@ -29,7 +30,7 @@ export function HeaderActionButton({ icon: Icon, ariaLabel, onClick }: { icon: C
       type="button"
       aria-label={ariaLabel}
       onClick={onClick}
-      className="grid h-[42px] w-[42px] place-items-center rounded-[50px] border border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.5)] text-[#808081] backdrop-blur-[22px] cursor-pointer hover:bg-[rgba(255,255,255,0.7)] hover:border-[rgba(255,255,255,0.5)] transition-all duration-200"
+      className="grid h-[42px] w-[42px] place-items-center rounded-[50px] border border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.5)] text-[#808081] backdrop-blur-[22px] cursor-pointer hover:bg-[rgba(255,255,255,0.7)] hover:border-[rgba(255,255,255,0.5)] transition-all duration-200 dark:border-white/10 dark:bg-white/5 dark:text-[#9aa4a8] dark:hover:bg-white/10 dark:hover:border-white/20"
     >
       <Icon className="w-5 h-5" />
     </button>
@@ -74,14 +75,14 @@ export function UserAvatar({ userName, userImage }: { userName?: string; userIma
 // Shared dashboard chrome without the native panel's notification requests.
 export function DashboardHeaderFrame({ centerContent, children }: { centerContent?: ReactNode; children: ReactNode }) {
   return (
-    <header className="fixed left-0 right-0 top-0 z-50 h-[98px] bg-[#eef4f5]">
+    <header className="fixed left-0 right-0 top-0 z-50 h-[98px] bg-[#eef4f5] dark:bg-[#10141a]">
       <div className="mx-auto flex h-full max-w-[1440px] items-center justify-between px-8">
         <div className="flex items-center gap-3">
           <button
             type="button"
             aria-label="Open navigation menu"
             onClick={toggleDrawer}
-            className="grid h-[42px] w-[42px] place-items-center rounded-[50px] text-[#808081] cursor-pointer hover:bg-white/50 transition-colors md:hidden"
+            className="grid h-[42px] w-[42px] place-items-center rounded-[50px] text-[#808081] cursor-pointer hover:bg-white/50 transition-colors md:hidden dark:text-[#9aa4a8] dark:hover:bg-white/5"
           >
             <Menu className="w-6 h-6" />
           </button>
@@ -206,6 +207,7 @@ export default function DashboardHeader(
                 CareOnboardConnect Login
               </a>
             )}
+            <ThemeToggle />
             <HeaderActionButton
               icon={CogIcon}
               ariaLabel="Settings"
@@ -217,20 +219,20 @@ export default function DashboardHeader(
                   <button
                     type="button"
                     aria-label="Notifications"
-                    className="grid h-[42px] w-[42px] place-items-center rounded-[50px] border border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.5)] text-[#808081] backdrop-blur-[22px] cursor-pointer hover:bg-[rgba(255,255,255,0.7)] hover:border-[rgba(255,255,255,0.5)] transition-all duration-200"
+                    className="grid h-[42px] w-[42px] place-items-center rounded-[50px] border border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.5)] text-[#808081] backdrop-blur-[22px] cursor-pointer hover:bg-[rgba(255,255,255,0.7)] hover:border-[rgba(255,255,255,0.5)] transition-all duration-200 dark:border-white/10 dark:bg-white/5 dark:text-[#9aa4a8] dark:hover:bg-white/10 dark:hover:border-white/20"
                   >
                     <BellIcon className="w-5 h-5" />
                   </button>
                   {unreadCount > 0 && (
-                    <span className="absolute right-[9px] top-[9px] block h-[10px] w-[10px] rounded-full bg-[#d53411] border-2 border-[#eef4f5]" />
+                    <span className="absolute right-[9px] top-[9px] block h-[10px] w-[10px] rounded-full bg-[#d53411] border-2 border-[#eef4f5] dark:border-[#10141a]" />
                   )}
                 </div>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[380px] z-[100] bg-[#f3f6f7] border-[#e5e5e6] rounded-xl p-0 backdrop-blur-sm max-h-[80vh] flex flex-col">
+              <DropdownMenuContent align="end" className="w-[380px] z-[100] bg-[#f3f6f7] dark:bg-[#1b232b] border-[#e5e5e6] dark:border-white/10 rounded-xl p-0 backdrop-blur-sm max-h-[80vh] flex flex-col">
                 {/* Notifications Header */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(239,239,239,0.08)] shrink-0">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(239,239,239,0.08)] dark:border-white/10 shrink-0">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-[16px] font-semibold text-[#10141a]">Notifications</h3>
+                    <h3 className="text-[16px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">Notifications</h3>
                     {unreadCount > 0 && (
                       <span className="bg-[#d53411] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
                         {unreadCount}
@@ -255,19 +257,19 @@ export default function DashboardHeader(
                     <div className="px-4 py-12 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <Loader2 className="w-8 h-8 text-[#00b4b8] animate-spin" />
-                        <p className="text-[12px] font-medium text-[#808081]">Loading notifications...</p>
+                        <p className="text-[12px] font-medium text-[#808081] dark:text-[#9aa4a8]">Loading notifications...</p>
                       </div>
                     </div>
                   ) : error ? (
                     /* Error State */
                     <div className="px-4 py-12 text-center">
                       <div className="flex flex-col items-center gap-3">
-                        <div className="flex items-center justify-center w-16 h-16 rounded-full bg-red-50">
+                        <div className="flex items-center justify-center w-16 h-16 rounded-full bg-red-50 dark:bg-red-500/10">
                           <AlertCircle className="w-8 h-8 text-[#d53411]" />
                         </div>
                         <div className="space-y-1">
-                          <p className="text-[14px] font-semibold text-[#10141a]">Failed to load notifications</p>
-                          <p className="text-[12px] font-medium text-[#808081]">Please try again later</p>
+                          <p className="text-[14px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">Failed to load notifications</p>
+                          <p className="text-[12px] font-medium text-[#808081] dark:text-[#9aa4a8]">Please try again later</p>
                         </div>
                       </div>
                     </div>
@@ -287,12 +289,12 @@ export default function DashboardHeader(
                     /* Empty State */
                     <div className="px-4 py-12 text-center">
                       <div className="flex flex-col items-center gap-3">
-                        <div className="flex items-center justify-center w-16 h-16 rounded-full bg-white/50">
-                          <BellIcon className="w-8 h-8 text-[#b2b2b3]" />
+                        <div className="flex items-center justify-center w-16 h-16 rounded-full bg-white/50 dark:bg-white/5">
+                          <BellIcon className="w-8 h-8 text-[#b2b2b3] dark:text-white/20" />
                         </div>
                         <div className="space-y-1">
-                          <p className="text-[14px] font-semibold text-[#10141a]">No notifications yet</p>
-                          <p className="text-[12px] font-medium text-[#808081]">You'll see updates here when there's activity</p>
+                          <p className="text-[14px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">No notifications yet</p>
+                          <p className="text-[12px] font-medium text-[#808081] dark:text-[#9aa4a8]">You'll see updates here when there's activity</p>
                         </div>
                       </div>
                     </div>
@@ -300,10 +302,10 @@ export default function DashboardHeader(
                 </div>
 
                 {/* Footer */}
-                <div className="border-t border-[rgba(239,239,239,0.08)] shrink-0 p-2">
+                <div className="border-t border-[rgba(239,239,239,0.08)] dark:border-white/10 shrink-0 p-2">
                   <button
                     disabled={notifications.length === 0}
-                    className="w-full px-4 py-2 text-[13px] font-medium text-[#5e636e] hover:bg-white/50 hover:text-[#10141a] transition-colors rounded-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#5e636e]"
+                    className="w-full px-4 py-2 text-[13px] font-medium text-[#5e636e] hover:bg-white/50 hover:text-[#10141a] dark:text-[#9aa4a8] dark:hover:bg-white/5 dark:hover:text-[#f4f6f7] transition-colors rounded-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#5e636e]"
                     onClick={() => clearAll().catch(() => {
                       // Error already logged in hook, UI rolled back optimistically
                     })}
@@ -318,33 +320,33 @@ export default function DashboardHeader(
                 <div
                   role="button"
                   aria-label={`Account menu for ${userName || 'User'}`}
-                  className="flex items-center gap-3 rounded-[60px] border border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.5)] px-[5px] py-[5px] backdrop-blur-[22px] hover:bg-[rgba(255,255,255,0.6)] transition-colors cursor-pointer"
+                  className="flex items-center gap-3 rounded-[60px] border border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.5)] px-[5px] py-[5px] backdrop-blur-[22px] hover:bg-[rgba(255,255,255,0.6)] transition-colors cursor-pointer dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
                 >
                   <UserAvatar userName={userName} userImage={userImage} />
                   <div className="hidden min-w-0 pr-2 sm:block">
-                    <p className="max-w-40 truncate text-sm font-medium leading-tight text-[#10141a]">
+                    <p className="max-w-40 truncate text-sm font-medium leading-tight text-[#10141a] dark:text-[#f4f6f7]">
                       {userName || 'User'}
                     </p>
                     {userRole && (
-                      <p className="mt-0.5 max-w-40 truncate text-[11px] font-medium leading-tight text-[#687173]">
+                      <p className="mt-0.5 max-w-40 truncate text-[11px] font-medium leading-tight text-[#687173] dark:text-[#9aa4a8]">
                         {userRole}
                       </p>
                     )}
                   </div>
                   {isUserDropdownOpen ? (
-                    <ChevronUp className="h-4 w-4 text-[#808081] mr-2" />
+                    <ChevronUp className="h-4 w-4 text-[#808081] dark:text-[#9aa4a8] mr-2" />
                   ) : (
-                    <ChevronDown className="h-4 w-4 text-[#808081] mr-2" />
+                    <ChevronDown className="h-4 w-4 text-[#808081] dark:text-[#9aa4a8] mr-2" />
                   )}
                 </div>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[214px] z-[100] bg-[#f3f6f7] border-[#e5e5e6] rounded-xl p-0 backdrop-blur-sm">
+              <DropdownMenuContent align="end" className="w-[214px] z-[100] bg-[#f3f6f7] dark:bg-[#1b232b] border-[#e5e5e6] dark:border-white/10 rounded-xl p-0 backdrop-blur-sm">
                 <div className="py-0">
-                  <div className="border-b border-[#dde5e6] px-4 py-3">
-                    <p className="truncate text-sm font-semibold text-[#10141a]">
+                  <div className="border-b border-[#dde5e6] dark:border-white/10 px-4 py-3">
+                    <p className="truncate text-sm font-semibold text-[#10141a] dark:text-[#f4f6f7]">
                       {userName || "User"}
                     </p>
-                    <p className="mt-1 truncate text-xs font-medium text-[#687173]">
+                    <p className="mt-1 truncate text-xs font-medium text-[#687173] dark:text-[#9aa4a8]">
                       {userRole || "User"}
                     </p>
                   </div>
@@ -356,8 +358,8 @@ export default function DashboardHeader(
                         ? "opacity-50 cursor-not-allowed"
                         : "cursor-pointer",
                       location.pathname === makeCommonRoute(Routes.common.profile)
-                        ? "bg-[#e5effa] text-[#00b4b8] hover:bg-[#e5effa] hover:text-[#00b4b8] focus:bg-[#e5effa] focus:text-[#00b4b8]"
-                        : "hover:bg-white/50 focus:bg-white/50"
+                        ? "bg-[#e5effa] text-[#00b4b8] hover:bg-[#e5effa] hover:text-[#00b4b8] focus:bg-[#e5effa] focus:text-[#00b4b8] dark:bg-white/10 dark:hover:bg-white/10 dark:focus:bg-white/10"
+                        : "hover:bg-white/50 focus:bg-white/50 dark:hover:bg-white/5 dark:focus:bg-white/5"
                     )}
                     onClick={() => userType !== UserType.SUPER_ADMIN && navigate(makeCommonRoute(Routes.common.profile))}
                   >
@@ -372,8 +374,8 @@ export default function DashboardHeader(
                     className={cn(
                       "cursor-pointer px-4 py-2 rounded-none gap-3",
                       location.pathname === getSettingsRoute() || location.pathname === makeCommonRoute(Routes.common.settings)
-                        ? "bg-[#e5effa] text-[#00b4b8] hover:bg-[#e5effa] hover:text-[#00b4b8] focus:bg-[#e5effa] focus:text-[#00b4b8]"
-                        : "hover:bg-white/50 focus:bg-white/50"
+                        ? "bg-[#e5effa] text-[#00b4b8] hover:bg-[#e5effa] hover:text-[#00b4b8] focus:bg-[#e5effa] focus:text-[#00b4b8] dark:bg-white/10 dark:hover:bg-white/10 dark:focus:bg-white/10"
+                        : "hover:bg-white/50 focus:bg-white/50 dark:hover:bg-white/5 dark:focus:bg-white/5"
                     )}
                     onClick={() => navigate(getSettingsRoute())}
                   >
@@ -388,8 +390,8 @@ export default function DashboardHeader(
                     className={cn(
                       "cursor-pointer px-4 py-2 rounded-none gap-3",
                       location.pathname === makeCommonRoute(Routes.common.helpCenter)
-                        ? "bg-[#e5effa] text-[#00b4b8] hover:bg-[#e5effa] hover:text-[#00b4b8] focus:bg-[#e5effa] focus:text-[#00b4b8]"
-                        : "hover:bg-white/50 focus:bg-white/50"
+                        ? "bg-[#e5effa] text-[#00b4b8] hover:bg-[#e5effa] hover:text-[#00b4b8] focus:bg-[#e5effa] focus:text-[#00b4b8] dark:bg-white/10 dark:hover:bg-white/10 dark:focus:bg-white/10"
+                        : "hover:bg-white/50 focus:bg-white/50 dark:hover:bg-white/5 dark:focus:bg-white/5"
                     )}
                     onClick={() => navigate(makeCommonRoute(Routes.common.helpCenter))}
                   >
@@ -402,7 +404,7 @@ export default function DashboardHeader(
 
                   <DropdownMenuItem
                     onClick={onLogout}
-                    className="gap-3 px-4 py-2 rounded-none cursor-pointer hover:bg-white/50 focus:bg-white/50"
+                    className="gap-3 px-4 py-2 rounded-none cursor-pointer hover:bg-white/50 focus:bg-white/50 dark:hover:bg-white/5 dark:focus:bg-white/5"
                   >
                     <LogOut className="w-4 h-4 text-[#d53411]" />
                     <span className="font-medium text-[14px] text-[#d53411]">Logout</span>

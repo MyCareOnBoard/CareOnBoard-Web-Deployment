@@ -34,6 +34,7 @@ import DSPManagementIcon from "@/assets/icons/dsp-management.svg?react";
 import CommunityInclusionIcon from "@/assets/icons/community-inclusion.svg?react";
 import GoaslAndDocumentsIcon from "@/assets/icons/goals-and-documents.svg?react";
 import MileageIcon from "@/assets/icons/mileage.svg?react";
+import {ScrollToTopButton} from "@/components/ScrollToTopButton";
 
 import {
     UsersRound,
@@ -296,7 +297,7 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
     return (
         <ProtectedRoute>
             {!canRenderCurrentRoute ? <Navigate to={Routes.agency.dashboard} replace /> :
-            <div className="relative min-h-screen bg-[#eef4f5] overflow-x-hidden">
+            <div className="relative min-h-screen bg-[#eef4f5] dark:bg-[#10141a] overflow-x-hidden">
                 <DashboardHeader
                     userName={user?.fullName}
                     userImage={(user as any)?.profileImage || user?.photoURL}
@@ -350,6 +351,8 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
                                 </TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
+                        {/* Stacked above the Smart Manager button so the two don't overlap. */}
+                        <ScrollToTopButton className="bottom-24 md:bottom-28" />
                     </>
                 )}
             </div>}
