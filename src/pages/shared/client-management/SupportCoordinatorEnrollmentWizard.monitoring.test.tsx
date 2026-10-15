@@ -74,6 +74,8 @@ async function newMonitoring({ photo = false } = {}) {
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  expect(screen.getByRole("heading", { name: "Documents", level: 1 })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   expect(screen.getByRole("heading", { name: "Monitoring settings" })).toBeInTheDocument();
   await screen.findByLabelText("Enable monitoring contact schedules");
   return view;
@@ -106,16 +108,17 @@ function editReview() {
   fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 }
 
-test("monitoring is the fifth of seven steps before agreement and signatures", async () => {
+test("monitoring follows optional documents before agreement and signatures", async () => {
   render(wizard());
   await act(async () => {});
   const steps = within(screen.getByRole("navigation", { name: "Enrollment steps" })).getAllByRole("button");
-  expect(steps).toHaveLength(7);
-  expect(steps[4]).toHaveTextContent("Monitoring settings");
-  expect(steps[5]).toHaveTextContent("Enrollment agreement");
-  expect(steps[6]).toHaveTextContent("Review & sign");
-  expect(screen.getByText("0 of 7 steps completed")).toBeInTheDocument();
-  expect(screen.getByText("Step 1 of 7")).toBeInTheDocument();
+  expect(steps).toHaveLength(8);
+  expect(steps[4]).toHaveTextContent("Documents");
+  expect(steps[5]).toHaveTextContent("Monitoring settings");
+  expect(steps[6]).toHaveTextContent("Enrollment agreement");
+  expect(steps[7]).toHaveTextContent("Review & sign");
+  expect(screen.getByText("0 of 8 steps completed")).toBeInTheDocument();
+  expect(screen.getByText("Step 1 of 8")).toBeInTheDocument();
 });
 
 test("a new enrollment can leave every setting off without writing a policy", async () => {
