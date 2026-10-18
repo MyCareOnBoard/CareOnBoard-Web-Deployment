@@ -35,7 +35,8 @@ import {
   type ClaimReportFormInput,
   type X12ExportCheck,
 } from "@/lib/api/claims";
-import { getClaimX12Action } from "../x12-export/x12ExportUtils";
+import { claimX12ButtonText, getClaimX12Action } from "../x12-export/x12ExportUtils";
+import ClaimReportActionsFooter from "./ClaimReportActionsFooter";
 import {
   applySavedClaimReport,
   buildClaimReportFieldsInput,
@@ -324,12 +325,38 @@ export default function ClaimReportModal({
 
   const x12Action = x12Mode
     ? {
-        label: x12Busy ? "Preparing 837P…" : x12Mode === "export" ? "Create & download 837P" : "Download 837P",
-        title: x12Mode === "export" ? "Puts this claim in a new 837P file. The report can't be changed after that." : undefined,
+        ...claimX12ButtonText({ mode: x12Mode, busy: x12Busy, ediExport: claimEdiExport }),
         busy: x12Busy,
         onClick: () => void handleX12(),
       }
     : null;
+  const pdfAction = {
+    label: isDownloading ? "Creating PDF…" : "Download claim form (PDF)",
+    detail: "CMS-1500 style, for printing or records",
+    busy: isDownloading,
+    onClick: () => void handleDownload(),
+  };
+
+  const footerStatus = locked ? (
+    <p role="status">This claim is already in an 837P file, so changes here are not saved.</p>
+  ) : persistId && SAVE_STATE_LABEL[saveState] ? (
+    <p
+      className={saveState === "error" || saveState === "load-error" ? "text-[#d92d20]" : undefined}
+      role="status"
+      aria-live="polite"
+    >
+      {SAVE_STATE_LABEL[saveState]}
+      {saveState === "load-error" ? (
+        <button
+          type="button"
+          onClick={() => setLoadAttempt((attempt) => attempt + 1)}
+          className="ml-2 font-medium underline"
+        >
+          Try again
+        </button>
+      ) : null}
+    </p>
+  ) : null;
 
   const x12Details = x12Problem?.details;
   const x12Notice = x12Problem ? (
@@ -421,28 +448,6 @@ export default function ClaimReportModal({
               <DialogDescription className="sr-only">
                 Review claim details, add signatures, download, or send the report.
               </DialogDescription>
-              {locked ? (
-                <p className="claim-report-no-print mt-2 text-[13px] text-[#808081]" role="status">
-                  This claim is already in an 837P file, so changes here are not saved.
-                </p>
-              ) : persistId && SAVE_STATE_LABEL[saveState] ? (
-                <p
-                  className={`claim-report-no-print mt-2 text-[13px] ${saveState === "error" || saveState === "load-error" ? "text-[#d92d20]" : "text-[#808081]"}`}
-                  role="status"
-                  aria-live="polite"
-                >
-                  {SAVE_STATE_LABEL[saveState]}
-                  {saveState === "load-error" ? (
-                    <button
-                      type="button"
-                      onClick={() => setLoadAttempt((attempt) => attempt + 1)}
-                      className="ml-2 font-medium underline"
-                    >
-                      Try again
-                    </button>
-                  ) : null}
-                </p>
-              ) : null}
             </DialogHeader>
 
             <div key={claim.id} className="claim-report-modal-body flex-1 overflow-x-hidden overflow-y-auto pb-6">
@@ -467,17 +472,22 @@ export default function ClaimReportModal({
               <ClaimReportSummaryFooter
                 form={form}
                 claimId={savedClaimId ?? claim.id}
-                isDownloading={isDownloading}
                 onUpdate={updateForm}
-                onDownload={handleDownload}
-                x12Action={x12Action}
-                notice={x12Notice}
-                onSend={handleSend}
                 onOpenPhysicianSignature={openPhysicianSignature}
                 onClearPhysicianSignature={clearPhysicianSignature}
               />
             </div>
           </div>
+
+          {/* Outside the print root, so the PDF never includes it. */}
+          <ClaimReportActionsFooter
+            status={footerStatus}
+            notice={x12Notice}
+            pdf={pdfAction}
+            x12={x12Action}
+            onSend={handleSend}
+            onClose={onClose}
+          />
         </DialogContent>
       </Dialog>
 

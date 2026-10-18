@@ -109,6 +109,28 @@ export function getClaimX12Action({
   return status === "pending" ? "export" : null;
 }
 
+/** Label and file description for the claim report's 837P button. */
+export function claimX12ButtonText({
+  mode,
+  busy = false,
+  ediExport,
+}: {
+  mode: "download" | "export";
+  busy?: boolean;
+  ediExport?: Pick<BillingClaimEdiExport, "fileName" | "controlNumber"> | null;
+}): { label: string; detail: string } {
+  if (mode === "export") {
+    return {
+      label: busy ? "Creating 837P file…" : "Create & download 837P file",
+      detail: "Electronic claim for NJMMIS. Locks this report",
+    };
+  }
+  return {
+    label: busy ? "Downloading 837P file…" : "Download 837P file",
+    detail: ediExport?.fileName || (ediExport?.controlNumber ? `Control #${ediExport.controlNumber}` : "Electronic claim for NJMMIS"),
+  };
+}
+
 export type GroupedClaimIssues = Array<{
   claimId: string;
   claimNumber: string;

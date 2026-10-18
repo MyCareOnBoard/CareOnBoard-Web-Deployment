@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { BillingClaimListItem } from "@/lib/api/claims";
 import {
   agencyDefaultPlaceholder,
+  claimX12ButtonText,
   countIssues,
   formatCents,
   getClaimX12Action,
@@ -108,5 +109,20 @@ describe("getClaimX12Action", () => {
     expect(getClaimX12Action({ canManage: true, status: "pending" })).toBe("export");
     expect(getClaimX12Action({ canManage: true, status: "rejected" })).toBeNull();
     expect(getClaimX12Action({ canManage: false, status: "pending" })).toBeNull();
+  });
+});
+
+describe("claimX12ButtonText", () => {
+  it("says a new file is made and the report locks", () => {
+    expect(claimX12ButtonText({ mode: "export" })).toEqual({
+      label: "Create & download 837P file",
+      detail: "Electronic claim for NJMMIS. Locks this report",
+    });
+    expect(claimX12ButtonText({ mode: "export", busy: true }).label).toBe("Creating 837P file…");
+  });
+
+  it("names the file a claim is already in", () => {
+    expect(claimX12ButtonText({ mode: "download", ediExport: { fileName: "837P_TEST.x12", controlNumber: "000000001" } }).detail).toBe("837P_TEST.x12");
+    expect(claimX12ButtonText({ mode: "download", ediExport: { controlNumber: "000000001" } }).detail).toBe("Control #000000001");
   });
 });
