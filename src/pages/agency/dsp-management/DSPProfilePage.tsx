@@ -4,6 +4,7 @@ import { getEmployeeById } from "@/lib/api/employees";
 import { DSPProfile } from "./DSPProfile";
 import { DSP } from "./types";
 import { Routes } from "@/routes/constants";
+import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 
 function normalizeAddress(address: any): string {
   if (!address) return "";
@@ -27,6 +28,7 @@ function calculateAge(dateOfBirth?: string): number | undefined {
 export default function DSPProfilePage() {
   const { dspId } = useParams<{ dspId: string }>();
   const navigate = useNavigate();
+  const mode = useEffectiveAgencyMode();
   const [dsp, setDsp] = useState<DSP | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -111,7 +113,7 @@ export default function DSPProfilePage() {
   return (
     <div className="min-h-screen">
       <div className="mx-auto p-6 space-y-6">
-        <h1 className="text-3xl font-bold text-gray-900">DSP Management</h1>
+        <h1 className="text-3xl font-bold text-gray-900">{mode === "hha" ? "Caregiver Management" : "DSP Management"}</h1>
         <DSPProfile
           dsp={dsp}
           onBack={() => navigate(Routes.agency.dspManagement)}

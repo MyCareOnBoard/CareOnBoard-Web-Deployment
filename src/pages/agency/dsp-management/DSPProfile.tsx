@@ -15,6 +15,7 @@ import { useMessaging } from "@/contexts/MessagingContext";
 import { ActivityTab } from "./components/ActivityTab";
 import { ShiftsTab } from "./components/ShiftsTab";
 import { ProfileTab } from "./components/ProfileTab";
+import { TrainingTab } from "./components/TrainingTab";
 import { EditProfileModal } from "./components/EditProfileModal";
 import { RequestDocumentModal } from "./components/RequestDocumentModal";
 import { withMessagingProvider } from "@/contexts/withMessagingProvider";
@@ -25,7 +26,7 @@ interface DSPProfileProps {
 }
 
 function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
-  const [activeTab, setActiveTab] = useState<"Activity" | "Shifts" | "Profile">("Activity");
+  const [activeTab, setActiveTab] = useState<"Activity" | "Shifts" | "Profile" | "Training">("Activity");
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showRequestDocument, setShowRequestDocument] = useState(false);
   const [isOpeningChat, setIsOpeningChat] = useState(false);
@@ -314,6 +315,16 @@ function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
           >
             Profile
           </button>
+          <button
+            onClick={() => setActiveTab("Training")}
+            className={`px-6 py-2 rounded-full text-sm border font-medium transition-colors cursor-pointer ${
+              activeTab === "Training"
+                ? "bg-teal-500 text-white border-teal-500"
+                : "text-gray-600 border-gray-200 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-700"
+            }`}
+          >
+            Training
+          </button>
         </div>
       </div>
 
@@ -360,6 +371,14 @@ function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
           dsp={currentDsp}
           onDeactivate={handleDeactivateUser}
           onActivate={handleActivateUser}
+        />
+      )}
+
+      {activeTab === "Training" && (
+        <TrainingTab
+          dspId={currentDsp.id}
+          agencyId={user?.agencyId}
+          mode={mode ?? undefined}
         />
       )}
 
