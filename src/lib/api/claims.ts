@@ -31,6 +31,15 @@ export type BillingClaimListItem = {
   rideCount?: number;
   createdAt: string;
   rejectionReason: string | null;
+  /** Set once the claim is in an 837P batch. */
+  ediExport?: BillingClaimEdiExport | null;
+};
+
+export type BillingClaimEdiExport = {
+  batchId: string;
+  controlNumber: string | null;
+  usageIndicator: "T" | "P" | null;
+  exportedAt: string | null;
 };
 
 export type ClaimsDashboardSummary = {
@@ -84,6 +93,7 @@ export type BillingClaimDetail = {
   updatedAt: string;
   shifts: Shift[];
   rides?: MileageRide[];
+  ediExport?: BillingClaimEdiExport | null;
 };
 
 type ClaimsDashboardResponse = {
@@ -380,4 +390,267 @@ export function getBillingClaimMutationErrorMessage(error: unknown): string {
   }
 
   return "Something went wrong. Please try again.";
+}
+
+// ===== Claim report (saved onset date + signatures) =====
+
+export type ClaimReportSignatureInput = {
+  signatureType: "type" | "draw" | "upload";
+  signatureData: string;
+};
+
+export type ClaimReportFormInput = {
+  onsetDate?: string | null;
+  onsetQualifier?: "431" | "484" | null;
+  signatureDate?: string | null;
+  conditions?: { employment: boolean; autoAccident: boolean; otherAccident: boolean };
+  outsideLab?: "yes" | "no";
+  hospitalization?: { from: string | null; to: string | null };
+  /** Omit to keep the saved signature; null removes it. */
+  patientSignature?: ClaimReportSignatureInput | null;
+  providerSignature?: ClaimReportSignatureInput | null;
+};
+
+export type SavedClaimReportSignature = {
+  signatureType: "type" | "draw" | "upload";
+  signatureData?: string | null;
+  savedAt?: string | null;
+};
+
+export type SavedClaimReportForm = {
+  onsetDate: string | null;
+  onsetQualifier: string | null;
+  signatureDate: string | null;
+  conditions: { employment?: boolean; autoAccident?: boolean; otherAccident?: boolean } | null;
+  outsideLab: "yes" | "no" | null;
+  hospitalization: { from?: string | null; to?: string | null } | null;
+  patientSignature: SavedClaimReportSignature | null;
+  providerSignature: SavedClaimReportSignature | null;
+  updatedAt: string | null;
+};
+
+export type ClaimReportResponse = {
+  claimId: string;
+  locked: boolean;
+  reportForm: SavedClaimReportForm | null;
+};
+
+type ApiEnvelope<T> = { success: boolean; data?: T; message?: string; error?: string };
+
+export async function getClaimReport(input: {
+  context: OperationalBillingRequestContext;
+  claimId: string;
+  signal?: AbortSignal;
+}): Promise<ClaimReportResponse> {
+  const { context, claimId, signal } = input;
+  const response = await axiosClient.get<ApiEnvelope<ClaimReportResponse>>(
+    `/billing/claims/${encodeURIComponent(claimId)}/report`,
+    { params: { agencyId: operationalAgencyId(context) }, ...(signal ? { signal } : {}) },
+  );
+  if (!response.data.success || !response.data.data) {
+    throw new Error(response.data.message || "Failed to load the claim report");
+  }
+  return response.data.data;
+}
+
+export async function updateClaimReport(input: {
+  context: OperationalBillingRequestContext;
+  claimId: string;
+  payload: ClaimReportFormInput;
+  signal?: AbortSignal;
+}): Promise<{ claimId: string; reportForm: SavedClaimReportForm | null }> {
+  const { context, claimId, payload, signal } = input;
+  const response = await axiosClient.patch<
+    ApiEnvelope<{ claimId: string; reportForm: SavedClaimReportForm | null }>
+  >(
+    `/billing/claims/${encodeURIComponent(claimId)}/report`,
+    withoutAgencyId(payload),
+    { params: { agencyId: operationalAgencyId(context) }, ...(signal ? { signal } : {}) },
+  );
+  if (!response.data.success || !response.data.data) {
+    throw new Error(response.data.message || "Failed to save the claim report");
+  }
+  return response.data.data;
+}
+
+// ===== 837P (X12) export =====
+
+export type EdiUsageIndicator = "T" | "P";
+
+export type EdiSettings = {
+  submitterId: string;
+  submitterName: string;
+  submitterContactName: string;
+  submitterContactPhone: string;
+  receiverId: string;
+  receiverName: string;
+  payerId: string;
+  payerName: string;
+  billingProviderName: string;
+  billingTaxId: string;
+  taxonomyCode: string;
+  billingStreet: string;
+  billingCity: string;
+  billingState: string;
+  billingZip: string;
+  usageIndicator: EdiUsageIndicator;
+};
+
+export type X12ValidationIssue = {
+  claimId?: string;
+  claimNumber?: string;
+  field?: string;
+  code?: string;
+  message: string;
+};
+
+export type X12ExportCheck = {
+  valid: boolean;
+  claimCount: number;
+  settingsErrors: X12ValidationIssue[];
+  claimErrors: X12ValidationIssue[];
+  warnings: X12ValidationIssue[];
+};
+
+export type X12Batch = {
+  id: string;
+  status: "generating" | "ready" | "failed";
+  usageIndicator: EdiUsageIndicator;
+  interchangeControlNumber: string;
+  claimCount: number;
+  claimIds: string[];
+  claimNumbers: string[];
+  totalChargeCents: number;
+  sizeBytes: number | null;
+  fileName: string;
+  createdAt: string;
+  createdBy: string | null;
+  resubmit: boolean;
+};
+
+/** Error raised when the server refuses an export; `details` lists each problem. */
+export class X12ExportError extends Error {
+  details: X12ExportCheck | null;
+
+  constructor(message: string, details: X12ExportCheck | null) {
+    super(message);
+    this.name = "X12ExportError";
+    this.details = details;
+  }
+}
+
+export async function getEdiSettings(input: {
+  context: OperationalBillingRequestContext;
+  signal?: AbortSignal;
+}): Promise<EdiSettings> {
+  const { context, signal } = input;
+  const response = await axiosClient.get<ApiEnvelope<EdiSettings>>("/billing/edi/settings", {
+    params: { agencyId: operationalAgencyId(context) },
+    ...(signal ? { signal } : {}),
+  });
+  if (!response.data.success || !response.data.data) {
+    throw new Error(response.data.message || "Failed to load 837P settings");
+  }
+  return response.data.data;
+}
+
+export async function saveEdiSettings(input: {
+  context: OperationalBillingRequestContext;
+  settings: EdiSettings;
+  signal?: AbortSignal;
+}): Promise<EdiSettings> {
+  const { context, settings, signal } = input;
+  const response = await axiosClient.put<ApiEnvelope<EdiSettings>>(
+    "/billing/edi/settings",
+    withoutAgencyId(settings),
+    { params: { agencyId: operationalAgencyId(context) }, ...(signal ? { signal } : {}) },
+  );
+  if (!response.data.success || !response.data.data) {
+    throw new Error(response.data.message || "Failed to save 837P settings");
+  }
+  return response.data.data;
+}
+
+export async function checkX12Export(input: {
+  context: OperationalBillingRequestContext;
+  claimIds: string[];
+  resubmit?: boolean;
+  signal?: AbortSignal;
+}): Promise<X12ExportCheck> {
+  const { context, claimIds, resubmit = false, signal } = input;
+  const response = await axiosClient.post<ApiEnvelope<X12ExportCheck>>(
+    "/billing/claims/x12-export/check",
+    { claimIds, resubmit },
+    { params: { agencyId: operationalAgencyId(context) }, ...(signal ? { signal } : {}) },
+  );
+  if (!response.data.success || !response.data.data) {
+    throw new Error(response.data.message || "Failed to check claims for 837P export");
+  }
+  return response.data.data;
+}
+
+export async function exportClaimsX12(input: {
+  context: OperationalBillingRequestContext;
+  claimIds: string[];
+  resubmit?: boolean;
+  signal?: AbortSignal;
+}): Promise<{ batch: X12Batch; warnings: X12ValidationIssue[] }> {
+  const { context, claimIds, resubmit = false, signal } = input;
+  try {
+    const response = await axiosClient.post<
+      ApiEnvelope<{ batch: X12Batch; warnings?: X12ValidationIssue[] }>
+    >(
+      "/billing/claims/x12-export",
+      { claimIds, resubmit },
+      { params: { agencyId: operationalAgencyId(context) }, ...(signal ? { signal } : {}) },
+    );
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.message || "Failed to create the 837P file");
+    }
+    return { batch: response.data.data.batch, warnings: response.data.data.warnings ?? [] };
+  } catch (error) {
+    const payload = (error as { response?: { data?: { message?: string; details?: X12ExportCheck } } })
+      ?.response?.data;
+    if (payload?.details) {
+      throw new X12ExportError(payload.message || "Some claims can't be exported yet.", payload.details);
+    }
+    throw error;
+  }
+}
+
+export async function listX12Batches(input: {
+  context: OperationalBillingRequestContext;
+  limit?: number;
+  signal?: AbortSignal;
+}): Promise<X12Batch[]> {
+  const { context, limit = 20, signal } = input;
+  const response = await axiosClient.get<ApiEnvelope<{ batches: X12Batch[] }>>(
+    "/billing/claims/x12-batches",
+    { params: { agencyId: operationalAgencyId(context), limit }, ...(signal ? { signal } : {}) },
+  );
+  if (!response.data.success || !response.data.data) {
+    throw new Error(response.data.message || "Failed to list 837P files");
+  }
+  return response.data.data.batches;
+}
+
+/** Downloads a batch and saves it with the server's file name. */
+export async function downloadX12Batch(input: {
+  context: OperationalBillingRequestContext;
+  batch: Pick<X12Batch, "id" | "fileName">;
+}): Promise<void> {
+  const { context, batch } = input;
+  const response = await axiosClient.get<Blob>(
+    `/billing/claims/x12-batches/${encodeURIComponent(batch.id)}/file`,
+    { params: { agencyId: operationalAgencyId(context) }, responseType: "blob" },
+  );
+  const url = URL.createObjectURL(response.data);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = batch.fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  // Revoking right after click() can cancel the download in Safari and some Firefox versions.
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }

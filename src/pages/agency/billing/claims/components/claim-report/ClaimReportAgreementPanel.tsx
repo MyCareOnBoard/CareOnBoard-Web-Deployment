@@ -54,12 +54,12 @@ function ClaimReportAgreementPanel({
       <section className={CLAIM_REPORT_SECTION}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <ReportFieldLabel>Service date</ReportFieldLabel>
+            <ReportFieldLabel>Onset date (date of current illness)</ReportFieldLabel>
             <CustomDatePicker
               key={`report-service-date-${claimId}`}
               align="start"
               date={form.serviceDateIso ? new Date(form.serviceDateIso) : null}
-              placeholder="Select service date"
+              placeholder="Select onset date"
               setDate={setDateField("serviceDateIso")}
               {...CLAIM_REPORT_DATE_PICKER_PROPS}
             />

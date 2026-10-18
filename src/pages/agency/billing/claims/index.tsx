@@ -61,6 +61,7 @@ import {
 
 const GenerateClaimModal = lazy(() => import("./components/GenerateClaimModal"));
 const ClaimReportModal = lazy(() => import("./components/claim-report/ClaimReportModal"));
+const X12ExportPanel = lazy(() => import("./components/x12-export/X12ExportPanel"));
 const OutOfPocketInvoiceModal = lazy(
   () => import("../out-of-pocket/components/OutOfPocketInvoiceModal"),
 );
@@ -74,6 +75,7 @@ export function ClaimsDashboardContent() {
   const reportClientId=reportParams.get('clientId');
   const reportAgencyId=reportParams.get('agencyId');
   const canViewReport=user?.profile?.isActive!==false && !['inactive','suspended','disabled','deleted'].includes(user?.profile?.status??'') && (actor==='super_admin'?Boolean(user?.profile?.accessList?.includes('Billing Management')):canAccessBillingChild(user?.userType,user?.profile?.accessList,'Claims View'));
+  const canManageClaims=user?.profile?.isActive!==false && !['inactive','suspended','disabled','deleted'].includes(user?.profile?.status??'') && (actor==='super_admin'?Boolean(user?.profile?.accessList?.includes('Billing Management')):canAccessBillingChild(user?.userType,user?.profile?.accessList,'Claims Management'));
   const reportScope=JSON.stringify([authScope,agencyId,actor,mode,canViewReport,reportClientId,reportClaimId]);
   const currentReportScope=useRef(reportScope);currentReportScope.current=reportScope;
   const [reportSelectionError,setReportSelectionError]=useState('');
@@ -637,6 +639,15 @@ export function ClaimsDashboardContent() {
           generateDisabled={savingClaim || openingReport !== null}
         />
       ) : (
+        <>
+        {canManageClaims ? (
+          <Suspense fallback={null}>
+            <X12ExportPanel
+              claims={generatedClaims.claims}
+              onExported={() => void generatedClaims.refetch({ force: true })}
+            />
+          </Suspense>
+        ) : null}
         <SavedClaimsTable
           claims={generatedClaims.claims}
           totalCount={generatedClaims.totalCount}
@@ -652,6 +663,7 @@ export function ClaimsDashboardContent() {
           onViewInvoice={(invoice) => void handleViewInvoice(invoice)}
           onCancelInvoice={setCancelModalInvoice}
         />
+        </>
       )}
 
       {generateOpen && (
@@ -677,6 +689,7 @@ export function ClaimsDashboardContent() {
             savedClaimId={claimReport.savedClaim.id}
             claimNumber={claimReport.savedClaim.claimNumber}
             initialPrefill={claimReport.savedClaim.reportPrefill}
+            canSave={canManageClaims && claimReport.savedClaim.status === "pending"}
             onClose={handleCloseReportModal}
           />
         </Suspense>

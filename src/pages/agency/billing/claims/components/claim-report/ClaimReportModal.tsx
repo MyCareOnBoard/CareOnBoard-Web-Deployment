@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import {
   Dialog,
@@ -23,6 +23,12 @@ import ClaimReportLeftColumn from "./ClaimReportLeftColumn";
 import ClaimReportServiceTable from "./ClaimReportServiceTable";
 import ClaimReportSummaryFooter from "./ClaimReportSummaryFooter";
 import "./claimReportPrint.css";
+import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
+import { getClaimReport, updateClaimReport, type ClaimReportFormInput } from "@/lib/api/claims";
+import {
+  applySavedClaimReport,
+  buildClaimReportFieldsInput,
+} from "../../utils/claimReportSavedFormUtils";
 
 const DigitalSignatureModal = lazy(
   () => import("@/pages/applicant/application/components/DigitalSignature")
@@ -30,12 +36,29 @@ const DigitalSignatureModal = lazy(
 
 type SignatureTarget = "signed" | "physician";
 
+type SaveState = "idle" | "loading" | "load-error" | "saving" | "saved" | "error";
+type SignatureFields = Pick<ClaimReportFormInput, "patientSignature" | "providerSignature">;
+const SIGNATURE_FIELDS = ["patientSignature", "providerSignature"] as const;
+
+const AUTOSAVE_DELAY_MS = 800;
+
+const SAVE_STATE_LABEL: Record<SaveState, string> = {
+  idle: "",
+  loading: "Loading saved details…",
+  "load-error": "Couldn't load the saved details, so changes here won't be saved.",
+  saving: "Saving…",
+  saved: "Saved",
+  error: "Couldn't save. It will try again on your next change.",
+};
+
 type ClaimReportModalProps = {
   open: boolean;
   claim: RecentClaim;
   savedClaimId?: string;
   claimNumber?: string;
   initialPrefill: ClaimReportPrefillSnapshot;
+  /** Save onset date, signatures and other report fields on the claim (Claims Management). */
+  canSave?: boolean;
   onClose: () => void;
 };
 
@@ -45,8 +68,10 @@ export default function ClaimReportModal({
   savedClaimId,
   claimNumber,
   initialPrefill,
+  canSave = false,
   onClose,
 }: ClaimReportModalProps) {
+  const { agencyId } = useOperationalAgency();
   const printRef = useRef<HTMLDivElement>(null);
   const [form, setForm] = useState<ClaimReportFormState>(() =>
     buildClaimReportFromClaim(claim, initialPrefill),
@@ -54,9 +79,106 @@ export default function ClaimReportModal({
   const [signatureTarget, setSignatureTarget] = useState<SignatureTarget | null>(null);
   const [signatureModalEverOpened, setSignatureModalEverOpened] = useState(false);
 
+  const persistId = canSave ? savedClaimId : undefined;
+  const [saveState, setSaveState] = useState<SaveState>(savedClaimId ? "loading" : "idle");
+  const [locked, setLocked] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const loadedRef = useRef(!savedClaimId);
+  // Signatures whose save hasn't succeeded yet; they ride along with the next save.
+  const unsavedSignaturesRef = useRef<SignatureFields>({});
+  const fieldsDirtyRef = useRef(false);
+  const formRef = useRef(form);
+  formRef.current = form;
+  const saveChainRef = useRef<Promise<unknown>>(Promise.resolve());
+
+  // Load what was saved on the claim before (onset date, signatures, conditions).
+  useEffect(() => {
+    if (!savedClaimId || !agencyId) return;
+    const controller = new AbortController();
+    loadedRef.current = false;
+    setLoadFailed(false);
+    setSaveState("loading");
+    getClaimReport({ context: { agencyId }, claimId: savedClaimId, signal: controller.signal })
+      .then((result) => {
+        if (controller.signal.aborted) return;
+        setForm((prev) => applySavedClaimReport(prev, result.reportForm));
+        setLocked(result.locked);
+        setSaveState("idle");
+        loadedRef.current = true;
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return;
+        // Saving now would overwrite the saved values with the prefill, so stay read-only.
+        setLoadFailed(true);
+        setSaveState("load-error");
+      });
+    return () => controller.abort();
+  }, [agencyId, savedClaimId, loadAttempt]);
+
+  const persist = useCallback(
+    (payload: ClaimReportFormInput) => {
+      if (!persistId || !agencyId || locked || loadFailed) return;
+      const body: ClaimReportFormInput = { ...unsavedSignaturesRef.current, ...payload };
+      const sent: SignatureFields = {};
+      for (const field of SIGNATURE_FIELDS) {
+        if (field in body) sent[field] = body[field];
+      }
+      Object.assign(unsavedSignaturesRef.current, sent);
+      setSaveState("saving");
+      // Saves run one after another so a later edit never lands before an earlier one.
+      saveChainRef.current = saveChainRef.current
+        .catch(() => undefined)
+        .then(() => updateClaimReport({ context: { agencyId }, claimId: persistId, payload: body }))
+        .then(() => {
+          for (const field of SIGNATURE_FIELDS) {
+            // Keep it if a newer signature replaced it while this save was running.
+            if (field in sent && unsavedSignaturesRef.current[field] === sent[field]) {
+              delete unsavedSignaturesRef.current[field];
+            }
+          }
+          setSaveState("saved");
+        })
+        .catch((error: unknown) => {
+          const code = (error as { response?: { data?: { error?: string } } })?.response?.data?.error;
+          if (code === "CLAIM_REPORT_LOCKED") {
+            setLocked(true);
+            setSaveState("idle");
+            return;
+          }
+          setSaveState("error");
+        });
+    },
+    [agencyId, loadFailed, locked, persistId],
+  );
+  const persistRef = useRef(persist);
+  persistRef.current = persist;
+
   const updateForm = useCallback((patch: Partial<ClaimReportFormState>) => {
+    if (loadedRef.current) fieldsDirtyRef.current = true;
     setForm((prev) => ({ ...prev, ...patch }));
   }, []);
+
+  const fieldsKey = JSON.stringify(buildClaimReportFieldsInput(form));
+  useEffect(() => {
+    if (!fieldsDirtyRef.current) return;
+    const timer = window.setTimeout(() => {
+      fieldsDirtyRef.current = false;
+      persist(buildClaimReportFieldsInput(formRef.current));
+    }, AUTOSAVE_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [fieldsKey, persist]);
+
+  // Closing the report unmounts it; send any change still waiting on the autosave delay.
+  useEffect(
+    () => () => {
+      const hasUnsavedSignature = Object.keys(unsavedSignaturesRef.current).length > 0;
+      if (!fieldsDirtyRef.current && !hasUnsavedSignature) return;
+      fieldsDirtyRef.current = false;
+      persistRef.current(buildClaimReportFieldsInput(formRef.current));
+    },
+    [],
+  );
 
   const updateDiagnosis = useCallback((letter: string, value: string) => {
     setForm((prev) => ({
@@ -81,14 +203,20 @@ export default function ClaimReportModal({
         signatureData: payload.signatureData,
       };
       const normalized = await normalizeSignaturePayload(claimPayload);
-      updateForm(
-        signatureTarget === "signed"
+      setForm((prev) => ({
+        ...prev,
+        ...(signatureTarget === "signed"
           ? { signedSignature: normalized }
-          : { physicianSignature: normalized }
+          : { physicianSignature: normalized }),
+      }));
+      persist(
+        signatureTarget === "signed"
+          ? { patientSignature: normalized }
+          : { providerSignature: normalized },
       );
       setSignatureTarget(null);
     },
-    [signatureTarget, updateForm]
+    [persist, signatureTarget]
   );
 
   const handleDownload = useCallback(async () => {
@@ -107,14 +235,14 @@ export default function ClaimReportModal({
 
   const openSignedSignature = useCallback(() => openSignature("signed"), [openSignature]);
   const openPhysicianSignature = useCallback(() => openSignature("physician"), [openSignature]);
-  const clearSignedSignature = useCallback(
-    () => updateForm({ signedSignature: null }),
-    [updateForm]
-  );
-  const clearPhysicianSignature = useCallback(
-    () => updateForm({ physicianSignature: null }),
-    [updateForm]
-  );
+  const clearSignedSignature = useCallback(() => {
+    setForm((prev) => ({ ...prev, signedSignature: null }));
+    persist({ patientSignature: null });
+  }, [persist]);
+  const clearPhysicianSignature = useCallback(() => {
+    setForm((prev) => ({ ...prev, physicianSignature: null }));
+    persist({ providerSignature: null });
+  }, [persist]);
 
   const blockClaimCloseWhileSigning = useCallback((event: Event) => {
     const target = event.target;
@@ -169,6 +297,28 @@ export default function ClaimReportModal({
               <DialogDescription className="sr-only">
                 Review claim details, add signatures, download, or send the report.
               </DialogDescription>
+              {locked ? (
+                <p className="claim-report-no-print mt-2 text-[13px] text-[#808081]" role="status">
+                  This claim is already in an 837P file, so changes here are not saved.
+                </p>
+              ) : persistId && SAVE_STATE_LABEL[saveState] ? (
+                <p
+                  className={`claim-report-no-print mt-2 text-[13px] ${saveState === "error" || saveState === "load-error" ? "text-[#d92d20]" : "text-[#808081]"}`}
+                  role="status"
+                  aria-live="polite"
+                >
+                  {SAVE_STATE_LABEL[saveState]}
+                  {saveState === "load-error" ? (
+                    <button
+                      type="button"
+                      onClick={() => setLoadAttempt((attempt) => attempt + 1)}
+                      className="ml-2 font-medium underline"
+                    >
+                      Try again
+                    </button>
+                  ) : null}
+                </p>
+              ) : null}
             </DialogHeader>
 
             <div key={claim.id} className="claim-report-modal-body flex-1 overflow-x-hidden overflow-y-auto pb-6">
