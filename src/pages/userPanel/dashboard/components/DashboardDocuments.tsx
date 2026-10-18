@@ -39,7 +39,7 @@ function badge(document: DashboardDocument) {
 interface Props {
     documents: DashboardDocument[];
     loading: boolean; error: boolean; focusDocumentId?: string | null;
-    onRetry: () => void; onUpload: (type?: string) => void; onView: (url: string) => void;
+    onRetry: () => void; onUpload: (type?: string) => void; onView: (url: string, title: string) => void;
     children?: ReactNode;
 }
 export default function DashboardDocuments({documents, loading, error, focusDocumentId, onRetry, onUpload, onView, children}: Props) {
@@ -102,7 +102,7 @@ export default function DashboardDocuments({documents, loading, error, focusDocu
                                 <p className="mt-1 text-xs text-[#596065]">{!item.fileUrl ? 'Upload this document to your record.' : item.status.toLowerCase() === 'needs review' ? (reviewReasons[item.reasonCode ?? ''] ?? 'Your agency needs to review this document. Contact them for details.') : item.expiryLabel ? `${item.status.toLowerCase() === 'expired' ? 'Expired' : 'Expires'} ${item.expiryLabel}` : item.status === 'Updating expiry status…' ? 'Checking document expiry details.' : 'Document on file.'}</p>
                             </div>
                             <div className="ml-auto flex shrink-0 items-center gap-1">
-                                {item.fileUrl && <Button type="button" variant="ghost" className="px-2 text-[#007f83]" aria-label={`View ${item.label}`} onClick={() => onView(item.fileUrl)}>View</Button>}
+                                {item.fileUrl && <Button type="button" variant="ghost" className="px-2 text-[#007f83]" aria-label={`View ${item.label}`} onClick={() => onView(item.fileUrl, item.label)}>View</Button>}
                                 {(!item.fileUrl || replace) && <Button type="button" variant="ghost" className="px-2 text-[#007f83]" aria-label={`${item.fileUrl ? 'Replace' : 'Upload'} ${item.label}`} onClick={() => onUpload(item.type)}>{item.fileUrl ? 'Replace' : 'Upload'}</Button>}
                             </div>
                         </div>;

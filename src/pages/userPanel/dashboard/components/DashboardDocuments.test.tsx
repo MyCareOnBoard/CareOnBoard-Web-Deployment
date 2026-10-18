@@ -19,7 +19,7 @@ describe('grouped dashboard documents', () => {
         fireEvent.click(screen.getByRole('button', {name: 'Replace License'}));
         expect(props.onUpload).toHaveBeenCalledWith('License');
         fireEvent.click(screen.getByRole('button', {name: 'View License'}));
-        expect(props.onView).toHaveBeenCalledWith('https://example.com/document.pdf');
+        expect(props.onView).toHaveBeenCalledWith('https://example.com/document.pdf', 'License');
         activateTab(tabs[1]);
         fireEvent.click(screen.getByRole('button', {name: 'Upload Resume'}));
         expect(props.onUpload).toHaveBeenCalledWith('Resume');

@@ -5,6 +5,7 @@ import React, {useState, useCallback, useEffect, useMemo, useRef} from "react";
 import {useNavigate, useSearchParams} from "react-router";
 import {AlertCircle, Pencil, X} from "lucide-react";
 import {Button} from "@/components/ui/button";
+import {DocumentPreviewModal} from "@/components/documents/DocumentPreviewModal";
 import DashboardDocuments, {groupFor} from './components/DashboardDocuments';
 import {auth} from "@/lib/firebase";
 import {Toggle} from "@/components/ui/toggle";
@@ -235,12 +236,14 @@ export default function UserPanelDashboardPage() {
         navigate(Routes.userPanel.profile);
     }
 
-    const handleOpenDocument = (url: string | null) => {
+    const [documentPreview, setDocumentPreview] = useState<{url: string; title: string} | null>(null);
+
+    const handleOpenDocument = (url: string | null, title: string) => {
         if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) {
             toast.error('This document link is unavailable. Upload a replacement or contact your agency.');
             return;
         }
-        window.open(url, "_blank", "noopener,noreferrer");
+        setDocumentPreview({url, title});
     }
 
     const handleToggle = async (trainingId: string) => {
@@ -384,6 +387,12 @@ export default function UserPanelDashboardPage() {
                         {(pending && !withinUploadWindow) && <p className="text-sm text-[#808081]">Last checked: {compliance?.evaluatedAt ? new Date(compliance.evaluatedAt).toLocaleString() : 'Not yet checked'}. <button type="button" onClick={() => refreshCompliance()}>Refresh</button></p>}
                         {!documentsLoading && !documentsError && focusDocumentId && !employeeDocuments.some(doc => doc.id === focusDocumentId || doc.documentId === focusDocumentId) && <p role="status">This document is unavailable or you no longer have access. <button type="button" onClick={() => navigate(Routes.userPanel.dashboard)}>Back to documents</button></p>}
                     </DashboardDocuments>
+                    <DocumentPreviewModal
+                        open={documentPreview !== null}
+                        onOpenChange={open => {if (!open) setDocumentPreview(null);}}
+                        title={documentPreview?.title ?? 'Document preview'}
+                        url={documentPreview?.url}
+                    />
                 </div>
             </div>
 
