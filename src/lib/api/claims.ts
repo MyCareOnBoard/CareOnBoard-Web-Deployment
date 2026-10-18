@@ -40,6 +40,8 @@ export type BillingClaimEdiExport = {
   controlNumber: string | null;
   usageIndicator: "T" | "P" | null;
   exportedAt: string | null;
+  /** Name of the batch file, so it can be downloaded without listing batches. */
+  fileName?: string | null;
 };
 
 export type ClaimsDashboardSummary = {
@@ -496,6 +498,21 @@ export type EdiSettings = {
   usageIndicator: EdiUsageIndicator;
 };
 
+/** Agency profile values a blank setting falls back to. */
+export type EdiAgencyDefaults = Partial<
+  Pick<
+    EdiSettings,
+    | "submitterName"
+    | "submitterContactName"
+    | "submitterContactPhone"
+    | "billingProviderName"
+    | "billingStreet"
+    | "billingCity"
+    | "billingState"
+    | "billingZip"
+  >
+>;
+
 export type X12ValidationIssue = {
   claimId?: string;
   claimNumber?: string;
@@ -542,9 +559,11 @@ export class X12ExportError extends Error {
 export async function getEdiSettings(input: {
   context: OperationalBillingRequestContext;
   signal?: AbortSignal;
-}): Promise<EdiSettings> {
+}): Promise<EdiSettings & { agencyDefaults?: EdiAgencyDefaults }> {
   const { context, signal } = input;
-  const response = await axiosClient.get<ApiEnvelope<EdiSettings>>("/billing/edi/settings", {
+  const response = await axiosClient.get<
+    ApiEnvelope<EdiSettings & { agencyDefaults?: EdiAgencyDefaults }>
+  >("/billing/edi/settings", {
     params: { agencyId: operationalAgencyId(context) },
     ...(signal ? { signal } : {}),
   });

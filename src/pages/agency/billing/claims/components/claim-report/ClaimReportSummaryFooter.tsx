@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, type ReactNode } from "react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import DocumentDownloadIcon from "@/assets/icons/document-download.svg?react";
@@ -14,6 +14,10 @@ type ClaimReportSummaryFooterProps = {
   isDownloading?: boolean;
   onUpdate: (patch: Partial<ClaimReportFormState>) => void;
   onDownload: () => void;
+  /** 837P button; hidden when the user can't export this claim. */
+  x12Action?: { label: string; title?: string; busy: boolean; onClick: () => void } | null;
+  /** Shown above the buttons, e.g. why the 837P file couldn't be made. */
+  notice?: ReactNode;
   onSend: () => void;
   onOpenPhysicianSignature: () => void;
   onClearPhysicianSignature: () => void;
@@ -42,6 +46,8 @@ function ClaimReportSummaryFooter({
   isDownloading = false,
   onUpdate,
   onDownload,
+  x12Action = null,
+  notice = null,
   onSend,
   onOpenPhysicianSignature,
   onClearPhysicianSignature,
@@ -92,6 +98,8 @@ function ClaimReportSummaryFooter({
         />
       </div>
 
+      {notice}
+
       <div className="claim-report-no-print flex flex-col gap-3 pb-2 sm:flex-row sm:justify-end">
         <button
           type="button"
@@ -102,6 +110,18 @@ function ClaimReportSummaryFooter({
           {isDownloading ? "Generating…" : "Download report"}
           <DocumentDownloadIcon className="cr-icon-dark-stroke h-5 w-5 shrink-0" aria-hidden />
         </button>
+        {x12Action ? (
+          <button
+            type="button"
+            disabled={x12Action.busy}
+            title={x12Action.title}
+            onClick={x12Action.onClick}
+            className="inline-flex min-h-[44px] w-full cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-[#e5e5e6] bg-white px-6 text-[14px] font-medium text-[#10141a] transition-colors hover:bg-[#eef4f5] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+          >
+            {x12Action.label}
+            <DocumentDownloadIcon className="cr-icon-dark-stroke h-5 w-5 shrink-0" aria-hidden />
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={onSend}

@@ -1,4 +1,12 @@
-import type { BillingClaimListItem, EdiSettings, X12ExportCheck, X12ValidationIssue } from "@/lib/api/claims";
+import type {
+  BillingClaimEdiExport,
+  BillingClaimListItem,
+  BillingClaimStatus,
+  EdiAgencyDefaults,
+  EdiSettings,
+  X12ExportCheck,
+  X12ValidationIssue,
+} from "@/lib/api/claims";
 
 export const EMPTY_EDI_SETTINGS: EdiSettings = {
   submitterId: "",
@@ -14,7 +22,8 @@ export const EMPTY_EDI_SETTINGS: EdiSettings = {
   taxonomyCode: "",
   billingStreet: "",
   billingCity: "",
-  billingState: "NJ",
+  // Blank falls back to the agency profile.
+  billingState: "",
   billingZip: "",
   usageIndicator: "T",
 };
@@ -56,7 +65,7 @@ export const EDI_SETTINGS_FIELDS: Array<{
   { key: "receiverName", label: "Receiver name", section: "payer" },
   { key: "payerId", label: "Payer ID", hint: "From the NJ 837P companion guide", section: "payer" },
   { key: "payerName", label: "Payer name", section: "payer" },
-  { key: "billingProviderName", label: "Billing provider name", hint: "Leave blank to use the agency's legal name", section: "provider" },
+  { key: "billingProviderName", label: "Billing provider name", section: "provider" },
   { key: "billingTaxId", label: "Tax ID (EIN)", hint: "9 digits, kept only for billing", section: "provider" },
   { key: "taxonomyCode", label: "Taxonomy code", hint: "10 characters ending in X, e.g. 251C00000X", section: "provider" },
   { key: "billingStreet", label: "Street address", hint: "Physical address, not a PO box", section: "provider" },
@@ -64,6 +73,38 @@ export const EDI_SETTINGS_FIELDS: Array<{
   { key: "billingState", label: "State", section: "provider" },
   { key: "billingZip", label: "ZIP+4", hint: "9 digits, e.g. 08608-1234", section: "provider" },
 ];
+
+/** Placeholder for a settings field that falls back to the agency profile when left blank. */
+export function agencyDefaultPlaceholder(
+  key: keyof EdiSettings,
+  defaults: EdiAgencyDefaults,
+): string | undefined {
+  const value = defaults[key as keyof EdiAgencyDefaults]?.trim();
+  if (!value) return undefined;
+  // 837P needs ZIP+4; a 5-digit profile ZIP can't be used as is.
+  if (key === "billingZip" && value.replace(/\D/g, "").length !== 9) {
+    return `Agency profile has ${value}. Enter the full ZIP+4`;
+  }
+  return `From agency profile: ${value}`;
+}
+
+/**
+ * What the claim report's 837P button does: download the file the claim is
+ * already in, create one for a pending claim, or nothing.
+ */
+export function getClaimX12Action({
+  canManage,
+  status,
+  ediExport,
+}: {
+  canManage: boolean;
+  status: BillingClaimStatus;
+  ediExport?: Pick<BillingClaimEdiExport, "batchId"> | null;
+}): "download" | "export" | null {
+  if (!canManage) return null;
+  if (ediExport?.batchId) return "download";
+  return status === "pending" ? "export" : null;
+}
 
 export type GroupedClaimIssues = Array<{
   claimId: string;

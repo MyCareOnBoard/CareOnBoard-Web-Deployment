@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { BillingClaimListItem } from "@/lib/api/claims";
-import { countIssues, formatCents, getExportableClaims, groupClaimIssues } from "./x12ExportUtils";
+import {
+  agencyDefaultPlaceholder,
+  countIssues,
+  formatCents,
+  getClaimX12Action,
+  getExportableClaims,
+  groupClaimIssues,
+} from "./x12ExportUtils";
 
 function claim(overrides: Partial<BillingClaimListItem>): BillingClaimListItem {
   return {
@@ -72,5 +79,33 @@ describe("formatting", () => {
         warnings: [{ message: "w" }],
       }),
     ).toBe(3);
+  });
+});
+
+describe("agencyDefaultPlaceholder", () => {
+  it("shows the agency value a blank field will use", () => {
+    expect(agencyDefaultPlaceholder("submitterName", { submitterName: "CareOnBoard LLC" })).toBe(
+      "From agency profile: CareOnBoard LLC",
+    );
+    expect(agencyDefaultPlaceholder("billingTaxId", { submitterName: "CareOnBoard LLC" })).toBeUndefined();
+    expect(agencyDefaultPlaceholder("billingCity", { billingCity: "  " })).toBeUndefined();
+  });
+
+  it("asks for the +4 when the agency ZIP has only 5 digits", () => {
+    expect(agencyDefaultPlaceholder("billingZip", { billingZip: "08608" })).toBe(
+      "Agency profile has 08608. Enter the full ZIP+4",
+    );
+    expect(agencyDefaultPlaceholder("billingZip", { billingZip: "08608-1234" })).toBe(
+      "From agency profile: 08608-1234",
+    );
+  });
+});
+
+describe("getClaimX12Action", () => {
+  it("downloads an exported claim, exports a pending one, and hides otherwise", () => {
+    expect(getClaimX12Action({ canManage: true, status: "paid", ediExport: { batchId: "b1" } })).toBe("download");
+    expect(getClaimX12Action({ canManage: true, status: "pending" })).toBe("export");
+    expect(getClaimX12Action({ canManage: true, status: "rejected" })).toBeNull();
+    expect(getClaimX12Action({ canManage: false, status: "pending" })).toBeNull();
   });
 });
