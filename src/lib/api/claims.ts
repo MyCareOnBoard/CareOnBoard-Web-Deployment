@@ -511,7 +511,10 @@ export type EdiAgencyDefaults = Partial<
     | "billingState"
     | "billingZip"
   >
->;
+> & {
+  /** Last 4 digits of the agency EIN a blank tax ID uses; the full number never leaves the server. */
+  taxIdLast4?: string;
+};
 
 export type X12ValidationIssue = {
   claimId?: string;

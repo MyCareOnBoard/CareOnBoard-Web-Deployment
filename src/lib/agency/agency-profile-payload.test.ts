@@ -4,6 +4,7 @@ import {
   buildAgencyProfileUpdatePayload,
   buildCheckPayrollProfilePayload,
   CHECK_INDUSTRIES,
+  einOnFileText,
   type AgencyProfileFormValues,
 } from "./agency-profile-payload";
 
@@ -150,5 +151,22 @@ describe("buildCheckPayrollProfilePayload", () => {
       phone: "+15125550123",
       payrollContact: { name: "Pat Payroll", email: "payroll@able.example", phone: "+15125550124" },
     });
+  });
+});
+
+describe("EIN on the agency profile", () => {
+  it("sends a changed EIN only as the protected einChange", () => {
+    const payload = buildAgencyProfileUpdatePayload({ ...baseValues, ein: " 12-3456789 " }, { ein: true });
+    expect(payload).toEqual({ checkPayrollProfile: { einChange: { mode: "replace", value: "12-3456789" } } });
+  });
+
+  it("sends nothing for a blank EIN so the one on file is kept", () => {
+    expect(buildAgencyProfileUpdatePayload({ ...baseValues, ein: "" }, { ein: true })).toEqual({});
+  });
+
+  it("describes the saved EIN by its last 4 digits only", () => {
+    expect(einOnFileText({ present: true, last4: "4321" })).toBe("On file: ••4321");
+    expect(einOnFileText({ present: false })).toBe("No EIN on file.");
+    expect(einOnFileText(null)).toBe("No EIN on file.");
   });
 });

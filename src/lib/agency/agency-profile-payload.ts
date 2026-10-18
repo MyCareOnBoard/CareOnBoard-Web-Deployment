@@ -86,7 +86,20 @@ export type AgencyProfileFormValues = {
   invoiceName: string;
   invoiceEmail: string;
   timezone: string;
+  /**
+   * Write-only. A new EIN is sent as checkPayrollProfile.einChange to the
+   * protected payroll record; it is never loaded back or put on the agency.
+   */
+  ein?: string;
 } & OperationalFormSlice;
+
+export const EIN_PATTERN = /^\d{2}-?\d{7}$/;
+
+/** How the saved EIN is shown: never more than its last 4 digits. */
+export function einOnFileText(status?: { present: boolean; last4?: string } | null): string {
+  if (!status?.present) return "No EIN on file.";
+  return status.last4 ? `On file: ••${status.last4}` : "EIN on file.";
+}
 
 type DirtyFields = Partial<Record<keyof AgencyProfileFormValues, boolean | boolean[]>>;
 
@@ -186,6 +199,12 @@ export function buildAgencyProfileUpdatePayload(
 
   if (hasOperationalDirtyFields(dirtyFields)) {
     Object.assign(payload, operationalFormToUpdatePayload(values));
+  }
+
+  const ein = trim(values.ein ?? "");
+  if (isFieldDirty(dirtyFields, "ein") && ein) {
+    // Same protected path the payroll setup uses; blank keeps the EIN on file.
+    payload.checkPayrollProfile = { einChange: { mode: "replace", value: ein } };
   }
 
   return payload;

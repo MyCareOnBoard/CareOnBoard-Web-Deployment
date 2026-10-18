@@ -88,6 +88,7 @@ describe("agencyDefaultPlaceholder", () => {
       "From agency profile: CareOnBoard LLC",
     );
     expect(agencyDefaultPlaceholder("billingTaxId", { submitterName: "CareOnBoard LLC" })).toBeUndefined();
+    expect(agencyDefaultPlaceholder("billingTaxId", { taxIdLast4: "4321" })).toBe("From agency EIN: ••4321");
     expect(agencyDefaultPlaceholder("billingCity", { billingCity: "  " })).toBeUndefined();
   });
 

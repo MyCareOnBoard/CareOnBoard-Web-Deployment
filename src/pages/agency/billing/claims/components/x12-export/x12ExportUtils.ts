@@ -66,7 +66,7 @@ export const EDI_SETTINGS_FIELDS: Array<{
   { key: "payerId", label: "Payer ID", hint: "From the NJ 837P companion guide", section: "payer" },
   { key: "payerName", label: "Payer name", section: "payer" },
   { key: "billingProviderName", label: "Billing provider name", section: "provider" },
-  { key: "billingTaxId", label: "Tax ID (EIN)", hint: "9 digits, kept only for billing", section: "provider" },
+  { key: "billingTaxId", label: "Tax ID (EIN)", hint: "9 digits. Leave blank to use the agency EIN", section: "provider" },
   { key: "taxonomyCode", label: "Taxonomy code", hint: "10 characters ending in X, e.g. 251C00000X", section: "provider" },
   { key: "billingStreet", label: "Street address", hint: "Physical address, not a PO box", section: "provider" },
   { key: "billingCity", label: "City", section: "provider" },
@@ -79,6 +79,9 @@ export function agencyDefaultPlaceholder(
   key: keyof EdiSettings,
   defaults: EdiAgencyDefaults,
 ): string | undefined {
+  if (key === "billingTaxId") {
+    return defaults.taxIdLast4 ? `From agency EIN: ••${defaults.taxIdLast4}` : undefined;
+  }
   const value = defaults[key as keyof EdiAgencyDefaults]?.trim();
   if (!value) return undefined;
   // 837P needs ZIP+4; a 5-digit profile ZIP can't be used as is.
