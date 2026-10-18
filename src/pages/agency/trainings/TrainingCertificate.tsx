@@ -17,10 +17,13 @@ interface Props {
 
 const CERTIFICATE_MIME_TYPES: Record<string, string> = {pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp'};
 
+// Only PDF and raster image types are previewed; anything else (HTML, SVG) could run script from a blob URL.
+const PREVIEWABLE_MIME_TYPES = new Set(Object.values(CERTIFICATE_MIME_TYPES));
+
 function certificateMimeType(headerType: unknown, blobType: string, fileName?: string | null): string {
     for (const candidate of [headerType, blobType]) {
         const type = typeof candidate === 'string' ? candidate.split(';', 1)[0].trim().toLowerCase() : '';
-        if (type && type !== 'application/octet-stream' && type !== 'binary/octet-stream') return type;
+        if (PREVIEWABLE_MIME_TYPES.has(type)) return type;
     }
     const extension = fileName?.split('.').pop()?.toLowerCase() ?? '';
     return CERTIFICATE_MIME_TYPES[extension] ?? 'application/pdf';

@@ -135,7 +135,7 @@ export default function ReviewTrainingsModal(
                             <p className="break-words text-sm font-semibold text-[#162a2c]">{employee.fullName}</p>
                             <p className="text-xs text-[#627476]">{employee.role}{mode ? ' · ' + mode.toUpperCase() : ''}</p>
                         </div>
-                        {courses.length > 0 && <p className="shrink-0 text-right text-xs text-[#627476]"><span className="block text-sm font-medium text-[#162a2c]">{courses.length} trainings</span>{awaitingReviewCount > 0 ? <span className="block font-medium text-[#88601d]">{awaitingReviewCount} awaiting review</span> : nextCursor ? 'More available below' : 'Assigned to staff'}</p>}
+                        {courses.length > 0 && <p className="shrink-0 text-right text-xs text-[#627476]"><span className="block text-sm font-medium text-[#162a2c]">{courses.length} trainings</span>{awaitingReviewCount > 0 && <span className="block font-medium text-[#88601d]">{awaitingReviewCount} awaiting review</span>}{nextCursor ? 'More available below' : 'Assigned to staff'}</p>}
                     </div>
                 </div>
                 <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-2 sm:px-7">
