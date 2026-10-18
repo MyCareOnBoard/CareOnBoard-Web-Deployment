@@ -5,6 +5,7 @@ import { FileText, Plus } from "lucide-react";
 import { DocumentPreviewModal } from "@/components/documents/DocumentPreviewModal";
 import { Button } from "@/components/ui/button";
 import type { EmployeeDocument } from "@/lib/api/employee-documents";
+import { documentTypeLabel } from "@/lib/documentTypes";
 
 interface DocumentsSectionProps {
   compliance?: DocumentComplianceResponse;
@@ -79,7 +80,7 @@ export function DocumentsSection({
                 <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shrink-0">
                   <FileText className="w-5 h-5 text-gray-600" />
                 </div>
-                <span className="text-sm text-gray-900">{doc.documentName}</span>
+                <span className="text-sm text-gray-900">{documentTypeLabel(doc.documentName)}</span>
               </div>
               <div className="flex items-center gap-3">
                 <span className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getDocumentStatusColor(pilot ? issue?.condition ?? 'pending' : doc.status)}`}>
@@ -104,7 +105,7 @@ export function DocumentsSection({
       <DocumentPreviewModal
         open={preview !== null}
         onOpenChange={(open) => { if (!open) setPreview(null); }}
-        title={preview?.documentName ?? "Document preview"}
+        title={preview ? documentTypeLabel(preview.documentName) : "Document preview"}
         url={preview?.fileUrl}
         fileName={preview?.fileName}
       />

@@ -5,7 +5,7 @@ import {Button} from "@/components/ui/button";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {FileUpload} from "@/components/ui/file-upload";
 import {useSaveDocumentMutation, useUploadDocumentMutation} from "@/pages/userPanel/dashboard/api";
-import {userPanelDocumentTypes} from "@/pages/userPanel/dashboard/constants";
+import type {UserPanelDocumentType} from "@/pages/userPanel/dashboard/constants";
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
 import {Calendar} from "@/components/ui/calendar";
 import {toast} from "sonner";
@@ -20,9 +20,10 @@ const tenYearsFromNow = new Date()
 tenYearsFromNow.setFullYear(new Date().getFullYear() + 10)
 
 const UserPanelDocumentUpload = (
-  {isOpen, setIsOpen, onComplete, onError, initialDocumentType = ''}: {
+  {isOpen, setIsOpen, onComplete, onError, initialDocumentType = '', documentTypes}: {
     isOpen: boolean;
     initialDocumentType?: string;
+    documentTypes: UserPanelDocumentType[];
     setIsOpen: (value: boolean) => void;
     onComplete: (result: SaveEmployeeDocumentResponse) => void;
     onError: () => void;
@@ -36,6 +37,7 @@ const UserPanelDocumentUpload = (
   const [openDatePopover, setOpenDatePopover] = useState<boolean>(false);
   const [uploadFile, {isLoading: isUploading}] = useUploadDocumentMutation();
   const [saveDocument, {isLoading: isSavingDocument}] = useSaveDocumentMutation();
+  const expiryExpected = documentTypes.find(doc => doc.value === formData.type)?.requiresExpiry ?? false;
 
   const handleCancel = () => {
     setIsOpen(false);
@@ -126,13 +128,13 @@ const UserPanelDocumentUpload = (
                     <SelectValue placeholder="Select document type"/>
                   </SelectTrigger>
                   <SelectContent>
-                    {userPanelDocumentTypes.map((doc) => <SelectItem key={doc.value} value={doc.value}>{doc.label}</SelectItem>)}
+                    {documentTypes.map((doc) => <SelectItem key={doc.value} value={doc.value}>{doc.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <div className={"mb-6"}>
-              <p className={"text-sm mb-1"}>Expiry Date</p>
+              <p className={"text-sm mb-1"}>Expiry Date{expiryExpected ? "" : " (optional)"}</p>
               <Popover
                 open={openDatePopover}
                 onOpenChange={(open) => setOpenDatePopover(open)}
@@ -179,6 +181,7 @@ const UserPanelDocumentUpload = (
                   />
                 </PopoverContent>
               </Popover>
+              {expiryExpected && !formData.expiryDate && <p className="text-sm my-1 text-[#596065]">Add the expiry date printed on this document. Without it, your agency can't assign you shifts until they record one.</p>}
             </div>
             <div className={"mb-6"}>
               <p className={"text-sm mb-1"}>Upload your document</p>

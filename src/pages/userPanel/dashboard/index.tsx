@@ -19,7 +19,7 @@ import {
     useUpdateEmployeeInfoMutation,
     userPanelDashboardApi
 } from "@/pages/userPanel/dashboard/api";
-import {userPanelDocumentTypes} from "@/pages/userPanel/dashboard/constants";
+import {getUserPanelDocumentTypes} from "@/pages/userPanel/dashboard/constants";
 import {Routes} from "@/routes/constants";
 import {setUser, useAuth} from "@/utils/auth";
 import {getUser} from "@/lib/api/users";
@@ -162,7 +162,8 @@ export default function UserPanelDashboardPage() {
 
     }, [employeeDocuments, compliance, complianceError]);
 
-    const dashboardDocuments = useMemo(() => userPanelDocumentTypes.map(type => {
+    const documentTypes = useMemo(() => getUserPanelDocumentTypes(user), [user]);
+    const dashboardDocuments = useMemo(() => documentTypes.map(type => {
         const document = getDocument(type.value);
         return {type: type.value, label: type.label, fileUrl: document.fileUrl, status: document.status,
             id: 'id' in document ? document.id : undefined,
@@ -170,7 +171,7 @@ export default function UserPanelDashboardPage() {
             reasonCode: 'reasonCode' in document ? document.reasonCode : undefined,
             expiryLabel: 'expiryDateKey' in document && document.expiryDateKey ? civilDateLabel(document.expiryDateKey)
                 : document.expiryDate ? formatDate(document.expiryDate) : undefined};
-    }), [getDocument]);
+    }), [documentTypes, getDocument]);
 
     const documentsNeedingAttention = useMemo(
         () => dashboardDocuments.filter(doc => groupFor(doc) === 'Needs attention').length,
@@ -416,6 +417,7 @@ export default function UserPanelDashboardPage() {
             </div>
             {isDocumentUploadModalOpen && <UserPanelDocumentUpload
                 initialDocumentType={uploadDocumentType}
+                documentTypes={documentTypes}
                 isOpen={isDocumentUploadModalOpen}
                 setIsOpen={setIsDocumentUploadModalOpen}
                 onComplete={handleDocumentUploaded}

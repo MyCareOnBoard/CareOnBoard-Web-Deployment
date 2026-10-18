@@ -4,6 +4,7 @@ import { DocumentPreviewModal } from "@/components/documents/DocumentPreviewModa
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { documentTypeLabel } from "@/lib/documentTypes";
 import { type SuperAdminStaffDocument, useGetStaffDocumentsQuery, useLazyGetStaffDocumentsQuery, useLazyGetStaffDocumentViewQuery } from "@/lib/api/staff-directory";
 
 function isExpired(expiryDate: string | null): boolean {
@@ -46,7 +47,7 @@ export function StaffDocumentsTab({ staffId }: { staffId: string }) {
     setOpeningId(document.id);
     setPreview({
       documentId: document.id,
-      title: document.documentName,
+      title: documentTypeLabel(document.documentName),
       url: null,
       isLoading: true,
       error: null,
@@ -97,7 +98,7 @@ export function StaffDocumentsTab({ staffId }: { staffId: string }) {
         <div key={document.id} className="flex flex-col gap-4 rounded-xl border border-[#e2e6e6] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-3">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#e8f7f7]"><FileText className="h-5 w-5 text-[#008f92]" aria-hidden="true" /></span>
-            <div className="min-w-0"><p className="truncate text-sm font-semibold text-[#10141a]">{document.documentName}</p><p className="mt-1 text-xs text-[#808081]">{document.expiryDate ? `Expires ${new Date(document.expiryDate).toLocaleDateString()}` : document.documentType || "Document"}</p></div>
+            <div className="min-w-0"><p className="truncate text-sm font-semibold text-[#10141a]">{documentTypeLabel(document.documentName)}</p><p className="mt-1 text-xs text-[#808081]">{document.expiryDate ? `Expires ${new Date(document.expiryDate).toLocaleDateString()}` : document.documentType ? documentTypeLabel(document.documentType) : "Document"}</p></div>
           </div>
           <div className="flex items-center justify-between gap-3 sm:justify-end">
             {isExpired(document.expiryDate) ? <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700">Expired</Badge> : null}

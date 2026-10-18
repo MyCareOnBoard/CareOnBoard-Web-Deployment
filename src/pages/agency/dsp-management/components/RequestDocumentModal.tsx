@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { requestEmployeeDocument, type EmployeeDocument, isExpiringSoon } from "@/lib/api/employee-documents";
+import { canonicalDocumentType, DOCUMENT_TYPE_LABELS } from "@/lib/documentTypes";
 import { useToast } from "@/hooks/use-toast";
 
 const DOCUMENT_TYPES = [
@@ -25,6 +26,13 @@ const DOCUMENT_TYPES = [
 	{ value: "hepatitis-b-vaccination", label: "Hepatitis B vaccination series documents" },
 	{ value: "hepatitis-b-immunity", label: "Hepatitis B immunity (titer result)" },
 	{ value: "tb-test", label: "Tb test result" },
+	{ value: "chha-certificate", label: DOCUMENT_TYPE_LABELS["chha-certificate"] },
+	{ value: "cpr-certification", label: DOCUMENT_TYPE_LABELS["cpr-certification"] },
+	{ value: "cna-hha-license", label: DOCUMENT_TYPE_LABELS["cna-hha-license"] },
+	{ value: "mmr-record", label: DOCUMENT_TYPE_LABELS["mmr-record"] },
+	{ value: "physical-exam", label: DOCUMENT_TYPE_LABELS["physical-exam"] },
+	{ value: "additional-vaccination", label: DOCUMENT_TYPE_LABELS["additional-vaccination"] },
+	{ value: "diploma", label: "High School Diploma / GED" },
 	{ value: "i9-form", label: "I-9 Form" },
 	{ value: "w4-form", label: "W-4 Form" },
 	{ value: "background-check", label: "Background Check" },
@@ -56,7 +64,7 @@ export function RequestDocumentModal({
 
 	/** Find existing document for selected type to surface expiry info */
 	const existingDoc = documentType
-		? documents.find((d) => d.documentType === documentType)
+		? documents.find((d) => canonicalDocumentType(d.documentType) === documentType)
 		: null;
 
 	const expiringSoon = existingDoc ? isExpiringSoon(existingDoc.expiryDate) : false;
