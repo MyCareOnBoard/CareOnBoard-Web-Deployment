@@ -1,11 +1,11 @@
-import {act, fireEvent, render, screen, waitFor} from '@testing-library/react';
+import {fireEvent, render, screen, waitFor} from '@testing-library/react';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 import TrainingCertificate from './TrainingCertificate';
 
 const requests = vi.hoisted(() => ({get: vi.fn(), post: vi.fn()}));
 vi.mock('@/lib/axios', () => ({default: requests}));
 vi.mock('@/components/documents/DocumentPreviewModal', () => ({DocumentPreviewModal: (props: any) => props.open
-    ? <div><span>{props.url}</span><button onClick={() => props.onOpenChange(false)}>Close preview</button></div> : null}));
+    ? <div><span>{props.url}</span><span>{props.fileName}</span><button onClick={() => props.onOpenChange(false)}>Close preview</button></div> : null}));
 const training = {id: 'one', name: 'CPR', timeFrame: '30 days', assignedDsp: 'employee-1', trainingType: 'manual', completedAt: null,
     status: 'Not Completed', approved: false, requiresCertificate: true};
 
@@ -80,10 +80,29 @@ describe('private training certificate', () => {
         fireEvent.click(screen.getByRole('button', {name: 'Close preview'}));
         expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1);
         fireEvent.click(screen.getByRole('button', {name: 'View certificate'}));
-        await act(async () => {});
+        await screen.findByText('blob:certificate');
         rerender(<TrainingCertificate training={{...training, certificateId: 'cert-2', certificateName: 'replacement.png'}}/>);
         await waitFor(() => expect(URL.revokeObjectURL).toHaveBeenCalledTimes(2));
         unmount();
         expect(URL.revokeObjectURL).toHaveBeenCalledTimes(3);
+    });
+
+    it.each([
+        ['a PDF', '%PDF-1.7 rest', 'application/pdf', 'scan.pdf'],
+        ['a PNG', '\x89PNG\r\n\x1a\n', 'image/png', 'scan.png'],
+    ])('previews %s served as a generic download by its file signature', async (_label, bytes, type, fileName) => {
+        requests.get.mockResolvedValue({data: new Blob([Uint8Array.from(bytes, c => c.charCodeAt(0))], {type: 'application/octet-stream'})});
+        render(<TrainingCertificate training={{...training, certificateId: 'cert-1', certificateName: 'scan'}}/>);
+        fireEvent.click(screen.getByRole('button', {name: 'View certificate'}));
+        await screen.findByText(fileName);
+        expect((vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob).type).toBe(type);
+    });
+
+    it('never previews other content types such as HTML', async () => {
+        requests.get.mockResolvedValue({data: new Blob(['<script>alert(1)</script>'], {type: 'text/html'})});
+        render(<TrainingCertificate training={{...training, certificateId: 'cert-1', certificateName: 'scan.html'}}/>);
+        fireEvent.click(screen.getByRole('button', {name: 'View certificate'}));
+        await screen.findByText('scan.pdf');
+        expect((vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob).type).toBe('application/pdf');
     });
 });

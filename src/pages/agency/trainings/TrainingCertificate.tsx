@@ -15,18 +15,41 @@ interface Props {
     onUploaded?: (certificate: CertificateResult) => void;
 }
 
-const CERTIFICATE_MIME_TYPES: Record<string, string> = {pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp'};
+const CERTIFICATE_MIME_TYPES: Record<string, string> = {pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp'};
+const EXTENSION_BY_MIME: Record<string, string> = {'application/pdf': 'pdf', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp'};
 
-// Only PDF and raster image types are previewed; anything else (HTML, SVG) could run script from a blob URL.
-const PREVIEWABLE_MIME_TYPES = new Set(Object.values(CERTIFICATE_MIME_TYPES));
+// Read the file's own signature. Only PDF, JPEG, PNG and WEBP are accepted on upload.
+function sniffCertificateType(head: Uint8Array): string | null {
+    const ascii = (from: number, to: number) => String.fromCharCode(...head.slice(from, to));
+    if (ascii(0, 5) === '%PDF-') return 'application/pdf';
+    if (head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) return 'image/jpeg';
+    if (head[0] === 0x89 && ascii(1, 4) === 'PNG') return 'image/png';
+    if (ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP') return 'image/webp';
+    return null;
+}
 
-function certificateMimeType(headerType: unknown, blobType: string, fileName?: string | null): string {
-    for (const candidate of [headerType, blobType]) {
-        const type = typeof candidate === 'string' ? candidate.split(';', 1)[0].trim().toLowerCase() : '';
-        if (PREVIEWABLE_MIME_TYPES.has(type)) return type;
-    }
-    const extension = fileName?.split('.').pop()?.toLowerCase() ?? '';
-    return CERTIFICATE_MIME_TYPES[extension] ?? 'application/pdf';
+function readHead(data: Blob): Promise<Uint8Array> {
+    const head = data.slice(0, 12);
+    if (typeof head.arrayBuffer === 'function') return head.arrayBuffer().then(buffer => new Uint8Array(buffer));
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(new Uint8Array(reader.result as ArrayBuffer));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsArrayBuffer(head);
+    });
+}
+
+// The browser downloads a blob it can't type as a PDF or image instead of showing it in the
+// preview, and the stored or served type can be missing or generic. Trust the bytes first,
+// then the file name, and never pass through other types (HTML, SVG) that could run script.
+async function certificatePreviewType(data: Blob, fileName?: string | null): Promise<string> {
+    try {
+        const sniffed = sniffCertificateType(await readHead(data));
+        if (sniffed) return sniffed;
+    } catch { /* fall back to the name below */ }
+    const blobType = data.type.split(';', 1)[0].trim().toLowerCase();
+    if (EXTENSION_BY_MIME[blobType]) return blobType;
+    return CERTIFICATE_MIME_TYPES[fileName?.split('.').pop()?.toLowerCase() ?? ''] ?? 'application/pdf';
 }
 
 export default function TrainingCertificate({training, onUploaded, canEditHireDate=false, showPolicySummary=true, dashboard=false}: Props) {
@@ -40,7 +63,7 @@ export default function TrainingCertificate({training, onUploaded, canEditHireDa
     const changeDate = (setter: (value: string) => void, value: string) => {setter(value); setSelection(current => current ? {...current, requestId: crypto.randomUUID()} : null);};
     const [error, setError] = useState<string | null>(null);
     const [previewOpen, setPreviewOpen] = useState(false);
-    const [preview, setPreview] = useState<{url?: string; error?: string; loading: boolean}>({loading: false});
+    const [preview, setPreview] = useState<{url?: string; fileName?: string; error?: string; loading: boolean}>({loading: false});
     const uploadController = useRef<AbortController | null>(null);
     const input = useRef<HTMLInputElement>(null);
 
@@ -52,11 +75,13 @@ export default function TrainingCertificate({training, onUploaded, canEditHireDa
         setPreview({loading: true});
         axiosClient.get<Blob>(`/employees/trainings/${training.id}/certificate`, {
             params: {certificateId: selectedCertificateId}, responseType: 'blob', signal: controller.signal,
-        }).then(({data, headers}) => {
+        }).then(async ({data}) => {
+            const type = await certificatePreviewType(data, training.certificateName);
             if (controller.signal.aborted) return;
-            // A blob typed as octet-stream (or with no type) makes the browser download it instead of showing it.
-            objectUrl = URL.createObjectURL(new Blob([data], {type: certificateMimeType(headers?.['content-type'], data.type, training.certificateName)}));
-            setPreview({url: objectUrl, loading: false});
+            objectUrl = URL.createObjectURL(new Blob([data], {type}));
+            // The preview picks PDF or image rendering from the extension, so keep it in step with the bytes.
+            const baseName = (training.certificateName || 'certificate').replace(/\.[^.]*$/, '');
+            setPreview({url: objectUrl, fileName: `${baseName}.${EXTENSION_BY_MIME[type]}`, loading: false});
         }).catch(() => {
             if (!controller.signal.aborted) setPreview({loading: false, error: 'Unable to open this certificate. Close the preview and try again.'});
         });
@@ -123,6 +148,6 @@ export default function TrainingCertificate({training, onUploaded, canEditHireDa
             {error && <p role="alert" className="text-[#d53411]">{error}</p>}
         </>}
         <DocumentPreviewModal open={previewOpen} onOpenChange={setPreviewOpen} title={`${training.name} certificate`}
-            fileName={training.certificateName ?? undefined} url={preview.url} isLoading={preview.loading} error={preview.error}/>
+            fileName={preview.fileName ?? training.certificateName ?? undefined} url={preview.url} isLoading={preview.loading} error={preview.error}/>
     </div>;
 }
