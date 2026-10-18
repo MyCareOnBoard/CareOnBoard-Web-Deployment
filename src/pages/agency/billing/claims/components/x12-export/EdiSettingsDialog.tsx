@@ -19,8 +19,14 @@ import {
   BILLING_SECONDARY_BUTTON_CLASS,
 } from "@/pages/agency/billing/components/billingModalStyles";
 import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
-import { getEdiSettings, saveEdiSettings, type EdiSettings, type EdiUsageIndicator } from "@/lib/api/claims";
-import { EDI_SETTINGS_FIELDS, EMPTY_EDI_SETTINGS } from "./x12ExportUtils";
+import {
+  getEdiSettings,
+  saveEdiSettings,
+  type EdiAgencyDefaults,
+  type EdiSettings,
+  type EdiUsageIndicator,
+} from "@/lib/api/claims";
+import { agencyDefaultPlaceholder, EDI_SETTINGS_FIELDS, EMPTY_EDI_SETTINGS } from "./x12ExportUtils";
 
 type EdiSettingsDialogProps = {
   open: boolean;
@@ -43,6 +49,7 @@ function errorMessage(error: unknown, fallback: string): string {
 export default function EdiSettingsDialog({ open, onClose, onSaved }: EdiSettingsDialogProps) {
   const { agencyId } = useOperationalAgency();
   const [settings, setSettings] = useState<EdiSettings>(EMPTY_EDI_SETTINGS);
+  const [agencyDefaults, setAgencyDefaults] = useState<EdiAgencyDefaults>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -60,8 +67,9 @@ export default function EdiSettingsDialog({ open, onClose, onSaved }: EdiSetting
     setLoadFailed(false);
     setError("");
     getEdiSettings({ context: { agencyId }, signal: controller.signal })
-      .then((loaded) => {
+      .then(({ agencyDefaults: defaults, ...loaded }) => {
         if (controller.signal.aborted) return;
+        setAgencyDefaults(defaults ?? {});
         // Keep the NJ defaults for fields that were never saved.
         const merged = { ...EMPTY_EDI_SETTINGS };
         for (const [key, value] of Object.entries(loaded) as Array<[keyof EdiSettings, string]>) {
@@ -104,7 +112,7 @@ export default function EdiSettingsDialog({ open, onClose, onSaved }: EdiSetting
       <DialogContent showCloseButton={false} className={`${BILLING_CORNER_MODAL_CLASS} flex max-h-[90dvh] flex-col`}>
         <BillingCornerModalHeader
           title="837P settings"
-          description="IDs and the billing address used in every 837P file. Get the submitter, receiver and payer IDs from your NJMMIS trading partner agreement and companion guide."
+          description="IDs and the billing address used in every 837P file. Get the submitter, receiver and payer IDs from your NJMMIS trading partner agreement and companion guide. Fields left blank use the agency profile."
           onClose={onClose}
           closeDisabled={saving}
         />
@@ -122,6 +130,7 @@ export default function EdiSettingsDialog({ open, onClose, onSaved }: EdiSetting
                   <Input
                     id={`edi-${field.key}`}
                     value={settings[field.key]}
+                    placeholder={agencyDefaultPlaceholder(field.key, agencyDefaults)}
                     disabled={loading || saving || loadFailed}
                     onChange={(event) => update(field.key, event.target.value)}
                     className={`${BILLING_FIELD_CLASS} w-full`}

@@ -7,6 +7,7 @@ import {
   getBillingClaimById,
   getBillingClaimMutationErrorMessage,
   getCreateBillingClaimErrorMessage,
+  type BillingClaimEdiExport,
   type BillingClaimListItem,
   type BillingClaimStatus,
   type SavedBillingClaim,
@@ -81,6 +82,8 @@ export function ClaimsDashboardContent() {
   const [reportSelectionError,setReportSelectionError]=useState('');
   const { toast } = useToast();
   const [dateRange, setDateRange] = useState(getCurrentWeekDateRange);
+  // Bumped when the claim report makes an 837P file, so the panel reloads its file list.
+  const [x12RefreshKey, setX12RefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState<ClaimsWorkspaceTab>("shifts");
   const [statusFilter, setStatusFilter] = useState<BillingClaimStatus | "all">("all");
   const [clientSearch, setClientSearch] = useState("");
@@ -169,6 +172,7 @@ export function ClaimsDashboardContent() {
   const [claimReport, setClaimReport] = useState<{
     claim: RecentClaim;
     savedClaim: SavedBillingClaim;
+    ediExport: BillingClaimEdiExport | null;
     scopeKey: string;
   } | null>(null);
 
@@ -495,6 +499,7 @@ export function ClaimsDashboardContent() {
             rejectionReason: detail.rejectionReason, amount: detail.amount,
             clientId: detail.clientId, shiftIds: detail.shiftIds, reportPrefill: detail.reportPrefill,
           },
+          ediExport: detail.ediExport ?? null,
         });
       } catch (error) {
         if(!current())return;
@@ -644,6 +649,7 @@ export function ClaimsDashboardContent() {
           <Suspense fallback={null}>
             <X12ExportPanel
               claims={generatedClaims.claims}
+              refreshKey={x12RefreshKey}
               onExported={() => void generatedClaims.refetch({ force: true })}
             />
           </Suspense>
@@ -690,6 +696,13 @@ export function ClaimsDashboardContent() {
             claimNumber={claimReport.savedClaim.claimNumber}
             initialPrefill={claimReport.savedClaim.reportPrefill}
             canSave={canManageClaims && claimReport.savedClaim.status === "pending"}
+            canManageClaims={canManageClaims}
+            status={claimReport.savedClaim.status}
+            ediExport={claimReport.ediExport}
+            onExported={() => {
+              setX12RefreshKey((key) => key + 1);
+              void generatedClaims.refetch({ force: true });
+            }}
             onClose={handleCloseReportModal}
           />
         </Suspense>

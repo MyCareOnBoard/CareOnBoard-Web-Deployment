@@ -55,6 +55,8 @@ import {
 } from "@/lib/agency/operational-settings";
 import {
   buildAgencyProfileUpdatePayload,
+  EIN_PATTERN,
+  einOnFileText,
   type AgencyProfileFormValues,
 } from "@/lib/agency/agency-profile-payload";
 import { IANA_TIMEZONES, isIanaTimezone } from "@/lib/timezones";
@@ -93,6 +95,7 @@ const EMPTY_VALUES: AgencyProfileFormValues = {
   invoiceName: "",
   invoiceEmail: "",
   timezone: "",
+  ein: "",
   ...pickOperationalFormValues({}),
 };
 
@@ -119,6 +122,8 @@ function agencyToFormValues(agency: Agency): AgencyProfileFormValues {
     invoiceName: agency.invoiceName ?? "",
     invoiceEmail: agency.invoiceEmail ?? "",
     timezone: agency.timezone ?? "",
+    // Write-only: the saved EIN is shown only as its last 4 digits.
+    ein: "",
     ...agencyOperationalToForm(agency),
   };
 }
@@ -133,6 +138,7 @@ export default function AgencyInfoTab() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [initialValues, setInitialValues] = useState<AgencyProfileFormValues>(EMPTY_VALUES);
+  const [einStatus, setEinStatus] = useState<{ present: boolean; last4?: string } | null>(null);
   const [initialLogo, setInitialLogo] = useState("");
   const [initialLetterhead, setInitialLetterhead] = useState("");
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -198,6 +204,7 @@ export default function AgencyInfoTab() {
       const agency = await getAgencyById(agencyId);
       setSupportedClientTypes(agency.supportedClientTypes ?? null);
       const values = agencyToFormValues(agency);
+      setEinStatus(agency.checkPayrollProfile?.einStatus ?? null);
       setInitialValues(values);
       setInitialLogo(agency.logo || "");
       setInitialLetterhead(agency.letterhead || "");
@@ -349,6 +356,7 @@ export default function AgencyInfoTab() {
 
   const applyAgencyState = (updated: Agency) => {
     const nextValues = agencyToFormValues(updated);
+    setEinStatus(updated.checkPayrollProfile?.einStatus ?? null);
     setInitialValues(nextValues);
     setInitialLogo(updated.logo || "");
     setInitialLetterhead(updated.letterhead || "");
@@ -615,6 +623,37 @@ export default function AgencyInfoTab() {
                       <FormItem>
                         <FormControl>
                           <Input placeholder="Enter Medicaid / CDD ID" {...field} disabled={disabled} className={inputClassName} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </SettingsFormFieldRow>
+
+                <SettingsFormFieldRow
+                  title="EIN"
+                  description={`Federal tax ID, shared with payroll setup and used on 837P claims. ${einOnFileText(einStatus)} Enter a new one to replace it.`}
+                >
+                  <FormField
+                    control={form.control}
+                    name="ein"
+                    rules={{
+                      validate: (value) =>
+                        !value?.trim() || EIN_PATTERN.test(value.trim()) || "EIN must be 9 digits (XX-XXXXXXX).",
+                    }}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Input
+                            placeholder={einStatus?.present ? "Enter a new EIN to replace it" : "XX-XXXXXXX"}
+                            {...field}
+                            value={field.value ?? ""}
+                            aria-label="EIN"
+                            autoComplete="off"
+                            inputMode="numeric"
+                            disabled={disabled}
+                            className={inputClassName}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

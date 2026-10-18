@@ -24,7 +24,19 @@ import ClaimReportServiceTable from "./ClaimReportServiceTable";
 import ClaimReportSummaryFooter from "./ClaimReportSummaryFooter";
 import "./claimReportPrint.css";
 import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
-import { getClaimReport, updateClaimReport, type ClaimReportFormInput } from "@/lib/api/claims";
+import {
+  downloadX12Batch,
+  exportClaimsX12,
+  getClaimReport,
+  updateClaimReport,
+  X12ExportError,
+  type BillingClaimEdiExport,
+  type BillingClaimStatus,
+  type ClaimReportFormInput,
+  type X12ExportCheck,
+} from "@/lib/api/claims";
+import { claimX12ButtonText, getClaimX12Action } from "../x12-export/x12ExportUtils";
+import ClaimReportActionsFooter from "./ClaimReportActionsFooter";
 import {
   applySavedClaimReport,
   buildClaimReportFieldsInput,
@@ -33,6 +45,7 @@ import {
 const DigitalSignatureModal = lazy(
   () => import("@/pages/applicant/application/components/DigitalSignature")
 );
+const EdiSettingsDialog = lazy(() => import("../x12-export/EdiSettingsDialog"));
 
 type SignatureTarget = "signed" | "physician";
 
@@ -59,6 +72,12 @@ type ClaimReportModalProps = {
   initialPrefill: ClaimReportPrefillSnapshot;
   /** Save onset date, signatures and other report fields on the claim (Claims Management). */
   canSave?: boolean;
+  /** Claims Management: may create and download this claim's 837P file. */
+  canManageClaims?: boolean;
+  status?: BillingClaimStatus;
+  ediExport?: BillingClaimEdiExport | null;
+  /** Called after this claim is put in a new 837P file. */
+  onExported?: () => void;
   onClose: () => void;
 };
 
@@ -69,6 +88,10 @@ export default function ClaimReportModal({
   claimNumber,
   initialPrefill,
   canSave = false,
+  canManageClaims = false,
+  status = "pending",
+  ediExport = null,
+  onExported,
   onClose,
 }: ClaimReportModalProps) {
   const { agencyId } = useOperationalAgency();
@@ -91,6 +114,7 @@ export default function ClaimReportModal({
   const formRef = useRef(form);
   formRef.current = form;
   const saveChainRef = useRef<Promise<unknown>>(Promise.resolve());
+  const lastSaveFailedRef = useRef(false);
 
   // Load what was saved on the claim before (onset date, signatures, conditions).
   useEffect(() => {
@@ -137,6 +161,7 @@ export default function ClaimReportModal({
               delete unsavedSignaturesRef.current[field];
             }
           }
+          lastSaveFailedRef.current = false;
           setSaveState("saved");
         })
         .catch((error: unknown) => {
@@ -146,6 +171,7 @@ export default function ClaimReportModal({
             setSaveState("idle");
             return;
           }
+          lastSaveFailedRef.current = true;
           setSaveState("error");
         });
     },
@@ -163,6 +189,8 @@ export default function ClaimReportModal({
   useEffect(() => {
     if (!fieldsDirtyRef.current) return;
     const timer = window.setTimeout(() => {
+      // The 837P button may have sent these changes already.
+      if (!fieldsDirtyRef.current) return;
       fieldsDirtyRef.current = false;
       persist(buildClaimReportFieldsInput(formRef.current));
     }, AUTOSAVE_DELAY_MS);
@@ -233,6 +261,129 @@ export default function ClaimReportModal({
 
   const handleSend = useCallback(() => undefined, []);
 
+  const [claimEdiExport, setClaimEdiExport] = useState(ediExport);
+  const [x12Busy, setX12Busy] = useState(false);
+  const [x12Problem, setX12Problem] = useState<{ message: string; details: X12ExportCheck | null } | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const x12Mode = savedClaimId
+    ? getClaimX12Action({ canManage: canManageClaims, status, ediExport: claimEdiExport })
+    : null;
+
+  const handleX12 = useCallback(async () => {
+    if (!agencyId || !savedClaimId || x12Busy) return;
+    const context = { agencyId };
+    setX12Busy(true);
+    setX12Problem(null);
+    let created = false;
+    try {
+      let batch = claimEdiExport?.batchId
+        ? {
+            id: claimEdiExport.batchId,
+            fileName: claimEdiExport.fileName || `837P_${claimEdiExport.controlNumber ?? claimEdiExport.batchId}.x12`,
+          }
+        : null;
+      if (!batch) {
+        // The file is built from what is saved on the claim, so send pending edits first.
+        if (fieldsDirtyRef.current || Object.keys(unsavedSignaturesRef.current).length > 0) {
+          fieldsDirtyRef.current = false;
+          persist(buildClaimReportFieldsInput(formRef.current));
+        }
+        await saveChainRef.current;
+        if (lastSaveFailedRef.current) {
+          setX12Problem({ message: "Couldn't save your latest changes, so no 837P file was made. Try again.", details: null });
+          return;
+        }
+        const result = await exportClaimsX12({ context, claimIds: [savedClaimId] });
+        batch = result.batch;
+        created = true;
+        setClaimEdiExport({
+          batchId: result.batch.id,
+          controlNumber: result.batch.interchangeControlNumber,
+          usageIndicator: result.batch.usageIndicator,
+          exportedAt: result.batch.createdAt,
+          fileName: result.batch.fileName,
+        });
+        setLocked(true);
+        onExported?.();
+      }
+      await downloadX12Batch({ context, batch });
+    } catch (error) {
+      if (error instanceof X12ExportError) {
+        setX12Problem({ message: error.message, details: error.details });
+      } else {
+        setX12Problem({
+          message: created || claimEdiExport?.batchId
+            ? "Couldn't download the 837P file. Try again."
+            : "Couldn't create the 837P file. Try again.",
+          details: null,
+        });
+      }
+    } finally {
+      setX12Busy(false);
+    }
+  }, [agencyId, claimEdiExport, onExported, persist, savedClaimId, x12Busy]);
+
+  const x12Action = x12Mode
+    ? {
+        ...claimX12ButtonText({ mode: x12Mode, busy: x12Busy, ediExport: claimEdiExport }),
+        busy: x12Busy,
+        onClick: () => void handleX12(),
+      }
+    : null;
+  const pdfAction = {
+    label: isDownloading ? "Creating PDF…" : "Download claim form (PDF)",
+    detail: "CMS-1500 style, for printing or records",
+    busy: isDownloading,
+    onClick: () => void handleDownload(),
+  };
+
+  const footerStatus = locked ? (
+    <p role="status">This claim is already in an 837P file, so changes here are not saved.</p>
+  ) : persistId && SAVE_STATE_LABEL[saveState] ? (
+    <p
+      className={saveState === "error" || saveState === "load-error" ? "text-[#d92d20]" : undefined}
+      role="status"
+      aria-live="polite"
+    >
+      {SAVE_STATE_LABEL[saveState]}
+      {saveState === "load-error" ? (
+        <button
+          type="button"
+          onClick={() => setLoadAttempt((attempt) => attempt + 1)}
+          className="ml-2 font-medium underline"
+        >
+          Try again
+        </button>
+      ) : null}
+    </p>
+  ) : null;
+
+  const x12Details = x12Problem?.details;
+  const x12Notice = x12Problem ? (
+    <div role="alert" className="claim-report-no-print rounded-[10px] bg-[#fef3f2] px-4 py-3 text-[14px] text-[#b42318]">
+      <p className="font-medium">{x12Problem.message}</p>
+      {x12Details?.settingsErrors.length ? (
+        <div className="mt-2">
+          <ul className="list-disc space-y-1 pl-5">
+            {x12Details.settingsErrors.map((issue, index) => (
+              <li key={`settings-${index}`}>{issue.message}</li>
+            ))}
+          </ul>
+          <button type="button" onClick={() => setSettingsOpen(true)} className="mt-2 font-medium underline">
+            Open 837P settings
+          </button>
+        </div>
+      ) : null}
+      {x12Details?.claimErrors.length ? (
+        <ul className="mt-2 list-disc space-y-1 pl-5">
+          {x12Details.claimErrors.map((issue, index) => (
+            <li key={`claim-${index}`}>{issue.message}</li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  ) : null;
+
   const openSignedSignature = useCallback(() => openSignature("signed"), [openSignature]);
   const openPhysicianSignature = useCallback(() => openSignature("physician"), [openSignature]);
   const clearSignedSignature = useCallback(() => {
@@ -297,28 +448,6 @@ export default function ClaimReportModal({
               <DialogDescription className="sr-only">
                 Review claim details, add signatures, download, or send the report.
               </DialogDescription>
-              {locked ? (
-                <p className="claim-report-no-print mt-2 text-[13px] text-[#808081]" role="status">
-                  This claim is already in an 837P file, so changes here are not saved.
-                </p>
-              ) : persistId && SAVE_STATE_LABEL[saveState] ? (
-                <p
-                  className={`claim-report-no-print mt-2 text-[13px] ${saveState === "error" || saveState === "load-error" ? "text-[#d92d20]" : "text-[#808081]"}`}
-                  role="status"
-                  aria-live="polite"
-                >
-                  {SAVE_STATE_LABEL[saveState]}
-                  {saveState === "load-error" ? (
-                    <button
-                      type="button"
-                      onClick={() => setLoadAttempt((attempt) => attempt + 1)}
-                      className="ml-2 font-medium underline"
-                    >
-                      Try again
-                    </button>
-                  ) : null}
-                </p>
-              ) : null}
             </DialogHeader>
 
             <div key={claim.id} className="claim-report-modal-body flex-1 overflow-x-hidden overflow-y-auto pb-6">
@@ -343,15 +472,22 @@ export default function ClaimReportModal({
               <ClaimReportSummaryFooter
                 form={form}
                 claimId={savedClaimId ?? claim.id}
-                isDownloading={isDownloading}
                 onUpdate={updateForm}
-                onDownload={handleDownload}
-                onSend={handleSend}
                 onOpenPhysicianSignature={openPhysicianSignature}
                 onClearPhysicianSignature={clearPhysicianSignature}
               />
             </div>
           </div>
+
+          {/* Outside the print root, so the PDF never includes it. */}
+          <ClaimReportActionsFooter
+            status={footerStatus}
+            notice={x12Notice}
+            pdf={pdfAction}
+            x12={x12Action}
+            onSend={handleSend}
+            onClose={onClose}
+          />
         </DialogContent>
       </Dialog>
 
@@ -366,6 +502,16 @@ export default function ClaimReportModal({
             useCase={signatureTarget ? `claim-report-${signatureTarget}` : "claim-report"}
             onSave={handleSignatureSave}
             nested
+          />
+        </Suspense>
+      ) : null}
+
+      {settingsOpen ? (
+        <Suspense fallback={null}>
+          <EdiSettingsDialog
+            open
+            onClose={() => setSettingsOpen(false)}
+            onSaved={() => setX12Problem(null)}
           />
         </Suspense>
       ) : null}

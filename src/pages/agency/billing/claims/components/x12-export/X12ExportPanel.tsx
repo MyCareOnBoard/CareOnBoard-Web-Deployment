@@ -14,6 +14,8 @@ import { formatCents, getExportableClaims } from "./x12ExportUtils";
 
 type X12ExportPanelProps = {
   claims: readonly BillingClaimListItem[];
+  /** Changes when a file is made elsewhere (the claim report), to reload the list. */
+  refreshKey?: number;
   onExported?: (batch: X12Batch) => void;
 };
 
@@ -26,7 +28,7 @@ function formatBatchDate(iso: string): string {
     : date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
-export default function X12ExportPanel({ claims, onExported }: X12ExportPanelProps) {
+export default function X12ExportPanel({ claims, refreshKey = 0, onExported }: X12ExportPanelProps) {
   const { agencyId } = useOperationalAgency();
   const { toast } = useToast();
   const [batches, setBatches] = useState<X12Batch[]>([]);
@@ -55,7 +57,7 @@ export default function X12ExportPanel({ claims, onExported }: X12ExportPanelPro
   useEffect(() => {
     void loadBatches();
     return () => requestRef.current?.abort();
-  }, [loadBatches]);
+  }, [loadBatches, refreshKey]);
 
   const download = async (batch: X12Batch) => {
     if (!agencyId) return;

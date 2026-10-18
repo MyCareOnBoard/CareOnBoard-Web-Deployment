@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { BillingClaimListItem } from "@/lib/api/claims";
-import { countIssues, formatCents, getExportableClaims, groupClaimIssues } from "./x12ExportUtils";
+import {
+  agencyDefaultPlaceholder,
+  claimX12ButtonText,
+  countIssues,
+  formatCents,
+  getClaimX12Action,
+  getExportableClaims,
+  groupClaimIssues,
+} from "./x12ExportUtils";
 
 function claim(overrides: Partial<BillingClaimListItem>): BillingClaimListItem {
   return {
@@ -72,5 +80,49 @@ describe("formatting", () => {
         warnings: [{ message: "w" }],
       }),
     ).toBe(3);
+  });
+});
+
+describe("agencyDefaultPlaceholder", () => {
+  it("shows the agency value a blank field will use", () => {
+    expect(agencyDefaultPlaceholder("submitterName", { submitterName: "CareOnBoard LLC" })).toBe(
+      "From agency profile: CareOnBoard LLC",
+    );
+    expect(agencyDefaultPlaceholder("billingTaxId", { submitterName: "CareOnBoard LLC" })).toBeUndefined();
+    expect(agencyDefaultPlaceholder("billingTaxId", { taxIdLast4: "4321" })).toBe("From agency EIN: ••4321");
+    expect(agencyDefaultPlaceholder("billingCity", { billingCity: "  " })).toBeUndefined();
+  });
+
+  it("asks for the +4 when the agency ZIP has only 5 digits", () => {
+    expect(agencyDefaultPlaceholder("billingZip", { billingZip: "08608" })).toBe(
+      "Agency profile has 08608. Enter the full ZIP+4",
+    );
+    expect(agencyDefaultPlaceholder("billingZip", { billingZip: "08608-1234" })).toBe(
+      "From agency profile: 08608-1234",
+    );
+  });
+});
+
+describe("getClaimX12Action", () => {
+  it("downloads an exported claim, exports a pending one, and hides otherwise", () => {
+    expect(getClaimX12Action({ canManage: true, status: "paid", ediExport: { batchId: "b1" } })).toBe("download");
+    expect(getClaimX12Action({ canManage: true, status: "pending" })).toBe("export");
+    expect(getClaimX12Action({ canManage: true, status: "rejected" })).toBeNull();
+    expect(getClaimX12Action({ canManage: false, status: "pending" })).toBeNull();
+  });
+});
+
+describe("claimX12ButtonText", () => {
+  it("says a new file is made and the report locks", () => {
+    expect(claimX12ButtonText({ mode: "export" })).toEqual({
+      label: "Create & download 837P file",
+      detail: "Electronic claim for NJMMIS. Locks this report",
+    });
+    expect(claimX12ButtonText({ mode: "export", busy: true }).label).toBe("Creating 837P file…");
+  });
+
+  it("names the file a claim is already in", () => {
+    expect(claimX12ButtonText({ mode: "download", ediExport: { fileName: "837P_TEST.x12", controlNumber: "000000001" } }).detail).toBe("837P_TEST.x12");
+    expect(claimX12ButtonText({ mode: "download", ediExport: { controlNumber: "000000001" } }).detail).toBe("Control #000000001");
   });
 });
