@@ -17,6 +17,12 @@ import {Button} from '@/components/ui/button';
 import {Skeleton} from '@/components/ui/skeleton';
 
 
+// Same rule as the staff Training tab: a submitted certificate the agency hasn't reviewed yet.
+function isAwaitingReview(training: TrainingData): boolean {
+    if (training.source === 'policy') return training.policyContextState === 'current' && training.reviewState === 'awaiting_review';
+    return !training.approved && training.status !== 'Changes Requested' && !!training.requiresCertificate && !!training.certificateId;
+}
+
 interface ReviewTrainingsModalProps {
     scopeKey?: string;
     open: boolean;
@@ -106,6 +112,7 @@ export default function ReviewTrainingsModal(
     };
 
     if (!employee) return null;
+    const awaitingReviewCount = courses.filter(isAwaitingReview).length;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -128,7 +135,7 @@ export default function ReviewTrainingsModal(
                             <p className="break-words text-sm font-semibold text-[#162a2c]">{employee.fullName}</p>
                             <p className="text-xs text-[#627476]">{employee.role}{mode ? ' · ' + mode.toUpperCase() : ''}</p>
                         </div>
-                        {courses.length > 0 && <p className="shrink-0 text-right text-xs text-[#627476]"><span className="block text-sm font-medium text-[#162a2c]">{courses.length} trainings</span>{nextCursor ? 'More available below' : 'Assigned to staff'}</p>}
+                        {courses.length > 0 && <p className="shrink-0 text-right text-xs text-[#627476]"><span className="block text-sm font-medium text-[#162a2c]">{courses.length} trainings</span>{awaitingReviewCount > 0 ? <span className="block font-medium text-[#88601d]">{awaitingReviewCount} awaiting review</span> : nextCursor ? 'More available below' : 'Assigned to staff'}</p>}
                     </div>
                 </div>
                 <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-2 sm:px-7">
@@ -136,18 +143,20 @@ export default function ReviewTrainingsModal(
                         const currentPolicy = training.source === 'policy' && training.policyContextState === 'current';
                         const urgent = currentPolicy && ['overdue', 'expired'].includes(training.deadlineState || '');
                         const beforeWork = currentPolicy && training.deadlineState === 'before_work';
+                        const awaitingReview = isAwaitingReview(training);
                         const accepted = training.source === 'policy' ? currentPolicy && training.deadlineState === 'satisfied' : training.approved;
                         const dueDate = currentPolicy && training.dueDateKey && !['satisfied', 'not_required', 'details_needed', 'expired', 'before_work'].includes(training.deadlineState || '') ? parseISO(training.dueDateKey) : null;
                         return <details key={employee.id + '-' + training.id} open={index === 0}
                             className="group/training relative ml-[5px] border-l border-[#e2eaea] py-6 pl-6 last-of-type:border-transparent">
                             <summary className="flex cursor-pointer list-none items-start gap-3 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#008c90] [&::-webkit-details-marker]:hidden">
-                            <span aria-hidden="true" className={`absolute -left-[5px] top-[31px] size-[9px] rounded-full border-2 bg-white ring-[5px] ring-white ${urgent ? 'border-[#b14d35]' : 'border-[#008c90]'}`}/>
+                            <span aria-hidden="true" className={`absolute -left-[5px] top-[31px] size-[9px] rounded-full border-2 bg-white ring-[5px] ring-white ${urgent ? 'border-[#b14d35]' : awaitingReview ? 'border-[#c99a3a]' : 'border-[#008c90]'}`}/>
                                 <span className="min-w-0 flex-1">
                                     <span className="block break-words text-[15px] font-semibold leading-[1.45] tracking-[-0.2px] text-[#162a2c]">{training.name}</span>
                                     <span className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[#627476]">
                                         <span className={`rounded-md px-2 py-1 text-[11px] font-semibold ${urgent ? 'bg-[#fff1eb] text-[#b14d35]' : beforeWork ? 'bg-[#faf3e4] text-[#88601d]' : accepted ? 'bg-[#e5f7f7] text-[#008c90]' : 'bg-[#f5f9f9] text-[#627476]'}`}>
                                             {training.source === 'policy' ? trainingPolicyLabel(training) : training.status || 'Not Completed'}
                                         </span>
+                                        {awaitingReview && <span className="rounded-md bg-[#faf3e4] px-2 py-1 text-[11px] font-semibold text-[#88601d]">Awaiting review</span>}
                                         {dueDate && isValid(dueDate) && <span>Due {format(dueDate, 'MMM d, yyyy')}</span>}
                                     </span>
                                 </span>

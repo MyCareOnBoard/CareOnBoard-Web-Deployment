@@ -15,6 +15,17 @@ interface Props {
     onUploaded?: (certificate: CertificateResult) => void;
 }
 
+const CERTIFICATE_MIME_TYPES: Record<string, string> = {pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp'};
+
+function certificateMimeType(headerType: unknown, blobType: string, fileName?: string | null): string {
+    for (const candidate of [headerType, blobType]) {
+        const type = typeof candidate === 'string' ? candidate.split(';', 1)[0].trim().toLowerCase() : '';
+        if (type && type !== 'application/octet-stream' && type !== 'binary/octet-stream') return type;
+    }
+    const extension = fileName?.split('.').pop()?.toLowerCase() ?? '';
+    return CERTIFICATE_MIME_TYPES[extension] ?? 'application/pdf';
+}
+
 export default function TrainingCertificate({training, onUploaded, canEditHireDate=false, showPolicySummary=true, dashboard=false}: Props) {
     const [selection, setSelection] = useState<{file: File; requestId: string} | null>(null);
     const [uploading, setUploading] = useState(false);
@@ -38,15 +49,16 @@ export default function TrainingCertificate({training, onUploaded, canEditHireDa
         setPreview({loading: true});
         axiosClient.get<Blob>(`/employees/trainings/${training.id}/certificate`, {
             params: {certificateId: selectedCertificateId}, responseType: 'blob', signal: controller.signal,
-        }).then(({data}) => {
+        }).then(({data, headers}) => {
             if (controller.signal.aborted) return;
-            objectUrl = URL.createObjectURL(data);
+            // A blob typed as octet-stream (or with no type) makes the browser download it instead of showing it.
+            objectUrl = URL.createObjectURL(new Blob([data], {type: certificateMimeType(headers?.['content-type'], data.type, training.certificateName)}));
             setPreview({url: objectUrl, loading: false});
         }).catch(() => {
             if (!controller.signal.aborted) setPreview({loading: false, error: 'Unable to open this certificate. Close the preview and try again.'});
         });
         return () => { controller.abort(); if (objectUrl) URL.revokeObjectURL(objectUrl); };
-    }, [previewOpen, training.id, selectedCertificateId]);
+    }, [previewOpen, training.id, selectedCertificateId, training.certificateName]);
 
     const upload = async () => {
         if (!selection || !training.id || uploadController.current) return;
