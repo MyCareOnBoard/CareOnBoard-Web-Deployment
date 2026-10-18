@@ -3,6 +3,7 @@ import {useToast} from '@/hooks/use-toast';
 import {sendDocumentAlert} from '@/lib/api/employee-documents';
 import {Link} from 'react-router';
 import {Button} from '@/components/ui/button';
+import {ArrowRight, Bell} from 'lucide-react';
 import {complianceAlertsApi} from './api';
 import {ComplianceBadge, ComplianceReviewList, ComplianceSkeleton, complianceTone, type ComplianceReviewItem} from './CompliancePresentation';
 import {SourceFilters, SourceNotice, SourcePage, visibleSourceData, type SourceProps} from './SourceControls';
@@ -42,8 +43,10 @@ export function WorkspaceSummary({kind,id,agencyId,mode,scopeKey,showName=true}:
         <p className="text-sm font-semibold">{item.label}</p>
         <ComplianceBadge tone={item.state==='pass'||item.state==='verified'?'success':item.state==='fail'?'danger':['unavailable','restricted','not_verified','not_recorded','needs_not_recorded','applicability_not_recorded'].includes(item.state)?'warning':complianceTone(item.state)}>{labels[item.state] || item.state.replaceAll('_',' ')}</ComplianceBadge>
         {item.message && <p className="text-sm text-[#5e7378]">{item.message}</p>}
-        {item.documentId && item.employeeId && <Button variant="outline" className="ml-2" disabled={sending!==null || !!query.error} onClick={()=>void sendAlert(item)}>{sending===item.documentId?'Sending…':'Send Alert'}</Button>}
-        {item.href && <Link className="inline-block text-sm font-semibold text-[#007f84] underline" to={item.href}>Open record</Link>}
+        {((item.documentId && item.employeeId) || item.href) && <div className="flex flex-wrap items-center gap-2 pt-1">
+          {item.documentId && item.employeeId && <Button variant="outline" size="sm" className="h-9 px-4" disabled={sending!==null || !!query.error} onClick={()=>void sendAlert(item)}><Bell aria-hidden="true" className="size-4"/>{sending===item.documentId?'Sending…':'Send Alert'}</Button>}
+          {item.href && <Button asChild variant="ghost" size="sm" className="h-9 px-3 text-[#007f84] hover:bg-[#e6f4f4] hover:text-[#006a6e]"><Link to={item.href}>Open record<ArrowRight aria-hidden="true" className="size-4"/></Link></Button>}
+        </div>}
       </div>)}</div>}
     </details>)}</>}
   </div>;
