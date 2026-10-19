@@ -25,6 +25,8 @@ type X12ExportDialogProps = {
   onClose: () => void;
   onOpenSettings: () => void;
   onExported: (batch: X12Batch) => void;
+  /** Opens the claim report for a claim that needs fixing. Hidden when not given. */
+  onOpenReport?: (claim: BillingClaimListItem) => void;
 };
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -39,6 +41,7 @@ export default function X12ExportDialog({
   onClose,
   onOpenSettings,
   onExported,
+  onOpenReport,
 }: X12ExportDialogProps) {
   const { agencyId } = useOperationalAgency();
   const [resubmit, setResubmit] = useState(false);
@@ -122,7 +125,7 @@ export default function X12ExportDialog({
       <DialogContent showCloseButton={false} className={`${BILLING_CORNER_MODAL_CLASS} flex max-h-[90dvh] flex-col`}>
         <BillingCornerModalHeader
           title="Create 837P file"
-          description="Pick the pending claims to send to NJ Medicaid. Each claim needs its onset date and both signatures saved on the claim report."
+          description="Pick the pending claims to send to NJ Medicaid."
           onClose={onClose}
           closeDisabled={Boolean(busy)}
         />
@@ -203,16 +206,31 @@ export default function X12ExportDialog({
               <p className="font-medium">
                 {claimIssues.length === 1 ? "1 claim needs" : `${claimIssues.length} claims need`} fixing
               </p>
-              {claimIssues.map((entry) => (
-                <div key={entry.claimId}>
-                  <p className="font-medium">{entry.claimNumber}</p>
-                  <ul className="list-disc space-y-1 pl-5">
-                    {entry.messages.map((message, index) => (
-                      <li key={index}>{message}</li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
+              {claimIssues.map((entry) => {
+                const claim = onOpenReport ? claims.find((item) => item.id === entry.claimId) : undefined;
+                return (
+                  <div key={entry.claimId}>
+                    <p className="font-medium">
+                      {entry.claimNumber}
+                      {claim ? (
+                        <button
+                          type="button"
+                          onClick={() => onOpenReport?.(claim)}
+                          disabled={Boolean(busy)}
+                          className="ml-3 font-normal underline disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Open claim report
+                        </button>
+                      ) : null}
+                    </p>
+                    <ul className="list-disc space-y-1 pl-5">
+                      {entry.messages.map((message, index) => (
+                        <li key={index}>{message}</li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })}
             </div>
           ) : null}
 

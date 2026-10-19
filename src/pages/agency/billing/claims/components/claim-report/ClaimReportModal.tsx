@@ -37,6 +37,7 @@ import {
 } from "@/lib/api/claims";
 import { claimX12ButtonText, getClaimX12Action } from "../x12-export/x12ExportUtils";
 import ClaimReportActionsFooter from "./ClaimReportActionsFooter";
+import ClaimsActionLoadingOverlay from "../ClaimsActionLoadingOverlay";
 import {
   applySavedClaimReport,
   buildClaimReportFieldsInput,
@@ -263,6 +264,8 @@ export default function ClaimReportModal({
 
   const [claimEdiExport, setClaimEdiExport] = useState(ediExport);
   const [x12Busy, setX12Busy] = useState(false);
+  // Which part of the 837P action is running, for the loading overlay.
+  const [x12Step, setX12Step] = useState<"creating" | "downloading" | null>(null);
   const [x12Problem, setX12Problem] = useState<{ message: string; details: X12ExportCheck | null } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const x12Mode = savedClaimId
@@ -273,6 +276,7 @@ export default function ClaimReportModal({
     if (!agencyId || !savedClaimId || x12Busy) return;
     const context = { agencyId };
     setX12Busy(true);
+    setX12Step(claimEdiExport?.batchId ? "downloading" : "creating");
     setX12Problem(null);
     let created = false;
     try {
@@ -305,6 +309,7 @@ export default function ClaimReportModal({
         });
         setLocked(true);
         onExported?.();
+        setX12Step("downloading");
       }
       await downloadX12Batch({ context, batch });
     } catch (error) {
@@ -320,6 +325,7 @@ export default function ClaimReportModal({
       }
     } finally {
       setX12Busy(false);
+      setX12Step(null);
     }
   }, [agencyId, claimEdiExport, onExported, persist, savedClaimId, x12Busy]);
 
@@ -336,6 +342,16 @@ export default function ClaimReportModal({
     busy: isDownloading,
     onClick: () => void handleDownload(),
   };
+
+  // Footer actions only; the background autosave never shows this.
+  const reportLabel = claimNumber || "this claim";
+  const actionOverlay = isDownloading
+    ? { title: "Preparing claim form", description: `Building the CMS-1500 PDF for ${reportLabel}…` }
+    : x12Step === "creating"
+      ? { title: "Creating 837P file", description: "Saving the report, checking the claim and building the NJMMIS file…" }
+      : x12Step === "downloading"
+        ? { title: "Downloading 837P file", description: `Getting the 837P file for ${reportLabel}…` }
+        : null;
 
   const footerStatus = locked ? (
     <p role="status">This claim is already in an 837P file, so changes here are not saved.</p>
@@ -410,6 +426,8 @@ export default function ClaimReportModal({
         modal={signatureTarget === null}
         onOpenChange={(value) => {
           if (!value && signatureTarget !== null) return;
+          // Escape or an outside click must not close the report while an action runs.
+          if (!value && actionOverlay) return;
           if (!value) onClose();
         }}
       >
@@ -504,6 +522,10 @@ export default function ClaimReportModal({
             nested
           />
         </Suspense>
+      ) : null}
+
+      {actionOverlay ? (
+        <ClaimsActionLoadingOverlay title={actionOverlay.title} description={actionOverlay.description} />
       ) : null}
 
       {settingsOpen ? (

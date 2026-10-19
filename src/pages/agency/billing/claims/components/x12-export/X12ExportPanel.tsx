@@ -17,6 +17,8 @@ type X12ExportPanelProps = {
   /** Changes when a file is made elsewhere (the claim report), to reload the list. */
   refreshKey?: number;
   onExported?: (batch: X12Batch) => void;
+  /** Opens a claim's report from the "claims need fixing" list. */
+  onOpenReport?: (claim: BillingClaimListItem) => void;
 };
 
 const RECENT_BATCH_LIMIT = 5;
@@ -28,7 +30,7 @@ function formatBatchDate(iso: string): string {
     : date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
-export default function X12ExportPanel({ claims, refreshKey = 0, onExported }: X12ExportPanelProps) {
+export default function X12ExportPanel({ claims, refreshKey = 0, onExported, onOpenReport }: X12ExportPanelProps) {
   const { agencyId } = useOperationalAgency();
   const { toast } = useToast();
   const [batches, setBatches] = useState<X12Batch[]>([]);
@@ -156,6 +158,14 @@ export default function X12ExportPanel({ claims, refreshKey = 0, onExported }: X
             setSettingsOpen(true);
           }}
           onExported={handleExported}
+          onOpenReport={
+            onOpenReport
+              ? (claim) => {
+                  setExportOpen(false);
+                  onOpenReport(claim);
+                }
+              : undefined
+          }
         />
       ) : null}
 
