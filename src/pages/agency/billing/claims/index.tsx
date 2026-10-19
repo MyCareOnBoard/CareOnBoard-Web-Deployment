@@ -651,6 +651,7 @@ export function ClaimsDashboardContent() {
               claims={generatedClaims.claims}
               refreshKey={x12RefreshKey}
               onExported={() => void generatedClaims.refetch({ force: true })}
+              onOpenReport={(claim) => void handleViewReport(claim)}
             />
           </Suspense>
         ) : null}
