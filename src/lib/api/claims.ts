@@ -82,6 +82,8 @@ export type BillingClaimDetail = {
   amount: number;
   clientId: string;
   clientName: string | null;
+  /** Program the claim belongs to. Older servers omit it. */
+  program?: AgencyMode;
   serviceCode: string;
   weekRange: string | null;
   serviceDate: string | null;
@@ -546,6 +548,8 @@ export type X12Batch = {
   createdAt: string;
   createdBy: string | null;
   resubmit: boolean;
+  /** Programs of the claims in the file. Older servers omit it. */
+  programs?: AgencyMode[];
 };
 
 /** Error raised when the server refuses an export; `details` lists each problem. */
@@ -643,12 +647,17 @@ export async function exportClaimsX12(input: {
 export async function listX12Batches(input: {
   context: OperationalBillingRequestContext;
   limit?: number;
+  /** Active agency program; only files holding its claims come back. */
+  mode?: AgencyMode;
   signal?: AbortSignal;
 }): Promise<X12Batch[]> {
-  const { context, limit = 20, signal } = input;
+  const { context, limit = 20, mode, signal } = input;
   const response = await axiosClient.get<ApiEnvelope<{ batches: X12Batch[] }>>(
     "/billing/claims/x12-batches",
-    { params: { agencyId: operationalAgencyId(context), limit }, ...(signal ? { signal } : {}) },
+    {
+      params: { agencyId: operationalAgencyId(context), limit, ...(mode ? { mode } : {}) },
+      ...(signal ? { signal } : {}),
+    },
   );
   if (!response.data.success || !response.data.data) {
     throw new Error(response.data.message || "Failed to list 837P files");

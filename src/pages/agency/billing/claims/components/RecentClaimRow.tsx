@@ -9,8 +9,9 @@ import {
   NETWORK_GROUPED_TABLE_ROW_CLASS,
   TABLE_ROW_CLASS,
 } from "./tableColumns";
-import { useStaffLabels } from "@/hooks/useStaffLabels";
 import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
+import { useStaffLabels } from "@/hooks/useStaffLabels";
+import { claimsModeLabels, type ClaimsModeLabels } from "../utils/claimsModeLabels";
 
 const MISSING_STAFF_ID = "—";
 const STAFF_ID_DISPLAY_LENGTH = 6;
@@ -55,6 +56,8 @@ type RowVariant = "mobile" | "desktop";
 
 type RecentClaimRowProps = {
   claim: RecentClaim;
+  /** Mode-aware column labels from the table; defaults to the signed-in user's program. */
+  labels?: ClaimsModeLabels;
   variant: RowVariant;
   showClient?: boolean;
   showAgency?: boolean;
@@ -71,8 +74,9 @@ function DurationRange({ start, end }: { start: string; end: string }) {
   );
 }
 
-function RecentClaimRow({ claim, variant, showClient = true, showAgency = false, providerFree = false }: RecentClaimRowProps) {
-  const { labels } = useStaffLabels();
+function RecentClaimRow({ claim, labels: labelsProp, variant, showClient = true, showAgency = false, providerFree = false }: RecentClaimRowProps) {
+  const { mode: userMode } = useStaffLabels();
+  const labels = labelsProp ?? claimsModeLabels(userMode);
   if (variant === "mobile") {
     return (
       <div className="rounded-[16px] border border-[#e5e5e6] bg-white px-4 py-4">
@@ -89,7 +93,7 @@ function RecentClaimRow({ claim, variant, showClient = true, showAgency = false,
 
         <div className={showClient ? "mt-4 space-y-3" : "space-y-3"}>
           <div className="flex justify-between gap-4">
-            <span className="text-[13px] text-[#808081]">{labels.noun}</span>
+            <span className="text-[13px] text-[#808081]">{labels.staff}</span>
             {providerFree ? <ProviderFreeStaff staffId={claim.staffId} staffName={claim.staffName} /> : <StaffLink staffId={claim.staffId} staffName={claim.staffName} />}
           </div>
           <div className="flex justify-between gap-4">
@@ -120,7 +124,7 @@ function RecentClaimRow({ claim, variant, showClient = true, showAgency = false,
             <p className="mt-1 text-[13px] font-medium text-[#10141a]">{claim.serviceCode}</p>
           </div>
           <div>
-            <p className="text-[12px] text-[#808081]">PA Number</p>
+            <p className="text-[12px] text-[#808081]">{labels.authNumber}</p>
             <p className="mt-1 text-[13px] font-medium text-[#10141a]">{claim.paNumber}</p>
           </div>
           <div>
