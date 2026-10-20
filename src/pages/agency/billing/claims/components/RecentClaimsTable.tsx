@@ -17,6 +17,8 @@ import {
   TABLE_ROW_CLASS,
 } from "./tableColumns";
 import { useStaffLabels } from "@/hooks/useStaffLabels";
+import type { AgencyMode } from "@/store/redux/agencyModeSlice";
+import { claimsModeLabels } from "../utils/claimsModeLabels";
 
 const SKELETON_ROW_COUNT = 10;
 
@@ -38,6 +40,8 @@ type RecentClaimsTableProps = {
   /** Lets the network workspace retain its single server-backed client search. */
   showControls?: boolean;
   loadMoreError?: string | null;
+  /** Active agency program. When given, staff and authorization labels follow it. */
+  mode?: AgencyMode | null;
 };
 
 function RecentClaimSkeletonRow({
@@ -89,11 +93,16 @@ export default function RecentClaimsTable({
   providerFree = false,
   showControls = true,
   loadMoreError,
+  mode,
 }: RecentClaimsTableProps) {
   const [filterQuery, setFilterQuery] = useState("");
   const [selectedClientName, setSelectedClientName] = useState<string | undefined>();
   const [typeFilter, setTypeFilter] = useState<"all" | "payer" | "out_of_pocket" | "both">("all");
-  const { labels } = useStaffLabels();
+  const { mode: userMode } = useStaffLabels();
+  const labels = useMemo(
+    () => claimsModeLabels(mode === undefined ? userMode : mode),
+    [mode, userMode],
+  );
 
   const sortedClaims = useMemo(
     () =>
@@ -186,9 +195,9 @@ export default function RecentClaimsTable({
           <div className={TABLE_MIN_WIDTH}>
             <div className={showAgency ? NETWORK_GROUPED_TABLE_HEADER_CLASS : GROUPED_TABLE_HEADER_CLASS}>
               {showAgency ? <span>Agency</span> : null}
-              <span>{labels.noun}</span>
+              <span>{labels.staff}</span>
               <span>Service code</span>
-              <span>PA Number</span>
+              <span>{labels.authNumber}</span>
               <span>Service date</span>
               <span>Duration/Distance</span>
               <span>Total hours/miles</span>
@@ -218,6 +227,7 @@ export default function RecentClaimsTable({
                   {group.claims.map((claim) => (
                     <RecentClaimRow
                       key={claim.id}
+                      labels={labels}
                       variant="desktop"
                       showClient={false}
                       claim={claim}
@@ -255,6 +265,7 @@ export default function RecentClaimsTable({
               {group.claims.map((claim) => (
                 <RecentClaimRow
                   key={claim.id}
+                  labels={labels}
                   variant="mobile"
                   showClient={false}
                   claim={claim}

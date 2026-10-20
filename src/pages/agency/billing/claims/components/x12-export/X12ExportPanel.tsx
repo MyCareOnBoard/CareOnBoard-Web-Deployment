@@ -31,7 +31,7 @@ function formatBatchDate(iso: string): string {
 }
 
 export default function X12ExportPanel({ claims, refreshKey = 0, onExported, onOpenReport }: X12ExportPanelProps) {
-  const { agencyId } = useOperationalAgency();
+  const { agencyId, mode } = useOperationalAgency();
   const { toast } = useToast();
   const [batches, setBatches] = useState<X12Batch[]>([]);
   const [loadingBatches, setLoadingBatches] = useState(false);
@@ -47,14 +47,19 @@ export default function X12ExportPanel({ claims, refreshKey = 0, onExported, onO
     requestRef.current = controller;
     setLoadingBatches(true);
     try {
-      const next = await listX12Batches({ context: { agencyId }, limit: RECENT_BATCH_LIMIT, signal: controller.signal });
+      const next = await listX12Batches({
+        context: { agencyId },
+        limit: RECENT_BATCH_LIMIT,
+        ...(mode ? { mode } : {}),
+        signal: controller.signal,
+      });
       if (!controller.signal.aborted) setBatches(next);
     } catch {
       // The list is a convenience; the export itself still works without it.
     } finally {
       if (!controller.signal.aborted) setLoadingBatches(false);
     }
-  }, [agencyId]);
+  }, [agencyId, mode]);
 
   useEffect(() => {
     void loadBatches();

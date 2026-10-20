@@ -7,6 +7,7 @@ import {
   getBillingClaimById,
   getBillingClaimMutationErrorMessage,
   getCreateBillingClaimErrorMessage,
+  type BillingClaimDetail,
   type BillingClaimEdiExport,
   type BillingClaimListItem,
   type BillingClaimStatus,
@@ -59,6 +60,8 @@ import {
   buildRecentClaimFromBillingDetail,
   STATUS_LABEL_TO_FILTER,
 } from "./utils/savedClaimUtils";
+
+const PROGRAM_NAMES = { ddd: "DDD", hha: "HHA", sc: "Support Coordination" } as const;
 
 const GenerateClaimModal = lazy(() => import("./components/GenerateClaimModal"));
 const ClaimReportModal = lazy(() => import("./components/claim-report/ClaimReportModal"));
@@ -173,6 +176,7 @@ export function ClaimsDashboardContent() {
     claim: RecentClaim;
     savedClaim: SavedBillingClaim;
     ediExport: BillingClaimEdiExport | null;
+    program: BillingClaimDetail["program"];
     scopeKey: string;
   } | null>(null);
 
@@ -491,6 +495,10 @@ export function ClaimsDashboardContent() {
         const detail = await getBillingClaimById({context:{agencyId},claimId:claim.id,signal:controller.signal});
         if(!current())return;
         if(detail.id!==claim.id || detail.clientId!==claim.clientId)throw new Error('Claim unavailable.');
+        if(mode && detail.program && detail.program!==mode){
+          toast({title:"Couldn't open claim report",description:`This claim belongs to the ${PROGRAM_NAMES[detail.program]} program. Switch to ${PROGRAM_NAMES[detail.program]} to open it.`,variant:"destructive"});
+          return;
+        }
         setClaimReport({
           scopeKey:capturedScope,
           claim: buildRecentClaimFromBillingDetail(detail),
@@ -500,12 +508,13 @@ export function ClaimsDashboardContent() {
             clientId: detail.clientId, shiftIds: detail.shiftIds, reportPrefill: detail.reportPrefill,
           },
           ediExport: detail.ediExport ?? null,
+          program: detail.program,
         });
       } catch (error) {
         if(!current())return;
         toast({title:"Couldn't open claim report",description:getBillingClaimMutationErrorMessage(error),variant:"destructive"});
       } finally {if(current())setOpeningReport(null);}
-    },[agencyId,toast,canViewReport,reportScope],
+    },[agencyId,toast,canViewReport,reportScope,mode],
   );
   useEffect(()=>{
     setReportSelectionError('');
@@ -642,10 +651,12 @@ export function ClaimsDashboardContent() {
           truncated={readyToClaim.truncated}
           onGenerateClaim={handleClientGroupGenerateClaim}
           generateDisabled={savingClaim || openingReport !== null}
+          mode={mode}
         />
       ) : (
         <>
-        {canManageClaims ? (
+        {/* Support coordination claims don't go out as 837P files yet. */}
+        {canManageClaims && mode !== "sc" ? (
           <Suspense fallback={null}>
             <X12ExportPanel
               claims={generatedClaims.claims}
@@ -697,7 +708,7 @@ export function ClaimsDashboardContent() {
             claimNumber={claimReport.savedClaim.claimNumber}
             initialPrefill={claimReport.savedClaim.reportPrefill}
             canSave={canManageClaims && claimReport.savedClaim.status === "pending"}
-            canManageClaims={canManageClaims}
+            canManageClaims={canManageClaims && claimReport.program !== "sc"}
             status={claimReport.savedClaim.status}
             ediExport={claimReport.ediExport}
             onExported={() => {
@@ -763,8 +774,9 @@ export function ClaimsDashboardContent() {
 }
 
 export default function ClaimsDashboardPage() {
-  const { agencyId } = useOperationalAgency();
-  return <ClaimsDashboardContent key={agencyId} />;
+  const { agencyId, mode } = useOperationalAgency();
+  // Remount on a program switch so tabs, filters and open dialogs from the other program reset.
+  return <ClaimsDashboardContent key={`${agencyId}:${mode ?? "all"}`} />;
 }
 
 export function AgencyClaimsDashboardPage() {
