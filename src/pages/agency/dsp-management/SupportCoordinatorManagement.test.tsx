@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, Route, Routes as RouterRoutes } from "react-router";
+import { Routes } from "@/routes/constants";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ getClientStats: vi.fn(), listClients: vi.fn(), listAgencyClients: vi.fn(), saveScCaseload: vi.fn(), useDSPList: vi.fn(), toastSuccess: vi.fn(), toastError: vi.fn(), toastWarning: vi.fn() }));
@@ -172,28 +173,17 @@ describe("SupportCoordinatorManagement", () => {
     expect(mocks.toastWarning).not.toHaveBeenCalled();
   });
 
-  it("opens and resets the add coordinator form without claiming an invitation was sent", async () => {
-    mocks.listAgencyClients.mockReset().mockResolvedValue([]);
-    mocks.saveScCaseload.mockReset();
+  it("sends Add to the manual staff onboarding flow", async () => {
     mocks.useDSPList.mockReturnValue({ dsps: [], isLoading: false, error: null });
     const user = userEvent.setup();
 
-    render(<MemoryRouter><SupportCoordinatorManagement /></MemoryRouter>);
+    render(<MemoryRouter initialEntries={[Routes.agency.dspManagement]}>
+      <RouterRoutes>
+        <Route path={Routes.agency.dspManagement} element={<SupportCoordinatorManagement />} />
+        <Route path={Routes.agency.manualStaffOnboarding} element={<p>Manual onboarding page</p>} />
+      </RouterRoutes>
+    </MemoryRouter>);
     await user.click(await screen.findByRole("button", { name: "Add support coordinator" }));
-    expect(screen.getByRole("dialog", { name: "Add Support coordinator" })).toBeInTheDocument();
-    await user.type(screen.getByLabelText("Full name"), "Tiara Booker");
-    await user.type(screen.getByLabelText("Email"), "tiara@example.com");
-    await user.type(screen.getByLabelText("Phone number"), "123");
-    await user.click(screen.getByRole("button", { name: "Send invitation" }));
-    expect(screen.getByRole("status")).toHaveTextContent("Enter a valid phone number.");
-    await user.clear(screen.getByLabelText("Phone number"));
-    await user.type(screen.getByLabelText("Phone number"), "241234567");
-    await user.click(screen.getByRole("button", { name: "Send invitation" }));
-    expect(screen.getByRole("status")).toHaveTextContent("No invitation was sent.");
-    await user.click(screen.getByRole("button", { name: "Cancel" }));
-    await user.click(screen.getByRole("button", { name: "Add support coordinator" }));
-    expect(screen.getByLabelText("Full name")).toHaveValue("");
-    expect(screen.getByLabelText("Email")).toHaveValue("");
-    expect(mocks.saveScCaseload).not.toHaveBeenCalled();
+    expect(await screen.findByText("Manual onboarding page")).toBeInTheDocument();
   });
 });
