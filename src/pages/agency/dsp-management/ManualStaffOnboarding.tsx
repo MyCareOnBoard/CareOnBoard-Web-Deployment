@@ -171,6 +171,8 @@ export default function ManualStaffOnboarding() {
   const { toast } = useToast();
   const agencyMode = useEffectiveAgencyMode();
   const applicantType = agencyModeToApplicantType(agencyMode);
+  const isSupportCoordinator = applicantType === "support_coordinator";
+  const managementPageLabel = isSupportCoordinator ? "Support Coordinator Management" : "DSP Management";
 
   const [sessionKey] = useState(getInitialSessionKey);
   const [activeStep, setActiveStep] = useState(0);
@@ -950,7 +952,7 @@ export default function ManualStaffOnboarding() {
         <h1 className="text-[40px] font-bold leading-[1.4] text-[#10141a]">Manual Staff Onboarding</h1>
         <div className="flex items-center gap-3">
           <Button type="button" onClick={() => navigate(Routes.agency.dspManagement)}>
-            Back to DSP Management
+            Back to {managementPageLabel}
           </Button>
         </div>
       </div>
@@ -1015,7 +1017,7 @@ export default function ManualStaffOnboarding() {
       <SuccessDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
         <SuccessDialogContent
           title="Staff Onboarded Successfully"
-          description={`${profileData.fullName} has been onboarded as a staff member. Their account is now active — share the login credentials with them so they can log in.`}
+          description={`${profileData.fullName} has been onboarded as ${isSupportCoordinator ? "a support coordinator" : "a staff member"}. Their account is now active — share the login credentials with them so they can log in.`}
           buttonText="Done"
           onButtonClick={() => { setShowSuccessDialog(false); navigate(Routes.agency.dspManagement); }}
         />
