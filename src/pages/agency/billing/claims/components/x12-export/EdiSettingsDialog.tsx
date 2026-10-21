@@ -27,6 +27,7 @@ import {
   type EdiUsageIndicator,
 } from "@/lib/api/claims";
 import { agencyDefaultPlaceholder, EDI_SETTINGS_FIELDS, EMPTY_EDI_SETTINGS } from "./x12ExportUtils";
+import { BILLING_PERIOD_LABELS, BILLING_PERIODS } from "../../utils/billingPeriodUtils";
 
 type EdiSettingsDialogProps = {
   open: boolean;
@@ -111,8 +112,8 @@ export default function EdiSettingsDialog({ open, onClose, onSaved }: EdiSetting
     <Dialog open={open} onOpenChange={(next) => !next && !saving && onClose()}>
       <DialogContent showCloseButton={false} className={`${BILLING_CORNER_MODAL_CLASS} flex max-h-[90dvh] flex-col`}>
         <BillingCornerModalHeader
-          title="837P settings"
-          description="IDs and the billing address used in every 837P file. Get the submitter, receiver and payer IDs from your NJMMIS trading partner agreement and companion guide. Fields left blank use the agency profile."
+          title="Billing and 837P settings"
+          description="How claims are grouped, plus the IDs and billing address used in every 837P file. Get the submitter, receiver and payer IDs from your NJMMIS trading partner agreement and companion guide. Fields left blank use the agency profile."
           onClose={onClose}
           closeDisabled={saving}
         />
@@ -140,6 +141,59 @@ export default function EdiSettingsDialog({ open, onClose, onSaved }: EdiSetting
               ))}
             </section>
           ))}
+
+          <section className="space-y-4">
+            <h3 className="text-[16px] font-semibold text-[#10141a]">Claims</h3>
+            <div>
+              <label htmlFor="edi-billingPeriod" className={BILLING_FIELD_LABEL_CLASS}>Billing period</label>
+              <Select
+                value={settings.billingPeriod}
+                onValueChange={(value) => update("billingPeriod", value)}
+                disabled={loading || saving || loadFailed}
+              >
+                <SelectTrigger id="edi-billingPeriod" className={`${BILLING_FIELD_CLASS} w-full`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {BILLING_PERIODS.map((period) => (
+                    <SelectItem key={period} value={period}>{BILLING_PERIOD_LABELS[period]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-[12px] text-[#808081]">
+                Shifts and rides in the same period become one claim, with one line per date. Clients with SDR weeks always use their SDR week.
+              </p>
+            </div>
+            {settings.billingPeriod === "biweekly" ? (
+              <div>
+                <label htmlFor="edi-billingPeriodAnchor" className={BILLING_FIELD_LABEL_CLASS}>First day of a two-week period</label>
+                <Input
+                  id="edi-billingPeriodAnchor"
+                  type="date"
+                  value={settings.billingPeriodAnchor}
+                  disabled={loading || saving || loadFailed}
+                  onChange={(event) => update("billingPeriodAnchor", event.target.value)}
+                  className={`${BILLING_FIELD_CLASS} w-full`}
+                />
+              </div>
+            ) : null}
+            <div>
+              <label htmlFor="edi-defaultPlaceOfService" className={BILLING_FIELD_LABEL_CLASS}>Place of service</label>
+              <Input
+                id="edi-defaultPlaceOfService"
+                value={settings.defaultPlaceOfService}
+                inputMode="numeric"
+                maxLength={2}
+                placeholder="12"
+                disabled={loading || saving || loadFailed}
+                onChange={(event) => update("defaultPlaceOfService", event.target.value.replace(/\D/g, ""))}
+                className={`${BILLING_FIELD_CLASS} w-full`}
+              />
+              <p className="mt-1 text-[12px] text-[#808081]">
+                2-digit code on new claim lines. 12 is the client's home; 99 is other.
+              </p>
+            </div>
+          </section>
 
           <section className="space-y-2">
             <label htmlFor="edi-usageIndicator" className={BILLING_FIELD_LABEL_CLASS}>File type</label>

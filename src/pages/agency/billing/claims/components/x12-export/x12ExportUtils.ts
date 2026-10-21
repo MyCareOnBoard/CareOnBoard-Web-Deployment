@@ -4,8 +4,11 @@ import type {
   BillingClaimStatus,
   EdiAgencyDefaults,
   EdiSettings,
+  X12Batch,
   X12ExportCheck,
+  X12SubmissionStatus,
   X12ValidationIssue,
+  X12ValidationStatus,
 } from "@/lib/api/claims";
 
 export const EMPTY_EDI_SETTINGS: EdiSettings = {
@@ -26,6 +29,9 @@ export const EMPTY_EDI_SETTINGS: EdiSettings = {
   billingState: "",
   billingZip: "",
   usageIndicator: "T",
+  billingPeriod: "weekly",
+  billingPeriodAnchor: "",
+  defaultPlaceOfService: "12",
 };
 
 /** Pending claims that can go in an 837P file. Already exported claims need `resubmit`. */
@@ -156,4 +162,59 @@ export function groupClaimIssues(issues: readonly X12ValidationIssue[]): Grouped
 export function countIssues(check: X12ExportCheck | null): number {
   if (!check) return 0;
   return check.settingsErrors.length + check.claimErrors.length;
+}
+
+export type BadgeTone = "success" | "warning" | "danger" | "neutral";
+
+export const VALIDATION_LABELS: Record<X12ValidationStatus, { label: string; tone: BadgeTone }> = {
+  passed: { label: "Passed", tone: "success" },
+  warnings: { label: "Warnings", tone: "warning" },
+  failed: { label: "Failed", tone: "danger" },
+  skipped: { label: "Not checked", tone: "neutral" },
+  error: { label: "Check didn't run", tone: "neutral" },
+};
+
+export const SUBMISSION_LABELS: Record<X12SubmissionStatus, { label: string; tone: BadgeTone }> = {
+  accepted: { label: "Accepted", tone: "success" },
+  accepted_with_errors: { label: "Accepted with errors", tone: "warning" },
+  partially_accepted: { label: "Partly accepted", tone: "warning" },
+  rejected: { label: "Rejected", tone: "danger" },
+};
+
+/** Where a file stands with NJMMIS: a response wins over "Sent", which wins over "Not sent". */
+export function submissionLabel(
+  batch: Pick<X12Batch, "status" | "submission" | "uploadedAt">,
+): { label: string; tone: BadgeTone } | null {
+  const status = batch.submission?.status;
+  if (status && SUBMISSION_LABELS[status]) return SUBMISSION_LABELS[status];
+  if (batch.status !== "ready") return null;
+  return batch.uploadedAt ? { label: "Sent", tone: "neutral" } : { label: "Not sent", tone: "warning" };
+}
+
+/** "312 claims in 1 file, $48,210.00" */
+export function runPreviewText({ claims, files, totalChargeCents }: { claims: number; files: number; totalChargeCents: number }): string {
+  return `${claims} ${claims === 1 ? "claim" : "claims"} in ${files} ${files === 1 ? "file" : "files"}, ${formatCents(totalChargeCents)}`;
+}
+
+/** Reads a file's bytes (FileReader fallback for browsers and test DOMs without Blob.arrayBuffer). */
+export function readFileBytes(file: Blob): Promise<Uint8Array> {
+  if (typeof file.arrayBuffer === "function") return file.arrayBuffer().then((data) => new Uint8Array(data));
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(new Uint8Array(reader.result as ArrayBuffer));
+    reader.onerror = () => reject(reader.error ?? new Error("Couldn't read the file."));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+/** Reads an uploaded file for the API: zips as base64, everything else as text. */
+export async function readUploadFile(file: File): Promise<{ fileName: string; content: string; encoding: "utf8" | "base64" }> {
+  const buffer = await readFileBytes(file);
+  const isZip = buffer.length > 3 && buffer[0] === 0x50 && buffer[1] === 0x4b && buffer[2] === 0x03 && buffer[3] === 0x04;
+  if (!isZip) return { fileName: file.name, content: new TextDecoder("latin1").decode(buffer), encoding: "utf8" };
+  let binary = "";
+  for (let index = 0; index < buffer.length; index += 0x8000) {
+    binary += String.fromCharCode(...buffer.subarray(index, index + 0x8000));
+  }
+  return { fileName: file.name, content: btoa(binary), encoding: "base64" };
 }

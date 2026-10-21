@@ -30,6 +30,11 @@ function applyPdfAlignmentFixes(root: HTMLElement) {
     });
   });
 
+  // The service line table scrolls sideways on narrow screens; the PDF needs every column.
+  root.querySelectorAll<HTMLElement>(".claim-report-print-section .overflow-x-auto").forEach((scroller) => {
+    scroller.style.overflow = "visible";
+  });
+
   root.querySelectorAll<HTMLElement>('[data-section="outside-lab"] label').forEach((label) => {
     centerForPdf(label);
   });

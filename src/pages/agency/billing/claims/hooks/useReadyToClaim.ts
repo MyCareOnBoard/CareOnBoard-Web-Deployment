@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { listReadyToClaim, type ReadyToClaimRow } from "@/lib/api/claims";
 import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
 
@@ -14,6 +14,8 @@ export function useReadyToClaim({ enabled = true }: UseReadyToClaimOptions = {})
   const { agencyId, mode } = useOperationalAgency();
   const [rows, setRows] = useState<ReadyToClaimRow[]>([]);
   const [mileageRate, setMileageRate] = useState(0);
+  const [billingPeriod, setBillingPeriod] = useState<string | null>(null);
+  const [billingPeriodAnchor, setBillingPeriodAnchor] = useState<string | null>(null);
   const [truncated, setTruncated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +48,8 @@ export function useReadyToClaim({ enabled = true }: UseReadyToClaimOptions = {})
 
       setRows(response.rows);
       setMileageRate(response.mileageRate ?? 0);
+      setBillingPeriod(response.billingPeriod ?? null);
+      setBillingPeriodAnchor(response.billingPeriodAnchor ?? null);
       setTruncated(response.truncated);
     } catch (fetchError) {
       if (controller.signal.aborted) return;
@@ -76,9 +80,15 @@ export function useReadyToClaim({ enabled = true }: UseReadyToClaimOptions = {})
     };
   }, [refetch]);
 
+  const billingOptions = useMemo(
+    () => ({ billingPeriod, billingPeriodAnchor }),
+    [billingPeriod, billingPeriodAnchor],
+  );
+
   return {
     rows,
     mileageRate,
+    billingOptions,
     truncated,
     loading,
     error,

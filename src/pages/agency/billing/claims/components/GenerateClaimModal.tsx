@@ -41,6 +41,7 @@ import type { RecentClaimClientGroup } from "../utils/groupRecentClaimsByClient"
 import ClaimPreviewSection, { CoverageLegend } from "./claimPreviewSection";
 import OutOfPocketBadge from "./OutOfPocketBadge";
 import { COVERAGE } from "@/lib/coverage";
+import type { BillingPeriodOptions } from "../utils/billingPeriodUtils";
 
 type GenerateClaimModalProps = {
   open: boolean;
@@ -48,6 +49,8 @@ type GenerateClaimModalProps = {
   saving?: boolean;
   readyToClaimRows?: ReadyToClaimRow[];
   mileageRate?: number;
+  /** Agency billing period, so shifts loaded here group like the ready-to-bill rows. */
+  billingOptions?: BillingPeriodOptions;
   onClose: () => void;
   /**
    * Coverage-aware generate: claim-leg selections (payer / both lines) bill a state claim;
@@ -80,6 +83,7 @@ export default function GenerateClaimModal({
   saving = false,
   readyToClaimRows = [],
   mileageRate = 0,
+  billingOptions,
   onClose,
   onGenerate,
 }: GenerateClaimModalProps) {
@@ -128,9 +132,10 @@ export default function GenerateClaimModal({
             shifts,
             rides,
             selectedServiceCodes,
+            billingOptions,
           )
         : [],
-    [selectedClient, readyToClaimRows, shifts, rides, selectedServiceCodes],
+    [selectedClient, readyToClaimRows, shifts, rides, selectedServiceCodes, billingOptions],
   );
 
   const previewItems = useMemo(

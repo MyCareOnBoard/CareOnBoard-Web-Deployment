@@ -9,6 +9,7 @@ import {
   getCreateBillingClaimErrorMessage,
   type BillingClaimDetail,
   type BillingClaimEdiExport,
+  type BillingClaimEdiRejection,
   type BillingClaimListItem,
   type BillingClaimStatus,
   type SavedBillingClaim,
@@ -176,6 +177,7 @@ export function ClaimsDashboardContent() {
     claim: RecentClaim;
     savedClaim: SavedBillingClaim;
     ediExport: BillingClaimEdiExport | null;
+    ediRejection: BillingClaimEdiRejection | null;
     program: BillingClaimDetail["program"];
     scopeKey: string;
   } | null>(null);
@@ -508,6 +510,7 @@ export function ClaimsDashboardContent() {
             clientId: detail.clientId, shiftIds: detail.shiftIds, reportPrefill: detail.reportPrefill,
           },
           ediExport: detail.ediExport ?? null,
+          ediRejection: detail.ediRejection ?? null,
           program: detail.program,
         });
       } catch (error) {
@@ -692,6 +695,7 @@ export function ClaimsDashboardContent() {
             saving={savingClaim}
             readyToClaimRows={allReadyRows}
             mileageRate={modalMileageRate}
+            billingOptions={readyToClaim.billingOptions}
             onClose={closeGenerateModal}
             onGenerate={saveCoverageBundles}
           />
@@ -711,6 +715,7 @@ export function ClaimsDashboardContent() {
             canManageClaims={canManageClaims && claimReport.program !== "sc"}
             status={claimReport.savedClaim.status}
             ediExport={claimReport.ediExport}
+            ediRejection={claimReport.ediRejection}
             onExported={() => {
               setX12RefreshKey((key) => key + 1);
               void generatedClaims.refetch({ force: true });

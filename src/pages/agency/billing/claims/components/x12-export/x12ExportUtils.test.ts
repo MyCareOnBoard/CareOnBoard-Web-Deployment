@@ -8,6 +8,9 @@ import {
   getClaimX12Action,
   getExportableClaims,
   groupClaimIssues,
+  readUploadFile,
+  runPreviewText,
+  submissionLabel,
 } from "./x12ExportUtils";
 
 function claim(overrides: Partial<BillingClaimListItem>): BillingClaimListItem {
@@ -124,5 +127,32 @@ describe("claimX12ButtonText", () => {
   it("names the file a claim is already in", () => {
     expect(claimX12ButtonText({ mode: "download", ediExport: { fileName: "837P_TEST.x12", controlNumber: "000000001" } }).detail).toBe("837P_TEST.x12");
     expect(claimX12ButtonText({ mode: "download", ediExport: { controlNumber: "000000001" } }).detail).toBe("Control #000000001");
+  });
+});
+
+describe("submissionLabel", () => {
+  it("shows the NJMMIS response, then sent, then not sent", () => {
+    const submission = { status: "rejected" as const, ackType: "999", receivedAt: null, responseId: null, errors: [] };
+    expect(submissionLabel({ status: "ready", submission, uploadedAt: null })).toEqual({ label: "Rejected", tone: "danger" });
+    expect(submissionLabel({ status: "ready", submission: null, uploadedAt: "2026-10-22T10:00:00.000Z" })?.label).toBe("Sent");
+    expect(submissionLabel({ status: "ready", submission: null, uploadedAt: null })?.label).toBe("Not sent");
+    expect(submissionLabel({ status: "invalid", submission: null, uploadedAt: null })).toBeNull();
+  });
+});
+
+describe("runPreviewText", () => {
+  it("reads like the spec", () => {
+    expect(runPreviewText({ claims: 312, files: 1, totalChargeCents: 4821000 })).toBe("312 claims in 1 file, $48,210.00");
+    expect(runPreviewText({ claims: 1, files: 2, totalChargeCents: 100 })).toBe("1 claim in 2 files, $1.00");
+  });
+});
+
+describe("readUploadFile", () => {
+  it("sends text files as text and zips as base64", async () => {
+    const text = await readUploadFile(new File(["ISA*00~"], "a.999"));
+    expect(text).toEqual({ fileName: "a.999", content: "ISA*00~", encoding: "utf8" });
+    const zip = await readUploadFile(new File([new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x01])], "r.zip"));
+    expect(zip.encoding).toBe("base64");
+    expect(zip.content).toBe(btoa(String.fromCharCode(0x50, 0x4b, 0x03, 0x04, 0x01)));
   });
 });

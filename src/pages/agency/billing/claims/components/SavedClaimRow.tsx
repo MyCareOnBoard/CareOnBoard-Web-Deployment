@@ -47,6 +47,29 @@ function StatusBadge({ status }: { status: BillingClaimListItem["status"] }) {
   return <BillingStatusBadge domain="claim" status={status} />;
 }
 
+/** NJMMIS result for the claim's 837P file: rejected (unlocked for fixing) or accepted. */
+function EdiResultBadge({ claim }: { claim: BillingClaimListItem }) {
+  if (claim.ediRejection && !claim.ediExport?.batchId) {
+    return (
+      <span
+        title={claim.ediRejection.reasons.join("\n") || "Rejected by NJMMIS"}
+        className="ml-2 inline-flex h-[22px] items-center rounded-full bg-[#fef3f2] px-2.5 text-[12px] font-medium text-[#b42318]"
+      >
+        NJMMIS rejected
+      </span>
+    );
+  }
+  const accepted = claim.ediExport?.submissionStatus;
+  if (accepted === "accepted" || accepted === "accepted_with_errors") {
+    return (
+      <span className="ml-2 inline-flex h-[22px] items-center rounded-full bg-[#ecfdf3] px-2.5 text-[12px] font-medium text-[#027a48]">
+        NJMMIS accepted
+      </span>
+    );
+  }
+  return null;
+}
+
 function SavedClaimActions({
   claim,
   onViewReport,
@@ -56,6 +79,7 @@ function SavedClaimActions({
 }: Omit<SavedClaimRowProps, "variant">) {
   const canUpdateStatus = claim.status === "pending";
   const canCancel = claim.status === "pending" || claim.status === "rejected";
+  const needsResend = Boolean(claim.ediRejection && !claim.ediExport?.batchId && claim.status === "pending");
 
   return (
     <DropdownMenu>
@@ -77,7 +101,7 @@ function SavedClaimActions({
         className="z-[100] min-w-[160px] rounded-xl border-0 bg-white p-0 shadow-lg"
       >
         <DropdownMenuItem className={menuItemClassName} onClick={() => onViewReport(claim)}>
-          View report
+          {needsResend ? "Fix and re-export" : "View report"}
         </DropdownMenuItem>
         <DropdownMenuItem
           className={menuItemClassName}
@@ -160,6 +184,7 @@ function SavedClaimRow({
 
         <div className="mt-4">
           <StatusBadge status={claim.status} />
+          <EdiResultBadge claim={claim} />
         </div>
       </div>
     );
@@ -183,8 +208,9 @@ function SavedClaimRow({
       <span className="text-[13px] font-medium tabular-nums text-[#10141a]">
         {formatCurrency(claim.amount)}
       </span>
-      <span>
+      <span className="flex flex-wrap items-center gap-y-1">
         <StatusBadge status={claim.status} />
+        <EdiResultBadge claim={claim} />
       </span>
       <span className="text-[13px] text-[#10141a]">{formatCreatedDate(claim.createdAt)}</span>
       <span className="flex justify-end">

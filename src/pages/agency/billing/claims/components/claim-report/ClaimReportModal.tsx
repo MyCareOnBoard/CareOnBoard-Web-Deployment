@@ -31,6 +31,7 @@ import {
   updateClaimReport,
   X12ExportError,
   type BillingClaimEdiExport,
+  type BillingClaimEdiRejection,
   type BillingClaimStatus,
   type ClaimReportFormInput,
   type X12ExportCheck,
@@ -77,6 +78,8 @@ type ClaimReportModalProps = {
   canManageClaims?: boolean;
   status?: BillingClaimStatus;
   ediExport?: BillingClaimEdiExport | null;
+  /** Why NJMMIS rejected this claim's last 837P file, if it did. */
+  ediRejection?: BillingClaimEdiRejection | null;
   /** Called after this claim is put in a new 837P file. */
   onExported?: () => void;
   onClose: () => void;
@@ -92,6 +95,7 @@ export default function ClaimReportModal({
   canManageClaims = false,
   status = "pending",
   ediExport = null,
+  ediRejection = null,
   onExported,
   onClose,
 }: ClaimReportModalProps) {
@@ -298,6 +302,16 @@ export default function ClaimReportModal({
           return;
         }
         const result = await exportClaimsX12({ context, claimIds: [savedClaimId] });
+        if (result.batch.status === "invalid") {
+          // The validator found errors, so the server released the claim again.
+          onExported?.();
+          setX12Problem({
+            message:
+              "The 837P file failed validation, so this claim wasn't locked. Open the file's report under 837P files on the Saved tab to see what to fix, then create the file again.",
+            details: null,
+          });
+          return;
+        }
         batch = result.batch;
         created = true;
         setClaimEdiExport({
@@ -372,6 +386,20 @@ export default function ClaimReportModal({
         </button>
       ) : null}
     </p>
+  ) : null;
+
+  const rejectionNotice = ediRejection && !claimEdiExport?.batchId ? (
+    <div role="status" className="claim-report-no-print mb-2 rounded-[10px] bg-[#fffaeb] px-4 py-3 text-[14px] text-[#b54708]">
+      <p className="font-medium">NJMMIS rejected this claim&apos;s last 837P file{ediRejection.ackType ? ` (${ediRejection.ackType})` : ""}.</p>
+      {ediRejection.reasons.length ? (
+        <ul className="mt-1 list-disc space-y-1 pl-5">
+          {ediRejection.reasons.map((reason, index) => (
+            <li key={index}>{reason}</li>
+          ))}
+        </ul>
+      ) : null}
+      <p className="mt-1">Fix the report, then create the 837P file again.</p>
+    </div>
   ) : null;
 
   const x12Details = x12Problem?.details;
@@ -500,7 +528,7 @@ export default function ClaimReportModal({
           {/* Outside the print root, so the PDF never includes it. */}
           <ClaimReportActionsFooter
             status={footerStatus}
-            notice={x12Notice}
+            notice={rejectionNotice || x12Notice ? <>{rejectionNotice}{x12Notice}</> : null}
             pdf={pdfAction}
             x12={x12Action}
             onSend={handleSend}

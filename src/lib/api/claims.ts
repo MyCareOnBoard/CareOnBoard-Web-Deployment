@@ -33,6 +33,8 @@ export type BillingClaimListItem = {
   rejectionReason: string | null;
   /** Set once the claim is in an 837P batch. */
   ediExport?: BillingClaimEdiExport | null;
+  /** Last NJMMIS rejection, kept after the claim is unlocked. */
+  ediRejection?: BillingClaimEdiRejection | null;
 };
 
 export type BillingClaimEdiExport = {
@@ -42,6 +44,18 @@ export type BillingClaimEdiExport = {
   exportedAt: string | null;
   /** Name of the batch file, so it can be downloaded without listing batches. */
   fileName?: string | null;
+  /** Batch run (.zip) the file belongs to. */
+  runId?: string | null;
+  /** NJMMIS response for the file; null until one is imported. */
+  submissionStatus?: X12SubmissionStatus | null;
+};
+
+/** Why NJMMIS rejected the claim's last 837P file. The claim was unlocked so it can be fixed and sent again. */
+export type BillingClaimEdiRejection = {
+  batchId: string | null;
+  ackType: string | null;
+  reasons: string[];
+  rejectedAt: string;
 };
 
 export type ClaimsDashboardSummary = {
@@ -98,6 +112,7 @@ export type BillingClaimDetail = {
   shifts: Shift[];
   rides?: MileageRide[];
   ediExport?: BillingClaimEdiExport | null;
+  ediRejection?: BillingClaimEdiRejection | null;
 };
 
 type ClaimsDashboardResponse = {
@@ -178,6 +193,9 @@ export type ReadyToClaimResponse = {
   shiftCount: number;
   rideCount: number;
   mileageRate?: number;
+  /** Agency billing period used for each row's weekRange when the client has no SDR week. */
+  billingPeriod?: string;
+  billingPeriodAnchor?: string | null;
 };
 
 export type UpdateBillingClaimStatusPayload = {
@@ -498,6 +516,12 @@ export type EdiSettings = {
   billingState: string;
   billingZip: string;
   usageIndicator: EdiUsageIndicator;
+  /** How shifts and rides are grouped into claims when the client has no SDR week. */
+  billingPeriod: "weekly" | "biweekly" | "semimonthly" | "monthly";
+  /** First day of a bi-weekly period (YYYY-MM-DD). */
+  billingPeriodAnchor: string;
+  /** Place of service on new claim lines, e.g. 12 (home). */
+  defaultPlaceOfService: string;
 };
 
 /** Agency profile values a blank setting falls back to. */
@@ -534,9 +558,32 @@ export type X12ExportCheck = {
   warnings: X12ValidationIssue[];
 };
 
+export type X12ValidationStatus = "passed" | "warnings" | "failed" | "skipped" | "error";
+
+export type X12ValidationSummary = {
+  status: X12ValidationStatus;
+  checkedAt: string | null;
+  errors: number;
+  warnings: number;
+  claimsWithErrors: number;
+  message: string | null;
+  hasReport: boolean;
+};
+
+export type X12SubmissionStatus = "accepted" | "accepted_with_errors" | "partially_accepted" | "rejected";
+
+export type X12Submission = {
+  status: X12SubmissionStatus;
+  ackType: string | null;
+  receivedAt: string | null;
+  responseId: string | null;
+  errors: string[];
+};
+
 export type X12Batch = {
   id: string;
-  status: "generating" | "ready" | "failed";
+  /** invalid: the validator found errors; the claims were released and the file can't be downloaded. */
+  status: "generating" | "ready" | "failed" | "invalid";
   usageIndicator: EdiUsageIndicator;
   interchangeControlNumber: string;
   claimCount: number;
@@ -550,6 +597,95 @@ export type X12Batch = {
   resubmit: boolean;
   /** Programs of the claims in the file. Older servers omit it. */
   programs?: AgencyMode[];
+  runId?: string | null;
+  validation?: X12ValidationSummary | null;
+  submission?: X12Submission | null;
+  /** When the file was marked as sent to NJMMIS. */
+  uploadedAt?: string | null;
+};
+
+export type X12FileIssue = {
+  level: "error" | "warning";
+  code: string;
+  message: string;
+  snip: number | null;
+  line: number | null;
+  segment: string | null;
+  loop?: string | null;
+  element: string | null;
+  claimNumber: string | null;
+};
+
+/** What the validator returns for one 837P file. */
+export type X12FileValidation = {
+  status: "passed" | "warnings" | "failed";
+  file: {
+    name: string;
+    isa13: string | null;
+    usage: string | null;
+    transactionSets: number;
+    claims: number;
+    lines: number;
+    totalChargeCents: number;
+  };
+  summary: { errors: number; warnings: number; claimsWithErrors: number };
+  errors: X12FileIssue[];
+  warnings: X12FileIssue[];
+  ack999?: string;
+  reportHtml?: string;
+};
+
+export type X12RunFilter = {
+  from?: string;
+  to?: string;
+  program?: "ddd" | "hha";
+  serviceCodes?: string[];
+};
+
+export type X12RunCheck = {
+  claimCount: number;
+  validClaimCount: number;
+  fileCount: number;
+  totalChargeCents: number;
+  settingsErrors: X12ValidationIssue[];
+  claimErrors: X12ValidationIssue[];
+  warnings: X12ValidationIssue[];
+};
+
+export type X12Run = {
+  id: string;
+  status: "queued" | "running" | "ready" | "failed";
+  usageIndicator: EdiUsageIndicator | null;
+  claimCount: number;
+  requestedClaimCount: number;
+  skippedClaimCount: number;
+  skippedClaims: Array<{ claimId: string; claimNumber: string | null; code: string; message: string }>;
+  totalChargeCents: number;
+  batchIds: string[];
+  files: Array<{ name: string; batchId: string; claims: number; included: boolean; validation: X12ValidationStatus }>;
+  programs: AgencyMode[];
+  validation: X12ValidationSummary | null;
+  zipFileName: string | null;
+  zipSizeBytes: number | null;
+  hasReport: boolean;
+  error: { code: string; message: string; claimErrors?: X12ValidationIssue[]; settingsErrors?: X12ValidationIssue[] } | null;
+  createdAt: string;
+  createdBy: string | null;
+  completedAt: string | null;
+};
+
+export type X12Response = {
+  id: string;
+  fileName: string;
+  types: Array<"TA1" | "999" | "824">;
+  status: "matched" | "unmatched" | "unrecognized";
+  matched: Array<{ batchId: string; fileName: string | null; interchangeControlNumber: string | null; status: X12SubmissionStatus; ackType: string }>;
+  /** reason "no_access": the file holds claims from a program this user can't manage. */
+  unmatched: Array<{ ackType: string; controlNumber: string; reason?: "no_access" }>;
+  rejectedClaims: number;
+  acceptedClaims: number;
+  receivedAt: string;
+  receivedBy: string | null;
 };
 
 /** Error raised when the server refuses an export; `details` lists each problem. */
@@ -675,13 +811,209 @@ export async function downloadX12Batch(input: {
     `/billing/claims/x12-batches/${encodeURIComponent(batch.id)}/file`,
     { params: { agencyId: operationalAgencyId(context) }, responseType: "blob" },
   );
-  const url = URL.createObjectURL(response.data);
+  saveBlob(response.data, batch.fileName);
+}
+
+/** Saves a downloaded blob under the given file name. */
+function saveBlob(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = batch.fileName;
+  link.download = fileName;
   document.body.appendChild(link);
   link.click();
   link.remove();
   // Revoking right after click() can cancel the download in Safari and some Firefox versions.
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/** Saves report HTML as a file (open it in a browser to print or save as PDF). */
+export function saveHtmlReport(html: string, fileName: string): void {
+  saveBlob(new Blob([html], { type: "text/html" }), fileName);
+}
+
+function requireData<T>(response: { data: ApiEnvelope<T> }, fallback: string): T {
+  if (!response.data.success || !response.data.data) {
+    throw new Error(response.data.message || fallback);
+  }
+  return response.data.data;
+}
+
+export async function validateX12Batch(input: {
+  context: OperationalBillingRequestContext;
+  batchId: string;
+}): Promise<X12Batch> {
+  const { context, batchId } = input;
+  const response = await axiosClient.post<ApiEnvelope<{ batch: X12Batch }>>(
+    `/billing/claims/x12-batches/${encodeURIComponent(batchId)}/validate`,
+    {},
+    { params: { agencyId: operationalAgencyId(context) } },
+  );
+  return requireData(response, "Failed to check the 837P file").batch;
+}
+
+/** A file's validation report as HTML. Show it in a sandboxed frame, never as a page of this app. */
+export async function getX12BatchReport(input: {
+  context: OperationalBillingRequestContext;
+  batchId: string;
+}): Promise<string> {
+  const { context, batchId } = input;
+  const response = await axiosClient.get<string>(`/billing/claims/x12-batches/${encodeURIComponent(batchId)}/report`, {
+    params: { agencyId: operationalAgencyId(context) },
+    responseType: "text",
+  });
+  return response.data;
+}
+
+export async function markX12BatchUploaded(input: {
+  context: OperationalBillingRequestContext;
+  batchId: string;
+}): Promise<{ batchId: string; uploadedAt: string }> {
+  const { context, batchId } = input;
+  const response = await axiosClient.post<ApiEnvelope<{ batchId: string; uploadedAt: string }>>(
+    `/billing/claims/x12-batches/${encodeURIComponent(batchId)}/mark-uploaded`,
+    {},
+    { params: { agencyId: operationalAgencyId(context) } },
+  );
+  return requireData(response, "Failed to mark the file as uploaded");
+}
+
+/** Checks an 837P file from the user's computer. Nothing is saved. */
+export async function validateX12File(input: {
+  context: OperationalBillingRequestContext;
+  fileName: string;
+  content: string;
+  signal?: AbortSignal;
+}): Promise<X12FileValidation> {
+  const { context, fileName, content, signal } = input;
+  const response = await axiosClient.post<ApiEnvelope<X12FileValidation>>(
+    "/billing/claims/x12-validate",
+    { fileName, content },
+    { params: { agencyId: operationalAgencyId(context) }, ...(signal ? { signal } : {}) },
+  );
+  return requireData(response, "Failed to check the 837P file");
+}
+
+type X12RunInput = {
+  context: OperationalBillingRequestContext;
+  claimIds?: string[];
+  filter?: X12RunFilter;
+  resubmit?: boolean;
+  skipInvalid?: boolean;
+  signal?: AbortSignal;
+};
+
+function runBody({ claimIds, filter, resubmit = false, skipInvalid = false }: X12RunInput) {
+  return { ...(claimIds ? { claimIds } : { filter: filter ?? {} }), resubmit, skipInvalid };
+}
+
+export async function checkX12Run(input: X12RunInput): Promise<X12RunCheck> {
+  const response = await axiosClient.post<ApiEnvelope<X12RunCheck>>(
+    "/billing/claims/x12-runs/check",
+    runBody(input),
+    { params: { agencyId: operationalAgencyId(input.context) }, ...(input.signal ? { signal: input.signal } : {}) },
+  );
+  return requireData(response, "Failed to check the claims");
+}
+
+/** Error raised when a batch run can't be made; `run` has the reason and the claims that need fixing. */
+export class X12RunError extends Error {
+  run: X12Run | null;
+  details: X12ExportCheck | null;
+
+  constructor(message: string, run: X12Run | null, details: X12ExportCheck | null) {
+    super(message);
+    this.name = "X12RunError";
+    this.run = run;
+    this.details = details;
+  }
+}
+
+export async function createX12Run(input: X12RunInput): Promise<{ run: X12Run; queued: boolean }> {
+  try {
+    const response = await axiosClient.post<ApiEnvelope<{ run: X12Run; queued: boolean }>>(
+      "/billing/claims/x12-runs",
+      runBody(input),
+      { params: { agencyId: operationalAgencyId(input.context) }, ...(input.signal ? { signal: input.signal } : {}) },
+    );
+    return requireData(response, "Failed to create the 837P batch");
+  } catch (error) {
+    const payload = (error as {
+      response?: { data?: { message?: string; data?: { run?: X12Run }; details?: { claimErrors?: X12ValidationIssue[]; settingsErrors?: X12ValidationIssue[] } } };
+    })?.response?.data;
+    if (payload?.message) {
+      const claimErrors = payload.details?.claimErrors ?? [];
+      const settingsErrors = payload.details?.settingsErrors ?? [];
+      const details = claimErrors.length || settingsErrors.length
+        ? { valid: false, claimCount: 0, claimErrors, settingsErrors, warnings: [] }
+        : null;
+      throw new X12RunError(payload.message, payload.data?.run ?? null, details);
+    }
+    throw error;
+  }
+}
+
+export async function listX12Runs(input: {
+  context: OperationalBillingRequestContext;
+  limit?: number;
+  mode?: AgencyMode;
+  signal?: AbortSignal;
+}): Promise<X12Run[]> {
+  const { context, limit = 10, mode, signal } = input;
+  const response = await axiosClient.get<ApiEnvelope<{ runs: X12Run[] }>>("/billing/claims/x12-runs", {
+    params: { agencyId: operationalAgencyId(context), limit, ...(mode ? { mode } : {}) },
+    ...(signal ? { signal } : {}),
+  });
+  return requireData(response, "Failed to list 837P batches").runs;
+}
+
+export async function getX12Run(input: {
+  context: OperationalBillingRequestContext;
+  runId: string;
+  signal?: AbortSignal;
+}): Promise<X12Run> {
+  const { context, runId, signal } = input;
+  const response = await axiosClient.get<ApiEnvelope<{ run: X12Run }>>(
+    `/billing/claims/x12-runs/${encodeURIComponent(runId)}`,
+    { params: { agencyId: operationalAgencyId(context) }, ...(signal ? { signal } : {}) },
+  );
+  return requireData(response, "Failed to load the 837P batch").run;
+}
+
+export async function downloadX12RunZip(input: {
+  context: OperationalBillingRequestContext;
+  run: Pick<X12Run, "id" | "zipFileName">;
+}): Promise<void> {
+  const { context, run } = input;
+  const response = await axiosClient.get<Blob>(`/billing/claims/x12-runs/${encodeURIComponent(run.id)}/zip`, {
+    params: { agencyId: operationalAgencyId(context) },
+    responseType: "blob",
+  });
+  saveBlob(response.data, run.zipFileName || `837P-batch-${run.id}.zip`);
+}
+
+/** A batch run's validation report as HTML. Show it in a sandboxed frame. */
+export async function getX12RunReport(input: {
+  context: OperationalBillingRequestContext;
+  runId: string;
+}): Promise<string> {
+  const { context, runId } = input;
+  const response = await axiosClient.get<string>(`/billing/claims/x12-runs/${encodeURIComponent(runId)}/report`, {
+    params: { agencyId: operationalAgencyId(context) },
+    responseType: "text",
+  });
+  return response.data;
+}
+
+export async function importX12Responses(input: {
+  context: OperationalBillingRequestContext;
+  files: Array<{ fileName: string; content: string; encoding: "utf8" | "base64" }>;
+}): Promise<X12Response[]> {
+  const { context, files } = input;
+  const response = await axiosClient.post<ApiEnvelope<{ responses: X12Response[] }>>(
+    "/billing/claims/x12-responses",
+    { files },
+    { params: { agencyId: operationalAgencyId(context) } },
+  );
+  return requireData(response, "Failed to import the response files").responses;
 }

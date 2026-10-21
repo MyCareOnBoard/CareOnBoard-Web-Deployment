@@ -1,12 +1,22 @@
+/** One CMS-1500 box 24 row. New claims have one line per date of service. */
 export type ClaimReportServiceLine = {
   duration: string;
+  /** YYYY-MM-DD; missing on claims saved before per-date lines. */
+  serviceDate?: string | null;
   placeOfService: string;
   cptHcpcs: string;
   modifier: string;
   diagnosisPointer: string;
   totalCharges: string;
-  nipId: string;
+  /** Units billed on this line (24G). Missing on older claims. */
+  units?: string;
+  unitType?: string;
+  /** Rendering/billing NPI (24J). */
+  npi?: string;
+  /** Older claims stored the NPI as `nipId`. */
+  nipId?: string;
   providerId: string;
+  sourceIds?: string[];
 };
 
 export type ClaimReportSummary = {
@@ -204,15 +214,16 @@ export const DEFAULT_CLAIM_REPORT: ClaimReportFormState = {
 };
 
 export const CLAIM_REPORT_TABLE_COLUMNS = [
-  "Duration of service",
+  "Date(s) of service",
   "Place of service",
   "CPT/HCPCS",
-  "MODIFIER",
+  "Modifier",
   "Diagnosis pointer",
-  "Total Charges",
-  "NIP ID",
+  "Charges",
+  "Units",
+  "NPI",
   "Provider ID",
 ] as const;
 
 export const CLAIM_REPORT_TABLE_GRID =
-  "grid grid-cols-[minmax(140px,1.4fr)_minmax(50px,0.6fr)_minmax(70px,0.8fr)_minmax(60px,0.7fr)_minmax(70px,0.8fr)_minmax(80px,0.9fr)_minmax(80px,0.9fr)_minmax(90px,1fr)] items-center gap-2";
+  "grid grid-cols-[minmax(140px,1.4fr)_minmax(50px,0.6fr)_minmax(70px,0.8fr)_minmax(60px,0.7fr)_minmax(70px,0.8fr)_minmax(80px,0.9fr)_minmax(50px,0.6fr)_minmax(90px,0.9fr)_minmax(90px,1fr)] items-center gap-2";

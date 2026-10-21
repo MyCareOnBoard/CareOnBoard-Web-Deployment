@@ -3,6 +3,7 @@ import type { Client, ClientService } from "@/lib/api/clients";
 import type { Shift } from "@/lib/api/shifts";
 import { getClientServicesForOperations } from "@/pages/shared/client-management/utils/clientServicesForOperations";
 import { parseSdrWeekRange } from "@/pages/agency/scheduling/weeklyDistributionSchedule";
+import { resolveBillingPeriodLabel, type BillingPeriodOptions } from "./billingPeriodUtils";
 
 export const CLAIM_SHIFT_MISSING_VALUE = "—";
 
@@ -83,27 +84,16 @@ export function findMatchingClientService(
   return findMatchingServicesForShift(client, shift)[0];
 }
 
+/**
+ * The claim "week range" for a shift: its SDR week when the service has one,
+ * otherwise the agency billing period (see billingPeriodUtils).
+ */
 export function resolveWeekRangeForShift(
   client: Client | undefined,
   shift: Shift,
+  options: BillingPeriodOptions = {},
 ): string | null {
-  const matchedService = findMatchingClientService(client, shift);
-  const rows = matchedService?.sdrWeeklyDistribution?.rows ?? [];
-  const shiftDate = shift.date?.trim();
-
-  if (shiftDate && rows.length > 0) {
-    for (const row of rows) {
-      const bounds = parseSdrWeekRange(row.weekRange);
-      if (!bounds) continue;
-      const start = format(bounds.start, "yyyy-MM-dd");
-      const end = format(bounds.end, "yyyy-MM-dd");
-      if (shiftDate >= start && shiftDate <= end) {
-        return row.weekRange?.trim() || null;
-      }
-    }
-  }
-
-  return shiftDate || null;
+  return resolveBillingPeriodLabel(shift.date, findMatchingClientService(client, shift), options);
 }
 
 export function resolvePaNumber(

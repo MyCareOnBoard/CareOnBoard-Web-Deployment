@@ -8,9 +8,10 @@ import {
   parseRateToNumber,
 } from "./claimReportPrefillUtils";
 import { resolveWeekRangeForShift } from "./claimShiftBillingUtils";
-import { rideDateYmd, serviceCodesMatch } from "./claimSelectionUtils";
+import { flattenClientServices, rideDateYmd, serviceCodesMatch } from "./claimSelectionUtils";
 import { mapReadyToClaimRowToRecentClaim } from "./readyToClaimUtils";
 import { splitCharge } from "@/lib/coverage";
+import { resolveBillingPeriodLabel, type BillingPeriodOptions } from "./billingPeriodUtils";
 
 export type ClaimConfirmSelection = {
   shifts: Shift[];
@@ -344,6 +345,7 @@ export function buildClaimableRowsForClient(
   fetchedShifts: Shift[],
   fetchedRides: MileageRide[],
   selectedServiceCodes: string[],
+  billingOptions: BillingPeriodOptions = {},
 ): ReadyToClaimRow[] {
   const cachedRows = getCachedClaimableRowsForClient(
     client,
@@ -351,7 +353,7 @@ export function buildClaimableRowsForClient(
     selectedServiceCodes,
   );
   const fetchedRows = filterRowsByServiceCodes(
-    shiftsAndRidesToReadyRows(client, fetchedShifts, fetchedRides),
+    shiftsAndRidesToReadyRows(client, fetchedShifts, fetchedRides, billingOptions),
     selectedServiceCodes,
   );
 
@@ -394,10 +396,7 @@ export function mapBundlesToClaimConfirmSelections(
           )
         : [],
     serviceCode: bundle.serviceCode,
-    weekRange:
-      bundle.sourceType === "ride"
-        ? bundle.rows[0]?.sortDate?.slice(0, 10) || bundle.weekRange
-        : bundle.weekRange,
+    weekRange: bundle.weekRange,
   }));
 }
 
@@ -405,6 +404,7 @@ function shiftsAndRidesToReadyRows(
   client: Client,
   shifts: Shift[],
   rides: MileageRide[],
+  billingOptions: BillingPeriodOptions,
 ): ReadyToClaimRow[] {
   const clientId = client.id;
   const clientName =
@@ -421,7 +421,7 @@ function shiftsAndRidesToReadyRows(
     staffId: shift.employeeId ?? null,
     serviceCode: shift.serviceCode?.trim() ?? "",
     sortDate: shift.date ?? null,
-    weekRange: resolveWeekRangeForShift(client, shift) ?? shift.date ?? null,
+    weekRange: resolveWeekRangeForShift(client, shift, billingOptions) ?? shift.date ?? null,
     shiftDate: shift.date ?? null,
     clockedInAt: shift.clockedInAt ?? null,
     clockedOutAt: shift.clockedOutAt ?? null,
@@ -445,7 +445,11 @@ function shiftsAndRidesToReadyRows(
       staffId: ride.caregiverId ?? null,
       serviceCode: ride.serviceCode?.trim() ?? "",
       sortDate,
-      weekRange: sortDate,
+      weekRange: resolveBillingPeriodLabel(
+        sortDate,
+        flattenClientServices(client).find((service) => serviceCodesMatch(service.code, ride.serviceCode ?? undefined)),
+        billingOptions,
+      ),
       completedAt: ride.completedAt ?? null,
       scheduledStartTime: ride.scheduledStartTime ?? null,
       actualDistance: ride.actualDistance ?? null,
