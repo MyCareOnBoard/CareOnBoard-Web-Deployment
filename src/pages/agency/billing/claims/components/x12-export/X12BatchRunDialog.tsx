@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
+import { format, parseISO } from "date-fns";
+import { Loader2 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import CustomDatePicker from "@/components/ui/datePicker";
 import BillingCornerModalHeader from "@/pages/agency/billing/components/BillingCornerModalHeader";
 import {
   BILLING_CHECKBOX_CLASS,
@@ -32,6 +35,15 @@ type X12BatchRunDialogProps = {
 };
 
 type Scope = "all" | "page";
+
+/** "2026-10-19" → a local Date (parseISO, so the day never shifts by time zone). */
+function ymdToDate(ymd: string): Date | null {
+  return ymd ? parseISO(ymd) : null;
+}
+
+function dateToYmd(date: Date | null): string {
+  return date ? format(date, "yyyy-MM-dd") : "";
+}
 
 function errorMessage(error: unknown, fallback: string): string {
   const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
@@ -163,34 +175,36 @@ export default function X12BatchRunDialog({ claims, onClose, onOpenSettings, onC
 
           {scope === "all" ? (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <label className="block">
+              <div>
                 <span className={BILLING_FIELD_LABEL_CLASS}>Service date from</span>
-                <input
-                  type="date"
-                  value={from}
-                  max={to || undefined}
-                  onChange={(event) => {
-                    setFrom(event.target.value);
+                <CustomDatePicker
+                  align="start"
+                  ariaLabel="Service date from"
+                  placeholder="Any date"
+                  date={ymdToDate(from)}
+                  setDate={(date) => {
+                    setFrom(dateToYmd(date));
                     reset();
                   }}
                   disabled={Boolean(busy)}
-                  className={`${BILLING_FIELD_CLASS} w-full`}
+                  className={BILLING_FIELD_CLASS}
                 />
-              </label>
-              <label className="block">
+              </div>
+              <div>
                 <span className={BILLING_FIELD_LABEL_CLASS}>Service date to</span>
-                <input
-                  type="date"
-                  value={to}
-                  min={from || undefined}
-                  onChange={(event) => {
-                    setTo(event.target.value);
+                <CustomDatePicker
+                  align="end"
+                  ariaLabel="Service date to"
+                  placeholder="Any date"
+                  date={ymdToDate(to)}
+                  setDate={(date) => {
+                    setTo(dateToYmd(date));
                     reset();
                   }}
                   disabled={Boolean(busy)}
-                  className={`${BILLING_FIELD_CLASS} w-full`}
+                  className={BILLING_FIELD_CLASS}
                 />
-              </label>
+              </div>
               {rangeInvalid ? (
                 <p role="alert" className="text-[13px] text-[#d92d20] sm:col-span-2">
                   The start date must be on or before the end date.
@@ -198,6 +212,20 @@ export default function X12BatchRunDialog({ claims, onClose, onOpenSettings, onC
               ) : (
                 <p className="text-[13px] text-[#808081] sm:col-span-2">
                   Leave the dates blank for every pending claim. At most 5,000 claims per batch.
+                  {from || to ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFrom("");
+                        setTo("");
+                        reset();
+                      }}
+                      disabled={Boolean(busy)}
+                      className="ml-2 font-medium text-[#00b4b8] underline disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Clear dates
+                    </button>
+                  ) : null}
                 </p>
               )}
             </div>
@@ -286,11 +314,20 @@ export default function X12BatchRunDialog({ claims, onClose, onOpenSettings, onC
             type="button"
             onClick={() => void runCheck()}
             disabled={Boolean(busy) || rangeInvalid || (scope === "page" && pageClaims.length === 0)}
-            className={BILLING_SECONDARY_BUTTON_CLASS}
+            aria-busy={busy === "checking"}
+            className={`${BILLING_SECONDARY_BUTTON_CLASS} gap-2`}
           >
+            {busy === "checking" ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden /> : null}
             {busy === "checking" ? "Checking…" : "Check claims"}
           </button>
-          <button type="button" onClick={() => void runCreate()} disabled={blocked} className={BILLING_PRIMARY_BUTTON_CLASS}>
+          <button
+            type="button"
+            onClick={() => void runCreate()}
+            disabled={blocked}
+            aria-busy={busy === "creating"}
+            className={`${BILLING_PRIMARY_BUTTON_CLASS} gap-2`}
+          >
+            {busy === "creating" ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden /> : null}
             {busy === "creating" ? "Creating…" : "Create zip"}
           </button>
         </div>

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { BillingClaimListItem } from "@/lib/api/claims";
 import X12BatchRunDialog from "./X12BatchRunDialog";
@@ -7,6 +7,15 @@ import X12BatchRunDialog from "./X12BatchRunDialog";
 const mocks = vi.hoisted(() => ({ check: vi.fn(), create: vi.fn() }));
 vi.mock("@/lib/operational-agency/OperationalAgencyProvider", () => ({
   useOperationalAgency: () => ({ agencyId: "a", mode: "hha" }),
+}));
+// The calendar popover is covered elsewhere; a plain input stands in for it here.
+vi.mock("@/components/ui/datePicker", () => ({
+  default: ({ ariaLabel, setDate }: { ariaLabel?: string; setDate: (date: Date | null) => void }) => (
+    <input
+      aria-label={ariaLabel}
+      onChange={(event) => setDate(event.target.value ? new Date(`${event.target.value}T00:00:00`) : null)}
+    />
+  ),
 }));
 vi.mock("@/lib/api/claims", () => ({
   checkX12Run: mocks.check,
@@ -25,8 +34,8 @@ describe("X12BatchRunDialog", () => {
     const user = userEvent.setup();
     render(<X12BatchRunDialog claims={[CLAIM]} onClose={vi.fn()} onOpenSettings={vi.fn()} onCreated={onCreated} />);
 
-    await user.type(screen.getByLabelText("Service date from"), "2026-09-01");
-    await user.type(screen.getByLabelText("Service date to"), "2026-09-30");
+    fireEvent.change(screen.getByLabelText("Service date from"), { target: { value: "2026-09-01" } });
+    fireEvent.change(screen.getByLabelText("Service date to"), { target: { value: "2026-09-30" } });
     await user.click(screen.getByRole("button", { name: "Check claims" }));
     expect(mocks.check).toHaveBeenCalledWith({ context: { agencyId: "a" }, filter: { from: "2026-09-01", to: "2026-09-30", program: "hha" } });
     expect(await screen.findByText("312 claims in 1 file, $48,210.00")).toBeTruthy();
@@ -34,6 +43,19 @@ describe("X12BatchRunDialog", () => {
     await user.click(screen.getByRole("button", { name: "Create zip" }));
     expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ filter: expect.any(Object), skipInvalid: false }));
     expect(onCreated).toHaveBeenCalledWith(run, false);
+  });
+
+  it("shows a spinner on Create zip while the batch is being created", async () => {
+    mocks.check.mockResolvedValue({ claimCount: 1, validClaimCount: 1, fileCount: 1, totalChargeCents: 4800, settingsErrors: [], claimErrors: [], warnings: [] });
+    let finish: (value: unknown) => void = () => {};
+    mocks.create.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    const user = userEvent.setup();
+    render(<X12BatchRunDialog claims={[CLAIM]} onClose={vi.fn()} onOpenSettings={vi.fn()} onCreated={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Create zip" }));
+    const button = screen.getByRole("button", { name: "Creating…" });
+    expect(button.getAttribute("aria-busy")).toBe("true");
+    expect(button.querySelector(".animate-spin")).toBeTruthy();
+    finish({ run: { id: "run-2", status: "ready" }, queued: false });
   });
 
   it("blocks the zip while claims need fixing unless they are left out", async () => {
