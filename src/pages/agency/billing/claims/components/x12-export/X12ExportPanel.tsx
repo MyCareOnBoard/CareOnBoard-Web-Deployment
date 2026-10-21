@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Archive, CheckCircle2, Download, FileSearch, FileText, Settings, Upload } from "lucide-react";
+import { Archive, CheckCircle2, ChevronDown, Download, FileSearch, FileText, Settings, Upload } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { menuItemClassName } from "@/components/ui/dot-grid-menu";
 import { useToast } from "@/hooks/use-toast";
 import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
 import {
@@ -43,10 +51,11 @@ type ReportView = { title: string; fileName: string; load?: () => Promise<string
 
 const ROW_BUTTON_CLASS =
   "inline-flex h-[36px] shrink-0 cursor-pointer items-center gap-2 rounded-full border border-[#e5e5e6] px-3 text-[13px] font-medium text-[#10141a] hover:bg-[#eef4f5] disabled:cursor-not-allowed disabled:opacity-60";
-const HEADER_BUTTON_CLASS =
-  "inline-flex h-[44px] cursor-pointer items-center gap-2 rounded-full border border-[#e5e5e6] bg-white px-5 text-[14px] font-medium text-[#10141a] hover:bg-[#eef4f5]";
-const PRIMARY_HEADER_BUTTON_CLASS =
-  "inline-flex h-[44px] cursor-pointer items-center gap-2 rounded-full bg-[#00b4b8] px-5 text-[14px] font-medium text-white hover:bg-[#009da1]";
+// Header actions share one height and shape. On phones they stack full width with the main action first.
+const HEADER_BUTTON_BASE =
+  "inline-flex h-[40px] w-full shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-full px-4 text-[14px] font-medium transition-colors sm:order-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2 sm:w-auto";
+const HEADER_BUTTON_CLASS = `${HEADER_BUTTON_BASE} border border-[#e5e5e6] bg-white text-[#10141a] hover:bg-[#eef4f5] data-[state=open]:bg-[#eef4f5]`;
+const PRIMARY_HEADER_BUTTON_CLASS = `${HEADER_BUTTON_BASE} order-first bg-[#00b4b8] text-white hover:bg-[#009da1]`;
 
 function formatDate(iso: string): string {
   const date = new Date(iso);
@@ -251,8 +260,8 @@ export default function X12ExportPanel({ claims, refreshKey = 0, onExported, onO
 
   return (
     <section className="rounded-[20px] border border-[#e5e5e6] bg-white p-5 sm:p-6" aria-labelledby="x12-export-title">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
           <h2 id="x12-export-title" className="text-[18px] font-semibold text-[#10141a]">
             837P files for NJ Medicaid
           </h2>
@@ -262,25 +271,42 @@ export default function X12ExportPanel({ claims, refreshKey = 0, onExported, onO
               : `${pendingCount} pending ${pendingCount === 1 ? "claim is" : "claims are"} not in a file yet.`}
           </p>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <button type="button" onClick={openSettings} className={HEADER_BUTTON_CLASS}>
-            <Settings className="h-4 w-4" />
-            Settings
-          </button>
-          <button type="button" onClick={() => setDialog("validate")} className={HEADER_BUTTON_CLASS}>
-            <FileSearch className="h-4 w-4" />
-            Validate a file
-          </button>
-          <button type="button" onClick={() => setDialog("responses")} className={HEADER_BUTTON_CLASS}>
-            <Upload className="h-4 w-4" />
-            Upload NJMMIS response
-          </button>
+        <div className="grid grid-cols-1 gap-2 sm:flex sm:shrink-0 sm:items-center sm:gap-3">
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <button type="button" className={`group ${HEADER_BUTTON_CLASS}`}>
+                More tools
+                <ChevronDown
+                  className="h-4 w-4 text-[#808081] transition-transform group-data-[state=open]:rotate-180"
+                  aria-hidden
+                />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="z-[100] min-w-[230px] overflow-hidden rounded-xl border-0 bg-white p-0 py-1 shadow-lg"
+            >
+              <DropdownMenuItem className={menuItemClassName} onSelect={() => setDialog("validate")}>
+                <FileSearch className="mr-2 h-4 w-4 text-[#808081]" aria-hidden />
+                Validate a file
+              </DropdownMenuItem>
+              <DropdownMenuItem className={menuItemClassName} onSelect={() => setDialog("responses")}>
+                <Upload className="mr-2 h-4 w-4 text-[#808081]" aria-hidden />
+                Upload NJMMIS response
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="my-1 bg-[#e5e5e6]" />
+              <DropdownMenuItem className={menuItemClassName} onSelect={openSettings}>
+                <Settings className="mr-2 h-4 w-4 text-[#808081]" aria-hidden />
+                837P settings
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <button type="button" onClick={() => setDialog("export")} className={HEADER_BUTTON_CLASS}>
-            <FileText className="h-4 w-4" />
+            <FileText className="h-4 w-4" aria-hidden />
             Create 837P file
           </button>
           <button type="button" onClick={() => setDialog("run")} className={PRIMARY_HEADER_BUTTON_CLASS}>
-            <Archive className="h-4 w-4" />
+            <Archive className="h-4 w-4" aria-hidden />
             Create zip batch
           </button>
         </div>
