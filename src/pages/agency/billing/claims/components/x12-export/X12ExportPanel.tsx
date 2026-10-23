@@ -300,7 +300,7 @@ export default function X12ExportPanel({ claims, refreshKey = 0, onExported, onO
               </DropdownMenuItem>
               <DropdownMenuItem className={menuItemClassName} onSelect={() => setDialog("responses")}>
                 <Upload className="mr-2 h-4 w-4 text-[#808081]" aria-hidden />
-                Upload NJMMIS response
+                Upload NJMMIS response (manual)
               </DropdownMenuItem>
               <DropdownMenuSeparator className="my-1 bg-[#e5e5e6]" />
               <DropdownMenuItem className={menuItemClassName} onSelect={openSettings}>

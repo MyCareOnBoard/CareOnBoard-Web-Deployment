@@ -637,6 +637,46 @@ export type ClearinghouseClaimResult = {
   errors: Array<{ code: string; message: string; field: string }>;
   /** Stedi's 277CA for the claim (report only). */
   ack277?: string;
+  /** The claim's billing status now (Stedi report only). */
+  claimStatus?: "pending" | "paid" | "rejected" | null;
+  /** Latest payer 277CA, pulled from Stedi (Stedi report only). */
+  payerAcknowledgment?: PayerAcknowledgment | null;
+  /** Latest 835 payment, pulled from Stedi (Stedi report only). */
+  remittance?: ClaimRemittance | null;
+};
+
+export type PayerAcknowledgment = {
+  /** accepted into adjudication, rejected by the payer's front-end edits, or received with no decision yet. */
+  outcome: "accepted" | "rejected" | "acknowledged";
+  mode: "test" | "production" | "other";
+  effectiveDate: string | null;
+  payerClaimNumber: string;
+  statuses: Array<{ category: string; categoryText: string; code: string; codeText: string; entity: string }>;
+  messages: string[];
+  receivedAt: string | null;
+};
+
+export type ClaimRemittance = {
+  outcome: "processed" | "denied" | "other";
+  mode: "test" | "production" | "other";
+  statusText: string;
+  chargeCents: number | null;
+  paidCents: number;
+  patientResponsibilityCents: number;
+  paymentDate: string | null;
+  traceNumber: string;
+  payerName: string;
+  adjustments: Array<{ level: "claim" | "line"; group: string; reason: string; reasonText: string; amountCents: number }>;
+  receivedAt: string | null;
+};
+
+export type StediResponseCheck = {
+  ran: boolean;
+  /** Why it did not poll: another check is running, or one just finished. */
+  reason: "running" | "recent" | null;
+  /** Stedi could not be read for every response; the next run retries. */
+  hadErrors: boolean;
+  finishedAt: string | null;
 };
 
 export type ClearinghouseResult = {
@@ -949,6 +989,16 @@ export async function getX12ClearinghouseReport(input: {
     { params: { agencyId: operationalAgencyId(context) }, ...(signal ? { signal } : {}) },
   );
   return requireData(response, "Failed to load the clearinghouse results");
+}
+
+/** Pulls new payer responses (277CA, 835) from Stedi now. They also arrive every 15 minutes on their own. */
+export async function checkStediResponses(input: { context: OperationalBillingRequestContext }): Promise<StediResponseCheck> {
+  const response = await axiosClient.post<ApiEnvelope<StediResponseCheck>>(
+    "/billing/claims/clearinghouse/stedi/check-responses",
+    {},
+    { params: { agencyId: operationalAgencyId(input.context) } },
+  );
+  return requireData(response, "Failed to check for payer responses");
 }
 
 /** Checks an 837P file from the user's computer. Nothing is saved. */

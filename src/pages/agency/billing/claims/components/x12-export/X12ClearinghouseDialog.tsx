@@ -14,6 +14,7 @@ import {
 } from "@/pages/agency/billing/components/billingModalStyles";
 import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
 import {
+  checkStediResponses,
   getX12ClearinghouseReport,
   saveBlob,
   submitX12BatchToClearinghouse,
@@ -22,7 +23,16 @@ import {
   type X12Batch,
 } from "@/lib/api/claims";
 import X12StatusBadge from "./X12StatusBadge";
-import { CLAIM_RESULT_LABELS, CLEARINGHOUSE_NAMES, clearinghouseBadge, clearinghouseResultsCsv } from "./x12ExportUtils";
+import {
+  CLAIM_RESULT_LABELS,
+  CLEARINGHOUSE_NAMES,
+  PAYER_ACK_LABELS,
+  clearinghouseBadge,
+  clearinghouseResultsCsv,
+  payerAckReasons,
+  remittanceAdjustments,
+  remittanceLabel,
+} from "./x12ExportUtils";
 
 // Stedi is the only clearinghouse in use. Claim.MD is turned off on the server; a
 // production file it already took still blocks a second send.
@@ -36,6 +46,18 @@ type X12ClearinghouseDialogProps = {
   /** Called after a send, so the file list and claims reload. */
   onSent: () => void;
 };
+
+/** Claims whose payer 277CA or 835 is new or changed between two loads of the report. */
+function newPayerResponses(before: ClearinghouseResult | null, after: ClearinghouseResult): number {
+  const seen = new Map((before?.claims ?? []).map((claim) => [claim.claimNumber, claim]));
+  return after.claims.filter((claim) => {
+    const old = seen.get(claim.claimNumber);
+    return (
+      JSON.stringify(claim.payerAcknowledgment ?? null) !== JSON.stringify(old?.payerAcknowledgment ?? null) ||
+      JSON.stringify(claim.remittance ?? null) !== JSON.stringify(old?.remittance ?? null)
+    );
+  }).length;
+}
 
 function errorMessage(error: unknown, fallback: string): string {
   const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
@@ -57,6 +79,8 @@ export default function X12ClearinghouseDialog({ batch, onClose, onSent }: X12Cl
   const [loadingResult, setLoadingResult] = useState(false);
   const [error, setError] = useState("");
   const [results, setResults] = useState<Partial<Record<ClearinghouseVendor, ClearinghouseResult>>>({});
+  const [checking, setChecking] = useState(false);
+  const [checkNote, setCheckNote] = useState("");
 
   const production = batch.usageIndicator === "P";
   const previous = results[vendor]?.submission ?? batch.clearinghouse?.[vendor] ?? null;
@@ -105,6 +129,34 @@ export default function X12ClearinghouseDialog({ batch, onClose, onSent }: X12Cl
       setError(errorMessage(sendError, `Couldn't send the file to ${CLEARINGHOUSE_NAMES[vendor]}. Try again.`));
     } finally {
       setSending(false);
+    }
+  };
+
+  // Payer 277CA / 835 responses arrive every 15 minutes on their own; this checks now.
+  const checkResponses = async () => {
+    if (!agencyId || checking) return;
+    setChecking(true);
+    setError("");
+    setCheckNote("");
+    try {
+      const checked = await checkStediResponses({ context: { agencyId } });
+      const reloaded = await getX12ClearinghouseReport({ context: { agencyId }, batchId: batch.id, vendor });
+      setResults((current) => ({ ...current, [vendor]: reloaded }));
+      const found = newPayerResponses(result, reloaded);
+      setCheckNote(
+        checked.reason === "running"
+          ? "A check is already running. Results show here when it finishes."
+          : checked.hadErrors
+            ? "Couldn't read every response from Stedi. It tries again in a few minutes."
+            : found
+              ? `Found ${found} new ${found === 1 ? "response" : "responses"} from NJ Medicaid.`
+              : "No new responses from NJ Medicaid yet.",
+      );
+      if (found) onSent();
+    } catch (checkError) {
+      setError(errorMessage(checkError, "Couldn't check for NJ Medicaid responses. Try again."));
+    } finally {
+      setChecking(false);
     }
   };
 
@@ -211,6 +263,30 @@ export default function X12ClearinghouseDialog({ batch, onClose, onSent }: X12Cl
               {result.submission.message && result.submission.status !== "submitted" ? (
                 <p className="text-[13px] text-[#b54708]">{result.submission.message}</p>
               ) : null}
+              {result.claims.some((claim) => claim.status === "accepted") ? (
+                <div className="flex flex-wrap items-center gap-3 rounded-[12px] bg-[#f7f9fa] p-3 text-[13px] text-[#344054]">
+                  <span className="min-w-0 flex-1">
+                    {production
+                      ? "NJ Medicaid's acceptance (277CA) and payments (835) are checked every 15 minutes and show on each claim."
+                      : "Test claims don't reach NJ Medicaid, so no payer answer comes back. Test responses from Stedi still show here."}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void checkResponses()}
+                    disabled={checking || sending}
+                    aria-busy={checking}
+                    className={`${BILLING_SECONDARY_BUTTON_CLASS} gap-2`}
+                  >
+                    {checking ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden /> : null}
+                    {checking ? "Checking…" : "Check now"}
+                  </button>
+                  {checkNote ? (
+                    <p role="status" className="basis-full text-[#344054]">
+                      {checkNote}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
               {result.claims.length ? (
                 <ul className="max-h-[320px] divide-y divide-[#e5e5e6] overflow-y-auto rounded-[12px] border border-[#e5e5e6]">
                   {result.claims.map((claim) => (
@@ -232,9 +308,50 @@ export default function X12ClearinghouseDialog({ batch, onClose, onSent }: X12Cl
                       ) : claim.status === "error" || claim.status === "pending" ? (
                         <p className="text-[#808081]">{claim.message}</p>
                       ) : null}
+                      {claim.payerAcknowledgment ? (
+                        <div className="space-y-0.5">
+                          <p className="flex flex-wrap items-center gap-2">
+                            <X12StatusBadge {...PAYER_ACK_LABELS[claim.payerAcknowledgment.outcome]} />
+                            {claim.payerAcknowledgment.payerClaimNumber ? (
+                              <span className="text-[#808081]">Payer claim {claim.payerAcknowledgment.payerClaimNumber}</span>
+                            ) : null}
+                          </p>
+                          {claim.payerAcknowledgment.outcome === "rejected" ? (
+                            <ul className="list-disc space-y-0.5 pl-5 text-[#b42318]">
+                              {payerAckReasons(claim.payerAcknowledgment).map((reason) => (
+                                <li key={reason}>{reason}</li>
+                              ))}
+                            </ul>
+                          ) : null}
+                        </div>
+                      ) : null}
+                      {claim.remittance ? (
+                        <div className="space-y-0.5">
+                          <p className="flex flex-wrap items-center gap-2">
+                            <X12StatusBadge {...remittanceLabel(claim.remittance)} />
+                            <span className="text-[#808081]">
+                              {[
+                                claim.remittance.paymentDate
+                                  ? new Date(`${claim.remittance.paymentDate}T00:00:00`).toLocaleDateString(undefined, { dateStyle: "medium" })
+                                  : "",
+                                claim.remittance.traceNumber ? `EFT/check ${claim.remittance.traceNumber}` : "",
+                              ]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </span>
+                          </p>
+                          {claim.remittance.adjustments.length ? (
+                            <ul className="list-disc space-y-0.5 pl-5 text-[#344054]">
+                              {remittanceAdjustments(claim.remittance).map((line, index) => (
+                                <li key={`${line}-${index}`}>{line}</li>
+                              ))}
+                            </ul>
+                          ) : null}
+                        </div>
+                      ) : null}
                       {claim.ack277 ? (
                         <details className="text-[#344054]">
-                          <summary className="cursor-pointer text-[#00807f]">277CA acknowledgment</summary>
+                          <summary className="cursor-pointer text-[#00807f]">Stedi 277CA acknowledgment</summary>
                           <pre className="mt-1 max-h-[160px] overflow-auto whitespace-pre-wrap break-all rounded-[8px] bg-[#f7f9fa] p-2 text-[11px]">
                             {claim.ack277.replace(/~/g, "~\n")}
                           </pre>

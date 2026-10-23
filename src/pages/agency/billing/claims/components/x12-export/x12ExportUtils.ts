@@ -2,12 +2,14 @@ import type {
   BillingClaimEdiExport,
   BillingClaimListItem,
   BillingClaimStatus,
+  ClaimRemittance,
   ClearinghouseClaimResult,
   ClearinghouseResult,
   ClearinghouseSubmission,
   ClearinghouseVendor,
   EdiAgencyDefaults,
   EdiSettings,
+  PayerAcknowledgment,
   X12Batch,
   X12ExportCheck,
   X12SubmissionStatus,
@@ -230,6 +232,39 @@ export function clearinghouseBadge(
   return { label: `${name}: ${parts.join(", ") || "sent"}`, tone, title: submission.message || undefined };
 }
 
+export const PAYER_ACK_LABELS: Record<PayerAcknowledgment["outcome"], { label: string; tone: BadgeTone }> = {
+  accepted: { label: "NJ Medicaid accepted", tone: "success" },
+  rejected: { label: "NJ Medicaid rejected", tone: "danger" },
+  acknowledged: { label: "NJ Medicaid received", tone: "neutral" },
+};
+
+/** "Paid $90.00" / "Denied" for a claim's latest 835. */
+export function remittanceLabel(remittance: ClaimRemittance): { label: string; tone: BadgeTone } {
+  if (remittance.outcome === "denied") return { label: "Denied", tone: "danger" };
+  if (remittance.outcome === "processed") {
+    return remittance.paidCents > 0
+      ? { label: `Paid ${formatCents(remittance.paidCents)}`, tone: "success" }
+      : { label: "Processed, $0 paid", tone: "warning" };
+  }
+  return { label: remittance.statusText || "Remittance received", tone: "neutral" };
+}
+
+/** Plain-words reasons from a payer 277CA, without repeats. */
+export function payerAckReasons(ack: PayerAcknowledgment): string[] {
+  const reasons = [
+    ...ack.statuses.map((status) => status.codeText || status.categoryText).filter(Boolean),
+    ...ack.messages,
+  ];
+  return [...new Set(reasons)];
+}
+
+/** Adjustment lines from an 835: "CO-45 Charge exceeds fee schedule: $10.00". */
+export function remittanceAdjustments(remittance: ClaimRemittance): string[] {
+  return remittance.adjustments.map(
+    (item) => `${item.group}-${item.reason}${item.reasonText ? ` ${item.reasonText}` : ""}: ${formatCents(item.amountCents)}`,
+  );
+}
+
 function csvCell(value: string): string {
   // A leading = + - @ would run as a formula in Excel.
   const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
@@ -238,7 +273,7 @@ function csvCell(value: string): string {
 
 /** One row per claim: what the clearinghouse said, for keeping with the claims. */
 export function clearinghouseResultsCsv(result: ClearinghouseResult): string {
-  const header = ["Clearinghouse", "Claim number", "Result", "Reference", "Messages", "Sent at", "Payer ID"];
+  const header = ["Clearinghouse", "Claim number", "Result", "Reference", "Messages", "Sent at", "Payer ID", "Payer status", "Payment"];
   const rows = result.claims.map((claim) => [
     CLEARINGHOUSE_NAMES[result.vendor],
     claim.claimNumber,
@@ -247,6 +282,8 @@ export function clearinghouseResultsCsv(result: ClearinghouseResult): string {
     (claim.errors.length ? claim.errors.map((issue) => issue.message || issue.code) : [claim.message]).filter(Boolean).join("; "),
     result.submission.submittedAt ?? "",
     result.submission.payerId,
+    claim.payerAcknowledgment ? PAYER_ACK_LABELS[claim.payerAcknowledgment.outcome].label : "",
+    claim.remittance ? remittanceLabel(claim.remittance).label : "",
   ]);
   return [header, ...rows].map((row) => row.map((cell) => csvCell(String(cell ?? ""))).join(",")).join("\r\n");
 }

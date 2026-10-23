@@ -5,13 +5,14 @@ import type { ClearinghouseResult, X12Batch } from "@/lib/api/claims";
 import X12ClearinghouseDialog from "./X12ClearinghouseDialog";
 import { clearinghouseResultsCsv } from "./x12ExportUtils";
 
-const mocks = vi.hoisted(() => ({ submit: vi.fn(), report: vi.fn() }));
+const mocks = vi.hoisted(() => ({ submit: vi.fn(), report: vi.fn(), check: vi.fn() }));
 vi.mock("@/lib/operational-agency/OperationalAgencyProvider", () => ({
   useOperationalAgency: () => ({ agencyId: "a", mode: "hha" }),
 }));
 vi.mock("@/lib/api/claims", () => ({
   submitX12BatchToClearinghouse: mocks.submit,
   getX12ClearinghouseReport: mocks.report,
+  checkStediResponses: mocks.check,
   saveBlob: vi.fn(),
 }));
 
@@ -52,6 +53,7 @@ describe("X12ClearinghouseDialog", () => {
   beforeEach(() => {
     mocks.submit.mockReset();
     mocks.report.mockReset();
+    mocks.check.mockReset();
   });
 
   it("sends a test file to Stedi with the typed payer ID and lists each claim's result", async () => {
@@ -101,6 +103,64 @@ describe("X12ClearinghouseDialog", () => {
     expect(screen.getByRole("button", { name: "Sent to Stedi" }).hasAttribute("disabled")).toBe(true);
   });
 
+  it("shows NJ Medicaid's 277CA and 835 per claim and checks for new ones", async () => {
+    const withPayer: ClearinghouseResult = {
+      ...RESULT,
+      submission: { ...SUBMISSION, usageIndicator: "P" },
+      claims: [
+        {
+          ...RESULT.claims[0],
+          payerAcknowledgment: { outcome: "accepted", mode: "production", effectiveDate: "2026-10-24", payerClaimNumber: "P123", statuses: [], messages: [], receivedAt: null },
+          remittance: {
+            outcome: "processed",
+            mode: "production",
+            statusText: "Processed as primary",
+            chargeCents: 10000,
+            paidCents: 9000,
+            patientResponsibilityCents: 0,
+            paymentDate: "2026-10-30",
+            traceNumber: "EFT123",
+            payerName: "NJ MEDICAID",
+            adjustments: [{ level: "line", group: "CO", reason: "45", reasonText: "Charge exceeds fee schedule", amountCents: 1000 }],
+            receivedAt: null,
+          },
+        },
+        {
+          ...RESULT.claims[1],
+          status: "accepted",
+          errors: [],
+          payerAcknowledgment: {
+            outcome: "rejected",
+            mode: "production",
+            effectiveDate: null,
+            payerClaimNumber: "",
+            statuses: [{ category: "A7", categoryText: "Rejected", code: "33", codeText: "Subscriber not found", entity: "" }],
+            messages: [],
+            receivedAt: null,
+          },
+        },
+      ],
+    };
+    // The first load has no payer answers yet; the reload after "Check now" has them.
+    mocks.report.mockResolvedValueOnce({ ...withPayer, claims: withPayer.claims.map((claim) => ({ ...claim, payerAcknowledgment: null, remittance: null })) });
+    mocks.report.mockResolvedValue(withPayer);
+    mocks.check.mockResolvedValue({ ran: true, reason: null, hadErrors: false, finishedAt: null });
+    const onSent = vi.fn();
+    const user = userEvent.setup();
+    const sent = { ...BATCH, usageIndicator: "P", clearinghouse: { stedi: { ...SUBMISSION, usageIndicator: "P" } } } as X12Batch;
+    render(<X12ClearinghouseDialog batch={sent} onClose={vi.fn()} onSent={onSent} />);
+
+    await user.click(await screen.findByRole("button", { name: "Check now" }));
+    expect(mocks.check).toHaveBeenCalledWith({ context: { agencyId: "a" } });
+    expect(await screen.findByText("Found 2 new responses from NJ Medicaid.")).toBeTruthy();
+    expect(onSent).toHaveBeenCalled();
+    expect(screen.getByText("NJ Medicaid accepted")).toBeTruthy();
+    expect(screen.getByText("Paid $90.00")).toBeTruthy();
+    expect(screen.getByText("CO-45 Charge exceeds fee schedule: $10.00")).toBeTruthy();
+    expect(screen.getByText("NJ Medicaid rejected")).toBeTruthy();
+    expect(screen.getByText("Subscriber not found")).toBeTruthy();
+  });
+
   it("blocks a production file that already went through Claim.MD", () => {
     const sent = { ...BATCH, usageIndicator: "P", clearinghouse: { claimmd: SUBMISSION } } as X12Batch;
     render(<X12ClearinghouseDialog batch={sent} onClose={vi.fn()} onSent={vi.fn()} />);
@@ -117,7 +177,7 @@ describe("clearinghouseResultsCsv", () => {
       claims: [{ ...RESULT.claims[1], errors: [{ code: "", message: "=HYPERLINK(1)", field: "" }] }],
     });
     const [header, row] = csv.split("\r\n");
-    expect(header).toBe("Clearinghouse,Claim number,Result,Reference,Messages,Sent at,Payer ID");
-    expect(row).toBe("Stedi,CLM-1,Rejected,R2,'=HYPERLINK(1),2026-10-23T14:00:00.000Z,100229");
+    expect(header).toBe("Clearinghouse,Claim number,Result,Reference,Messages,Sent at,Payer ID,Payer status,Payment");
+    expect(row).toBe("Stedi,CLM-1,Rejected,R2,'=HYPERLINK(1),2026-10-23T14:00:00.000Z,100229,,");
   });
 });
