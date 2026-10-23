@@ -522,6 +522,10 @@ export type EdiSettings = {
   billingPeriodAnchor: string;
   /** Place of service on new claim lines, e.g. 12 (home). */
   defaultPlaceOfService: string;
+  /** NJ Medicaid's payer ID on Stedi's payer list; blank sends the file's own payer ID. */
+  stediPayerId: string;
+  /** NJ Medicaid's payer ID on Claim.MD's payer list; blank sends the file's own payer ID. */
+  claimMdPayerId: string;
 };
 
 /** Agency profile values a blank setting falls back to. */
@@ -602,6 +606,44 @@ export type X12Batch = {
   submission?: X12Submission | null;
   /** When the file was marked as sent to NJMMIS. */
   uploadedAt?: string | null;
+  /** Latest submission to each clearinghouse; null or missing when never sent. */
+  clearinghouse?: Partial<Record<ClearinghouseVendor, ClearinghouseSubmission>> | null;
+};
+
+export type ClearinghouseVendor = "stedi" | "claimmd";
+
+export type ClearinghouseSubmission = {
+  /** submitted: every claim has an answer. partial: some couldn't be sent; send again to retry them. */
+  status: "submitting" | "submitted" | "partial" | "failed";
+  payerId: string;
+  usageIndicator: EdiUsageIndicator | null;
+  submittedAt: string | null;
+  submittedBy: string | null;
+  acceptedClaims: number;
+  rejectedClaims: number;
+  pendingClaims: number;
+  errorClaims: number;
+  fileId: string;
+  message: string;
+};
+
+export type ClearinghouseClaimResult = {
+  claimId: string | null;
+  claimNumber: string;
+  status: "accepted" | "rejected" | "pending" | "error";
+  /** Stedi correlation ID or Claim.MD claim ID. */
+  reference: string;
+  message: string;
+  errors: Array<{ code: string; message: string; field: string }>;
+  /** Stedi's 277CA for the claim (report only). */
+  ack277?: string;
+};
+
+export type ClearinghouseResult = {
+  vendor: ClearinghouseVendor;
+  batchId: string;
+  submission: ClearinghouseSubmission;
+  claims: ClearinghouseClaimResult[];
 };
 
 export type X12FileIssue = {
@@ -815,7 +857,7 @@ export async function downloadX12Batch(input: {
 }
 
 /** Saves a downloaded blob under the given file name. */
-function saveBlob(blob: Blob, fileName: string): void {
+export function saveBlob(blob: Blob, fileName: string): void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -876,6 +918,37 @@ export async function markX12BatchUploaded(input: {
     { params: { agencyId: operationalAgencyId(context) } },
   );
   return requireData(response, "Failed to mark the file as uploaded");
+}
+
+/** Sends a ready 837P file to a clearinghouse. `payerId` overrides the saved clearinghouse payer ID once. */
+export async function submitX12BatchToClearinghouse(input: {
+  context: OperationalBillingRequestContext;
+  batchId: string;
+  vendor: ClearinghouseVendor;
+  payerId?: string;
+}): Promise<ClearinghouseResult> {
+  const { context, batchId, vendor, payerId } = input;
+  const response = await axiosClient.post<ApiEnvelope<ClearinghouseResult>>(
+    `/billing/claims/x12-batches/${encodeURIComponent(batchId)}/submit/${vendor}`,
+    payerId ? { payerId } : {},
+    { params: { agencyId: operationalAgencyId(context) } },
+  );
+  return requireData(response, "Failed to send the file to the clearinghouse");
+}
+
+/** The latest per-claim results a clearinghouse gave for a file. */
+export async function getX12ClearinghouseReport(input: {
+  context: OperationalBillingRequestContext;
+  batchId: string;
+  vendor: ClearinghouseVendor;
+  signal?: AbortSignal;
+}): Promise<ClearinghouseResult> {
+  const { context, batchId, vendor, signal } = input;
+  const response = await axiosClient.get<ApiEnvelope<ClearinghouseResult>>(
+    `/billing/claims/x12-batches/${encodeURIComponent(batchId)}/clearinghouse/${vendor}`,
+    { params: { agencyId: operationalAgencyId(context) }, ...(signal ? { signal } : {}) },
+  );
+  return requireData(response, "Failed to load the clearinghouse results");
 }
 
 /** Checks an 837P file from the user's computer. Nothing is saved. */

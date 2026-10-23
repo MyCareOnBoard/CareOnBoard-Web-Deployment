@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Archive, CheckCircle2, ChevronDown, Download, FileSearch, FileText, Settings, Upload } from "lucide-react";
+import { Archive, CheckCircle2, ChevronDown, Download, FileSearch, FileText, Send, Settings, Upload } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,12 +26,19 @@ import {
 } from "@/lib/api/claims";
 import EdiSettingsDialog from "./EdiSettingsDialog";
 import X12BatchRunDialog from "./X12BatchRunDialog";
+import X12ClearinghouseDialog from "./X12ClearinghouseDialog";
 import X12ExportDialog from "./X12ExportDialog";
 import X12ReportDialog from "./X12ReportDialog";
 import X12ResponseUploadDialog from "./X12ResponseUploadDialog";
 import X12StatusBadge from "./X12StatusBadge";
 import X12ValidateFileDialog from "./X12ValidateFileDialog";
-import { VALIDATION_LABELS, formatCents, getExportableClaims, submissionLabel } from "./x12ExportUtils";
+import {
+  VALIDATION_LABELS,
+  clearinghouseBadge,
+  formatCents,
+  getExportableClaims,
+  submissionLabel,
+} from "./x12ExportUtils";
 
 type X12ExportPanelProps = {
   claims: readonly BillingClaimListItem[];
@@ -76,6 +83,7 @@ export default function X12ExportPanel({ claims, refreshKey = 0, onExported, onO
   const [loadingBatches, setLoadingBatches] = useState(false);
   const [dialog, setDialog] = useState<"export" | "run" | "settings" | "responses" | "validate" | null>(null);
   const [report, setReport] = useState<ReportView | null>(null);
+  const [clearinghouseBatch, setClearinghouseBatch] = useState<X12Batch | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const requestRef = useRef<AbortController | null>(null);
   // Runs started here that should download once the background job finishes.
@@ -385,6 +393,10 @@ export default function X12ExportPanel({ claims, refreshKey = 0, onExported, onO
                       {submission ? (
                         <X12StatusBadge {...submission} title={batch.submission?.errors.join("\n") || undefined} />
                       ) : null}
+                      {batch.clearinghouse?.stedi ? <X12StatusBadge {...clearinghouseBadge("stedi", batch.clearinghouse.stedi)} /> : null}
+                      {batch.clearinghouse?.claimmd ? (
+                        <X12StatusBadge {...clearinghouseBadge("claimmd", batch.clearinghouse.claimmd)} />
+                      ) : null}
                     </p>
                     <p className="text-[13px] text-[#808081]">
                       {formatDate(batch.createdAt)} · {batch.claimCount} {batch.claimCount === 1 ? "claim" : "claims"} ·{" "}
@@ -398,6 +410,12 @@ export default function X12ExportPanel({ claims, refreshKey = 0, onExported, onO
                       <button type="button" onClick={() => openBatchReport(batch)} className={ROW_BUTTON_CLASS}>
                         <FileSearch className="h-4 w-4" />
                         View report
+                      </button>
+                    ) : null}
+                    {batch.status === "ready" ? (
+                      <button type="button" onClick={() => setClearinghouseBatch(batch)} className={ROW_BUTTON_CLASS}>
+                        <Send className="h-4 w-4" aria-hidden />
+                        {batch.clearinghouse ? "Clearinghouse results" : "Send to clearinghouse"}
                       </button>
                     ) : null}
                     {canRecheck ? (
@@ -496,6 +514,17 @@ export default function X12ExportPanel({ claims, refreshKey = 0, onExported, onO
 
       {dialog === "settings" ? (
         <EdiSettingsDialog open onClose={closeDialog} onSaved={() => toast({ title: "837P settings saved" })} />
+      ) : null}
+
+      {clearinghouseBatch ? (
+        <X12ClearinghouseDialog
+          batch={clearinghouseBatch}
+          onClose={() => setClearinghouseBatch(null)}
+          onSent={() => {
+            void loadLists();
+            onExported?.();
+          }}
+        />
       ) : null}
 
       {report ? (

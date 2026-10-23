@@ -39,6 +39,7 @@ const SECTION_TITLES = {
   submitter: "Submitter",
   payer: "Receiver and payer",
   provider: "Billing provider",
+  clearinghouse: "Clearinghouses",
 } as const;
 
 function errorMessage(error: unknown, fallback: string): string {

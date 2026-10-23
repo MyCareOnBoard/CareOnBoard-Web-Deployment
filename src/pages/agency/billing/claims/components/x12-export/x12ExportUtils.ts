@@ -2,6 +2,10 @@ import type {
   BillingClaimEdiExport,
   BillingClaimListItem,
   BillingClaimStatus,
+  ClearinghouseClaimResult,
+  ClearinghouseResult,
+  ClearinghouseSubmission,
+  ClearinghouseVendor,
   EdiAgencyDefaults,
   EdiSettings,
   X12Batch,
@@ -32,6 +36,8 @@ export const EMPTY_EDI_SETTINGS: EdiSettings = {
   billingPeriod: "weekly",
   billingPeriodAnchor: "",
   defaultPlaceOfService: "12",
+  stediPayerId: "",
+  claimMdPayerId: "",
 };
 
 /** Pending claims that can go in an 837P file. Already exported claims need `resubmit`. */
@@ -61,7 +67,7 @@ export const EDI_SETTINGS_FIELDS: Array<{
   key: Exclude<keyof EdiSettings, "usageIndicator">;
   label: string;
   hint?: string;
-  section: "submitter" | "payer" | "provider";
+  section: "submitter" | "payer" | "provider" | "clearinghouse";
 }> = [
   { key: "submitterId", label: "Submitter ID (ETIN)", hint: "From your NJMMIS trading partner agreement", section: "submitter" },
   { key: "submitterName", label: "Submitter name", section: "submitter" },
@@ -78,6 +84,18 @@ export const EDI_SETTINGS_FIELDS: Array<{
   { key: "billingCity", label: "City", section: "provider" },
   { key: "billingState", label: "State", section: "provider" },
   { key: "billingZip", label: "ZIP+4", hint: "9 digits, e.g. 08608-1234", section: "provider" },
+  {
+    key: "stediPayerId",
+    label: "Stedi payer ID",
+    hint: "NJ Medicaid on Stedi's payer list is 100229. Blank uses the payer ID above",
+    section: "clearinghouse",
+  },
+  {
+    key: "claimMdPayerId",
+    label: "Claim.MD payer ID",
+    hint: "From Claim.MD's payer list. Blank uses the payer ID above",
+    section: "clearinghouse",
+  },
 ];
 
 /** Placeholder for a settings field that falls back to the agency profile when left blank. */
@@ -189,6 +207,54 @@ export function submissionLabel(
   if (status && SUBMISSION_LABELS[status]) return SUBMISSION_LABELS[status];
   if (batch.status !== "ready") return null;
   return batch.uploadedAt ? { label: "Sent", tone: "neutral" } : { label: "Not sent", tone: "warning" };
+}
+
+export const CLEARINGHOUSE_NAMES: Record<ClearinghouseVendor, string> = { stedi: "Stedi", claimmd: "Claim.MD" };
+
+export const CLAIM_RESULT_LABELS: Record<ClearinghouseClaimResult["status"], { label: string; tone: BadgeTone }> = {
+  accepted: { label: "Accepted", tone: "success" },
+  rejected: { label: "Rejected", tone: "danger" },
+  pending: { label: "Waiting", tone: "neutral" },
+  error: { label: "Not sent", tone: "warning" },
+};
+
+/** "Stedi: 3 accepted, 1 rejected" for the file list. */
+export function clearinghouseBadge(
+  vendor: ClearinghouseVendor,
+  submission: ClearinghouseSubmission,
+): { label: string; tone: BadgeTone; title?: string } {
+  const name = CLEARINGHOUSE_NAMES[vendor];
+  if (submission.status === "submitting") return { label: `${name}: sending…`, tone: "neutral" };
+  if (submission.status === "failed") return { label: `${name}: not sent`, tone: "danger", title: submission.message || undefined };
+  const parts = [
+    submission.acceptedClaims ? `${submission.acceptedClaims} accepted` : "",
+    submission.rejectedClaims ? `${submission.rejectedClaims} rejected` : "",
+    submission.pendingClaims ? `${submission.pendingClaims} waiting` : "",
+    submission.errorClaims ? `${submission.errorClaims} not sent` : "",
+  ].filter(Boolean);
+  const tone: BadgeTone = submission.rejectedClaims || submission.errorClaims ? "warning" : submission.pendingClaims ? "neutral" : "success";
+  return { label: `${name}: ${parts.join(", ") || "sent"}`, tone, title: submission.message || undefined };
+}
+
+function csvCell(value: string): string {
+  // A leading = + - @ would run as a formula in Excel.
+  const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+}
+
+/** One row per claim: what the clearinghouse said, for keeping with the claims. */
+export function clearinghouseResultsCsv(result: ClearinghouseResult): string {
+  const header = ["Clearinghouse", "Claim number", "Result", "Reference", "Messages", "Sent at", "Payer ID"];
+  const rows = result.claims.map((claim) => [
+    CLEARINGHOUSE_NAMES[result.vendor],
+    claim.claimNumber,
+    CLAIM_RESULT_LABELS[claim.status].label,
+    claim.reference,
+    (claim.errors.length ? claim.errors.map((issue) => issue.message || issue.code) : [claim.message]).filter(Boolean).join("; "),
+    result.submission.submittedAt ?? "",
+    result.submission.payerId,
+  ]);
+  return [header, ...rows].map((row) => row.map((cell) => csvCell(String(cell ?? ""))).join(",")).join("\r\n");
 }
 
 /** "312 claims in 1 file, $48,210.00" */
