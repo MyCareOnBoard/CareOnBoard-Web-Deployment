@@ -24,11 +24,10 @@ import {
 import X12StatusBadge from "./X12StatusBadge";
 import { CLAIM_RESULT_LABELS, CLEARINGHOUSE_NAMES, clearinghouseBadge, clearinghouseResultsCsv } from "./x12ExportUtils";
 
-const VENDOR_DETAILS: Record<ClearinghouseVendor, string> = {
-  stedi: "Sends each claim on its own and returns Stedi's 277CA acknowledgment for it.",
-  claimmd: "Uploads the whole file and returns Claim.MD's answer for each claim.",
-};
-const VENDORS: ClearinghouseVendor[] = ["stedi", "claimmd"];
+// Stedi is the only clearinghouse in use. Claim.MD is turned off on the server; a
+// production file it already took still blocks a second send.
+const VENDOR: ClearinghouseVendor = "stedi";
+const OTHER_VENDORS: ClearinghouseVendor[] = ["claimmd"];
 const PAYER_ID_PATTERN = /^[A-Za-z0-9-]*$/;
 
 type X12ClearinghouseDialogProps = {
@@ -44,10 +43,14 @@ function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 
-/** Send a ready 837P file to Stedi or Claim.MD and show what each claim got back. */
+/**
+ * Send a ready 837P file to Stedi and show what each claim got back. The file's
+ * test/production mode (from 837P settings) decides Stedi's mode: a test file goes
+ * through Stedi's test mode and never reaches the payer.
+ */
 export default function X12ClearinghouseDialog({ batch, onClose, onSent }: X12ClearinghouseDialogProps) {
   const { agencyId } = useOperationalAgency();
-  const [vendor, setVendor] = useState<ClearinghouseVendor>("stedi");
+  const vendor = VENDOR;
   const [payerId, setPayerId] = useState("");
   const [productionConfirmed, setProductionConfirmed] = useState(false);
   const [sending, setSending] = useState(false);
@@ -58,8 +61,8 @@ export default function X12ClearinghouseDialog({ batch, onClose, onSent }: X12Cl
   const production = batch.usageIndicator === "P";
   const previous = results[vendor]?.submission ?? batch.clearinghouse?.[vendor] ?? null;
   const result = results[vendor] ?? null;
-  const otherSent = VENDORS.find(
-    (other) => other !== vendor && ["submitted", "partial", "submitting"].includes((results[other]?.submission ?? batch.clearinghouse?.[other])?.status ?? ""),
+  const otherSent = OTHER_VENDORS.find((other) =>
+    ["submitted", "partial", "submitting"].includes(batch.clearinghouse?.[other]?.status ?? ""),
   );
   const blockedByOther = production && Boolean(otherSent);
   const alreadySent = previous?.status === "submitted";
@@ -130,49 +133,26 @@ export default function X12ClearinghouseDialog({ batch, onClose, onSent }: X12Cl
     <Dialog open onOpenChange={(next) => !next && !sending && onClose()}>
       <DialogContent showCloseButton={false} className={`${BILLING_CORNER_MODAL_CLASS} flex max-h-[90dvh] flex-col`}>
         <BillingCornerModalHeader
-          title="Send to a clearinghouse"
+          title="Send to Stedi"
           description={`${batch.fileName} · ${batch.claimCount} ${batch.claimCount === 1 ? "claim" : "claims"} · ${
             production ? "Production" : "Test"
-          }. The clearinghouse checks every claim and says whether it was accepted.`}
+          }. Stedi checks every claim and returns its 277CA acknowledgment.`}
           onClose={onClose}
           closeDisabled={sending}
         />
 
         <div className="flex-1 space-y-5 overflow-y-auto px-6 pb-2 pt-6">
-          <fieldset className="space-y-2" disabled={sending}>
-            <legend className={BILLING_FIELD_LABEL_CLASS}>Clearinghouse</legend>
-            {VENDORS.map((option) => {
-              const summary = results[option]?.submission ?? batch.clearinghouse?.[option] ?? null;
-              const selected = option === vendor;
-              return (
-                <label
-                  key={option}
-                  className={`flex cursor-pointer gap-3 rounded-[12px] border p-4 transition-colors focus-within:ring-2 focus-within:ring-[#00b4b8] ${
-                    selected ? "border-[#00b4b8] bg-[#eef9f9]" : "border-[#e5e5e6] hover:bg-[#f7f9fa]"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="clearinghouse"
-                    value={option}
-                    checked={selected}
-                    onChange={() => {
-                      setVendor(option);
-                      setError("");
-                    }}
-                    className="mt-1 h-4 w-4 accent-[#00b4b8]"
-                  />
-                  <span className="min-w-0 flex-1 space-y-1">
-                    <span className="flex flex-wrap items-center gap-2 text-[14px] font-medium text-[#10141a]">
-                      {CLEARINGHOUSE_NAMES[option]}
-                      {summary ? <X12StatusBadge {...clearinghouseBadge(option, summary)} /> : null}
-                    </span>
-                    <span className="block text-[13px] text-[#808081]">{VENDOR_DETAILS[option]}</span>
-                  </span>
-                </label>
-              );
-            })}
-          </fieldset>
+          <div className="flex flex-wrap items-center gap-2">
+            <X12StatusBadge label={production ? "Production mode" : "Test mode"} tone={production ? "warning" : "neutral"} />
+            {/* Once results load, their section shows this badge. */}
+            {previous && !result ? <X12StatusBadge {...clearinghouseBadge(vendor, previous)} /> : null}
+          </div>
+          {!production ? (
+            <p className="rounded-[12px] bg-[#eef9f9] p-4 text-[13px] text-[#344054]">
+              This is a test file, so it goes through Stedi&apos;s test mode. Stedi checks each claim and returns a test 277CA, and nothing is
+              sent to NJ Medicaid. To bill, set 837P settings to Production and create a new file.
+            </p>
+          ) : null}
 
           {!alreadySent ? (
             <div>
@@ -197,8 +177,7 @@ export default function X12ClearinghouseDialog({ batch, onClose, onSent }: X12Cl
           {production && !alreadySent && !blockedByOther ? (
             <div className="space-y-3 rounded-[12px] bg-[#fffaeb] p-4">
               <p className="text-[13px] text-[#b54708]">
-                This is a production file. Accepted claims go on to NJ Medicaid for payment, and a production file can only go through one
-                clearinghouse.
+                This is a production file. Stedi sends accepted claims on to NJ Medicaid for payment.
               </p>
               <Checkbox
                 checked={productionConfirmed}

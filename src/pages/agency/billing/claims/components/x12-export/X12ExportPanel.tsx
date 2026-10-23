@@ -415,7 +415,7 @@ export default function X12ExportPanel({ claims, refreshKey = 0, onExported, onO
                     {batch.status === "ready" ? (
                       <button type="button" onClick={() => setClearinghouseBatch(batch)} className={ROW_BUTTON_CLASS}>
                         <Send className="h-4 w-4" aria-hidden />
-                        {batch.clearinghouse ? "Clearinghouse results" : "Send to clearinghouse"}
+                        {batch.clearinghouse?.stedi ? "Stedi results" : "Send to Stedi"}
                       </button>
                     ) : null}
                     {canRecheck ? (

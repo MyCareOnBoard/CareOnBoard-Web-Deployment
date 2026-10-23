@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ClearinghouseResult, X12Batch } from "@/lib/api/claims";
@@ -49,6 +49,11 @@ const RESULT: ClearinghouseResult = {
 };
 
 describe("X12ClearinghouseDialog", () => {
+  beforeEach(() => {
+    mocks.submit.mockReset();
+    mocks.report.mockReset();
+  });
+
   it("sends a test file to Stedi with the typed payer ID and lists each claim's result", async () => {
     mocks.submit.mockResolvedValue(RESULT);
     const onSent = vi.fn();
@@ -65,30 +70,43 @@ describe("X12ClearinghouseDialog", () => {
     expect(screen.getByRole("button", { name: "Sent to Stedi" }).hasAttribute("disabled")).toBe(true);
   });
 
-  it("switches to Claim.MD and asks to confirm a production file", async () => {
-    mocks.submit.mockResolvedValue({ ...RESULT, vendor: "claimmd" });
+  it("explains that a test file goes through Stedi's test mode", () => {
+    render(<X12ClearinghouseDialog batch={BATCH} onClose={vi.fn()} onSent={vi.fn()} />);
+    expect(screen.getByText("Test mode")).toBeTruthy();
+    expect(screen.getByText(/nothing is\s+sent to NJ Medicaid/)).toBeTruthy();
+    expect(screen.queryByRole("radio")).toBeNull();
+    expect(screen.queryByText(/Claim\.MD/)).toBeNull();
+  });
+
+  it("asks to confirm a production file before sending it to Stedi", async () => {
+    mocks.submit.mockResolvedValue(RESULT);
     const user = userEvent.setup();
     render(<X12ClearinghouseDialog batch={{ ...BATCH, usageIndicator: "P" }} onClose={vi.fn()} onSent={vi.fn()} />);
 
-    await user.click(screen.getByRole("radio", { name: /Claim\.MD/ }));
-    const send = screen.getByRole("button", { name: "Send to Claim.MD" });
+    expect(screen.getByText("Production mode")).toBeTruthy();
+    const send = screen.getByRole("button", { name: "Send to Stedi" });
     expect(send.hasAttribute("disabled")).toBe(true);
     await user.click(screen.getByRole("checkbox", { name: "Send this production file" }));
     await user.click(send);
-    expect(mocks.submit).toHaveBeenCalledWith(expect.objectContaining({ vendor: "claimmd", payerId: undefined }));
+    expect(mocks.submit).toHaveBeenCalledWith(expect.objectContaining({ vendor: "stedi", payerId: undefined }));
   });
 
-  it("loads earlier results and blocks a second clearinghouse for a production file", async () => {
-    mocks.report.mockResolvedValue({ ...RESULT, vendor: "claimmd" });
-    const user = userEvent.setup();
+  it("loads earlier Stedi results", async () => {
+    mocks.report.mockResolvedValue(RESULT);
+    const sent = { ...BATCH, clearinghouse: { stedi: SUBMISSION } } as X12Batch;
+    render(<X12ClearinghouseDialog batch={sent} onClose={vi.fn()} onSent={vi.fn()} />);
+
+    expect(mocks.report).toHaveBeenCalledWith(expect.objectContaining({ batchId: "batch-1", vendor: "stedi" }));
+    expect(await screen.findByText("Bad member ID")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Sent to Stedi" }).hasAttribute("disabled")).toBe(true);
+  });
+
+  it("blocks a production file that already went through Claim.MD", () => {
     const sent = { ...BATCH, usageIndicator: "P", clearinghouse: { claimmd: SUBMISSION } } as X12Batch;
     render(<X12ClearinghouseDialog batch={sent} onClose={vi.fn()} onSent={vi.fn()} />);
 
     expect(screen.getByText(/already went through Claim\.MD/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Send to Stedi" }).hasAttribute("disabled")).toBe(true);
-    await user.click(screen.getByRole("radio", { name: /Claim\.MD/ }));
-    expect(mocks.report).toHaveBeenCalledWith(expect.objectContaining({ batchId: "batch-1", vendor: "claimmd" }));
-    expect(await screen.findByText("Bad member ID")).toBeTruthy();
   });
 });
 

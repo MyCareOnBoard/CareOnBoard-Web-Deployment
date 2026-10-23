@@ -90,12 +90,6 @@ export const EDI_SETTINGS_FIELDS: Array<{
     hint: "NJ Medicaid on Stedi's payer list is 100229. Blank uses the payer ID above",
     section: "clearinghouse",
   },
-  {
-    key: "claimMdPayerId",
-    label: "Claim.MD payer ID",
-    hint: "From Claim.MD's payer list. Blank uses the payer ID above",
-    section: "clearinghouse",
-  },
 ];
 
 /** Placeholder for a settings field that falls back to the agency profile when left blank. */

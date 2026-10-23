@@ -39,7 +39,7 @@ const SECTION_TITLES = {
   submitter: "Submitter",
   payer: "Receiver and payer",
   provider: "Billing provider",
-  clearinghouse: "Clearinghouses",
+  clearinghouse: "Clearinghouse (Stedi)",
 } as const;
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -214,6 +214,11 @@ export default function EdiSettingsDialog({ open, onClose, onSaved }: EdiSetting
                 <SelectItem value="P">Production</SelectItem>
               </SelectContent>
             </Select>
+            <p className="text-[12px] text-[#808081]">
+              {settings.usageIndicator === "P"
+                ? "Files sent to Stedi go to NJ Medicaid for payment."
+                : "Files sent to Stedi use its test mode: Stedi checks each claim and nothing reaches NJ Medicaid."}
+            </p>
             {switchingToProduction ? (
               <div className="space-y-2 rounded-[10px] bg-[#fffaeb] px-4 py-3 text-[14px] text-[#b54708]">
                 <p>
