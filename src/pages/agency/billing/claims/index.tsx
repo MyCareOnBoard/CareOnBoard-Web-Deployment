@@ -67,6 +67,7 @@ const PROGRAM_NAMES = { ddd: "DDD", hha: "HHA", sc: "Support Coordination" } as 
 const GenerateClaimModal = lazy(() => import("./components/GenerateClaimModal"));
 const ClaimReportModal = lazy(() => import("./components/claim-report/ClaimReportModal"));
 const X12ExportPanel = lazy(() => import("./components/x12-export/X12ExportPanel"));
+const StediEnrollmentBanner = lazy(() => import("./components/stedi-enrollment/StediEnrollmentBanner"));
 const OutOfPocketInvoiceModal = lazy(
   () => import("../out-of-pocket/components/OutOfPocketInvoiceModal"),
 );
@@ -661,6 +662,7 @@ export function ClaimsDashboardContent() {
         {/* Support coordination claims don't go out as 837P files yet. */}
         {canManageClaims && mode !== "sc" ? (
           <Suspense fallback={null}>
+            <StediEnrollmentBanner />
             <X12ExportPanel
               claims={generatedClaims.claims}
               refreshKey={x12RefreshKey}

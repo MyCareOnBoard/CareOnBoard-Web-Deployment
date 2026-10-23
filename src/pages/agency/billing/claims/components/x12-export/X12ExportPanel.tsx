@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Archive, CheckCircle2, ChevronDown, Download, FileSearch, FileText, Send, Settings, Upload } from "lucide-react";
+import { Archive, CheckCircle2, ChevronDown, Download, FileSearch, FileText, Send, Settings, ShieldCheck, Upload } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +25,7 @@ import {
   type X12Run,
 } from "@/lib/api/claims";
 import EdiSettingsDialog from "./EdiSettingsDialog";
+import StediEnrollmentWizard from "../stedi-enrollment/StediEnrollmentWizard";
 import X12BatchRunDialog from "./X12BatchRunDialog";
 import X12ClearinghouseDialog from "./X12ClearinghouseDialog";
 import X12ExportDialog from "./X12ExportDialog";
@@ -81,7 +82,7 @@ export default function X12ExportPanel({ claims, refreshKey = 0, onExported, onO
   const [batches, setBatches] = useState<X12Batch[]>([]);
   const [runs, setRuns] = useState<X12Run[]>([]);
   const [loadingBatches, setLoadingBatches] = useState(false);
-  const [dialog, setDialog] = useState<"export" | "run" | "settings" | "responses" | "validate" | null>(null);
+  const [dialog, setDialog] = useState<"export" | "run" | "settings" | "responses" | "validate" | "enrollment" | null>(null);
   const [report, setReport] = useState<ReportView | null>(null);
   const [clearinghouseBatch, setClearinghouseBatch] = useState<X12Batch | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -307,6 +308,10 @@ export default function X12ExportPanel({ claims, refreshKey = 0, onExported, onO
                 <Settings className="mr-2 h-4 w-4 text-[#808081]" aria-hidden />
                 837P settings
               </DropdownMenuItem>
+              <DropdownMenuItem className={menuItemClassName} onSelect={() => setDialog("enrollment")}>
+                <ShieldCheck className="mr-2 h-4 w-4 text-[#808081]" aria-hidden />
+                Stedi enrollment
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <button type="button" onClick={() => setDialog("export")} className={HEADER_BUTTON_CLASS}>
@@ -515,6 +520,8 @@ export default function X12ExportPanel({ claims, refreshKey = 0, onExported, onO
       {dialog === "settings" ? (
         <EdiSettingsDialog open onClose={closeDialog} onSaved={() => toast({ title: "837P settings saved" })} />
       ) : null}
+
+      {dialog === "enrollment" ? <StediEnrollmentWizard open onClose={closeDialog} /> : null}
 
       {clearinghouseBatch ? (
         <X12ClearinghouseDialog
