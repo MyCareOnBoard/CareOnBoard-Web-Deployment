@@ -45,6 +45,9 @@ function AIAutomationContent() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Id of a conversation this page just created, so the URL effect doesn't reload it
+  const justCreatedIdRef = useRef<string | null>(null);
+
   const [createConversation] = useCreateConversationMutation();
   const [sendMessage, { isLoading: isSending }] = useSendMessageMutation();
   const [fetchConversation] = useLazyGetConversationQuery();
@@ -75,6 +78,10 @@ function AIAutomationContent() {
 
   useEffect(() => {
     if (urlConversationId) {
+      if (justCreatedIdRef.current === urlConversationId) {
+        justCreatedIdRef.current = null; // already in local state, don't wipe or refetch
+        return;
+      }
       loadConversation(urlConversationId);
     } else {
       setActiveConversationId(null);
@@ -130,27 +137,12 @@ function AIAutomationContent() {
     async (text?: string) => {
       const content = (text ?? inputValue).trim();
       if (!content || isSending) return;
-
+  
       setInputValue("");
-
-      let conversationId = activeConversationId;
-      if (!conversationId) {
-        try {
-          // New conversations are pinned to the active DDD/HHA view at creation.
-          const result = await createConversation(mode ? { context: { mode } } : {}).unwrap();
-          conversationId = result.id;
-          setActiveConversationId(conversationId);
-          setConversationMode(mode ?? null);
-          navigate(`/agency/automations/${conversationId}`, { replace: true });
-        } catch {
-          toast.error("Failed to start conversation");
-          return;
-        }
-      }
-
+  
       const attachmentsSnapshot = [...pendingAttachments];
       setPendingAttachments([]);
-
+  
       const userMessage: LocalMessage = {
         id: `user-${Date.now()}`,
         role: "user",
@@ -163,8 +155,32 @@ function AIAutomationContent() {
         content: "",
         isLoading: true,
       };
-
+  
+      // Show the message and typing indicator immediately
       setMessages((prev) => [...prev, userMessage, loadingMessage]);
+  
+      let conversationId = activeConversationId;
+      if (!conversationId) {
+        try {
+          const result = await createConversation(
+            mode ? { context: { mode } } : {}
+          ).unwrap();
+          conversationId = result.id;
+          justCreatedIdRef.current = conversationId; // must be set before navigate
+          setActiveConversationId(conversationId);
+          setConversationMode(mode ?? null);
+          navigate(`/agency/automations/${conversationId}`, { replace: true });
+        } catch {
+          toast.error("Failed to start conversation");
+          // roll back the optimistic messages and restore the input
+          setMessages((prev) =>
+            prev.filter((m) => m.id !== userMessage.id && m.id !== loadingMessage.id)
+          );
+          setInputValue(content);
+          setPendingAttachments(attachmentsSnapshot);
+          return;
+        }
+      }
 
       // Merge area + mode; send undefined (never {}) so an empty context can't
       // clobber the conversation's stored context on the first message.
