@@ -55,7 +55,7 @@ export default function DayTimeline({shifts, showNow, onOpen}: Props) {
         }
     }, [items, showNow, first, last]);
 
-    return <div ref={scrollRef} className="max-h-[640px] overflow-auto">
+    return <div ref={scrollRef} className="max-h-[640px] overflow-auto pt-3">
         <div className="relative" style={{height: top(last * 60) + 24, minWidth: LABEL_WIDTH + lanes * (LANE_WIDTH + 12)}}>
             {hours.map(hour => <div key={hour} className="absolute left-0 right-0" style={{top: top(hour * 60)}}>
                 <span className="absolute left-0 -translate-y-1/2 text-[15px] font-medium text-[#5d6b73] dark:text-[#9aa4a8]">
@@ -73,8 +73,7 @@ export default function DayTimeline({shifts, showNow, onOpen}: Props) {
                         <span className={cn('w-[3px] shrink-0 rounded-full', toneBar[tone])} aria-hidden="true"/>
                         <button type="button" onClick={() => onOpen(item.shift)}
                             aria-label={`${shiftTitle(item.shift)}, ${formatClock(item.start)} to ${formatClock(item.end % (24 * 60))}, ${name}, ${toneLabel[tone]}`}
-                            className="flex min-w-0 flex-1 cursor-pointer flex-col items-start gap-1.5 self-start overflow-hidden rounded-xl border border-[#e1eaec] bg-white p-3 text-left shadow-[0_1px_2px_rgba(16,40,44,0.05)] transition-colors hover:border-[#00a3a7] focus-visible:outline-2 focus-visible:outline-[#007679] dark:border-white/10 dark:bg-[#1b232b]"
-                            style={{maxHeight: height}}>
+                            className="flex min-w-0 flex-1 cursor-pointer flex-col items-start gap-1.5 overflow-hidden rounded-xl border border-[#e1eaec] bg-white p-3 text-left shadow-[0_1px_2px_rgba(16,40,44,0.05)] transition-colors hover:border-[#00a3a7] focus-visible:outline-2 focus-visible:outline-[#007679] dark:border-white/10 dark:bg-[#1b232b]">
                             <span className="w-full truncate text-[14px] font-bold text-[#10141a] dark:text-[#f4f6f7]">{shiftTitle(item.shift)}</span>
                             <span className="text-[13px] font-medium text-[#34434c] dark:text-[#c9d3d6]">
                                 {formatClock(item.start)} - {formatClock(item.end % (24 * 60))}

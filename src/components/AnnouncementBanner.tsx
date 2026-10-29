@@ -14,24 +14,24 @@ const PRIORITY: Record<string, number> = { urgent: 0, warning: 1, info: 2 }
 
 const TYPE_STYLES = {
   info: {
-    bg: "bg-blue-50",
+    bg: "bg-blue-50 dark:bg-[#2b82ff]/10",
     left: "border-l-[#2b82ff]",
     icon: Info,
-    text: "text-[#2b82ff]",
+    text: "text-[#2b82ff] dark:text-[#8ab8ff]",
     badge: "border-[#2b82ff] text-[#2b82ff]",
   },
   warning: {
-    bg: "bg-orange-50",
+    bg: "bg-orange-50 dark:bg-[#FF6C10]/10",
     left: "border-l-[#FF6C10]",
     icon: AlertTriangle,
-    text: "text-[#FF6C10]",
+    text: "text-[#FF6C10] dark:text-[#ffa36b]",
     badge: "border-[#FF6C10] text-[#FF6C10]",
   },
   urgent: {
-    bg: "bg-red-50",
+    bg: "bg-red-50 dark:bg-[#ef4444]/10",
     left: "border-l-[#ef4444]",
     icon: Siren,
-    text: "text-[#ef4444]",
+    text: "text-[#ef4444] dark:text-[#f8a1a1]",
     badge: "border-[#ef4444] text-[#ef4444]",
   },
 } as const
@@ -99,11 +99,11 @@ export default function AnnouncementBanner({
 
         <div className="min-w-0 flex-1">
           <p className={`text-[13px] font-semibold ${s.text}`}>{top.title}</p>
-          <p className="mt-0.5 line-clamp-1 text-[12px] text-slate-600">{top.body}</p>
+          <p className="mt-0.5 line-clamp-1 text-[12px] text-slate-600 dark:text-[#c9d3d6]">{top.body}</p>
           {extraCount > 0 && (
             <Link
               to={viewAllPath}
-              className="mt-0.5 inline-block text-[11px] font-medium text-[#00B4B8] hover:underline"
+              className="mt-0.5 inline-block text-[11px] font-medium text-[#00B4B8] hover:underline dark:text-[#7fe0e2]"
             >
               +{extraCount} more announcement{extraCount > 1 ? "s" : ""} →
             </Link>
@@ -121,7 +121,7 @@ export default function AnnouncementBanner({
             type="button"
             onClick={dismiss}
             aria-label="Dismiss announcement"
-            className="rounded p-0.5 text-slate-400 transition-colors hover:text-slate-600"
+            className="rounded p-0.5 text-slate-400 transition-colors hover:text-slate-600 dark:text-[#9aa4a8] dark:hover:text-[#f4f6f7]"
           >
             <X className="h-3.5 w-3.5" />
           </button>
