@@ -31,16 +31,23 @@ export function overviewRange(now: Date) {
     return {startDate: toDateKey(start), endDate: toDateKey(end)};
 }
 
-/** Local date-time for a shift's "08:00 AM"-style time on its YYYY-MM-DD date. */
-export function shiftDateTime(dateKey?: string, time?: string): Date | null {
-    const day = dateKey?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    const clock = time?.match(/^\s*(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?\s*$/i);
-    if (!day || !clock) return null;
+/** Minutes after midnight for "08:00 AM", "8.00 PM" or "14:30" style times; null when unparseable. */
+export function clockMinutes(time?: string | null): number | null {
+    const clock = time?.match(/^\s*(\d{1,2})[:.](\d{2})(?::\d{2})?\s*:?\s*(AM|PM)?\s*$/i);
+    if (!clock) return null;
     let hours = Number(clock[1]);
     const period = clock[3]?.toUpperCase();
     if (period === 'PM' && hours !== 12) hours += 12;
     if (period === 'AM' && hours === 12) hours = 0;
-    return new Date(Number(day[1]), Number(day[2]) - 1, Number(day[3]), hours, Number(clock[2]));
+    return hours * 60 + Number(clock[2]);
+}
+
+/** Local date-time for a shift's "08:00 AM"-style time on its YYYY-MM-DD date. */
+export function shiftDateTime(dateKey?: string, time?: string): Date | null {
+    const day = dateKey?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const minutes = clockMinutes(time);
+    if (!day || minutes === null) return null;
+    return new Date(Number(day[1]), Number(day[2]) - 1, Number(day[3]), Math.floor(minutes / 60), minutes % 60);
 }
 
 function scheduledHours(shift: Shift) {

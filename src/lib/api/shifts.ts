@@ -538,7 +538,8 @@ const timeToMinutes = (timeStr?: string): number => {
 
 export const categorizeShifts = (shifts: Shift[]): CategorizedShifts => {
     const now = new Date();
-    const today = now.toISOString().split('T')[0];
+    // Shift dates are local calendar days; the UTC date is already tomorrow on US evenings.
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
     const current: Shift[] = [];
     const upcoming: Shift[] = [];

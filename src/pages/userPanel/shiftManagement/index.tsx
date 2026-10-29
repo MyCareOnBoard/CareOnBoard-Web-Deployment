@@ -1,39 +1,31 @@
 import ShiftNoteStatus from '@/pages/shared/notes/ShiftNoteStatus';
 import { useState, useEffect, useMemo } from "react";
-import { useNavigate, useSearchParams } from "react-router";
-import { Clock, MapPin, Calendar, ChevronRight, Plus, Loader2, Database, Tornado } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Shift, ShiftStatus, ShiftActionStatus, formatShiftLocation, listShifts, categorizeShifts, clockIn as apiClockIn, clockOut as apiClockOut } from "@/lib/api/shifts";
-import { getExpiryState, formatCountdown, convertTimeToISODate } from "@/lib/shift-expiry";
-import { format } from "date-fns";
+import { useSearchParams } from "react-router";
+import { CalendarDays, CirclePlus, Loader2 } from "lucide-react";
+import { addDays, differenceInCalendarDays, format, isSameDay, startOfDay } from "date-fns";
+import { Shift, ShiftActionStatus, formatShiftLocation, categorizeShifts, clockIn as apiClockIn, clockOut as apiClockOut } from "@/lib/api/shifts";
+import { convertTimeToISODate } from "@/lib/shift-expiry";
 import { ClockOutModal } from "./ClockOutModal";
 import { ClockInModal } from "./ClockInModal";
 import { LocationErrorModal } from "./LocationErrorModal";
 import { PersonalCareNoteModal } from "./components/PersonalCareNoteModal";
+import DayStrip from "./components/DayStrip";
+import DayTimeline from "./components/DayTimeline";
+import CurrentShiftBar from "./components/CurrentShiftBar";
+import ShiftDetailsDialog from "./components/ShiftDetailsDialog";
+import ManualTimesheetDialog from "@/pages/userPanel/manualShiftManagement/ManualTimesheetDialog";
 import { createEmployeeActivityLog } from "@/lib/api/employees";
 import { getClientBasicInfo } from "@/lib/notes/clientBasicInfo";
 import { HHA_PERSONAL_CARE } from "@/lib/notes/noteTypes";
-import ExpandIcon from "@/assets/icons/arrow-expand-01.svg?react";
-import { Routes } from "@/routes/constants";
 import { toast } from "sonner";
 import { useAuth } from "@/utils/auth/context/AuthContext";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useReverseGeocode } from "@/hooks/useReverseGeocode";
+import { useEmployeeShifts } from "@/hooks/useEmployeeShifts";
+import { toDateKey } from "@/pages/userPanel/dashboard/overviewStats";
 
-const formatTimeRemaining = (minutes: number): string => {
-  if (minutes < 60) {
-    return `${minutes} min remaining`;
-  }
-
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-
-  if (remainingMinutes === 0) {
-    return `${hours} ${hours === 1 ? 'hour' : 'hours'} remaining`;
-  }
-
-  return `${hours} ${hours === 1 ? 'hour' : 'hours'} ${remainingMinutes} min remaining`;
-};
+/** Days shown in the strip, and how many of them sit before the selected day. */
+const STRIP_DAYS = 9;
+const DAYS_BEFORE = 2;
 
 // date-fns `format` throws RangeError on an unparseable value. Shift timestamps
 // from the API are occasionally malformed (or absent), so format defensively —
@@ -46,38 +38,14 @@ const safeFormat = (value: string | null | undefined, pattern: string): string =
 
 const calculateRemainingMinutes = (endTime: string, date: string): number => {
   try {
-    const now = new Date();
     const endDateTime = convertTimeToISODate(endTime, date);
-    const diffInMs = endDateTime.getTime() - now.getTime();
-    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
-    return Math.max(0, diffInMinutes);
+    return Math.max(0, Math.floor((endDateTime.getTime() - Date.now()) / 60_000));
   } catch (error) {
     console.error('Error calculating remaining minutes:', error);
     return 0;
   }
 };
 
-type ShiftPanel = 'today' | 'upcoming' | 'previous';
-
-const getClientName = (client?: { firstName?: string; lastName?: string; name?: string }) => {
-  if (!client) return "Unknown Client";
-  if (client.firstName && client.lastName) {
-    return `${client.firstName} ${client.lastName}`;
-  }
-  if (client.name) {
-    return client.name;
-  }
-  return "Unknown Client";
-};
-
-const getInitialsFromName = (name: string) => {
-  const parts = name.split(" ").filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-  const first = parts[0].charAt(0);
-  const last = parts[parts.length - 1].charAt(0);
-  return `${first}${last}`.toUpperCase();
-};
 const GEOFENCE_RADIUS_METERS = 91.44; // 300 ft — must match server CLOCK_GEOFENCE_RADIUS_METERS default
 
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -116,606 +84,19 @@ const checkLocationMatch = (
   return [false, 0];
 };
 
-const calculateTimeUntilStart = (startTime: string, date: string): string => {
-  try {
-    const now = new Date();
-    const startDateTime = convertTimeToISODate(startTime, date);
-    const diffInMs = startDateTime.getTime() - now.getTime();
-    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
-
-    if (diffInMinutes <= 0) {
-      return 'Starting now';
-    }
-
-    const hours = Math.floor(diffInMinutes / 60);
-    const minutes = diffInMinutes % 60;
-
-    if (hours === 0) {
-      return `Starts in ${minutes}min`;
-    }
-
-    if (minutes === 0) {
-      return `Starts in ${hours}h`;
-    }
-
-    return `Starts in ${hours}h ${minutes}min`;
-  } catch (error) {
-    console.error('Error calculating time until start:', error);
-    return 'Starting soon';
-  }
-};
-
-const isShiftPassed = (endTime: string | undefined, date: string): boolean => {
-  if (!endTime) return false;
-
-  try {
-    const now = new Date();
-    const endDateTime = convertTimeToISODate(endTime, date);
-    return endDateTime.getTime() < now.getTime();
-  } catch (error) {
-    console.error('Error checking if shift has passed:', error);
-    return false;
-  }
-};
-
-interface ShiftCardProps {
-  shift: Shift;
-  panel: ShiftPanel;
-  showDate?: boolean;
-  showAction?: boolean;
-  onActionClick?: (shiftId: string) => void;
-  onNoteClick?: (shiftId: string) => void;
-  isLoading?: boolean;
-}
-
-function ShiftCard({
-  shift,
-  panel,
-  showDate = false,
-  showAction = true,
-  onActionClick,
-  onNoteClick,
-  isLoading = false
-}: ShiftCardProps) {
-  const [expiryTick, setExpiryTick] = useState(0);
-  useEffect(() => {
-    let intervalId: number | null = null;
-    let timeoutId: number | null = null;
-    const tick = () => setExpiryTick((x) => x + 1);
-
-    if (shift.clockedInAt) {
-      return undefined;
-    }
-
-    const state = getExpiryState(shift, new Date());
-    if (!state) {
-      return undefined;
-    }
-
-    if (state.isExpiringWindow) {
-      intervalId = window.setInterval(tick, 1000);
-    } else if (!state.isExpired) {
-      const msToWindow = state.graceEnd - Date.now();
-      if (msToWindow > 0 && msToWindow < 6 * 60 * 60 * 1000) {
-        timeoutId = window.setTimeout(() => {
-          tick();
-          intervalId = window.setInterval(tick, 1000);
-        }, msToWindow);
-      }
-    }
-
-    return () => {
-      if (intervalId !== null) window.clearInterval(intervalId);
-      if (timeoutId !== null) window.clearTimeout(timeoutId);
-    };
-  }, [
-    shift.id,
-    shift.clockedInAt,
-    shift.status,
-    shift.date,
-    shift.startTime,
-    shift.endTime,
-    shift.actionStatus,
-  ]);
-  const expiryState = useMemo(
-    () => getExpiryState(shift, new Date()),
-    [
-      shift.id,
-      shift.status,
-      shift.clockedInAt,
-      shift.startTime,
-      shift.endTime,
-      shift.date,
-      expiryTick,
-    ],
-  );
-
-  const getStatusColor = (status?: string) => {
-    if (!status) return "";
-
-    const lowerStatus = status.toLowerCase();
-    if (lowerStatus.includes("expiring") || lowerStatus.includes("remaining")) {
-      return "bg-[rgba(213,52,17,0.05)] border-[#d53411] border-[0.5px] text-[#d53411]";
-    }
-    if (lowerStatus.includes("tomorrow") || lowerStatus.includes("ongoing") || lowerStatus.includes("started")) {
-      return "bg-[rgba(14,175,82,0.05)] border-[#0eaf52] border-[0.5px] text-[#0eaf52]";
-    }
-    return "bg-[rgba(178,178,179,0.1)] border-[#b2b2b3] border-[0.5px] text-[#565656]";
-  };
-
-  const getActionButton = () => {
-    if (!showAction || !shift.actionStatus) return null;
-    if (panel === 'today' && expiryState?.isExpired) return null;
-
-    const buttonConfig = {
-      [ShiftActionStatus.CLOCK_IN]: {
-        label: "Clock In",
-        color: "bg-[#2B82FF] hover:bg-[#1e6ae6]",
-      },
-      [ShiftActionStatus.CLOCK_OUT]: {
-        label: "Clock Out",
-        color: "bg-[#D53411] hover:bg-[#b82d0f]",
-      },
-    };
-
-    const config = buttonConfig[shift.actionStatus];
-
-    return (
-      <Button
-        onClick={() => onActionClick?.(shift.id)}
-        disabled={isLoading}
-        className={`${config.color} text-white rounded-full px-4 py-2 h-auto text-[14px] font-semibold shadow-sm transition-all duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
-      >
-        {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Clock size={16} />}
-        {config.label}
-      </Button>
-    );
-  };
-
-  return (
-    <div
-      className="bg-white/50 backdrop-blur-[20px] rounded-[20px] p-3 lg:p-4 flex flex-col lg:flex-row items-start lg:items-center gap-3 lg:gap-4 hover:bg-white/70 transition-colors">
-      <div className="flex lg:hidden flex-col gap-2.5 w-full">
-        <div className="grid grid-cols-3 gap-2 text-sm">
-          <div className="flex flex-col gap-0.5">
-            <p className="text-[11px] text-[#808081] leading-[1.4] whitespace-nowrap">Client</p>
-            <p className="text-[13px] text-[#10141a] leading-[1.4] font-semibold whitespace-nowrap">
-              {shift.client?.firstName} {shift.client?.lastName}
-            </p>
-          </div>
-
-          {showDate ? (
-            <div className="flex flex-col gap-0.5">
-              <p className="text-[11px] text-[#808081] leading-[1.4] whitespace-nowrap">Date</p>
-              <p className="text-[13px] text-[#10141a] leading-[1.4] whitespace-nowrap">
-                {safeFormat(shift.date, "dd MMMM")}
-              </p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-0.5">
-              <p className="text-[11px] text-[#808081] leading-[1.4] whitespace-nowrap">Location</p>
-              <p className="text-[13px] text-[#10141a] leading-[1.4] whitespace-nowrap">{shift.client?.address}</p>
-            </div>
-          )}
-
-          <div className="flex flex-col gap-0.5">
-            <p className="text-[11px] text-[#808081] leading-[1.4] whitespace-nowrap">
-              {shift.clockedInAt
-                ? (panel === 'previous' ? "Clocked In" : "Started at")
-                : "Start at"
-              }
-            </p>
-            <p className="text-[13px] text-[#10141a] leading-[1.4] whitespace-nowrap">
-              {shift.clockedInAt
-                ? safeFormat(shift.clockedInAt, 'hh:mm a')
-                : shift.startTime
-              }
-            </p>
-          </div>
-        </div>
-
-        {showDate && (
-          <div className="flex flex-col gap-0.5">
-            <p className="text-[11px] text-[#808081] leading-[1.4] whitespace-nowrap">Location</p>
-            <p className="text-[13px] text-[#10141a] leading-[1.4] whitespace-nowrap">{shift.client?.address}</p>
-          </div>
-        )}
-
-        {(shift.clockedInAt || shift.clockedOutAt) && showDate && (
-          <div className="grid grid-cols-3 gap-2 text-sm">
-            {shift.clockedInAt && (
-              <div className="flex flex-col gap-0.5">
-                <p className="text-[11px] text-[#808081] leading-[1.4] whitespace-nowrap">Clocked In</p>
-                <p
-                  className="text-[13px] text-[#10141a] leading-[1.4] whitespace-nowrap">{safeFormat(shift.clockedInAt, 'hh:mm a')}</p>
-              </div>
-            )}
-
-            {shift.clockedOutAt && (
-              <div className="flex flex-col gap-0.5">
-                <p className="text-[11px] text-[#808081] leading-[1.4] whitespace-nowrap">Clocked Out</p>
-                <p
-                  className="text-[13px] text-[#10141a] leading-[1.4] whitespace-nowrap">{safeFormat(shift.clockedOutAt, 'hh:mm a')}</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="flex flex-wrap items-center gap-2">
-          {panel === 'today' && (
-            <>
-              {expiryState?.isExpired ? (
-                <span
-                  className="bg-[rgba(213,52,17,0.05)] border-[#d53411] border-[0.5px] border-solid text-[#d53411] text-[11px] font-semibold py-1 px-2 rounded-[60px] leading-normal text-center whitespace-nowrap">
-                  Expired
-                </span>
-              ) : expiryState?.isExpiringWindow && shift.actionStatus === ShiftActionStatus.CLOCK_IN ? (
-                <>
-                  <span
-                    className="bg-[rgba(213,52,17,0.05)] border-[#d53411] border-[0.5px] border-solid text-[#d53411] text-[11px] font-semibold py-1 px-2 rounded-[60px] leading-normal text-center whitespace-nowrap">
-                    {formatCountdown(expiryState.msUntilHardExpiry)}
-                  </span>
-                  <span
-                    role="status"
-                    aria-live="polite"
-                    aria-atomic="true"
-                    className="sr-only">
-                    {`Shift expires in ${Math.ceil(expiryState.msUntilHardExpiry / 60000)} minutes`}
-                  </span>
-                </>
-              ) : null}
-
-              {(shift.status === ShiftStatus.ONGOING || shift.actionStatus === ShiftActionStatus.CLOCK_OUT) && (
-                <span
-                  className="bg-[rgba(14,175,82,0.05)] border-[#0eaf52] border-[0.5px] border-solid text-[#0eaf52] text-[11px] font-semibold py-1 px-2 rounded-[60px] leading-normal text-center whitespace-nowrap">
-                  Ongoing Shift
-                </span>
-              )}
-
-              {shift.timeRemaining !== undefined && (shift.status === ShiftStatus.ONGOING || shift.actionStatus === ShiftActionStatus.CLOCK_OUT) && (
-                <span
-                  className={`${shift.timeRemaining <= 5 ? 'bg-[rgba(213,52,17,0.05)] border-[#d53411] text-[#d53411]' : 'bg-[rgba(14,175,82,0.05)] border-[#0eaf52] text-[#0eaf52]'} border-[0.5px] border-solid text-[11px] font-semibold py-1 px-2 rounded-[60px] leading-normal text-center whitespace-nowrap`}>
-                  {formatTimeRemaining(shift.timeRemaining)}
-                </span>
-              )}
-            </>
-          )}
-
-          {panel === 'upcoming' && (
-            <>
-              {shift.startTime && (
-                <span
-                  className="bg-[rgba(14,175,82,0.05)] border-[#0eaf52] border-[0.5px] border-solid text-[#0eaf52] text-[11px] font-semibold py-1 px-2 rounded-[60px] leading-normal text-center whitespace-nowrap">
-                  {calculateTimeUntilStart(shift.startTime, shift.date)}
-                </span>
-              )}
-            </>
-          )}
-
-          {panel === 'previous' && (
-            <>
-              {shift.status === ShiftStatus.COMPLETED && shift.sessionDuration && (
-                <span
-                  className="bg-[rgba(178,178,179,0.1)] border-[#b2b2b3] border-[0.5px] border-solid text-[#565656] text-[11px] font-semibold py-1 px-2 rounded-[60px] leading-normal text-center whitespace-nowrap">
-                  {shift.sessionDuration}
-                </span>
-              )}
-
-              {shift.status === ShiftStatus.EXPIRED && (
-                <span
-                  className="bg-[rgba(213,52,17,0.05)] border-[#d53411] border-[0.5px] border-solid text-[#d53411] text-[11px] font-semibold py-1 px-2 rounded-[60px] leading-normal text-center whitespace-nowrap">
-                  Expired
-                </span>
-              )}
-            </>
-          )}
-          {showAction && <div className="mt-1">{getActionButton()}</div>}
-        </div>
-
-      </div>
-
-      <div className="items-center hidden w-full gap-6 lg:flex">
-        <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
-          {shift.client?.profileImage && (
-            <AvatarImage
-              src={shift.client.profileImage}
-              alt={getClientName(shift.client)}
-              className="object-cover w-full h-full aspect-auto"
-            />
-          )}
-          <AvatarFallback
-            className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-xl font-bold">
-            {getInitialsFromName(getClientName(shift.client))}
-          </AvatarFallback>
-        </Avatar>
-
-        <div className="flex items-center flex-1 min-w-0 gap-16">
-          <div className="flex flex-col gap-1.5 shrink-0">
-            <p className="text-[16px] font-semibold text-[#10141a] leading-[1.6] whitespace-nowrap">
-              {shift.client?.firstName} {shift.client?.lastName}
-            </p>
-            <p className="text-[14px] text-[#808081] leading-[1.4] whitespace-nowrap">Client</p>
-          </div>
-
-          <div className="flex flex-wrap gap-x-16 gap-y-2">
-            {panel === 'previous' && (
-              <div className="flex flex-col shrink-0 gap-1">
-                <p className="text-[12px] text-[#808081] leading-[1.4] whitespace-nowrap">Date</p>
-                <p className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">
-                  {safeFormat(shift.date, "dd MMMM")}
-                </p>
-              </div>
-            )}
-
-            <div className="flex flex-col shrink-0 gap-1">
-              <p className="text-[12px] text-[#808081] leading-[1.4] whitespace-nowrap">Location</p>
-              <p className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">{shift.client?.address}</p>
-            </div>
-
-            {shift.startTime && (
-              <div className="flex flex-col shrink-0 gap-1">
-                <p className="text-[12px] text-[#808081] leading-[1.4] whitespace-nowrap">
-                  {shift.clockedInAt
-                    ? (panel === 'previous' ? "Clocked In" : "Started at")
-                    : "Start at"
-                  }
-                </p>
-                <p className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">
-                  {shift.clockedInAt
-                    ? safeFormat(shift.clockedInAt, 'hh:mm a')
-                    : panel === 'today'
-                      ? shift.startTime
-                      : `${safeFormat(shift.date, 'dd MMMM yyyy')} ${shift.startTime}`
-                  }
-                </p>
-              </div>
-            )}
-
-            {shift.clockedInAt && !shift.startTime && (
-              <div className="flex flex-col shrink-0 gap-1">
-                <p className="text-[12px] text-[#808081] leading-[1.4] whitespace-nowrap">
-                  {panel === 'previous' ? "Clocked In" : (shift.clockedOutAt ? "Clocked In" : "Started at")}
-                </p>
-                <p
-                  className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">{safeFormat(shift.clockedInAt, 'hh:mm a')}</p>
-              </div>
-            )}
-
-            {shift.clockedOutAt && (
-              <div className="flex flex-col shrink-0 gap-1">
-                <p className="text-[12px] text-[#808081] leading-[1.4] whitespace-nowrap">Clocked Out</p>
-                <p
-                  className="text-[14px] text-[#10141a] leading-[1.4] whitespace-nowrap">{safeFormat(shift.clockedOutAt, 'hh:mm a')}</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {panel === 'today' && (
-            <>
-              {expiryState?.isExpired ? (
-                <span
-                  className="bg-[rgba(213,52,17,0.05)] border-[#d53411] border-[0.5px] border-solid text-[#d53411] text-[12px] font-semibold py-1 px-2 rounded-[60px] leading-normal text-center whitespace-nowrap">
-                  Expired
-                </span>
-              ) : expiryState?.isExpiringWindow && shift.actionStatus === ShiftActionStatus.CLOCK_IN ? (
-                <>
-                  <span
-                    className="bg-[rgba(213,52,17,0.05)] border-[#d53411] border-[0.5px] border-solid text-[#d53411] text-[12px] font-semibold py-1 px-2 rounded-[60px] leading-normal text-center whitespace-nowrap">
-                    {formatCountdown(expiryState.msUntilHardExpiry)}
-                  </span>
-                  <span
-                    role="status"
-                    aria-live="polite"
-                    aria-atomic="true"
-                    className="sr-only">
-                    {`Shift expires in ${Math.ceil(expiryState.msUntilHardExpiry / 60000)} minutes`}
-                  </span>
-                </>
-              ) : null}
-
-              {(shift.status === ShiftStatus.ONGOING || shift.actionStatus === ShiftActionStatus.CLOCK_OUT) && (
-                <span
-                  className="bg-[rgba(14,175,82,0.05)] border-[#0eaf52] border-[0.5px] border-solid text-[#0eaf52] text-[12px] font-semibold py-1 px-2 rounded-[60px] leading-normal text-center whitespace-nowrap">
-                  Ongoing Shift
-                </span>
-              )}
-
-              {shift.timeRemaining !== undefined && (shift.status === ShiftStatus.ONGOING || shift.actionStatus === ShiftActionStatus.CLOCK_OUT) && (
-                <span
-                  className={`${shift.timeRemaining <= 5 ? 'bg-[rgba(213,52,17,0.05)] border-[#d53411] text-[#d53411]' : 'bg-[rgba(14,175,82,0.05)] border-[#0eaf52] text-[#0eaf52]'} border-[0.5px] border-solid text-[12px] font-semibold py-1 px-2 rounded-[60px] leading-normal text-center whitespace-nowrap`}>
-                  {formatTimeRemaining(shift.timeRemaining)}
-                </span>
-              )}
-            </>
-          )}
-
-          {panel === 'upcoming' && (
-            <>
-              {shift.startTime && (
-                <span
-                  className="bg-[rgba(14,175,82,0.05)] border-[#0eaf52] border-[0.5px] border-solid text-[#0eaf52] text-[12px] font-semibold py-1 px-2 rounded-[60px] leading-normal text-center whitespace-nowrap">
-                  {calculateTimeUntilStart(shift.startTime, shift.date)}
-                </span>
-              )}
-            </>
-          )}
-
-          {panel === 'previous' && (
-            <>
-              {shift.status === ShiftStatus.COMPLETED && shift.sessionDuration && (
-                <span
-                  className="bg-[rgba(178,178,179,0.1)] border-[#b2b2b3] border-[0.5px] border-solid text-[#565656] text-[12px] font-semibold py-1 px-2 rounded-[60px] leading-normal text-center whitespace-nowrap">
-                  {shift.sessionDuration} session
-                </span>
-              )}
-
-              {shift.status === ShiftStatus.EXPIRED && (
-                <span
-                  className="bg-[rgba(213,52,17,0.05)] border-[#d53411] border-[0.5px] border-solid text-[#d53411] text-[12px] font-semibold py-1 px-2 rounded-[60px] leading-normal text-center whitespace-nowrap">
-                  Expired
-                </span>
-              )}
-            </>
-          )}
-          {showAction && <div className="shrink-0">{getActionButton()}</div>}
-        </div>
-
-      </div>
-      {panel === 'previous' && onNoteClick ? <Button variant="outline" className="mt-3 rounded-full" onClick={() => onNoteClick(shift.id)}>Shift note</Button> : null}
-    </div>
-  );
-}
-
-interface ShiftSectionProps {
-  title: string;
-  subtitle: string;
-  shifts: Shift[];
-  panel: ShiftPanel;
-  backgroundColor: string;
-  isExpanded?: boolean;
-  onExpandToggle?: () => void;
-  showExpandButton?: boolean;
-  showDate?: boolean;
-  maxVisibleShifts?: number;
-  showAction?: boolean;
-  onActionClick?: (shiftId: string) => void;
-  onNoteClick?: (shiftId: string) => void;
-  isLoading?: boolean;
-}
-
-function ShiftSection({
-  title,
-  subtitle,
-  shifts,
-  panel,
-  backgroundColor,
-  isExpanded = false,
-  onExpandToggle,
-  showExpandButton = true,
-  showDate = false,
-  maxVisibleShifts = 2,
-  showAction = true,
-  onActionClick,
-  onNoteClick,
-  isLoading = false,
-}: ShiftSectionProps) {
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 8;
-
-  // Calculate pagination
-  const totalPages = Math.ceil(shifts.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-
-  const displayShifts = isExpanded
-    ? shifts.slice(startIndex, endIndex)
-    : shifts.slice(0, maxVisibleShifts);
-
-  const handleExpandToggle = () => {
-    setCurrentPage(1);
-    onExpandToggle?.();
-  };
-
-  const handlePreviousPage = () => {
-    setCurrentPage((prev) => Math.max(1, prev - 1));
-  };
-
-  const handleNextPage = () => {
-    setCurrentPage((prev) => Math.min(totalPages, prev + 1));
-  };
-
-  return (
-    <div
-      className={`${backgroundColor} rounded-[20px] border border-white p-5 lg:p-6 shadow-sm relative`}
-    >
-      <div className="flex flex-col items-start justify-between gap-3 mb-6 sm:flex-row">
-        <div>
-          <h3
-            className="text-[18px] lg:text-[20px] font-medium text-[#10141a] leading-[1.6] whitespace-nowrap">{title}</h3>
-          <p className="text-[12px] lg:text-[14px] text-[#808081] leading-[1.4] mt-1">{subtitle}</p>
-        </div>
-
-        {showExpandButton && onExpandToggle && (
-          <Button
-            onClick={handleExpandToggle}
-            className="bg-white/80 hover:bg-white backdrop-blur-[22px] text-[#808081] rounded-full px-4 py-2 h-auto text-[12px] font-normal shadow-sm transition-all duration-200 flex items-center gap-2"
-          >
-            <ExpandIcon
-              className={`transform transition-transform ${isExpanded ? "rotate-90" : ""}`}
-              style={{ width: "16px", height: "16px" }}
-            />
-            {isExpanded ? "Collapse" : "Expand"}
-          </Button>
-        )}
-      </div>
-
-      <div className="space-y-3">
-        {displayShifts.length > 0 ? (
-          displayShifts.map((shift) => (
-            <ShiftCard
-              key={shift.id}
-              shift={shift}
-              panel={panel}
-              showDate={showDate}
-              showAction={showAction}
-              onActionClick={onActionClick}
-              onNoteClick={onNoteClick}
-              isLoading={isLoading}
-            />
-          ))
-        ) : (
-          <div className="text-center py-8">
-            <p className="text-[14px] text-[#808081]">No shifts available</p>
-          </div>
-        )}
-      </div>
-
-      {isExpanded && totalPages > 1 && (
-        <div className="flex items-center justify-center gap-3 mt-6">
-          <Button
-            onClick={handlePreviousPage}
-            disabled={currentPage === 1}
-            size="sm"
-            variant="outline"
-            className="bg-white/50 backdrop-blur border border-white/30 rounded-full p-1.5 h-auto disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/70"
-          >
-            <ChevronRight size={20} className="rotate-180" />
-          </Button>
-          <span className="text-[16px] font-medium text-[#10141a] min-w-[60px] text-center">
-            {currentPage}<span className="text-[14px] text-[#808081]">/{totalPages}</span>
-          </span>
-          <Button
-            onClick={handleNextPage}
-            disabled={currentPage === totalPages}
-            size="sm"
-            variant="outline"
-            className="bg-white/50 backdrop-blur border border-white/30 rounded-full p-1.5 h-auto disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/70"
-          >
-            <ChevronRight size={20} />
-          </Button>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function ShiftManagementPage() {
   const { user } = useAuth();
-  const navigate = useNavigate();
-  const [upcomingExpanded, setUpcomingExpanded] = useState(false);
   const [noteSearchParams, setNoteSearchParams] = useSearchParams();
   const selectedNoteShift = noteSearchParams.get('shiftId');
   const openShiftNote = (shiftId: string) => setNoteSearchParams(previous => { const next = new URLSearchParams(previous); next.set('shiftId', shiftId); return next; });
-  const [previousExpanded, setPreviousExpanded] = useState(false);
-  const [todayShift, setTodayShift] = useState<Shift | null>(null);
-  const [upcomingShifts, setUpcomingShifts] = useState<Shift[]>([]);
-  const [previousShifts, setPreviousShifts] = useState<Shift[]>([]);
+
+  const [selectedDay, setSelectedDay] = useState(() => startOfDay(new Date()));
+  const [windowStart, setWindowStart] = useState(() => addDays(startOfDay(new Date()), -DAYS_BEFORE));
+  const [openShift, setOpenShift] = useState<Shift | null>(null);
+  const [timesheetOpen, setTimesheetOpen] = useState(false);
+
   const [showClockInModal, setShowClockInModal] = useState(false);
-  const [clockInShiftId, setClockInShiftId] = useState<string | null>(null);
   const [showClockOutModal, setShowClockOutModal] = useState(false);
-  const [clockOutShiftId, setClockOutShiftId] = useState<string | null>(null);
   const [showPersonalCareModal, setShowPersonalCareModal] = useState(false);
   const [personalCareActivityLogId, setPersonalCareActivityLogId] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<string>("Getting location...");
@@ -723,70 +104,40 @@ export default function ShiftManagementPage() {
   const [locationError, setLocationError] = useState(false);
   const [showLocationErrorModal, setShowLocationErrorModal] = useState(false);
   const [locationDistance, setLocationDistance] = useState<number | null>(null);
-  const [shiftsLoading, setShiftsLoading] = useState(true);
+  const [actionBusy, setActionBusy] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const { reverseGeocode } = useReverseGeocode();
 
-  const currentDate = new Date();
+  // Shifts for the visible strip, and separately today's, which drive the
+  // Clock in / Clock out bar whichever days the strip shows.
+  const stripShifts = useEmployeeShifts({
+    agencyId: user?.agencyId, employeeId: user?.profile?.id, client: true,
+    startDate: toDateKey(windowStart), endDate: toDateKey(addDays(windowStart, STRIP_DAYS - 1)),
+  });
+  const todayKey = toDateKey(new Date());
+  const todayShifts = useEmployeeShifts({
+    agencyId: user?.agencyId, employeeId: user?.profile?.id, client: true,
+    startDate: todayKey, endDate: todayKey,
+  });
+  const currentShift = useMemo(() => categorizeShifts(todayShifts.shifts).current, [todayShifts.shifts]);
+  const reloadShifts = () => { stripShifts.reload(); todayShifts.reload(); };
 
-  const initiateTimeRemaining = () => {
-    if (todayShift) {
-      setTimeRemaining(calculateRemainingMinutes(todayShift.endTime || '', todayShift.date))
-    }
-  }
+  const selectedKey = toDateKey(selectedDay);
+  const dayShifts = useMemo(() => stripShifts.shifts.filter(shift => shift.date === selectedKey), [stripShifts.shifts, selectedKey]);
 
-  useEffect(() => {
-    if (user?.profile?.id) {
-      loadShifts();
-    }
-  }, [user?.profile?.id]);
-
-  useEffect(() => {
-    initiateTimeRemaining();
-
-    const interval = setInterval(() => {
-      initiateTimeRemaining();
-    }, 60000);
-
-    return () => clearInterval(interval);
-  }, [todayShift]);
-
-  const loadShifts = async () => {
-    const agencyId = user?.agencyId;
-    const employeeId = user?.profile?.id;
-
-    if (!agencyId) {
-      console.warn('No user ID available for fetching shifts');
-      return;
-    }
-
-    try {
-      setShiftsLoading(true);
-
-      // Single API call to get all shifts
-      const response = await listShifts({
-        employeeId: employeeId,
-        agencyId: agencyId,
-        limit: 100,
-        client: true, // Populate client data
-      });
-
-      if (response.success) {
-        // Categorize shifts client-side
-        const { current, upcoming, previous } = categorizeShifts(response.shifts);
-        setTodayShift(current);
-        setUpcomingShifts(upcoming);
-        setPreviousShifts(previous);
-      }
-    } catch (error: any) {
-      console.error('Failed to load shifts:', error);
-      toast.error('Failed to load shifts', {
-        description: error?.response?.data?.error || 'Please try again later'
-      });
-    } finally {
-      setShiftsLoading(false);
-    }
+  const selectDay = (date: Date) => {
+    const day = startOfDay(date);
+    setSelectedDay(day);
+    const offset = differenceInCalendarDays(day, windowStart);
+    if (offset < 0 || offset >= STRIP_DAYS) setWindowStart(addDays(day, -DAYS_BEFORE));
   };
+
+  useEffect(() => {
+    const update = () => setTimeRemaining(currentShift ? calculateRemainingMinutes(currentShift.endTime || '', currentShift.date) : null);
+    update();
+    const interval = setInterval(update, 60000);
+    return () => clearInterval(interval);
+  }, [currentShift]);
 
   useEffect(() => {
     let cancelled = false;
@@ -840,53 +191,33 @@ export default function ShiftManagementPage() {
     };
   }, []);
 
-  const handleShiftAction = async (shiftId: string) => {
-    const shift = todayShift?.id === shiftId ? todayShift : null;
-    if (!shift) return;
+  /** Checks location for the current shift, then opens the Clock in / Clock out confirmation. */
+  const handleShiftAction = () => {
+    const shift = currentShift;
+    if (!shift?.actionStatus) return;
+    setOpenShift(null);
 
-    if (shift.actionStatus === ShiftActionStatus.CLOCK_IN) {
-      if (locationError || !userCoords) {
-        toast.error('Location unavailable', {
-          description: 'Please enable location services and try again'
-        });
-        return;
-      }
-
-      const [isLocationMatch, distance] = checkLocationMatch(userCoords, shift.location);
-      if (!isLocationMatch) {
-        setShowLocationErrorModal(true);
-        setLocationDistance(distance);
-        return;
-      }
-      setClockInShiftId(shiftId);
-      setShowClockInModal(true);
+    if (locationError || !userCoords) {
+      toast.error('Location unavailable', {
+        description: shift.actionStatus === ShiftActionStatus.CLOCK_IN
+          ? 'Please enable location services and try again'
+          : 'Please enable location services to clock out',
+      });
       return;
     }
 
-    if (shift.actionStatus === ShiftActionStatus.CLOCK_OUT) {
-      if (locationError || !userCoords) {
-        toast.error('Location unavailable', {
-          description: 'Please enable location services to clock out',
-        });
-        return;
-      }
-      const [isLocationMatch, distance] = checkLocationMatch(userCoords, shift.location);
-      if (!isLocationMatch) {
-        setShowLocationErrorModal(true);
-        setLocationDistance(distance);
-        return;
-      }
-      setClockOutShiftId(shiftId);
-      setShowClockOutModal(true);
+    const [isLocationMatch, distance] = checkLocationMatch(userCoords, shift.location);
+    if (!isLocationMatch) {
+      setShowLocationErrorModal(true);
+      setLocationDistance(distance);
       return;
     }
+    if (shift.actionStatus === ShiftActionStatus.CLOCK_IN) setShowClockInModal(true);
+    else setShowClockOutModal(true);
   };
 
   const handleClockInConfirm = async () => {
-    if (!clockInShiftId) return;
-
-    const shiftToClockIn = todayShift?.id === clockInShiftId ? todayShift : null;
-    if (!shiftToClockIn) return;
+    if (!currentShift) return;
 
     if (!userCoords) {
       toast.error('Location unavailable', {
@@ -896,18 +227,16 @@ export default function ShiftManagementPage() {
     }
 
     try {
-      setShiftsLoading(true);
-      const response = await apiClockIn(clockInShiftId, {
+      setActionBusy(true);
+      const response = await apiClockIn(currentShift.id, {
         latitude: userCoords.lat,
         longitude: userCoords.lng,
       });
 
       if (response?.success) {
-        setTodayShift(response.shift);
-        await loadShifts();
+        reloadShifts();
         toast.success('Clocked in successfully');
         setShowClockInModal(false);
-        setClockInShiftId(null);
       }
     } catch (error: any) {
       console.error('Failed to clock in:', error);
@@ -915,7 +244,7 @@ export default function ShiftManagementPage() {
         description: error?.response?.data?.error || 'Please try again'
       });
     } finally {
-      setShiftsLoading(false);
+      setActionBusy(false);
     }
   };
 
@@ -961,9 +290,7 @@ export default function ShiftManagementPage() {
   };
 
   const handleClockOutConfirm = async () => {
-    if (!clockOutShiftId) return;
-
-    const shiftToClockOut = todayShift?.id === clockOutShiftId ? todayShift : null;
+    const shiftToClockOut = currentShift;
     if (!shiftToClockOut) return;
 
     if (!userCoords) {
@@ -974,29 +301,19 @@ export default function ShiftManagementPage() {
     }
 
     try {
-      setShiftsLoading(true);
-      const response = await apiClockOut(clockOutShiftId, {
+      setActionBusy(true);
+      const response = await apiClockOut(shiftToClockOut.id, {
         latitude: userCoords.lat,
         longitude: userCoords.lng,
       });
 
       if (response?.success) {
-        const isPersonalCareShift = shiftToClockOut.notesType === HHA_PERSONAL_CARE;
-
-        setPreviousShifts((prev) => [response.shift, ...prev]);
-        setTodayShift(null);
         setShowClockOutModal(false);
-        setClockOutShiftId(null);
         toast.success('Clocked out successfully');
-
-        const agencyId = user?.agencyId;
-        const employeeId = user?.profile?.id;
-        if (agencyId && employeeId) {
-          await loadShifts();
-        }
+        reloadShifts();
 
         // Personal-care shifts prompt the aide to fill the checklist right away.
-        if (isPersonalCareShift) {
+        if (shiftToClockOut.notesType === HHA_PERSONAL_CARE) {
           await openPersonalCareNote(
             shiftToClockOut,
             shiftToClockOut.clockedInAt,
@@ -1010,143 +327,75 @@ export default function ShiftManagementPage() {
         description: error?.response?.data?.error || 'Please try again'
       });
     } finally {
-      setShiftsLoading(false);
+      setActionBusy(false);
     }
   };
 
-  const filteredUpcomingShifts = useMemo(() => {
-    return upcomingShifts.filter(shift => {
-      if (isShiftPassed(shift.endTime, shift.date)) {
-        return false;
-      }
-      if (todayShift && shift.id === todayShift.id) {
-        return false;
-      }
-      return true;
-    });
-  }, [upcomingShifts, todayShift]);
+  const isOpenShiftCurrent = openShift !== null && openShift.id === currentShift?.id && Boolean(currentShift?.actionStatus);
+  const loadingDay = stripShifts.loading && dayShifts.length === 0;
 
   return (
-    <div className="min-h-[calc(100vh-200px)] px-2 sm:px-0">
-      <div className="flex flex-col items-start justify-between gap-4 mb-6 sm:flex-row sm:items-center lg:mb-8">
-        <h1
-          className="text-[28px] sm:text-[32px] lg:text-[40px] font-semibold leading-[1.6] text-[#10141a] whitespace-nowrap">
-          Shift Management
-        </h1>
+    <div className="flex min-h-[calc(100vh-200px)] flex-col gap-5">
+      <h1 className="sr-only">Shift management</h1>
 
-        <div className="flex items-center gap-3">
-          <Button
-            onClick={() => navigate(Routes.userPanel.manualShiftManagement)}
-            className="bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-4 py-2 lg:py-3 h-auto text-[14px] font-semibold shadow-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap"
-          >
-            <Plus size={20} />
-            Manual Timesheet
-          </Button>
-        </div>
-      </div>
+      {currentShift?.actionStatus && <CurrentShiftBar
+        shift={currentShift}
+        minutesLeft={timeRemaining}
+        userLocation={userLocation}
+        locationError={locationError}
+        busy={actionBusy}
+        onAction={handleShiftAction}
+      />}
 
-      <div className="bg-[#FFFFFF4D] border border-white shadow-sm rounded-[20px] p-3 lg:p-6 relative">
-        <div
-          className="flex bg-white/0 backdrop-blur rounded-[20px] min-h-[46px] mb-4 lg:mb-6 items-start flex-wrap gap-3 sm:gap-4 lg:gap-6">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div
-              className="bg-white/50 backdrop-blur-[8px] border border-white/30 rounded-full p-2.5 sm:p-3 w-[38px] h-[38px] sm:w-[43px] sm:h-[43px] flex items-center justify-center shrink-0">
-              <Calendar size={18} className="sm:w-5 sm:h-5" />
-            </div>
-            <div>
-              <p
-                className="text-[14px] sm:text-[16px] font-semibold text-[#10141a] leading-[1.4] whitespace-nowrap">Today</p>
-              <p className="text-[12px] sm:text-[14px] font-medium text-[#808081] leading-[1.4] whitespace-nowrap">
-                {format(currentDate, "dd MMMM yyyy")}
-              </p>
-            </div>
+      <section aria-label="Schedule" className="relative flex flex-1 flex-col gap-5 rounded-[20px] bg-white p-4 shadow-[0_1px_2px_rgba(16,40,44,0.06)] sm:p-6 dark:bg-[#1b232b]">
+        <DayStrip windowStart={windowStart} days={STRIP_DAYS} selected={selectedDay} onSelect={selectDay}/>
+
+        {stripShifts.error ? (
+          <p role="alert" className="py-16 text-center text-sm text-[#b3371c] dark:text-[#f3a08c]">
+            We couldn't load your shifts.{' '}
+            <button type="button" onClick={stripShifts.reload} className="cursor-pointer font-semibold underline">Try again</button>
+          </p>
+        ) : loadingDay ? (
+          <div role="status" className="flex flex-1 flex-col items-center justify-center gap-3 py-20 text-sm text-[#5d6b73] dark:text-[#9aa4a8]">
+            <Loader2 className="h-8 w-8 animate-spin text-[#00a3a7] motion-reduce:animate-none" aria-hidden="true" />
+            Loading shifts…
           </div>
-
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div
-              className="bg-white/50 backdrop-blur-[8px] border border-white/30 rounded-full p-2.5 sm:p-3 w-[38px] h-[38px] sm:w-[43px] sm:h-[43px] flex items-center justify-center shrink-0">
-              <Clock size={18} className="sm:w-5 sm:h-5" />
-            </div>
-            <div>
-              <p
-                className="text-[14px] sm:text-[16px] font-semibold text-[#10141a] leading-[1.4] whitespace-nowrap">Time</p>
-              <p className="text-[12px] sm:text-[14px] font-medium text-[#808081] leading-[1.4] whitespace-nowrap">
-                {format(currentDate, "hh:mm a").toUpperCase()}
-              </p>
-            </div>
+        ) : dayShifts.length === 0 ? (
+          <div className="mx-auto flex max-w-[380px] flex-1 flex-col items-center justify-center gap-2 py-16 text-center">
+            <CalendarDays className="h-9 w-9 text-[#8a99a3]" aria-hidden="true" />
+            <p className="mt-1 text-base font-bold text-[#34434c] dark:text-[#e3e9eb]">
+              {isSameDay(selectedDay, new Date()) ? 'No shifts scheduled yet' : `No shifts on ${format(selectedDay, 'EEEE, MMM d')}`}
+            </p>
+            <p className="text-[13px] text-[#5d6b73] dark:text-[#9aa4a8]">
+              Your assigned shifts will appear here once they're scheduled. Check back later for updates to your schedule.
+            </p>
+            <button type="button" onClick={() => setTimesheetOpen(true)}
+              className="mt-4 inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-[10px] bg-[#003839] px-5 text-sm font-bold text-white transition-colors hover:bg-[#005759] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679]">
+              <CirclePlus className="h-4 w-4" aria-hidden="true" /> Add manual timesheet
+            </button>
           </div>
-
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div
-              className="bg-white/50 backdrop-blur-[8px] border border-white/30 rounded-full p-2.5 sm:p-3 w-[38px] h-[38px] sm:w-[43px] sm:h-[43px] flex items-center justify-center shrink-0">
-              <MapPin size={18} className={`sm:w-5 sm:h-5 ${locationError ? "text-red-500" : ""}`} />
+        ) : (
+          <>
+            <DayTimeline shifts={dayShifts} showNow={selectedKey === todayKey} onOpen={setOpenShift}/>
+            <div className="flex justify-end">
+              <button type="button" onClick={() => setTimesheetOpen(true)}
+                className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-[10px] bg-[#003839] px-4 text-sm font-bold text-white transition-colors hover:bg-[#005759] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679]">
+                <CirclePlus className="h-4 w-4" aria-hidden="true" /> Add manual timesheet
+              </button>
             </div>
-            <div className="max-w-[200px] sm:max-w-[250px]">
-              <p
-                className="text-[14px] sm:text-[16px] font-semibold text-[#10141a] leading-[1.4] whitespace-nowrap">Location</p>
-              <p
-                className={`text-[12px] sm:text-[14px] font-medium leading-[1.4] truncate ${locationError ? "text-red-500" : "text-[#808081]"}`}>
-                {userLocation}
-              </p>
-            </div>
-          </div>
-        </div>
+          </>
+        )}
+      </section>
 
-        <div className="space-y-6">
-          {shiftsLoading ? (
-            <div
-              className="bg-[#FFFFFF4D] border border-white shadow-sm rounded-[20px] p-6 min-h-[200px] flex items-center justify-center">
-              <div className="flex flex-col items-center gap-4">
-                <Loader2 className="w-10 h-10 animate-spin text-[#0eaf52]" />
-                <p className="text-[14px] text-[#808081]">Loading shifts...</p>
-              </div>
-            </div>
-          ) : todayShift ? (
-            <ShiftSection
-              title="Current Shift"
-              subtitle="This is your current active shift."
-              shifts={[{ ...todayShift, timeRemaining: timeRemaining !== null ? timeRemaining : undefined }]}
-              panel="today"
-              backgroundColor="bg-[rgba(14,175,82,0.1)]"
-              showExpandButton={false}
-              maxVisibleShifts={1}
-              onActionClick={handleShiftAction}
-              isLoading={shiftsLoading}
-            />
-          ) : null}
+      <ShiftDetailsDialog
+        shift={openShift}
+        onClose={() => setOpenShift(null)}
+        actionLabel={isOpenShiftCurrent ? (currentShift?.actionStatus === ShiftActionStatus.CLOCK_IN ? 'Clock in' : 'Clock out') : undefined}
+        onAction={isOpenShiftCurrent ? handleShiftAction : undefined}
+        onNote={shiftId => { setOpenShift(null); openShiftNote(shiftId); }}
+      />
 
-          {!shiftsLoading && (
-            <ShiftSection
-              title="Upcoming Shifts"
-              subtitle="These are your shifts for the day."
-              shifts={filteredUpcomingShifts}
-              panel="upcoming"
-              backgroundColor="bg-[rgba(43,130,255,0.1)]"
-              isExpanded={upcomingExpanded}
-              onExpandToggle={() => setUpcomingExpanded(!upcomingExpanded)}
-              showDate
-              showAction={false}
-              isLoading={shiftsLoading}
-            />
-          )}
-
-          {!shiftsLoading && (
-            <ShiftSection
-              title="Previous Shifts"
-              subtitle="These are your Previous shifts"
-              shifts={previousShifts}
-              panel="previous"
-              onNoteClick={openShiftNote}
-              backgroundColor="bg-white/30"
-              isExpanded={previousExpanded}
-              onExpandToggle={() => setPreviousExpanded(!previousExpanded)}
-              showDate
-              showAction={false}
-              isLoading={shiftsLoading}
-            />
-          )}
-        </div>
-      </div>
+      <ManualTimesheetDialog open={timesheetOpen} onOpenChange={setTimesheetOpen} onSubmitted={reloadShifts} />
 
       {selectedNoteShift && user?.agencyId && user?.uid ? <ShiftNoteStatus key={`${user.uid}:${user.agencyId}:${selectedNoteShift}`} shiftId={selectedNoteShift} agencyId={user.agencyId} viewerId={user.uid} employeeId={user.profile?.id} /> : null}
 
@@ -1154,7 +403,7 @@ export default function ShiftManagementPage() {
         isOpen={showClockOutModal}
         onConfirm={handleClockOutConfirm}
         onCancel={() => setShowClockOutModal(false)}
-        isLoading={shiftsLoading}
+        isLoading={actionBusy}
       />
 
       <PersonalCareNoteModal
@@ -1173,11 +422,8 @@ export default function ShiftManagementPage() {
       <ClockInModal
         isOpen={showClockInModal}
         onConfirm={handleClockInConfirm}
-        onCancel={() => {
-          setShowClockInModal(false);
-          setClockInShiftId(null);
-        }}
-        isLoading={shiftsLoading}
+        onCancel={() => setShowClockInModal(false)}
+        isLoading={actionBusy}
       />
 
       <LocationErrorModal
@@ -1185,9 +431,8 @@ export default function ShiftManagementPage() {
         onClose={() => setShowLocationErrorModal(false)}
         userLocation={userLocation}
         locationDistance={locationDistance ?? 0}
-        shiftLocation={formatShiftLocation(todayShift?.location) || ''}
+        shiftLocation={formatShiftLocation(currentShift?.location) || ''}
       />
     </div>
   );
 }
-
