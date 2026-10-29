@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Navigate, Outlet, useNavigate, useLocation } from "react-router";
+import { Link, Navigate, Outlet, useNavigate, useLocation } from "react-router";
 import { useAuth } from "@/utils/auth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Routes } from "@/routes/constants";
@@ -7,52 +7,62 @@ import DashboardHeader from "@/components/DashboardHeader";
 import DashboardSidebar, { NavItem } from "@/components/DashboardSidebar";
 import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
 import { UserType } from "@/utils/auth/types/user.types";
-import QuestionIcon from "@/assets/icons/question-mark-circle.svg?react";
-import CogIcon from "@/assets/icons/cog.svg?react";
-import HomeIcon from "@/assets/icons/home.svg?react";
-import ExchangeIcon from "@/assets/icons/exchange-01.svg?react";
-import ShareKnowledgeIcon from "@/assets/icons/share-knowledge.svg?react";
-import ServiceIcon from "@/assets/icons/service.svg?react";
-import NoteIcon from "@/assets/icons/note-01.svg?react";
-import InvoiceIcon from "@/assets/icons/invoice-01.svg?react";
-import UserRoadsideIcon from "@/assets/icons/user-roadside.svg?react";
-import BellIcon from "@/assets/icons/bell.svg?react";
-import SupportIcon from "@/assets/icons/support.svg?react";
-import CommunityInclusionIcon from "@/assets/icons/community-inclusion.svg?react";
-import { Sun, Megaphone } from "lucide-react"
+import {
+  CalendarClock, Car, CircleHelp, HeartPulse, Headset, LayoutDashboard, MapPin, Megaphone,
+  NotebookPen, Receipt, Settings, Sun, TriangleAlert, Users, Wallet,
+} from "lucide-react";
+import LogoNameIcon from "@/assets/icons/green-green-logo.svg?react";
+import LogoMarkIcon from "@/assets/icons/logo.svg?react";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
 import { ScrollToTopButton } from "@/components/ScrollToTopButton";
 import { roleLabel } from "@/lib/roleLabel";
 
 const navItems: NavItem[] = [
-  { label: "Dashboard", path: Routes.userPanel.dashboard, icon: HomeIcon },
-  { label: "Shift Management", path: Routes.userPanel.shiftManagement, icon: ExchangeIcon },
-  { label: "Clients & Services", path: Routes.userPanel.clientsAndServices, icon: ShareKnowledgeIcon },
-  { label: "Plan of Care", path: Routes.userPanel.planOfCare, icon: ServiceIcon },
-  { label: "Notes", path: Routes.userPanel.notes.index, icon: NoteIcon },
-  { label: "Mileage", path: Routes.userPanel.mileage, icon: UserRoadsideIcon },
-  { label: "Expenses", path: Routes.userPanel.expenses, icon: InvoiceIcon },
-  { label: "Incident", path: Routes.userPanel.incident, icon: BellIcon },
+  { label: "Dashboard", path: Routes.userPanel.dashboard, icon: LayoutDashboard },
+  { label: "Shift Management", path: Routes.userPanel.shiftManagement, icon: CalendarClock },
+  { label: "Clients & Services", path: Routes.userPanel.clientsAndServices, icon: Users },
+  { label: "Plan of Care", path: Routes.userPanel.planOfCare, icon: HeartPulse },
+  { label: "Notes", path: Routes.userPanel.notes.index, icon: NotebookPen },
+  { label: "Mileage", path: Routes.userPanel.mileage, icon: Car },
+  { label: "Expenses", path: Routes.userPanel.expenses, icon: Receipt },
+  { label: "Incident", path: Routes.userPanel.incident, icon: TriangleAlert },
   { label: "Announcements", path: Routes.userPanel.announcements, icon: Megaphone },
-  { label: "Support", path: Routes.userPanel.messages, icon: SupportIcon },
-  {
-    label: "Community Inclusion",
-    path: Routes.userPanel.communityInclusion,
-    icon: CommunityInclusionIcon
-  },
+  { label: "Support", path: Routes.userPanel.messages, icon: Headset },
+  { label: "Community Inclusion", path: Routes.userPanel.communityInclusion, icon: MapPin },
   { label: "Day Program", path: Routes.userPanel.dayProgram, icon: Sun },
-  {
-    label: "Help Center",
-    path: Routes.userPanel.helpCenter,
-    icon: QuestionIcon
-  },
-  { label: "My Payroll", path: Routes.userPanel.payroll, icon: InvoiceIcon },
-  {
-    label: "Settings",
-    path: Routes.userPanel.settings,
-    icon: CogIcon
-  },
+  { label: "Help Center", path: Routes.userPanel.helpCenter, icon: CircleHelp },
+  { label: "My Payroll", path: Routes.userPanel.payroll, icon: Wallet },
+  { label: "Settings", path: Routes.userPanel.settings, icon: Settings },
 ];
+
+const sidebarLogo = (collapsed: boolean) => collapsed
+  ? <LogoMarkIcon aria-label="Care on Board" role="img" className="h-9 w-auto" />
+  : <LogoNameIcon aria-label="Care on Board" role="img" className="h-auto w-[196px]" />;
+
+// Faint diagonal lines on the help card, as in the design.
+const helpCardPattern = {
+  backgroundImage: "repeating-linear-gradient(135deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 32px)",
+};
+
+function SidebarHelpCard() {
+  return (
+    <div className="flex flex-col gap-3 rounded-[14px] bg-[#012829] p-4 text-white" style={helpCardPattern}>
+      <span className="grid h-10 w-10 place-items-center rounded-[10px] bg-[#033f40]">
+        <Headset className="h-5 w-5" aria-hidden="true" />
+      </span>
+      <div>
+        <p className="text-lg font-semibold">Need help?</p>
+        <p className="mt-1 text-sm text-white/85">Contact the agency</p>
+      </div>
+      <Link
+        to={Routes.userPanel.messages}
+        className="flex min-h-11 items-center justify-center rounded-[12px] bg-[#018b8e] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#019da0] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+      >
+        Contact us
+      </Link>
+    </div>
+  );
+}
 
 
 export default function UserPanelDashboardLayout({ children }: { children?: ReactNode }) {
@@ -83,11 +93,13 @@ export default function UserPanelDashboardLayout({ children }: { children?: Reac
         userRole={roleLabel({ applicantType: user?.applicantType, role: user?.profile?.role || user?.role })}
         userType={user?.userType || UserType.APPLICANT}
         onLogout={handleLogout}
+        sidebarInset
+        showSettings={false}
       />
-      <DashboardSidebar navItems={visibleNavItems} />
-      <main className={`ml-0 ${collapsed ? "md:ml-[112px]" : "md:ml-[240px]"} pt-[130px] pb-10 transition-[margin] duration-200`}>
-        <AnnouncementBanner endpoint="/employeePortal/announcements" viewAllPath={Routes.userPanel.announcements} />
-        <div className="px-8">{excludedPage ? <Navigate to={Routes.userPanel.dashboard} replace /> : isSc && location.pathname === Routes.userPanel.shiftManagement ? <Navigate to={Routes.userPanel.manualShiftManagement} replace /> : children ?? <Outlet />}</div>
+      <DashboardSidebar navItems={visibleNavItems} variant="brand" logo={sidebarLogo} footer={<SidebarHelpCard />} />
+      <main className={`ml-0 ${collapsed ? "md:ml-[88px]" : "md:ml-[248px]"} pt-[98px] pb-10 transition-[margin] duration-200`}>
+        <AnnouncementBanner endpoint="/employeePortal/announcements" viewAllPath={Routes.userPanel.announcements} className="mx-4 mb-4 sm:mx-8" />
+        <div className="px-4 sm:px-8">{excludedPage ? <Navigate to={Routes.userPanel.dashboard} replace /> : isSc && location.pathname === Routes.userPanel.shiftManagement ? <Navigate to={Routes.userPanel.manualShiftManagement} replace /> : children ?? <Outlet />}</div>
       </main>
       <ScrollToTopButton />
     </div>}

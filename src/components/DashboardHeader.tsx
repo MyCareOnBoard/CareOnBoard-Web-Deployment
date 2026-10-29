@@ -14,12 +14,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import BellIcon from "@/assets/icons/bell.svg?react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useTheme } from "@/providers/ThemeProvider";
 import CogIcon from "@/assets/icons/cog.svg?react";
 import LogoNameIcon from "@/assets/icons/green-green-logo.svg?react";
 import LogoMarkIcon from "@/assets/icons/logo.svg?react";
-import { ChevronDown, ChevronUp, User, LogOut, Lock, HelpCircle, Menu } from "lucide-react";
+import { ChevronDown, ChevronUp, User, LogOut, Lock, HelpCircle, Menu, Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toggleDrawer } from "@/hooks/useSidebarDrawer";
+import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
 import { UserType } from "@/utils/auth/types/user.types";
 import { settingsRouteForUserType } from "./dashboardHeaderRoutes";
 
@@ -72,11 +74,37 @@ export function UserAvatar({ userName, userImage }: { userName?: string; userIma
   );
 }
 
-// Shared dashboard chrome without the native panel's notification requests.
-export function DashboardHeaderFrame({ centerContent, children }: { centerContent?: ReactNode; children: ReactNode }) {
+// Phones: the theme switch lives in the account menu to keep the header row short.
+function ThemeMenuItem() {
+  const { theme, toggleTheme } = useTheme();
+  const isDark = theme === "dark";
+  const Icon = isDark ? Sun : Moon;
   return (
-    <header className="fixed left-0 right-0 top-0 z-50 h-[98px] bg-[#eef4f5] dark:bg-[#10141a]">
-      <div className="mx-auto flex h-full max-w-[1440px] items-center justify-between px-8">
+    <DropdownMenuItem
+      onSelect={(event) => { event.preventDefault(); toggleTheme(); }}
+      className="gap-3 px-4 py-2 rounded-none cursor-pointer hover:bg-white/50 focus:bg-white/50 sm:hidden dark:hover:bg-white/5 dark:focus:bg-white/5"
+    >
+      <Icon className="w-4 h-4 text-[#808081]" />
+      <span className="font-medium text-[14px] text-[#808081]">{isDark ? "Light mode" : "Dark mode"}</span>
+    </DropdownMenuItem>
+  );
+}
+
+// Shared dashboard chrome without the native panel's notification requests.
+export function DashboardHeaderFrame({ centerContent, children, sidebarInset = false }: {
+  centerContent?: ReactNode;
+  children: ReactNode;
+  /** The layout uses a full-height sidebar that carries the logo; start the header beside it. */
+  sidebarInset?: boolean;
+}) {
+  const [collapsed] = useSidebarCollapsed();
+  return (
+    <header className={cn(
+      "fixed left-0 right-0 top-0 z-50 h-[98px] bg-[#eef4f5] dark:bg-[#10141a]",
+      sidebarInset && "md:transition-[left] md:duration-200",
+      sidebarInset && (collapsed ? "md:left-[88px]" : "md:left-[248px]")
+    )}>
+      <div className={cn("mx-auto flex h-full max-w-[1440px] items-center justify-between", sidebarInset ? "gap-2 px-4 sm:px-8" : "px-8")}>
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -86,8 +114,9 @@ export function DashboardHeaderFrame({ centerContent, children }: { centerConten
           >
             <Menu className="w-6 h-6" />
           </button>
-          <LogoNameIcon className="hidden w-[226px] md:block" />
-          <LogoMarkIcon className="w-auto h-9 md:hidden" />
+          <LogoNameIcon className={cn("hidden w-[226px]", !sidebarInset && "md:block")} />
+          {/* The drawer carries the logo when the sidebar is inset, leaving room for the actions on phones. */}
+          <LogoMarkIcon className={cn("w-auto h-9 md:hidden", sidebarInset && "hidden")} />
         </div>
         {centerContent && <div className="flex items-center">{centerContent}</div>}
         {children}
@@ -97,7 +126,10 @@ export function DashboardHeaderFrame({ centerContent, children }: { centerConten
 }
 
 export default function DashboardHeader(
-  { actions, centerContent, userName, userImage, userRole, onLogout, userType }: {
+  { actions, centerContent, userName, userImage, userRole, onLogout, userType, sidebarInset, showSettings = true }: {
+    sidebarInset?: boolean;
+    /** Hide the settings shortcut when the layout's sidebar already links to settings. */
+    showSettings?: boolean;
     actions?: ReactNode;
     centerContent?: ReactNode;
     userName?: string;
@@ -194,7 +226,7 @@ export default function DashboardHeader(
   }
 
   return (
-    <DashboardHeaderFrame centerContent={centerContent}>
+    <DashboardHeaderFrame centerContent={centerContent} sidebarInset={sidebarInset}>
         {actions ?? (
           <div className="flex items-center gap-[10px]">
             {getCareConnectDashboardUrl() && (
@@ -202,17 +234,21 @@ export default function DashboardHeader(
                 href={getCareConnectDashboardUrl()!}
                 target="_blank"
                 rel="noopener noreferrer"
+                aria-label="CareOnboardConnect Login"
                 className="whitespace-nowrap bg-[#00b4b8] text-white px-2 py-1 text-[10px] rounded-full border border-[rgba(255,255,255,0.3)] font-medium backdrop-blur-[22px] transition-all duration-200 hover:bg-[#00b4b8]/90 hover:border-[rgba(255,255,255,0.5)] sm:px-3 sm:py-1.5 sm:text-[11px] lg:px-4 lg:py-2 lg:text-xs"
               >
-                CareOnboardConnect Login
+                <span className="sm:hidden">Connect</span>
+                <span className="hidden sm:inline">CareOnboardConnect Login</span>
               </a>
             )}
-            <ThemeToggle />
-            <HeaderActionButton
-              icon={CogIcon}
-              ariaLabel="Settings"
-              onClick={() => navigate(getSettingsRoute())}
-            />
+            <ThemeToggle className="hidden sm:grid" />
+            {showSettings && (
+              <HeaderActionButton
+                icon={CogIcon}
+                ariaLabel="Settings"
+                onClick={() => navigate(getSettingsRoute())}
+              />
+            )}
             <DropdownMenu open={isNotificationDropdownOpen} onOpenChange={setIsNotificationDropdownOpen}>
               <DropdownMenuTrigger asChild>
                 <div className="relative">
@@ -401,6 +437,8 @@ export default function DashboardHeader(
                       location.pathname === makeCommonRoute(Routes.common.helpCenter) ? "font-semibold text-[#00b4b8]" : "font-medium text-[#808081]"
                     )}>Help Center</span>
                   </DropdownMenuItem>
+
+                  <ThemeMenuItem />
 
                   <DropdownMenuItem
                     onClick={onLogout}

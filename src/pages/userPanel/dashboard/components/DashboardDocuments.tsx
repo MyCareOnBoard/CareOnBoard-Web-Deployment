@@ -3,6 +3,7 @@ import {AlertCircle, CheckCircle2, FileText, Upload} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Skeleton} from '@/components/ui/skeleton';
 import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs';
+import {subTabCount, subTabList, subTabTrigger} from './subTabStyles';
 
 export interface DashboardDocument {
     type: string; label: string; id?: string; documentId?: string;
@@ -41,8 +42,10 @@ interface Props {
     loading: boolean; error: boolean; focusDocumentId?: string | null;
     onRetry: () => void; onUpload: (type?: string) => void; onView: (url: string, title: string) => void;
     children?: ReactNode;
+    /** Shown inside the dashboard's documents & trainings panel, which supplies its own heading. */
+    embedded?: boolean;
 }
-export default function DashboardDocuments({documents, loading, error, focusDocumentId, onRetry, onUpload, onView, children}: Props) {
+export default function DashboardDocuments({documents, loading, error, focusDocumentId, onRetry, onUpload, onView, children, embedded = false}: Props) {
     const focusDocument = documents.find(item => focusDocumentId && (item.id === focusDocumentId || item.documentId === focusDocumentId));
     const focusType = focusDocument?.type;
     const focusGroup = focusDocument ? groupFor(focusDocument) : undefined;
@@ -65,9 +68,10 @@ export default function DashboardDocuments({documents, loading, error, focusDocu
     }, [focusType, loading, error, currentGroup]);
 
     return <div role="region" aria-label="Documents" className="min-w-0">
-        <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-            <div><h3 className="text-xl font-bold text-[#10141a]">Documents</h3><p className="mt-1 text-sm text-[#596065]">Your document checklist and expiry status.</p></div>
-            <Button type="button" onClick={() => onUpload()} className="h-auto gap-2 rounded-full bg-[#00b4b8] px-4 py-2.5 text-white hover:bg-[#009da1]"><Upload size={16} aria-hidden="true"/>Upload document</Button>
+        <div className={`flex flex-wrap items-start justify-between gap-4 ${embedded ? 'mb-4' : 'mb-6'}`}>
+            {embedded ? <p className="pt-2.5 text-sm text-[#596065] dark:text-[#9aa4a8]">Your document checklist and expiry status.</p>
+                : <div><h3 className="text-xl font-bold text-[#10141a] dark:text-[#f4f6f7]">Documents</h3><p className="mt-1 text-sm text-[#596065] dark:text-[#9aa4a8]">Your document checklist and expiry status.</p></div>}
+            <Button type="button" onClick={() => onUpload()} className="h-auto min-h-11 gap-2 rounded-full bg-[#007679] px-4 py-2.5 text-white hover:bg-[#005759]"><Upload size={16} aria-hidden="true"/>Upload document</Button>
         </div>
         {children}
         {loading ? <div role="status" aria-label="Loading documents" className="space-y-5">
@@ -81,25 +85,25 @@ export default function DashboardDocuments({documents, loading, error, focusDocu
                 </div>)}
             </div>)}</div>
         </div> : error ? <p role="alert" className="text-sm text-[#b3371c]">Unable to load documents. <Button type="button" variant="ghost" onClick={onRetry}>Retry documents</Button></p>
-        : visibleGroups.length === 0 ? <p className="py-8 text-center text-sm text-[#596065]">No documents to show.</p>
+        : visibleGroups.length === 0 ? <p className="py-8 text-center text-sm text-[#596065] dark:text-[#9aa4a8]">No documents to show.</p>
         : <Tabs value={currentGroup} onValueChange={value => setActiveGroup(value as typeof groups[number])}>
-            <TabsList className="flex-wrap">
-                {visibleGroups.map(group => <TabsTrigger key={group} value={group}>
+            <TabsList className={`w-full ${subTabList}`}>
+                {visibleGroups.map(group => <TabsTrigger key={group} value={group} className={`sm:flex-1 ${subTabTrigger}`}>
                     {group === 'Needs attention' ? <AlertCircle size={15} className="text-[#a76000]" aria-hidden="true"/> : group === 'Current' ? <CheckCircle2 size={15} className="text-[#187343]" aria-hidden="true"/> : <FileText size={15} className="text-[#687e82]" aria-hidden="true"/>}
                     {group}{' '}
-                    <span className="rounded-full bg-[#e7eff0] px-1.5 py-0.5 text-xs font-medium">{documents.filter(item => groupFor(item) === group).length}</span>
+                    <span className={subTabCount}>{documents.filter(item => groupFor(item) === group).length}</span>
                 </TabsTrigger>)}
             </TabsList>
             {visibleGroups.map(group => <TabsContent key={group} value={group} forceMount hidden={currentGroup !== group}>
-                <div className="divide-y divide-[#e5edef] rounded-xl border border-[#dce7e9] bg-white px-4">
+                <div className="divide-y divide-[#e5edef] dark:divide-white/10 rounded-xl border border-[#dce7e9] bg-white dark:border-white/10 dark:bg-[#1b232b] px-4">
                     {documents.filter(item => groupFor(item) === group).map(item => {
                         const status = badge(item);
                         const replace = ['expired', 'expiring', 'expires today', 'needs review'].includes(item.status.toLowerCase());
                         return <div key={item.type} id={'staff-document-' + item.type} tabIndex={-1} className="flex flex-wrap items-center gap-3 py-4 focus:outline-2 focus:outline-[#00b4b8]">
                             <FileText className="h-8 w-7 shrink-0 text-[#687e82]" aria-hidden="true"/>
                             <div className="min-w-0 flex-1 basis-40">
-                                <div className="flex flex-wrap items-center gap-2"><p className="break-words text-sm font-bold text-[#10141a]">{item.label}</p><span className={`rounded-full px-2 py-1 text-xs font-medium ${status.color}`}>{status.label}</span></div>
-                                <p className="mt-1 text-xs text-[#596065]">{!item.fileUrl ? 'Upload this document to your record.' : item.status.toLowerCase() === 'needs review' ? (reviewReasons[item.reasonCode ?? ''] ?? 'Your agency needs to review this document. Contact them for details.') : item.expiryLabel ? `${item.status.toLowerCase() === 'expired' ? 'Expired' : 'Expires'} ${item.expiryLabel}` : item.status === 'Updating expiry status…' ? 'Checking document expiry details.' : 'Document on file.'}</p>
+                                <div className="flex flex-wrap items-center gap-2"><p className="break-words text-sm font-bold text-[#10141a] dark:text-[#f4f6f7]">{item.label}</p><span className={`rounded-full px-2 py-1 text-xs font-medium ${status.color}`}>{status.label}</span></div>
+                                <p className="mt-1 text-xs text-[#596065] dark:text-[#9aa4a8]">{!item.fileUrl ? 'Upload this document to your record.' : item.status.toLowerCase() === 'needs review' ? (reviewReasons[item.reasonCode ?? ''] ?? 'Your agency needs to review this document. Contact them for details.') : item.expiryLabel ? `${item.status.toLowerCase() === 'expired' ? 'Expired' : 'Expires'} ${item.expiryLabel}` : item.status === 'Updating expiry status…' ? 'Checking document expiry details.' : 'Document on file.'}</p>
                             </div>
                             <div className="ml-auto flex shrink-0 items-center gap-1">
                                 {item.fileUrl && <Button type="button" variant="ghost" className="px-2 text-[#007f83]" aria-label={`View ${item.label}`} onClick={() => onView(item.fileUrl, item.label)}>View</Button>}

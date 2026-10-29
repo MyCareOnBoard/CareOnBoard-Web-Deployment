@@ -3,11 +3,10 @@ import { useGetDocumentComplianceQuery, useComplianceDateRefresh } from '@/pages
 import { complianceLabel, civilDateLabel } from '@/pages/agency/compliance-alerts/apiTypes';
 import React, {useState, useCallback, useEffect, useMemo, useRef} from "react";
 import {useNavigate, useSearchParams} from "react-router";
-import {AlertCircle, Pencil, X} from "lucide-react";
+import {AlertCircle, X} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {DocumentPreviewModal} from "@/components/documents/DocumentPreviewModal";
 import DashboardDocuments, {groupFor} from './components/DashboardDocuments';
-import {auth} from "@/lib/firebase";
 import {Toggle} from "@/components/ui/toggle";
 
 import UserPanelDocumentUpload from "@/pages/userPanel/dashboard/components/uploadDocumentModal";
@@ -29,13 +28,23 @@ import type {TrainingData} from '@/pages/agency/trainings/trainingApi';
 import TrainingCertificate from '@/pages/agency/trainings/TrainingCertificate';
 import DashboardTrainings, {groupOrder, trainingGroup} from './components/DashboardTrainings';
 import {parseISO} from 'date-fns';
+import AttentionBanner, {attentionMessage} from './components/AttentionBanner';
+import ComplianceHub, {type HubSection} from './components/ComplianceHub';
+import OverviewCards from './components/OverviewCards';
+import QuickActions from './components/QuickActions';
+import UpcomingTasks from './components/UpcomingTasks';
+import {computeOverviewStats} from './overviewStats';
+import {upcomingShifts, useDashboardShifts} from './useDashboardShifts';
 
-function getGreeting(): { text: string; emoji: string } {
+function getGreeting(): string {
     const h = new Date().getHours();
-    if (h < 12) return {text: "Good morning", emoji: "🌅"};
-    if (h < 17) return {text: "Good afternoon", emoji: "☀️"};
-    return {text: "Good evening", emoji: "🌙"};
+    if (h < 12) return "Good morning";
+    if (h < 17) return "Good afternoon";
+    return "Good evening";
 }
+
+/** Training groups that mean a deadline has already passed. */
+const lapsedTrainingGroups = new Set(['Expired', 'Overdue']);
 
 // Groups ahead of "In review" in groupOrder are the ones worth surfacing on the
 // dashboard header — overdue/expired/required items, not informational ones.
@@ -57,10 +66,8 @@ export default function UserPanelDashboardPage() {
     const [trainingCursor, setTrainingCursor] = useState<string>();
     const [trainings, setTrainings] = useState<TrainingData[]>([]);
     const [pendingTraining, setPendingTraining] = useState<string | null>(null);
-    const documentsSectionRef = useRef<HTMLDivElement>(null);
-    const trainingsSectionRef = useRef<HTMLDivElement>(null);
-    const scrollToSection = (ref: React.RefObject<HTMLDivElement | null>) =>
-        ref.current?.scrollIntoView({behavior: "smooth", block: "start"});
+    const hubRef = useRef<HTMLDivElement>(null);
+    const [hubSection, setHubSection] = useState<HubSection>();
 
 
     const [searchParams] = useSearchParams();
@@ -100,8 +107,6 @@ export default function UserPanelDashboardPage() {
 
     const navigate = useNavigate();
     const dispatch = useDispatch();
-
-    const currentUser = auth.currentUser;
 
     const formatDate = (value?: any) => {
         if (!value) return "N/A";
@@ -182,17 +187,6 @@ export default function UserPanelDashboardPage() {
         [trainings]
     );
 
-    const calculateAge = (dateOfBirth: string) => {
-        const today = new Date();
-        const birthDate = new Date(dateOfBirth);
-        let age = today.getFullYear() - birthDate.getFullYear();
-        const monthDiff = today.getMonth() - birthDate.getMonth();
-        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-            age--;
-        }
-        return age;
-    }
-
     const handleDocumentUploaded = (result: SaveEmployeeDocumentResponse) => {
         setUpload({...result, savedAt: Date.now()});
         setWithinUploadWindow(true);
@@ -232,10 +226,6 @@ export default function UserPanelDashboardPage() {
             setSavingAvailability(false);
         }
     };
-
-    const goToProfile = () => {
-        navigate(Routes.userPanel.profile);
-    }
 
     const [documentPreview, setDocumentPreview] = useState<{url: string; title: string} | null>(null);
 
@@ -290,30 +280,112 @@ export default function UserPanelDashboardPage() {
     }, [trainingPage, trainingCursor]);
 
     const greeting = getGreeting();
+    const todayLabel = new Date().toLocaleDateString("en-US", {weekday: "long", month: "long", day: "numeric"});
+    const isSupportCoordinator = user?.applicantType === "support_coordinator" || user?.profile?.role === "support_coordinator" || user?.role === "support_coordinator";
+
+    const {shifts, loading: shiftsLoading, error: shiftsError, retry: retryShifts} = useDashboardShifts(user?.agencyId, user?.profile?.id);
+    const overviewStats = useMemo(() => computeOverviewStats(shifts), [shifts]);
+    const nextShifts = useMemo(() => upcomingShifts(shifts), [shifts]);
+
+    const expiredDocuments = useMemo(
+        () => dashboardDocuments.filter(doc => doc.fileUrl && doc.status.toLowerCase() === 'expired'),
+        [dashboardDocuments]
+    );
+    const lapsedTrainings = useMemo(
+        () => trainings.filter(training => lapsedTrainingGroups.has(trainingGroup(training))),
+        [trainings]
+    );
+    const documentSummary = useMemo(() => {
+        const current = dashboardDocuments.filter(doc => ['Current', 'Available'].includes(groupFor(doc))).length;
+        const missing = dashboardDocuments.filter(doc => groupFor(doc) === 'Not uploaded').length;
+        if (documentsLoading) return {summary: 'Loading your documents…', progress: 0};
+        return {
+            alert: documentsNeedingAttention ? `${documentsNeedingAttention} need${documentsNeedingAttention === 1 ? 's' : ''} attention` : undefined,
+            summary: `${current} of ${dashboardDocuments.length} on file${missing ? ` · ${missing} not uploaded` : ''}`,
+            progress: dashboardDocuments.length ? current / dashboardDocuments.length : 0,
+        };
+    }, [dashboardDocuments, documentsNeedingAttention, documentsLoading]);
+    const trainingSummary = useMemo(() => {
+        const approved = trainings.filter(training => trainingGroup(training) === 'Approved').length;
+        const inReview = trainings.filter(training => trainingGroup(training) === 'In review').length;
+        const total = trainings.length;
+        if (!total && isTrainingLoading) return {summary: 'Loading your trainings…', progress: 0};
+        return {
+            alert: lapsedTrainings.length ? `${lapsedTrainings.length} overdue`
+                : trainingsNeedingAttention ? `${trainingsNeedingAttention} due` : undefined,
+            summary: total ? `${approved} of ${total}${trainingPage?.nextCursor ? '+' : ''} approved${inReview ? ` · ${inReview} in review` : ''}` : 'No trainings assigned',
+            progress: total ? approved / total : 0,
+        };
+    }, [trainings, lapsedTrainings, trainingsNeedingAttention, trainingPage?.nextCursor, isTrainingLoading]);
+
+    // Open on whichever section needs the person, unless they've picked one.
+    const activeHubSection: HubSection = hubSection
+        ?? (!documentsLoading && documentsNeedingAttention === 0 && trainingsNeedingAttention > 0 ? 'trainings' : 'documents');
+    const openHubSection = (section: HubSection) => {
+        setHubSection(section);
+        hubRef.current?.scrollIntoView({behavior: "smooth", block: "start"});
+    };
+
+    const bannerMessage = useMemo(() => attentionMessage({
+        expiredDocuments: expiredDocuments.map(doc => doc.label), documents: documentsNeedingAttention,
+        lapsedTrainings: lapsedTrainings.length, trainings: trainingsNeedingAttention,
+    }), [expiredDocuments, documentsNeedingAttention, lapsedTrainings, trainingsNeedingAttention]);
+
+    const documentsPanel = <>
+        <DashboardDocuments key={user?.uid} embedded documents={dashboardDocuments}
+            loading={documentsLoading} error={documentsError} focusDocumentId={focusDocumentId}
+            onRetry={() => {void refreshDocuments();}} onView={handleOpenDocument}
+            onUpload={type => {setUploadDocumentType(type); setIsDocumentUploadModalOpen(true);}}>
+            {(complianceError || compliance?.syncStatus === 'error') && <p role="alert" className="text-sm text-[#d53411]">We couldn't load document expiry status. Try again. Last checked: {compliance?.evaluatedAt ? new Date(compliance.evaluatedAt).toLocaleString() : 'Not yet checked'}. <button type="button" onClick={() => refreshCompliance()}>Retry</button></p>}
+            {pending && <p role="status" className="text-sm text-[#808081]">Document saved. Updating expiry status…</p>}
+            {(pending && !withinUploadWindow) && <p className="text-sm text-[#808081]">Last checked: {compliance?.evaluatedAt ? new Date(compliance.evaluatedAt).toLocaleString() : 'Not yet checked'}. <button type="button" onClick={() => refreshCompliance()}>Refresh</button></p>}
+            {!documentsLoading && !documentsError && focusDocumentId && !employeeDocuments.some(doc => doc.id === focusDocumentId || doc.documentId === focusDocumentId) && <p role="status">This document is unavailable or you no longer have access. <button type="button" onClick={() => navigate(Routes.userPanel.dashboard)}>Back to documents</button></p>}
+        </DashboardDocuments>
+        <DocumentPreviewModal
+            open={documentPreview !== null}
+            onOpenChange={open => {if (!open) setDocumentPreview(null);}}
+            title={documentPreview?.title ?? 'Document preview'}
+            url={documentPreview?.url}
+        />
+    </>;
+
+    const trainingsPanel = <DashboardTrainings key={user?.uid} embedded trainings={trainings} loading={isTrainingLoading} error={trainingError}
+        hasMore={!!trainingPage?.nextCursor} assessmentIncomplete={trainingPage?.summary?.policyAssessmentComplete === false}
+        onLoadMore={() => setTrainingCursor(trainingPage?.nextCursor ?? undefined)} onRetry={() => {void refreshTrainings();}}
+        renderTraining={training => <>
+            {training.requiresCertificate && <TrainingCertificate training={training} dashboard showPolicySummary={false} onUploaded={certificate => {
+                setTrainings(current => current.map(item => item.id === training.id ? {...item, ...certificate} : item));
+                dispatch(userPanelDashboardApi.util.invalidateTags([{type: 'EmployeeTrainings', id: 'SELF'}]));
+                toast.success(certificate.approved ? 'Certificate saved and approved' : 'Certificate submitted for agency review');
+            }}/>}
+            {!training.requiresCertificate && training.source !== 'policy' && <Button type="button" variant="outline"
+                onClick={() => handleToggle(training.id || '')} disabled={pendingTraining !== null}
+                aria-label={`${approvalStates[training.id ?? ''] ? 'Mark incomplete' : 'Mark complete'} ${training.name}`}>
+                {approvalStates[training.id ?? ''] ? 'Mark incomplete' : 'Mark complete'}
+            </Button>}
+        </>}/>;
 
     return (
-        <div className="min-h-[calc(100vh-200px)]">
-            {/* Row 1: Profile + Documents */}
-            <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6 items-start">
-                {/* Left Column */}
-                {/* Header */}
-                <div>
-                <div className="mb-8">
-                    <h1 className="text-[30px] font-bold leading-[1.4] text-[#10141a]">
-                        {greeting.text}, {employeeInfo?.fullName?.split(" ")[0] || "there"}. {greeting.emoji}
+        <div className="flex min-h-[calc(100vh-200px)] flex-col gap-6">
+            {/* Header */}
+            <header className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[#5d6b73] dark:text-[#9aa4a8]">{todayLabel}</p>
+                    <h1 className="mt-0.5 text-[26px] font-extrabold leading-tight text-[#10141a] sm:text-[28px] dark:text-[#f4f6f7]">
+                        {greeting}, {employeeInfo?.fullName?.split(" ")[0] || "there"}
                     </h1>
                     {(documentsNeedingAttention > 0 || trainingsNeedingAttention > 0) && (
-                        <div className="flex flex-wrap items-center gap-2 mt-3">
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
                             {documentsNeedingAttention > 0 && (
-                                <button type="button" onClick={() => scrollToSection(documentsSectionRef)}
-                                    className="inline-flex items-center gap-1.5 rounded-full bg-[#fff0eb] px-3 py-1.5 text-sm font-medium text-[#b3371c] transition-colors hover:bg-[#ffe3d8] cursor-pointer">
+                                <button type="button" onClick={() => openHubSection('documents')}
+                                    className="inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-full bg-[#fff0eb] px-3 py-1.5 text-sm font-medium text-[#b3371c] transition-colors hover:bg-[#ffe3d8] dark:bg-[#d53411]/20 dark:text-[#f3a08c]">
                                     <AlertCircle size={14} aria-hidden="true"/>
                                     {documentsNeedingAttention} document{documentsNeedingAttention === 1 ? '' : 's'} need attention
                                 </button>
                             )}
                             {trainingsNeedingAttention > 0 && (
-                                <button type="button" onClick={() => scrollToSection(trainingsSectionRef)}
-                                    className="inline-flex items-center gap-1.5 rounded-full bg-[#fff3d6] px-3 py-1.5 text-sm font-medium text-[#8a5200] transition-colors hover:bg-[#ffe9b8] cursor-pointer">
+                                <button type="button" onClick={() => openHubSection('trainings')}
+                                    className="inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-full bg-[#fff3d6] px-3 py-1.5 text-sm font-medium text-[#8a5200] transition-colors hover:bg-[#ffe9b8] dark:bg-[#f29d0c]/20 dark:text-[#f7c46b]">
                                     <AlertCircle size={14} aria-hidden="true"/>
                                     {trainingsNeedingAttention} training{trainingsNeedingAttention === 1 ? '' : 's'} need attention
                                 </button>
@@ -321,99 +393,43 @@ export default function UserPanelDashboardPage() {
                         </div>
                     )}
                 </div>
-                {/* Profile Card */}
-                <div className="bg-[#FFFFFF4D] rounded-[20px] p-6 shadow-sm">
-                    {/* Identity */}
-                    <div className="flex items-start gap-4">
-                        {currentUser?.photoURL ? (
-                            <img
-                                src={currentUser.photoURL}
-                                alt={employeeInfo?.fullName}
-                                className="object-cover w-20 h-20 rounded-full shrink-0"
-                            />
-                        ) : (
-                            <div
-                                className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-2xl font-bold text-white">
-                                {employeeInfo?.fullName?.charAt(0) || "U"}
-                            </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                            <div
-                                className="mb-1 inline-block rounded-full border border-[#0EAF52] bg-[#F0FAF4] px-2 py-0.5 text-xs font-semibold text-[#0EAF52]">
-                                ID-{employeeInfo?.profile?.tagId}
-                            </div>
-                            <h2 className="truncate text-[20px] font-bold text-[#10141a]">
-                                {employeeInfo?.fullName || "User Name"}
-                            </h2>
-                            <p className="text-[13px] text-[#808081]">
-                                {employeeInfo?.role?.toUpperCase() || "No role assigned"} • {employeeInfo?.dateOfBirth ? calculateAge(employeeInfo?.dateOfBirth) + ' yrs old' : ''}
-                            </p>
-                            {employeeInfo?.hireDate && (
-                                <p className="text-[13px] text-[#808081]">
-                                    Hiring Date: {formatDate(employeeInfo?.hireDate)}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="mt-5 flex items-center justify-between gap-3 border-t border-[#e5e5e6] pt-4">
-                        <button type="button" onClick={goToProfile}
-                            className="inline-flex cursor-pointer items-center gap-1.5 text-sm font-medium text-[#596065] transition-colors hover:text-[#10141a]">
-                            <Pencil size={15} aria-hidden="true"/>
-                            Edit profile
-                        </button>
-                        <div className="flex items-center gap-2">
-                            <span className="text-sm text-[#808081]">Available for work</span>
-                            <Toggle
-                                className={"h-8 w-14"}
-                                aria-label="Work availability"
-                                disabled={savingAvailability}
-                                aria-busy={savingAvailability}
-                                pressed={workAvailability}
-                                onPressedChange={handleWorkAvailabilityChange}
-                            />
-                        </div>
-                    </div>
-                </div>
-                </div>
-                {/* Right Column - Documents */}
-                <div ref={documentsSectionRef} className="min-w-0 rounded-[20px] border border-[#dce7e9] bg-white/70 p-4 sm:p-6">
-                    <DashboardDocuments key={user?.uid} documents={dashboardDocuments}
-                        loading={documentsLoading} error={documentsError} focusDocumentId={focusDocumentId}
-                        onRetry={() => {void refreshDocuments();}} onView={handleOpenDocument}
-                        onUpload={type => {setUploadDocumentType(type); setIsDocumentUploadModalOpen(true);}}>
-                        {(complianceError || compliance?.syncStatus === 'error') && <p role="alert" className="text-sm text-[#d53411]">We couldn't load document expiry status. Try again. Last checked: {compliance?.evaluatedAt ? new Date(compliance.evaluatedAt).toLocaleString() : 'Not yet checked'}. <button type="button" onClick={() => refreshCompliance()}>Retry</button></p>}
-                        {pending && <p role="status" className="text-sm text-[#808081]">Document saved. Updating expiry status…</p>}
-                        {(pending && !withinUploadWindow) && <p className="text-sm text-[#808081]">Last checked: {compliance?.evaluatedAt ? new Date(compliance.evaluatedAt).toLocaleString() : 'Not yet checked'}. <button type="button" onClick={() => refreshCompliance()}>Refresh</button></p>}
-                        {!documentsLoading && !documentsError && focusDocumentId && !employeeDocuments.some(doc => doc.id === focusDocumentId || doc.documentId === focusDocumentId) && <p role="status">This document is unavailable or you no longer have access. <button type="button" onClick={() => navigate(Routes.userPanel.dashboard)}>Back to documents</button></p>}
-                    </DashboardDocuments>
-                    <DocumentPreviewModal
-                        open={documentPreview !== null}
-                        onOpenChange={open => {if (!open) setDocumentPreview(null);}}
-                        title={documentPreview?.title ?? 'Document preview'}
-                        url={documentPreview?.url}
+                <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-full bg-white py-1.5 pl-4 pr-2 text-sm font-semibold text-[#34434c] shadow-[0_1px_2px_rgba(16,40,44,0.06)] dark:bg-[#1b232b] dark:text-[#c9d3d6]">
+                    Available for work
+                    <Toggle
+                        className="h-8 w-14"
+                        aria-label="Work availability"
+                        disabled={savingAvailability}
+                        aria-busy={savingAvailability}
+                        pressed={workAvailability}
+                        onPressedChange={handleWorkAvailabilityChange}
                     />
-                </div>
-            </div>
+                </label>
+            </header>
 
-            {/* Row 2: Trainings, full width */}
-            <div ref={trainingsSectionRef} className="mt-6 min-w-0 rounded-[20px] border border-[#dce7e9] bg-white/70 p-4 sm:p-6">
-                <DashboardTrainings key={user?.uid} trainings={trainings} loading={isTrainingLoading} error={trainingError}
-                    hasMore={!!trainingPage?.nextCursor} assessmentIncomplete={trainingPage?.summary?.policyAssessmentComplete === false}
-                    onLoadMore={() => setTrainingCursor(trainingPage?.nextCursor ?? undefined)} onRetry={() => {void refreshTrainings();}}
-                    renderTraining={training => <>
-                        {training.requiresCertificate && <TrainingCertificate training={training} dashboard showPolicySummary={false} onUploaded={certificate => {
-                            setTrainings(current => current.map(item => item.id === training.id ? {...item, ...certificate} : item));
-                            dispatch(userPanelDashboardApi.util.invalidateTags([{type: 'EmployeeTrainings', id: 'SELF'}]));
-                            toast.success(certificate.approved ? 'Certificate saved and approved' : 'Certificate submitted for agency review');
-                        }}/>}
-                        {!training.requiresCertificate && training.source !== 'policy' && <Button type="button" variant="outline"
-                            onClick={() => handleToggle(training.id || '')} disabled={pendingTraining !== null}
-                            aria-label={`${approvalStates[training.id ?? ''] ? 'Mark incomplete' : 'Mark complete'} ${training.name}`}>
-                            {approvalStates[training.id ?? ''] ? 'Mark incomplete' : 'Mark complete'}
-                        </Button>}
-                    </>}/>
+            {(documentsNeedingAttention > 0 || trainingsNeedingAttention > 0) && (
+                <AttentionBanner
+                    severity={expiredDocuments.length || lapsedTrainings.length ? 'urgent' : 'warning'}
+                    message={bannerMessage}
+                    showDocuments={documentsNeedingAttention > 0}
+                    showTrainings={trainingsNeedingAttention > 0}
+                    onDocuments={() => openHubSection('documents')}
+                    onTrainings={() => openHubSection('trainings')}
+                />
+            )}
+
+            <OverviewCards stats={overviewStats} loading={shiftsLoading} error={shiftsError} onRetry={retryShifts}/>
+
+            <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
+                <div ref={hubRef} className="min-w-0 scroll-mt-[110px]">
+                    <ComplianceHub active={activeHubSection} onChange={setHubSection}
+                        documents={documentSummary} trainings={trainingSummary}
+                        documentsPanel={documentsPanel} trainingsPanel={trainingsPanel}/>
+                </div>
+                <div className="flex min-w-0 flex-col gap-5">
+                    <UpcomingTasks shifts={nextShifts} loading={shiftsLoading} error={shiftsError} onRetry={retryShifts}
+                        viewAllPath={isSupportCoordinator ? Routes.userPanel.manualShiftManagement : Routes.userPanel.shiftManagement}/>
+                    <QuickActions supportCoordinator={isSupportCoordinator}/>
+                </div>
             </div>
             {isDocumentUploadModalOpen && <UserPanelDocumentUpload
                 initialDocumentType={uploadDocumentType}

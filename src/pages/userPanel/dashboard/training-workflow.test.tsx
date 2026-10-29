@@ -9,7 +9,8 @@ vi.mock('@/utils/auth', () => ({useAuth: () => ({user: {uid: 'employee-1', profi
 vi.mock('@/lib/firebase', () => ({auth: {currentUser: null}}));
 vi.mock('@/lib/api/users', () => ({getUser: vi.fn()}));
 vi.mock('react-redux', () => ({useDispatch: () => state.dispatch}));
-vi.mock('react-router', () => ({useNavigate: () => vi.fn(), useSearchParams: () => [new URLSearchParams()]}));
+vi.mock('react-router', () => ({useNavigate: () => vi.fn(), useSearchParams: () => [new URLSearchParams()], Link: ({to, children, ...rest}: any) => <a href={to} {...rest}>{children}</a>}));
+vi.mock('./useDashboardShifts', () => ({useDashboardShifts: () => ({shifts: [], loading: false, error: false, retry: vi.fn()}), upcomingShifts: () => []}));
 vi.mock('framer-motion', () => ({AnimatePresence: ({children}: any) => children, motion: {div: 'div'}}));
 vi.mock('sonner', () => ({toast: {success: vi.fn(), error: vi.fn()}}));
 vi.mock('@/pages/agency/compliance-alerts/api', () => ({useGetDocumentComplianceQuery: () => ({data: {items: [], pilotEnabled: false}, refetch: vi.fn()}), useComplianceDateRefresh: vi.fn()}));
@@ -26,9 +27,13 @@ vi.mock('./api', () => ({
   },
 }));
 
+// The dashboard hub opens on Documents; switch to the Trainings panel.
+const openTrainings = () => fireEvent.mouseDown(screen.getByRole('tab', {name: /^Trainings/}), {button: 0, ctrlKey: false});
+
 describe('employee training pagination', () => {
   it('requests and advances cursor pages', () => {
     render(<Dashboard />);
+    openTrainings();
     expect(state.trainingArgs[0]).toEqual({limit: 25});
     expect(screen.getByText('First')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', {name: 'Load more trainings'}));
@@ -38,6 +43,7 @@ describe('employee training pagination', () => {
   it('requires a certificate instead of a completion toggle for new assignments', () => {
     Object.assign(trainingPage.items[0], {requiresCertificate: true, status: 'Awaiting Review'});
     render(<Dashboard />);
+    openTrainings();
 
     expect(screen.getByText('Upload completion certificate')).toBeVisible();
     expect(screen.getByText('Awaiting Review')).toBeInTheDocument();
@@ -50,6 +56,7 @@ describe('employee training pagination', () => {
 
   it('updates existing rows when a continuation page is refreshed', () => {
     const {rerender} = render(<Dashboard />);
+    openTrainings();
     fireEvent.click(screen.getByRole('button', {name: 'Load more trainings'}));
     trainingPage = {...trainingPage, items: [{...trainingPage.items[0], name: 'Updated training'}]};
     rerender(<Dashboard />);
