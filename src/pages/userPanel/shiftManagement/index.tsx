@@ -420,6 +420,9 @@ export default function ShiftManagementPage() {
         onAction={isOpenShiftCurrent ? handleShiftAction : undefined}
         actionDisabled={clockInLocked}
         onNote={shiftId => { setOpenShift(null); openShiftNote(shiftId); }}
+        onAddHours={() => { setOpenShift(null); setTimesheetOpen(true); }}
+        upNext={openShift !== null && openShift.id === upNextId}
+        viewer={{ agencyId: user?.agencyId, viewerId: user?.uid, employeeId: user?.profile?.id }}
       />
 
       <ManualTimesheetDialog open={timesheetOpen} onOpenChange={setTimesheetOpen} onSubmitted={reloadShifts} />

@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {ShiftStatus, type Shift} from '@/lib/api/shifts';
-import {clientLabel, clockInOpensAt, clockTimes, daySummary, formatClock, formatDuration, layoutDay, nextUpcomingShift, shiftSpan, shiftTitle, shiftTone, startsIn, visibleHours} from './timeline';
+import {clientLabel, clockInOpensAt, clockInTiming, clockTimes, daySummary, directionsUrl, formatClock, formatDuration, layoutDay, nextUpcomingShift, shiftSpan, shiftTitle, shiftTone, startsIn, visibleHours} from './timeline';
 
 vi.mock('@/lib/firebase', () => ({auth: {currentUser: null}}));
 
@@ -139,5 +139,24 @@ describe('clockTimes', () => {
         expect(clockTimes(shift({clockedInAt: at(9, 2)}))).toBe('In 9:02 am');
         expect(clockTimes(shift({}))).toBeNull();
         expect(clockTimes(shift({clockedInAt: 'not a date'}))).toBeNull();
+    });
+});
+
+describe('clock in timing and directions', () => {
+    const at = (h: number, m: number) => new Date(2026, 9, 29, h, m).toISOString();
+    it('compares the clock in with the scheduled start', () => {
+        expect(clockInTiming(shift({clockedInAt: at(8, 1)}))).toBe('On time');
+        expect(clockInTiming(shift({clockedInAt: at(8, 12)}))).toBe('12 min late');
+        expect(clockInTiming(shift({clockedInAt: at(7, 55)}))).toBe('5 min early');
+        expect(clockInTiming(shift({clockedInAt: at(9, 30)}))).toBe('1h 30m late');
+        expect(clockInTiming(shift({}))).toBeNull();
+    });
+
+    it('links directions to the coordinates, else the address', () => {
+        expect(directionsUrl(shift({location: {address: '7 Broad St', latlon: {lat: '40.7', lon: '-74.1'}}})))
+            .toBe('https://www.google.com/maps/dir/?api=1&destination=40.7%2C-74.1');
+        expect(directionsUrl(shift({location: {address: '7 Broad St, Newark'}})))
+            .toBe('https://www.google.com/maps/dir/?api=1&destination=7%20Broad%20St%2C%20Newark');
+        expect(directionsUrl(shift({}))).toBeNull();
     });
 });

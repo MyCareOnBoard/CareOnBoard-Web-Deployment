@@ -165,7 +165,7 @@ export function shiftAddress(shift: Shift) {
 }
 
 /** "9:02 am" for an ISO timestamp, or null when it is missing or unreadable. */
-function clockOf(value?: string | null) {
+export function clockOf(value?: string | null) {
     if (!value) return null;
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? null : formatClock(date.getHours() * 60 + date.getMinutes());
@@ -177,4 +177,29 @@ export function clockTimes(shift: Shift) {
     const clockedOut = clockOf(shift.clockedOutAt);
     if (!clockedIn && !clockedOut) return null;
     return [clockedIn && `In ${clockedIn}`, clockedOut && `Out ${clockedOut}`].filter(Boolean).join(' · ');
+}
+
+/** How the clock in compared with the scheduled start: "On time", "12 min late" or "5 min early". */
+export function clockInTiming(shift: Shift): string | null {
+    const start = shiftDateTime(shift.date, shift.startTime);
+    const clockedIn = shift.clockedInAt ? new Date(shift.clockedInAt) : null;
+    if (!start || !clockedIn || Number.isNaN(clockedIn.getTime())) return null;
+    const minutes = Math.round((clockedIn.getTime() - start.getTime()) / 60_000);
+    if (Math.abs(minutes) <= 1) return 'On time';
+    const amount = Math.abs(minutes) < 60 ? `${Math.abs(minutes)} min` : formatDuration(Math.abs(minutes));
+    return minutes > 0 ? `${amount} late` : `${amount} early`;
+}
+
+/** Minutes between clock in and clock out (or now, while running); null before clock in. */
+export function workedMinutes(shift: Shift, now: Date = new Date()): number | null {
+    if (!shift.clockedInAt) return null;
+    return Math.round(workedHours(shift, now) * 60);
+}
+
+/** A Google Maps directions link to the shift's address (or its coordinates). */
+export function directionsUrl(shift: Shift): string | null {
+    const lat = shift.location?.latlon?.lat;
+    const lon = shift.location?.latlon?.lon;
+    const destination = lat && lon ? `${lat},${lon}` : shiftAddress(shift);
+    return destination ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}` : null;
 }
