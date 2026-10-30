@@ -218,11 +218,13 @@ function ShiftTicket({shift, actionLabel, onAction, actionDisabled, onNote, onAd
             <X className="h-5 w-5" aria-hidden="true"/><span className="sr-only">Close</span>
         </DialogClose>
 
-        <div className="max-h-[calc(100dvh-96px)] overflow-y-auto rounded-[24px] scrollbar-hide">
+        <div className="flex max-h-[calc(100dvh-96px)] flex-col overflow-hidden rounded-[24px]">
+            {/* Everything but the buttons scrolls; the buttons stay pinned in the footer. */}
+            <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide">
             <div className={cn(SURFACE, 'flex flex-col gap-4 rounded-t-[24px] px-5 pb-5 pt-5 sm:px-6')}>
                 <div className="flex items-center justify-between gap-3">
                     <span className="text-[13px] font-bold uppercase tracking-wide text-[#5d6b73] dark:text-[#9aa4a8]">
-                        {day ? format(day, 'EEE, MMM d') : shift.date}{shift.serviceCode ? ` · ${shift.serviceCode}` : ''}
+                        {day ? format(day, 'EEEE, MMM d') : shift.date}
                     </span>
                     <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold', pill.className)}>
                         <span className={cn('h-[7px] w-[7px] rounded-full', pill.dot)} aria-hidden="true"/>{pill.label}
@@ -249,7 +251,7 @@ function ShiftTicket({shift, actionLabel, onAction, actionDisabled, onNote, onAd
                 </div> : <p className="text-lg font-bold text-[#10141a] dark:text-[#f4f6f7]">{shift.startTime}{shift.endTime ? ` – ${shift.endTime}` : ''}</p>}
                 <div className="min-w-0">
                     <DialogTitle className="text-[22px] font-extrabold leading-tight text-[#10141a] dark:text-[#f4f6f7]">{shiftTitle(shift)}</DialogTitle>
-                    <DialogDescription className="mt-0.5 text-sm text-[#5d6b73] dark:text-[#9aa4a8]">{clientLabel(shift)}</DialogDescription>
+                    <DialogDescription className="mt-0.5 text-sm text-[#5d6b73] dark:text-[#9aa4a8]">{clientLabel(shift)}{shift.serviceCode ? ` · ${shift.serviceCode}` : ''}</DialogDescription>
                 </div>
             </div>
 
@@ -257,7 +259,7 @@ function ShiftTicket({shift, actionLabel, onAction, actionDisabled, onNote, onAd
                 <span className="absolute left-[22px] right-[22px] top-[11px] border-t-2 border-dashed border-[#dbe4e6] dark:border-white/15"/>
             </div>
 
-            <div className={cn(SURFACE, 'flex flex-col gap-[18px] rounded-b-[24px] px-5 pb-6 pt-3 sm:px-6')}>
+            <div className={cn(SURFACE, 'flex flex-col gap-[18px] px-5 pb-5 pt-3 sm:px-6', !buttons && 'rounded-b-[24px] pb-6')}>
                 {address && <div className="overflow-hidden rounded-[18px] border border-[#e3eaec] dark:border-white/10">
                     <Suspense fallback={<div className="h-[120px] bg-[#e9f1f1] dark:bg-[#16292b]"/>}>
                         <ShiftMap address={address} lat={shift.location?.latlon?.lat} lon={shift.location?.latlon?.lon}/>
@@ -282,9 +284,13 @@ function ShiftTicket({shift, actionLabel, onAction, actionDisabled, onNote, onAd
                     <Steps steps={steps}/>
                 </section>
 
-                {buttons && <div className="flex flex-wrap gap-2.5">{buttons}</div>}
-                {hint && <p className="-mt-2 text-center text-xs text-[#6b787e] dark:text-[#9aa4a8]">{hint}</p>}
             </div>
+            </div>
+
+            {buttons && <footer className={cn(SURFACE, 'flex shrink-0 flex-col gap-2 rounded-b-[24px] border-t border-[#edf2f3] px-5 pb-5 pt-4 sm:px-6 dark:border-white/10')}>
+                <div className="flex flex-wrap gap-2.5">{buttons}</div>
+                {hint && <p className="text-center text-xs text-[#6b787e] dark:text-[#9aa4a8]">{hint}</p>}
+            </footer>}
         </div>
     </div>;
 }
