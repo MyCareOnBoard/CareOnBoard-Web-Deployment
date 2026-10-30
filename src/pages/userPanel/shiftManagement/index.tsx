@@ -422,6 +422,7 @@ export default function ShiftManagementPage() {
         onNote={shiftId => { setOpenShift(null); openShiftNote(shiftId); }}
         onAddHours={() => { setOpenShift(null); setTimesheetOpen(true); }}
         upNext={openShift !== null && openShift.id === upNextId}
+        userPosition={userCoords}
         viewer={{ agencyId: user?.agencyId, viewerId: user?.uid, employeeId: user?.profile?.id }}
       />
 

@@ -1,6 +1,6 @@
-import {lazy, Suspense, type ReactNode} from 'react';
+import {lazy, Suspense, useState, type ReactNode} from 'react';
 import {format} from 'date-fns';
-import {Check, CirclePlus, Clock, Lock, MessageCircle, Navigation, PencilLine, X} from 'lucide-react';
+import {Car, Check, CirclePlus, Clock, ExternalLink, Lock, MessageCircle, Navigation, PencilLine, X} from 'lucide-react';
 import {useNavigate} from 'react-router';
 import {Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle} from '@/components/ui/dialog';
 import type {Shift} from '@/lib/api/shifts';
@@ -16,6 +16,7 @@ import {
 import {useNow} from '../useNow';
 
 const ShiftMap = lazy(() => import('./ShiftMap'));
+const hasMapsKey = Boolean(import.meta.env.VITE_GOOGLE_PLACES_API_KEY);
 
 const tonePill: Record<ShiftTone, {label: string; className: string; dot: string}> = {
     completed: {label: 'Completed', className: 'bg-[#e6f6ed] text-[#187343] dark:bg-[#187343]/25 dark:text-[#7fd6a3]', dot: 'bg-[#20a35c]'},
@@ -100,6 +101,8 @@ interface Props {
     onAddHours?: () => void;
     /** This is the next shift still to come today, labelled "Up next". */
     upNext?: boolean;
+    /** The viewer's current position, for the route to the client's address. */
+    userPosition?: {lat: number; lng: number} | null;
     /** Who is looking, for the shift note status. */
     viewer?: {agencyId?: string; viewerId?: string; employeeId?: string};
 }
@@ -108,12 +111,12 @@ export default function ShiftDetailsDialog(props: Props) {
     return <Dialog open={props.shift !== null} onOpenChange={open => { if (!open) props.onClose(); }}>
         <DialogContent showCloseButton={false}
             className="w-[calc(100vw-24px)] max-w-[470px] border-0 bg-transparent pt-14 shadow-none dark:bg-transparent">
-            {props.shift && <ShiftTicket {...props} shift={props.shift}/>}
+            {props.shift && <ShiftTicket key={props.shift.id} {...props} shift={props.shift}/>}
         </DialogContent>
     </Dialog>;
 }
 
-function ShiftTicket({shift, actionLabel, onAction, actionDisabled, onNote, onAddHours, upNext, viewer}: Props & {shift: Shift}) {
+function ShiftTicket({shift, actionLabel, onAction, actionDisabled, onNote, onAddHours, upNext, userPosition, viewer}: Props & {shift: Shift}) {
     const navigate = useNavigate();
     const now = useNow();
     const tone = shiftTone(shift, now);
@@ -125,6 +128,10 @@ function ShiftTicket({shift, actionLabel, onAction, actionDisabled, onNote, onAd
     const directions = directionsUrl(shift);
     const opensAt = clockInOpensAt(shift);
     const clockIn = actionLabel === 'Clock in';
+    // The route is drawn in the embedded map; Google Maps stays one tap away for turn-by-turn.
+    const canRoute = hasMapsKey && Boolean(userPosition);
+    const [showRoute, setShowRoute] = useState(false);
+    const [routeSummary, setRouteSummary] = useState<string | null>(null);
 
     // Only ended shifts have a note to look up.
     const needsNote = tone === 'completed' && Boolean(onNote && viewer?.agencyId && viewer.viewerId);
@@ -262,7 +269,8 @@ function ShiftTicket({shift, actionLabel, onAction, actionDisabled, onNote, onAd
             <div className={cn(SURFACE, 'flex flex-col gap-[18px] px-5 pb-5 pt-3 sm:px-6', !buttons && 'rounded-b-[24px] pb-6')}>
                 {address && <div className="overflow-hidden rounded-[18px] border border-[#e3eaec] dark:border-white/10">
                     <Suspense fallback={<div className="h-[120px] bg-[#e9f1f1] dark:bg-[#16292b]"/>}>
-                        <ShiftMap address={address} lat={shift.location?.latlon?.lat} lon={shift.location?.latlon?.lon}/>
+                        <ShiftMap address={address} lat={shift.location?.latlon?.lat} lon={shift.location?.latlon?.lon}
+                            origin={userPosition} showRoute={showRoute} onRouteSummary={setRouteSummary}/>
                     </Suspense>
                     <div className="flex items-center justify-between gap-3 px-3.5 py-3">
                         <div className="flex min-w-0 flex-col gap-0.5">
@@ -270,11 +278,23 @@ function ShiftTicket({shift, actionLabel, onAction, actionDisabled, onNote, onAd
                             <span className="text-[15px] font-bold text-[#10141a] dark:text-[#f4f6f7]">{address}</span>
                             {geo && <span className="text-xs text-[#5d6b73] dark:text-[#9aa4a8]">{geo}</span>}
                         </div>
-                        {directions && <a href={directions} target="_blank" rel="noopener noreferrer"
+                        {canRoute ? <button type="button" onClick={() => setShowRoute(value => !value)} aria-pressed={showRoute}
+                            className="inline-flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full bg-[#e3f6f6] px-3 text-[13px] font-bold text-[#005759] hover:bg-[#d2efef] focus-visible:outline-2 focus-visible:outline-[#007679] aria-pressed:bg-[#007679] aria-pressed:text-white dark:bg-[#00a3a7]/15 dark:text-[#7fe0e2] dark:aria-pressed:bg-[#00a3a7] dark:aria-pressed:text-[#04201f]">
+                            <Navigation className="h-3.5 w-3.5" aria-hidden="true"/>{showRoute ? 'Hide route' : 'Directions'}
+                        </button> : directions && <a href={directions} target="_blank" rel="noopener noreferrer"
                             className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full bg-[#e3f6f6] px-3 text-[13px] font-bold text-[#005759] hover:bg-[#d2efef] focus-visible:outline-2 focus-visible:outline-[#007679] dark:bg-[#00a3a7]/15 dark:text-[#7fe0e2]">
                             <Navigation className="h-3.5 w-3.5" aria-hidden="true"/>Directions<span className="sr-only"> (opens Google Maps)</span>
                         </a>}
                     </div>
+                    {showRoute && <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#edf2f3] px-3.5 py-2.5 dark:border-white/10" aria-live="polite">
+                        <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#34434c] dark:text-[#dbe3e6]">
+                            <Car className="h-4 w-4 text-[#007679] dark:text-[#7fe0e2]" aria-hidden="true"/>{routeSummary ?? 'Finding the route…'}
+                        </span>
+                        {directions && <a href={directions} target="_blank" rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[13px] font-bold text-[#007679] hover:underline dark:text-[#7fe0e2]">
+                            Open in Google Maps<ExternalLink className="h-3.5 w-3.5" aria-hidden="true"/>
+                        </a>}
+                    </div>}
                 </div>}
 
                 <section aria-label="Shift progress" className="flex flex-col gap-2.5">
