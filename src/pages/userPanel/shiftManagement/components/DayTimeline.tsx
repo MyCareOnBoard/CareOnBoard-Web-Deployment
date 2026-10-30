@@ -1,8 +1,8 @@
 import {useEffect, useMemo, useRef} from 'react';
-import {MapPin} from 'lucide-react';
+import {Clock, MapPin} from 'lucide-react';
 import type {Shift} from '@/lib/api/shifts';
 import {cn} from '@/lib/utils';
-import {clientLabel, formatClock, formatDuration, layoutDay, shiftAddress, shiftTitle, shiftTone, visibleHours, type ShiftTone} from '../timeline';
+import {clientLabel, clockTimes, formatClock, formatDuration, layoutDay, shiftAddress, shiftTitle, shiftTone, visibleHours, type ShiftTone} from '../timeline';
 import {useNow} from '../useNow';
 
 const HOUR_HEIGHT = 80;
@@ -99,6 +99,8 @@ export default function DayTimeline({shifts, showNow, nextShiftId, onOpen}: Prop
                     const styles = toneCard[tone];
                     const name = clientLabel(item.shift);
                     const address = shiftAddress(item.shift);
+                    // What actually happened: clock in / out times, or a note that a missed shift was never started.
+                    const actual = clockTimes(item.shift) ?? (tone === 'missed' ? 'Not clocked in' : null);
                     const range = `${formatClock(item.start)} – ${formatClock(item.end % (24 * 60))}`;
                     // Whole minutes left, rounded down like the Clock out card's countdown.
                     const minutesLeft = tone === 'ongoing' && showNow ? Math.floor(item.end - nowMinutes - now.getSeconds() / 60) : null;
@@ -111,13 +113,16 @@ export default function DayTimeline({shifts, showNow, nextShiftId, onOpen}: Prop
                             width: `calc(${lanePart} - 6px)`,
                         }}>
                         <button type="button" onClick={() => onOpen(item.shift)}
-                            aria-label={`${shiftTitle(item.shift)}, ${range}, ${name}${address ? `, ${address}` : ''}, ${toneLabel[tone]}`}
+                            aria-label={[shiftTitle(item.shift), range, name, actual, address, toneLabel[tone]].filter(Boolean).join(', ')}
                             className={cn('flex h-full w-full cursor-pointer flex-col items-start gap-0.5 overflow-hidden rounded-xl border-l-4 px-3 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#007679]', styles.card)}>
                             <span className={cn('w-full truncate text-[12px] font-bold', styles.label)}>{range} · {toneLabel[tone]}</span>
                             <span className={cn('w-full truncate text-[15px] font-bold leading-snug', styles.title)}>{shiftTitle(item.shift)}</span>
                             <span className={cn('w-full truncate text-[13px]', styles.text)}>
                                 {name}{minutesLeft !== null && minutesLeft > 0 ? ` · ${formatDuration(minutesLeft)} left` : ''}
                             </span>
+                            {actual && <span className={cn('flex w-full min-w-0 items-center gap-1 text-[13px] font-semibold', styles.label)}>
+                                <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden="true"/><span className="truncate">{actual}</span>
+                            </span>}
                             {address && <span className={cn('flex w-full min-w-0 items-center gap-1 text-[13px]', styles.text)}>
                                 <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true"/><span className="truncate">{address}</span>
                             </span>}

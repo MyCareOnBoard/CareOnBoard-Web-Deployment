@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {ShiftStatus, type Shift} from '@/lib/api/shifts';
-import {clientLabel, clockInOpensAt, daySummary, formatClock, formatDuration, layoutDay, nextUpcomingShift, shiftSpan, shiftTitle, shiftTone, startsIn, visibleHours} from './timeline';
+import {clientLabel, clockInOpensAt, clockTimes, daySummary, formatClock, formatDuration, layoutDay, nextUpcomingShift, shiftSpan, shiftTitle, shiftTone, startsIn, visibleHours} from './timeline';
 
 vi.mock('@/lib/firebase', () => ({auth: {currentUser: null}}));
 
@@ -129,5 +129,15 @@ describe('day summary and next shift', () => {
     it('counts down to the start', () => {
         expect(startsIn(day[3], now)).toBe('in 1h 59m');
         expect(startsIn(day[1], now)).toBeNull();
+    });
+});
+
+describe('clockTimes', () => {
+    it('shows the actual clock in and out times', () => {
+        const at = (h: number, m: number) => new Date(2026, 9, 29, h, m).toISOString();
+        expect(clockTimes(shift({clockedInAt: at(9, 2), clockedOutAt: at(11, 4)}))).toBe('In 9:02 am · Out 11:04 am');
+        expect(clockTimes(shift({clockedInAt: at(9, 2)}))).toBe('In 9:02 am');
+        expect(clockTimes(shift({}))).toBeNull();
+        expect(clockTimes(shift({clockedInAt: 'not a date'}))).toBeNull();
     });
 });

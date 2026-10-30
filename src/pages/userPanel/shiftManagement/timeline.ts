@@ -163,3 +163,18 @@ export function shiftRange(shift: Shift) {
 export function shiftAddress(shift: Shift) {
     return formatShiftLocation(shift.location) || (shift.client as {address?: string} | undefined)?.address || '';
 }
+
+/** "9:02 am" for an ISO timestamp, or null when it is missing or unreadable. */
+function clockOf(value?: string | null) {
+    if (!value) return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : formatClock(date.getHours() * 60 + date.getMinutes());
+}
+
+/** The actual clock times for a shift: "In 9:02 am · Out 11:04 am", "In 9:02 am", or null before clock in. */
+export function clockTimes(shift: Shift) {
+    const clockedIn = clockOf(shift.clockedInAt);
+    const clockedOut = clockOf(shift.clockedOutAt);
+    if (!clockedIn && !clockedOut) return null;
+    return [clockedIn && `In ${clockedIn}`, clockedOut && `Out ${clockedOut}`].filter(Boolean).join(' · ');
+}
