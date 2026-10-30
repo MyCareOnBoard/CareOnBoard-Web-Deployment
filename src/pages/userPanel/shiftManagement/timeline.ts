@@ -94,3 +94,12 @@ export function clientLabel(shift: Shift) {
     const id = shift.clientId || (shift.client as {id?: string} | undefined)?.id;
     return id ? `Client ${shortClientId(id)}` : 'Client not set';
 }
+
+/** Clock in opens this long before the scheduled start. */
+export const CLOCK_IN_OPENS_BEFORE_MS = 5 * 60_000;
+
+/** When Clock in becomes available for a shift, or null when the start time can't be read. */
+export function clockInOpensAt(shift: Shift): Date | null {
+    const start = shiftDateTime(shift.date, shift.startTime);
+    return start ? new Date(start.getTime() - CLOCK_IN_OPENS_BEFORE_MS) : null;
+}

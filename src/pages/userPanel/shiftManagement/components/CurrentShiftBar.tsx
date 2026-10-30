@@ -3,7 +3,8 @@ import {Clock, Loader2, MapPin} from 'lucide-react';
 import {ShiftActionStatus, ShiftStatus, type Shift} from '@/lib/api/shifts';
 import {formatCountdown, getExpiryState} from '@/lib/shift-expiry';
 import {cn} from '@/lib/utils';
-import {clientLabel, shiftTitle} from '../timeline';
+import {format} from 'date-fns';
+import {clientLabel, clockInOpensAt, shiftTitle} from '../timeline';
 
 const formatTimeLeft = (minutes: number) => {
     if (minutes < 60) return `${minutes} min left`;
@@ -33,6 +34,25 @@ function useExpiry(shift: Shift) {
     return useMemo(() => getExpiryState(shift, new Date()), [shift, tick]);
 }
 
+/**
+ * Whether Clock in is open: from 5 minutes before the scheduled start onwards.
+ * Re-renders once when the window opens.
+ */
+export function useClockInOpen(shift: Shift | null | undefined) {
+    const opensAt = shift ? clockInOpensAt(shift) : null;
+    const opensAtMs = opensAt?.getTime() ?? null;
+    const [now, setNow] = useState(() => Date.now());
+    useEffect(() => {
+        if (opensAtMs === null) return;
+        const wait = opensAtMs - Date.now();
+        if (wait <= 0) { setNow(Date.now()); return; }
+        // Timers longer than ~24 days overflow; a shift today is never that far out.
+        const timer = window.setTimeout(() => setNow(Date.now()), Math.min(wait + 50, 2 ** 31 - 1));
+        return () => window.clearTimeout(timer);
+    }, [opensAtMs]);
+    return {open: opensAtMs === null || now >= opensAtMs, opensAt};
+}
+
 interface Props {
     shift: Shift;
     /** Minutes until the scheduled end, for a shift that is running. */
@@ -49,12 +69,15 @@ export default function CurrentShiftBar({shift, minutesLeft, userLocation, locat
     const running = shift.status === ShiftStatus.ONGOING || shift.actionStatus === ShiftActionStatus.CLOCK_OUT;
     const clockIn = shift.actionStatus === ShiftActionStatus.CLOCK_IN;
     const showAction = shift.actionStatus && !(clockIn && expiry?.isExpired);
+    const clockInWindow = useClockInOpen(shift);
+    const locked = clockIn && !clockInWindow.open;
 
-    let tag: {label: string; tone: 'green' | 'red'} | null = null;
+    let tag: {label: string; tone: 'green' | 'red' | 'grey'} | null = null;
     if (!running && expiry?.isExpired) tag = {label: 'Expired', tone: 'red'};
     else if (clockIn && expiry?.isExpiringWindow) tag = {label: `Clock in within ${formatCountdown(expiry.msUntilHardExpiry)}`, tone: 'red'};
     else if (running && minutesLeft !== null) tag = {label: formatTimeLeft(minutesLeft), tone: minutesLeft <= 5 ? 'red' : 'green'};
     else if (running) tag = {label: 'In progress', tone: 'green'};
+    else if (locked && clockInWindow.opensAt) tag = {label: `Clock in opens at ${format(clockInWindow.opensAt, 'h:mm a')}`, tone: 'grey'};
 
     return <section aria-label="Current shift"
         className="flex flex-wrap items-center justify-between gap-4 rounded-[18px] border border-[#cfe8e8] bg-[#f2fafa] px-4 py-3.5 sm:px-5 dark:border-white/10 dark:bg-[#00a3a7]/10">
@@ -62,7 +85,9 @@ export default function CurrentShiftBar({shift, minutesLeft, userLocation, locat
             <div className="flex flex-wrap items-center gap-2">
                 <p className="text-[13px] font-semibold uppercase tracking-wide text-[#00666a] dark:text-[#7fe0e2]">{running ? 'Current shift' : 'Next shift today'}</p>
                 {tag && <span className={cn('rounded-full px-2 py-0.5 text-xs font-bold',
-                    tag.tone === 'red' ? 'bg-[#fff0eb] text-[#b3371c] dark:bg-[#d53411]/20 dark:text-[#f3a08c]' : 'bg-[#e6f6ed] text-[#187343] dark:bg-[#187343]/20 dark:text-[#7fd6a3]')}>
+                    tag.tone === 'red' ? 'bg-[#fff0eb] text-[#b3371c] dark:bg-[#d53411]/20 dark:text-[#f3a08c]'
+                        : tag.tone === 'grey' ? 'bg-[#eef1f2] text-[#4c5559] dark:bg-white/10 dark:text-[#c9d3d6]'
+                        : 'bg-[#e6f6ed] text-[#187343] dark:bg-[#187343]/20 dark:text-[#7fd6a3]')}>
                     {tag.label}
                 </span>}
             </div>
@@ -79,7 +104,8 @@ export default function CurrentShiftBar({shift, minutesLeft, userLocation, locat
                 {`Shift expires in ${Math.ceil(expiry.msUntilHardExpiry / 60000)} minutes`}
             </span>}
         </div>
-        {showAction && <button type="button" onClick={onAction} disabled={busy}
+        {showAction && <button type="button" onClick={onAction} disabled={busy || locked}
+            title={locked ? 'Clock in opens 5 minutes before the shift starts' : undefined}
             className={cn('inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full px-5 text-sm font-bold text-white transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-60',
                 clockIn ? 'bg-[#007679] hover:bg-[#005759] focus-visible:outline-[#007679]' : 'bg-[#d53411] hover:bg-[#b82d0f] focus-visible:outline-[#d53411]')}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true"/> : <Clock className="h-4 w-4" aria-hidden="true"/>}

@@ -25,10 +25,12 @@ interface Props {
     /** Shown when this is today's actionable shift. */
     actionLabel?: string;
     onAction?: () => void;
+    /** Clock in isn't open yet (it opens 5 minutes before the start). */
+    actionDisabled?: boolean;
     onNote?: (shiftId: string) => void;
 }
 
-export default function ShiftDetailsDialog({shift, onClose, actionLabel, onAction, onNote}: Props) {
+export default function ShiftDetailsDialog({shift, onClose, actionLabel, onAction, actionDisabled, onNote}: Props) {
     const tone = shift ? shiftTone(shift) : 'upcoming';
     const day = shift ? shiftDateTime(shift.date, '12:00 PM') : null;
     const rows = shift ? [
@@ -65,8 +67,9 @@ export default function ShiftDetailsDialog({shift, onClose, actionLabel, onActio
                         className="inline-flex min-h-11 cursor-pointer items-center rounded-full border border-[#007679] px-5 text-sm font-semibold text-[#005759] hover:bg-[#007679]/10 dark:border-[#7fe0e2] dark:text-[#7fe0e2]">
                         Shift note
                     </button>}
-                    {onAction && actionLabel && <button type="button" onClick={onAction}
-                        className="inline-flex min-h-11 cursor-pointer items-center rounded-full bg-[#007679] px-5 text-sm font-bold text-white hover:bg-[#005759]">
+                    {onAction && actionLabel && <button type="button" onClick={onAction} disabled={actionDisabled}
+                        title={actionDisabled ? 'Clock in opens 5 minutes before the shift starts' : undefined}
+                        className="inline-flex min-h-11 cursor-pointer items-center rounded-full bg-[#007679] px-5 text-sm font-bold text-white hover:bg-[#005759] disabled:cursor-not-allowed disabled:opacity-50">
                         {actionLabel}
                     </button>}
                 </div> : null}

@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {ShiftStatus, type Shift} from '@/lib/api/shifts';
-import {clientLabel, formatClock, layoutDay, shiftSpan, shiftTitle, shiftTone, visibleHours} from './timeline';
+import {clientLabel, clockInOpensAt, formatClock, layoutDay, shiftSpan, shiftTitle, shiftTone, visibleHours} from './timeline';
 
 vi.mock('@/lib/firebase', () => ({auth: {currentUser: null}}));
 
@@ -83,5 +83,12 @@ describe('shiftTitle and clientLabel', () => {
         expect(shiftTitle(shift({}))).toBe('Scheduled shift');
         expect(clientLabel(shift({clientId: 'abcdef123', client} as Partial<Shift>))).toBe('Client ABCDEF');
         expect(clientLabel(shift({}))).toBe('Client not set');
+    });
+});
+
+describe('clockInOpensAt', () => {
+    it('opens five minutes before the scheduled start', () => {
+        expect(clockInOpensAt(shift({date: '2026-10-30', startTime: '12:00 PM'}))).toEqual(new Date(2026, 9, 30, 11, 55));
+        expect(clockInOpensAt(shift({startTime: ''}))).toBeNull();
     });
 });

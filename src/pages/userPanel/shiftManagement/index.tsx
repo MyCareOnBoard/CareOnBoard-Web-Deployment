@@ -11,7 +11,7 @@ import { LocationErrorModal } from "./LocationErrorModal";
 import { PersonalCareNoteModal } from "./components/PersonalCareNoteModal";
 import DayStrip from "./components/DayStrip";
 import DayTimeline from "./components/DayTimeline";
-import CurrentShiftBar from "./components/CurrentShiftBar";
+import CurrentShiftBar, { useClockInOpen } from "./components/CurrentShiftBar";
 import ShiftDetailsDialog from "./components/ShiftDetailsDialog";
 import ManualTimesheetDialog from "@/pages/userPanel/manualShiftManagement/ManualTimesheetDialog";
 import { createEmployeeActivityLog } from "@/lib/api/employees";
@@ -120,6 +120,8 @@ export default function ShiftManagementPage() {
     startDate: todayKey, endDate: todayKey,
   });
   const currentShift = useMemo(() => categorizeShifts(todayShifts.shifts).current, [todayShifts.shifts]);
+  const clockInWindow = useClockInOpen(currentShift);
+  const clockInLocked = currentShift?.actionStatus === ShiftActionStatus.CLOCK_IN && !clockInWindow.open;
   const reloadShifts = () => { stripShifts.reload(); todayShifts.reload(); };
 
   const selectedKey = toDateKey(selectedDay);
@@ -195,6 +197,10 @@ export default function ShiftManagementPage() {
   const handleShiftAction = () => {
     const shift = currentShift;
     if (!shift?.actionStatus) return;
+    if (clockInLocked) {
+      toast.error('Too early to clock in', { description: 'Clock in opens 5 minutes before the shift starts.' });
+      return;
+    }
     setOpenShift(null);
 
     if (locationError || !userCoords) {
@@ -392,6 +398,7 @@ export default function ShiftManagementPage() {
         onClose={() => setOpenShift(null)}
         actionLabel={isOpenShiftCurrent ? (currentShift?.actionStatus === ShiftActionStatus.CLOCK_IN ? 'Clock in' : 'Clock out') : undefined}
         onAction={isOpenShiftCurrent ? handleShiftAction : undefined}
+        actionDisabled={clockInLocked}
         onNote={shiftId => { setOpenShift(null); openShiftNote(shiftId); }}
       />
 
