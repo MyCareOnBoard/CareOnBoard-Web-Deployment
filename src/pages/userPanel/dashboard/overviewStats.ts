@@ -50,7 +50,8 @@ export function shiftDateTime(dateKey?: string, time?: string): Date | null {
     return new Date(Number(day[1]), Number(day[2]) - 1, Number(day[3]), Math.floor(minutes / 60), minutes % 60);
 }
 
-function scheduledHours(shift: Shift) {
+/** Scheduled length of a shift in hours (overnight shifts wrap past midnight). */
+export function scheduledHours(shift: Shift) {
     const start = shiftDateTime(shift.date, shift.startTime);
     const end = shiftDateTime(shift.date, shift.endTime);
     if (!start || !end) return 0;
@@ -59,7 +60,8 @@ function scheduledHours(shift: Shift) {
     return minutes / 60;
 }
 
-function workedHours(shift: Shift, now: Date) {
+/** Hours between clock in and clock out, or until now while the shift is running. */
+export function workedHours(shift: Shift, now: Date) {
     if (!shift.clockedInAt) return 0;
     const start = new Date(shift.clockedInAt).getTime();
     const end = shift.clockedOutAt ? new Date(shift.clockedOutAt).getTime()

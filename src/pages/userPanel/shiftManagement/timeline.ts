@@ -1,5 +1,5 @@
-import {ShiftStatus, type Shift} from '@/lib/api/shifts';
-import {clockMinutes, shiftDateTime} from '@/pages/userPanel/dashboard/overviewStats';
+import {ShiftStatus, formatShiftLocation, type Shift} from '@/lib/api/shifts';
+import {clockMinutes, scheduledHours, shiftDateTime, workedHours} from '@/pages/userPanel/dashboard/overviewStats';
 import {shortClientId} from '@/pages/userPanel/dashboard/components/UpcomingTasks';
 
 const DAY_MINUTES = 24 * 60;
@@ -102,4 +102,64 @@ export const CLOCK_IN_OPENS_BEFORE_MS = 5 * 60_000;
 export function clockInOpensAt(shift: Shift): Date | null {
     const start = shiftDateTime(shift.date, shift.startTime);
     return start ? new Date(start.getTime() - CLOCK_IN_OPENS_BEFORE_MS) : null;
+}
+
+/** "3h 33m", "4h" or "45m" for a number of minutes. */
+export function formatDuration(minutes: number) {
+    const total = Math.max(0, Math.round(minutes));
+    const hours = Math.floor(total / 60);
+    const rest = total % 60;
+    if (!hours) return `${rest}m`;
+    return rest ? `${hours}h ${rest}m` : `${hours}h`;
+}
+
+export interface DaySummary {
+    scheduledMinutes: number;
+    workedMinutes: number;
+    done: number;
+    ongoing: number;
+    later: number;
+    missed: number;
+}
+
+/** Totals for one day's shifts: time scheduled and worked, and how many are done, running, still to come or missed. */
+export function daySummary(shifts: Shift[], now: Date = new Date()): DaySummary {
+    const summary: DaySummary = {scheduledMinutes: 0, workedMinutes: 0, done: 0, ongoing: 0, later: 0, missed: 0};
+    for (const shift of shifts) {
+        summary.scheduledMinutes += scheduledHours(shift) * 60;
+        summary.workedMinutes += workedHours(shift, now) * 60;
+        const tone = shiftTone(shift, now);
+        if (tone === 'completed') summary.done++;
+        else if (tone === 'ongoing') summary.ongoing++;
+        else if (tone === 'missed') summary.missed++;
+        else summary.later++;
+    }
+    return summary;
+}
+
+/** The earliest shift on the list that is still to come, skipping `excludeId`. */
+export function nextUpcomingShift(shifts: Shift[], now: Date = new Date(), excludeId?: string): Shift | null {
+    return shifts
+        .filter(shift => shift.id !== excludeId && shiftTone(shift, now) === 'upcoming')
+        .map(shift => ({shift, start: shiftDateTime(shift.date, shift.startTime)?.getTime() ?? Infinity}))
+        .sort((a, b) => a.start - b.start)[0]?.shift ?? null;
+}
+
+/** "in 1h 59m" until a shift starts, or null once it has. */
+export function startsIn(shift: Shift, now: Date) {
+    const start = shiftDateTime(shift.date, shift.startTime);
+    const minutes = start ? Math.ceil((start.getTime() - now.getTime()) / 60_000) : 0;
+    return minutes > 0 ? `in ${formatDuration(minutes)}` : null;
+}
+
+/** "9:00 am – 11:00 am" for a shift, falling back to its raw times when they can't be read. */
+export function shiftRange(shift: Shift) {
+    const span = shiftSpan(shift);
+    if (!span) return `${shift.startTime ?? ''}${shift.endTime ? ` – ${shift.endTime}` : ''}`;
+    return `${formatClock(span.start)} – ${formatClock(span.end % DAY_MINUTES)}`;
+}
+
+/** Where the shift happens: the shift's own address, else the client's address on file. */
+export function shiftAddress(shift: Shift) {
+    return formatShiftLocation(shift.location) || (shift.client as {address?: string} | undefined)?.address || '';
 }
