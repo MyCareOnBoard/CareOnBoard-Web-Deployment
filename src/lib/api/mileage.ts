@@ -168,6 +168,8 @@ export interface CreateManualMileageRequest {
   clientId?: string;
   clientName?: string;
   notes?: string;
+  /** ISO time the trip is planned for; the server uses now when left out. */
+  scheduledStartTime?: string;
 }
 
 export interface RideActionResponse {

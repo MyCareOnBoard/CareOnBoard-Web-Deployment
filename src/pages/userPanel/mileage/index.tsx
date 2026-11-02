@@ -1,298 +1,217 @@
-import { useEffect, useMemo, useState } from "react";
-import { Loader2, Plus } from "lucide-react";
-import { useNavigate } from "react-router";
-import { Button } from "@/components/ui/button";
-import { Routes } from "@/routes/constants";
-import CurrentRide from "./components/CurrentRide";
-import UpcomingRides from "./components/UpcomingRides";
-import AddManualMileageModal from "./components/AddManualMileageModal";
-import DriverLicenseRequiredDialog from "./components/DriverLicenseRequiredDialog";
-import { mileageApi, MileageRide } from "@/lib/api/mileage";
-import { useToast } from "@/hooks/use-toast";
-import { useGetEmployeeDocumentsQuery } from "@/pages/userPanel/dashboard/api";
-import {
-  CARD_SURFACE,
-  PAGE_TITLE,
-  SECTION_SUBTITLE,
-  SECTION_TITLE,
-  SUMMARY_COUNT,
-} from "./mileageStyles";
+import {useCallback, useEffect, useMemo, useState} from 'react';
+import {useNavigate} from 'react-router';
+import {PlusCircle} from 'lucide-react';
+import {Routes} from '@/routes/constants';
+import {mileageApi, type MileageRide, type MileageSegment} from '@/lib/api/mileage';
+import {useToast} from '@/hooks/use-toast';
+import {useAuth} from '@/utils/auth';
+import {useEmployeeShifts} from '@/hooks/useEmployeeShifts';
+import {useGetEmployeeDocumentsQuery} from '@/pages/userPanel/dashboard/api';
+import {toDateKey} from '@/pages/userPanel/dashboard/overviewStats';
+import {cn} from '@/lib/utils';
+import DriverLicenseRequiredDialog from './components/DriverLicenseRequiredDialog';
+import MileageMap from './components/MileageMap';
+import TrackMileageDialog, {type TripDraft} from './components/TrackMileageDialog';
+import {ConfirmRideDialog, PRIMARY_BUTTON, type RideAction} from './components/RideDialogs';
+import {CARD, CurrentRideCard, EmptyRides, OverviewCard, PastRidesCard, RideCardsSkeleton, UpcomingRidesCard} from './components/RideCards';
+import {groupRides, liveDistance, routePath, type LatLng} from './rides';
 
-type FirebaseTimestampLike = { seconds?: number; _seconds?: number };
+const toLatLng = (position: GeolocationPosition): LatLng => ({lat: position.coords.latitude, lng: position.coords.longitude});
 
-const parseRideDate = (value?: string | Date | FirebaseTimestampLike | null): Date | null => {
-  if (!value) return null;
-  if (value instanceof Date) return value;
-  if (typeof value === "string") {
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-  if (typeof value === "object") {
-    const seconds = value.seconds ?? value._seconds;
-    if (typeof seconds === "number") {
-      const parsed = new Date(seconds * 1000);
-      return Number.isNaN(parsed.getTime()) ? null : parsed;
-    }
-  }
-  return null;
+/** One location fix for starting or stopping a ride. */
+function currentPosition() {
+    return new Promise<LatLng>((resolve, reject) => {
+        if (!navigator.geolocation) {
+            reject(new Error("This device can't share its location."));
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(position => resolve(toLatLng(position)), error => {
+            reject(new Error(error.code === error.PERMISSION_DENIED
+                ? 'Allow location access for this site so we can track the distance.'
+                : "We couldn't find your location. Check that location is on and try again."));
+        }, {enableHighAccuracy: true, timeout: 15000, maximumAge: 10000});
+    });
+}
+
+const errorText = (error: unknown, fallback: string) => error instanceof Error && error.message ? error.message : fallback;
+
+const done: Record<RideAction, {title: string; description: string}> = {
+    start: {title: 'Ride started', description: "We're tracking distance from your location."},
+    resume: {title: 'Ride resumed', description: "We're tracking distance again."},
+    pause: {title: 'Ride paused', description: "Tap play when you're ready to carry on."},
+    finish: {title: 'Ride finished', description: 'The distance has been added to your total.'},
+    cancel: {title: 'Ride cancelled', description: 'The trip was taken off your schedule.'},
 };
 
-const isSameLocalDay = (date: Date, today: Date): boolean =>
-  date.toDateString() === today.toDateString();
-
-function formatTotalKm(value: number): string {
-  if (!Number.isFinite(value)) return "0";
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+function shiftWindow(now: Date) {
+    return {
+        startDate: toDateKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30)),
+        endDate: toDateKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 30)),
+    };
 }
 
 export default function MileagePage() {
-  const navigate = useNavigate();
-  const [totalMileage, setTotalMileage] = useState(0);
-  const [rides, setRides] = useState<MileageRide[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
-  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
-  const [showLicensePrompt, setShowLicensePrompt] = useState(false);
-  const { toast } = useToast();
+    const navigate = useNavigate();
+    const {toast} = useToast();
+    const {user} = useAuth();
+    const [rides, setRides] = useState<MileageRide[]>([]);
+    const [total, setTotal] = useState(0);
+    const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(false);
+    const [busy, setBusy] = useState(false);
+    const [pending, setPending] = useState<{action: RideAction; ride: MileageRide} | null>(null);
+    const [trackOpen, setTrackOpen] = useState(false);
+    const [draft, setDraft] = useState<TripDraft | null>(null);
+    const [licensePrompt, setLicensePrompt] = useState(false);
+    const [segments, setSegments] = useState<MileageSegment[]>([]);
+    const [position, setPosition] = useState<LatLng | null>(null);
 
-  const { data: employeeDocuments = [] } = useGetEmployeeDocumentsQuery();
+    // Clients for the trip form come from the caregiver's own shifts, by id only.
+    const [now] = useState(() => new Date());
+    const {startDate, endDate} = useMemo(() => shiftWindow(now), [now]);
+    const {shifts} = useEmployeeShifts({agencyId: user?.agencyId, employeeId: user?.profile?.id, startDate, endDate});
+    const clientIds = useMemo(() => [...new Set(shifts.map(shift => shift.clientId).filter((id): id is string => Boolean(id)))], [shifts]);
 
-  const hasValidDriverLicense = useMemo(() => {
-    const doc = employeeDocuments.find((d) => d.documentType === "driver-license");
-    if (!doc) return false;
-    if (doc.status === "expired") return false;
-    if (doc.expiryDate && new Date(doc.expiryDate) < new Date()) return false;
-    return doc.status === "available" || doc.status === "expiring-soon";
-  }, [employeeDocuments]);
+    const {data: documents = []} = useGetEmployeeDocumentsQuery();
+    const hasLicense = useMemo(() => {
+        const doc = documents.find(item => item.documentType === 'driver-license');
+        if (!doc || doc.status === 'expired') return false;
+        if (doc.expiryDate && new Date(doc.expiryDate) < new Date()) return false;
+        return doc.status === 'available' || doc.status === 'expiring-soon';
+    }, [documents]);
 
-  const handleTrackMileageClick = () => {
-    if (!hasValidDriverLicense) {
-      setShowLicensePrompt(true);
-    } else {
-      setIsManualModalOpen(true);
-    }
-  };
+    const fetchRides = useCallback(async () => {
+        try {
+            const response = await mileageApi.list({limit: 100});
+            setRides(response.data ?? []);
+            setTotal(response.totalMileage ?? 0);
+            setLoadError(false);
+        } catch {
+            setLoadError(true);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+    useEffect(() => { fetchRides(); }, [fetchRides]);
 
-  const fetchRides = async () => {
-    setLoading(true);
-    try {
-      const res = await mileageApi.list();
-      setRides(res.data || []);
-      setTotalMileage(res.totalMileage ?? 0);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "We couldn't load your rides. Try again.";
-      toast({
-        title: "Couldn't load mileage",
-        variant: "destructive",
-        description: message,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+    const {current, upcoming, past} = useMemo(() => groupRides(rides), [rides]);
+    const active = current && (current.status === 'in_progress' || current.status === 'paused') ? current : null;
+    const running = active?.status === 'in_progress';
 
-  useEffect(() => {
-    fetchRides();
-  }, []);
+    // The active ride's legs, for the route on the map and the live distance.
+    const activeKey = active ? `${active.id}:${active.status}:${active.segmentCount ?? 0}` : '';
+    useEffect(() => {
+        if (!active) {
+            setSegments([]);
+            return;
+        }
+        let stale = false;
+        mileageApi.getSegments(active.id)
+            .then(response => { if (!stale) setSegments(response.data ?? []); })
+            .catch(() => { if (!stale) setSegments([]); });
+        return () => { stale = true; };
+        // activeKey changes whenever the ride starts, pauses or gains a leg.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeKey]);
 
-  const currentRide = useMemo(() => {
-    const active = rides.find((ride) => ride.status === "in_progress" || ride.status === "paused");
-    if (active) return active;
+    // Follow the caregiver on the map during a ride, or whenever they've already allowed location.
+    // We never prompt for location just for opening the page.
+    useEffect(() => {
+        if (!navigator.geolocation) return;
+        let watchId: number | null = null;
+        let cancelled = false;
+        const watch = () => {
+            if (cancelled || watchId !== null) return;
+            watchId = navigator.geolocation.watchPosition(next => setPosition(toLatLng(next)), () => undefined,
+                {enableHighAccuracy: Boolean(active), maximumAge: 15000, timeout: 30000});
+        };
+        if (active) watch();
+        else navigator.permissions?.query({name: 'geolocation'}).then(status => { if (status.state === 'granted') watch(); }).catch(() => undefined);
+        return () => {
+            cancelled = true;
+            if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+        };
+    }, [Boolean(active)]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const scheduled = rides
-      .filter((ride) => ride.status === "scheduled")
-      .sort((a, b) => {
-        const aDate = parseRideDate(a.scheduledStartTime);
-        const bDate = parseRideDate(b.scheduledStartTime);
-        const aTime = aDate ? aDate.getTime() : Number.POSITIVE_INFINITY;
-        const bTime = bDate ? bDate.getTime() : Number.POSITIVE_INFINITY;
-        return aTime - bTime;
-      });
+    const path = useMemo(() => routePath(segments), [segments]);
+    const distance = active ? liveDistance(segments, running ? position : null) : null;
 
-    const today = new Date();
-    const scheduledToday = scheduled.filter((ride) => {
-      const rideDate = parseRideDate(ride.scheduledStartTime);
-      return rideDate ? isSameLocalDay(rideDate, today) : false;
-    });
-    return scheduledToday[0] ?? scheduled[0] ?? null;
-  }, [rides]);
+    const openTrack = (next: TripDraft | null = null) => {
+        if (!hasLicense) {
+            setLicensePrompt(true);
+            return;
+        }
+        setDraft(next);
+        setTrackOpen(true);
+    };
 
-  const upcomingRides = useMemo(() => {
-    return rides
-      .filter((ride) => ride.status === "scheduled" && ride.id !== currentRide?.id)
-      .sort((a, b) => {
-        const aDate = parseRideDate(a.scheduledStartTime);
-        const bDate = parseRideDate(b.scheduledStartTime);
-        const aTime = aDate ? aDate.getTime() : Number.POSITIVE_INFINITY;
-        const bTime = bDate ? bDate.getTime() : Number.POSITIVE_INFINITY;
-        return aTime - bTime;
-      });
-  }, [rides, currentRide]);
+    const runAction = async () => {
+        if (!pending) return;
+        const {action, ride} = pending;
+        setBusy(true);
+        try {
+            if (action === 'start' || action === 'resume') {
+                const here = await currentPosition();
+                setPosition(here);
+                await mileageApi.start(ride.id, {startLocation: {latitude: here.lat, longitude: here.lng}});
+            } else if (action === 'pause' || (action === 'finish' && ride.status === 'in_progress')) {
+                // Completing only works on a paused ride, so finishing a moving ride pauses it first.
+                const here = await currentPosition();
+                setPosition(here);
+                await mileageApi.stop(ride.id, {endLocation: {latitude: here.lat, longitude: here.lng}});
+                if (action === 'finish') await mileageApi.complete(ride.id);
+            } else if (action === 'finish') {
+                await mileageApi.complete(ride.id);
+            } else {
+                await mileageApi.cancel(ride.id, {cancelReason: 'Cancelled by caregiver'});
+            }
+            toast(done[action]);
+            setPending(null);
+        } catch (error) {
+            toast({title: "That didn't work", variant: 'destructive', description: errorText(error, 'Please try again.')});
+        } finally {
+            setBusy(false);
+            fetchRides();
+        }
+    };
 
-  const handleStart = async (rideId: string) => {
-    setActionLoading(true);
-    try {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject);
-      });
+    const empty = !loading && !loadError && !rides.length;
 
-      await mileageApi.start(rideId, {
-        startLocation: {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        },
-      });
-      await fetchRides();
-      toast({ title: "Ride started", description: "We're tracking distance from your location." });
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "We couldn't start this ride. Try again.";
-      toast({ title: "Couldn't start ride", variant: "destructive", description: message });
-    } finally {
-      setActionLoading(false);
-    }
-  };
+    return <div className="flex min-h-[calc(100vh-200px)] flex-col">
+        <div className="flex flex-1 flex-col gap-4 rounded-[20px] bg-white p-4 shadow-[0_1px_2px_rgba(16,40,44,0.06)] sm:p-6 dark:bg-[#1b232b]">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <h1 className="text-lg font-semibold text-[#10141a] dark:text-[#f4f6f7]">Mileage</h1>
+                {!loading && !empty && <button type="button" onClick={() => openTrack()} className={cn(PRIMARY_BUTTON, 'h-10 w-auto')}>
+                    <PlusCircle className="h-4 w-4" aria-hidden="true"/> Log mileage
+                </button>}
+            </div>
 
-  const handleStop = async (rideId: string) => {
-    setActionLoading(true);
-    try {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject);
-      });
+            <div className="grid flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+                <MileageMap position={position} path={path} live={running}
+                    className="h-[300px] overflow-hidden rounded-[12px] border border-[#e8edef] sm:h-[400px] lg:h-auto lg:min-h-[600px] dark:border-white/10"/>
 
-      await mileageApi.stop(rideId, {
-        endLocation: {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        },
-      });
-      await fetchRides();
-      toast({
-        title: "Ride paused",
-        description: "Tap Resume when you're ready to continue.",
-      });
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "We couldn't pause this ride. Try again.";
-      toast({ title: "Couldn't pause ride", variant: "destructive", description: message });
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleComplete = async (rideId: string) => {
-    setActionLoading(true);
-    try {
-      await mileageApi.complete(rideId);
-      await fetchRides();
-      toast({ title: "Ride completed", description: "Distance has been saved to your record." });
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "We couldn't complete this ride. Try again.";
-      toast({ title: "Couldn't complete ride", variant: "destructive", description: message });
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleCancel = async (rideId: string) => {
-    setActionLoading(true);
-    try {
-      await mileageApi.cancel(rideId, { cancelReason: "Cancelled by caregiver" });
-      await fetchRides();
-      toast({ title: "Ride cancelled", description: "This trip was removed from your schedule." });
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "We couldn't cancel this ride. Try again.";
-      toast({ title: "Couldn't cancel ride", variant: "destructive", description: message });
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  return (
-    <div className="min-h-[calc(100vh-200px)]">
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className={PAGE_TITLE}>Mileage</h1>
-        <Button
-          type="button"
-          onClick={handleTrackMileageClick}
-          className="w-full sm:w-auto min-h-[44px] flex items-center justify-center gap-2 bg-[#00B4B8] hover:bg-[#00A0A4] text-white rounded-full px-5 text-sm font-semibold shadow-none"
-        >
-          <Plus className="w-4 h-4 shrink-0" aria-hidden />
-          Log mileage
-        </Button>
-      </div>
-
-      <div className={`${CARD_SURFACE} mb-4`}>
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex flex-col gap-1 min-w-0">
-            <p className={SECTION_TITLE}>Overview</p>
-            <p className={SECTION_SUBTITLE}>Total distance you&apos;ve logged</p>
-          </div>
-          <p className={`${SUMMARY_COUNT} shrink-0 tabular-nums`}>
-            {loading ? (
-              <span className="text-[#808081]">…</span>
-            ) : (
-              <>
-                {formatTotalKm(totalMileage)}
-                <span className="text-[20px] font-medium text-[#808081] ml-1">km</span>
-              </>
-            )}
-          </p>
-        </div>
-      </div>
-
-      {loading ? (
-        <div className={`${CARD_SURFACE} mb-4`}>
-          <div className="py-12 flex flex-col items-center justify-center gap-2 text-center">
-            <Loader2 className="w-6 h-6 animate-spin text-[#808081]" aria-hidden />
-            <p className="text-[14px] font-medium text-[#808081]">Loading your rides…</p>
-          </div>
-        </div>
-      ) : (
-        <CurrentRide
-          ride={currentRide}
-          onStart={handleStart}
-          onStop={handleStop}
-          onComplete={handleComplete}
-          onCancel={handleCancel}
-          actionLoading={actionLoading}
-        />
-      )}
-
-      <div className={CARD_SURFACE}>
-        <div className="mb-6">
-          <h2 className={SECTION_TITLE}>Upcoming rides</h2>
-          <p className={`${SECTION_SUBTITLE} mt-1`}>
-            Scheduled trips after your current or next ride
-          </p>
+                <aside aria-label="Your mileage" className="flex flex-col gap-3">
+                    <OverviewCard total={total} loading={loading}/>
+                    {loading ? <RideCardsSkeleton/>
+                        : loadError ? <p role="alert" className={cn(CARD, 'text-center text-[13px] text-[#b3371c] dark:text-[#f3a08c]')}>
+                            We couldn&apos;t load your rides.{' '}
+                            <button type="button" onClick={() => { setLoading(true); fetchRides(); }} className="cursor-pointer font-semibold underline">Try again</button>
+                        </p>
+                        : empty ? <EmptyRides onLog={() => openTrack()}/>
+                        : <>
+                            {current && <CurrentRideCard ride={current} distance={distance} busy={busy} onAction={(action, ride) => setPending({action, ride})}/>}
+                            <UpcomingRidesCard rides={upcoming} locked={Boolean(active)} busy={busy} onAction={(action, ride) => setPending({action, ride})}/>
+                            <PastRidesCard rides={past} onRepeat={ride => openTrack({
+                                type: ride.clientId ? 'client' : 'agency', purpose: ride.purpose ?? '', clientId: ride.clientId, notes: ride.notes ?? '',
+                            })}/>
+                        </>}
+                </aside>
+            </div>
         </div>
 
-        {!loading && (
-          <UpcomingRides
-            rides={upcomingRides}
-            onCancel={handleCancel}
-            actionLoading={actionLoading}
-          />
-        )}
-      </div>
-
-      <AddManualMileageModal
-        isOpen={isManualModalOpen}
-        onClose={() => setIsManualModalOpen(false)}
-        onCreated={fetchRides}
-      />
-
-      <DriverLicenseRequiredDialog
-        open={showLicensePrompt}
-        onOpenChange={setShowLicensePrompt}
-        onGoToDocuments={() => {
-          setShowLicensePrompt(false);
-          navigate(Routes.userPanel.dashboard);
-        }}
-      />
-    </div>
-  );
+        <TrackMileageDialog open={trackOpen} onOpenChange={setTrackOpen} onCreated={fetchRides} clientIds={clientIds} draft={draft}/>
+        <ConfirmRideDialog action={pending?.action ?? null} busy={busy} onConfirm={runAction} onClose={() => { if (!busy) setPending(null); }}/>
+        <DriverLicenseRequiredDialog open={licensePrompt} onOpenChange={setLicensePrompt}
+            onGoToDocuments={() => { setLicensePrompt(false); navigate(Routes.userPanel.dashboard); }}/>
+    </div>;
 }
