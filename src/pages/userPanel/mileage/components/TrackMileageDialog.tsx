@@ -104,7 +104,7 @@ export default function TrackMileageDialog({open, onOpenChange, onCreated, clien
                     <CloseButton/>
                 </div>
 
-                <form className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 pb-5 [&>*]:shrink-0" onSubmit={event => { event.preventDefault(); submit(); }}>
+                <form id={`${id}-form`} className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 pb-5 [&>*]:shrink-0" onSubmit={event => { event.preventDefault(); submit(); }}>
                     <div role="radiogroup" aria-label="Trip for" className="grid grid-cols-2 gap-1 rounded-[8px] bg-[#f3f5f6] p-1 dark:bg-white/5">
                         {(['agency', 'client'] as TripType[]).map(option => <button key={option} type="button" role="radio" aria-checked={type === option}
                             onClick={() => setType(option)}
@@ -161,11 +161,13 @@ export default function TrackMileageDialog({open, onOpenChange, onCreated, clien
                     </div>
 
                     <GpsNote>GPS tracking starts when you tap Start on the created entry.</GpsNote>
-
-                    <button type="submit" disabled={missing || badTime || submitting} className={PRIMARY_BUTTON}>
+                </form>
+                {/* Pinned footer, so the button stays in view while the fields scroll. */}
+                <div className="shrink-0 border-t border-[#edf1f2] px-5 py-4 dark:border-white/10">
+                    <button type="submit" form={`${id}-form`} disabled={missing || badTime || submitting} className={PRIMARY_BUTTON}>
                         {submitting ? 'Setting up…' : 'Set up trip'}
                     </button>
-                </form>
+                </div>
                 <VoiceInputButton className="z-[60]"/>
             </VoiceRecordingProvider>
         </DialogContent>
