@@ -12,7 +12,7 @@ interface ReportPreviewData {
   summary?: SheetSummary[];
   sheetName?: string | null;
   columns?: string[];
-  rows?: unknown[][];
+  rows?: unknown[];
   rowCount?: number;
   truncated?: boolean;
 }
@@ -30,12 +30,24 @@ const MAX_COLUMNS = 5;
  * There is no shared data-table component in this codebase, so this follows the
  * grid-template convention used by the staff-tasks page.
  */
+function parseRow(row: unknown): unknown[] {
+  if (Array.isArray(row)) return row;
+  if (typeof row !== "string") return [];
+  try {
+    const parsed: unknown = JSON.parse(row);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 export default function ReportPreviewCard({ data }: { data: unknown }) {
   const d = data as ReportPreviewData;
   const summary = Array.isArray(d?.summary) ? d.summary : [];
   const allColumns = Array.isArray(d?.columns) ? d.columns : [];
   const columns = allColumns.slice(0, MAX_COLUMNS);
-  const rows = Array.isArray(d?.rows) ? d.rows : [];
+  // Saved chats store each row as a JSON string (Firestore can't hold nested arrays).
+  const rows = (Array.isArray(d?.rows) ? d.rows : []).map(parseRow);
   const hiddenColumns = allColumns.length - columns.length;
 
   return (
