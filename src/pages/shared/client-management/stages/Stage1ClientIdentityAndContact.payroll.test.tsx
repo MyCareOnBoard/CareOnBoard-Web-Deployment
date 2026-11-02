@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { createInitialAddClientFormData } from "../types/formData";
+import { fetchFirstPlaceDetailsForQuery } from "@/hooks/useGooglePlacesAutocomplete";
 import { Stage1ClientIdentityAndContact } from "./Stage1ClientIdentityAndContact";
 
 const { selectSuggestion } = vi.hoisted(() => ({ selectSuggestion: vi.fn() }));
@@ -112,5 +113,15 @@ describe("Stage 1 payroll service locations", () => {
 
     await vi.waitFor(() => expect(selectSuggestion).toHaveBeenCalledWith("same-primary-address"));
     await vi.waitFor(() => expect(current.stage1.payrollServiceLocations).toContainEqual({ source: "primaryAddress", attestedActualServiceLocation: true, effectiveFrom: "2026-08-14" }));
+  });
+
+  it("looks up an imported street together with the document's city/state and ZIP", async () => {
+    const formData = createInitialAddClientFormData();
+    Object.assign(formData.stage1, { address: "12 Maple Ave", countyState: "Trenton, NJ", zipCode: "08608" });
+    formData._pendingImportedPrimaryGeocode = true;
+    vi.mocked(fetchFirstPlaceDetailsForQuery).mockResolvedValue(null);
+    render(<Stage1ClientIdentityAndContact formData={formData} setFormData={vi.fn()} footer={null} />);
+    await act(async () => {});
+    expect(fetchFirstPlaceDetailsForQuery).toHaveBeenCalledWith("12 Maple Ave, Trenton, NJ, 08608");
   });
 });

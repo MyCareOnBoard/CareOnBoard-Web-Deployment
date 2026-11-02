@@ -144,6 +144,12 @@ export function Stage1ClientIdentityAndContact({
 
     let cancelled = false;
     const rawQuery = String(formData.stage1.address ?? "").trim();
+    // Documents often give the street on one line and the ZIP / county-state on
+    // others. A bare street ("12 Maple Ave") can match another state, so add them.
+    const extras = [formData.stage1.countyState, formData.stage1.zipCode]
+      .map((part) => String(part ?? "").replace(/\s*\/\s*/g, ", ").trim())
+      .filter((part) => part && !rawQuery.toLowerCase().includes(part.toLowerCase()));
+    const geocodeQuery = [rawQuery, ...extras].join(", ");
 
     if (rawQuery.length < 3) {
       setFormData((prev) => {
@@ -156,7 +162,7 @@ export function Stage1ClientIdentityAndContact({
     }
 
     void (async () => {
-      const details = await fetchFirstPlaceDetailsForQuery(rawQuery);
+      const details = await fetchFirstPlaceDetailsForQuery(geocodeQuery);
       if (cancelled) return;
 
       setFormData((prev) => {
@@ -202,6 +208,8 @@ export function Stage1ClientIdentityAndContact({
   }, [
     formData._pendingImportedPrimaryGeocode,
     formData.stage1.address,
+    formData.stage1.countyState,
+    formData.stage1.zipCode,
     setFormData,
   ]);
   const handlePrimaryAddressDetails = (details: AddressDetails) => {
