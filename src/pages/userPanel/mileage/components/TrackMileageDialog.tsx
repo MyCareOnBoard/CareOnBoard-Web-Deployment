@@ -104,7 +104,7 @@ export default function TrackMileageDialog({open, onOpenChange, onCreated, clien
                     <CloseButton/>
                 </div>
 
-                <form className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 pb-5" onSubmit={event => { event.preventDefault(); submit(); }}>
+                <form className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 pb-5 [&>*]:shrink-0" onSubmit={event => { event.preventDefault(); submit(); }}>
                     <div role="radiogroup" aria-label="Trip for" className="grid grid-cols-2 gap-1 rounded-[8px] bg-[#f3f5f6] p-1 dark:bg-white/5">
                         {(['agency', 'client'] as TripType[]).map(option => <button key={option} type="button" role="radio" aria-checked={type === option}
                             onClick={() => setType(option)}
