@@ -80,6 +80,8 @@ export type DocumentImportDialogProps<T extends ImportExtractionResult = ClientE
   disabled?: boolean;
   /** Files already attached to the target doc slots, shown pre-filled each time the modal opens. */
   initialFiles?: Record<string, File>;
+  /** Open the dialog on mount and start reading `initialFiles` right away (folder import). */
+  autoStart?: boolean;
 };
 
 type ModalStep = "pick" | "review";
@@ -103,6 +105,7 @@ export default function DocumentImportDialog<T extends ImportExtractionResult = 
   triggerClassName,
   disabled = false,
   initialFiles,
+  autoStart = false,
 }: DocumentImportDialogProps<T>) {
   const backToPickRef = useRef<HTMLButtonElement>(null);
   const activeRequest = useRef<AbortController | null>(null);
@@ -156,6 +159,7 @@ export default function DocumentImportDialog<T extends ImportExtractionResult = 
     setImportModalOpen(true);
   }, [resetPickState, seedInitialFiles]);
 
+  const autoStarted = useRef(false);
   const closeImportModal = useCallback(() => {
     setImportModalOpen(false);
     setModalStep("pick");
@@ -221,6 +225,19 @@ export default function DocumentImportDialog<T extends ImportExtractionResult = 
     },
     [onExtract, disabled],
   );
+
+  useEffect(() => {
+    if (!autoStart || autoStarted.current || disabled || !initialFiles || !Object.keys(initialFiles).length) return;
+    // Deferred so StrictMode's mount/unmount/mount check starts the read only once.
+    const timer = window.setTimeout(() => {
+      autoStarted.current = true;
+      resetPickState();
+      setModalStep("pick");
+      setImportModalOpen(true);
+      void runExtract(initialFiles);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [autoStart, disabled, initialFiles, resetPickState, runExtract]);
 
   const pickMultipleFiles = (files: File[]) => {
     if (busy || disabled) return;

@@ -17,9 +17,12 @@ const SLOTS: ImportSlot[] = [
 export default function HhaImportFromFilePanel({
   formData,
   setFormData,
+  autoStart = false,
 }: {
   formData: AddClientFormData;
   setFormData: React.Dispatch<React.SetStateAction<AddClientFormData>>;
+  /** Folder import: read the attached POC / Clinical Assessment as soon as the wizard opens. */
+  autoStart?: boolean;
 }) {
   // Same query args as Stage 2 so this reuses the cached HHA catalog. Imported
   // authorizations are resolved against it (matched rows kept, unmatched dropped).
@@ -89,6 +92,7 @@ export default function HhaImportFromFilePanel({
       onApply={onApply}
       computePreviewWarnings={computePreviewWarnings}
       initialFiles={initialFiles}
+      autoStart={autoStart}
     />
   );
 }

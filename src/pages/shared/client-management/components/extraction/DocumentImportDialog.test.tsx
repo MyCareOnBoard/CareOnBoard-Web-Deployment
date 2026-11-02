@@ -1,3 +1,4 @@
+import React from "react";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import DocumentImportDialog from "./DocumentImportDialog";
@@ -104,4 +105,13 @@ test("multiple-file selection keeps valid files, rejects invalid files and allow
   fireEvent.click(screen.getByRole("button", { name: "Remove selected NJCAT.pdf" }));
   expect(screen.queryByText("NJCAT.pdf")).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: /Extract information/ })).toBeDisabled();
+});
+
+test("autoStart opens the dialog and reads the initial files once, including under StrictMode", async () => {
+  const onExtract = vi.fn().mockResolvedValue(response);
+  const { rerender } = render(<React.StrictMode><DocumentImportDialog<typeof response> {...props} onExtract={onExtract} onApply={vi.fn()} initialFiles={{ file }} autoStart /></React.StrictMode>);
+  await screen.findByRole("dialog", { name: "Review extracted information" });
+  rerender(<React.StrictMode><DocumentImportDialog<typeof response> {...props} onExtract={onExtract} onApply={vi.fn()} initialFiles={{ file }} autoStart /></React.StrictMode>);
+  expect(onExtract).toHaveBeenCalledTimes(1);
+  expect(onExtract.mock.calls[0][0]).toEqual({ file });
 });

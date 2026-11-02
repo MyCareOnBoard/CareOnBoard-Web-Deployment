@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router";
+import React, { useEffect, useMemo, useState } from "react";
+import { useParams, useNavigate, useSearchParams } from "react-router";
 import { Loader2 } from "lucide-react";
 import { Routes } from "@/routes/constants";
 import { getAgencyClientById, type Client } from "@/lib/api/clients";
@@ -9,6 +9,7 @@ import { clientToFormData } from "../utils/clientToFormData";
 import { createInitialAddClientFormData, type ClientType } from "../types/formData";
 import { ClientFormConfig } from "../types/config";
 import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
+import { buildFolderImportFormData, folderImportSession, FOLDER_IMPORT_PARAM } from "../utils/folderImport";
 
 type AgencyClientFormWrapperProps = {
   isEditMode?: boolean;
@@ -26,6 +27,23 @@ export function AgencyClientFormWrapper({ isEditMode = false }: AgencyClientForm
   const supportedClientTypes: ClientType[] | undefined = selectedMode === "sc" ? ["ddd"] : selectedMode
     ? [selectedMode]
     : agencyTypes.length ? agencyTypes : undefined;
+
+  const [searchParams] = useSearchParams();
+  // Folder import: the add page builds the client from the folder; after a "save and
+  // continue" the edit page keeps the id so the final save returns to the folder list.
+  const folderImportId = searchParams.get(FOLDER_IMPORT_PARAM);
+  const folderOwner = user?.uid;
+  const requestedFolderMode = selectedMode ?? folderImportSession.get(folderOwner)?.mode;
+  const folderMode = requestedFolderMode === "hha" || requestedFolderMode === "ddd" ? requestedFolderMode : null;
+  const folderItem = useMemo(
+    () => (folderMode ? folderImportSession.client(folderOwner, folderImportId, folderMode) : null),
+    [folderOwner, folderImportId, folderMode],
+  );
+  const folderImport = useMemo(() => {
+    if (isEditMode || !folderItem || !folderMode) return null;
+    const { formData, unattached } = buildFolderImportFormData(folderItem, folderMode);
+    return { formData, wizard: { name: folderItem.name, autofillFiles: folderItem.autofillFiles, unattached } };
+  }, [isEditMode, folderItem, folderMode]);
 
   const [client, setClient] = useState<Client | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -103,7 +121,7 @@ export function AgencyClientFormWrapper({ isEditMode = false }: AgencyClientForm
 
   const initialFormData = isEditMode && client
     ? clientToFormData(client, false)
-    : createInitialAddClientFormData();
+    : folderImport?.formData ?? createInitialAddClientFormData();
 
   const config: ClientFormConfig = {
     showAgencySelection: false,
@@ -118,6 +136,16 @@ export function AgencyClientFormWrapper({ isEditMode = false }: AgencyClientForm
   };
 
   const handleSuccess = (id?: string, isProgressive?: boolean) => {
+    if (folderItem && id) {
+      folderImportSession.markCreated(folderItem.id, id);
+      if (isProgressive) {
+        navigate(`${Routes.agency.editClient.replace(":clientId", id)}?${FOLDER_IMPORT_PARAM}=${encodeURIComponent(folderItem.id)}`, { replace: true });
+      } else {
+        // Back to the folder list so the next client can be set up.
+        navigate(`${Routes.agency.clients}?${FOLDER_IMPORT_PARAM}=resume`);
+      }
+      return;
+    }
     if (id && isProgressive) {
       navigate(Routes.agency.editClient.replace(":clientId", id), { replace: true });
     } else if (id) {
@@ -129,12 +157,13 @@ export function AgencyClientFormWrapper({ isEditMode = false }: AgencyClientForm
 
   return (
     <ClientFormWizard
-      key={selectedMode ?? "default"}
+      key={`${selectedMode ?? "default"}:${folderImport ? folderItem?.id : ""}`}
       initialFormData={initialFormData}
       clientId={clientId}
       isEditMode={isEditMode}
       config={config}
       onSuccess={handleSuccess}
+      folderImport={folderImport?.wizard}
     />
   );
 }

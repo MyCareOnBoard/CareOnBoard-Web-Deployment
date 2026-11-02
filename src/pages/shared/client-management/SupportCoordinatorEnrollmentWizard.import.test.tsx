@@ -271,3 +271,22 @@ test("closing during Google matching cancels the lookup and ignores its late res
   expect(screen.queryByRole("dialog", { name: "Review extracted information" })).not.toBeInTheDocument();
   expect(screen.queryByText("Enrolling Alex Example")).not.toBeInTheDocument();
 });
+
+test("a folder-imported client opens with its documents pending and reads them for autofill once", async () => {
+  const { folderImportSession, groupFolderFiles } = await import("./utils/folderImport");
+  const files = ["NJCAT.pdf", "Tier letter.pdf"].map(name => {
+    const file = new File(["%PDF-1.7"], name, { type: "application/pdf" });
+    Object.defineProperty(file, "webkitRelativePath", { value: `Intake/Alex Example/${name}` });
+    return file;
+  });
+  folderImportSession.start("owner", "sc", "Intake", groupFolderFiles(files, "sc"));
+  try {
+    render(<MemoryRouter initialEntries={["/agency/clients/add?folderImport=client-0"]}><SupportCoordinatorEnrollmentWizard /></MemoryRouter>);
+    expect(screen.getByText(/Importing from folder: Alex Example/)).toBeInTheDocument();
+    await screen.findByRole("dialog", { name: "Review extracted information" });
+    expect(extractScClientOnboardingViaApi).toHaveBeenCalledTimes(2);
+    expect(screen.getAllByText("Autofill from documents (2)")[0]).toBeInTheDocument();
+  } finally {
+    folderImportSession.clear();
+  }
+});

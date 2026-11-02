@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
-import { Link, useNavigate, useParams } from "react-router";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { format, parseISO } from "date-fns";
 import { Eye, EyeOff, Info, Loader2, UploadCloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import ScEnrollmentDocumentsStep from "./components/ScEnrollmentDocumentsStep";
 import { mergeScExtractionBatch } from "./utils/mergeScExtractionBatch";
 import { createScPendingDocument, mergeScPendingDocuments, scPendingDocumentsError, toScClientDocument, type ScPendingDocument } from "./utils/scEnrollmentDocuments";
 import { useToast } from "@/hooks/use-toast";
+import { folderImportSession, FOLDER_IMPORT_PARAM } from "./utils/folderImport";
 import { useAssignmentReviewScope } from "@/hooks/useAssignmentReview";
 import { getAgencyById } from "@/lib/api/agencies";
 import { documentReviewTypes, getScMonitoringPolicy, saveScMonitoringPolicy, type MonitoringPolicyResponse } from "@/lib/api/sc-monitoring-policy";
@@ -107,7 +108,12 @@ function EnrollmentWizard({ isEditMode }: { isEditMode: boolean }) {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState("");
   const [photoError, setPhotoError] = useState("");
-  const [pendingDocuments, setPendingDocuments] = useState<ScPendingDocument[]>([]);
+  const [searchParams] = useSearchParams();
+  const folderImportId = isEditMode ? null : searchParams.get(FOLDER_IMPORT_PARAM);
+  const folderClient = useMemo(() => folderImportSession.client(user?.uid, folderImportId, "sc"), [user?.uid, folderImportId]);
+  // Folder import: every supported file attaches on save; up to 5 are read on arrival.
+  const [pendingDocuments, setPendingDocuments] = useState<ScPendingDocument[]>(() => folderClient ? mergeScPendingDocuments([], folderClient.files.map(({ file }) => ({ file }))) : []);
+  const [folderAutofillPending, setFolderAutofillPending] = useState(() => Boolean(folderClient && Object.keys(folderClient.autofillFiles).length));
   const [pendingOutcomeId, setPendingOutcomeId] = useState<string | null>(null);
   const [showSSN, setShowSSN] = useState(false);
   const [signatureTarget, setSignatureTarget] = useState<"participant" | "guardian" | "family" | null>(null);
@@ -133,6 +139,7 @@ function EnrollmentWizard({ isEditMode }: { isEditMode: boolean }) {
   const progress = Math.round(completedCount / steps.length * 100);
   const pendingOutcome = form.outcomes.find(outcome => outcome.id === pendingOutcomeId);
   const name = form.firstName.trim() ? `${isEditMode ? "Editing" : "Enrolling"} ${form.firstName.trim()} ${form.lastName.trim()}`.trim() : isEditMode ? "Edit client" : "New client enrollment";
+  useEffect(() => { if (step !== 0) setFolderAutofillPending(false); }, [step]);
   useEffect(() => {
     alive.current = true;
     return () => { alive.current = false; };
@@ -301,6 +308,11 @@ function EnrollmentWizard({ isEditMode }: { isEditMode: boolean }) {
   const finishSave = (savedId: string) => {
     const missing = savedRecord.current?.attachmentErrors || [];
     toast(missing.length ? { title: "Client saved with missing attachments", description: `The ${missing.join(" and ")} could not be attached. Add it from the client record.`, variant: "destructive" } : { title: isEditMode ? "Client updated" : "Enrollment saved", description: isEditMode ? "Client changes were saved." : "A pending client record was created.", variant: "success" });
+    if (folderClient) {
+      folderImportSession.markCreated(folderClient.id, savedId);
+      navigate(`${Routes.agency.clients}?${FOLDER_IMPORT_PARAM}=resume`);
+      return;
+    }
     navigate(Routes.agency.clientDetails.replace(":clientId", savedId));
   };
   const policyFailure = (cause: unknown) => {
@@ -506,6 +518,7 @@ function EnrollmentWizard({ isEditMode }: { isEditMode: boolean }) {
     </aside>
 
     <main className="sc-enrollment-main">
+      {folderClient && step === 0 && <p role="status" className="mb-4 rounded-xl border border-[#cce9ea] bg-[#f2fbfb] px-4 py-3 text-[13px] leading-5 text-[#10141a] [overflow-wrap:anywhere]"><span className="font-semibold">Importing from folder: {folderClient.name}.</span> {folderClient.files.length} {folderClient.files.length === 1 ? "document is" : "documents are"} ready to attach in Documents{folderClient.files.length > Object.keys(folderClient.autofillFiles).length ? `. The first ${Object.keys(folderClient.autofillFiles).length} are read for autofill; use "Use for autofill" in Documents for the rest` : ""}.</p>}
       <div className="sc-enrollment-heading"><div><h1>{steps[step]}</h1><p>{[
         "Choose the program for this participant.",
         "Enter the participant's identity, contact details, and program IDs.",
@@ -516,7 +529,7 @@ function EnrollmentWizard({ isEditMode }: { isEditMode: boolean }) {
         "Review the program terms with the participant before signing.",
         "Confirm the participant's signature and submit the enrollment.",
       ][step]}</p></div><div className="sc-enrollment-heading-actions">
-        {step === 0 && <ScImportFromFilePanel form={form} onApply={applyImport} pendingDocuments={pendingDocuments} onRemoveDocument={removeDocument} disabled={saving || createResultUnknown || Boolean(savedClientId)} />}
+        {step === 0 && <ScImportFromFilePanel form={form} onApply={applyImport} pendingDocuments={pendingDocuments} onRemoveDocument={removeDocument} initialFiles={folderAutofillPending ? folderClient?.autofillFiles : undefined} autoStart={folderAutofillPending} disabled={saving || createResultUnknown || Boolean(savedClientId)} />}
         <span className="sc-enrollment-step-number">Step {step + 1} of {steps.length}</span>
       </div></div>
       <form onSubmit={submit} className="sc-enrollment-form">

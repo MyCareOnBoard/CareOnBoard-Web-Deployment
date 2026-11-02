@@ -13,6 +13,7 @@ import { useListAgencyClientsQuery, useGetClientStatsQuery, type Client } from "
 import { countUniqueAssignedDspsForClient } from "@/lib/countUniqueAssignedDsps";
 import { isForm485Required } from "@/pages/shared/client-management/utils/form485GenerationEligibility";
 import SupportCoordinatorClientsPage from "./SupportCoordinatorClientsPage";
+import FolderImportDialog from "@/pages/shared/client-management/components/FolderImportDialog";
 
 interface DisplayClient {
   id: string;
@@ -77,6 +78,19 @@ function AgencyClientsPage() {
     ].filter(Boolean);
     return parts.join(" ") || "Unnamed Client";
   }, []);
+
+  // Names for the folder import's "already exists" hint, with and without middle names.
+  const existingClientNames = useMemo(
+    () => clients.flatMap((client) => [formatClientName(client), [client.firstName, client.lastName].filter(Boolean).join(" ")]),
+    [clients, formatClientName],
+  );
+  const folderImportModes = useMemo(
+    () => {
+      const types = (user?.agency?.supportedClientTypes ?? []).filter((type): type is "ddd" | "hha" => type === "ddd" || type === "hha");
+      return types.length ? types : (["ddd", "hha"] as Array<"ddd" | "hha">);
+    },
+    [user?.agency?.supportedClientTypes],
+  );
 
   // Format date from ISO string or Firestore Timestamp (memoized)
   const formatDate = useCallback((dateValue?: string | { _seconds?: number; _nanoseconds?: number } | Date): string => {
@@ -226,14 +240,21 @@ function AgencyClientsPage() {
             <ArrowRight className="w-5 h-5 text-[#525253]" />
           </button> */}
         </div>
-        <Button
-          size="lg"
-          className="h-[52px] px-[16px] py-[12px]"
-          onClick={() => navigate(Routes.agency.addClient)}
-        >
-          <Plus className="w-5 h-5 text-white" />
-          Add Client
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <FolderImportDialog
+            mode={selectedMode === "ddd" || selectedMode === "hha" ? selectedMode : null}
+            allowedModes={folderImportModes}
+            existingClientNames={existingClientNames}
+          />
+          <Button
+            size="lg"
+            className="h-[52px] px-[16px] py-[12px]"
+            onClick={() => navigate(Routes.agency.addClient)}
+          >
+            <Plus className="w-5 h-5 text-white" />
+            Add Client
+          </Button>
+        </div>
       </div>
 
       {/* Summary Card */}

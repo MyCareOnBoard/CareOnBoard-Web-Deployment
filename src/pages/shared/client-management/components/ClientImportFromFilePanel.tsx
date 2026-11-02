@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useMemo } from "react";
 import { Info } from "lucide-react";
 import { extractClientIspViaApi } from "@/lib/api/gemini";
 import type { ClientExtractionResponse } from "../types/clientExtraction";
@@ -11,13 +11,37 @@ import DocumentImportDialog, {
 
 const SLOTS: ImportSlot[] = [{ id: "file", label: "ISP document" }];
 
+/**
+ * A folder-imported file is attached to its guessed slot before it is read. When the
+ * reader recognises it as a different document, drop the guessed copy so the file is
+ * not saved twice.
+ */
+export function withoutGuessedSlot(formData: AddClientFormData, file: File | undefined, detected: string): AddClientFormData {
+  if (!file || !formData.stage3.docs.some((d) => d.key === detected)) return formData;
+  return {
+    ...formData,
+    stage3: {
+      ...formData.stage3,
+      docs: formData.stage3.docs.map((d) => {
+        if (d.key === detected || (d.file !== file && !d.files?.includes(file))) return d;
+        const files = (d.files ?? (d.file ? [d.file] : [])).filter((f) => f !== file);
+        return { ...d, file: files[0], files: files.length > 1 ? files : undefined, fileName: files.length ? files.map((f) => f.name).join(", ") : undefined };
+      }),
+    },
+  };
+}
+
 export default function ClientImportFromFilePanel({
   formData,
   setFormData,
+  autoStartFile,
 }: {
   formData: AddClientFormData;
   setFormData: React.Dispatch<React.SetStateAction<AddClientFormData>>;
+  /** Folder import: read this file as soon as the wizard opens. */
+  autoStartFile?: File;
 }) {
+  const autoStartFiles = useMemo(() => (autoStartFile ? { file: autoStartFile } : undefined), [autoStartFile]);
   const onExtract = useCallback(
     (files: Record<string, File>) =>
       extractClientIspViaApi(files.file, { type: formData.type }),
@@ -29,7 +53,8 @@ export default function ClientImportFromFilePanel({
       extraction: ClientExtractionResponse,
       { overwrite, files }: { overwrite: boolean; files: Record<string, File> },
     ) => {
-      const { formData: merged } = mergeExtractionDraft(formData, extraction, {
+      const base = withoutGuessedSlot(formData, files.file, extraction.detectedDocumentType);
+      const { formData: merged } = mergeExtractionDraft(base, extraction, {
         overwrite,
         importFile: files.file ?? null,
       });
@@ -104,6 +129,8 @@ export default function ClientImportFromFilePanel({
       onExtract={onExtract}
       onApply={onApply}
       computePreviewWarnings={computePreviewWarnings}
+      initialFiles={autoStartFiles}
+      autoStart={Boolean(autoStartFiles)}
     />
   );
 }

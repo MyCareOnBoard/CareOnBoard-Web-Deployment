@@ -27,13 +27,15 @@ const documentTypeLabels = {
   pcpt: "Person-Centered Planning Tool (PCPT)", other: "Other intake document", unknown: "Unrecognized document",
 };
 
-export default function ScImportFromFilePanel<T extends ScImportFormValues>({ form, disabled, pendingDocuments, onApply, onRemoveDocument, initialFiles, triggerLabel, triggerAriaLabel, triggerClassName }: {
+export default function ScImportFromFilePanel<T extends ScImportFormValues>({ form, disabled, pendingDocuments, onApply, onRemoveDocument, initialFiles, autoStart, triggerLabel, triggerAriaLabel, triggerClassName }: {
   form: T;
   disabled: boolean;
   pendingDocuments: ScPendingDocument[];
   onRemoveDocument: (file: File) => void;
   onApply: (extraction: ScImportReview, context: { overwrite: boolean; files: Record<string, File> }) => void;
   initialFiles?: Record<string, File>;
+  /** Folder import: open and start reading `initialFiles` right away. */
+  autoStart?: boolean;
   triggerLabel?: string;
   triggerAriaLabel?: string;
   triggerClassName?: string;
@@ -72,6 +74,7 @@ export default function ScImportFromFilePanel<T extends ScImportFormValues>({ fo
     triggerAriaLabel={triggerAriaLabel ?? "Autofill from documents"}
     triggerClassName={triggerClassName ?? "sc-enrollment-upload"}
     initialFiles={initialFiles}
+    autoStart={autoStart}
     dialogTitlePick="Import client document"
     pickDescription={<div className="w-full space-y-4 text-[13px] leading-relaxed text-[#617579]">
       <p>Select up to 5 different files, including an ISP, completed NJCAT, DDD application, enrollment agreement, or supporting document. Review extracted information and Google Places address matches before applying them. Originals attach when you save the client.</p>

@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Routes } from "@/routes/constants";
 import { useListAgencyClientsQuery } from "@/lib/api/clients";
 import { useAuth } from "@/utils/auth";
+import FolderImportDialog from "@/pages/shared/client-management/components/FolderImportDialog";
 import "./support-coordinator-clients.css";
 
 type Filter = "All clients" | "SP" | "CCP";
@@ -50,6 +51,7 @@ export default function SupportCoordinatorClientsPage() {
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-[28px] font-bold leading-[1.4] text-[#10141a] sm:text-[32px] lg:text-[40px]">Client Management</h1>
         <div className="flex flex-wrap items-center gap-3">
+          <FolderImportDialog mode="sc" allowedModes={["sc"]} existingClientNames={clients.flatMap((client) => [[client.firstName, client.middleName, client.lastName].filter(Boolean).join(" "), [client.firstName, client.lastName].filter(Boolean).join(" ")])} />
           <Button size="lg" className="h-[52px] gap-2 px-5" onClick={() => navigate(Routes.agency.addClient)}>
             <Plus className="h-5 w-5" />New Enrollment
           </Button>

@@ -57,6 +57,8 @@ type ClientFormWizardProps = {
   isEditMode?: boolean;
   config: ClientFormConfig;
   onSuccess?: (clientId?: string, isProgressive?: boolean) => void;
+  /** Set when this client comes from "Import from folder": its type and documents are pre-filled. */
+  folderImport?: { name: string; autofillFiles: Record<string, File>; unattached: string[] };
 };
 
 export function ClientFormWizard({
@@ -65,6 +67,7 @@ export function ClientFormWizard({
   isEditMode = false,
   config,
   onSuccess,
+  folderImport,
 }: ClientFormWizardProps) {
   const {
     formData,
@@ -100,7 +103,10 @@ export function ClientFormWizard({
   const [savedClientName, setSavedClientName] = React.useState<string | undefined>(undefined);
   const [pocGuardOpen, setPocGuardOpen] = useState(false);
   const [generatePocOpen, setGeneratePocOpen] = useState(false);
-  const [typeSelected, setTypeSelected] = useState(isEditMode);
+  const [typeSelected, setTypeSelected] = useState(isEditMode || Boolean(folderImport));
+  // Read the folder's documents once, on first arrival at step 1.
+  const [folderAutofillPending, setFolderAutofillPending] = useState(Boolean(folderImport));
+  useEffect(() => { if (stage !== 1) setFolderAutofillPending(false); }, [stage]);
   const savedClientIdRef = useRef<string | undefined>(clientId);
   const reviewCaptureRef = useRef("");
   const savedAssignmentFormRef = useRef(initialFormData);
@@ -157,7 +163,7 @@ export function ClientFormWizard({
 
   // When the agency supports exactly one client type, skip the picker entirely
   // for new clients by auto-selecting that type (jumps straight to Stage 1).
-  const autoSelectedRef = useRef(false);
+  const autoSelectedRef = useRef(Boolean(folderImport));
   useEffect(() => {
     if (isEditMode) return;
     if (autoSelectedRef.current) return;
@@ -372,9 +378,9 @@ export function ClientFormWizard({
             !isEditMode ? (
               <Suspense fallback={null}>
                 {formData.type === "hha" ? (
-                  <HhaImportFromFilePanel formData={formData} setFormData={setFormData} />
+                  <HhaImportFromFilePanel formData={formData} setFormData={setFormData} autoStart={folderAutofillPending} />
                 ) : (
-                  <ClientImportFromFilePanel formData={formData} setFormData={setFormData} />
+                  <ClientImportFromFilePanel formData={formData} setFormData={setFormData} autoStartFile={folderAutofillPending ? folderImport?.autofillFiles.file : undefined} />
                 )}
               </Suspense>
             ) : undefined
@@ -465,6 +471,8 @@ export function ClientFormWizard({
     decisionState,
     savedReview,
     assignmentsUnsaved,
+    folderAutofillPending,
+    folderImport,
   ]);
 
   return (
@@ -478,6 +486,17 @@ export function ClientFormWizard({
               : (previous.servicePrograms ?? [previous.type]).filter((program) => program !== "sc") }))} />
           Enroll this client in Support Coordination
         </label>
+      )}
+      {folderImport && stage === 1 && (
+        <div role="status" className="mb-5 rounded-xl border border-[#cce9ea] bg-[#f2fbfb] px-4 py-3 text-[13px] leading-5 text-[#10141a]">
+          <p className="font-semibold [overflow-wrap:anywhere]">Importing from folder: {folderImport.name}</p>
+          <p className="text-[#5c6368]">Documents from the folder are attached in step 3. Review the values read from them before saving.</p>
+          {folderImport.unattached.length > 0 && (
+            <p className="mt-1 text-[#8a5a00] [overflow-wrap:anywhere]">
+              Not matched to a document slot, attach in step 3 if needed: {folderImport.unattached.join(", ")}
+            </p>
+          )}
+        </div>
       )}
       {stageContent}
       {stage !== 2 && agencyMode !== "sc" && rosterSubmissionBlocked(decisionState, rosterRows(savedAssignmentFormRef.current), rosterRows(formData), formData.type) && <p className="my-3 text-sm">Review each newly selected staff member in Step 2 before saving assignments.</p>}
