@@ -1,7 +1,8 @@
-import {useEffect, useMemo, useState} from 'react';
+import {useEffect, useMemo, useRef, useState} from 'react';
 import {GoogleMap, MarkerF, PolylineF, useJsApiLoader} from '@react-google-maps/api';
-import {MapPin} from 'lucide-react';
+import {LocateFixed, MapPin} from 'lucide-react';
 import {apiKey, GOOGLE_MAPS_LOADER_ID, libraries} from '@/providers/GoogleMapsLoader';
+import {cn} from '@/lib/utils';
 import type {LatLng} from '../rides';
 
 // Light grey map, as in the design, so the route and pins stand out.
@@ -40,6 +41,8 @@ interface Props {
     path: LatLng[];
     /** The ride is moving, so draw on from the last point to where the caregiver is. */
     live?: boolean;
+    /** Why we can't show the caregiver's location, if we can't. */
+    locationNote?: string | null;
     className?: string;
 }
 
@@ -53,7 +56,7 @@ function Placeholder({className}: {className?: string}) {
     </div>;
 }
 
-function LoadedMap({position, path, live = false, className}: Props) {
+function LoadedMap({position, path, live = false, locationNote, className}: Props) {
     const {isLoaded, loadError} = useJsApiLoader({id: GOOGLE_MAPS_LOADER_ID, googleMapsApiKey: apiKey, libraries});
     const [map, setMap] = useState<google.maps.Map | null>(null);
     // The drawn route: the saved legs, then (while moving) on to where the caregiver is now.
@@ -64,6 +67,8 @@ function LoadedMap({position, path, live = false, className}: Props) {
     const routeKey = route.map(point => `${point.lat},${point.lng}`).join('|');
 
     // Frame the whole route when there is one, else follow the caregiver.
+    // The first fix zooms in to street level so the caregiver can see where they are.
+    const zoomedIn = useRef(false);
     useEffect(() => {
         if (!map) return;
         if (route.length > 1) {
@@ -72,15 +77,18 @@ function LoadedMap({position, path, live = false, className}: Props) {
             map.fitBounds(bounds, 48);
         } else if (lat !== undefined && lng !== undefined) {
             map.panTo({lat, lng});
+            if (!zoomedIn.current) map.setZoom(15);
         }
+        if (lat !== undefined) zoomedIn.current = true;
         // routeKey stands in for `route`, which is a new array on every position update.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [map, routeKey, lat, lng]);
 
     const [initialCenter] = useState(() => position ?? path[0] ?? FALLBACK_CENTER);
+    const [initialZoom] = useState(position ? 15 : 11);
     if (!isLoaded || loadError) return <Placeholder className={className}/>;
-    return <div className={className}>
-        <GoogleMap mapContainerClassName="h-full w-full" center={initialCenter} zoom={position ? 14 : 11}
+    return <div className={cn('relative', className)}>
+        <GoogleMap mapContainerClassName="h-full w-full" center={initialCenter} zoom={initialZoom}
             options={MAP_OPTIONS} onLoad={setMap} onUnmount={() => setMap(null)}>
             {route.length > 1 && <PolylineF path={route} options={{strokeColor: '#20a35c', strokeWeight: 4, strokeOpacity: 0.95}}/>}
             {start && <MarkerF position={start} title="Ride start" icon={{url: PIN_URL, scaledSize: new google.maps.Size(36, 46), anchor: new google.maps.Point(18, 45)}}/>}
@@ -94,6 +102,13 @@ function LoadedMap({position, path, live = false, className}: Props) {
                 }}/>
             </>}
         </GoogleMap>
+        {position && <button type="button" onClick={() => { map?.panTo(position); map?.setZoom(15); }} aria-label="Show my location" title="Show my location"
+            className="absolute left-3 top-3 grid h-10 w-10 cursor-pointer place-items-center rounded-[8px] bg-white text-[#007679] shadow-[0_1px_4px_rgba(16,40,44,0.2)] transition-colors hover:bg-[#f3f5f6]">
+            <LocateFixed className="h-5 w-5" aria-hidden="true"/>
+        </button>}
+        {locationNote && <p role="status" className="absolute inset-x-3 top-3 mx-auto max-w-[420px] rounded-[8px] bg-white/95 px-3 py-2 text-center text-[13px] text-[#3d4a50] shadow-[0_1px_4px_rgba(16,40,44,0.2)]">
+            {locationNote}
+        </p>}
     </div>;
 }
 

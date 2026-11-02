@@ -114,23 +114,21 @@ export default function MileagePage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeKey]);
 
-    // Follow the caregiver on the map during a ride, or whenever they've already allowed location.
-    // We never prompt for location just for opening the page.
+    // Show the caregiver where they are: ask for location when the page opens and follow it.
+    const [locationNote, setLocationNote] = useState<string | null>(null);
     useEffect(() => {
-        if (!navigator.geolocation) return;
-        let watchId: number | null = null;
-        let cancelled = false;
-        const watch = () => {
-            if (cancelled || watchId !== null) return;
-            watchId = navigator.geolocation.watchPosition(next => setPosition(toLatLng(next)), () => undefined,
-                {enableHighAccuracy: Boolean(active), maximumAge: 15000, timeout: 30000});
-        };
-        if (active) watch();
-        else navigator.permissions?.query({name: 'geolocation'}).then(status => { if (status.state === 'granted') watch(); }).catch(() => undefined);
-        return () => {
-            cancelled = true;
-            if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-        };
+        if (!navigator.geolocation) {
+            setLocationNote("This device can't share its location.");
+            return;
+        }
+        const watchId = navigator.geolocation.watchPosition(next => {
+            setPosition(toLatLng(next));
+            setLocationNote(null);
+        }, error => {
+            if (error.code === error.PERMISSION_DENIED) setLocationNote('Allow location access for this site to see where you are on the map.');
+            else setLocationNote(previous => previous ?? "We couldn't find your location yet.");
+        }, {enableHighAccuracy: Boolean(active), maximumAge: 15000, timeout: 30000});
+        return () => navigator.geolocation.clearWatch(watchId);
     }, [Boolean(active)]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const path = useMemo(() => routePath(segments), [segments]);
@@ -187,7 +185,7 @@ export default function MileagePage() {
             </div>
 
             <div className="grid flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
-                <MileageMap position={position} path={path} live={running}
+                <MileageMap position={position} path={path} live={running} locationNote={position ? null : locationNote}
                     className="h-[300px] overflow-hidden rounded-[12px] border border-[#e8edef] sm:h-[400px] lg:h-auto lg:min-h-[600px] dark:border-white/10"/>
 
                 <aside aria-label="Your mileage" className="flex flex-col gap-3">
