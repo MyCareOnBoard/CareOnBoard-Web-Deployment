@@ -53,21 +53,21 @@ export default function AttentionBanner({severity, message, showDocuments, showT
     const Icon = severity === 'urgent' ? CircleAlert : FileUp;
     // Polite, not an alert: it shows on every visit and shouldn't interrupt a screen reader.
     return <section role="status" aria-label="Action needed"
-        className={`flex flex-wrap items-center justify-between gap-4 rounded-[20px] border px-4 py-4 sm:px-6 sm:py-5 ${style.box}`}>
+        className={`flex flex-wrap items-center justify-between gap-4 rounded-[12px] border px-4 py-4 sm:px-6 sm:py-5 ${style.box}`}>
         <div className="flex min-w-0 flex-1 basis-72 items-start gap-4 sm:items-center">
-            <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-[14px] ${style.icon}`}><Icon className="h-6 w-6" aria-hidden="true"/></span>
+            <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-[8px] ${style.icon}`}><Icon className="h-5 w-5" aria-hidden="true"/></span>
             <div className="min-w-0">
-                <p className={`text-base font-bold sm:text-lg ${style.title}`}>Keep your record current</p>
+                <p className={`text-[16px] font-semibold ${style.title}`}>Keep your record current</p>
                 <p className="mt-1 text-sm text-[#34434c] dark:text-[#c9d3d6]">{message}</p>
             </div>
         </div>
         <div className="flex w-full flex-wrap gap-2.5 sm:w-auto">
             {showTrainings && <button type="button" onClick={onTrainings}
-                className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full border border-[#007679] px-5 text-sm font-semibold text-[#005759] transition-colors hover:bg-[#007679]/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] sm:flex-none dark:border-[#7fe0e2] dark:text-[#7fe0e2]">
+                className="inline-flex h-10 flex-1 items-center justify-center rounded-[6px] border border-[#003839] bg-white px-5 text-sm font-semibold text-[#003839] transition-colors hover:bg-[#f2fafa] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] sm:flex-none dark:border-[#7fe0e2] dark:bg-transparent dark:text-[#7fe0e2] dark:hover:bg-white/5">
                 View trainings
             </button>}
             {showDocuments && <button type="button" onClick={onDocuments}
-                className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full bg-[#007679] px-5 text-sm font-bold text-white transition-colors hover:bg-[#005759] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] sm:flex-none">
+                className="inline-flex h-10 flex-1 items-center justify-center rounded-[6px] px-5 text-sm font-semibold transition-colors bg-[#003839] text-white hover:bg-[#00494a] dark:bg-[#00a3a7] dark:text-[#06292a] dark:hover:bg-[#33b5b8] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] sm:flex-none">
                 Update documents
             </button>}
         </div>

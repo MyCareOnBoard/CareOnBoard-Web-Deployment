@@ -71,12 +71,12 @@ export default function DashboardDocuments({documents, loading, error, focusDocu
         <div className={`flex flex-wrap items-start justify-between gap-4 ${embedded ? 'mb-4' : 'mb-6'}`}>
             {embedded ? <p className="pt-2.5 text-sm text-[#596065] dark:text-[#9aa4a8]">Your document checklist and expiry status.</p>
                 : <div><h3 className="text-xl font-bold text-[#10141a] dark:text-[#f4f6f7]">Documents</h3><p className="mt-1 text-sm text-[#596065] dark:text-[#9aa4a8]">Your document checklist and expiry status.</p></div>}
-            <Button type="button" onClick={() => onUpload()} className="h-auto min-h-11 gap-2 rounded-full bg-[#007679] px-4 py-2.5 text-white hover:bg-[#005759]"><Upload size={16} aria-hidden="true"/>Upload document</Button>
+            <Button type="button" onClick={() => onUpload()} className="h-10 gap-2 rounded-[6px] px-4 font-semibold bg-[#003839] text-white hover:bg-[#00494a] dark:bg-[#00a3a7] dark:text-[#06292a] dark:hover:bg-[#33b5b8]"><Upload size={16} aria-hidden="true"/>Upload document</Button>
         </div>
         {children}
         {loading ? <div role="status" aria-label="Loading documents" className="space-y-5">
             <span className="sr-only">Loading documents</span>
-            <div aria-hidden="true" className="space-y-5">{[0,1].map(group => <div key={group} className="rounded-xl border border-[#dce7e9] p-4">
+            <div aria-hidden="true" className="space-y-5">{[0,1].map(group => <div key={group} className="rounded-[8px] border border-[#e3e8ea] p-4 dark:border-white/10">
                 <Skeleton className="mb-5 h-5 w-40 motion-reduce:animate-none"/>
                 {[0,1].map(row => <div key={row} className="mt-4 flex items-center gap-3">
                     <Skeleton className="h-9 w-8 shrink-0 motion-reduce:animate-none"/>
@@ -95,7 +95,7 @@ export default function DashboardDocuments({documents, loading, error, focusDocu
                 </TabsTrigger>)}
             </TabsList>
             {visibleGroups.map(group => <TabsContent key={group} value={group} forceMount hidden={currentGroup !== group}>
-                <div className="divide-y divide-[#e5edef] dark:divide-white/10 rounded-xl border border-[#dce7e9] bg-white dark:border-white/10 dark:bg-[#1b232b] px-4">
+                <div className="divide-y divide-[#e5edef] dark:divide-white/10 rounded-[8px] border border-[#e3e8ea] bg-white dark:border-white/10 dark:bg-[#1b232b] px-4">
                     {documents.filter(item => groupFor(item) === group).map(item => {
                         const status = badge(item);
                         const replace = ['expired', 'expiring', 'expires today', 'needs review'].includes(item.status.toLowerCase());

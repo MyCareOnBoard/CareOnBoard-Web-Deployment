@@ -40,7 +40,7 @@ function TrainingSkeleton({compact = false}: {compact?: boolean}) {
         <span className="sr-only">Loading trainings</span>
         <div aria-hidden="true" className="space-y-4">
 
-            {[0, 1, 2].slice(0, compact ? 1 : 3).map(item => <div key={item} className="space-y-3"><Skeleton className="h-4 w-32 motion-reduce:animate-none"/><div className="rounded-xl border border-[#dce7e9] bg-white/70 p-5">
+            {[0, 1, 2].slice(0, compact ? 1 : 3).map(item => <div key={item} className="space-y-3"><Skeleton className="h-4 w-32 motion-reduce:animate-none"/><div className="rounded-[8px] border border-[#e3e8ea] bg-white/70 p-5 dark:border-white/10 dark:bg-transparent">
                 <div className="flex justify-between gap-4"><Skeleton className="h-5 w-2/3 motion-reduce:animate-none"/><Skeleton className="h-6 w-20 rounded-full motion-reduce:animate-none"/></div>
                 <Skeleton className="mt-3 h-4 w-1/2 motion-reduce:animate-none"/>
                 {!compact && item === 0 && <div className="mt-6 space-y-4">
@@ -97,7 +97,7 @@ export default function DashboardTrainings({trainings, loading, error, hasMore, 
                         {sorted.filter(training => trainingGroup(training) === group).map(training => {
                             const label = training.source === 'policy' ? trainingPolicyLabel(training) : training.status;
                             const tone = group === 'Approved' ? 'bg-[#e6f6ed] text-[#187343]' : ['Expired', 'Overdue'].includes(label) ? 'bg-[#fff0eb] text-[#b3371c]' : ['Due soon', 'Due today', 'Renewal due', 'Required before work', 'Required before HHA services'].includes(label) ? 'bg-[#fff3d6] text-[#8a5200]' : 'bg-[#eef2f5] text-[#4b5c6b]';
-                            return <AccordionItem key={training.id ?? training.name} value={training.id ?? training.name} className="overflow-hidden rounded-xl border border-[#dce7e9] bg-white dark:border-white/10 dark:bg-[#1b232b]">
+                            return <AccordionItem key={training.id ?? training.name} value={training.id ?? training.name} className="overflow-hidden rounded-[8px] border border-[#e3e8ea] bg-white dark:border-white/10 dark:bg-[#1b232b]">
                                 <AccordionTrigger aria-label={`${training.name}, ${label}`} className="gap-3 px-4 py-5 text-base hover:bg-[#f7fafa] dark:hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-[#00b4b8] sm:px-5">
                                     <span className="min-w-0 flex-1">
                                         <span className="flex flex-wrap items-start justify-between gap-2">

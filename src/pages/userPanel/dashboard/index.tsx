@@ -371,7 +371,7 @@ export default function UserPanelDashboardPage() {
             <header className="flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0">
                     <p className="text-sm font-semibold text-[#5d6b73] dark:text-[#9aa4a8]">{todayLabel}</p>
-                    <h1 className="mt-0.5 text-[26px] font-extrabold leading-tight text-[#10141a] sm:text-[28px] dark:text-[#f4f6f7]">
+                    <h1 className="mt-0.5 text-[24px] font-semibold leading-tight text-[#10141a] sm:text-[26px] dark:text-[#f4f6f7]">
                         {greeting}, {employeeInfo?.fullName?.split(" ")[0] || "there"}
                     </h1>
                     {(documentsNeedingAttention > 0 || trainingsNeedingAttention > 0) && (
@@ -393,7 +393,7 @@ export default function UserPanelDashboardPage() {
                         </div>
                     )}
                 </div>
-                <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-full bg-white py-1.5 pl-4 pr-2 text-sm font-semibold text-[#34434c] shadow-[0_1px_2px_rgba(16,40,44,0.06)] dark:bg-[#1b232b] dark:text-[#c9d3d6]">
+                <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-[8px] border border-[#e8edef] bg-white py-1.5 pl-4 pr-2 text-sm font-semibold text-[#34434c] dark:border-white/10 dark:bg-[#1b232b] dark:text-[#c9d3d6]">
                     Available for work
                     <Toggle
                         className="h-8 w-14"
