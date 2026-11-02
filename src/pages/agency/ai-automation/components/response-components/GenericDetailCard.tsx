@@ -1,9 +1,94 @@
+import { useEffect, useRef, useState } from "react";
+import { FileText } from "lucide-react";
+import { DocumentPreviewModal } from "@/components/documents/DocumentPreviewModal";
+import { getAgencyClientById } from "@/lib/api/clients";
+import { clientDocumentUrl } from "@/pages/shared/client-details/components/ClientDocumentChecklist";
 import { str } from "./strValue";
+
+/** A client document the card can open. The card never carries the file URL (cards also reach the model). */
+interface DocumentRef {
+  clientId: string;
+  index: number;
+  key?: string | null;
+  fileName?: string | null;
+}
 
 interface GenericDetailField {
   label: string;
   value: string;
   badge?: boolean;
+  document?: DocumentRef;
+}
+
+type PreviewState = { title: string; url?: string; fileName?: string; loading: boolean; error?: string };
+
+/** Find the referenced file on the freshly loaded client, checking it is still the same document. */
+function findClientDocumentUrl(documents: unknown, ref: DocumentRef): { url?: string; fileName?: string } {
+  const list = Array.isArray(documents) ? (documents as Array<Record<string, unknown> | null>) : [];
+  const same = (doc: Record<string, unknown> | null | undefined) =>
+    Boolean(doc) && (!ref.key || doc!.key === ref.key) && (!ref.fileName || doc!.fileName === ref.fileName);
+  const doc = same(list[ref.index]) ? list[ref.index] : list.find(same);
+  return doc ? { url: clientDocumentUrl(doc.url), fileName: typeof doc.fileName === "string" ? doc.fileName : undefined } : {};
+}
+
+function DocumentLink({ field, display }: { field: GenericDetailField; display: string }) {
+  const [preview, setPreview] = useState<PreviewState | null>(null);
+  const request = useRef<AbortController | null>(null);
+  const ref = field.document!;
+  const linkText = ref.fileName || "View document";
+
+  useEffect(() => () => request.current?.abort(), []);
+
+  const open = async () => {
+    request.current?.abort();
+    const controller = new AbortController();
+    request.current = controller;
+    setPreview({ title: field.label, fileName: ref.fileName ?? undefined, loading: true });
+    try {
+      const client = await getAgencyClientById(ref.clientId, { signal: controller.signal });
+      if (controller.signal.aborted) return;
+      const found = findClientDocumentUrl(client?.documents, ref);
+      setPreview({
+        title: field.label,
+        url: found.url,
+        fileName: found.fileName ?? ref.fileName ?? undefined,
+        loading: false,
+        error: found.url ? undefined : "This file is no longer on the client's record.",
+      });
+    } catch {
+      if (!controller.signal.aborted) setPreview({ title: field.label, loading: false, error: "Couldn't load this document. Try again." });
+    }
+  };
+
+  const close = (next: boolean) => {
+    if (next) return;
+    request.current?.abort();
+    setPreview(null);
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={open}
+        className="inline-flex max-w-full items-start gap-1 text-left text-[12px] text-[#2563eb] underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none break-words"
+        aria-label={`Preview ${field.label}: ${linkText}`}
+      >
+        <FileText className="mt-[2px] h-3 w-3 shrink-0" aria-hidden="true" />
+        <span className="min-w-0">{linkText}</span>
+      </button>
+      {display && <p className="text-[11px] text-[#6b7280] break-words">{display}</p>}
+      <DocumentPreviewModal
+        open={preview !== null}
+        onOpenChange={close}
+        title={preview?.title ?? field.label}
+        url={preview?.url}
+        fileName={preview?.fileName}
+        isLoading={preview?.loading}
+        error={preview?.error}
+      />
+    </>
+  );
 }
 
 interface GenericDetailSection {
@@ -54,7 +139,9 @@ export default function GenericDetailCard({ data }: { data: unknown }) {
               return (
               <div key={fi} className="min-w-0">
                 <p className="text-[11px] text-[#9ca3af] mb-0.5">{field.label}</p>
-                {field.badge ? (
+                {field.document?.clientId ? (
+                  <DocumentLink field={field} display={display === "—" ? "" : display} />
+                ) : field.badge ? (
                   <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium capitalize ${badgeClasses(display)}`}>
                     {display || "—"}
                   </span>
