@@ -145,17 +145,19 @@ export interface UserIncidentReport {
     employeeUid: string;
     employeeName: string;
     agencyId: string;
+    /** Agency-facing only. Field staff see the client by short id, never by name. */
     clientName: string;
+    clientId?: string | null;
     date: string;
     time: string;
     whatHappened: string;
-    whatActionsTaken: string;
+    whatActionsTaken: string | null;
     whatDidYouDo: string;
     witness: {
         name: string;
         contactInfo: string;
         relationship: string;
-    };
+    } | null;
     status: 'submitted' | 'under_review' | 'resolved' | 'not_resolved';
     resolution?: 'resolved' | 'not_resolved';
     submittedAt: string;
@@ -170,12 +172,13 @@ export interface UserIncidentReport {
  * Create User Incident Payload (for DSP submission)
  */
 export interface CreateUserIncidentPayload {
-    clientName: string;
+    /** Optional when clientId is sent; the server fills it from the client record. */
+    clientName?: string;
     clientId?: string;
     date: string;
     time: string;
     whatHappened: string;
-    whatActionsTaken: string;
+    whatActionsTaken?: string;
     whatDidYouDo: string;
     witness: {
         name: string;
@@ -417,9 +420,12 @@ export const getIncidentStatusText = (status: IncidentStatus): string => {
  * Get all incident reports for authenticated user (DSP/Employee)
  * @returns Promise with user incidents response
  */
-export const getUserIncidents = async (): Promise<GetUserIncidentsResponse> => {
+export const getUserIncidents = async (
+    params?: { limit?: number; startAfter?: string },
+    options?: { signal?: AbortSignal },
+): Promise<GetUserIncidentsResponse> => {
     try {
-        const response = await axiosClient.get(USER_INCIDENT_BASE);
+        const response = await axiosClient.get(USER_INCIDENT_BASE, { params, signal: options?.signal });
         return response.data;
     } catch (error: any) {
         console.error('Error fetching user incidents:', error);

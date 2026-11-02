@@ -1,380 +1,150 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { 
-  submitUserIncident, 
-  CreateUserIncidentPayload 
-} from "@/lib/api/incidents";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/utils/auth";
-import { programLabel } from "@/lib/roleLabel";
-import { Input } from "@/components/ui/input";
-import VoiceEnabledTextarea from "@/components/VoiceEnabledTextarea";
-import VoiceInputButton from "@/components/VoiceInputButton";
-import { VoiceRecordingProvider } from "@/contexts/VoiceRecordingContext";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import CustomDatePicker from "@/components/ui/datePicker";
-import TimePicker from "@/components/TimePicker";
-import { searchClients, Client } from "@/lib/api/clients";
-import { Loader2 } from "lucide-react";
+import {useEffect, useMemo, useState} from 'react';
+import {PlusCircle, ShieldAlert} from 'lucide-react';
+import {getUserIncidents, type UserIncidentReport} from '@/lib/api/incidents';
+import {useAuth} from '@/utils/auth';
+import {useEmployeeShifts} from '@/hooks/useEmployeeShifts';
+import {toDateKey} from '@/pages/userPanel/dashboard/overviewStats';
+import {cn} from '@/lib/utils';
+import {
+    CenterDialog, DetailRow, EmptyRecords, PAGE_SIZE, PRIMARY_BUTTON, Pagination, SECONDARY_BUTTON, SearchBox, StatCard, StatusPill, TableSkeleton,
+} from '../records/RecordsKit';
+import {usePagedRecords} from '../records/usePagedRecords';
+import ReportIncidentDialog from './ReportIncidentDialog';
+import {filterIncidents, incidentClient, incidentOverview, incidentWhen, splitWitnesses, statusOf} from './incidentRecords';
+
+const CELL = 'md:px-2 md:py-4';
+const MUTED = 'text-[#5d6b73] md:hidden dark:text-[#9aa4a8]';
+
+function IncidentRow({incident, onOpen}: {incident: UserIncidentReport; onOpen: () => void}) {
+    const status = statusOf(incident);
+    const client = incidentClient(incident);
+    return <tr onClick={onOpen} className="grid cursor-pointer grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 border-b border-[#edf1f2] px-2 py-3.5 text-[14px] text-[#34434c] transition-colors hover:bg-[#f7f9f9] md:table-row md:p-0 dark:border-white/10 dark:text-[#c9d3d6] dark:hover:bg-white/[0.03]">
+        <th scope="row" className={cn('text-left font-semibold text-[#10141a] md:font-normal dark:text-[#f4f6f7]', CELL)}>
+            <span className="font-normal text-[#5d6b73] md:hidden dark:text-[#9aa4a8]">Client #ID: </span>
+            <button type="button" onClick={event => { event.stopPropagation(); onOpen(); }} className="cursor-pointer text-left hover:underline">{client ?? 'Not linked'}</button>
+        </th>
+        <td className="justify-self-end md:hidden"><StatusPill {...status}/></td>
+        <td className={cn('col-span-2 md:max-w-[360px]', CELL)}>
+            <span className={MUTED}>What happened: </span><span className="line-clamp-2 md:line-clamp-1">{incident.whatHappened}</span>
+        </td>
+        <td className={cn('col-span-2', CELL)}><span className={MUTED}>When: </span>{incidentWhen(incident)}</td>
+        <td className={cn('hidden text-center md:table-cell', CELL)}><StatusPill {...status}/></td>
+    </tr>;
+}
+
+function IncidentDetails({incident, onClose}: {incident: UserIncidentReport | null; onClose: () => void}) {
+    const witnesses = splitWitnesses(incident?.witness?.name);
+    return <CenterDialog open={Boolean(incident)} onOpenChange={open => { if (!open) onClose(); }} title="Incident report">
+        {incident && <dl className="mt-2">
+            <DetailRow label="Status"><StatusPill {...statusOf(incident)}/></DetailRow>
+            <DetailRow label="Client #ID">{incidentClient(incident) ?? 'Not linked'}</DetailRow>
+            <DetailRow label="When">{incidentWhen(incident)}</DetailRow>
+            <DetailRow label="What happened">{incident.whatHappened}</DetailRow>
+            <DetailRow label="What you did">{incident.whatDidYouDo}</DetailRow>
+            {incident.whatActionsTaken && <DetailRow label="Actions taken">{incident.whatActionsTaken}</DetailRow>}
+            <DetailRow label="Witnesses">{witnesses.length ? witnesses.join(', ') : 'None'}</DetailRow>
+            {incident.reviewerNotes && <DetailRow label="Note from your agency">{incident.reviewerNotes}</DetailRow>}
+        </dl>}
+    </CenterDialog>;
+}
+
+function SubmittedDialog({open, onDone, onAnother}: {open: boolean; onDone: () => void; onAnother: () => void}) {
+    return <CenterDialog open={open} onOpenChange={value => { if (!value) onDone(); }} title="Incident report submitted"
+        description="Your incident report has been successfully submitted. Your agency has been notified and will review the details provided.">
+        <div className="mt-3 flex flex-col gap-2.5">
+            <button type="button" onClick={onDone} className={PRIMARY_BUTTON}>Done for now</button>
+            <button type="button" onClick={onAnother} className={SECONDARY_BUTTON}>Report another incident</button>
+        </div>
+    </CenterDialog>;
+}
+
+function shiftWindow(now: Date) {
+    return {
+        startDate: toDateKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 60)),
+        endDate: toDateKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7)),
+    };
+}
 
 export default function UserIncidentPage() {
-  const { user } = useAuth();
-  // Field staff carry one program; scope client search to it (DSP→ddd / Caregiver→hha).
-  const clientType = programLabel({ applicantType: user?.applicantType, role: user?.role })
-    .toLowerCase() as "ddd" | "hha";
-  const { toast } = useToast();
+    const {user} = useAuth();
+    const {records: incidents, loading: fetching, error, reload} = usePagedRecords<UserIncidentReport>(getUserIncidents);
+    // Keep the current rows on screen while a refresh runs.
+    const loading = fetching && !incidents.length;
+    const [reporting, setReporting] = useState(false);
+    const [submitted, setSubmitted] = useState(false);
+    const [open, setOpen] = useState<UserIncidentReport | null>(null);
+    const [search, setSearch] = useState('');
+    const [page, setPage] = useState(1);
 
-  // Form state
-  const [clientName, setClientName] = useState("");
-  const [clientId, setClientId] = useState("");
-  const [date, setDate] = useState<Date | null>(new Date());
-  const [time, setTime] = useState("12:00");
-  const [whatHappened, setWhatHappened] = useState("");
-  const [actionsTaken, setActionsTaken] = useState("");
-  const [whatDidYouDo, setWhatDidYouDo] = useState("");
-  
-  const [witness, setWitness] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+    // Clients for the form come from the caregiver's own recent shifts, by id only.
+    const [now] = useState(() => new Date());
+    const {startDate, endDate} = useMemo(() => shiftWindow(now), [now]);
+    const {shifts} = useEmployeeShifts({agencyId: user?.agencyId, employeeId: user?.profile?.id, startDate, endDate});
+    const clientIds = useMemo(() => [...new Set(shifts.map(shift => shift.clientId).filter((id): id is string => Boolean(id)))], [shifts]);
 
-  // Client search state
-  const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
-  const [showClientDropdown, setShowClientDropdown] = useState(false);
-  const [isSearchingClients, setIsSearchingClients] = useState(false);
-  const clientSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const overview = useMemo(() => incidentOverview(incidents), [incidents]);
+    const shown = useMemo(() => filterIncidents(incidents, search), [incidents, search]);
+    const pages = Math.max(1, Math.ceil(shown.length / PAGE_SIZE));
+    useEffect(() => { setPage(1); }, [search]);
+    useEffect(() => { if (page > pages) setPage(pages); }, [page, pages]);
+    const pageRows = shown.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+    const empty = !loading && !error && !incidents.length;
 
-  // Search clients with debouncing
-  const handleClientSearch = useCallback(async (query: string) => {
-    // Clear existing timeout
-    if (clientSearchTimeoutRef.current) {
-      clearTimeout(clientSearchTimeoutRef.current);
-    }
+    const reportButton = (full = false) => <button type="button" onClick={() => setReporting(true)} className={cn(PRIMARY_BUTTON, !full && 'h-10 w-auto')}>
+        {full ? 'Report an incident' : <><PlusCircle className="h-4 w-4" aria-hidden="true"/> Report an incident</>}
+    </button>;
 
-    // If query is too short, clear results
-    if (query.trim().length < 2) {
-      setClientSearchResults([]);
-      setShowClientDropdown(false);
-      return;
-    }
+    return <div className="flex min-h-[calc(100vh-200px)] flex-col">
+        <h1 className="sr-only">Incidents</h1>
+        <div className="flex flex-1 flex-col gap-6 rounded-[20px] bg-white p-4 shadow-[0_1px_2px_rgba(16,40,44,0.06)] sm:p-6 dark:bg-[#1b232b]">
+            <section aria-labelledby="incidents-overview" className="flex flex-col gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h2 id="incidents-overview" className="text-lg font-semibold text-[#10141a] dark:text-[#f4f6f7]">Overview</h2>
+                    {!loading && !empty && reportButton()}
+                </div>
+                <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+                    <StatCard loading={loading} value={String(overview.total)} label="Reported" note="All incidents you've reported" tone="neutral"/>
+                    <StatCard loading={loading} value={String(overview.waiting)} label="Awaiting review" tone="amber"
+                        note={overview.waiting === 1 ? '1 report with your agency' : `${overview.waiting} reports with your agency`}/>
+                    <StatCard loading={loading} value={String(overview.resolved)} label="Resolved" note="Reviewed and closed" tone="green"/>
+                    <StatCard loading={loading} value={String(overview.notResolved)} label="Not resolved" note="Closed without a fix" tone="red"/>
+                </div>
+            </section>
 
-    // Debounce the search
-    clientSearchTimeoutRef.current = setTimeout(async () => {
-      try {
-        setIsSearchingClients(true);
-        const results = await searchClients(query, user?.agencyId, clientType);
-        setClientSearchResults(results);
-        setShowClientDropdown(results.length > 0);
-      } catch (error) {
-        console.error("Failed to search clients:", error);
-        setClientSearchResults([]);
-      } finally {
-        setIsSearchingClients(false);
-      }
-    }, 300);
-  }, [user?.agencyId, clientType]);
-
-  const handleClientSelect = (client: Client) => {
-    const fullName = client.firstName && client.lastName 
-      ? `${client.firstName} ${client.lastName}` 
-      : client.id;
-    
-    setClientName(fullName);
-    setClientId(client.id);
-    setShowClientDropdown(false);
-    setClientSearchResults([]);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Validation
-    if (!clientName.trim()) {
-      toast({
-        title: "Client Required",
-        description: "Please select a client from the search results",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!clientId) {
-      toast({
-        title: "Client Required",
-        description: "Please select a client from the dropdown",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!date) {
-      toast({
-        title: "Date Required",
-        description: "Please specify when the incident occurred",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!whatHappened.trim()) {
-      toast({
-        title: "Description Required",
-        description: "Please describe what happened",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!actionsTaken.trim()) {
-      toast({
-        title: "Actions Required",
-        description: "Please describe what actions were taken",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!whatDidYouDo.trim()) {
-      toast({
-        title: "Your Actions Required",
-        description: "Please describe what you did",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-
-      if (!user?.agencyId || !user?.uid) {
-        toast({
-          title: "User Data Missing",
-          description: "Unable to submit. Please log out and log back in.",
-          variant: "destructive",
-        });
-        setSubmitting(false);
-        return;
-      }
-
-      // Format date and time as ISO string
-      const incidentDateTime = new Date(date);
-      const [hours, minutes] = time.split(':');
-      incidentDateTime.setHours(parseInt(hours), parseInt(minutes));
-
-      const payload: CreateUserIncidentPayload = {
-        clientName: clientName.trim(),
-        clientId: clientId || undefined,
-        date: date.toISOString().split('T')[0], // Format as YYYY-MM-DD
-        time: time, // Format as HH:mm
-        whatHappened: whatHappened.trim(),
-        whatActionsTaken: actionsTaken.trim(),
-        whatDidYouDo: whatDidYouDo.trim(),
-        witness: {
-          name: witness.trim(),
-          contactInfo: '', // Add these fields to your form if needed
-          relationship: '', // Add these fields to your form if needed
-        },
-      };
-
-      const response = await submitUserIncident(payload);
-
-      console.log('Create incident response:', response);
-
-      if (response.success) {
-        toast({
-          title: "Incident Reported",
-          description: "Your incident report has been submitted successfully",
-        });
-
-        // Reset form
-        setClientName("");
-        setClientId("");
-        setDate(new Date());
-        setTime("12:00");
-        setWhatHappened("");
-        setActionsTaken("");
-        setWhatDidYouDo("");
-        setWitness("");
-        setClientSearchResults([]);
-        setShowClientDropdown(false);
-      }
-    } catch (error: any) {
-      console.error("Error submitting incident:", error);
-      console.error("Error response:", error?.response);
-      console.error("Error data:", error?.response?.data);
-      toast({
-        title: "Submission Failed",
-        description: error?.response?.data?.message || error?.message || "Failed to submit incident report",
-        variant: "destructive",
-      });
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <VoiceRecordingProvider pageTitle="Incident">
-    <div className="min-h-[calc(100vh-200px)] px-4 sm:px-6 lg:px-0 pb-20">
-      {/* Header */}
-      <div className="mb-6 sm:mb-8">
-        <h1 className="text-[28px] sm:text-[32px] lg:text-[40px] font-bold leading-[1.4] text-[#10141a]">
-          Incident
-        </h1>
-      </div>
-
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="p-6 bg-white shadow-sm rounded-xl sm:rounded-2xl sm:p-8 lg:p-10">
-        {/* Client Name */}
-        <div className="relative mb-6">
-          <Label className="block text-[14px] sm:text-[15px] font-medium text-[#6b7280] mb-2">
-            Client Name
-          </Label>
-          <div className="relative">
-            <Input
-              type="text"
-              value={clientName}
-              onChange={(e) => {
-                const value = e.target.value;
-                setClientName(value);
-                setClientId("");
-                handleClientSearch(value);
-              }}
-              placeholder="Search client name..."
-              className="pr-10"
-            />
-            {isSearchingClients && (
-              <div className="absolute -translate-y-1/2 right-3 top-1/2">
-                <Loader2 className="w-4 h-4 animate-spin text-[#808081]" />
-              </div>
-            )}
-          </div>
-          {/* Client Dropdown */}
-          {showClientDropdown && clientSearchResults.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">
-              {clientSearchResults.map((client) => (
-                <button
-                  key={client.id}
-                  type="button"
-                  onClick={() => handleClientSelect(client)}
-                  className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-xl last:rounded-b-xl cursor-pointer border-b border-[#f0f0f0] last:border-b-0"
-                >
-                  <p className="text-[14px] font-normal text-black">
-                    {client.firstName && client.lastName 
-                      ? `${client.firstName} ${client.lastName}` 
-                      : client.id}
-                  </p>
-                  {(client.primaryAddress?.address || client.address) && (
-                    <p className="text-[12px] font-normal text-[#808081]">
-                      {client.primaryAddress?.address || client.address}
-                    </p>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
+            {empty ? <EmptyRecords icon={ShieldAlert} title="No incidents reported" body="If something happens during a visit, report it here so your agency can follow up." action={reportButton(true)}/>
+                : <section aria-labelledby="incident-history" className="flex flex-col">
+                    <div className="flex flex-wrap items-center justify-between gap-3 pb-3">
+                        <h2 id="incident-history" className="text-lg font-semibold text-[#10141a] dark:text-[#f4f6f7]">Incident history</h2>
+                        <SearchBox value={search} onChange={setSearch} placeholder="Search incident here" label="Search incidents"/>
+                    </div>
+                    {error ? <p role="alert" className="border-t border-[#edf1f2] py-16 text-center text-sm text-[#b3371c] dark:border-white/10 dark:text-[#f3a08c]">
+                        We couldn&apos;t load your reports.{' '}
+                        <button type="button" onClick={reload} className="cursor-pointer font-semibold underline">Try again</button>
+                    </p> : <>
+                        <table className="w-full border-t border-[#edf1f2] text-left dark:border-white/10">
+                            <caption className="sr-only">Your incident reports with the client, what happened, when and their status</caption>
+                            <thead className="hidden md:table-header-group">
+                                <tr className="border-b border-[#edf1f2] text-[13px] font-semibold text-[#10141a] dark:border-white/10 dark:text-[#f4f6f7]">
+                                    <th scope="col" className="px-2 py-4 font-semibold">Client #ID</th>
+                                    <th scope="col" className="px-2 py-4 font-semibold">What happened</th>
+                                    <th scope="col" className="px-2 py-4 font-semibold">When</th>
+                                    <th scope="col" className="px-2 py-4 text-center font-semibold">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {loading ? <TableSkeleton columns={4}/>
+                                    : pageRows.length ? pageRows.map(incident => <IncidentRow key={incident.id} incident={incident} onOpen={() => setOpen(incident)}/>)
+                                    : <tr><td colSpan={4} className="px-2 py-12 text-center text-sm text-[#5d6b73] dark:text-[#9aa4a8]">No reports match "{search.trim()}".</td></tr>}
+                            </tbody>
+                        </table>
+                        {!loading && <Pagination page={page} pages={pages} onPage={setPage} label="Incident pages"/>}
+                    </>}
+                </section>}
         </div>
 
-        {/* Date and Time Row */}
-        <div className="grid grid-cols-1 gap-4 mb-6 sm:grid-cols-2 sm:gap-6">
-          {/* Date */}
-          <div>
-            <Label className="block text-[14px] sm:text-[15px] font-medium text-[#6b7280] mb-2">
-              Date
-            </Label>
-            <CustomDatePicker
-              date={date}
-              setDate={setDate}
-              placeholder="Select date"
-              endMonth={new Date()}
-            />
-          </div>
-
-          {/* Time */}
-          <div>
-            <Label className="block text-[14px] sm:text-[15px] font-medium text-[#6b7280] mb-2">
-              Time
-            </Label>
-            <TimePicker value={time} onChange={setTime}>
-              <Input
-                type="text"
-                value={time}
-                readOnly
-                placeholder="Select time"
-                className="cursor-pointer"
-              />
-            </TimePicker>
-          </div>
-        </div>
-
-        {/* What Happened */}
-        <div className="mb-6">
-          <Label className="block text-[14px] sm:text-[15px] font-medium text-[#6b7280] mb-2">
-            What Happened
-          </Label>
-          <VoiceEnabledTextarea
-            value={whatHappened}
-            onChange={setWhatHappened}
-            className="min-h-[120px]"
-            placeholder="Describe what happened..."
-            fieldName="What happened"
-            pageTitle="Incident"
-          />
-        </div>
-
-        {/* What Actions were taken */}
-        <div className="mb-6">
-          <Label className="block text-[14px] sm:text-[15px] font-medium text-[#6b7280] mb-2">
-            What Actions were taken?
-          </Label>
-          <VoiceEnabledTextarea
-            value={actionsTaken}
-            onChange={setActionsTaken}
-            className="min-h-[120px]"
-            placeholder="Describe the actions taken..."
-            fieldName="What actions were taken"
-            pageTitle="Incident"
-          />
-        </div>
-
-        {/* What did you do */}
-        <div className="mb-6">
-          <Label className="block text-[14px] sm:text-[15px] font-medium text-[#6b7280] mb-2">
-            What did you do?
-          </Label>
-          <VoiceEnabledTextarea
-            value={whatDidYouDo}
-            onChange={setWhatDidYouDo}
-            className="min-h-[120px]"
-            placeholder="Describe your actions..."
-            fieldName="What did you do"
-            pageTitle="Incident"
-          />
-        </div>
-
-        {/* Witness */}
-        <div className="mb-6">
-          <Label className="block text-[14px] sm:text-[15px] font-medium text-[#6b7280] mb-2">
-            Witness
-          </Label>
-          <Input
-            type="text"
-            value={witness}
-            onChange={(e) => setWitness(e.target.value)}
-            placeholder="Enter witness name..."
-          />
-        </div>
-
-        {/* Submit Button */}
-        <div className="mt-8">
-          <Button
-            type="submit"
-            disabled={submitting}
-            className="px-8 py-3 bg-[#00b8d4] text-white text-[15px] sm:text-[16px] font-medium rounded-lg hover:bg-[#00a5c0] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {submitting ? "Submitting..." : "Submit"}
-          </Button>
-        </div>
-      </form>
-      <VoiceInputButton />
-    </div>
-    </VoiceRecordingProvider>
-  );
+        <ReportIncidentDialog open={reporting} onOpenChange={setReporting} clientIds={clientIds}
+            onSubmitted={() => { setReporting(false); setSubmitted(true); reload(); }}/>
+        <SubmittedDialog open={submitted} onDone={() => setSubmitted(false)} onAnother={() => { setSubmitted(false); setReporting(true); }}/>
+        <IncidentDetails incident={open} onClose={() => setOpen(null)}/>
+    </div>;
 }
