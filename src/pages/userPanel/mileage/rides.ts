@@ -40,9 +40,9 @@ export function groupRides(rides: MileageRide[], now: Date = new Date()): RideGr
 /** Field staff see clients by a short id only: "Client ABC123". */
 export const rideClientLabel = (ride: Pick<MileageRide, 'clientId'>) => ride.clientId ? `Client ${shortClientId(ride.clientId)}` : null;
 
-/** The ride's headline: its purpose, else the client it was for. */
+/** The ride's headline: its purpose, else the client it was for ("Client ABC123"). */
 export function rideTitle(ride: MileageRide) {
-    return ride.purpose?.trim() || (ride.clientId ? `Trip for ${rideClientLabel(ride)}` : 'Agency trip');
+    return ride.purpose?.trim() || rideClientLabel(ride) || 'Agency trip';
 }
 
 /** "24.0" style distance in km. */

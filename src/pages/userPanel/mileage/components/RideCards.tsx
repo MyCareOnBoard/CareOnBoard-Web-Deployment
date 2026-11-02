@@ -17,6 +17,12 @@ const rideTime = (ride: MileageRide) => {
     return date ? format(date, 'h:mm a') : '—';
 };
 
+/** Rides the agency scheduled (one-off or repeating), as opposed to ones the caregiver logged. */
+const fromAgency = (ride: MileageRide) => ride.isManual !== true;
+
+/** "9:00 AM · Repeats" or "9:00 AM · Agency" under a ride's title. Repeating rides always come from the agency. */
+const rideMeta = (ride: MileageRide) => [rideTime(ride), ride.isRecurring ? 'Repeats' : fromAgency(ride) ? 'Agency' : null].filter(Boolean).join(' · ');
+
 const rideDay = (ride: MileageRide) => rideDate(ride.completedAt) ?? rideDate(ride.startedAt) ?? rideDate(ride.scheduledStartTime);
 
 function Km({value, size = 'md'}: {value: number | null | undefined; size?: 'md' | 'lg'}) {
@@ -84,7 +90,8 @@ interface CurrentProps {
 export function CurrentRideCard({ride, distance, busy, onAction}: CurrentProps) {
     const running = ride.status === 'in_progress';
     const paused = ride.status === 'paused';
-    const sub = running ? 'Tracking your distance now' : paused ? 'Paused. Resume or finish when ready' : 'Your next scheduled trip';
+    const sub = running ? 'Tracking your distance now' : paused ? 'Paused. Resume or finish when ready'
+        : fromAgency(ride) ? 'Your next trip, set up by your agency' : 'Your next scheduled trip';
     const client = rideClientLabel(ride);
     return <section aria-labelledby="current-ride"
         className={cn(CARD, (running || paused) && 'border-[#7fd6d8] bg-[#f4fbfb] dark:border-[#00a3a7]/50 dark:bg-[#00a3a7]/5')}>
@@ -104,10 +111,14 @@ export function CurrentRideCard({ride, distance, busy, onAction}: CurrentProps) 
         </div>
         <dl className="mt-4 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 text-[13px]">
             <dt className="text-[#5d6b73] dark:text-[#9aa4a8]">Purpose</dt>
-            <dd className="truncate text-right font-medium text-[#10141a] dark:text-[#f4f6f7]">{ride.purpose?.trim() || (client ? `Trip for ${client}` : 'Agency trip')}</dd>
+            <dd className="truncate text-right font-medium text-[#10141a] dark:text-[#f4f6f7]">{ride.purpose?.trim() || (client ? 'Client trip' : 'Agency trip')}</dd>
             {client && <>
                 <dt className="text-[#5d6b73] dark:text-[#9aa4a8]">Client #ID</dt>
                 <dd className="text-right font-medium text-[#10141a] dark:text-[#f4f6f7]">{shortClientId(ride.clientId as string)}</dd>
+            </>}
+            {ride.serviceCode && <>
+                <dt className="text-[#5d6b73] dark:text-[#9aa4a8]">Service</dt>
+                <dd className="text-right font-medium text-[#10141a] dark:text-[#f4f6f7]">{ride.serviceCode}</dd>
             </>}
             <dt className="text-[#5d6b73] dark:text-[#9aa4a8]">{running || paused ? 'Started' : 'Time'}</dt>
             <dd className="text-right font-medium text-[#10141a] dark:text-[#f4f6f7]">{rideTime(ride)}</dd>
@@ -138,7 +149,7 @@ export function UpcomingRidesCard({rides, locked, busy, onAction}: UpcomingProps
                 <DateTile date={rideDate(ride.scheduledStartTime)}/>
                 <div className="min-w-0 flex-1">
                     <p className="truncate text-[14px] font-medium text-[#10141a] dark:text-[#f4f6f7]">{rideTitle(ride)}</p>
-                    <p className="text-[12px] text-[#5d6b73] dark:text-[#9aa4a8]">{rideTime(ride)}</p>
+                    <p className="truncate text-[12px] text-[#5d6b73] dark:text-[#9aa4a8]">{rideMeta(ride)}</p>
                 </div>
                 <IconButton label={locked ? 'Finish your current ride first' : 'Start ride'} tone="go" disabled={locked || busy} onClick={() => onAction('start', ride)}><Play className="h-4 w-4 fill-current"/></IconButton>
                 <IconButton label="Cancel ride" tone="stop" disabled={busy} onClick={() => onAction('cancel', ride)}><X className="h-4 w-4"/></IconButton>
@@ -169,7 +180,7 @@ export function PastRidesCard({rides, onRepeat}: {rides: MileageRide[]; onRepeat
                 <DateTile date={rideDay(ride)}/>
                 <div className="min-w-0 flex-1">
                     <p className="truncate text-[14px] font-medium text-[#10141a] dark:text-[#f4f6f7]">{rideTitle(ride)}</p>
-                    <p className="text-[12px] text-[#5d6b73] dark:text-[#9aa4a8]">{rideTime(ride)}</p>
+                    <p className="truncate text-[12px] text-[#5d6b73] dark:text-[#9aa4a8]">{rideMeta(ride)}</p>
                 </div>
                 <Km value={ride.actualDistance}/>
                 <IconButton label="Log this trip again" tone="plain" onClick={() => onRepeat(ride)}><RotateCcw className="h-4 w-4"/></IconButton>
