@@ -2,7 +2,8 @@ import {lazy, Suspense, useState, type ReactNode} from 'react';
 import {format} from 'date-fns';
 import {Car, Check, CirclePlus, Clock, ExternalLink, Lock, MessageCircle, Navigation, PencilLine, X} from 'lucide-react';
 import {useNavigate} from 'react-router';
-import {Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle} from '@/components/ui/dialog';
+import {Dialog, DialogContent, DialogDescription, DialogTitle} from '@/components/ui/dialog';
+import {CloseButton, PANEL_BODY, SIDE_PANEL, SIDE_PANEL_OVERLAY} from '@/pages/userPanel/records/RecordsKit';
 import type {Shift} from '@/lib/api/shifts';
 import {Routes} from '@/routes/constants';
 import {shiftDateTime} from '@/pages/userPanel/dashboard/overviewStats';
@@ -32,9 +33,7 @@ const toneText: Record<ShiftTone, string> = {
     upcoming: 'text-[#005759] dark:text-[#7fe0e2]', missed: 'text-[#b3371c] dark:text-[#f3a08c]',
 };
 
-// Ticket surface: the dialog itself is transparent so the notches in the tear line show the page behind.
-const SURFACE = 'bg-white dark:bg-[#1b232b]';
-const NOTCH = 'radial-gradient(circle at 0 50%, transparent 12px, var(--ticket) 12.5px) left / 51% 100% no-repeat, radial-gradient(circle at 100% 50%, transparent 12px, var(--ticket) 12.5px) right / 51% 100% no-repeat';
+const PRIMARY = 'bg-[#003839] text-white hover:bg-[#00494a] dark:bg-[#00a3a7] dark:text-[#06292a] dark:hover:bg-[#19b5b8]';
 
 type StepKind = 'done' | 'now' | 'due' | 'todo' | 'missed';
 interface Step {kind: StepKind; title: string; detail: string; time?: string}
@@ -61,10 +60,10 @@ function Steps({steps}: {steps: Step[]}) {
                     {!last && <span className={cn('min-h-[18px] w-0.5 flex-1', step.kind === 'done' ? 'bg-[#20a35c]' : 'bg-[#e3eaec] dark:bg-white/10')}/>}
                 </span>
                 <span className={cn('min-w-0', !last && 'pb-3')}>
-                    <span className={cn('block text-[15px] font-bold', step.kind === 'todo' ? 'text-[#8a979d]' : 'text-[#10141a] dark:text-[#f4f6f7]')}>{step.title}</span>
+                    <span className={cn('block text-[14px] font-semibold', step.kind === 'todo' ? 'text-[#8a979d]' : 'text-[#10141a] dark:text-[#f4f6f7]')}>{step.title}</span>
                     <span className={cn('block text-[13px]', stepDetailClass[step.kind])}>{step.detail}</span>
                 </span>
-                <span className={cn('text-sm font-bold', step.kind === 'todo' ? 'text-[#8a979d]' : 'text-[#10141a] dark:text-[#f4f6f7]')}>{step.time ?? ''}</span>
+                <span className={cn('text-[13px] font-semibold', step.kind === 'todo' ? 'text-[#8a979d]' : 'text-[#10141a] dark:text-[#f4f6f7]')}>{step.time ?? ''}</span>
             </li>;
         })}
     </ol>;
@@ -109,14 +108,13 @@ interface Props {
 
 export default function ShiftDetailsDialog(props: Props) {
     return <Dialog open={props.shift !== null} onOpenChange={open => { if (!open) props.onClose(); }}>
-        <DialogContent showCloseButton={false}
-            className="w-[calc(100vw-24px)] max-w-[470px] border-0 bg-transparent pt-14 shadow-none dark:bg-transparent">
-            {props.shift && <ShiftTicket key={props.shift.id} {...props} shift={props.shift}/>}
+        <DialogContent showCloseButton={false} overlayClassName={SIDE_PANEL_OVERLAY} className={SIDE_PANEL}>
+            {props.shift && <ShiftPanel key={props.shift.id} {...props} shift={props.shift}/>}
         </DialogContent>
     </Dialog>;
 }
 
-function ShiftTicket({shift, actionLabel, onAction, actionDisabled, onNote, onAddHours, upNext, userPosition, viewer}: Props & {shift: Shift}) {
+function ShiftPanel({shift, actionLabel, onAction, actionDisabled, onNote, onAddHours, upNext, userPosition, viewer}: Props & {shift: Shift}) {
     const navigate = useNavigate();
     const now = useNow();
     const tone = shiftTone(shift, now);
@@ -142,7 +140,7 @@ function ShiftTicket({shift, actionLabel, onAction, actionDisabled, onNote, onAd
     const noteInfo = noteStep(note.isError ? undefined : note.currentData?.state);
     if (needsNote && note.isFetching && !note.currentData) noteInfo.step = {kind: 'todo', title: 'Shift note', detail: 'Checking…'};
 
-    // Middle of the ticket: what the bar between start and end means right now.
+    // Middle of the time card: what the bar between start and end means right now.
     let middle = scheduled !== null ? `${formatDuration(scheduled)} shift` : 'Scheduled';
     let progress = 0;
     if (tone === 'ongoing' && span) {
@@ -190,127 +188,112 @@ function ShiftTicket({shift, actionLabel, onAction, actionDisabled, onNote, onAd
 
     let buttons: ReactNode = null;
     let hint: string | null = null;
-    const buttonBase = 'inline-flex min-h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-[14px] px-4 text-[15px] font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679]';
+    const buttonBase = 'inline-flex h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-[6px] px-4 text-[14px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679]';
     if (onAction && actionLabel) {
         const locked = clockIn && actionDisabled;
         buttons = <button type="button" onClick={onAction} disabled={actionDisabled}
             className={cn(buttonBase, 'disabled:cursor-not-allowed',
                 locked ? 'bg-[#eef1f2] text-[#6b787e] dark:bg-white/10 dark:text-[#9aa4a8]'
-                    : clockIn ? 'bg-[#007679] text-white hover:bg-[#005759]' : 'bg-[#d53411] text-white hover:bg-[#b82d0f] focus-visible:outline-[#d53411]')}>
+                    : clockIn ? PRIMARY : 'bg-[#d53411] text-white hover:bg-[#b82d0f] focus-visible:outline-[#d53411]')}>
             {locked ? <Lock className="h-4 w-4" aria-hidden="true"/> : <Clock className="h-4 w-4" aria-hidden="true"/>}
             {locked && opensAt ? `Clock in opens at ${format(opensAt, 'h:mm aaa')}` : actionLabel}
         </button>;
         if (locked) hint = 'Clock in turns on 5 minutes before the shift starts.';
     } else if (tone === 'completed' && onNote && noteInfo.button) {
         buttons = <button type="button" onClick={() => onNote(shift.id)}
-            className={cn(buttonBase, 'bg-[#003839] text-white hover:bg-[#005759] dark:bg-[#00a3a7] dark:text-[#04201f] dark:hover:bg-[#33b6b9]')}>
+            className={cn(buttonBase, PRIMARY)}>
             <PencilLine className="h-4 w-4" aria-hidden="true"/>{noteInfo.button}
         </button>;
     } else if (tone === 'missed') {
         buttons = <>
             <button type="button" onClick={() => navigate(Routes.userPanel.messages)}
-                className={cn(buttonBase, 'border-[1.5px] border-[#007679] bg-white text-[#005759] hover:bg-[#e3f6f6] dark:border-[#00a3a7] dark:bg-transparent dark:text-[#7fe0e2] dark:hover:bg-[#00a3a7]/10')}>
+                className={cn(buttonBase, 'border border-[#e3e8ea] bg-white text-[#10141a] hover:bg-[#f3f5f6] dark:border-white/10 dark:bg-transparent dark:text-[#f4f6f7] dark:hover:bg-white/5')}>
                 <MessageCircle className="h-4 w-4" aria-hidden="true"/>Message agency
             </button>
             {onAddHours && <button type="button" onClick={onAddHours}
-                className={cn(buttonBase, 'bg-[#003839] text-white hover:bg-[#005759] dark:bg-[#00a3a7] dark:text-[#04201f] dark:hover:bg-[#33b6b9]')}>
+                className={cn(buttonBase, PRIMARY)}>
                 <CirclePlus className="h-4 w-4" aria-hidden="true"/>Add hours worked
             </button>}
         </>;
         if (onAddHours) hint = 'Worked this shift but missed the clock in? Add your hours on a manual timesheet.';
     }
 
-    return <div className="relative [--ticket:#ffffff] dark:[--ticket:#1b232b]">
-        <DialogClose className="absolute -top-12 right-0 grid h-10 w-10 cursor-pointer place-items-center rounded-full bg-white/90 text-[#10141a] hover:bg-white focus-visible:outline-2 focus-visible:outline-[#7fe0e2] dark:bg-[#1b232b] dark:text-[#f4f6f7]">
-            <X className="h-5 w-5" aria-hidden="true"/><span className="sr-only">Close</span>
-        </DialogClose>
+    return <>
+        <div className="flex shrink-0 items-start justify-between gap-3 px-5 pb-4 pt-5">
+            <div className="min-w-0">
+                <DialogTitle className="text-[18px] font-bold text-[#10141a] dark:text-[#f4f6f7]">{shiftTitle(shift)}</DialogTitle>
+                <DialogDescription className="mt-0.5 text-[13px] text-[#5d6b73] dark:text-[#9aa4a8]">
+                    {day ? format(day, 'EEEE, MMM d') : shift.date} · {clientLabel(shift)}{shift.serviceCode ? ` · ${shift.serviceCode}` : ''}
+                </DialogDescription>
+            </div>
+            <CloseButton/>
+        </div>
 
-        <div className="flex max-h-[calc(100dvh-96px)] flex-col overflow-hidden rounded-[24px]">
-            {/* Everything but the buttons scrolls; the buttons stay pinned in the footer. */}
-            <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide">
-            <div className={cn(SURFACE, 'flex flex-col gap-4 rounded-t-[24px] px-5 pb-5 pt-5 sm:px-6')}>
-                <div className="flex items-center justify-between gap-3">
-                    <span className="text-[13px] font-bold uppercase tracking-wide text-[#5d6b73] dark:text-[#9aa4a8]">
-                        {day ? format(day, 'EEEE, MMM d') : shift.date}
-                    </span>
-                    <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold', pill.className)}>
-                        <span className={cn('h-[7px] w-[7px] rounded-full', pill.dot)} aria-hidden="true"/>{pill.label}
-                    </span>
-                </div>
+        <div className={PANEL_BODY}>
+            <div className="flex flex-col gap-3 rounded-[12px] border border-[#e8edef] p-4 dark:border-white/10">
+                <span className={cn('inline-flex items-center gap-1.5 self-start rounded-full px-2.5 py-0.5 text-[12px] font-semibold', pill.className)}>
+                    <span className={cn('h-1.5 w-1.5 rounded-full', pill.dot)} aria-hidden="true"/>{pill.label}
+                </span>
                 {start && end ? <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
                     <div className="flex flex-col">
-                        <span className="text-xs font-bold text-[#5d6b73] dark:text-[#9aa4a8]">START</span>
-                        <span className="text-[30px] font-extrabold leading-tight text-[#10141a] dark:text-[#f4f6f7]">{start.time}</span>
-                        <span className="text-sm text-[#5d6b73] dark:text-[#9aa4a8]">{start.period}</span>
+                        <span className="text-[12px] text-[#5d6b73] dark:text-[#9aa4a8]">Start</span>
+                        <span className="text-[24px] font-semibold leading-tight text-[#10141a] tabular-nums dark:text-[#f4f6f7]">{start.time} <span className="text-[14px] font-normal text-[#5d6b73] dark:text-[#9aa4a8]">{start.period}</span></span>
                     </div>
-                    <div className="flex min-w-[112px] flex-col items-center gap-1.5">
-                        <span className={cn('text-xs font-bold', toneText[tone])}>{middle}</span>
-                        <span className="h-1.5 w-28 overflow-hidden rounded-full bg-[#e3eaec] dark:bg-white/10" role="presentation">
+                    <div className="flex min-w-[104px] flex-col items-center gap-1.5">
+                        <span className={cn('text-[12px] font-semibold', toneText[tone])}>{middle}</span>
+                        <span className="h-1.5 w-24 overflow-hidden rounded-full bg-[#e3eaec] dark:bg-white/10" role="presentation">
                             <span className={cn('block h-full rounded-full', toneBar[tone])} style={{width: `${progress * 100}%`}}/>
                         </span>
-                        <span className="text-xs text-[#5d6b73] dark:text-[#9aa4a8]">{length}</span>
+                        <span className="text-[12px] text-[#5d6b73] dark:text-[#9aa4a8]">{length}</span>
                     </div>
                     <div className="flex flex-col items-end">
-                        <span className="text-xs font-bold text-[#5d6b73] dark:text-[#9aa4a8]">END</span>
-                        <span className="text-[30px] font-extrabold leading-tight text-[#10141a] dark:text-[#f4f6f7]">{end.time}</span>
-                        <span className="text-sm text-[#5d6b73] dark:text-[#9aa4a8]">{end.period}</span>
+                        <span className="text-[12px] text-[#5d6b73] dark:text-[#9aa4a8]">End</span>
+                        <span className="text-[24px] font-semibold leading-tight text-[#10141a] tabular-nums dark:text-[#f4f6f7]">{end.time} <span className="text-[14px] font-normal text-[#5d6b73] dark:text-[#9aa4a8]">{end.period}</span></span>
                     </div>
-                </div> : <p className="text-lg font-bold text-[#10141a] dark:text-[#f4f6f7]">{shift.startTime}{shift.endTime ? ` – ${shift.endTime}` : ''}</p>}
-                <div className="min-w-0">
-                    <DialogTitle className="text-[22px] font-extrabold leading-tight text-[#10141a] dark:text-[#f4f6f7]">{shiftTitle(shift)}</DialogTitle>
-                    <DialogDescription className="mt-0.5 text-sm text-[#5d6b73] dark:text-[#9aa4a8]">{clientLabel(shift)}{shift.serviceCode ? ` · ${shift.serviceCode}` : ''}</DialogDescription>
+                </div> : <p className="text-[16px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">{shift.startTime}{shift.endTime ? ` – ${shift.endTime}` : ''}</p>}
+            </div>
+
+            {address && <div className="overflow-hidden rounded-[12px] border border-[#e8edef] dark:border-white/10">
+                <Suspense fallback={<div className="h-[120px] bg-[#e9f1f1] dark:bg-[#16292b]"/>}>
+                    <ShiftMap address={address} lat={shift.location?.latlon?.lat} lon={shift.location?.latlon?.lon}
+                        origin={userPosition} showRoute={showRoute} onRouteSummary={setRouteSummary}/>
+                </Suspense>
+                <div className="flex items-center justify-between gap-3 px-3.5 py-3">
+                    <div className="flex min-w-0 flex-col gap-0.5">
+                        <span className="text-[12px] text-[#5d6b73] dark:text-[#9aa4a8]">Client's address</span>
+                        <span className="text-[14px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">{address}</span>
+                        {geo && <span className="text-[12px] text-[#5d6b73] dark:text-[#9aa4a8]">{geo}</span>}
+                    </div>
+                    {canRoute ? <button type="button" onClick={() => setShowRoute(value => !value)} aria-pressed={showRoute}
+                        className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-[6px] border border-[#e3e8ea] px-3 text-[13px] font-semibold text-[#10141a] hover:bg-[#f3f5f6] focus-visible:outline-2 focus-visible:outline-[#007679] aria-pressed:border-[#003839] aria-pressed:bg-[#003839] aria-pressed:text-white dark:border-white/10 dark:text-[#f4f6f7] dark:hover:bg-white/5 dark:aria-pressed:border-[#00a3a7] dark:aria-pressed:bg-[#00a3a7] dark:aria-pressed:text-[#06292a]">
+                        <Navigation className="h-3.5 w-3.5" aria-hidden="true"/>{showRoute ? 'Hide route' : 'Directions'}
+                    </button> : directions && <a href={directions} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[6px] border border-[#e3e8ea] px-3 text-[13px] font-semibold text-[#10141a] hover:bg-[#f3f5f6] focus-visible:outline-2 focus-visible:outline-[#007679] dark:border-white/10 dark:text-[#f4f6f7] dark:hover:bg-white/5">
+                        <Navigation className="h-3.5 w-3.5" aria-hidden="true"/>Directions<span className="sr-only"> (opens Google Maps)</span>
+                    </a>}
                 </div>
-            </div>
-
-            <div className="relative h-6" style={{background: NOTCH}} aria-hidden="true">
-                <span className="absolute left-[22px] right-[22px] top-[11px] border-t-2 border-dashed border-[#dbe4e6] dark:border-white/15"/>
-            </div>
-
-            <div className={cn(SURFACE, 'flex flex-col gap-[18px] px-5 pb-5 pt-3 sm:px-6', !buttons && 'rounded-b-[24px] pb-6')}>
-                {address && <div className="overflow-hidden rounded-[18px] border border-[#e3eaec] dark:border-white/10">
-                    <Suspense fallback={<div className="h-[120px] bg-[#e9f1f1] dark:bg-[#16292b]"/>}>
-                        <ShiftMap address={address} lat={shift.location?.latlon?.lat} lon={shift.location?.latlon?.lon}
-                            origin={userPosition} showRoute={showRoute} onRouteSummary={setRouteSummary}/>
-                    </Suspense>
-                    <div className="flex items-center justify-between gap-3 px-3.5 py-3">
-                        <div className="flex min-w-0 flex-col gap-0.5">
-                            <span className="text-[11px] font-bold uppercase tracking-wide text-[#5d6b73] dark:text-[#9aa4a8]">Client's address</span>
-                            <span className="text-[15px] font-bold text-[#10141a] dark:text-[#f4f6f7]">{address}</span>
-                            {geo && <span className="text-xs text-[#5d6b73] dark:text-[#9aa4a8]">{geo}</span>}
-                        </div>
-                        {canRoute ? <button type="button" onClick={() => setShowRoute(value => !value)} aria-pressed={showRoute}
-                            className="inline-flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full bg-[#e3f6f6] px-3 text-[13px] font-bold text-[#005759] hover:bg-[#d2efef] focus-visible:outline-2 focus-visible:outline-[#007679] aria-pressed:bg-[#007679] aria-pressed:text-white dark:bg-[#00a3a7]/15 dark:text-[#7fe0e2] dark:aria-pressed:bg-[#00a3a7] dark:aria-pressed:text-[#04201f]">
-                            <Navigation className="h-3.5 w-3.5" aria-hidden="true"/>{showRoute ? 'Hide route' : 'Directions'}
-                        </button> : directions && <a href={directions} target="_blank" rel="noopener noreferrer"
-                            className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full bg-[#e3f6f6] px-3 text-[13px] font-bold text-[#005759] hover:bg-[#d2efef] focus-visible:outline-2 focus-visible:outline-[#007679] dark:bg-[#00a3a7]/15 dark:text-[#7fe0e2]">
-                            <Navigation className="h-3.5 w-3.5" aria-hidden="true"/>Directions<span className="sr-only"> (opens Google Maps)</span>
-                        </a>}
-                    </div>
-                    {showRoute && <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#edf2f3] px-3.5 py-2.5 dark:border-white/10" aria-live="polite">
-                        <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#34434c] dark:text-[#dbe3e6]">
-                            <Car className="h-4 w-4 text-[#007679] dark:text-[#7fe0e2]" aria-hidden="true"/>{routeSummary ?? 'Finding the route…'}
-                        </span>
-                        {directions && <a href={directions} target="_blank" rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-[13px] font-bold text-[#007679] hover:underline dark:text-[#7fe0e2]">
-                            Open in Google Maps<ExternalLink className="h-3.5 w-3.5" aria-hidden="true"/>
-                        </a>}
-                    </div>}
+                {showRoute && <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#edf1f2] px-3.5 py-2.5 dark:border-white/10" aria-live="polite">
+                    <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[#34434c] dark:text-[#dbe3e6]">
+                        <Car className="h-4 w-4 text-[#007679] dark:text-[#7fe0e2]" aria-hidden="true"/>{routeSummary ?? 'Finding the route…'}
+                    </span>
+                    {directions && <a href={directions} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[13px] font-semibold text-[#007679] hover:underline dark:text-[#7fe0e2]">
+                        Open in Google Maps<ExternalLink className="h-3.5 w-3.5" aria-hidden="true"/>
+                    </a>}
                 </div>}
+            </div>}
 
-                <section aria-label="Shift progress" className="flex flex-col gap-2.5">
-                    <h3 className="text-xs font-bold uppercase tracking-wide text-[#5d6b73] dark:text-[#9aa4a8]">
-                        {tone === 'completed' || tone === 'missed' ? 'How the shift went' : 'Shift progress'}
-                    </h3>
-                    <Steps steps={steps}/>
-                </section>
-
-            </div>
-            </div>
-
-            {buttons && <footer className={cn(SURFACE, 'flex shrink-0 flex-col gap-2 rounded-b-[24px] border-t border-[#edf2f3] px-5 pb-5 pt-4 sm:px-6 dark:border-white/10')}>
-                <div className="flex flex-wrap gap-2.5">{buttons}</div>
-                {hint && <p className="text-center text-xs text-[#6b787e] dark:text-[#9aa4a8]">{hint}</p>}
-            </footer>}
+            <section aria-label="Shift progress" className="flex flex-col gap-3">
+                <h3 className="text-[14px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">
+                    {tone === 'completed' || tone === 'missed' ? 'How the shift went' : 'Shift progress'}
+                </h3>
+                <Steps steps={steps}/>
+            </section>
         </div>
-    </div>;
+
+        {buttons && <div className="flex shrink-0 flex-col gap-2 border-t border-[#edf1f2] px-5 py-4 dark:border-white/10">
+            <div className="flex flex-wrap gap-2.5">{buttons}</div>
+            {hint && <p className="text-center text-[12px] text-[#5d6b73] dark:text-[#9aa4a8]">{hint}</p>}
+        </div>}
+    </>;
 }

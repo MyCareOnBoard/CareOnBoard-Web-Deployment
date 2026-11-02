@@ -1,5 +1,5 @@
 import {ShiftStatus, formatShiftLocation, type Shift} from '@/lib/api/shifts';
-import {clockMinutes, scheduledHours, shiftDateTime, workedHours} from '@/pages/userPanel/dashboard/overviewStats';
+import {clockMinutes, shiftDateTime, workedHours} from '@/pages/userPanel/dashboard/overviewStats';
 import {shortClientId} from '@/pages/userPanel/dashboard/components/UpcomingTasks';
 
 const DAY_MINUTES = 24 * 60;
@@ -33,14 +33,19 @@ export function shiftSpan(shift: Shift): {start: number; end: number} | null {
     return {start, end: Math.min(end, DAY_MINUTES)};
 }
 
-/** Places a day's shifts in lanes so overlapping ones sit side by side. */
-export function layoutDay(shifts: Shift[]): TimelineItem[] {
+/**
+ * Places a day's shifts in lanes so overlapping ones sit side by side.
+ * `minSpan` treats every shift as at least that many minutes long when
+ * choosing lanes, so a short shift's card doesn't cover the next one.
+ */
+export function layoutDay(shifts: Shift[], minSpan = 0): TimelineItem[] {
     const items = shifts
         .map(shift => ({shift, span: shiftSpan(shift)}))
         .filter((item): item is {shift: Shift; span: {start: number; end: number}} => item.span !== null)
         .sort((a, b) => a.span.start - b.span.start || b.span.end - a.span.end)
         .map(({shift, span}) => ({shift, start: span.start, end: span.end, lane: 0, lanes: 1}));
 
+    const visualEnd = (item: TimelineItem) => Math.max(item.end, item.start + minSpan);
     let group: TimelineItem[] = [];
     let groupEnd = -1;
     const closeGroup = () => {
@@ -54,11 +59,11 @@ export function layoutDay(shifts: Shift[]): TimelineItem[] {
             groupEnd = -1;
         }
         const laneEnds: number[] = [];
-        group.forEach(other => { laneEnds[other.lane] = Math.max(laneEnds[other.lane] ?? 0, other.end); });
+        group.forEach(other => { laneEnds[other.lane] = Math.max(laneEnds[other.lane] ?? 0, visualEnd(other)); });
         const free = laneEnds.findIndex(end => end <= item.start);
         item.lane = free === -1 ? laneEnds.length : free;
         group.push(item);
-        groupEnd = Math.max(groupEnd, item.end);
+        groupEnd = Math.max(groupEnd, visualEnd(item));
     }
     closeGroup();
     return items;
@@ -111,30 +116,6 @@ export function formatDuration(minutes: number) {
     const rest = total % 60;
     if (!hours) return `${rest}m`;
     return rest ? `${hours}h ${rest}m` : `${hours}h`;
-}
-
-export interface DaySummary {
-    scheduledMinutes: number;
-    workedMinutes: number;
-    done: number;
-    ongoing: number;
-    later: number;
-    missed: number;
-}
-
-/** Totals for one day's shifts: time scheduled and worked, and how many are done, running, still to come or missed. */
-export function daySummary(shifts: Shift[], now: Date = new Date()): DaySummary {
-    const summary: DaySummary = {scheduledMinutes: 0, workedMinutes: 0, done: 0, ongoing: 0, later: 0, missed: 0};
-    for (const shift of shifts) {
-        summary.scheduledMinutes += scheduledHours(shift) * 60;
-        summary.workedMinutes += workedHours(shift, now) * 60;
-        const tone = shiftTone(shift, now);
-        if (tone === 'completed') summary.done++;
-        else if (tone === 'ongoing') summary.ongoing++;
-        else if (tone === 'missed') summary.missed++;
-        else summary.later++;
-    }
-    return summary;
 }
 
 /** The earliest shift on the list that is still to come, skipping `excludeId`. */

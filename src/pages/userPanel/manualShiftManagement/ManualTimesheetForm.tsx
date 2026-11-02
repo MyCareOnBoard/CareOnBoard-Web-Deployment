@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {addDays} from 'date-fns';
-import {AlertTriangle, Loader2, MapPin, Search} from 'lucide-react';
+import {CalendarPlus, Loader2, MapPin, Search} from 'lucide-react';
 import {useToast} from '@/hooks/use-toast';
 import {cn} from '@/lib/utils';
 import {useAuth} from '@/utils/auth';
@@ -18,6 +18,7 @@ import ConfirmShiftModal from './components/ConfirmShiftModal';
 import SuccessModal from './components/SuccessModal';
 import SignatureDropzone from './components/SignatureDropzone';
 import WeekEntries from './components/WeekEntries';
+import {Hint} from '@/pages/userPanel/records/RecordsKit';
 import {shortClientId} from '@/pages/userPanel/dashboard/components/UpcomingTasks';
 import {
     buildManualShiftRequests, dateFromKey, daysToFix, emptyWeek, hasEntries, weekFrom, weeksFromDrafts,
@@ -31,9 +32,9 @@ const SIGNATURE_CONTEXT: Record<SignatureTarget, string> = {
     user: 'manual-timesheet-user',
 };
 
-const inputClass = 'h-11 w-full rounded-[10px] border border-[#dfe5e7] bg-white px-3.5 text-sm text-[#10141a] placeholder:text-[#8a99a3] focus-visible:border-[#00a3a7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00a3a7]/25 dark:border-white/15 dark:bg-transparent dark:text-[#f4f6f7]';
-const labelClass = 'mb-1.5 block text-sm font-semibold text-[#10141a] dark:text-[#f4f6f7]';
-const menuClass = 'absolute z-50 mt-1 max-h-[220px] w-full overflow-y-auto rounded-[10px] border border-[#dfe5e7] bg-white shadow-lg dark:border-white/15 dark:bg-[#11191c]';
+const inputClass = 'h-11 w-full rounded-[8px] border border-[#e3e8ea] bg-white px-3 text-[14px] text-[#10141a] placeholder:text-[#8a979d] focus-visible:border-[#007679] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#007679]/20 dark:border-white/10 dark:bg-[#141b21] dark:text-[#f4f6f7]';
+const labelClass = 'mb-1.5 block text-[14px] font-semibold text-[#10141a] dark:text-[#f4f6f7]';
+const menuClass = 'absolute z-50 mt-1 max-h-[220px] w-full overflow-y-auto rounded-[8px] border border-[#e3e8ea] bg-white shadow-lg dark:border-white/15 dark:bg-[#11191c]';
 const optionClass = 'block w-full cursor-pointer border-b border-[#edf2f3] px-3.5 py-2.5 text-left text-sm text-[#10141a] last:border-b-0 hover:bg-[#f2fafa] dark:border-white/10 dark:text-[#f4f6f7] dark:hover:bg-white/5';
 
 /** Support coordinators manage their clients by name; field staff only see a short id. */
@@ -145,6 +146,8 @@ export function useTimesheetState({enabled}: {enabled: boolean}) {
 
 interface Props {
     state: TimesheetState;
+    /** In the dialog the fields scroll and Save / Submit sit in a pinned footer. */
+    pinnedFooter?: boolean;
     /** Called after a successful submission once the success message is closed. */
     onSubmitted?: () => void;
 }
@@ -153,7 +156,7 @@ interface Props {
  * Bi-weekly manual timesheet: client, location, one or two weeks of check in/out
  * times and both signatures. Saving keeps the rows as drafts; submitting finalizes them.
  */
-export default function ManualTimesheetForm({state, onSubmitted}: Props) {
+export default function ManualTimesheetForm({state, onSubmitted, pinnedFooter = false}: Props) {
     const {toast} = useToast();
     const {user} = useAuth();
     const {
@@ -453,15 +456,29 @@ export default function ManualTimesheetForm({state, onSubmitted}: Props) {
     const busy = saving || submitting;
     const signatureError = (message: string) => fail('Signature not added', message);
 
+    const actions = <div className={cn('flex flex-col-reverse gap-3 sm:flex-row sm:justify-end',
+        pinnedFooter && 'shrink-0 border-t border-[#edf1f2] px-5 py-4 sm:px-6 dark:border-white/10')}>
+        <button type="button" onClick={handleSave} disabled={busy}
+            className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-[6px] border border-[#e3e8ea] bg-white px-5 text-[14px] font-semibold text-[#10141a] hover:bg-[#f3f5f6] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-transparent dark:text-[#f4f6f7] dark:hover:bg-white/5">
+            {saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true"/>}
+            {saving ? 'Saving…' : 'Save progress'}
+        </button>
+        <button type="button" onClick={handleSubmit} disabled={busy}
+            className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-[6px] bg-[#003839] px-5 text-[14px] font-semibold text-white hover:bg-[#00494a] disabled:cursor-not-allowed disabled:opacity-60 dark:bg-[#00a3a7] dark:text-[#06292a] dark:hover:bg-[#19b5b8]">
+            {submitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true"/>}
+            Submit timesheet
+        </button>
+    </div>;
+
     return <>
-        <div className="flex flex-col gap-7">
+        <div className={pinnedFooter ? 'flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-5 pb-5 pt-4 sm:px-6 [&>*]:shrink-0' : 'flex flex-col gap-6'}>
             {loadingDrafts && <p role="status" className="flex items-center gap-2 text-sm text-[#5d6b73] dark:text-[#9aa4a8]">
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true"/> Loading your saved progress…
             </p>}
 
             <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] md:items-end">
-                <div className="flex min-h-11 items-center gap-3 rounded-[12px] border border-[#e6ecee] bg-[#f8fafa] px-3 py-2 dark:border-white/10 dark:bg-white/5">
-                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#d53411] text-sm font-bold text-white" aria-hidden="true">{initials(employeeName)}</span>
+                <div className="flex min-h-11 items-center gap-3 rounded-t-[6px] border-b-2 border-[#00a3a7] bg-[#e3f6f6] px-3 py-2 dark:bg-[#00a3a7]/15">
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#e5484d] text-[13px] font-semibold text-white" aria-hidden="true">{initials(employeeName)}</span>
                     <span className="min-w-0">
                         <span className="block truncate text-sm font-semibold text-[#10141a] dark:text-[#f4f6f7]">{employeeName}</span>
                         {agencyName && <span className="block truncate text-xs text-[#5d6b73] dark:text-[#9aa4a8]">{agencyName}</span>}
@@ -471,7 +488,7 @@ export default function ManualTimesheetForm({state, onSubmitted}: Props) {
                 <div ref={clientBoxRef} className="relative">
                     <label htmlFor="timesheet-client" className={labelClass}>Client name</label>
                     <div className="relative">
-                        <input id="timesheet-client" value={clientQuery ?? client.label} autoComplete="off" placeholder="Search client"
+                        <input id="timesheet-client" value={clientQuery ?? client.label} autoComplete="off" placeholder="Search client here"
                             role="combobox" aria-expanded={clientMenuOpen} aria-controls="timesheet-client-options" aria-autocomplete="list"
                             onChange={event => { setClientQuery(event.target.value); setClient({id: '', label: ''}); searchForClients(event.target.value); }}
                             onFocus={() => { if (clientResults.length > 0) setClientMenuOpen(true); }}
@@ -495,7 +512,7 @@ export default function ManualTimesheetForm({state, onSubmitted}: Props) {
                 <div ref={locationBoxRef} className="relative">
                     <label htmlFor="timesheet-location" className={labelClass}>Location</label>
                     <div className="relative">
-                        <input id="timesheet-location" value={location} autoComplete="off" placeholder="Enter location"
+                        <input id="timesheet-location" value={location} autoComplete="off" placeholder="Search for location here"
                             onChange={event => { setLocation(event.target.value); setSelectedLocation(null); locationAutocomplete.handleInputChange(event.target.value); }}
                             onFocus={() => { if (locationAutocomplete.suggestions.length > 0) setShowSuggestions(true); }}
                             onKeyDown={event => { if (event.key === 'Escape') setShowSuggestions(false); }}
@@ -520,16 +537,19 @@ export default function ManualTimesheetForm({state, onSubmitted}: Props) {
                 onChange={next => setWeek(index, next)}
                 onRemove={index > 0 ? () => setWeeks(current => current.slice(0, index)) : undefined}/>)}
 
-            {weeks.length === 1 && <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] bg-[#e3f6f6] px-4 py-3.5 dark:bg-[#00a3a7]/15">
-                <p className="text-sm font-semibold text-[#00494b] dark:text-[#bdf0f1]">Got another week to record?</p>
+            {weeks.length === 1 && <div className="flex flex-wrap items-center justify-between gap-3 rounded-[8px] bg-[#e3f6f6] px-3 py-2.5 dark:bg-[#00a3a7]/15">
+                <p className="flex items-center gap-2.5 text-[14px] font-semibold text-[#005759] dark:text-[#bdf0f1]">
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#00a3a7] text-white" aria-hidden="true"><CalendarPlus className="h-4 w-4"/></span>
+                    Got another week to record?
+                </p>
                 <button type="button" onClick={addSecondWeek}
-                    className="inline-flex min-h-10 cursor-pointer items-center rounded-full bg-[#007679] px-5 text-sm font-semibold text-white hover:bg-[#005759] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679]">
+                    className="inline-flex h-9 cursor-pointer items-center rounded-[6px] bg-white px-4 text-[13px] font-semibold text-[#10141a] shadow-[0_1px_2px_rgba(16,40,44,0.08)] hover:bg-[#f3f5f6] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] dark:bg-[#1b232b] dark:text-[#f4f6f7] dark:hover:bg-white/5">
                     Set up here
                 </button>
             </div>}
 
             <section aria-labelledby="timesheet-signatures" className="flex flex-col gap-3">
-                <h3 id="timesheet-signatures" className="text-base font-bold text-[#10141a] dark:text-[#f4f6f7]">Signature module</h3>
+                <h3 id="timesheet-signatures" className="text-[14px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">Signature module</h3>
                 <div className="grid gap-4 md:grid-cols-2">
                     <SignatureDropzone label="client signature" signature={clientSignature} onChange={setClientSignature}
                         onError={signatureError} onDraw={() => setSignatureTarget('client')}/>
@@ -538,24 +558,11 @@ export default function ManualTimesheetForm({state, onSubmitted}: Props) {
                 </div>
             </section>
 
-            <div className="flex gap-3 rounded-[14px] border border-[#f5d48a] bg-[#fff8e6] px-4 py-3.5 text-sm text-[#5c4300] dark:border-[#f5d48a]/30 dark:bg-[#f5b400]/10 dark:text-[#f3dc9f]">
-                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[#c98a00]" aria-hidden="true"/>
-                <p>A progress note summarizes the activities done with the client during this period. The timesheet <strong>must</strong> be submitted with progress notes, or pay for the period will be reduced.</p>
-            </div>
+            <Hint>A progress note summarizes the activities done with the client during this period. The timesheet <strong>must</strong> be submitted with progress notes, or pay for the period will be reduced.</Hint>
 
-            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                <button type="button" onClick={handleSave} disabled={busy}
-                    className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-full border border-[#c9d3d6] px-7 text-sm font-semibold text-[#10141a] hover:bg-[#f1f6f7] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/20 dark:text-[#f4f6f7] dark:hover:bg-white/5">
-                    {saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true"/>}
-                    {saving ? 'Saving…' : 'Save progress'}
-                </button>
-                <button type="button" onClick={handleSubmit} disabled={busy}
-                    className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-full bg-[#003839] px-7 text-sm font-semibold text-white hover:bg-[#012829] disabled:cursor-not-allowed disabled:opacity-60 dark:bg-[#007679] dark:hover:bg-[#005759]">
-                    {submitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true"/>}
-                    Submit timesheet
-                </button>
-            </div>
+            {!pinnedFooter && actions}
         </div>
+        {pinnedFooter && actions}
 
         <DigitalSignatureModal
             key={signatureTarget ?? 'none'}

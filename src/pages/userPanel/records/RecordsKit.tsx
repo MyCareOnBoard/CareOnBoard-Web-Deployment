@@ -125,11 +125,14 @@ interface PanelProps {
     footer: ReactNode;
 }
 
+/** Right-anchored panel surface: centred on phones, pinned top-right from sm up. */
+export const SIDE_PANEL = 'flex max-h-[calc(100dvh-32px)] w-[calc(100vw-32px)] max-w-[440px] flex-col gap-0 overflow-hidden rounded-[16px] border-0 p-0 sm:left-auto sm:right-6 sm:top-6 sm:translate-x-0 sm:translate-y-0 dark:bg-[#1b232b]';
+export const SIDE_PANEL_OVERLAY = 'bg-[#10141a]/30';
+
 /** Right-anchored form panel with a scrolling body and a pinned footer, as in the designs. */
 export function SidePanel({open, onOpenChange, busy, title, description, children, footer}: PanelProps) {
     return <Dialog open={open} onOpenChange={value => { if (!busy) onOpenChange(value); }}>
-        <DialogContent showCloseButton={false} overlayClassName="bg-[#10141a]/30"
-            className="flex max-h-[calc(100dvh-32px)] w-[calc(100vw-32px)] max-w-[440px] flex-col gap-0 overflow-hidden rounded-[16px] border-0 p-0 sm:left-auto sm:right-6 sm:top-6 sm:translate-x-0 sm:translate-y-0 dark:bg-[#1b232b]">
+        <DialogContent showCloseButton={false} overlayClassName={SIDE_PANEL_OVERLAY} className={SIDE_PANEL}>
             <div className="flex shrink-0 items-start justify-between gap-3 px-5 pb-4 pt-5">
                 <div>
                     <DialogTitle className="text-[18px] font-bold text-[#10141a] dark:text-[#f4f6f7]">{title}</DialogTitle>

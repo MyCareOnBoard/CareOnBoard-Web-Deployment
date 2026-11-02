@@ -61,17 +61,17 @@ export default function SignatureDropzone({label, signature, onChange, onError, 
         <button type="button" onClick={() => inputRef.current?.click()} aria-describedby={hintId}
             onDragOver={event => { event.preventDefault(); setDragging(true); }}
             onDragLeave={() => setDragging(false)} onDrop={onDrop}
-            className={cn('flex min-h-[112px] w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-[14px] border bg-white px-4 py-4 text-center transition-colors focus-visible:outline-2 focus-visible:outline-[#007679] dark:bg-transparent',
-                dragging ? 'border-[#00a3a7] bg-[#f2fafa] dark:bg-[#00a3a7]/10' : 'border-[#dfe5e7] hover:border-[#00a3a7] dark:border-white/15')}>
+            className={cn('flex min-h-[112px] w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-[8px] border bg-white px-4 py-4 text-center transition-colors focus-visible:outline-2 focus-visible:outline-[#007679] dark:bg-transparent',
+                dragging ? 'border-[#007679] bg-[#007679]/5' : 'border-[#e3e8ea] hover:border-[#c9d3d6] dark:border-white/10')}>
             {signature ? <>
                 <SignaturePreview signature={signature}/>
                 <span className="text-[13px] font-semibold text-[#007679] dark:text-[#7fe0e2]">Replace {label}</span>
             </> : <>
-                <span className="grid h-9 w-9 place-items-center rounded-full bg-[#f1f6f7] text-[#34434c] dark:bg-white/10 dark:text-[#c9d3d6]"><CloudUpload className="h-5 w-5" aria-hidden="true"/></span>
-                <span className="text-sm text-[#34434c] dark:text-[#c9d3d6]">
+                <span className="grid h-9 w-9 place-items-center rounded-full bg-[#f3f5f6] text-[#3d4a50] dark:bg-white/10 dark:text-[#c9d3d6]"><CloudUpload className="h-4 w-4" aria-hidden="true"/></span>
+                <span className="text-[13px] text-[#3d4a50] dark:text-[#c9d3d6]">
                     <span className="font-semibold text-[#007679] dark:text-[#7fe0e2]">Click to upload</span> or drag and drop {label}
                 </span>
-                <span id={hintId} className="text-xs text-[#5d6b73] dark:text-[#9aa4a8]">PNG, JPG or PDF (max. 5 MB)</span>
+                <span id={hintId} className="text-[12px] text-[#8a979d]">PNG, JPG or PDF (max. 5 MB)</span>
             </>}
         </button>
         <input ref={inputRef} type="file" accept=".png,.jpg,.jpeg,.pdf,image/png,image/jpeg,application/pdf" className="hidden"

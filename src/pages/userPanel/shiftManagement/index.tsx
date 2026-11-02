@@ -1,7 +1,7 @@
 import ShiftNoteStatus from '@/pages/shared/notes/ShiftNoteStatus';
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router";
-import { CalendarDays, CirclePlus, Loader2 } from "lucide-react";
+import { CalendarDays, CirclePlus } from "lucide-react";
 import { addDays, differenceInCalendarDays, format, startOfDay } from "date-fns";
 import { Shift, ShiftActionStatus, ShiftStatus, formatShiftLocation, categorizeShifts, clockIn as apiClockIn, clockOut as apiClockOut } from "@/lib/api/shifts";
 import { convertTimeToISODate } from "@/lib/shift-expiry";
@@ -10,10 +10,9 @@ import { ClockInModal } from "./ClockInModal";
 import { LocationErrorModal } from "./LocationErrorModal";
 import { PersonalCareNoteModal } from "./components/PersonalCareNoteModal";
 import DayStrip from "./components/DayStrip";
-import DayTimeline from "./components/DayTimeline";
+import DayTimeline, { DayTimelineSkeleton } from "./components/DayTimeline";
 import CurrentShiftCard, { useClockInOpen } from "./components/CurrentShiftCard";
-import { DaySummaryCard, NextShiftCard } from "./components/DayPanel";
-import { daySummary, nextUpcomingShift } from "./timeline";
+import { nextUpcomingShift } from "./timeline";
 import { useNow } from "./useNow";
 import ShiftDetailsDialog from "./components/ShiftDetailsDialog";
 import ManualTimesheetDialog from "@/pages/userPanel/manualShiftManagement/ManualTimesheetDialog";
@@ -25,6 +24,7 @@ import { useAuth } from "@/utils/auth/context/AuthContext";
 import { useReverseGeocode } from "@/hooks/useReverseGeocode";
 import { useEmployeeShifts } from "@/hooks/useEmployeeShifts";
 import { toDateKey } from "@/pages/userPanel/dashboard/overviewStats";
+import { cn } from "@/lib/utils";
 
 /** Days shown in the strip, and how many of them sit before the selected day. */
 const STRIP_DAYS = 9;
@@ -137,7 +137,6 @@ export default function ShiftManagementPage() {
 
   const selectedKey = toDateKey(selectedDay);
   const dayShifts = useMemo(() => stripShifts.shifts.filter(shift => shift.date === selectedKey), [stripShifts.shifts, selectedKey]);
-  const summary = useMemo(() => daySummary(dayShifts, now), [dayShifts, now]);
 
   const selectDay = (date: Date) => {
     const day = startOfDay(date);
@@ -353,65 +352,61 @@ export default function ShiftManagementPage() {
   const loadingDay = stripShifts.loading && dayShifts.length === 0;
   const isToday = selectedKey === todayKey;
 
+  const timesheetButton = (wide: boolean) => (
+    <button type="button" onClick={() => setTimesheetOpen(true)}
+      className={cn(
+        "inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-[6px] bg-[#003839] px-4 text-[14px] font-semibold text-white transition-colors hover:bg-[#00494a] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] dark:bg-[#00a3a7] dark:text-[#06292a] dark:hover:bg-[#19b5b8]",
+        wide && "h-11 w-full",
+      )}>
+      <CirclePlus className="h-4 w-4" aria-hidden="true" /> Add manual timesheet
+    </button>
+  );
+  const emptyDay = !stripShifts.error && !loadingDay && dayShifts.length === 0;
+
   return (
-    <div className="flex min-h-[calc(100vh-200px)] flex-col gap-5">
+    <div className="flex min-h-[calc(100vh-200px)] flex-col">
       <h1 className="sr-only">Shift management</h1>
 
-      <div className="grid flex-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
-        <section aria-label="Schedule" className="relative flex min-w-0 flex-col gap-5 rounded-[20px] bg-white p-4 shadow-[0_1px_2px_rgba(16,40,44,0.06)] sm:p-6 dark:bg-[#1b232b]">
-          <DayStrip windowStart={windowStart} days={STRIP_DAYS} selected={selectedDay} onSelect={selectDay}/>
+      <section aria-label="Schedule" className="flex flex-1 flex-col gap-4 rounded-[20px] bg-white p-4 shadow-[0_1px_2px_rgba(16,40,44,0.06)] sm:p-6 dark:bg-[#1b232b]">
+        <DayStrip windowStart={windowStart} days={STRIP_DAYS} selected={selectedDay} onSelect={selectDay}/>
 
-          {stripShifts.error ? (
-            <p role="alert" className="py-16 text-center text-sm text-[#b3371c] dark:text-[#f3a08c]">
-              We couldn't load your shifts.{' '}
-              <button type="button" onClick={stripShifts.reload} className="cursor-pointer font-semibold underline">Try again</button>
+        {currentShift?.actionStatus && (
+          <CurrentShiftCard
+            shift={currentShift}
+            minutesLeft={timeRemaining}
+            userLocation={userLocation}
+            locationError={locationError}
+            busy={actionBusy}
+            onAction={handleShiftAction}
+          />
+        )}
+
+        {stripShifts.error ? (
+          <p role="alert" className="flex-1 py-16 text-center text-sm text-[#b3371c] dark:text-[#f3a08c]">
+            We couldn't load your shifts.{' '}
+            <button type="button" onClick={stripShifts.reload} className="cursor-pointer font-semibold underline">Try again</button>
+          </p>
+        ) : loadingDay ? (
+          <div className="flex-1"><DayTimelineSkeleton/></div>
+        ) : emptyDay ? (
+          <div className="mx-auto flex max-w-[400px] flex-1 flex-col items-center justify-center py-16 text-center">
+            <CalendarDays className="h-9 w-9 text-[#8a979d]" strokeWidth={1.5} aria-hidden="true" />
+            <p className="mt-2 text-base font-semibold text-[#5d6b73] dark:text-[#c9d3d6]">
+              {isToday ? 'No shifts scheduled yet' : `No shifts on ${format(selectedDay, 'EEEE, MMM d')}`}
             </p>
-          ) : loadingDay ? (
-            <div role="status" className="flex flex-col items-center justify-center gap-3 py-20 text-sm text-[#5d6b73] dark:text-[#9aa4a8]">
-              <Loader2 className="h-8 w-8 animate-spin text-[#00a3a7] motion-reduce:animate-none" aria-hidden="true" />
-              Loading shifts…
-            </div>
-          ) : dayShifts.length === 0 ? (
-            <div className="mx-auto flex max-w-[380px] flex-col items-center justify-center gap-2 py-16 text-center">
-              <CalendarDays className="h-9 w-9 text-[#8a99a3]" aria-hidden="true" />
-              <p className="mt-1 text-base font-bold text-[#34434c] dark:text-[#e3e9eb]">
-                {isToday ? 'No shifts scheduled yet' : `No shifts on ${format(selectedDay, 'EEEE, MMM d')}`}
-              </p>
-              <p className="text-[13px] text-[#5d6b73] dark:text-[#9aa4a8]">
-                Your assigned shifts will appear here once they're scheduled. Check back later for updates to your schedule.
-              </p>
-            </div>
-          ) : (
-            <DayTimeline shifts={dayShifts} showNow={isToday} nextShiftId={isToday ? upNextId : undefined} onOpen={setOpenShift}/>
-          )}
-        </section>
+            <p className="mt-1.5 text-[13px] text-[#8a979d] dark:text-[#9aa4a8]">
+              Your assigned shifts will appear here once they're scheduled. Check back later for updates to your schedule.
+            </p>
+            <div className="mt-5 w-full">{timesheetButton(true)}</div>
+          </div>
+        ) : (
+          <div className="flex-1">
+            <DayTimeline shifts={dayShifts} showNow={isToday} onOpen={setOpenShift}/>
+          </div>
+        )}
 
-        {/* On phones the panel splits around the schedule: Clock in / Clock out and the next shift above it,
-            the day summary and manual timesheet below. From lg it is one column on the right. */}
-        <aside aria-label="Your day" className="contents lg:flex lg:flex-col lg:gap-4">
-          {!stripShifts.error && !loadingDay && dayShifts.length > 0 && <div className="order-last lg:order-none">
-            <DaySummaryCard label={isToday ? 'Today' : format(selectedDay, 'EEE, MMM d')} summary={summary}
-              future={selectedKey > todayKey} shiftCount={dayShifts.length}/>
-          </div>}
-          {currentShift?.actionStatus && <div className="order-first lg:order-none">
-            <CurrentShiftCard
-              shift={currentShift}
-              minutesLeft={timeRemaining}
-              userLocation={userLocation}
-              locationError={locationError}
-              busy={actionBusy}
-              onAction={handleShiftAction}
-            />
-          </div>}
-          {nextShift && <div className="order-first lg:order-none">
-            <NextShiftCard shift={nextShift} now={now} onOpen={setOpenShift}/>
-          </div>}
-          <button type="button" onClick={() => setTimesheetOpen(true)}
-            className="order-last inline-flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-[#007679] bg-white px-5 text-[15px] font-bold text-[#005759] transition-colors hover:bg-[#e3f6f6] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] lg:order-none dark:border-[#00a3a7] dark:bg-transparent dark:text-[#7fe0e2] dark:hover:bg-[#00a3a7]/10">
-            <CirclePlus className="h-4 w-4" aria-hidden="true" /> Add manual timesheet
-          </button>
-        </aside>
-      </div>
+        {!loadingDay && !emptyDay && <div className="flex justify-end">{timesheetButton(false)}</div>}
+      </section>
 
       <ShiftDetailsDialog
         shift={openShift}

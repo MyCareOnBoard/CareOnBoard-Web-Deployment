@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {ShiftStatus, type Shift} from '@/lib/api/shifts';
-import {clientLabel, clockInOpensAt, clockInTiming, clockTimes, daySummary, directionsUrl, formatClock, formatDuration, layoutDay, nextUpcomingShift, shiftSpan, shiftTitle, shiftTone, startsIn, visibleHours} from './timeline';
+import {clientLabel, clockInOpensAt, clockInTiming, clockTimes, directionsUrl, formatClock, formatDuration, layoutDay, nextUpcomingShift, shiftSpan, shiftTitle, shiftTone, startsIn, visibleHours} from './timeline';
 
 vi.mock('@/lib/firebase', () => ({auth: {currentUser: null}}));
 
@@ -50,6 +50,11 @@ describe('layoutDay', () => {
         expect(byId.d).toMatchObject({lane: 0, lanes: 1});
     });
 
+    it('gives short shifts room for their card when asked', () => {
+        const short = [shift({id: 'a', startTime: '08:00 AM', endTime: '08:30 AM'}), shift({id: 'b', startTime: '08:30 AM', endTime: '09:00 AM'})];
+        expect(layoutDay(short).map(item => item.lane)).toEqual([0, 0]);
+        expect(layoutDay(short, 60).map(item => [item.lane, item.lanes])).toEqual([[0, 2], [1, 2]]);
+    });
     it('skips shifts without a readable start', () => {
         expect(layoutDay([shift({startTime: ''})])).toEqual([]);
     });
@@ -102,7 +107,7 @@ describe('formatDuration', () => {
     });
 });
 
-describe('day summary and next shift', () => {
+describe('next shift', () => {
     const now = new Date(2026, 9, 29, 10, 1);
     const day = [
         shift({id: 'done', startTime: '07:00 AM', endTime: '09:30 AM', status: ShiftStatus.COMPLETED,
@@ -112,13 +117,6 @@ describe('day summary and next shift', () => {
         shift({id: 'late', startTime: '06:00 PM', endTime: '08:00 PM'}),
         shift({id: 'next', startTime: '12:00 PM', endTime: '04:00 PM'}),
     ];
-
-    it('adds up scheduled and worked time', () => {
-        const summary = daySummary(day, now);
-        expect(summary.scheduledMinutes).toBe(150 + 120 + 120 + 240);
-        expect(summary.workedMinutes).toBe(150 + 60);
-        expect(summary).toMatchObject({done: 1, ongoing: 1, later: 2, missed: 0});
-    });
 
     it('picks the earliest shift still to come', () => {
         expect(nextUpcomingShift(day, now)?.id).toBe('next');
