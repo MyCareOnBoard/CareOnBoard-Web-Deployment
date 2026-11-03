@@ -203,6 +203,14 @@ function mergeGuardianRelationship(
   return current;
 }
 
+const TIER_LETTERS = new Set(["A", "B", "C", "D", "E"]);
+
+/** "Tier E", "e", "E" -> "E"; anything else -> "". */
+export function normalizeExtractedTier(raw: string | undefined): string {
+  const text = String(raw ?? "").trim().toUpperCase().replace(/^TIER\s*[-:]?\s*/, "");
+  return TIER_LETTERS.has(text) ? text : "";
+}
+
 function parseIsoOrUsDate(s: string | undefined): Date | undefined {
   if (!s || !String(s).trim()) return undefined;
   if (isExtractedNoDataToken(s)) return undefined;
@@ -915,7 +923,10 @@ export function mergeExtractionDraft(
     next.stage1.medicaidId = mergeString(next.stage1.medicaidId, s1.medicaidId, overwrite);
     next.stage1.dddId = mergeString(next.stage1.dddId, s1.dddId, overwrite);
     next.stage1.ssn = mergeString(next.stage1.ssn, s1.ssn, overwrite);
-    next.stage1.tier = mergeString(next.stage1.tier ?? "", s1.tier, overwrite) || undefined;
+    if (next.type !== "hha") {
+      next.stage1.tier =
+        mergeString(next.stage1.tier ?? "", normalizeExtractedTier(s1.tier), overwrite) || undefined;
+    }
     next.stage1.preferredName =
       mergeString(next.stage1.preferredName ?? "", s1.preferredName, overwrite) || undefined;
 
@@ -1257,6 +1268,10 @@ export function mergeExtractionDraft(
   }
 
   const s3 = draft.stage3;
+  // Only ever turns the requirement on; the Medication/Behavioral choice stays with staff.
+  if (s3?.acuityRequired === true && !next.acuityRequirements?.enabled) {
+    next.acuityRequirements = { types: [], ...next.acuityRequirements, enabled: true };
+  }
   if (s3) {
     next.stage3.medicalConditions = mergeUniqueStrings(
       next.stage3.medicalConditions,

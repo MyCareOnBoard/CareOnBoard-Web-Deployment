@@ -695,3 +695,29 @@ describe("mergeExtractionDraft", () => {
     });
   });
 });
+
+describe("mergeExtractionDraft ISP procedure flags", () => {
+  it("turns on the Acuity requirement and keeps chosen types", () => {
+    const initial = { ...createInitialAddClientFormData(), acuityRequirements: { enabled: false, types: ["behavioral" as const] } };
+    const { formData } = mergeExtractionDraft(initial, makeExtraction({ draft: { stage3: { acuityRequired: true } } }));
+    expect(formData.acuityRequirements).toEqual({ enabled: true, types: ["behavioral"] });
+  });
+
+  it("never turns the Acuity requirement off", () => {
+    const initial = { ...createInitialAddClientFormData(), acuityRequirements: { enabled: true, types: [] } };
+    const { formData } = mergeExtractionDraft(initial, makeExtraction({ draft: { stage3: { acuityRequired: false } } }));
+    expect(formData.acuityRequirements?.enabled).toBe(true);
+  });
+
+  it("maps an extracted tier like 'Tier E' to the tier letter", () => {
+    const { formData } = mergeExtractionDraft(createInitialAddClientFormData(), makeExtraction({ draft: { stage1: { tier: "Tier E" } } }));
+    expect(formData.stage1.tier).toBe("E");
+  });
+
+  it("ignores tiers that are not A to E, and tiers on HHA clients", () => {
+    const bad = mergeExtractionDraft(createInitialAddClientFormData(), makeExtraction({ draft: { stage1: { tier: "Tier 3" } } }));
+    expect(bad.formData.stage1.tier).toBeUndefined();
+    const hha = mergeExtractionDraft(createInitialAddClientFormData(), makeExtraction({ draft: { type: "hha", stage1: { tier: "E" } } }));
+    expect(hha.formData.stage1.tier).toBeUndefined();
+  });
+});

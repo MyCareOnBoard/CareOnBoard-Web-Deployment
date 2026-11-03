@@ -304,6 +304,9 @@ export type ClientExtractionDraft = {
     physicianInfo: ExtractionHhaPhysicianInfo;
     fallRisk: string;
     specialPrecautions: string;
+    /** Set by the server when an ISP service Procedure line mentions Acuity. */
+    acuityRequired: boolean;
+    acuityProcedures: string[];
   }>;
   stage4?: Partial<{
     evvRequirement: string;
