@@ -37,7 +37,7 @@ test("still allows deleting when the history check fails, with a warning", async
   api.getClientDeletionImpact.mockRejectedValue(new Error("down"));
   const user = userEvent.setup();
   renderDialog();
-  expect(await screen.findByText(/could not check whether this client has shifts/)).toBeInTheDocument();
+  expect(await screen.findByText(/Shifts and billing claims could not be checked/)).toBeInTheDocument();
   await user.type(screen.getByLabelText(/to confirm/), "Jane Doe");
   expect(screen.getByRole("button", { name: "Delete permanently" })).toBeEnabled();
 });

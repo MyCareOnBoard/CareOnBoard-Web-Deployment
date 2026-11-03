@@ -35,6 +35,8 @@ interface ConfirmDialogContentProps extends React.ComponentPropsWithoutRef<typeo
   onCancel?: () => void;
   isLoading?: boolean;
   loadingText?: string;
+  /** Keeps the confirm button disabled, e.g. until a typed confirmation matches. */
+  confirmDisabled?: boolean;
 }
 
 const ConfirmDialogContent = React.forwardRef<
@@ -52,6 +54,7 @@ const ConfirmDialogContent = React.forwardRef<
   onCancel,
   isLoading = false,
   loadingText = "Processing...",
+  confirmDisabled = false,
   ...props 
 }, ref) => (
   <ConfirmDialogPortal>
@@ -108,7 +111,7 @@ const ConfirmDialogContent = React.forwardRef<
             variant={confirmVariant}
             className={cn("flex-1 rounded-[60px] px-4 py-4 text-[14px] font-semibold leading-[1.4] text-white cursor-pointer disabled:cursor-not-allowed", confirmVariant === "destructive" && "bg-[#ef4444] hover:bg-[#dc2626]")}
             onClick={onConfirm}
-            disabled={isLoading}
+            disabled={isLoading || confirmDisabled}
           >
             {isLoading ? (
               <div className="flex items-center gap-2">

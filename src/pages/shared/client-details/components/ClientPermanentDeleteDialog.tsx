@@ -1,7 +1,6 @@
 import { useEffect, useId, useState } from "react";
-import { AlertTriangle, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Loader2 } from "lucide-react";
+import { ConfirmDialog, ConfirmDialogContent } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { getClientDeletionImpact, type ClientDeletionImpact, useDeleteClientMutation } from "@/lib/api/clients";
 
@@ -57,32 +56,30 @@ export function ClientPermanentDeleteDialog({ open, onOpenChange, clientId, agen
     }
   };
 
-  return <Dialog open={open} onOpenChange={next => { if (!busy) onOpenChange(next); }}>
-    <DialogContent className="max-w-md" onEscapeKeyDown={event => { if (busy) event.preventDefault(); }} onInteractOutside={event => { if (busy) event.preventDefault(); }}>
-      <DialogHeader>
-        <DialogTitle>Permanently delete {name}?</DialogTitle>
-        <DialogDescription>
-          This erases the client's profile, records and uploaded documents. It cannot be undone. To keep them, archive the client instead.
-        </DialogDescription>
-      </DialogHeader>
-      {!impact && !impactFailed && <p role="status" className="flex items-center gap-2 text-[13px] text-[#617579]"><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />Checking this client's shifts and claims…</p>}
-      {(history || impactFailed) && <div role="alert" className="flex gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-[13px] leading-5 text-[#5c4a1e]">
-        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
-        <span>{impactFailed
-          ? "We could not check whether this client has shifts or billing claims. Any that exist will be kept but will no longer link to a client."
-          : `This client has ${history}. They will be kept for your records but will no longer link to a client.`}</span>
-      </div>}
-      <div className="space-y-1.5">
-        <label htmlFor={inputId} className="text-[13px] font-medium text-[#10141a]">Type <span className="font-semibold">{name}</span> to confirm</label>
-        <Input id={inputId} value={typed} autoComplete="off" disabled={busy} onChange={event => setTyped(event.target.value)} onKeyDown={event => { if (event.key === "Enter") void confirm(); }} />
+  return <ConfirmDialog open={open} onOpenChange={next => { if (!busy) onOpenChange(next); }}>
+    <ConfirmDialogContent
+      title="Delete permanently?"
+      description={`This erases ${name}'s profile, records and uploaded documents. It cannot be undone.`}
+      confirmText="Delete permanently"
+      loadingText="Deleting…"
+      isLoading={busy}
+      confirmDisabled={!canConfirm}
+      onCancel={() => { if (!busy) onOpenChange(false); }}
+      onConfirm={() => void confirm()}
+      onEscapeKeyDown={event => { if (busy) event.preventDefault(); }}
+      onInteractOutside={event => { if (busy) event.preventDefault(); }}
+    >
+      <div className="flex flex-col gap-3 text-left">
+        {!impact && !impactFailed && <p role="status" className="flex items-center justify-center gap-2 text-[13px] text-[#808081]"><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />Checking shifts and claims…</p>}
+        {(history || impactFailed) && <p role="alert" className="rounded-2xl bg-amber-50 px-3 py-2 text-[13px] leading-5 text-[#5c4a1e] dark:bg-amber-500/10 dark:text-amber-200">
+          {impactFailed
+            ? "Shifts and billing claims could not be checked. Any that exist are kept but will no longer link to this client."
+            : `This client has ${history}. They are kept but will no longer link to this client.`}
+        </p>}
+        <label htmlFor={inputId} className="text-[13px] font-medium text-[#10141a] dark:text-[#f4f6f7]">Type <span className="font-semibold">{name}</span> to confirm</label>
+        <Input id={inputId} value={typed} autoComplete="off" disabled={busy} className="h-11 rounded-full" onChange={event => setTyped(event.target.value)} onKeyDown={event => { if (event.key === "Enter") void confirm(); }} />
+        {error && <p role="alert" className="text-[13px] font-medium text-red-600">{error}</p>}
       </div>
-      {error && <p role="alert" className="text-[13px] font-medium text-red-600">{error}</p>}
-      <DialogFooter className="gap-2">
-        <Button type="button" variant="outline" disabled={busy} onClick={() => onOpenChange(false)}>Cancel</Button>
-        <Button type="button" className="gap-1.5 bg-[#d93c24] text-white hover:bg-[#c52d16]" disabled={!canConfirm} onClick={() => void confirm()}>
-          {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}{busy ? "Deleting…" : "Delete permanently"}
-        </Button>
-      </DialogFooter>
-    </DialogContent>
-  </Dialog>;
+    </ConfirmDialogContent>
+  </ConfirmDialog>;
 }
