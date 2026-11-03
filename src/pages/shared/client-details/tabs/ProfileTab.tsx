@@ -1,5 +1,5 @@
 import React, { memo, useCallback, useMemo, useState } from "react";
-import { CheckCircle, Loader2, Trash2 } from "lucide-react";
+import { Archive, CheckCircle, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
 import { Client, updateClient, useDeleteClientMutation } from "@/lib/api/clients";
@@ -9,8 +9,9 @@ import { Routes } from "@/routes/constants";
 import { cn } from "@/lib/utils";
 import { ProfileSectionCard } from "@/pages/shared/client-details/components/ProfileSectionCard";
 import { buildProfileSections, type ProfileSection } from "./profileTabViewModel";
+import { ClientPermanentDeleteDialog } from "../components/ClientPermanentDeleteDialog";
 
-type PendingConfirmAction = "deactivate" | "delete";
+type PendingConfirmAction = "deactivate" | "archive";
 
 const CLIENT_CONFIRM_CONFIG: Record<
   PendingConfirmAction,
@@ -22,11 +23,11 @@ const CLIENT_CONFIRM_CONFIG: Record<
       "Are you sure you want to deactivate this client? This action will mark the client as inactive and may affect their access to services.",
     confirmText: "Deactivate",
   },
-  delete: {
-    title: "Delete client",
+  archive: {
+    title: "Archive client",
     message:
-      "Are you sure you want to delete this client? This action cannot be undone and will permanently remove all client data from the system.",
-    confirmText: "Delete",
+      "The client is removed from active lists, but their profile, documents and history are kept. You can delete an archived client permanently later.",
+    confirmText: "Archive",
   },
 };
 
@@ -51,9 +52,11 @@ type ProfileTabToolbarProps = {
   isInactive: boolean;
   isActivating: boolean;
   isDeactivating: boolean;
-  isDeleting: boolean;
+  isArchived: boolean;
+  isArchiving: boolean;
   onActivate: () => void;
   onOpenDeactivate: () => void;
+  onOpenArchive: () => void;
   onOpenDelete: () => void;
 };
 
@@ -61,9 +64,11 @@ const ProfileTabToolbar = memo(function ProfileTabToolbar({
   isInactive,
   isActivating,
   isDeactivating,
-  isDeleting,
+  isArchived,
+  isArchiving,
   onActivate,
   onOpenDeactivate,
+  onOpenArchive,
   onOpenDelete,
 }: ProfileTabToolbarProps) {
   return (
@@ -120,18 +125,23 @@ const ProfileTabToolbar = memo(function ProfileTabToolbar({
           profileActionBtn,
           "gap-1.5 border border-red-200/90 bg-white/90 text-red-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700",
         )}
-        onClick={onOpenDelete}
-        disabled={isDeleting}
+        onClick={isArchived ? onOpenDelete : onOpenArchive}
+        disabled={isArchiving}
       >
-        {isDeleting ? (
+        {isArchived ? (
+          <>
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete permanently
+          </>
+        ) : isArchiving ? (
           <>
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            Deleting…
+            Archiving…
           </>
         ) : (
           <>
-            <Trash2 className="h-3.5 w-3.5" />
-            Delete
+            <Archive className="h-3.5 w-3.5" />
+            Archive
           </>
         )}
       </Button>
@@ -163,7 +173,8 @@ export function ProfileTab({
   const [pendingAction, setPendingAction] = useState<PendingConfirmAction | null>(null);
   const [isDeactivating, setIsDeactivating] = useState(false);
   const [isActivating, setIsActivating] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [isArchiving, setIsArchiving] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const sections = useMemo(
     () => buildProfileSections(client, formatDate),
@@ -225,11 +236,11 @@ export function ProfileTab({
     }
   }, [clientId, onClientUpdated, toast]);
 
-  const handleDelete = useCallback(async () => {
+  const handleArchive = useCallback(async () => {
     const agencyId = client.agencyId;
     if (!clientId || !agencyId) {
       toast({
-        title: "Cannot delete client",
+        title: "Cannot archive client",
         description: "Agency information is missing for this client.",
         variant: "destructive",
       });
@@ -237,45 +248,50 @@ export function ProfileTab({
     }
 
     try {
-      setIsDeleting(true);
-      // Use the RTK mutation (not the plain api fn) so it invalidates the
-      // 'Clients'/'ClientStats' tags and the management list refetches — otherwise
-      // the deleted client lingers in the list until a manual refresh.
+      setIsArchiving(true);
+      // The RTK mutation invalidates 'Clients'/'ClientStats' so the management list refetches.
       await deleteClientMutation({ clientId, agencyId }).unwrap();
 
       toast({
-        title: "Client deleted",
-        description: "The client has been successfully deleted.",
+        title: "Client archived",
+        description: "The client was archived. Their records are kept.",
       });
 
       setPendingAction(null);
-      navigate(afterDeleteRoute);
+      onClientUpdated?.();
     } catch (error: unknown) {
       const message =
-        error instanceof Error ? error.message : "An error occurred while deleting the client.";
-      console.error("Failed to delete client:", error);
+        error instanceof Error ? error.message : "An error occurred while archiving the client.";
+      console.error("Failed to archive client:", error);
       toast({
-        title: "Failed to delete client",
+        title: "Failed to archive client",
         description: message,
         variant: "destructive",
       });
     } finally {
-      setIsDeleting(false);
+      setIsArchiving(false);
     }
-  }, [afterDeleteRoute, client.agencyId, clientId, navigate, toast, deleteClientMutation]);
+  }, [client.agencyId, clientId, onClientUpdated, toast, deleteClientMutation]);
+
+  const handleDeleted = useCallback(() => {
+    setDeleteOpen(false);
+    toast({ title: "Client deleted", description: "The client and their files were permanently deleted." });
+    navigate(afterDeleteRoute);
+  }, [afterDeleteRoute, navigate, toast]);
 
   const openDeactivateModal = useCallback(() => setPendingAction("deactivate"), []);
-  const openDeleteModal = useCallback(() => setPendingAction("delete"), []);
+  const openArchiveModal = useCallback(() => setPendingAction("archive"), []);
+  const openDeleteDialog = useCallback(() => setDeleteOpen(true), []);
   const closeConfirmModal = useCallback(() => setPendingAction(null), []);
 
   const handleConfirm = useCallback(() => {
-    if (pendingAction === "delete") void handleDelete();
+    if (pendingAction === "archive") void handleArchive();
     else if (pendingAction === "deactivate") void handleDeactivate();
-  }, [handleDeactivate, handleDelete, pendingAction]);
+  }, [handleDeactivate, handleArchive, pendingAction]);
 
   const confirmConfig = pendingAction ? CLIENT_CONFIRM_CONFIG[pendingAction] : null;
   const isConfirmBusy =
-    pendingAction === "deactivate" ? isDeactivating : pendingAction === "delete" ? isDeleting : false;
+    pendingAction === "deactivate" ? isDeactivating : pendingAction === "archive" ? isArchiving : false;
 
   const isInactive = client.status === "inactive" || client.status === "archived";
 
@@ -287,10 +303,12 @@ export function ProfileTab({
           isInactive={isInactive}
           isActivating={isActivating}
           isDeactivating={isDeactivating}
-          isDeleting={isDeleting}
+          isArchived={client.status === "archived"}
+          isArchiving={isArchiving}
           onActivate={handleActivate}
           onOpenDeactivate={openDeactivateModal}
-          onOpenDelete={openDeleteModal}
+          onOpenArchive={openArchiveModal}
+          onOpenDelete={openDeleteDialog}
         />
         )}
 
@@ -309,6 +327,17 @@ export function ProfileTab({
         confirmText={confirmConfig?.confirmText ?? "Confirm"}
         cancelText="Cancel"
       />
+
+      {client.status === "archived" && (
+        <ClientPermanentDeleteDialog
+          open={deleteOpen}
+          onOpenChange={setDeleteOpen}
+          clientId={clientId}
+          agencyId={client.agencyId}
+          clientName={[client.firstName, client.lastName].filter(Boolean).join(" ")}
+          onDeleted={handleDeleted}
+        />
+      )}
     </>
   );
 }

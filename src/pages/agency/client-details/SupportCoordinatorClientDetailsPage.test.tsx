@@ -108,7 +108,7 @@ it('opens Client Information first by default and keeps sample clients read-only
   expect(screen.getByRole('heading', { name: 'Client Information' })).toBeInTheDocument();
   expect(screen.getByText(/Preview only. These sample details/)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Edit Client' })).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Delete client' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Archive client' })).not.toBeInTheDocument();
   expect(screen.queryByText('Care workspace for 182441')).not.toBeInTheDocument();
 });
 
@@ -182,7 +182,7 @@ it('allows authorized SC client-management staff and lets them cancel without a 
   const user = userEvent.setup();
   render(activationPage());
   await user.click(await screen.findByRole('button', { name: 'Activate client' }));
-  expect(screen.queryByRole('button', { name: 'Delete client' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Archive client' })).not.toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Not now' }));
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   expect(updateClient).not.toHaveBeenCalled();
@@ -204,18 +204,27 @@ it.each([
   expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title, variant: 'success' }));
 });
 
-it('uses the existing delete mutation and returns to the client list after archiving', async () => {
+it('archives first with the existing delete mutation and returns to the client list', async () => {
   vi.mocked(getAgencyClientById).mockResolvedValue(pendingClient);
-  removeClient.mockResolvedValue({ success: true, message: 'Client deleted successfully' });
+  removeClient.mockResolvedValue({ success: true, message: 'Client archived successfully' });
   const user = userEvent.setup();
   render(activationPage());
-  await user.click(await screen.findByRole('button', { name: 'Delete client' }));
+  expect(await screen.findByRole('button', { name: 'Archive client' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Delete permanently' })).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Archive client' }));
   expect(screen.getByText(/archive the client and remove them from active client lists/)).toBeInTheDocument();
   expect(removeClient).not.toHaveBeenCalled();
-  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete client' }));
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Archive client' }));
   expect(await screen.findByText('Client list')).toBeInTheDocument();
   expect(removeClient).toHaveBeenCalledWith({ clientId: 'pending-client', agencyId: 'a' });
-  expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Client deleted', variant: 'success' }));
+  expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Client archived', variant: 'success' }));
+});
+
+it('offers permanent delete only once the client is archived', async () => {
+  vi.mocked(getAgencyClientById).mockResolvedValue({ ...pendingClient, status: 'archived' });
+  render(activationPage());
+  expect(await screen.findByRole('button', { name: 'Delete permanently' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Archive client' })).not.toBeInTheDocument();
 });
 
 it('keeps a confirmed status change when the user switches tabs during saving', async () => {

@@ -1270,6 +1270,17 @@ export async function deleteClient(clientId: string, agencyId?: string): Promise
   }
 }
 
+export type ClientDeletionImpact = { hasShifts: boolean; hasClaims: boolean };
+
+/** Whether a permanent delete would leave shifts or claims without their client. */
+export async function getClientDeletionImpact(clientId: string, agencyId?: string, signal?: AbortSignal): Promise<ClientDeletionImpact> {
+  const response = await axiosClient.get<{ success: boolean; data: ClientDeletionImpact }>(`/clients/${encodeURIComponent(clientId)}/deletion-impact`, {
+    params: agencyId ? { agencyId } : undefined,
+    signal,
+  });
+  return response.data.data;
+}
+
 /**
  * ✅ Search clients by name or other criteria
  * Endpoint: GET /clients/search
@@ -1453,13 +1464,15 @@ export const clientsApi = createApi({
         'ClientStats'
       ],
     }),
+    /** Archives the client; with permanent: true it erases the client and its files. */
     deleteClient: builder.mutation<
       { success: boolean; message: string },
-      { clientId: string; agencyId?: string }
+      { clientId: string; agencyId?: string; permanent?: boolean }
     >({
-      query: ({ clientId, agencyId }) => {
+      query: ({ clientId, agencyId, permanent }) => {
         const queryParams = new URLSearchParams();
         if (agencyId) queryParams.append('agencyId', agencyId);
+        if (permanent) queryParams.append('permanent', 'true');
 
         return {
           url: `/clients/${clientId}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`,

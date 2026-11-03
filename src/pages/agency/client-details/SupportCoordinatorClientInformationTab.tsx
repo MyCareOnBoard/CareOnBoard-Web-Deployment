@@ -10,12 +10,13 @@ import { useAuth } from '@/utils/auth';
 import { Routes } from '@/routes/constants';
 import { ProfileSectionCard } from '@/pages/shared/client-details/components/ProfileSectionCard';
 import { buildProfileSections } from '@/pages/shared/client-details/tabs/profileTabViewModel';
+import { ClientPermanentDeleteDialog } from '@/pages/shared/client-details/components/ClientPermanentDeleteDialog';
 
-type Action = 'activate' | 'deactivate' | 'delete';
+type Action = 'activate' | 'deactivate' | 'archive';
 const confirmations = {
   activate: { title: 'Activate this client?', label: 'Activate client', description: 'Confirm that you have reviewed enrollment and this client is ready for active services. Existing agency requirements still apply. For SC clients, monitoring follows the agency’s settings and keeps existing enrollment and contact dates, so a contact may already be due.' },
   deactivate: { title: 'Deactivate this client?', label: 'Deactivate client', description: 'This will mark the client as inactive and may affect access to services. SC contact deadlines will pause. Existing contacts and follow-ups will be kept.' },
-  delete: { title: 'Delete this client?', label: 'Delete client', description: 'This will archive the client and remove them from active client lists. Existing records are retained. Active services and assignments may be affected.' },
+  archive: { title: 'Archive this client?', label: 'Archive client', description: 'This will archive the client and remove them from active client lists. Existing records are retained. Active services and assignments may be affected. You can delete an archived client permanently later.' },
 };
 export type ClientInformationProps = {
   client: Client;
@@ -37,6 +38,7 @@ function ClientInformation({ client, formatDate, clientId, onClientUpdated, read
   const [action, setAction] = useState<Action | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const sections = useMemo(() => {
@@ -56,17 +58,19 @@ function ClientInformation({ client, formatDate, clientId, onClientUpdated, read
     && (user?.userType === 'agency' || (user?.userType === 'agency_staff'
       && user.profile?.accessList?.includes('Client Management')
       && user.profile?.agencyModes?.includes('sc')));
-  const canDelete = canManage && user?.userType === 'agency' && client.status !== 'archived';
+  const isOwner = canManage && user?.userType === 'agency';
+  const canArchive = isOwner && client.status !== 'archived';
+  const canDeletePermanently = isOwner && client.status === 'archived';
   const statusAction = client.status === 'active' ? 'deactivate' : client.status === 'pending' || client.status === 'inactive' ? 'activate' : null;
   const open = (next: Action) => { setError(''); setAction(next); };
   const confirm = async () => {
-    if (!action || busy || error || !canManage || (action === 'delete' ? !canDelete : action !== statusAction)) return;
+    if (!action || busy || error || !canManage || (action === 'archive' ? !canArchive : action !== statusAction)) return;
     setBusy(true); setError('');
     let saved: Client | undefined;
     try {
-      if (action === 'delete') {
+      if (action === 'archive') {
         const result = await remove({ clientId, agencyId: client.agencyId }).unwrap();
-        if (!result.success) throw new Error('Deletion was not confirmed.');
+        if (!result.success) throw new Error('Archiving was not confirmed.');
       } else {
         const status = action === 'activate' ? 'active' : 'inactive';
         const result = await update({ clientId, data: { status } }).unwrap();
@@ -84,8 +88,8 @@ function ClientInformation({ client, formatDate, clientId, onClientUpdated, read
     if (saved) onClientUpdated(saved);
     if (!alive.current) return;
     setAction(null);
-    toast({ title: action === 'activate' ? 'Client activated' : action === 'deactivate' ? 'Client deactivated' : 'Client deleted', description: action === 'delete' ? 'The client was archived; existing records are retained.' : 'The client’s status was updated.', variant: 'success' });
-    if (action === 'delete') navigate(Routes.agency.clients);
+    toast({ title: action === 'activate' ? 'Client activated' : action === 'deactivate' ? 'Client deactivated' : 'Client archived', description: action === 'archive' ? 'The client was archived; existing records are retained.' : 'The client’s status was updated.', variant: 'success' });
+    if (action === 'archive') navigate(Routes.agency.clients);
     if (alive.current) setBusy(false);
   };
   return <section aria-labelledby="client-information-heading" className="space-y-5 py-4">
@@ -94,7 +98,8 @@ function ClientInformation({ client, formatDate, clientId, onClientUpdated, read
       {canManage && <div className="flex flex-wrap gap-2">
         <Button variant="outline" disabled={busy} onClick={() => navigate(Routes.agency.editClient.replace(':clientId', clientId))}>Edit Client</Button>
         {statusAction && <Button variant={statusAction === 'activate' ? 'default' : 'outline'} disabled={busy || Boolean(error)} onClick={() => open(statusAction)}>{confirmations[statusAction].label}</Button>}
-        {canDelete && <Button variant="outline" className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800" disabled={busy || Boolean(error)} onClick={() => open('delete')}>Delete client</Button>}
+        {canArchive && <Button variant="outline" className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800" disabled={busy || Boolean(error)} onClick={() => open('archive')}>Archive client</Button>}
+        {canDeletePermanently && <Button variant="outline" className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800" disabled={busy} onClick={() => setDeleteOpen(true)}>Delete permanently</Button>}
       </div>}
     </div>
     {error && !action && <p role="alert" className="text-sm text-red-700">{error}</p>}
@@ -105,5 +110,8 @@ function ClientInformation({ client, formatDate, clientId, onClientUpdated, read
         cancelText="Not now" onCancel={() => { if (!busy) setAction(null); }} onConfirm={() => void confirm()} isLoading={busy} loadingText="Saving…" aria-busy={busy}
         onEscapeKeyDown={event => { if (busy) event.preventDefault(); }} onInteractOutside={event => { if (busy) event.preventDefault(); }} />
     </ConfirmDialog>
+    {canDeletePermanently && <ClientPermanentDeleteDialog open={deleteOpen} onOpenChange={setDeleteOpen} clientId={clientId} agencyId={client.agencyId}
+      clientName={[client.firstName, client.lastName].filter(Boolean).join(' ')}
+      onDeleted={() => { setDeleteOpen(false); toast({ title: 'Client deleted', description: 'The client and their files were permanently deleted.', variant: 'success' }); navigate(Routes.agency.clients); }} />}
   </section>;
 }
