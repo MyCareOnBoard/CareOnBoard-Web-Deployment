@@ -40,6 +40,20 @@ describe("MSRT client fields", () => {
     expect((formDataToApiPayload(data) as Record<string, unknown>).acuity).toBe("behavioral");
   });
 
+  it("takes acuity from the documents-step Acuity requirement when it is recorded", () => {
+    const data = createInitialAddClientFormData();
+    seedRequiredAddress(data);
+    data.stage1.acuity = "behavioral";
+    const acuityFor = (acuityRequirements: typeof data.acuityRequirements) =>
+      (formDataToApiPayload({ ...data, acuityRequirements }) as Record<string, unknown>).acuity;
+
+    expect(acuityFor({ enabled: false, types: [] })).toBe("none");
+    expect(acuityFor({ enabled: true, types: ["medication"] })).toBe("medical");
+    expect(acuityFor({ enabled: true, types: ["medication", "behavioral"] })).toBe("both");
+    // No type picked yet: keep the stored value.
+    expect(acuityFor({ enabled: true, types: [] })).toBe("behavioral");
+  });
+
   it("round-trips both fields back into the form", () => {
     const client = {
       id: "c1",

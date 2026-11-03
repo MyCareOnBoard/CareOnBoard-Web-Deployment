@@ -568,7 +568,7 @@ const maskSSN = (value: string) => {
             </div>
           ) : null}
 
-          {/* Admission date and acuity are Agency Compliance (MSRT) roster columns. */}
+          {/* Admission date is an Agency Compliance (MSRT) roster column. Acuity comes from the AENF section on the documents step. */}
           <div className="flex flex-col gap-1">
             <DatePickerField
               id="client-admission-date"
@@ -581,25 +581,6 @@ const maskSSN = (value: string) => {
             </p>
           </div>
 
-          {!isHhaClient ? (
-            <div className="flex flex-col gap-1">
-              <label className="text-[12px] font-normal text-[#10141a]">Acuity</label>
-              <Select
-                value={stage1.acuity}
-                onValueChange={(v) => updateStage1({ acuity: v })}
-              >
-                <SelectTrigger className={SELECT_TRIGGER_CN}>
-                  <SelectValue placeholder="Select acuity" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  <SelectItem value="behavioral">Behavioral</SelectItem>
-                  <SelectItem value="medical">Medical</SelectItem>
-                  <SelectItem value="both">Behavioral and medical</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          ) : null}
         </div>
       </div>
 

@@ -20,6 +20,25 @@ function isRealIsoDate(value: string | undefined): value is string {
   return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
 }
 
+/**
+ * The Agency Compliance (MSRT) "Acuity?" column, taken from the documents-step Acuity
+ * requirement. Falls back to the stored value when the requirement was never recorded
+ * or no type is picked yet.
+ */
+export function msrtAcuityFromRequirements(
+  requirements: AddClientFormData["acuityRequirements"],
+  stored: string | undefined,
+): string | undefined {
+  if (!requirements) return stored || undefined;
+  if (!requirements.enabled) return "none";
+  const medical = requirements.types.includes("medication");
+  const behavioral = requirements.types.includes("behavioral");
+  if (medical && behavioral) return "both";
+  if (medical) return "medical";
+  if (behavioral) return "behavioral";
+  return stored || undefined;
+}
+
 function structuredPrimaryAddress(s1: AddClientFormData["stage1"]) {
   const value = { line1: s1.line1?.trim(), line2: s1.line2?.trim() || null, city: s1.city?.trim(), state: s1.state?.trim(), postalCode: s1.postalCode?.trim(), country: s1.country?.trim().toUpperCase() };
   return Object.values(value).some((item) => item) ? value : {};
@@ -199,7 +218,7 @@ export function formDataToApiPayload(
     // Civil date, not an ISO timestamp: the backend stores YYYY-MM-DD so a report
     // cannot render an admission a day early once formatted in the agency timezone.
     admissionDate: toCivilDate(s1.admissionDate),
-    acuity: s1.acuity || undefined,
+    acuity: isHhaClient ? s1.acuity || undefined : msrtAcuityFromRequirements(formData.acuityRequirements, s1.acuity),
     primaryAddress:
       primaryLocation?.lat && primaryLocation?.lon
         ? {
