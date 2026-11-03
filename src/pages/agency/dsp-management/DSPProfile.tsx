@@ -7,7 +7,9 @@ import { ChevronLeft, MessageSquare } from "lucide-react";
 import { DSP } from "./types";
 import { useDSPDetails,  useUpdateDSPStatus } from "./useDSPManagement";
 import { Routes } from "@/routes/constants";
-import { listEmployeeDocuments, EmployeeDocument, sendDocumentAlert } from "@/lib/api/employee-documents";
+import { listEmployeeDocuments, EmployeeDocument, sendDocumentAlert, deleteEmployeeDocument } from "@/lib/api/employee-documents";
+import { ConfirmDialog, ConfirmDialogContent } from "@/components/ui/confirm-dialog";
+import { documentTypeLabel } from "@/lib/documentTypes";
 import { getEmployeeTrainings } from "@/lib/api/employees";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/utils/auth";
@@ -58,6 +60,8 @@ function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
   
   const [documents, setDocuments] = useState<EmployeeDocument[]>([]);
   const [documentsLoading, setDocumentsLoading] = useState(false);
+  const [removingDoc, setRemovingDoc] = useState<EmployeeDocument | null>(null);
+  const [isRemovingDoc, setIsRemovingDoc] = useState(false);
   const [alertingDocId, setAlertingDocId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -144,10 +148,38 @@ function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
     }
   };
 
+  const handleRemoveDocument = async () => {
+    if (!removingDoc) return;
+    try {
+      setIsRemovingDoc(true);
+      await deleteEmployeeDocument(currentDsp.id, removingDoc.id);
+      toast({ title: "Document removed", description: `${documentTypeLabel(removingDoc.documentName)} was removed from ${currentDsp.fullName}'s documents.` });
+      setRemovingDoc(null);
+      void fetchDocuments();
+      void refreshCompliance();
+    } catch (error) {
+      console.error('Failed to remove document:', error);
+      toast({ title: "Error", description: "Failed to remove the document. Please try again.", variant: "destructive" });
+    } finally {
+      setIsRemovingDoc(false);
+    }
+  };
+
   const getDocumentActionButton = (status: string, doc?: EmployeeDocument) => {
-    if ((status === 'expired' || status === 'expiring-soon') && doc) {
+    if (!doc) return null;
+    const removeButton = (
+      <button
+        type="button"
+        onClick={() => setRemovingDoc(doc)}
+        aria-label={`Remove ${documentTypeLabel(doc.documentName)}`}
+        className="px-3 py-1 text-xs text-red-600 rounded-full border border-red-200 hover:bg-red-50 transition-colors cursor-pointer"
+      >
+        Remove
+      </button>
+    );
+    if (status === 'expired' || status === 'expiring-soon') {
       const isLoading = alertingDocId === doc.id;
-      return (
+      return (<>
         <button
           onClick={() => handleSendDocumentAlert(doc)}
           disabled={isLoading}
@@ -155,9 +187,10 @@ function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
         >
           {isLoading ? 'Sending...' : 'Send Alert'}
         </button>
-      );
+        {removeButton}
+      </>);
     }
-    return null;
+    return removeButton;
   };
 
   const getInitials = (name: string) => {
@@ -398,6 +431,19 @@ function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
         documents={documents}
         onRequested={() => {void fetchDocuments(); void refreshCompliance();}}
       />
+
+      <ConfirmDialog open={removingDoc !== null} onOpenChange={(open) => { if (!open && !isRemovingDoc) setRemovingDoc(null); }}>
+        <ConfirmDialogContent
+          title="Remove document"
+          description={removingDoc ? `Remove ${documentTypeLabel(removingDoc.documentName)}${removingDoc.uploadedAt ? ` (uploaded ${new Date(removingDoc.uploadedAt).toLocaleDateString()})` : ''} from ${currentDsp.fullName}'s documents? This can't be undone.` : undefined}
+          confirmText="Remove"
+          cancelText="Cancel"
+          onConfirm={handleRemoveDocument}
+          onCancel={() => setRemovingDoc(null)}
+          isLoading={isRemovingDoc}
+          loadingText="Removing..."
+        />
+      </ConfirmDialog>
     </div>
   );
 }
