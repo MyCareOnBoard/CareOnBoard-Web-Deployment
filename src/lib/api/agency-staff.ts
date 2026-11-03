@@ -72,6 +72,8 @@ export interface AgencyStaffMember {
     accessList: string[];
     agencyModes?: ("ddd" | "hha" | "sc")[];
     managedCoordinatorIds?: string[];
+    /** DDD/HHA clients this staff member may see and manage (Client Management access). */
+    managedClientIds?: string[];
     role?: string;
     employmentType?: EmploymentType;
     employmentStartDate?: string;
@@ -278,6 +280,19 @@ export const agencyStaffApi = createApi({
             invalidatesTags: ["AgencyStaff"],
         }),
 
+        assignStaffClients: builder.mutation<
+            { success: boolean; clientIds: string[] },
+            { id: string; clientIds: string[]; expectedClientIds: string[] }
+        >({
+            query: ({ id, clientIds, expectedClientIds }) => ({
+                url: `/agencyStaff/staff/${encodeURIComponent(id)}/clients`,
+                method: "PUT",
+                data: { clientIds, expectedClientIds },
+                requiresAuth: true,
+            }),
+            invalidatesTags: ["AgencyStaff"],
+        }),
+
         /**
          * Delete an agency staff member
          */
@@ -324,6 +339,7 @@ export const {
     useCreateAgencyStaffMutation,
     useUpdateAgencyStaffMutation,
     useAssignStaffCoordinatorsMutation,
+    useAssignStaffClientsMutation,
     useDeleteAgencyStaffMutation,
     useResetPasswordMutation,
     useToggleActiveMutation,

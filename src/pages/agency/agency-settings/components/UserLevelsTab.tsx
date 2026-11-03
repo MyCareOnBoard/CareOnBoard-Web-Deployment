@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import AddNewUserModal from "../user-levels/AddNewUserModal";
+import ClientAssignmentDrawer from "../user-levels/ClientAssignmentDrawer";
 import CoordinatorAssignmentDrawer from "../user-levels/CoordinatorAssignmentDrawer";
 import {
   useListAgencyStaffQuery,
@@ -22,6 +23,7 @@ import {
   useResetPasswordMutation,
   useToggleActiveMutation,
   useAssignStaffCoordinatorsMutation,
+  useAssignStaffClientsMutation,
   type CreateAgencyStaffRequest,
   type UpdateAgencyStaffRequest,
   type AgencyStaffMember,
@@ -35,13 +37,23 @@ import { validateImageUrl } from "@/lib/utils/string-utils";
 import SettingsSectionCard from "./SettingsSectionCard";
 import { useAuth } from "@/utils/auth";
 import { UserType } from "@/utils/auth/types/user.types";
+import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 
 export default function InternalUsersPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [editingStaff, setEditingStaff] = useState<AgencyStaffMember | null>(null);
   const [assignmentStaff, setAssignmentStaff] = useState<AgencyStaffMember | null>(null);
+  const [clientAssignmentStaff, setClientAssignmentStaff] = useState<AgencyStaffMember | null>(null);
   const { user: signedInUser } = useAuth();
+  const activeMode = useEffectiveAgencyMode();
+  const isAgencyOwner = signedInUser?.userType === UserType.AGENCY;
+  const agencyClientTypes = signedInUser?.agency?.supportedClientTypes ?? ["ddd", "hha"];
+  // DDD/HHA programs whose clients a staff member can be given; empty without Client Management.
+  const clientModesFor = (staff: AgencyStaffMember) => staff.accessList.includes("Client Management")
+    ? (staff.agencyModes?.length ? staff.agencyModes : ["ddd", "hha"] as const)
+      .filter((mode): mode is "ddd" | "hha" => mode !== "sc" && agencyClientTypes.includes(mode))
+    : [];
 
   // Confirmation dialog states
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -72,6 +84,7 @@ export default function InternalUsersPage() {
   const [createStaff, { isLoading: isCreating }] = useCreateAgencyStaffMutation();
   const [updateStaff, { isLoading: isUpdating }] = useUpdateAgencyStaffMutation();
   const [assignStaffCoordinators] = useAssignStaffCoordinatorsMutation();
+  const [assignStaffClients] = useAssignStaffClientsMutation();
   const [deleteStaff, { isLoading: isDeleting }] = useDeleteAgencyStaffMutation();
   const [resetPassword, { isLoading: isResettingPassword }] = useResetPasswordMutation();
   const [toggleActive, { isLoading: isTogglingActive }] = useToggleActiveMutation();
@@ -382,7 +395,10 @@ export default function InternalUsersPage() {
                       </span>
                     ))}
                   </div>
-                  {user.agencyModes?.includes("sc") && <p className="text-[11px] text-[#6b7280]">{user.managedCoordinatorIds?.length || 0} coordinators assigned</p>}
+                  {activeMode === "sc" || activeMode === null
+                    ? user.agencyModes?.includes("sc") && <p className="text-[11px] text-[#6b7280]">{user.managedCoordinatorIds?.length || 0} coordinators assigned</p>
+                    : null}
+                  {activeMode !== "sc" && clientModesFor(user).length > 0 && <p className="text-[11px] text-[#6b7280]">{user.managedClientIds?.length || 0} client{user.managedClientIds?.length === 1 ? "" : "s"} assigned</p>}
                 </div>
 
                 {/* Fourth: Actions */}
@@ -399,7 +415,12 @@ export default function InternalUsersPage() {
                       <DropdownMenuItem disabled={isUpdating} onSelect={() => handleEditClick(user)}>
                         <Pencil aria-hidden="true" className="h-4 w-4" /> Edit staff member
                       </DropdownMenuItem>
-                      {signedInUser?.userType === UserType.AGENCY && <DropdownMenuItem onSelect={() => setAssignmentStaff(user)}>
+                      {/* DDD/HHA: pick the clients staff with Client Management manage. SC: pick coordinators. */}
+                      {isAgencyOwner && activeMode !== "sc" && clientModesFor(user).length > 0 && <DropdownMenuItem onSelect={() => setClientAssignmentStaff(user)}>
+                        <UsersRound aria-hidden="true" className="h-4 w-4" />
+                        Manage clients
+                      </DropdownMenuItem>}
+                      {isAgencyOwner && (activeMode === "sc" || (activeMode === null && user.agencyModes?.includes("sc"))) && <DropdownMenuItem onSelect={() => setAssignmentStaff(user)}>
                         <UsersRound aria-hidden="true" className="h-4 w-4" />
                         Manage coordinators
                       </DropdownMenuItem>}
@@ -432,6 +453,20 @@ export default function InternalUsersPage() {
         onSave={async (coordinatorIds, expectedCoordinatorIds) => {
           await assignStaffCoordinators({ id: assignmentStaff.id, coordinatorIds, expectedCoordinatorIds }).unwrap();
           toast({ title: "Assignments saved", description: `${assignmentStaff.name}'s coordinators were updated.` });
+        }}
+      />}
+
+      {clientAssignmentStaff && <ClientAssignmentDrawer
+        key={clientAssignmentStaff.id}
+        staffName={clientAssignmentStaff.name}
+        agencyId={clientAssignmentStaff.agencyId}
+        modes={clientModesFor(clientAssignmentStaff)}
+        assignedIds={clientAssignmentStaff.managedClientIds || []}
+        canAssign={clientModesFor(clientAssignmentStaff).length > 0}
+        onClose={() => setClientAssignmentStaff(null)}
+        onSave={async (clientIds, expectedClientIds) => {
+          await assignStaffClients({ id: clientAssignmentStaff.id, clientIds, expectedClientIds }).unwrap();
+          toast({ title: "Assignments saved", description: `${clientAssignmentStaff.name}'s clients were updated.` });
         }}
       />}
 

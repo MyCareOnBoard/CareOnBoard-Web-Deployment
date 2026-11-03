@@ -61,6 +61,8 @@ export interface ListStaffDirectoryResponse {
 
 export interface SuperAdminStaffDetail extends StaffDirectoryStaffMember {
   managedCoordinatorIds?: string[];
+  managedClientIds?: string[];
+  accessList?: string[];
   agencyModes?: Array<"ddd" | "hha" | "sc">;
   clientTypes: Array<"hha" | "ddd">;
   profile: {
@@ -140,6 +142,17 @@ export const staffDirectoryApi = createApi({
         requiresAuth: true,
       }),
     }),
+    assignStaffClients: builder.mutation<
+      { success: boolean; clientIds: string[] },
+      { staffId: string; clientIds: string[]; expectedClientIds: string[] }
+    >({
+      query: ({ staffId, clientIds, expectedClientIds }) => ({
+        url: `/superAdminStaffDirectory/staff-directory/${encodeURIComponent(staffId)}/clients`,
+        method: "PUT",
+        data: { clientIds, expectedClientIds },
+        requiresAuth: true,
+      }),
+    }),
     getStaffDocuments: builder.query<{ success: boolean; documents: SuperAdminStaffDocument[]; pagination: { hasMore: boolean; nextCursor: string | null } }, StaffDocumentsParams>({
       query: ({ staffId, cursor }) => ({ url: `/superAdminStaffDirectory/staff-directory/${encodeURIComponent(staffId)}/documents`, method: "GET", params: { limit: 50, ...(cursor ? { cursor } : {}) }, requiresAuth: true }),
     }),
@@ -149,4 +162,4 @@ export const staffDirectoryApi = createApi({
   }),
 });
 
-export const { useListStaffDirectoryQuery, useGetStaffDetailQuery, useAssignStaffCoordinatorsMutation, useGetStaffDocumentsQuery, useLazyGetStaffDocumentsQuery, useLazyGetStaffDocumentViewQuery } = staffDirectoryApi;
+export const { useListStaffDirectoryQuery, useGetStaffDetailQuery, useAssignStaffCoordinatorsMutation, useAssignStaffClientsMutation, useGetStaffDocumentsQuery, useLazyGetStaffDocumentsQuery, useLazyGetStaffDocumentViewQuery } = staffDirectoryApi;
