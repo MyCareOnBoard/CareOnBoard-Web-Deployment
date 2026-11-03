@@ -83,6 +83,8 @@ export type ScAssessmentHistoryEntry = {
 };
 
 export interface Client {
+  /** Set when the client was created straight from a folder upload; cleared once reviewed. */
+  importReview?: { source: "folder_upload"; status: "needs_review" | "reviewed"; folderName?: string; notes?: string[] };
   scEnrollment?: ScEnrollment;
   scAssessment?: ScAssessment;
   scAssessmentHistory?: ScAssessmentHistoryEntry[];
@@ -717,6 +719,7 @@ export interface ClientPayrollServiceLocation { source: "primaryAddress" | "seco
  * Create Client Request
  */
 export interface CreateClientRequest {
+  importReview?: import('./client-import-review').ClientImportReviewInput;
   scEnrollment?: ScEnrollment;
   scOutcomes?: ClientOutcome[];
   medicationSupportSettings?: MedicationSupportSettings;

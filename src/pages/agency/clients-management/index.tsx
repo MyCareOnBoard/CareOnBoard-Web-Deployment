@@ -14,6 +14,7 @@ import { countUniqueAssignedDspsForClient } from "@/lib/countUniqueAssignedDsps"
 import { isForm485Required } from "@/pages/shared/client-management/utils/form485GenerationEligibility";
 import SupportCoordinatorClientsPage from "./SupportCoordinatorClientsPage";
 import FolderImportDialog from "@/pages/shared/client-management/components/FolderImportDialog";
+import { ClientImportReviewBanner } from "@/pages/shared/client-management/components/ClientImportReview";
 
 interface DisplayClient {
   id: string;
@@ -49,7 +50,7 @@ function AgencyClientsPage() {
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const shouldShowSearchDropdown = searchQuery.trim().length >= 2;
 
-  const { data: clientsData, isLoading: isLoadingClients, isFetching: isSearching } = useListAgencyClientsQuery(
+  const { data: clientsData, isLoading: isLoadingClients, isFetching: isSearching, refetch: refetchClients } = useListAgencyClientsQuery(
     {
       agencyId,
       search: debouncedSearchQuery.trim() || undefined,
@@ -59,7 +60,7 @@ function AgencyClientsPage() {
     { skip: !agencyId }
   );
 
-  const { data: statsData } = useGetClientStatsQuery(
+  const { data: statsData, refetch: refetchStats } = useGetClientStatsQuery(
     { agencyId: user?.agencyId || "", type: selectedMode || undefined },
     { skip: !user?.agencyId || !!debouncedSearchQuery.trim() }
   );
@@ -245,6 +246,7 @@ function AgencyClientsPage() {
             mode={selectedMode === "ddd" || selectedMode === "hha" ? selectedMode : null}
             allowedModes={folderImportModes}
             existingClientNames={existingClientNames}
+            onClientsCreated={() => { for (const refetch of [refetchClients, refetchStats]) { try { void refetch?.(); } catch { /* query not started (skipped) */ } } }}
           />
           <Button
             size="lg"
@@ -256,6 +258,8 @@ function AgencyClientsPage() {
           </Button>
         </div>
       </div>
+
+      <ClientImportReviewBanner program={selectedMode === "ddd" || selectedMode === "hha" ? selectedMode : null} />
 
       {/* Summary Card */}
       <div className="rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white">

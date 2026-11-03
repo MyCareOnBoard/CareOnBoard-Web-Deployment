@@ -10,6 +10,7 @@ import { Routes } from "@/routes/constants";
 import { useListAgencyClientsQuery } from "@/lib/api/clients";
 import { useAuth } from "@/utils/auth";
 import FolderImportDialog from "@/pages/shared/client-management/components/FolderImportDialog";
+import { ClientImportReviewBanner } from "@/pages/shared/client-management/components/ClientImportReview";
 import "./support-coordinator-clients.css";
 
 type Filter = "All clients" | "SP" | "CCP";
@@ -23,7 +24,7 @@ export default function SupportCoordinatorClientsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   // ponytail: API caps this list at 100; add server pagination if SC agencies exceed that.
-  const { data, isLoading, error } = useListAgencyClientsQuery(
+  const { data, isLoading, error, refetch } = useListAgencyClientsQuery(
     { agencyId: user?.agencyId || "", type: "sc", limit: 100 },
     { skip: !user?.agencyId, refetchOnMountOrArgChange: true },
   );
@@ -51,12 +52,14 @@ export default function SupportCoordinatorClientsPage() {
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-[28px] font-bold leading-[1.4] text-[#10141a] sm:text-[32px] lg:text-[40px]">Client Management</h1>
         <div className="flex flex-wrap items-center gap-3">
-          <FolderImportDialog mode="sc" allowedModes={["sc"]} existingClientNames={clients.flatMap((client) => [[client.firstName, client.middleName, client.lastName].filter(Boolean).join(" "), [client.firstName, client.lastName].filter(Boolean).join(" ")])} />
+          <FolderImportDialog mode="sc" allowedModes={["sc"]} onClientsCreated={() => { try { void refetch?.(); } catch { /* query not started (skipped) */ } }} existingClientNames={clients.flatMap((client) => [[client.firstName, client.middleName, client.lastName].filter(Boolean).join(" "), [client.firstName, client.lastName].filter(Boolean).join(" ")])} />
           <Button size="lg" className="h-[52px] gap-2 px-5" onClick={() => navigate(Routes.agency.addClient)}>
             <Plus className="h-5 w-5" />New Enrollment
           </Button>
         </div>
       </div>
+
+      <ClientImportReviewBanner program="sc" />
 
       <section aria-labelledby="sc-overview-title" className="mb-7">
         <h2 id="sc-overview-title" className="mb-3 text-[20px] font-bold text-[#10141a]">Overview</h2>

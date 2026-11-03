@@ -133,12 +133,15 @@ export function folderMatchesClientName(folderName: string, clientNames: string[
 /* In-memory hand-off between the folder dialog and the add-client wizards. Files
  * can't survive a page reload, so a reload simply drops the queue. The batch belongs
  * to the signed-in user, so another account in the same tab never sees it. */
-export type FolderImportSession = { owner: string; mode: FolderImportMode; folderName: string; clients: FolderImportClient[]; created: Record<string, string> };
+/** Outcome of creating one folder client directly (without the form). */
+export type FolderImportResult = { status: "created" | "failed"; message?: string; name?: string; notes?: string[]; documentError?: string };
+export type FolderImportSession = { owner: string; mode: FolderImportMode; folderName: string; clients: FolderImportClient[]; created: Record<string, string>; results: Record<string, FolderImportResult> };
 let session: FolderImportSession | null = null;
 
 export const folderImportSession = {
   get: (owner: string | undefined) => (owner && session?.owner === owner ? session : null),
-  start(owner: string, mode: FolderImportMode, folderName: string, clients: FolderImportClient[]) { session = { owner, mode, folderName, clients, created: {} }; },
+  start(owner: string, mode: FolderImportMode, folderName: string, clients: FolderImportClient[]) { session = { owner, mode, folderName, clients, created: {}, results: {} }; },
+  setResult(id: string, result: FolderImportResult) { if (session) session.results = { ...session.results, [id]: result }; },
   client(owner: string | undefined, id: string | null | undefined, mode: FolderImportMode) {
     const current = folderImportSession.get(owner);
     return id && current?.mode === mode ? current.clients.find(client => client.id === id) ?? null : null;

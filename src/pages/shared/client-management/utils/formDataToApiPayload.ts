@@ -76,7 +76,7 @@ function isMeaningfulHhaInsuranceRow(row: HhaInsuranceInfo): boolean {
   );
 }
 
-function isMeaningfulHhaAuthorizationRow(row: HhaAuthorization): boolean {
+export function isMeaningfulHhaAuthorizationRow(row: HhaAuthorization): boolean {
   return Boolean(
     row.authorizationNumber?.trim() ||
       row.serviceId?.trim() ||
@@ -95,7 +95,7 @@ function isMeaningfulHhaAuthorizationRow(row: HhaAuthorization): boolean {
 }
 
 /** Mirrors backend client.schema: rows tied to a service must carry staffRate + payType. */
-function hhaAuthorizationRowMissingPayFields(row: HhaAuthorization): boolean {
+export function hhaAuthorizationRowMissingPayFields(row: HhaAuthorization): boolean {
   const hasService = Boolean(row.serviceId?.trim() || row.serviceCode?.trim());
   return hasService && (!row.staffRate?.trim() || !row.payType);
 }

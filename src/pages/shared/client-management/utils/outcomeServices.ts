@@ -10,6 +10,16 @@ import {
 export const UNASSIGNED_OUTCOME_LABEL = "Unassigned outcome";
 
 const toIso = (d?: Date) => (d ? d.toISOString() : undefined);
+const pad2 = (n: number) => String(n).padStart(2, "0");
+/**
+ * Authorization and SDR dates are civil dates on the server (YYYY-MM-DD). Imported dates
+ * are UTC midnight and picker dates are local midnight, so read the matching calendar day.
+ */
+const toCivilDate = (d?: Date) => {
+  if (!d || Number.isNaN(d.getTime())) return undefined;
+  if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0) return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+};
 
 /** Trim, dedupe, and cap SDR string lists for API / wizard. */
 function dedupeTrimStringList(
@@ -238,11 +248,11 @@ export function wizardServiceToClientService(
     clientPayType: svc.clientPayType,
     ispEffectiveDate: toIso(svc.ispEffectiveDate),
     cprRequired: svc.cprRequired,
-    startAuthDate: toIso(svc.startAuthDate),
-    endAuthDate: toIso(svc.endAuthDate),
+    startAuthDate: toCivilDate(svc.startAuthDate),
+    endAuthDate: toCivilDate(svc.endAuthDate),
     pcptDate: toIso(svc.pcptDate),
-    sdrStartDate: toIso(svc.sdrStartDate),
-    sdrEndDate: toIso(svc.sdrEndDate),
+    sdrStartDate: toCivilDate(svc.sdrStartDate),
+    sdrEndDate: toCivilDate(svc.sdrEndDate),
     provider: svc.provider?.trim() || undefined,
     location: svc.location?.trim() || undefined,
     claimsSource: svc.claimsSource?.trim() || undefined,

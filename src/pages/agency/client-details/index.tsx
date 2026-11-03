@@ -28,6 +28,7 @@ import { useAuth } from "@/utils/auth";
 import { getAgencyClientById, updateClient, type Client, type ClientDocument, type ClientDocumentKey } from "@/lib/api/clients";
 import { Routes } from "@/routes/constants";
 import SupportCoordinatorClientDetailsPage from "./SupportCoordinatorClientDetailsPage";
+import { ClientImportReviewNotice } from "@/pages/shared/client-management/components/ClientImportReview";
 
 const AgencyCareClientEntry = lazy(() => import('@/features/agency-care/AgencyCareHome').then(module => ({ default: module.AgencyCareClientEntry })));
 const AgencyCareSourcePublications = lazy(() => import('@/features/agency-care/AgencyCareSourcePublications').then(module => ({ default: module.AgencyCareSourcePublications })));
@@ -247,6 +248,8 @@ function AgencyClientDetailsPage() {
           </div>
         )}
       </div>
+
+      <ClientImportReviewNotice client={client} />
 
       {/* Header Block */}
       <div className="flex items-start justify-between gap-6">

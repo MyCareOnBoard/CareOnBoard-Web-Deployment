@@ -29,6 +29,7 @@ import SupportCoordinatorDocumentsTab from "./SupportCoordinatorDocumentsTab";
 import SupportCoordinatorPcpt from "./SupportCoordinatorPcpt";
 import SupportCoordinatorIsp from "./SupportCoordinatorIsp";
 import SupportCoordinatorClientInformationTab from "./SupportCoordinatorClientInformationTab";
+import { ClientImportReviewNotice } from "@/pages/shared/client-management/components/ClientImportReview";
 
 const AgencyCareClientEntry = lazy(() => import('@/features/agency-care/AgencyCareHome').then(module => ({ default: module.AgencyCareClientEntry })));
 const AgencyCareSourcePublications = lazy(() => import('@/features/agency-care/AgencyCareSourcePublications').then(module => ({ default: module.AgencyCareSourcePublications })));
@@ -210,6 +211,7 @@ function SupportCoordinatorClientDetailsWorkspace() {
       <Link to={Routes.agency.clients} className="mb-5 inline-flex items-center gap-2 text-sm font-medium text-[#008f93] hover:underline">
         <ArrowLeft className="h-4 w-4" /> Back to clients
       </Link>
+      <ClientImportReviewNotice client={savedClient} />
       <div className="rounded-2xl bg-white p-4 shadow-sm sm:p-6">
         <header className="flex flex-wrap items-center justify-between gap-5 border-b border-[#e5e7eb] pb-5">
           <div className="flex min-w-0 items-center gap-3">
