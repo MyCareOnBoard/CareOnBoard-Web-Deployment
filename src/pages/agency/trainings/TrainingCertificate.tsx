@@ -4,7 +4,7 @@ import axiosClient from '@/lib/axios';
 import {DocumentPreviewModal} from '@/components/documents/DocumentPreviewModal';
 import {Button} from '@/components/ui/button';
 import type {TrainingData} from './trainingApi';
-import {TrainingDateField, TrainingPolicyStatus} from './TrainingPolicyFields';
+import {TrainingDateField, TrainingPolicyStatus, todayDateKey} from './TrainingPolicyFields';
 
 type CertificateResult = Pick<TrainingData, 'certificateId' | 'certificateName' | 'status' | 'approved' | 'completedAt'>;
 interface Props {
@@ -60,6 +60,7 @@ export default function TrainingCertificate({training, onUploaded, canEditHireDa
     const [previewCertificate,setPreviewCertificate] = useState<string | null>(null);
     const selectedCertificateId = previewCertificate === 'accepted' ? training.acceptedCertificate?.id : training.certificateId;
     const policy = training.source === 'policy' && training.policyContextState === 'current';
+    const futureCompletion = Boolean(completedOnDate) && completedOnDate > todayDateKey();
     const changeDate = (setter: (value: string) => void, value: string) => {setter(value); setSelection(current => current ? {...current, requestId: crypto.randomUUID()} : null);};
     const [error, setError] = useState<string | null>(null);
     const [previewOpen, setPreviewOpen] = useState(false);
@@ -90,6 +91,7 @@ export default function TrainingCertificate({training, onUploaded, canEditHireDa
 
     const upload = async () => {
         if (!selection || !training.id || uploadController.current) return;
+        if (policy && futureCompletion) { setError('The completion date can\'t be in the future.'); return; }
         const controller = new AbortController();
         uploadController.current = controller;
         setUploading(true);
@@ -104,8 +106,11 @@ export default function TrainingCertificate({training, onUploaded, canEditHireDa
             onUploaded?.(result.data);
             setSelection(null);
             if (input.current) input.current.value = '';
-        } catch {
-            if (!controller.signal.aborted) setError('Certificate not uploaded. Try again with the selected file.');
+        } catch (err) {
+            // The server checks dates in the agency's time zone, so show its reason (such as a future completion date).
+            const response = (err as {response?: {status?: number; data?: {error?: unknown}}}).response;
+            const reason = response?.status && response.status < 500 && typeof response.data?.error === 'string' ? response.data.error : null;
+            if (!controller.signal.aborted) setError(reason || 'Certificate not uploaded. Try again with the selected file.');
         } finally {
             uploadController.current = null;
             if (!controller.signal.aborted) setUploading(false);
@@ -119,7 +124,7 @@ export default function TrainingCertificate({training, onUploaded, canEditHireDa
         <TrainingPolicyStatus training={training} canEditHireDate={canEditHireDate} showSummary={showPolicySummary}/>
         {policy && training.acceptedCertificate && training.acceptedCertificate.id !== training.certificateId && <Button type="button" variant="ghost" className="h-auto px-0 text-[#008f92]" onClick={()=>{setPreviewCertificate('accepted');setPreviewOpen(true);}}>View accepted certificate</Button>}
         {onUploaded && (training.source !== 'policy' || policy) && <>
-            {policy && <div className={dashboard ? "flex flex-wrap gap-3 [&>div]:min-w-0 [&>div]:flex-1 [&_button]:w-full [&_button]:justify-start [&_button]:bg-white" : "flex flex-wrap gap-3"}><TrainingDateField label="Completion date" value={completedOnDate} onChange={value=>changeDate(setCompletedOnDate,value)} disabled={uploading}/>{training.requirementId==='cpr-certification' && <TrainingDateField label="Printed expiry date (optional)" value={printedExpiryDate} onChange={value=>changeDate(setPrintedExpiryDate,value)} disabled={uploading}/>}</div>}
+            {policy && <div className={dashboard ? "flex flex-wrap gap-3 [&>div]:min-w-0 [&>div]:flex-1 [&_button]:w-full [&_button]:justify-start [&_button]:bg-white" : "flex flex-wrap gap-3"}><TrainingDateField label="Completion date" value={completedOnDate} onChange={value=>{setError(null);changeDate(setCompletedOnDate,value);}} disabled={uploading} noFutureDates/>{training.requirementId==='cpr-certification' && <TrainingDateField label="Printed expiry date (optional)" value={printedExpiryDate} onChange={value=>changeDate(setPrintedExpiryDate,value)} disabled={uploading}/>}</div>}
             <label className={dashboard ? "relative flex w-full cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed border-[#b7cccf] bg-white p-5 text-center text-[#596065] focus-within:ring-2 focus-within:ring-[#00b4b8]" : "flex max-w-full flex-col gap-1 text-[#596065]"}>
                 {dashboard && (selection ? <FileCheck2 aria-hidden="true" className="h-6 w-6 text-[#00858a]"/> : <Upload aria-hidden="true" className="h-6 w-6 text-[#687e82]"/>)}
                 <span className={dashboard ? 'font-semibold text-[#007f83]' : undefined}>{training.certificateId ? 'Replace completion certificate' : 'Upload completion certificate'}</span>
@@ -141,7 +146,7 @@ export default function TrainingCertificate({training, onUploaded, canEditHireDa
                     }}/>
             </label>
             {!dashboard && <p className="text-xs text-[#808081]">PDF, JPEG, PNG, or WEBP, up to 10 MB. Agency approval is required.</p>}
-            {(selection || dashboard) && <Button type="button" disabled={!selection || uploading || policy && !completedOnDate} className={dashboard ? "h-auto w-full rounded-xl bg-[#00b4b8] px-4 py-3 text-white hover:bg-[#009da1] disabled:opacity-50" : "h-auto rounded-full bg-[#00b4b8] px-4 py-2 text-white hover:bg-[#009da1]"} onClick={upload}>
+            {(selection || dashboard) && <Button type="button" disabled={!selection || uploading || policy && (!completedOnDate || futureCompletion)} className={dashboard ? "h-auto w-full rounded-xl bg-[#00b4b8] px-4 py-3 text-white hover:bg-[#009da1] disabled:opacity-50" : "h-auto rounded-full bg-[#00b4b8] px-4 py-2 text-white hover:bg-[#009da1]"} onClick={upload}>
                 {uploading ? 'Uploading certificate…' : dashboard ? 'Submit for review' : 'Submit certificate'}
             </Button>}
             {dashboard && <p className="text-center text-xs text-[#596065]">Your agency reviews the certificate before approval.</p>}

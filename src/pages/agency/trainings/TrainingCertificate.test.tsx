@@ -37,6 +37,31 @@ describe('private training certificate', () => {
         expect(requests.post).not.toHaveBeenCalled();
     });
 
+    it('blocks future completion dates but keeps future expiry dates selectable', () => {
+        vi.useFakeTimers({toFake: ['Date']});
+        vi.setSystemTime(new Date(2026, 10, 4, 12));
+        try {
+            render(<TrainingCertificate training={{...training, source: 'policy', policyContextState: 'current', requirementId: 'cpr-certification'}} dashboard onUploaded={vi.fn()}/>);
+            fireEvent.click(screen.getByRole('button', {name: 'Completion date'}));
+            expect(screen.getByRole('button', {name: /November 5th, 2026/})).toBeDisabled();
+            expect(screen.getByRole('button', {name: /next month/i})).toHaveAttribute('aria-disabled', 'true');
+            fireEvent.click(screen.getByRole('button', {name: /November 4th, 2026/}));
+            expect(screen.getByRole('button', {name: 'Completion date'})).toHaveTextContent('2026-11-04');
+            fireEvent.click(screen.getByRole('button', {name: 'Printed expiry date (optional)'}));
+            expect(screen.getByRole('button', {name: /November 5th, 2026/})).toBeEnabled();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('shows the server reason when a certificate is rejected', async () => {
+        requests.post.mockRejectedValue({response: {status: 400, data: {error: 'Enter a valid completion date no later than today.'}}});
+        render(<TrainingCertificate training={training} onUploaded={vi.fn()}/>);
+        fireEvent.change(screen.getByLabelText('Upload completion certificate'), {target: {files: [new File(['pdf'], 'completion.pdf', {type: 'application/pdf'})]}});
+        fireEvent.click(screen.getByRole('button', {name: 'Submit certificate'}));
+        expect(await screen.findByRole('alert')).toHaveTextContent('Enter a valid completion date no later than today.');
+    });
+
     it('keeps expiry and review warnings when the timeline supplies the status heading', () => {
         render(<TrainingCertificate training={{...training, source:'policy', policyContextState:'current', deadlineState:'expired', effectiveExpiryDateKey:'2026-09-01', reviewState:'changes_requested', reviewReason:'Upload a legible certificate.'}} showPolicySummary={false}/>);
         expect(screen.queryByText('Automatically assigned')).not.toBeInTheDocument();

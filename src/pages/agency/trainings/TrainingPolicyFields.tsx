@@ -4,9 +4,14 @@ import {Calendar} from '@/components/ui/calendar';
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover';
 import {Button} from '@/components/ui/button';
 import type {TrainingData} from './trainingApi';
-export function TrainingDateField({label,value,onChange,disabled=false}: {label:string;value:string;onChange:(date:string)=>void;disabled?:boolean}) {
+/** Today's date as yyyy-MM-dd in the browser's time zone. */
+export const todayDateKey = () => format(new Date(),'yyyy-MM-dd');
+export function TrainingDateField({label,value,onChange,disabled=false,noFutureDates=false}: {label:string;value:string;onChange:(date:string)=>void;disabled?:boolean;noFutureDates?:boolean}) {
  const id=useId(), [open,setOpen]=useState(false);
- return <div className="space-y-1"><label htmlFor={id} className="block text-xs font-medium">{label}</label><Popover open={open} onOpenChange={setOpen}><PopoverTrigger asChild><Button id={id} type="button" variant="outline" disabled={disabled} className="rounded-xl" aria-label={label}>{value || 'Select date'}</Button></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={value ? parseISO(value) : undefined} onSelect={date=>{onChange(date ? format(date,'yyyy-MM-dd') : '');setOpen(false);}}/></PopoverContent></Popover></div>;
+ // Read on each render so a page left open past midnight still allows the new day.
+ const today=noFutureDates ? parseISO(todayDateKey()) : undefined;
+ const selected=value ? parseISO(value) : undefined;
+ return <div className="space-y-1"><label htmlFor={id} className="block text-xs font-medium">{label}</label><Popover open={open} onOpenChange={setOpen}><PopoverTrigger asChild><Button id={id} type="button" variant="outline" disabled={disabled} className="rounded-xl" aria-label={label}>{value || 'Select date'}</Button></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={selected} defaultMonth={selected} disabled={today ? {after:today} : undefined} endMonth={today} onSelect={date=>{onChange(date ? format(date,'yyyy-MM-dd') : '');setOpen(false);}}/></PopoverContent></Popover></div>;
 }
 export function trainingPolicyLabel(training:TrainingData) {
  const labels:Record<string,string>={satisfied:'Accepted',before_work:'Required before work',upcoming:'Upcoming',due_soon:'Due soon',due_today:'Due today',overdue:'Overdue',expired:'Expired',renewal_due:'Renewal due',not_required:'Not currently required',details_needed:'Details needed'};
