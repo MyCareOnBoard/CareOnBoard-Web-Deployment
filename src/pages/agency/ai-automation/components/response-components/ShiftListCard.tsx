@@ -53,16 +53,16 @@ export default function ShiftListCard({ data, meta: rawMeta, onSendMessage }: { 
           {paging.pageRows.map((shift, i) => (
             <div key={shift.id || i} className="flex items-center gap-3 px-4 py-2.5 text-[12px] sm:text-[13px]">
               <span className="w-14 shrink-0 font-medium text-[#10141a]">{formatDate(shift.date)}</span>
-              <span className="flex-1 truncate text-[#374151]">{shift.clientName || "—"}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[#374151]">{shift.clientName || "—"}</span>
+                <span className="block truncate text-[11px] text-[#6b7280]">
+                  {shift.assignedDSP || "Unassigned"}
+                </span>
+              </span>
               <span className="shrink-0 text-[#6b7280]">
                 {shift.startTime || ""}
                 {shift.endTime ? `–${shift.endTime}` : ""}
               </span>
-              {shift.assignedDSP && (
-                <span className="hidden sm:block shrink-0 truncate max-w-[96px] text-[#6b7280]">
-                  {shift.assignedDSP}
-                </span>
-              )}
               <span
                 className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium capitalize ${statusBadge(shift.status)}`}
               >

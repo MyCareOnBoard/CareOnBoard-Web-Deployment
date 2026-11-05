@@ -34,10 +34,12 @@ describe("GenericListCard paging", () => {
   });
 
   it("pages shift cards using their meta", () => {
-    const shifts = Array.from({ length: 12 }, (_, i) => ({ id: `s${i}`, clientName: `Client ${i + 1}`, date: "2026-11-01", status: "pending" }));
+    const shifts = Array.from({ length: 12 }, (_, i) => ({ id: `s${i}`, clientName: `Client ${i + 1}`, assignedDSP: i === 0 ? "Kennet Smith" : null, date: "2026-11-01", status: "pending" }));
     render(<ShiftListCard data={shifts} meta={{ total: 12, hasMore: false }} />);
     expect(screen.getByText("Client 10")).toBeTruthy();
     expect(screen.queryByText("Client 11")).toBeNull();
+    expect(screen.getByText("Kennet Smith")).toBeTruthy();
+    expect(screen.getAllByText("Unassigned").length).toBe(9);
     fireEvent.click(screen.getByLabelText("Next page"));
     expect(screen.getByText("Client 12")).toBeTruthy();
   });
