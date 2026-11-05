@@ -54,6 +54,7 @@ import {
   normalizeWeeklyDistributionUpdate,
   weeklyDistributionFingerprintFromWd,
 } from "@/pages/shared/client-management/utils/sdrWeeklyDistribution";
+import { parseServiceDate, toCivilDate } from "./serviceDates";
 
 interface ServicesTabProps {
   client: Client;
@@ -235,25 +236,6 @@ function emptyOutcomeGroup(): EditableOutcomeGroup {
   };
 }
 
-function parseDate(
-  value?: string | { _seconds?: number; _nanoseconds?: number } | Date,
-): Date | null {
-  if (!value) return null;
-  try {
-    if (value instanceof Date) return value;
-    if (typeof value === "string") {
-      const d = new Date(value);
-      return isNaN(d.getTime()) ? null : d;
-    }
-    if (typeof value === "object" && "_seconds" in value && value._seconds) {
-      return new Date(value._seconds * 1000);
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 function mapClientServicesToEditable(services?: ClientService[]): EditableServiceRow[] {
   if (!services) return [];
   return services.map((svc) => ({
@@ -267,13 +249,13 @@ function mapClientServicesToEditable(services?: ClientService[]): EditableServic
     payType: svc.payType,
     clientRate: svc.clientRate,
     clientPayType: svc.clientPayType,
-    ispEffectiveDate: parseDate(svc.ispEffectiveDate),
+    ispEffectiveDate: parseServiceDate(svc.ispEffectiveDate),
     cprRequired: svc.cprRequired,
-    startAuthDate: parseDate(svc.startAuthDate),
-    endAuthDate: parseDate(svc.endAuthDate),
-    pcptDate: parseDate(svc.pcptDate),
-    sdrStartDate: parseDate(svc.sdrStartDate),
-    sdrEndDate: parseDate(svc.sdrEndDate),
+    startAuthDate: parseServiceDate(svc.startAuthDate),
+    endAuthDate: parseServiceDate(svc.endAuthDate),
+    pcptDate: parseServiceDate(svc.pcptDate),
+    sdrStartDate: parseServiceDate(svc.sdrStartDate),
+    sdrEndDate: parseServiceDate(svc.sdrEndDate),
     provider: svc.provider ?? "",
     location: svc.location ?? "",
     claimsSource: svc.claimsSource ?? "",
@@ -300,19 +282,13 @@ function mapEditableToClientServices(services: EditableServiceRow[]): ClientServ
     payType: svc.payType,
     clientRate: emptish(svc.clientRate),
     clientPayType: svc.clientPayType,
-    ispEffectiveDate: svc.ispEffectiveDate
-      ? svc.ispEffectiveDate.toISOString()
-      : undefined,
+    ispEffectiveDate: toCivilDate(svc.ispEffectiveDate),
     cprRequired: svc.cprRequired,
-    startAuthDate: svc.startAuthDate
-      ? svc.startAuthDate.toISOString()
-      : undefined,
-    endAuthDate: svc.endAuthDate ? svc.endAuthDate.toISOString() : undefined,
-    pcptDate: svc.pcptDate ? svc.pcptDate.toISOString() : undefined,
-    sdrStartDate: svc.sdrStartDate
-      ? svc.sdrStartDate.toISOString()
-      : undefined,
-    sdrEndDate: svc.sdrEndDate ? svc.sdrEndDate.toISOString() : undefined,
+    startAuthDate: toCivilDate(svc.startAuthDate),
+    endAuthDate: toCivilDate(svc.endAuthDate),
+    pcptDate: toCivilDate(svc.pcptDate),
+    sdrStartDate: toCivilDate(svc.sdrStartDate),
+    sdrEndDate: toCivilDate(svc.sdrEndDate),
     provider: emptish(svc.provider),
     location: emptish(svc.location),
     claimsSource: emptish(svc.claimsSource),
@@ -1537,8 +1513,12 @@ export function ServicesTab({ client, clientId, onServicesUpdated, readOnly = fa
             error: failure.code === 'ASSIGNMENT_DECISION_CHANGED' ? 'Requirements changed. Review the updated checks before assigning.' : undefined}}));
       }
       console.error("Failed to update services.");
+      // Prefer the server's reason (e.g. which field failed validation) over axios's status text.
+      const serverMessage = (err as { response?: { data?: { message?: unknown } } })?.response?.data?.message;
       setError(
-        err instanceof Error ? err.message : "Failed to update services. Please try again.",
+        typeof serverMessage === "string" && serverMessage
+          ? serverMessage
+          : err instanceof Error ? err.message : "Failed to update services. Please try again.",
       );
       setShowErrorModal(true);
     } finally {
