@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import GenericListCard from "./GenericListCard";
 import ShiftListCard from "./ShiftListCard";
@@ -42,5 +43,22 @@ describe("GenericListCard paging", () => {
     expect(screen.getAllByText("Unassigned").length).toBe(9);
     fireEvent.click(screen.getByLabelText("Next page"));
     expect(screen.getByText("Client 12")).toBeTruthy();
+  });
+
+  it("links rows to the record's page when the assistant sends one", () => {
+    render(
+      <MemoryRouter>
+        <GenericListCard data={{ title: "DSPs", rows: [{ primary: "Ann Lee", link: { kind: "dsp", id: "emp-1" } }, { primary: "No link" }], total: 2, hasMore: false }} />
+        <ShiftListCard data={[{ id: "s1", clientName: "Bo Kim", date: "2026-11-01", status: "pending" }]} meta={{ total: 1, hasMore: false }} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("Ann Lee").closest("a")?.getAttribute("href")).toBe("/agency/dsp-management/emp-1");
+    expect(screen.getByText("No link").closest("a")).toBeNull();
+    expect(screen.getByText("Bo Kim").closest("a")?.getAttribute("href")).toBe("/agency/shifts/s1");
+  });
+
+  it("renders plain rows outside a router", () => {
+    render(<GenericListCard data={{ title: "DSPs", rows: [{ primary: "Ann Lee", link: { kind: "dsp", id: "emp-1" } }], total: 1, hasMore: false }} />);
+    expect(screen.getByText("Ann Lee").closest("a")).toBeNull();
   });
 });

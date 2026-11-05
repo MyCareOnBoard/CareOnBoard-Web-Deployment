@@ -1,5 +1,9 @@
 import { CalendarDays } from "lucide-react";
 import ListPager, { listCountLabel, readListMeta, usePagedRows } from "./ListPager";
+import { RecordRow, recordHref } from "./recordLink";
+
+// Fixed column widths so every row lines up: date, client, staff, time (hidden on phones), status.
+const SHIFT_COLUMNS = "grid items-center gap-3 px-4 py-2.5 grid-cols-[48px_minmax(0,1fr)_minmax(0,1fr)_88px] sm:grid-cols-[56px_minmax(0,1fr)_minmax(0,1fr)_150px_96px]";
 
 interface ShiftRow {
   id: string;
@@ -50,23 +54,37 @@ export default function ShiftListCard({ data, meta: rawMeta, onSendMessage }: { 
         <p className="px-4 py-3 text-[13px] text-[#6b7280]">No shifts found.</p>
       ) : (
         <div className="divide-y divide-[#f3f4f6]">
+          <div className={`${SHIFT_COLUMNS} bg-[#fafafa] text-[11px] font-medium uppercase tracking-wide text-[#9ca3af]`}>
+            <span>Date</span>
+            <span>Client</span>
+            <span>Staff</span>
+            <span className="hidden sm:block">Time</span>
+            <span>Status</span>
+          </div>
           {paging.pageRows.map((shift, i) => (
-            <div key={shift.id || i} className="flex items-center gap-3 px-4 py-2.5 text-[12px] sm:text-[13px]">
-              <span className="w-14 shrink-0 font-medium text-[#10141a]">{formatDate(shift.date)}</span>
-              <span className="min-w-0 flex-1 truncate text-[#374151]">{shift.clientName || "—"}</span>
-              <span className={`min-w-0 flex-1 truncate ${shift.assignedDSP ? "text-[#374151]" : "text-[#9ca3af]"}`}>
+            <RecordRow
+              key={shift.id || i}
+              href={recordHref({ kind: "shift", id: shift.id })}
+              className={`${SHIFT_COLUMNS} text-[12px] sm:text-[13px]`}
+            >
+              <span className="font-medium text-[#10141a]">{formatDate(shift.date)}</span>
+              <span className="truncate text-[#374151]" title={shift.clientName || undefined}>{shift.clientName || "—"}</span>
+              <span
+                className={`truncate ${shift.assignedDSP ? "text-[#374151]" : "text-[#9ca3af]"}`}
+                title={shift.assignedDSP || undefined}
+              >
                 {shift.assignedDSP || "Unassigned"}
               </span>
-              <span className="shrink-0 text-[#6b7280]">
+              <span className="hidden truncate text-[#6b7280] sm:block">
                 {shift.startTime || ""}
                 {shift.endTime ? `–${shift.endTime}` : ""}
               </span>
-              <span
-                className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium capitalize ${statusBadge(shift.status)}`}
-              >
-                {shift.status || "—"}
+              <span>
+                <span className={`inline-block max-w-full truncate rounded-full border px-2 py-0.5 text-[11px] font-medium capitalize ${statusBadge(shift.status)}`}>
+                  {shift.status || "—"}
+                </span>
               </span>
-            </div>
+            </RecordRow>
           ))}
         </div>
       )}

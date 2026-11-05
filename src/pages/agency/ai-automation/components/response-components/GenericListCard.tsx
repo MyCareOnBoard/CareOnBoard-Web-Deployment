@@ -4,6 +4,7 @@ interface GenericListRow {
   meta?: string[];
   status?: string;
   statusColor?: "green" | "amber" | "red" | "blue" | "gray";
+  link?: RecordLink;
 }
 
 interface GenericListData extends ListMeta {
@@ -25,6 +26,7 @@ function statusClasses(color?: string) {
 
 import { str } from "./strValue";
 import ListPager, { type ListMeta, listCountLabel, readListMeta, usePagedRows } from "./ListPager";
+import { type RecordLink, RecordRow, recordHref } from "./recordLink";
 
 export default function GenericListCard({ data, onSendMessage }: { data: unknown; onSendMessage?: (text: string) => void }) {
   const d = data as GenericListData;
@@ -47,7 +49,7 @@ export default function GenericListCard({ data, onSendMessage }: { data: unknown
       ) : (
         <div className="divide-y divide-[#f3f4f6]">
           {paging.pageRows.map((row, i) => (
-            <div key={paging.start + i} className="flex items-center gap-3 px-4 py-2.5">
+            <RecordRow key={paging.start + i} href={recordHref(row.link)} className="flex items-center gap-3 px-4 py-2.5">
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-medium text-[#10141a] truncate">{str(row.primary)}</p>
                 {row.secondary != null && (
@@ -66,7 +68,7 @@ export default function GenericListCard({ data, onSendMessage }: { data: unknown
                   </span>
                 )}
               </div>
-            </div>
+            </RecordRow>
           ))}
         </div>
       )}
