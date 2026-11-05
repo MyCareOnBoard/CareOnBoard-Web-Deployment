@@ -53,11 +53,9 @@ export default function ShiftListCard({ data, meta: rawMeta, onSendMessage }: { 
           {paging.pageRows.map((shift, i) => (
             <div key={shift.id || i} className="flex items-center gap-3 px-4 py-2.5 text-[12px] sm:text-[13px]">
               <span className="w-14 shrink-0 font-medium text-[#10141a]">{formatDate(shift.date)}</span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[#374151]">{shift.clientName || "—"}</span>
-                <span className="block truncate text-[11px] text-[#6b7280]">
-                  {shift.assignedDSP || "Unassigned"}
-                </span>
+              <span className="min-w-0 flex-1 truncate text-[#374151]">{shift.clientName || "—"}</span>
+              <span className={`min-w-0 flex-1 truncate ${shift.assignedDSP ? "text-[#374151]" : "text-[#9ca3af]"}`}>
+                {shift.assignedDSP || "Unassigned"}
               </span>
               <span className="shrink-0 text-[#6b7280]">
                 {shift.startTime || ""}
