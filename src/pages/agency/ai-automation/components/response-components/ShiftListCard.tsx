@@ -1,6 +1,7 @@
 import { CalendarDays } from "lucide-react";
 import ListPager, { listCountLabel, readListMeta, usePagedRows } from "./ListPager";
 import { RecordRow, recordHref } from "./recordLink";
+import { formatShiftRowClockDisplay } from "@/lib/shift-row-time";
 
 // Fixed column widths so every row lines up: date, client, staff, scheduled time, clock in, clock out, status.
 // Scheduled time shows from sm up and the clock columns from lg up, so names keep room on small screens.
@@ -43,11 +44,11 @@ function formatDate(dateStr?: string) {
   }
 }
 
-function formatClock(iso?: string | null) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+// Same clock display as the shift pages, with a dash when there is no punch.
+function formatClock(value?: string | null) {
+  if (!value) return "—";
+  const shown = formatShiftRowClockDisplay(value);
+  return shown === "--:-- --" ? "—" : shown;
 }
 
 export default function ShiftListCard({ data, meta: rawMeta, onSendMessage }: { data: unknown; meta?: unknown; onSendMessage?: (text: string) => void }) {

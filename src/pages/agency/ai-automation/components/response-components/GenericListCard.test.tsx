@@ -91,7 +91,6 @@ describe("GenericListCard paging", () => {
     );
     expect(screen.getByText("Clock in")).toBeTruthy();
     expect(screen.getByText("Clock out")).toBeTruthy();
-    const expected = new Date("2026-11-01T13:05:00Z").toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-    expect(screen.getByText(expected)).toBeTruthy();
+    expect(screen.getByText("1:05 PM")).toBeTruthy();
   });
 });
