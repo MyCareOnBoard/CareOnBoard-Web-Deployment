@@ -61,4 +61,37 @@ describe("GenericListCard paging", () => {
     render(<GenericListCard data={{ title: "DSPs", rows: [{ primary: "Ann Lee", link: { kind: "dsp", id: "emp-1" } }], total: 1, hasMore: false }} />);
     expect(screen.getByText("Ann Lee").closest("a")).toBeNull();
   });
+
+  it("shows column headers and keeps meta values in their columns", () => {
+    render(
+      <GenericListCard
+        data={{
+          title: "DSPs",
+          columns: ["Name", "Role", "Availability", "Status"],
+          rows: [
+            { primary: "Ann", meta: ["dsp", "available"], status: "active" },
+            { primary: "Bo", status: "inactive" },
+          ],
+        }}
+      />,
+    );
+    for (const h of ["Name", "Role", "Availability", "Status"]) expect(screen.getByText(h)).toBeTruthy();
+    expect(screen.getByText("available")).toBeTruthy();
+    // A row with no meta still fills both meta columns.
+    expect(screen.getAllByText("—")).toHaveLength(2);
+  });
+
+  it("shows clock in and clock out on shift cards", () => {
+    render(
+      <ShiftListCard
+        data={[
+          { id: "s1", clientName: "C", date: "2026-11-01", status: "completed", clockedInAt: "2026-11-01T13:05:00Z", clockedOutAt: null },
+        ]}
+      />,
+    );
+    expect(screen.getByText("Clock in")).toBeTruthy();
+    expect(screen.getByText("Clock out")).toBeTruthy();
+    const expected = new Date("2026-11-01T13:05:00Z").toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+    expect(screen.getByText(expected)).toBeTruthy();
+  });
 });

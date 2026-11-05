@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { Link, useInRouterContext } from "react-router";
 import { Routes } from "@/routes/constants";
 
@@ -22,11 +22,11 @@ export function recordHref(link?: RecordLink | null): string | null {
 }
 
 /** Renders a list row as a link to `href` when there is one, else as a plain row. */
-export function RecordRow({ href, className, children }: { href: string | null; className: string; children: ReactNode }) {
+export function RecordRow({ href, className, style, children }: { href: string | null; className: string; style?: CSSProperties; children: ReactNode }) {
   const inRouter = useInRouterContext();
-  if (!href || !inRouter) return <div className={className}>{children}</div>;
+  if (!href || !inRouter) return <div className={className} style={style}>{children}</div>;
   return (
-    <Link to={href} className={`${className} transition-colors hover:bg-[#f3fafa] focus-visible:bg-[#f3fafa] focus-visible:outline-none`}>
+    <Link to={href} style={style} className={`${className} transition-colors hover:bg-[#f3fafa] focus-visible:bg-[#f3fafa] focus-visible:outline-none`}>
       {children}
     </Link>
   );
