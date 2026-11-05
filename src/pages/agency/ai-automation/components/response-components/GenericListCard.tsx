@@ -6,7 +6,7 @@ interface GenericListRow {
   statusColor?: "green" | "amber" | "red" | "blue" | "gray";
 }
 
-interface GenericListData {
+interface GenericListData extends ListMeta {
   title: string;
   icon?: string;
   emptyMessage?: string;
@@ -24,17 +24,20 @@ function statusClasses(color?: string) {
 }
 
 import { str } from "./strValue";
+import ListPager, { type ListMeta, listCountLabel, readListMeta, usePagedRows } from "./ListPager";
 
-export default function GenericListCard({ data }: { data: unknown }) {
+export default function GenericListCard({ data, onSendMessage }: { data: unknown; onSendMessage?: (text: string) => void }) {
   const d = data as GenericListData;
   const rows = Array.isArray(d?.rows) ? d.rows : [];
+  const meta = readListMeta(d);
+  const paging = usePagedRows(rows);
 
   return (
     <div className="rounded-[18px] border border-[#e5e7eb] bg-white overflow-hidden">
       <div className="flex items-center gap-2 px-4 py-3 border-b border-[#e5e7eb] bg-[#f3fafa]">
         {d?.icon && <span className="text-[14px] leading-none">{d.icon}</span>}
         <span className="text-[13px] font-semibold text-[#10141a]">{d?.title || "Results"}</span>
-        <span className="ml-auto text-[12px] text-[#6b7280]">{rows.length}</span>
+        <span className="ml-auto text-[12px] text-[#6b7280]">{listCountLabel(rows.length, meta)}</span>
       </div>
 
       {rows.length === 0 ? (
@@ -43,8 +46,8 @@ export default function GenericListCard({ data }: { data: unknown }) {
         </p>
       ) : (
         <div className="divide-y divide-[#f3f4f6]">
-          {rows.map((row, i) => (
-            <div key={i} className="flex items-center gap-3 px-4 py-2.5">
+          {paging.pageRows.map((row, i) => (
+            <div key={paging.start + i} className="flex items-center gap-3 px-4 py-2.5">
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-medium text-[#10141a] truncate">{str(row.primary)}</p>
                 {row.secondary != null && (
@@ -67,6 +70,7 @@ export default function GenericListCard({ data }: { data: unknown }) {
           ))}
         </div>
       )}
+      <ListPager loaded={rows.length} meta={meta} paging={paging} noun={d?.title || "results"} onSendMessage={onSendMessage} />
     </div>
   );
 }

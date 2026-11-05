@@ -1,4 +1,5 @@
 import { ClipboardList } from "lucide-react";
+import ListPager, { listCountLabel, readListMeta, usePagedRows } from "./ListPager";
 
 interface TaskRow {
   id: string;
@@ -31,22 +32,24 @@ function priorityDot(priority: string) {
   return "bg-slate-300";
 }
 
-export default function TaskListCard({ data }: { data: unknown }) {
+export default function TaskListCard({ data, meta: rawMeta, onSendMessage }: { data: unknown; meta?: unknown; onSendMessage?: (text: string) => void }) {
+  const meta = readListMeta(rawMeta);
   const tasks = Array.isArray(data) ? (data as TaskRow[]) : [];
+  const paging = usePagedRows(tasks);
 
   return (
     <div className="rounded-[18px] border border-[#e5e7eb] bg-white overflow-hidden">
       <div className="flex items-center gap-2 px-4 py-3 border-b border-[#e5e7eb] bg-[#f3fafa]">
         <ClipboardList className="h-4 w-4 text-[#00b4b8]" />
         <span className="text-[13px] font-semibold text-[#10141a]">Tasks</span>
-        <span className="ml-auto text-[12px] text-[#6b7280]">{tasks.length}</span>
+        <span className="ml-auto text-[12px] text-[#6b7280]">{listCountLabel(tasks.length, meta)}</span>
       </div>
 
       {tasks.length === 0 ? (
         <p className="px-4 py-3 text-[13px] text-[#6b7280]">No tasks found.</p>
       ) : (
         <div className="divide-y divide-[#f3f4f6]">
-          {tasks.map((task, i) => (
+          {paging.pageRows.map((task, i) => (
             <div key={task.id || i} className="px-4 py-3 text-[12px] sm:text-[13px]">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-2 flex-1 min-w-0">
@@ -82,6 +85,7 @@ export default function TaskListCard({ data }: { data: unknown }) {
           ))}
         </div>
       )}
+      <ListPager loaded={tasks.length} meta={meta} paging={paging} noun="tasks" onSendMessage={onSendMessage} />
     </div>
   );
 }

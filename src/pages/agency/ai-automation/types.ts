@@ -11,6 +11,8 @@ export interface Attachment {
 export interface ResponseComponent {
   type: string;
   data: unknown;
+  /** Paging totals for list cards whose data is a bare array (shift-list, task-list). */
+  meta?: unknown;
 }
 
 export interface LocalMessage {

@@ -14,7 +14,10 @@ import PdfDownloadCard from "./PdfDownloadCard";
 import ReportPreviewCard from "./ReportPreviewCard";
 import ReportDownloadCard from "./ReportDownloadCard";
 
-const STATIC_REGISTRY: Record<string, React.FC<{ data: unknown }>> = {
+type CardProps = { data: unknown; meta?: unknown; onSendMessage?: (text: string) => void };
+
+// List cards also get `meta` (paging totals) and onSendMessage (their "Load all" button).
+const STATIC_REGISTRY: Record<string, React.FC<CardProps>> = {
   "shift-list": ShiftListCard,
   "risk-summary": RiskSummaryCard,
   "no-caregivers": NoCaregiversCard,
@@ -45,7 +48,7 @@ export function ComponentRenderer({
   onSendMessage?: (text: string) => void;
 }) {
   const StaticComp = STATIC_REGISTRY[component.type];
-  if (StaticComp) return <StaticComp data={component.data} />;
+  if (StaticComp) return <StaticComp data={component.data} meta={component.meta} onSendMessage={onSendMessage} />;
 
   const InteractiveComp = INTERACTIVE_REGISTRY[component.type as keyof typeof INTERACTIVE_REGISTRY];
   if (InteractiveComp) return <InteractiveComp data={component.data} onSendMessage={onSendMessage} />;
