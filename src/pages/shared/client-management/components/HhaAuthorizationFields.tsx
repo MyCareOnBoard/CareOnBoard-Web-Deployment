@@ -248,6 +248,7 @@ export const HhaAuthorizationFields = React.memo(function HhaAuthorizationFields
       </div>
 
       <ServiceAssignedDspsSection
+        program="hha"
         reviewRow={row}
         isEditing
         assignedDsps={row.assignedDsps ?? []}

@@ -18,6 +18,8 @@ export type ServiceAssignedDspsSectionProps = {
   reviewRow?: ReviewRosterRow;
   assignedDsps?: AssignedDsp[];
   onChange?: (assignedDsps: AssignedDsp[]) => void;
+  /** Client program, for the DSP vs Caregiver wording. Falls back to the agency mode. */
+  program?: "ddd" | "hha";
 };
 
 function DspSearchSlotRow({
@@ -158,16 +160,27 @@ export function MedicationRequirementQuestion() {
   );
 }
 
+// DDD staff are DSPs, HHA staff are caregivers. Default to DSP when the program is unknown.
+function staffLabels(program?: string | null) {
+  return program === "hha"
+    ? { one: "Caregiver", many: "Caregivers", lower: "caregivers" }
+    : { one: "DSP", many: "DSPs", lower: "DSPs" };
+}
+
 function ServiceAssignedDspsEditor({
   assignedDsps,
   onChange,
   reviewRow,
+  program,
 }: {
   reviewRow?: ReviewRosterRow;
   assignedDsps: AssignedDsp[];
   onChange: (assignedDsps: AssignedDsp[]) => void;
+  program?: "ddd" | "hha";
 }) {
   const review = useRosterReviewSelection(reviewRow);
+  const agencyMode = useEffectiveAgencyMode();
+  const labels = staffLabels(review.program || program || agencyMode);
   const medication = review.medication;
   const [rejectedStaff, setRejectedStaff] = useState<AssignedDsp | null>(null);
   useEffect(() => {setRejectedStaff(null);}, [review.scopeKey]);
@@ -224,7 +237,7 @@ function ServiceAssignedDspsEditor({
     <div>
       <div className="mb-4">
         <p className="mb-1 text-[14px] font-semibold leading-[1.4] text-[#10141a]">
-          Assigned Caregivers
+          Assigned {labels.many}
         </p>
         <p className="text-[13px] text-[#808081]">
           Search for staff to assign to this service. Assignments are not imported from uploaded
@@ -233,7 +246,7 @@ function ServiceAssignedDspsEditor({
       </div>
       {assignedDsps.length === 0 ? (
         <p className="mb-2 text-[13px] text-[#808081]">
-          No caregivers assigned yet. Use Add Caregiver below to search.
+          No {labels.lower} assigned yet. Use Add {labels.one} below to search.
         </p>
       ) : (
         <ul className="mb-3 flex w-full max-w-md flex-col gap-2">
@@ -277,7 +290,7 @@ function ServiceAssignedDspsEditor({
         onClick={addSearchSlot}
       >
         <Plus className="mr-1 h-4 w-4" />
-        Add Caregiver
+        Add {labels.one}
       </Button>
       <ConfirmDialog open={!!pendingStaff && pendingStaff.scopeKey === review.scopeKey && medication?.value.underMedication === true} onOpenChange={open => {if (!open) setPendingStaff(null);}}>
         <ConfirmDialogContent className="max-w-md"
@@ -297,10 +310,11 @@ function ServiceAssignedDspsEditor({
   );
 }
 
-function ServiceAssignedDspsView({ assignedDsps }: { assignedDsps: AssignedDsp[] }) {
+function ServiceAssignedDspsView({ assignedDsps, program }: { assignedDsps: AssignedDsp[]; program?: string | null }) {
+  const agencyMode = useEffectiveAgencyMode();
   return (
     <div className="flex flex-col gap-1">
-      <p className="text-[12px] font-normal text-[#10141a]">Assigned DSPs</p>
+      <p className="text-[12px] font-normal text-[#10141a]">Assigned {staffLabels(program || agencyMode).many}</p>
       <p className="text-[14px] font-semibold text-[#10141a]">
         {assignedDsps.map((d) => d.name).join(", ")}
       </p>
@@ -313,12 +327,13 @@ export function ServiceAssignedDspsSection({
   reviewRow,
   assignedDsps = [],
   onChange,
+  program,
 }: ServiceAssignedDspsSectionProps) {
   if (!isEditing) {
     if (!assignedDsps.length) return null;
     return (
       <div className="mt-3 border-t border-[#e5e5e6] pt-3">
-        <ServiceAssignedDspsView assignedDsps={assignedDsps} />
+        <ServiceAssignedDspsView assignedDsps={assignedDsps} program={program} />
       </div>
     );
   }
@@ -329,6 +344,7 @@ export function ServiceAssignedDspsSection({
         reviewRow={reviewRow}
         assignedDsps={assignedDsps}
         onChange={onChange ?? (() => {})}
+        program={program}
       />
     </div>
   );

@@ -27,7 +27,9 @@ it.each(['ddd', 'hha'] as const)('reviews only the selected staff in the explici
   await waitFor(() => expect(getAssignmentDecision).toHaveBeenCalledTimes(1));
   expect(getClientCompetencies).not.toHaveBeenCalled();
   expect(getAssignmentDecision).toHaveBeenLastCalledWith(expect.objectContaining({agencyId: 'selected-agency', clientId: 'client', input: expect.objectContaining({program, kind: 'service_roster', serviceRowKey: 'service', employeeId: 'staff-a', roster: expect.any(Object)})}), expect.any(AbortSignal));
-  fireEvent.click(screen.getByRole('button', {name: 'Add Caregiver'}));
+  // DDD staff are DSPs, HHA staff are caregivers.
+  expect(screen.getByText(program === 'hha' ? 'Assigned Caregivers' : 'Assigned DSPs')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', {name: program === 'hha' ? 'Add Caregiver' : 'Add DSP'}));
   fireEvent.change(screen.getByPlaceholderText('Search staff by name (2+ characters)'), {target: {value: 'x'}});
   expect(getAssignmentDecision).toHaveBeenCalledTimes(1);
   fireEvent.click(screen.getByRole('button', {name: 'Review assignment for Grace'}));
@@ -80,7 +82,7 @@ it.each(['ddd', 'hha'] as const)('asks only when medication is on, and both answ
   }
   render(<Harness />);
   const pick = async (name: string) => {
-    fireEvent.click(screen.getByRole('button', {name: 'Add Caregiver'}));
+    fireEvent.click(screen.getByRole('button', {name: program === 'hha' ? 'Add Caregiver' : 'Add DSP'}));
     fireEvent.change(screen.getByPlaceholderText('Search staff by name (2+ characters)'), {target: {value: name}});
     fireEvent.click(await screen.findByRole('button', {name}));
   };
@@ -115,7 +117,7 @@ it.each(['inactive', 'blocked'] as const)('clears rejected staff and search whil
     return <AssignmentReviewRosterProvider agencyId="agency" program="ddd" savedRows={[]}><ServiceAssignedDspsSection isEditing reviewRow={row} assignedDsps={assigned} onChange={setAssigned} /></AssignmentReviewRosterProvider>;
   }
   render(<Harness />);
-  fireEvent.click(screen.getByRole('button', {name: 'Add Caregiver'}));
+  fireEvent.click(screen.getByRole('button', {name: 'Add DSP'}));
   fireEvent.change(screen.getByPlaceholderText('Search staff by name (2+ characters)'), {target: {value: 'Ada'}});
   fireEvent.click(await screen.findByRole('button', {name: 'Ada'}));
   await waitFor(() => expect(screen.queryByRole('button', {name: 'Remove Ada from this service'})).not.toBeInTheDocument());
