@@ -23,7 +23,12 @@ export function AssignmentDecision({decision, loading, error, refresh, draft, on
   const staffRejected = selectionCleared && decision?.state === 'ready' && status === 'BLOCKED';
   const passed = decision?.checks?.filter(check => check.outcome === 'pass') || [];
   const Icon = loading ? Loader2 : status === 'CLEARED' ? CheckCircle2 : status === 'BLOCKED' && !staffRejected ? XCircle : AlertCircle;
-  const title = loading ? 'Checking requirements…' : unavailable ? 'Checks unavailable' : decision?.state === 'inactive' ? 'Blocked · no applicable assignment checks enabled' : status === 'CLEARED' ? 'Cleared · configured requirements passed' : staffRejected ? 'Staff not selected · requirements not met' : status === 'BLOCKED' ? 'Blocked · requirements need attention' : 'Warning · requirements need review';
+  const inactiveReason = decision?.state === 'inactive' ? decision.inactiveReason : undefined;
+  const inactiveTitle = inactiveReason === 'before_cutoff' ? `Blocked · ${context === 'shift' ? 'shift is' : 'service ends'} before assignment checks start`
+    : inactiveReason === 'no_applicable_checks' ? 'Blocked · no enabled check applies to this assignment'
+    : inactiveReason === 'checks_disabled' ? 'Blocked · assignment checks are turned off' : 'Blocked · no applicable assignment checks enabled';
+  const settingsLink = <a href="/agency/agency-settings?tab=agencyInfo" className="text-primary underline underline-offset-2 hover:no-underline">Settings → Agency Information → Assignment checks</a>;
+  const title = loading ? 'Checking requirements…' : unavailable ? 'Checks unavailable' : decision?.state === 'inactive' ? inactiveTitle : status === 'CLEARED' ? 'Cleared · configured requirements passed' : staffRejected ? 'Staff not selected · requirements not met' : status === 'BLOCKED' ? 'Blocked · requirements need attention' : 'Warning · requirements need review';
   const color = loading || unavailable ? 'bg-slate-50 text-foreground' : status === 'CLEARED' ? 'bg-emerald-50 text-emerald-800' : status === 'BLOCKED' && !staffRejected ? 'bg-red-50 text-red-800' : 'bg-amber-50 text-amber-900';
   return <section ref={panel} tabIndex={-1} className="my-4 overflow-hidden rounded-2xl border border-[#dce6e8] bg-white text-sm" aria-label="Assignment checks" aria-live="polite">
     <div className={`flex items-start gap-3 px-5 py-4 ${color}`}>
@@ -31,7 +36,9 @@ export function AssignmentDecision({decision, loading, error, refresh, draft, on
       <div><h3 className="font-semibold">{title}</h3><p className="mt-1 text-xs">{context === 'staff' ? 'Staff requirements' : 'Staff and client requirements'}{employeeName ? ` · ${employeeName}` : ''}{date ? ` · ${date}` : ''}</p></div>
     </div>
     {!loading && <>
-      {unavailable ? <p role="alert" className="px-5 py-4">{error || CHECKS_UNAVAILABLE}</p> : decision?.state === 'inactive' ? <p className="px-5 py-4 text-muted-foreground">Assignment is blocked. The agency owner must enable applicable requirements in <a href="/agency/agency-settings?tab=agencyInfo" className="text-primary underline underline-offset-2 hover:no-underline">Settings → Agency Information → Assignment checks.</a></p> : <>
+      {unavailable ? <p role="alert" className="px-5 py-4">{error || CHECKS_UNAVAILABLE}</p> : decision?.state === 'inactive' ? <p className="px-5 py-4 text-muted-foreground">{inactiveReason === 'before_cutoff'
+        ? <>{context === 'shift' ? 'This shift is before' : 'This service ends before'} {decision.checksStartDate ? <strong className="font-medium text-foreground">{decision.checksStartDate}</strong> : 'the date'} when assignment checks start, so staff can't be assigned to it. Update the service to its current authorization dates, or move the start date in {settingsLink}.</>
+        : <>Assignment is blocked. The agency owner must enable applicable requirements in {settingsLink}.</>}</p> : <>
         {staffRejected && <p className="px-5 pt-4">Search for another staff member. This person's unmet requirements are shown below.</p>}
         {error && <p role="alert" className="px-5 pt-4">{error}</p>}
         <div className="divide-y divide-border px-5">{decision?.findings.map(f => <div className="flex gap-3 py-3" key={`${f.ruleId}:${f.code}`}>

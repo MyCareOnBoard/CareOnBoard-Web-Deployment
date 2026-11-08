@@ -39,8 +39,16 @@ it('shows a blocked inactive policy with settings and recheck actions', () => {
   render(<AssignmentDecision decision={{state: 'inactive', contextKey: 'pair', policyRevision: 0, evaluatedAt: warning.evaluatedAt, findings: [], hasRestrictedFindings: false, canAcknowledge: false}} refresh={vi.fn()} onChange={vi.fn()} />);
   expect(screen.getByText('Blocked · no applicable assignment checks enabled')).toBeInTheDocument();
   expect(screen.queryByText(/Cleared/)).not.toBeInTheDocument();
-  expect(screen.getByRole('link', {name: 'Settings → Agency Information → Assignment checks.'})).toHaveAttribute('href', '/agency/agency-settings?tab=agencyInfo');
+  expect(screen.getByRole('link', {name: 'Settings → Agency Information → Assignment checks'})).toHaveAttribute('href', '/agency/agency-settings?tab=agencyInfo');
   expect(screen.getByRole('button', {name: 'Recheck requirements'})).toBeEnabled();
+});
+
+it('explains a block for a service that ends before assignment checks start', () => {
+  render(<AssignmentDecision decision={{state: 'inactive', inactiveReason: 'before_cutoff', checksStartDate: '2026-09-22', contextKey: 'pair', policyRevision: 3, evaluatedAt: warning.evaluatedAt, findings: [], hasRestrictedFindings: false, canAcknowledge: false}} refresh={vi.fn()} onChange={vi.fn()} context="staff" />);
+  expect(screen.getByText('Blocked · service ends before assignment checks start')).toBeInTheDocument();
+  expect(screen.getByText('2026-09-22')).toBeInTheDocument();
+  expect(screen.getByText(/Update the service to its current authorization dates/)).toBeInTheDocument();
+  expect(screen.queryByText(/no applicable assignment checks enabled/)).not.toBeInTheDocument();
 });
 
 it('requires a completed preview for every changed staff selection and ignores removed staff', () => {

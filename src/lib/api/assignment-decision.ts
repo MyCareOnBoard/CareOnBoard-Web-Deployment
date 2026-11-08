@@ -7,6 +7,10 @@ export type AssignmentDecision = {
   findings: Array<{ruleId: string; ruleVersion: number; severity: 'mandatory' | 'warning'; code: string; message: string}>;
   hasRestrictedFindings: boolean; canAcknowledge: boolean;
   checks?: Array<{ruleId: string; label: string; category: 'staff' | 'client'; outcome: 'pass' | 'fail' | 'unknown'}>;
+  /** Why nothing was checked when state is 'inactive'. */
+  inactiveReason?: 'checks_disabled' | 'before_cutoff' | 'no_applicable_checks';
+  /** The policy's "apply to service on or after" date, sent with before_cutoff. */
+  checksStartDate?: string;
 };
 export type AssignmentAcknowledgment = {contextKey: string; fingerprint: string; reason: string};
 export type AssignmentDecisionEnvelope = {assignmentDecisions: Record<string, AssignmentDecision>};
