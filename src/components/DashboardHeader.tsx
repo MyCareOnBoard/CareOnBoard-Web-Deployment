@@ -18,7 +18,7 @@ import { useTheme } from "@/providers/ThemeProvider";
 import CogIcon from "@/assets/icons/cog.svg?react";
 import LogoNameIcon from "@/assets/icons/green-green-logo.svg?react";
 import LogoMarkIcon from "@/assets/icons/logo.svg?react";
-import { ChevronDown, ChevronUp, User, LogOut, Lock, HelpCircle, Menu, Moon, Sun } from "lucide-react";
+import { Bell, ChevronDown, ChevronUp, User, LogOut, Lock, HelpCircle, Menu, Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toggleDrawer } from "@/hooks/useSidebarDrawer";
 import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
@@ -126,10 +126,12 @@ export function DashboardHeaderFrame({ centerContent, children, sidebarInset = f
 }
 
 export default function DashboardHeader(
-  { actions, centerContent, userName, userImage, userRole, onLogout, userType, sidebarInset, showSettings = true, accountMenu }: {
+  { actions, centerContent, userName, userImage, userRole, onLogout, userType, sidebarInset, showSettings = true, accountMenu, variant = "classic" }: {
     sidebarInset?: boolean;
-    /** Replaces the default account menu items (the user panel has its own); the header then drops its Care Connect button and theme toggle. */
+    /** Replaces the default account menu items (the user panel has its own). */
     accountMenu?: ReactNode;
+    /** "panel": the redesigned user panel header. Its account menu carries the Care Connect link and theme switch, and the bell uses the new style. */
+    variant?: "classic" | "panel";
     /** Hide the settings shortcut when the layout's sidebar already links to settings. */
     showSettings?: boolean;
     actions?: ReactNode;
@@ -218,13 +220,13 @@ export default function DashboardHeader(
   }
 
   const getCareConnectDashboardUrl = () => careConnectDashboardUrl(userType as UserType);
+  const panel = variant === "panel";
 
   return (
     <DashboardHeaderFrame centerContent={centerContent} sidebarInset={sidebarInset}>
         {actions ?? (
           <div className="flex items-center gap-[10px]">
-            {/* A custom account menu carries the Care Connect link and theme switch itself. */}
-            {!accountMenu && getCareConnectDashboardUrl() && (
+            {!panel && getCareConnectDashboardUrl() && (
               <a
                 href={getCareConnectDashboardUrl()!}
                 target="_blank"
@@ -236,7 +238,7 @@ export default function DashboardHeader(
                 <span className="hidden sm:inline">CareOnboardConnect Login</span>
               </a>
             )}
-            {!accountMenu && <ThemeToggle className="hidden sm:grid" />}
+            {!panel && <ThemeToggle className="hidden sm:grid" />}
             {showSettings && (
               <HeaderActionButton
                 icon={CogIcon}
@@ -246,7 +248,11 @@ export default function DashboardHeader(
             )}
             <DropdownMenu open={isNotificationDropdownOpen} onOpenChange={setIsNotificationDropdownOpen}>
               <DropdownMenuTrigger asChild>
-                <div className="relative">
+                {panel ? <button type="button" aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
+                  className="relative grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-[rgba(22,22,22,0.1)] bg-white text-[#10141a] transition-colors hover:bg-[#f3f5f6] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] dark:border-white/10 dark:bg-[#1b232b] dark:text-[#f4f6f7] dark:hover:bg-white/5">
+                  <Bell className="h-5 w-5" strokeWidth={1.6} aria-hidden="true" />
+                  {unreadCount > 0 && <span aria-hidden="true" className="absolute right-[9px] top-[8px] h-2 w-2 rounded-full bg-[#e5372b] ring-2 ring-white dark:ring-[#1b232b]" />}
+                </button> : <div className="relative">
                   <button
                     type="button"
                     aria-label="Notifications"
@@ -257,7 +263,7 @@ export default function DashboardHeader(
                   {unreadCount > 0 && (
                     <span className="absolute right-[9px] top-[9px] block h-[10px] w-[10px] rounded-full bg-[#d53411] border-2 border-[#eef4f5] dark:border-[#10141a]" />
                   )}
-                </div>
+                </div>}
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-[380px] z-[100] bg-[#f3f6f7] dark:bg-[#1b232b] border-[#e5e5e6] dark:border-white/10 rounded-xl p-0 backdrop-blur-sm max-h-[80vh] flex flex-col">
                 {/* Notifications Header */}

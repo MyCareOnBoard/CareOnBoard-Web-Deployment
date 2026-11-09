@@ -97,6 +97,7 @@ export default function UserPanelDashboardLayout({ children }: { children?: Reac
         onLogout={handleLogout}
         sidebarInset
         showSettings={false}
+        variant="panel"
         accountMenu={<UserPanelAccountMenu roleLabel={userRole} onLogout={handleLogout} />}
       />
       <DashboardSidebar navItems={visibleNavItems} variant="brand" logo={sidebarLogo} footer={<SidebarHelpCard />} />
