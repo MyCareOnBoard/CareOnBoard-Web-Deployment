@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
-import { ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
 import { Routes } from '@/routes/constants'
@@ -133,12 +132,7 @@ export default function MfaChallengePage() {
 
   return (
     <div className="relative flex w-full min-w-0 flex-col gap-8 overflow-x-hidden">
-      <div className="space-y-4">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#00B4B8]/10 text-[#00B4B8]">
-          <ShieldCheck className="h-7 w-7" aria-hidden />
-        </div>
-        <AuthStepHeader title={MFA_COPY.challenge.title} description={headerDescription} />
-      </div>
+      <AuthStepHeader title={MFA_COPY.challenge.title} description={headerDescription} />
 
       <RecaptchaAnchor id={RECAPTCHA_CONTAINER_ID} />
 
@@ -148,7 +142,7 @@ export default function MfaChallengePage() {
 
       {phase === 'send-failed' && (
         <div className="space-y-4">
-          <p className="text-sm text-red-600" role="alert" aria-live="polite">
+          <p className="text-[13px] text-[#d0202b]" role="alert" aria-live="polite">
             {error}
           </p>
           <Button
@@ -171,6 +165,7 @@ export default function MfaChallengePage() {
           verifying={verifying}
           sending={sending}
           error={error}
+          codeLabel={MFA_COPY.challenge.codeLabel}
           resendCopy={{
             resend: MFA_COPY.challenge.resend,
             resendCountdown: MFA_COPY.challenge.resendCountdown,
@@ -178,16 +173,15 @@ export default function MfaChallengePage() {
         />
       )}
 
-      <footer className="flex flex-col gap-4 border-t border-[#e5eef5] pt-6">
-        <AuthLegalFootnote />
-        <Button
+      <footer className="flex flex-col items-center gap-3">
+        <button
           type="button"
-          variant="ghost"
           onClick={() => void handleDifferentAccount()}
-          className="w-full text-slate-600 hover:text-slate-900"
+          className="rounded-[4px] text-[14px] text-[#34434c] hover:text-[#10141a] hover:underline focus-visible:outline-2 focus-visible:outline-[#007679] dark:text-[#c9d3d6] dark:hover:text-[#f4f6f7]"
         >
           {MFA_COPY.challenge.useDifferentAccount}
-        </Button>
+        </button>
+        <AuthLegalFootnote />
       </footer>
     </div>
   )

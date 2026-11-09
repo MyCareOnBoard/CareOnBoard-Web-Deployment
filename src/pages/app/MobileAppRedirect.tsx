@@ -1,4 +1,8 @@
+import { useEffect } from "react";
 import { useParams } from "react-router";
+
+const IOS_STORE = import.meta.env.VITE_MOBILE_APP_IOS_STORE_URL || 'https://apps.apple.com/app/6760315221';
+const ANDROID_STORE = import.meta.env.VITE_MOBILE_APP_ANDROID_STORE_URL || 'https://play.google.com/store/apps/details?id=com.iota.careonboardapplicant';
 
 export default function MobileAppRedirect() {
   const { agencyId } = useParams<{ agencyId: string }>();
@@ -9,12 +13,17 @@ export default function MobileAppRedirect() {
   const isMobile = isAndroid || isIOS;
 
   const handleOpenApp = () => {
-    const iosStore = import.meta.env.VITE_MOBILE_APP_IOS_STORE_URL || 'https://apps.apple.com/app/6760315221';
-    const androidStore = import.meta.env.VITE_MOBILE_APP_ANDROID_STORE_URL || 'https://play.google.com/store/apps/details?id=com.iota.careonboardapplicant';
+    const iosStore = IOS_STORE;
+    const androidStore = ANDROID_STORE;
 
     if (!isMobile) {
       // For desktop, just redirect to app store
       window.open(iosStore, '_blank');
+      return;
+    }
+
+    if (!agencyId) {
+      window.location.href = isIOS ? iosStore : androidStore;
       return;
     }
 
@@ -41,6 +50,12 @@ export default function MobileAppRedirect() {
       }
     }
   };
+
+  // The download link (no agency) skips the app link and opens the phone's store straight away.
+  useEffect(() => {
+    if (agencyId || !isMobile) return;
+    window.location.replace(isIOS ? IOS_STORE : ANDROID_STORE);
+  }, [agencyId, isMobile, isIOS]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#00b4b8] to-[#0090a8]">

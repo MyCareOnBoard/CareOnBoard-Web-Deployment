@@ -1,177 +1,96 @@
-import {Outlet, useLocation} from "react-router";
+import { useEffect, useState } from "react";
+import { Outlet, useLocation } from "react-router";
+import QRCode from "react-qr-code";
+import "@fontsource/urbanist/300.css";
+import LogoNameIcon from "@/assets/icons/green-green-logo.svg?react";
+import { getAgencyInfo } from "@/lib/api/onboarding";
+import { Routes } from "@/routes/constants";
 
-import React, {useLayoutEffect} from "react"
-import {useState, useEffect} from "react"
-import {getAgencyInfo} from "@/lib/api/onboarding";
+const PHOTOS = [
+  { src: "/assets/family-care-couple.jpg", position: "45% center" },
+  { src: "/assets/family-care-nurse.jpg", position: "62% center" },
+  { src: "/healthcare-professional-ready.jpg", position: "center" },
+];
 
-interface Quote {
-  text: string
-  author: string
+// Faint vertical lines behind the panel content, as in the design.
+const panelLines = {
+  backgroundImage: "repeating-linear-gradient(90deg, rgba(255,255,255,0.055) 0 1px, transparent 1px 76px)",
+};
+
+/** QR card under every sign-in form. The link sends phones to the right app store. */
+function AppDownloadCard() {
+  const downloadUrl = `${window.location.origin}${Routes.mobileAppDownload}`;
+  return (
+    <div className="mt-8 flex items-center gap-4 border-t border-[#e3e8ea] pt-6 dark:border-white/10">
+      <div className="shrink-0 rounded-[14px] border border-[#e3e8ea] bg-white p-2.5 dark:border-white/10">
+        <QRCode value={downloadUrl} size={76} aria-label="QR code to download the Care on Board app" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[18px] text-[#10141a] dark:text-[#f4f6f7]">Scan to download the app.</p>
+        <p className="mt-1 text-[14px] leading-relaxed text-[#34434c] dark:text-[#9aa4a8]">
+          Scan the QR code to access care updates and real-time support on the go.
+        </p>
+      </div>
+    </div>
+  );
 }
 
-const quotes: Quote[] = [
-  {
-    text: "The best way to find yourself is to lose yourself in the service of others.",
-    author: "Mahatma Gandhi",
-  },
-  {
-    text: "True success isn’t only about what you do for yourself. It’s about how you lift others up, bring light into their lives, and leave a positive impact. You’re capable of that—keep going.",
-    author: "Ernest Madu",
-  },
-]
+function BrandPanel({ agency }: { agency: string }) {
+  return (
+    <aside className="relative hidden w-[55%] shrink-0 flex-col overflow-hidden rounded-[24px] bg-[#003839] p-8 text-white lg:sticky lg:top-4 lg:flex lg:h-[calc(100vh-32px)] xl:p-10">
+      <div className="pointer-events-none absolute inset-0" style={panelLines} aria-hidden="true" />
+      <div className="relative">
+        <LogoNameIcon aria-label="Care on Board" role="img" className="h-auto w-[196px]" />
+        {agency && <p className="mt-6 inline-flex rounded-full bg-white/10 px-3 py-1 text-[13px] text-white/90">Welcome to {agency}</p>}
+        <h1 className="mt-8 text-[clamp(44px,4.6vw,72px)] font-light leading-[1.3] tracking-[-0.01em]">
+          <span className="block text-[#22b8b6]">One Platform.</span>{" "}
+          <span className="block">Complete Care</span>
+        </h1>
+        <p className="mt-6 max-w-[760px] text-[15px] leading-relaxed text-white/90">
+          Simplify how care is managed, delivered, and experienced. CareOnboard unites staffing, coordination, billing,
+          and compliance into one seamless, intelligent system so you can focus on what truly matters: people.
+        </p>
+      </div>
+      <div className="relative mt-10 flex min-h-0 flex-1 gap-6" aria-hidden="true">
+        {PHOTOS.map((photo, index) => (
+          <img key={index} src={photo.src} alt="" loading="lazy" decoding="async" style={{ objectPosition: photo.position }}
+            className="h-full max-h-[520px] min-h-0 w-[clamp(240px,40%,340px)] shrink-0 self-end rounded-[20px] object-cover" />
+        ))}
+      </div>
+    </aside>
+  );
+}
 
 export default function AuthLayout() {
-  const [currentQuote, setCurrentQuote] = useState(0);
+  const [agency, setAgency] = useState("");
+  const agencyId = new URLSearchParams(useLocation().search).get("agencyId");
 
-  const [agency, setAgency] = useState<string>("");
+  useEffect(() => {
+    if (!agencyId || agencyId === "undefined") return;
+    let live = true;
+    getAgencyInfo(agencyId).then((info) => {
+      if (live && info?.agency?.name) setAgency(info.agency.name);
+    }).catch(() => undefined);
+    return () => { live = false; };
+  }, [agencyId]);
 
-  const agencyId = new URLSearchParams(useLocation().search).get('agencyId');
-
-  const fetchAgencyInfo = async () => {
-    const agency = await getAgencyInfo(agencyId as string);
-    if (agency) {
-      setAgency(agency?.agency?.name)
-    }
-  }
-
-  useLayoutEffect(() => {
-    if (agencyId && agencyId !== "undefined") {
-      fetchAgencyInfo();
-    }
+  useEffect(() => {
+    document.body.classList.add("auth-layout-active");
+    return () => document.body.classList.remove("auth-layout-active");
   }, []);
 
-  // Auto-rotate quotes every 5 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentQuote((prev) => (prev + 1) % quotes.length)
-    }, 5000)
-
-    return () => clearInterval(interval)
-  }, [])
-
-  useEffect(() => {
-    document.body.classList.add('auth-layout-active')
-    return () => document.body.classList.remove('auth-layout-active')
-  }, [])
-
   return (
-    <div className="min-h-screen overflow-x-hidden bg-gradient-to-b from-white via-[#f8fafc] to-white">
-      <div className="flex flex-col lg:flex-row items-center justify-between gap-6 w-full max-w-[100vw] px-4 sm:px-6 lg:px-[30px] py-4 sm:py-6 overflow-x-hidden">
-      {/* Left Banner - Teal branding section */}
-      <div
-        className="hidden lg:flex bg-[#00b4b8] flex-col h-[calc(100vh-60px)] justify-between p-[60px] rounded-[20px] w-[528px] relative overflow-hidden shadow-[0_24px_60px_rgba(0,0,0,0.12)]"
-      >
-        {/* Background Image with Overlay */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute inset-0 overflow-hidden opacity-40">
-            <img
-              alt=""
-              className="absolute h-full left-[-14.67%] max-w-none top-[-8.3%] w-[121.76%] object-cover"
-              src="/login-bg-main.jpg"
-            />
+    <div className="min-h-screen bg-white dark:bg-[#10141a]">
+      <div className="flex min-h-screen w-full gap-4 p-4">
+        <main className="flex min-w-0 flex-1 flex-col items-center justify-center px-2 py-8 sm:px-8">
+          <div className="w-full min-w-0 max-w-[520px]">
+            <LogoNameIcon aria-label="Care on Board" role="img" className="mb-10 h-auto w-[164px] lg:hidden" />
+            <Outlet />
+            <AppDownloadCard />
           </div>
-          <div
-            className="absolute inset-0"
-            style={{
-              background: 'linear-gradient(180deg, rgba(0, 180, 184, 0) 18.309%, #00b4b8 88.547%, #00b4b8 113.69%)'
-            }}
-          />
-        </div>
-
-        {/* Content */}
-        <div className="relative z-10 flex flex-col justify-between h-full">
-          {/* Logo */}
-          <div className="flex gap-[11.563px] items-center">
-            <div className="w-[37px] h-[37px] flex items-center justify-center">
-              <img
-                src="/logo.svg"
-                alt="CareOnboard"
-                className="w-full h-full"
-              />
-            </div>
-            <p className="font-bold text-[27.75px] text-white tracking-[0.2775px]"
-               style={{fontFamily: 'Urbanist, sans-serif'}}>
-              CareOnboard
-            </p>
-          </div>
-
-          {/* Heading */}
-          <div className="flex flex-col gap-[24px] w-full">
-            <h1
-              className="font-bold text-[40px] leading-[1.4] text-white w-full"
-              style={{fontFamily: 'Urbanist, sans-serif'}}
-            >
-              Welcome to {agency ? agency : "CareOnboard"} Application Portal
-            </h1>
-            <p
-              className="font-normal text-[20px] leading-[1.6] text-[#f3f6f7] w-full"
-              style={{fontFamily: 'Urbanist, sans-serif'}}
-            >
-              Helping adults with developmental disabilities live full and meaningful lives.
-            </p>
-          </div>
-
-          {/* Quotes Section */}
-          <div className="flex flex-col gap-[24px] items-center w-full">
-            <div className="bg-[#2b7a7c] flex flex-col gap-[20px] p-[16px] rounded-[6px] w-full">
-              <div className="flex flex-col gap-[14px] w-full">
-                {/* Quote Mark */}
-                <div className="h-[17px] w-[20px]">
-                  <svg width="20" height="17" viewBox="0 0 20 17" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path
-                      d="M0 16.5V8.5C0 3.8 2.4 0 8 0V3C5.2 3 3.6 4.6 3.2 7.5C3.8 7.3 4.4 7.2 5 7.2C7.2 7.2 9 9 9 11.2V16.5H0ZM11 16.5V8.5C11 3.8 13.4 0 19 0V3C16.2 3 14.6 4.6 14.2 7.5C14.8 7.3 15.4 7.2 16 7.2C18.2 7.2 20 9 20 11.2V16.5H11Z"
-                      fill="white"/>
-                  </svg>
-                </div>
-                {/* Quote Text */}
-                <p
-                  className="font-semibold text-[16px] leading-[1.6] text-white"
-                  style={{fontFamily: 'Urbanist, sans-serif'}}
-                >
-                  {quotes[currentQuote].text}
-                </p>
-              </div>
-              {/* Author Badge */}
-              <div
-                className="inline-flex bg-[rgba(213,230,255,0.1)] border border-[#e5effa] items-center justify-center px-[18px] py-[8px] rounded-[99px] self-start">
-                <p
-                  className="font-medium text-[14px] leading-[1.4] text-white"
-                  style={{fontFamily: 'Urbanist, sans-serif'}}
-                >
-                  {quotes[currentQuote].author}
-                </p>
-              </div>
-            </div>
-
-            {/* Indicator Dots */}
-            <div className="flex gap-2 h-[8px] w-[50px] justify-center items-center">
-              {quotes.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => setCurrentQuote(index)}
-                  className={`h-2 rounded-full transition-all ${
-                    index === currentQuote ? "bg-white w-8" : "bg-white/30 w-2"
-                  }`}
-                  aria-label={`Go to quote ${index + 1}`}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Right Content - Form area */}
-      <div className="flex flex-1 flex-col gap-[10px] min-h-[calc(100vh-32px)] lg:h-[calc(100vh-60px)] items-center justify-center min-w-0 w-full">
-        <div className="w-full max-w-[520px] min-w-0">
-          <div className="bg-white/90 backdrop-blur-md border border-[#e5eef5] rounded-[24px] shadow-[0_20px_60px_rgba(16,24,40,0.12)] px-6 sm:px-10 py-8 sm:py-10 overflow-hidden">
-            <div className="flex flex-col gap-[32px] sm:gap-[40px] items-stretch justify-center min-w-0 w-full">
-              <Outlet/>
-            </div>
-          </div>
-        </div>
+        </main>
+        <BrandPanel agency={agency} />
       </div>
     </div>
-    </div>
-  )
+  );
 }
-

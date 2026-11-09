@@ -6,6 +6,9 @@ type OtpBoxInputProps = {
   disabled?: boolean
   autoFocus?: boolean
   length?: number
+  /** Replaces the default row and box styles. */
+  className?: string
+  boxClassName?: string
 }
 
 export default function OtpBoxInput({
@@ -14,6 +17,8 @@ export default function OtpBoxInput({
   disabled = false,
   autoFocus = true,
   length = 6,
+  className = "flex gap-3 justify-center",
+  boxClassName = "w-12 h-14 text-center text-xl font-semibold rounded-xl border border-slate-300 bg-white text-slate-900 outline-none focus:border-[#00B4B8] focus:ring-2 focus:ring-[#00B4B8]/20 disabled:opacity-50 transition-colors",
 }: OtpBoxInputProps) {
   const digits = value.split("").concat(Array(length).fill("")).slice(0, length)
   const inputsRef = useRef<(HTMLInputElement | null)[]>([])
@@ -60,7 +65,7 @@ export default function OtpBoxInput({
   }
 
   return (
-    <div className="flex gap-3 justify-center">
+    <div className={className}>
       {digits.map((digit, i) => (
         <input
           key={i}
@@ -73,7 +78,7 @@ export default function OtpBoxInput({
           onChange={(e) => handleInput(i, e)}
           onKeyDown={(e) => handleKeyDown(i, e)}
           onFocus={(e) => e.target.select()}
-          className="w-12 h-14 text-center text-xl font-semibold rounded-xl border border-slate-300 bg-white text-slate-900 outline-none focus:border-[#00B4B8] focus:ring-2 focus:ring-[#00B4B8]/20 disabled:opacity-50 transition-colors"
+          className={boxClassName}
           aria-label={`OTP digit ${i + 1}`}
         />
       ))}

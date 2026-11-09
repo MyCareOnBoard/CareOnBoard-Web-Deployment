@@ -91,7 +91,7 @@ it("shows invited signup details inside the shared auth side-and-form layout", a
     </Route></Routes>
   </MemoryRouter>);
   expect(await screen.findByText("Invited Person · Invited Agency · invited@example.test")).toBeVisible();
-  expect(screen.getByRole("heading", { name: "Welcome to CareOnboard Application Portal" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "One Platform. Complete Care" })).toBeInTheDocument();
 });
 
 it("requires a new invitation when old signup details are incomplete", async () => {

@@ -258,6 +258,10 @@ export const router = createBrowserRouter([
         Component: MobileAppRedirect,
     },
     {
+        path: Routes.mobileAppDownload,
+        Component: MobileAppRedirect,
+    },
+    {
         path: Routes.agency.analyticsPrint,
         element: <ProtectedRoute><AnalyticsPrintPage /></ProtectedRoute>,
     },

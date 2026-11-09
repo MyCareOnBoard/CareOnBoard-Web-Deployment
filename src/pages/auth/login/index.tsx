@@ -1,7 +1,7 @@
 import React from "react"
 import { useState } from "react"
 import { useNavigate, Link, useLocation } from "react-router"
-import { Eye, EyeOff } from "lucide-react"
+import { Eye, EyeOff, LockKeyhole } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -17,6 +17,8 @@ import {
 import { completePostLogin } from "@/utils/auth/helpers/postLogin"
 import { agencyCareInvitationReturnTo, agencyCareReturnTo, authRouteWithReturnTo } from "@/utils/auth/helpers/agencyCareReturnTo"
 import { useDispatch } from "react-redux"
+import { AuthStepHeader } from "@/pages/auth/components/AuthStepHeader"
+import { authInputClass, authLabelClass, authLinkClass, authPrimaryButtonClass } from "@/pages/auth/components/authFormStyles"
 import type { AppDispatch } from "@/store/redux/store"
 
 export default function LoginPage() {
@@ -148,116 +150,97 @@ export default function LoginPage() {
     }
   }
 
+  const signupHref = returnTo ? authRouteWithReturnTo(Routes.auth.signup, returnTo) : Routes.auth.signup + (agencyId ? `?agencyId=${encodeURIComponent(agencyId)}` : "")
+
   return (
     <div className="space-y-8">
-      <div className="space-y-2">
-        <h2 className="text-3xl sm:text-4xl font-semibold text-slate-900 tracking-tight">Login to account</h2>
-        <p className="text-sm sm:text-base text-slate-500">Please enter your information to access your account</p>
-      </div>
+      <AuthStepHeader title="Welcome back." description="Sign in to pick up where you left off." />
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} noValidate className="space-y-5">
         <div className="space-y-2">
-          <Label htmlFor="email" className="text-sm font-medium text-slate-700">
-            Email Address
-          </Label>
+          <Label htmlFor="email" className={authLabelClass}>Email</Label>
           <Input
             id="email"
             type="email"
-            placeholder="Enter email address"
+            autoComplete="email"
+            placeholder="Enter your email here"
             value={email}
             onChange={handleEmailChange}
             onBlur={handleEmailBlur}
             required
-            className={`h-12 rounded-2xl border-slate-200 bg-slate-50 text-base placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-[#00B4B8]/40 focus-visible:border-[#00B4B8] ${errors.email ? 'border-red-500 focus-visible:ring-red-500' : ''
-              }`}
+            aria-invalid={errors.email ? true : undefined}
+            aria-describedby={errors.email ? "email-error" : undefined}
+            className={authInputClass}
           />
-          {errors.email && (
-            <p className="text-sm text-red-600">
-              {errors.email}
-            </p>
-          )}
+          {errors.email && <p id="email-error" className="text-[13px] text-[#d0202b]">{errors.email}</p>}
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="password" className="text-sm font-medium text-slate-700">
-            Password
-          </Label>
+          <Label htmlFor="password" className={authLabelClass}>Password</Label>
           <div className="relative">
+            <LockKeyhole className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#8a969c]" strokeWidth={1.8} aria-hidden="true" />
             <Input
               id="password"
               type={showPassword ? "text" : "password"}
-              placeholder="Enter password"
+              autoComplete="current-password"
+              placeholder="Enter your password"
               value={password}
               onChange={handlePasswordChange}
               onBlur={handlePasswordBlur}
               required
-              className={`h-12 rounded-2xl border-slate-200 bg-slate-50 text-base placeholder:text-slate-400 pr-12 focus-visible:ring-2 focus-visible:ring-[#00B4B8]/40 focus-visible:border-[#00B4B8] ${errors.password ? 'border-red-500 focus-visible:ring-red-500' : ''
-                }`}
+              aria-invalid={errors.password ? true : undefined}
+              aria-describedby={errors.password ? "password-error" : undefined}
+              className={`${authInputClass} pl-10 pr-12`}
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute text-slate-500 -translate-y-1/2 right-4 top-1/2 hover:text-slate-900"
+              className="absolute right-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-[8px] text-[#8a969c] hover:text-[#10141a] focus-visible:outline-2 focus-visible:outline-[#007679] dark:hover:text-[#f4f6f7]"
               aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-pressed={showPassword}
             >
-              {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              {showPassword ? <EyeOff className="h-[18px] w-[18px]" strokeWidth={1.8} /> : <Eye className="h-[18px] w-[18px]" strokeWidth={1.8} />}
             </button>
           </div>
-          {errors.password && (
-            <p className="text-sm text-red-600">
-              {errors.password}
-            </p>
-          )}
+          {errors.password && <p id="password-error" className="text-[13px] text-[#d0202b]">{errors.password}</p>}
         </div>
 
-        <div className="flex items-center justify-between pt-1">
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="remember"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-              className="border-slate-300 rounded-md"
-            />
-            <label htmlFor="remember" className="text-sm text-slate-600 cursor-pointer">
-              Remember me
-            </label>
-          </div>
-          <Link to={Routes.auth.forgotPassword} className="text-sm text-[#00B4B8] hover:text-[#148a9c] font-semibold">
+        <div className="flex items-center justify-between gap-3">
+          <Checkbox
+            id="remember"
+            checked={rememberMe}
+            onChange={(e) => setRememberMe(e.target.checked)}
+            label="Remember me"
+            className="size-[18px] rounded-[5px] border-[#007679] peer-checked:border-[#007679] peer-checked:bg-[#007679] dark:bg-transparent"
+            labelClassName="ml-1.5 text-[14px] font-normal text-[#34434c] dark:text-[#c9d3d6]"
+          />
+          <Link to={Routes.auth.forgotPassword} className={`text-[14px] ${authLinkClass}`}>
             Forgot password?
           </Link>
         </div>
 
-        <Button
-          type="submit"
-          disabled={loading}
-          className="w-full h-12 bg-[#00B4B8] hover:bg-[#148a9c] text-white rounded-2xl text-base font-semibold mt-4 transition-all shadow-[0_12px_24px_rgba(0,180,184,0.25)]"
-        >
+        <Button type="submit" disabled={loading} className={authPrimaryButtonClass}>
           {loading ? (
             <span className="flex items-center justify-center gap-2">
               <ButtonLoader />
-              Logging in...
+              Signing in...
             </span>
           ) : (
-            "Login"
+            "Sign in"
           )}
         </Button>
       </form>
 
-      <p className="pt-2 text-sm text-center text-slate-600">
-        Don't have an account?{" "}
-        <Link
-          to={returnTo ? authRouteWithReturnTo(Routes.auth.signup, returnTo) : Routes.auth.signup + (agencyId ? `?agencyId=${agencyId}` : "")}
-          className="text-[#00B4B8] hover:text-[#148a9c] font-semibold"
-        >
-          Sign Up
-        </Link>
-      </p>
-      <p className="text-sm text-center text-slate-600">
-        Family member?{" "}
-        <Link to={Routes.auth.familyLogin} className="text-[#00B4B8] hover:text-[#148a9c] font-semibold">
-          Sign in with phone
-        </Link>
-      </p>
+      <div className="space-y-2 text-center text-[14px] text-[#34434c] dark:text-[#c9d3d6]">
+        <p>
+          Don't have an account?{" "}
+          <Link to={signupHref} className={authLinkClass}>Sign up here</Link>
+        </p>
+        <p>
+          Family member?{" "}
+          <Link to={Routes.auth.familyLogin} className={authLinkClass}>Sign in with phone</Link>
+        </p>
+      </div>
     </div>
   )
 }

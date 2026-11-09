@@ -12,17 +12,18 @@ export const MFA_COPY = {
       `Send another code in 0:${String(seconds).padStart(2, '0')}`,
   },
   challenge: {
-    title: 'Enter your sign-in code',
+    title: "Confirm it's you",
     codeSent: (maskedPhone: string) =>
-      `Enter the 6-digit code we sent to ${maskedPhone}.`,
+      `We've sent a one-time PIN to ${maskedPhone}. Enter the code to verify your identity and continue signing in.`,
+    codeLabel: 'Check your phone for the one-time PIN',
     sendFailed: 'We could not text a code to your phone. Try again below.',
     sending: (maskedPhone: string) => `Sending a code to ${maskedPhone}…`,
-    verifySignIn: 'Verify and sign in',
+    verifySignIn: 'Verify and continue',
     useDifferentAccount: 'Sign in with a different account',
     sendCode: 'Send code',
-    resend: 'Send another code',
+    resend: 'Resend PIN',
     resendCountdown: (seconds: number) =>
-      `Send another code in 0:${String(seconds).padStart(2, '0')}`,
+      `Resend PIN in 0:${String(seconds).padStart(2, '0')}`,
   },
   form: {
     codeLabel: '6-digit code',

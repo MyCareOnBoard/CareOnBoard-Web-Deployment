@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
 import { ButtonLoader } from '@/components/ui/loader'
 import { MFA_COPY } from '@/utils/auth/copy/mfaCopy'
 import OtpBoxInput from '@/pages/auth/family-login/OtpBoxInput'
 import {
-  authGhostLinkClass,
+  authLabelClass,
+  authLinkClass,
   authPrimaryButtonClass,
 } from '@/pages/auth/components/authFormStyles'
 
@@ -20,6 +20,7 @@ type MfaCodeFormProps = {
   error?: string
   codeSent: boolean
   autoFocus?: boolean
+  codeLabel?: string
   resendCopy?: {
     resend: string
     resendCountdown: (seconds: number) => string
@@ -35,6 +36,7 @@ export default function MfaCodeForm({
   error,
   codeSent,
   autoFocus = true,
+  codeLabel = MFA_COPY.form.codeLabel,
   resendCopy = {
     resend: MFA_COPY.enroll.resend,
     resendCountdown: MFA_COPY.enroll.resendCountdown,
@@ -78,16 +80,20 @@ export default function MfaCodeForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <div className="space-y-3">
-        <Label className="text-sm font-medium text-slate-700">{MFA_COPY.form.codeLabel}</Label>
-        <OtpBoxInput value={code} onChange={setCode} disabled={verifying} autoFocus={autoFocus} />
-        <p id="mfa-code-hint" className="text-center text-xs text-slate-500">
-          Codes expire after a few minutes.
-        </p>
+      <div role="group" aria-labelledby="mfa-code-label" aria-describedby={error ? 'mfa-code-error' : undefined} className="space-y-3">
+        <p id="mfa-code-label" className={authLabelClass}>{codeLabel}</p>
+        <OtpBoxInput
+          value={code}
+          onChange={setCode}
+          disabled={verifying}
+          autoFocus={autoFocus}
+          className="flex justify-between gap-2"
+          boxClassName="h-14 w-full max-w-[64px] min-w-0 rounded-[12px] border border-[#e3e8ea] bg-white text-center text-[22px] font-medium text-[#10141a] outline-none transition-colors focus:border-[#007679] focus:ring-2 focus:ring-[#007679]/20 disabled:opacity-50 dark:border-white/10 dark:bg-[#1b232b] dark:text-[#f4f6f7]"
+        />
       </div>
 
       {error && (
-        <p id="mfa-code-error" className="text-sm text-red-600" role="alert" aria-live="polite">
+        <p id="mfa-code-error" className="text-[13px] text-[#d0202b]" role="alert" aria-live="polite">
           {error}
         </p>
       )}
@@ -107,24 +113,22 @@ export default function MfaCodeForm({
         )}
       </Button>
 
-      <Button
-        type="button"
-        variant="ghost"
-        disabled={resendSeconds > 0 || sending}
-        onClick={handleResend}
-        className={authGhostLinkClass}
-        aria-label={
-          resendSeconds > 0
-            ? `Send another code in ${resendSeconds} seconds`
-            : 'Send another verification code'
-        }
-      >
-        {sending
-          ? MFA_COPY.loading.resending
-          : resendSeconds > 0
-            ? resendCopy.resendCountdown(resendSeconds)
-            : resendCopy.resend}
-      </Button>
+      <p className="text-center text-[14px] text-[#34434c] dark:text-[#c9d3d6]">
+        Didn't receive a code?{' '}
+        <button
+          type="button"
+          disabled={resendSeconds > 0 || sending}
+          onClick={handleResend}
+          className={`${authLinkClass} rounded-[4px] disabled:cursor-not-allowed disabled:text-[#8a969c] disabled:no-underline focus-visible:outline-2 focus-visible:outline-[#007679]`}
+          aria-label={resendSeconds > 0 ? `${resendCopy.resend} in ${resendSeconds} seconds` : undefined}
+        >
+          {sending
+            ? MFA_COPY.loading.resending
+            : resendSeconds > 0
+              ? resendCopy.resendCountdown(resendSeconds)
+              : resendCopy.resend}
+        </button>
+      </p>
     </form>
   )
 }

@@ -9,12 +9,12 @@ type AuthStatusBannerProps = {
 export function AuthStatusBanner({ message, live = 'polite' }: AuthStatusBannerProps) {
   return (
     <div
-      className="flex items-center gap-3 rounded-2xl border border-[#e5eef5] bg-slate-50/80 px-4 py-3"
+      className="flex items-center gap-3 rounded-[12px] border border-[#e3e8ea] bg-[#f6f8f9] px-4 py-3 dark:border-white/10 dark:bg-[#1b232b]"
       role="status"
       aria-live={live}
     >
       <ButtonLoader aria-hidden />
-      <p className="text-sm text-slate-600">{message}</p>
+      <p className="text-sm text-[#34434c] dark:text-[#c9d3d6]">{message}</p>
     </div>
   )
 }

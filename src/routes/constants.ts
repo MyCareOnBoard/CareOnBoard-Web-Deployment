@@ -2,6 +2,7 @@ export const Routes = {
     root: "/",
     agencySplash: "/:id",
     mobileAppRedirect: "/app/:agencyId",
+    mobileAppDownload: "/get-app",
     splash: "/splash",
     app: "/",
     agencyCare: {

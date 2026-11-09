@@ -22,9 +22,9 @@ function renderLogin(returnTo?: string) {
       <Route path="*" element={<Destination />} />
     </Routes>
   </MemoryRouter>)
-  fireEvent.change(screen.getByLabelText('Email Address'), { target: { value: 'external@example.com' } })
+  fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'external@example.com' } })
   fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Login' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
 }
 
 describe('pending Agency Care identity login', () => {
@@ -49,7 +49,7 @@ describe('pending Agency Care identity login', () => {
       variant: 'destructive',
       description: expect.stringMatching(/setup is incomplete.*invitation/i),
     })))
-    expect(screen.getByRole('heading', { name: 'Login to account' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Welcome back.' })).toBeInTheDocument()
     expect(mocks.completePostLogin).not.toHaveBeenCalled()
   })
 
