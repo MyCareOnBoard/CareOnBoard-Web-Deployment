@@ -1,192 +1,61 @@
 import { memo } from "react";
-import { format, isValid, parseISO } from "date-fns";
-import { ExternalLink, FileText, X } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ExternalLink, FileText } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { CloseButton, SIDE_PANEL_OVERLAY, StatusPill } from "@/pages/userPanel/records/RecordsKit";
 import type { PlanOfCare } from "../types";
-import { PlanOfCareClientAvatar } from "./PlanOfCareClientAvatar";
 import { isAllowedStorageUrl } from "../utils/storageUrl";
-import {
-  MODAL_BODY,
-  MODAL_HEADER,
-  MODAL_HEADER_ACTIONS,
-  MODAL_HEADER_ICON_BTN,
-  MODAL_HEADER_ICON_BTN_CLOSE,
-  MODAL_MAX_WIDTH,
-  MODAL_META_CARD,
-  MODAL_PDF_FRAME,
-  MODAL_SHELL,
-  MODAL_SKELETON,
-  MODAL_TITLE,
-  SECTION_SUBTITLE,
-} from "../planOfCareStyles";
+import { formatDate, PLAN_STATUS_LABEL, PLAN_STATUS_TONE, planStatus } from "../planOfCareView";
 
 interface PlanOfCareModalProps {
   open: boolean;
-  isLoading: boolean;
-  plan: PlanOfCare | null;
+  plan: PlanOfCare;
+  /** "Client #ABC123" for field staff; the name only for support coordinators. */
+  clientLabel: string;
   onClose: () => void;
 }
 
-function formatDisplayDate(value: string | null | undefined): string | null {
-  if (!value?.trim()) return null;
-  const trimmed = value.trim();
-  const isoParsed = parseISO(trimmed);
-  if (isValid(isoParsed)) {
-    return format(isoParsed, "MMM d, yyyy");
-  }
-  const fallback = new Date(trimmed);
-  if (isValid(fallback)) {
-    return format(fallback, "MMM d, yyyy");
-  }
-  return trimmed;
-}
+const PDF_FRAME = "h-[58dvh] w-full sm:h-[68dvh] lg:h-[72dvh]";
 
-function PlanOfCareModalSkeleton() {
-  return (
-    <div className="space-y-4" aria-hidden>
-      <div className={`${MODAL_SKELETON} ${MODAL_PDF_FRAME} rounded-xl`} />
-      <p className="text-[14px] font-medium text-[#808081] text-center">
-        Loading document…
-      </p>
-    </div>
-  );
-}
+function PlanOfCareModalInner({ open, plan, clientLabel, onClose }: PlanOfCareModalProps) {
+  const docTitle = plan.planOfCare?.title?.trim() || "Plan of care";
+  const expiry = formatDate(plan.planOfCare?.expiryDate);
+  const issued = formatDate(plan.planOfCare?.issuedOnDate);
+  const status = planStatus(plan);
+  const pdfUrl = plan.planOfCare?.url;
+  const safePdfUrl = pdfUrl && isAllowedStorageUrl(pdfUrl) ? pdfUrl : undefined;
+  const details = [clientLabel, issued && `Issued ${issued}`, expiry && `${status === "expired" ? "Expired" : "Expires"} ${expiry}`].filter(Boolean).join(" · ");
 
-function PlanOfCareModalInner({
-  open,
-  isLoading,
-  plan,
-  onClose,
-}: PlanOfCareModalProps) {
-  const displayName = plan?.clientName || "Client";
-  const docTitle = plan?.planOfCare?.title?.trim() || "Plan of care";
-  const expiryLabel = formatDisplayDate(plan?.planOfCare?.expiryDate);
-
-  const pdfUrl = plan?.planOfCare?.url;
-  const safePdfUrl =
-    pdfUrl && isAllowedStorageUrl(pdfUrl) ? pdfUrl : undefined;
-  const showPdfEmbed =
-    open && !isLoading && Boolean(safePdfUrl) && Boolean(plan);
-
-  const handleOpenInNewTab = () => {
-    if (!safePdfUrl) return;
-    window.open(safePdfUrl, "_blank", "noopener,noreferrer");
-  };
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) onClose();
-      }}
-    >
-      <DialogContent
-        showCloseButton={false}
-        className={`${MODAL_SHELL} ${MODAL_MAX_WIDTH}`}
-      >
-        <div className={MODAL_HEADER}>
-          <div className="flex items-start gap-4 min-w-0 flex-1">
-            {plan && (
-              <PlanOfCareClientAvatar
-                name={displayName}
-                imageUrl={plan.clientImage}
-                size="modal"
-              />
-            )}
-            <div className="min-w-0 flex-1">
-              <DialogTitle className={MODAL_TITLE}>{docTitle}</DialogTitle>
-              <p className={`${SECTION_SUBTITLE} mt-0.5 truncate`}>
-                {displayName}
-                {expiryLabel && (
-                  <>
-                    <span className="text-[#808081]"> · </span>
-                    <span>Expires {expiryLabel}</span>
-                  </>
-                )}
-              </p>
-              <DialogDescription className="sr-only">
-                Plan of care document for {displayName}
-                {expiryLabel ? `, expires ${expiryLabel}` : ""}
-              </DialogDescription>
-            </div>
+  return <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+    <DialogContent showCloseButton={false} overlayClassName={SIDE_PANEL_OVERLAY}
+      className="flex max-h-[calc(100dvh-32px)] w-[calc(100vw-32px)] max-w-4xl flex-col gap-0 overflow-hidden rounded-[16px] border-0 bg-white p-0 sm:max-w-4xl dark:bg-[#1b232b]">
+      <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#edf1f2] px-5 py-4 dark:border-white/10">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <DialogTitle className="truncate text-[18px] font-bold text-[#10141a] dark:text-[#f4f6f7]">{docTitle}</DialogTitle>
+            <StatusPill label={PLAN_STATUS_LABEL[status]} tone={PLAN_STATUS_TONE[status]} />
           </div>
-          <div className={MODAL_HEADER_ACTIONS}>
-            {safePdfUrl && (
-              <button
-                type="button"
-                aria-label="Open plan of care in new tab"
-                onClick={handleOpenInNewTab}
-                className={MODAL_HEADER_ICON_BTN}
-              >
-                <ExternalLink className="h-[18px] w-[18px] stroke-[1.75]" />
-              </button>
-            )}
-            <button
-              type="button"
-              aria-label="Close plan of care"
-              onClick={onClose}
-              className={MODAL_HEADER_ICON_BTN_CLOSE}
-            >
-              <X className="h-[18px] w-[18px] stroke-[1.75]" />
-            </button>
-          </div>
+          <DialogDescription className="mt-0.5 text-[13px] text-[#5d6b73] dark:text-[#9aa4a8]">{details}</DialogDescription>
         </div>
-
-        <div className={MODAL_BODY}>
-          {isLoading && <PlanOfCareModalSkeleton />}
-
-          {!isLoading && plan && (
-            <div className="flex flex-1 flex-col min-h-0">
-              {showPdfEmbed ? (
-                <div className="flex flex-1 min-h-0 overflow-hidden border border-[#e5e5e6] bg-white">
-                  <iframe
-                    key={safePdfUrl ?? `plan-${plan.clientId}`}
-                    src={safePdfUrl}
-                    title={plan.planOfCare!.title || "Plan of Care PDF"}
-                    className={`${MODAL_PDF_FRAME} border-0`}
-                    referrerPolicy="no-referrer"
-                    aria-label={
-                      plan.planOfCare!.title || "Plan of Care PDF"
-                    }
-                  />
-                </div>
-              ) : (
-                <div
-                  className={`${MODAL_META_CARD} flex flex-col items-center text-center gap-3 py-10 px-4`}
-                >
-                  <FileText
-                    className="w-10 h-10 text-[#808081]"
-                    aria-hidden
-                  />
-                  <div>
-                    <p className="text-[16px] font-semibold text-[#10141a]">
-                      No document uploaded
-                    </p>
-                    <p className={`${SECTION_SUBTITLE} mt-2 max-w-md`}>
-                      Your agency hasn&apos;t added a plan of care PDF for this
-                      client yet. Contact your supervisor if you need one.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {!isLoading && !plan && (
-            <p className="text-[14px] font-medium text-[#808081] text-center py-8">
-              Couldn&apos;t load this plan of care. Try closing and opening
-              again.
-            </p>
-          )}
+        <div className="flex shrink-0 items-center gap-2">
+          {safePdfUrl && <button type="button" aria-label="Open plan of care in new tab" onClick={() => window.open(safePdfUrl, "_blank", "noopener,noreferrer")}
+            className="grid h-9 w-9 cursor-pointer place-items-center rounded-full border border-[#e3e8ea] text-[#10141a] transition-colors hover:bg-[#f3f5f6] dark:border-white/15 dark:text-[#f4f6f7] dark:hover:bg-white/5">
+            <ExternalLink className="h-4 w-4" aria-hidden="true" />
+          </button>}
+          <CloseButton label="Close plan of care" />
         </div>
-      </DialogContent>
-    </Dialog>
-  );
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4">
+        {safePdfUrl ? <iframe key={safePdfUrl} src={safePdfUrl} title={docTitle} referrerPolicy="no-referrer"
+            className={`${PDF_FRAME} rounded-[8px] border border-[#e3e8ea] bg-white dark:border-white/10`} />
+          : <div className="mx-auto flex max-w-[420px] flex-col items-center py-14 text-center">
+            <FileText className="h-10 w-10 text-[#8a979d]" strokeWidth={1.5} aria-hidden="true" />
+            <p className="mt-3 text-base font-semibold text-[#5d6b73] dark:text-[#c9d3d6]">No document uploaded</p>
+            <p className="mt-1.5 text-[13px] text-[#8a979d] dark:text-[#9aa4a8]">Your agency hasn&apos;t added a plan of care for this client yet. Contact your supervisor if you need one.</p>
+          </div>}
+      </div>
+    </DialogContent>
+  </Dialog>;
 }
 
 export const PlanOfCareModal = memo(PlanOfCareModalInner);
