@@ -55,13 +55,14 @@ it("saves the availability switch without closing the menu", async () => {
   expect(screen.getByRole("menuitemcheckbox", { name: "Available for work?" })).toBeInTheDocument();
 });
 
-it("switches dark mode without closing the menu", async () => {
+it("picks the theme without closing the menu", async () => {
   renderMenu();
-  const dark = screen.getByRole("menuitemcheckbox", { name: "Dark mode" });
-  expect(dark).toHaveAttribute("aria-checked", "false");
-  await userEvent.click(dark);
+  expect(screen.getByRole("menuitemradio", { name: "Light" })).toHaveAttribute("aria-checked", "true");
+  await userEvent.click(screen.getByRole("menuitemradio", { name: "Light" }));
+  expect(mocks.toggleTheme).not.toHaveBeenCalled();
+  await userEvent.click(screen.getByRole("menuitemradio", { name: "Dark" }));
   expect(mocks.toggleTheme).toHaveBeenCalledTimes(1);
-  expect(screen.getByRole("menuitemcheckbox", { name: "Dark mode" })).toBeInTheDocument();
+  expect(screen.getByRole("menuitemradio", { name: "Dark" })).toBeInTheDocument();
 });
 
 it("logs out and links to careonboardconnect", async () => {

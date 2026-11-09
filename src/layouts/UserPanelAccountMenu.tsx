@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useDispatch } from "react-redux";
-import { ChevronRight, LogOut, MapPin, Moon, UserRound } from "lucide-react";
+import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
+import { ChevronRight, LogOut, MapPin, Moon, Sun, SunMoon, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { careConnectDashboardUrl } from "@/components/dashboardHeaderRoutes";
@@ -21,6 +22,11 @@ function MenuSwitch({ on, className }: { on: boolean; className?: string }) {
     <span className={cn("absolute h-5 w-5 rounded-full bg-white shadow transition-transform", on ? "translate-x-6" : "translate-x-1")} />
   </span>;
 }
+
+const THEMES = [
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
+] as const;
 
 const ITEM = "flex min-h-11 cursor-pointer items-center gap-3 rounded-[10px] px-3 text-[15px] text-[#10141a] outline-none focus:bg-[#f3f5f6] data-[highlighted]:bg-[#f3f5f6] dark:text-[#f4f6f7] dark:focus:bg-white/5 dark:data-[highlighted]:bg-white/5";
 
@@ -47,7 +53,6 @@ export function UserPanelAccountMenu({ roleLabel, onLogout }: { roleLabel: strin
   const careConnectUrl = careConnectDashboardUrl(UserType.EMPLOYEE);
   const onProfile = location.pathname === Routes.userPanel.profile;
   const { theme, toggleTheme } = useTheme();
-  const isDark = theme === "dark";
 
   // The menu content only mounts while open, so this refreshes the address each time it opens.
   const uid = user?.uid;
@@ -102,12 +107,20 @@ export function UserPanelAccountMenu({ roleLabel, onLogout }: { roleLabel: strin
         <UserRound className="h-5 w-5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
         Profile &amp; Settings
       </DropdownMenuItem>
-      <DropdownMenuItem role="menuitemcheckbox" aria-checked={isDark} className={ITEM}
-        onSelect={(event) => { event.preventDefault(); toggleTheme(); }}>
-        <Moon className="h-5 w-5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-        <span className="flex-1">Dark mode</span>
-        <MenuSwitch on={isDark} className={isDark ? "bg-[#007679]" : "bg-[#d5dcdf]"} />
-      </DropdownMenuItem>
+      <div className="flex min-h-11 items-center gap-3 px-3 text-[15px] text-[#10141a] dark:text-[#f4f6f7]">
+        <SunMoon className="h-5 w-5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+        <span id="account-menu-theme" className="flex-1">Theme</span>
+        <DropdownMenuPrimitive.RadioGroup value={theme} aria-labelledby="account-menu-theme"
+          onValueChange={(value) => { if (value !== theme) toggleTheme(); }}
+          className="flex rounded-full bg-[#f3f5f6] p-[3px] dark:bg-white/5">
+          {THEMES.map(({ value, label, icon: Icon }) => <DropdownMenuPrimitive.RadioItem key={value} value={value}
+            onSelect={(event) => event.preventDefault()}
+            className="flex h-7 cursor-pointer items-center gap-1.5 rounded-full px-2.5 text-[13px] font-medium text-[#5d6b73] outline-none transition-colors data-[highlighted]:text-[#10141a] data-[highlighted]:ring-2 data-[highlighted]:ring-[#007679]/35 data-[state=checked]:bg-white data-[state=checked]:text-[#10141a] data-[state=checked]:shadow-[0_1px_2px_rgba(16,40,44,0.14)] dark:text-[#9aa4a8] dark:data-[highlighted]:text-[#f4f6f7] dark:data-[state=checked]:bg-[#2b3741] dark:data-[state=checked]:text-[#f4f6f7]">
+            <Icon className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
+            {label}
+          </DropdownMenuPrimitive.RadioItem>)}
+        </DropdownMenuPrimitive.RadioGroup>
+      </div>
       <DropdownMenuItem className={cn(ITEM, "font-semibold text-[#d0202b] dark:text-[#f38b8f]")} onSelect={onLogout}>
         <LogOut className="h-5 w-5 shrink-0" strokeWidth={1.8} aria-hidden="true" />
         Log out
