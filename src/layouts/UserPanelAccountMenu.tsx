@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useDispatch } from "react-redux";
-import { ChevronRight, LogOut, MapPin, UserRound } from "lucide-react";
+import { ChevronRight, LogOut, MapPin, Moon, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { ThemeMenuItem } from "@/components/DashboardHeader";
 import { careConnectDashboardUrl } from "@/components/dashboardHeaderRoutes";
 import { getProfileInfo, type ProfileInfo } from "@/lib/api/profile";
 import { getUser } from "@/lib/api/users";
+import { useTheme } from "@/providers/ThemeProvider";
 import { cn } from "@/lib/utils";
 import { Routes } from "@/routes/constants";
 import { useAuth } from "@/utils/auth";
@@ -15,6 +15,12 @@ import { setUser } from "@/utils/auth/store/authSlice";
 import { UserType } from "@/utils/auth/types/user.types";
 import type { AppDispatch } from "@/store/redux/store";
 import { useUpdateEmployeeInfoMutation } from "@/pages/userPanel/dashboard/api";
+
+function MenuSwitch({ on, className }: { on: boolean; className?: string }) {
+  return <span aria-hidden="true" className={cn("relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors", className)}>
+    <span className={cn("absolute h-5 w-5 rounded-full bg-white shadow transition-transform", on ? "translate-x-6" : "translate-x-1")} />
+  </span>;
+}
 
 const ITEM = "flex min-h-11 cursor-pointer items-center gap-3 rounded-[10px] px-3 text-[15px] text-[#10141a] outline-none focus:bg-[#f3f5f6] data-[highlighted]:bg-[#f3f5f6] dark:text-[#f4f6f7] dark:focus:bg-white/5 dark:data-[highlighted]:bg-white/5";
 
@@ -40,6 +46,8 @@ export function UserPanelAccountMenu({ roleLabel, onLogout }: { roleLabel: strin
   const agencyName = user?.agency?.name?.replace(/\s+/g, " ").trim();
   const careConnectUrl = careConnectDashboardUrl(UserType.EMPLOYEE);
   const onProfile = location.pathname === Routes.userPanel.profile;
+  const { theme, toggleTheme } = useTheme();
+  const isDark = theme === "dark";
 
   // The menu content only mounts while open, so this refreshes the address each time it opens.
   const uid = user?.uid;
@@ -84,9 +92,7 @@ export function UserPanelAccountMenu({ roleLabel, onLogout }: { roleLabel: strin
         onSelect={(event) => { event.preventDefault(); void toggleAvailability(); }}
         className="-mx-2 mt-3 flex cursor-pointer items-center justify-between gap-3 rounded-[8px] px-2 py-1.5 text-[15px] font-semibold text-white outline-none focus:bg-white/10 data-[highlighted]:bg-white/10 data-[disabled]:opacity-70">
         Available for work?
-        <span aria-hidden="true" className={cn("relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors", available ? "bg-[#20c05c]" : "bg-white/25")}>
-          <span className={cn("absolute h-5 w-5 rounded-full bg-white shadow transition-transform", available ? "translate-x-6" : "translate-x-1")} />
-        </span>
+        <MenuSwitch on={available} className={available ? "bg-[#20c05c]" : "bg-white/25"} />
       </DropdownMenuItem>
     </div>
 
@@ -96,7 +102,12 @@ export function UserPanelAccountMenu({ roleLabel, onLogout }: { roleLabel: strin
         <UserRound className="h-5 w-5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
         Profile &amp; Settings
       </DropdownMenuItem>
-      <ThemeMenuItem />
+      <DropdownMenuItem role="menuitemcheckbox" aria-checked={isDark} className={ITEM}
+        onSelect={(event) => { event.preventDefault(); toggleTheme(); }}>
+        <Moon className="h-5 w-5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+        <span className="flex-1">Dark mode</span>
+        <MenuSwitch on={isDark} className={isDark ? "bg-[#007679]" : "bg-[#d5dcdf]"} />
+      </DropdownMenuItem>
       <DropdownMenuItem className={cn(ITEM, "font-semibold text-[#d0202b] dark:text-[#f38b8f]")} onSelect={onLogout}>
         <LogOut className="h-5 w-5 shrink-0" strokeWidth={1.8} aria-hidden="true" />
         Log out

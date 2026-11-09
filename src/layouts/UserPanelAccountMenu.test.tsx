@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   update: vi.fn(),
   getUser: vi.fn(),
+  toggleTheme: vi.fn(),
   user: { uid: "u1", fullName: "Fred Fafa", agency: { name: "JJ Watkins\nCare" }, profile: { role: "dsp", workAvailability: true } },
 }));
 
@@ -19,7 +20,7 @@ vi.mock("@/utils/auth", () => ({ useAuth: () => ({ user: mocks.user }) }));
 vi.mock("@/lib/api/users", () => ({ getUser: mocks.getUser }));
 vi.mock("@/lib/api/profile", () => ({ getProfileInfo: async () => ({ address: { address: "6391 Elgin St" }, city: "Celina", state: "Delaware", zipCode: "10299" }) }));
 vi.mock("@/pages/userPanel/dashboard/api", () => ({ useUpdateEmployeeInfoMutation: () => [mocks.update] }));
-vi.mock("@/components/DashboardHeader", () => ({ ThemeMenuItem: () => null }));
+vi.mock("@/providers/ThemeProvider", () => ({ useTheme: () => ({ theme: "light", toggleTheme: mocks.toggleTheme }) }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 
 const onLogout = vi.fn();
@@ -52,6 +53,15 @@ it("saves the availability switch without closing the menu", async () => {
   expect(mocks.update).toHaveBeenCalledWith({ workAvailability: false });
   await waitFor(() => expect(mocks.getUser).toHaveBeenCalled());
   expect(screen.getByRole("menuitemcheckbox", { name: "Available for work?" })).toBeInTheDocument();
+});
+
+it("switches dark mode without closing the menu", async () => {
+  renderMenu();
+  const dark = screen.getByRole("menuitemcheckbox", { name: "Dark mode" });
+  expect(dark).toHaveAttribute("aria-checked", "false");
+  await userEvent.click(dark);
+  expect(mocks.toggleTheme).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole("menuitemcheckbox", { name: "Dark mode" })).toBeInTheDocument();
 });
 
 it("logs out and links to careonboardconnect", async () => {

@@ -75,7 +75,7 @@ export function UserAvatar({ userName, userImage }: { userName?: string; userIma
 }
 
 // Phones: the theme switch lives in the account menu to keep the header row short.
-export function ThemeMenuItem() {
+function ThemeMenuItem() {
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === "dark";
   const Icon = isDark ? Sun : Moon;
@@ -128,7 +128,7 @@ export function DashboardHeaderFrame({ centerContent, children, sidebarInset = f
 export default function DashboardHeader(
   { actions, centerContent, userName, userImage, userRole, onLogout, userType, sidebarInset, showSettings = true, accountMenu }: {
     sidebarInset?: boolean;
-    /** Replaces the default account menu items; the user panel has its own. */
+    /** Replaces the default account menu items (the user panel has its own); the header then drops its Care Connect button and theme toggle. */
     accountMenu?: ReactNode;
     /** Hide the settings shortcut when the layout's sidebar already links to settings. */
     showSettings?: boolean;
@@ -223,7 +223,8 @@ export default function DashboardHeader(
     <DashboardHeaderFrame centerContent={centerContent} sidebarInset={sidebarInset}>
         {actions ?? (
           <div className="flex items-center gap-[10px]">
-            {getCareConnectDashboardUrl() && (
+            {/* A custom account menu carries the Care Connect link and theme switch itself. */}
+            {!accountMenu && getCareConnectDashboardUrl() && (
               <a
                 href={getCareConnectDashboardUrl()!}
                 target="_blank"
@@ -235,7 +236,7 @@ export default function DashboardHeader(
                 <span className="hidden sm:inline">CareOnboardConnect Login</span>
               </a>
             )}
-            <ThemeToggle className="hidden sm:grid" />
+            {!accountMenu && <ThemeToggle className="hidden sm:grid" />}
             {showSettings && (
               <HeaderActionButton
                 icon={CogIcon}
