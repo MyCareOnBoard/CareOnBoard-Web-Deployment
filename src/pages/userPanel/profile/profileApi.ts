@@ -3,14 +3,7 @@ import axiosClient from "@/lib/axios";
 import { auth } from "@/lib/firebase";
 import { getAuthErrorMessage } from "@/utils/auth/helpers/errorMessages";
 
-export const PASSWORD_RULES = [
-  { label: "8+ Characters", test: (value: string) => value.length >= 8 },
-  { label: "Number", test: (value: string) => /\d/.test(value) },
-  { label: "Uppercase letter", test: (value: string) => /[A-Z]/.test(value) },
-  { label: "Lowercase letter", test: (value: string) => /[a-z]/.test(value) },
-];
-
-export const meetsPasswordRules = (value: string) => PASSWORD_RULES.every((rule) => rule.test(value));
+export { PASSWORD_RULES, meetsPasswordRules } from "@/lib/passwordRules";
 
 /** Staff sign in with email and password; anyone else has no password to change here. */
 export const hasPasswordSignIn = () => Boolean(auth.currentUser?.providerData.some((provider) => provider.providerId === "password"));

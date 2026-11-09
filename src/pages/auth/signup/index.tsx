@@ -1,19 +1,9 @@
-/**
- * Sign Up Page
- *
- * Styled to match the exact design from the provided image.
- * Features:
- * - Full name, email, and password fields
- * - Password visibility toggle with eye icon
- * - Teal rounded sign up button
- * - Link to login page
- * - Terms of service and privacy policy agreement
- */
+/** Sign up page for applicants invited by an agency (needs ?agencyId=). */
 
 import type React from "react"
 import {useEffect, useState} from "react"
 import {useNavigate, Link, useLocation, Navigate} from "react-router"
-import {Eye, EyeOff} from "lucide-react"
+import {Check, CircleX, Eye, EyeOff, LockKeyhole} from "lucide-react"
 import {Button} from "@/components/ui/button"
 import {Input} from "@/components/ui/input"
 import {Label} from "@/components/ui/label"
@@ -29,6 +19,31 @@ import {Routes} from "@/routes/constants";
 import {getAgencyInfo} from "@/lib/api/onboarding"
 import type {ApplicantType} from "@/pages/applicant/application/documentConfig"
 import {agencyCareReturnTo} from "@/utils/auth/helpers/agencyCareReturnTo"
+import {PASSWORD_RULES} from "@/lib/passwordRules"
+import {cn} from "@/lib/utils"
+import {AuthStepHeader} from "@/pages/auth/components/AuthStepHeader"
+import {authInputClass, authLabelClass, authLinkClass, authPrimaryButtonClass} from "@/pages/auth/components/authFormStyles"
+
+const ERROR_TEXT = "text-[13px] text-[#d0202b]"
+const STRENGTH = [
+  {label: "Weak", bar: "bg-[#e5372b]"},
+  {label: "Fair", bar: "bg-[#f0a52b]"},
+  {label: "Strong", bar: "bg-[#20a35c]"},
+]
+
+/** Shown when the page can't be used: no invite link, or the agency didn't load. */
+function InviteNotice({title, message}: { title: string; message: string }) {
+  return (
+    <div role="alert" className="relative mb-10 inline-flex max-w-full items-start gap-3 rounded-[12px] border border-[#e3e8ea] bg-white py-3 pl-3 pr-5 shadow-[0_8px_24px_rgba(208,32,43,0.08)] dark:border-white/10 dark:bg-[#1b232b]">
+      <span className="pointer-events-none absolute -left-16 -top-16 h-40 w-40 rounded-full bg-[#e5372b]/10 blur-3xl" aria-hidden="true"/>
+      <CircleX className="relative mt-0.5 h-5 w-5 shrink-0 fill-[#d0202b] text-white" aria-hidden="true"/>
+      <div className="relative min-w-0">
+        <p className="text-[14px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">{title}</p>
+        <p className="text-[13px] text-[#34434c] dark:text-[#c9d3d6]">{message}</p>
+      </div>
+    </div>
+  )
+}
 
 export default function SignUpPage() {
   const [fullName, setFullName] = useState("")
@@ -134,7 +149,7 @@ export default function SignUpPage() {
     if (!password) {
       return getValidationMessage('password', 'required')
     }
-    if (password.length < 6) {
+    if (password.length < 8) {
       return getValidationMessage('password', 'tooShort')
     }
     if (!/(?=.*[a-z])/.test(password)) {
@@ -252,147 +267,130 @@ export default function SignUpPage() {
     return <Navigate to={`${invitation.pathname}${invitation.search}`} replace />
   }
 
-  return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="space-y-2">
-        <h2 className="text-3xl font-bold text-gray-900">Create an account</h2>
-        <p className="text-gray-500 text-sm">
-          Set up your access to manage users, data, and healthcare operations.
-        </p>
-      </div>
+  const rulesMet = PASSWORD_RULES.filter((rule) => rule.test(password)).length
+  // 0-1 rules: weak (1 bar), 2-3: fair (2 bars), all 4: strong (3 bars).
+  const strength = !password ? -1 : rulesMet === PASSWORD_RULES.length ? 2 : rulesMet >= 2 ? 1 : 0
 
-      {/* Registration Form */}
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Full Name Field */}
+  return (
+    <div>
+      {!agencyLoading && !agencyId && (
+        <InviteNotice title="You need an invitation" message="An agency invite link is required to sign up."/>
+      )}
+      {!agencyLoading && agencyId && !agencyInfo && (
+        <InviteNotice title="We couldn't load this agency" message="Check your invite link and try again."/>
+      )}
+
+      <div className="space-y-8">
+      <AuthStepHeader title="Let's get you started." description="Create your account to stay connected and keep your care organized."/>
+
+      <form onSubmit={handleSubmit} noValidate className="space-y-5">
         <div className="space-y-2">
-          <Label htmlFor="fullName" className="text-sm font-medium text-gray-900">
-            Full Name
-          </Label>
+          <Label htmlFor="fullName" className={authLabelClass}>Full name</Label>
           <Input
             id="fullName"
             type="text"
-            placeholder="Enter full name"
+            autoComplete="name"
+            placeholder="Enter your full name"
             value={fullName}
             onChange={handleFullNameChange}
             onBlur={handleFullNameBlur}
             required
-            className={`h-12 rounded-2xl border-gray-200 bg-white text-base placeholder:text-gray-400 ${
-              errors.fullName ? 'border-red-500 focus-visible:ring-red-500' : ''
-            }`}
+            aria-invalid={errors.fullName ? true : undefined}
+            aria-describedby={errors.fullName ? "fullName-error" : undefined}
+            className={authInputClass}
           />
-          {errors.fullName && (
-            <p className="text-sm text-red-600">
-              {errors.fullName}
-            </p>
-          )}
+          {errors.fullName && <p id="fullName-error" className={ERROR_TEXT}>{errors.fullName}</p>}
         </div>
 
-        {/* Email Field */}
         <div className="space-y-2">
-          <Label htmlFor="email" className="text-sm font-medium text-gray-900">
-            Email Address
-          </Label>
+          <Label htmlFor="email" className={authLabelClass}>Email</Label>
           <Input
             id="email"
             type="email"
-            placeholder="Enter email address"
+            autoComplete="email"
+            placeholder="Enter your email here"
             value={email}
             onChange={handleEmailChange}
             onBlur={handleEmailBlur}
             required
-            className={`h-12 rounded-2xl border-gray-200 bg-white text-base placeholder:text-gray-400 ${
-              errors.email ? 'border-red-500 focus-visible:ring-red-500' : ''
-            }`}
+            aria-invalid={errors.email ? true : undefined}
+            aria-describedby={errors.email ? "email-error" : undefined}
+            className={authInputClass}
           />
-          {errors.email && (
-            <p className="text-sm text-red-600">
-              {errors.email}
-            </p>
-          )}
+          {errors.email && <p id="email-error" className={ERROR_TEXT}>{errors.email}</p>}
         </div>
 
-        {/* Password Field with Toggle */}
         <div className="space-y-2">
-          <Label htmlFor="password" className="text-sm font-medium text-gray-900">
-            Password
-          </Label>
+          <div className="flex items-center justify-between gap-3">
+            <Label htmlFor="password" className={authLabelClass}>Password</Label>
+            <div className="flex items-center gap-2 text-[13px] text-[#34434c] dark:text-[#c9d3d6]">
+              Security level
+              <span className="flex gap-1" aria-hidden="true">
+                {STRENGTH.map((level, index) => (
+                  <span key={level.label} className={cn("h-1 w-5 rounded-full transition-colors", strength >= index ? STRENGTH[strength].bar : "bg-[#e3e8ea] dark:bg-white/10")}/>
+                ))}
+              </span>
+              <span className="sr-only" aria-live="polite">{strength >= 0 ? STRENGTH[strength].label : "Not set"}</span>
+            </div>
+          </div>
           <div className="relative">
+            <LockKeyhole className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#8a969c]" strokeWidth={1.8} aria-hidden="true"/>
             <Input
               id="password"
               type={showPassword ? "text" : "password"}
-              placeholder="Enter password"
+              autoComplete="new-password"
+              placeholder="Enter your password"
               value={password}
               onChange={handlePasswordChange}
               onBlur={handlePasswordBlur}
               required
-              minLength={6}
-              className={`h-12 rounded-2xl border-gray-200 bg-white text-base placeholder:text-gray-400 pr-12 ${
-                errors.password ? 'border-red-500 focus-visible:ring-red-500' : ''
-              }`}
+              aria-invalid={errors.password ? true : undefined}
+              aria-describedby={errors.password ? "password-error password-rules" : "password-rules"}
+              className={`${authInputClass} pl-10 pr-12`}
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-900"
+              className="absolute right-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-[8px] text-[#8a969c] hover:text-[#10141a] focus-visible:outline-2 focus-visible:outline-[#007679] dark:hover:text-[#f4f6f7]"
               aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-pressed={showPassword}
             >
-              {showPassword ? <EyeOff className="w-5 h-5"/> : <Eye className="w-5 h-5"/>}
+              {showPassword ? <EyeOff className="h-[18px] w-[18px]" strokeWidth={1.8}/> : <Eye className="h-[18px] w-[18px]" strokeWidth={1.8}/>}
             </button>
           </div>
-          {errors.password && (
-            <p className="text-sm text-red-600">
-              {errors.password}
-            </p>
-          )}
-          {/* Password strength indicator */}
-          {password && !errors.password && (
-            <div className="space-y-1">
-              <div className="h-1 w-full bg-gray-200 rounded-full overflow-hidden">
-                <div
-                  className={`h-full transition-all ${
-                    password.length >= 8 && /(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)
-                      ? 'bg-green-500 w-full'
-                      : password.length >= 6
-                        ? 'bg-yellow-500 w-2/3'
-                        : 'bg-red-500 w-1/3'
-                  }`}
-                />
-              </div>
-              <p className="text-xs text-gray-500">
-                Password strength: {
-                password.length >= 8 && /(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)
-                  ? 'Strong'
-                  : password.length >= 6
-                    ? 'Medium'
-                    : 'Weak'
-              }
-              </p>
-            </div>
-          )}
+          {errors.password && <p id="password-error" className={ERROR_TEXT}>{errors.password}</p>}
+          <ul id="password-rules" className="flex flex-wrap gap-2 pt-2" aria-label="Password rules">
+            {PASSWORD_RULES.map((rule) => {
+              const ok = rule.test(password)
+              return (
+                <li key={rule.label} className={cn("inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] transition-colors",
+                  ok ? "border-[#bfe6cf] bg-[#e8f7ee] text-[#18804a] dark:border-[#20a35c]/40 dark:bg-[#20a35c]/15 dark:text-[#7fd6a3]"
+                    : "border-[#e3e8ea] text-[#8a969c] dark:border-white/10 dark:text-[#9aa4a8]")}>
+                  <span className={cn("flex h-4 w-4 items-center justify-center rounded-full border", ok ? "border-current" : "border-[#c4ccd0] dark:border-white/20")} aria-hidden="true">
+                    <Check className="h-2.5 w-2.5" strokeWidth={3}/>
+                  </span>
+                  {rule.label}<span className="sr-only">{ok ? " (met)" : " (not met)"}</span>
+                </li>
+              )
+            })}
+          </ul>
         </div>
 
-        {/* Applicant Type Selector (only when agency supports multiple programs) */}
         {showApplicantTypeSelector && (
-          <div className="space-y-2">
-            <Label className="text-sm font-medium text-gray-900">
-              I am applying as
-            </Label>
+          <fieldset className="space-y-2">
+            <legend className={cn(authLabelClass, "mb-2")}>I am applying as</legend>
             <div className="grid grid-cols-2 gap-3">
               {applicantOptions.map((option) => <button key={option} type="button"
                 onClick={() => setApplicantType(option)} aria-pressed={applicantType === option}
-                className={`min-h-12 rounded-2xl border px-4 py-2 text-base font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#17a2b8] focus-visible:ring-offset-2 ${applicantType === option ? "border-[#17a2b8] bg-[#17a2b8]/10 text-[#17a2b8]" : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"}`}>
+                className={cn("min-h-11 rounded-[10px] border px-4 py-2 text-[15px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679]",
+                  applicantType === option ? "border-[#007679] bg-[#e3f6f6] text-[#00494a] dark:bg-[#007679]/20 dark:text-[#5fd0cd]" : "border-[#e3e8ea] bg-white text-[#34434c] hover:bg-[#f6f8f9] dark:border-white/10 dark:bg-[#1b232b] dark:text-[#c9d3d6]")}>
                 {option === "support_coordinator" ? "Support Coordinator" : option === "hha" ? "Caregiver" : "DSP"}
               </button>)}
             </div>
-          </div>
+          </fieldset>
         )}
 
-        <Button
-          type="submit"
-          disabled={signupDisabled}
-          className="w-full h-12 bg-[#17a2b8] hover:bg-[#148a9c] text-white rounded-2xl text-base font-semibold mt-4 transition-all"
-        >
+        <Button type="submit" disabled={signupDisabled} className={authPrimaryButtonClass}>
           {loading ? (
             <span className="flex items-center justify-center gap-2">
               <ButtonLoader/>
@@ -404,40 +402,25 @@ export default function SignUpPage() {
               Loading agency...
             </span>
           ) : (
-            "Sign Up"
+            "Sign up"
           )}
         </Button>
-
-        {/* Gating messages: explain why signup is unavailable */}
-        {!agencyLoading && !agencyId && (
-          <p className="text-center text-sm text-red-600">
-            An agency invite link is required to sign up.
-          </p>
-        )}
-        {!agencyLoading && agencyId && !agencyInfo && (
-          <p className="text-center text-sm text-red-600">
-            We couldn&apos;t load this agency. Please check your invite link and try again.
-          </p>
-        )}
       </form>
 
-      <div className="space-y-3 pt-2">
-        <p className="text-center text-sm text-gray-600">
+      <div className="space-y-3 text-center">
+        <p className="text-[14px] text-[#34434c] dark:text-[#c9d3d6]">
           Already have an account?{" "}
-          <Link to={Routes.auth.login + (agencyId ? `?agencyId=${agencyId}` : "")} className="text-[#17a2b8] hover:text-[#148a9c] font-semibold">
-            Login
+          <Link to={Routes.auth.login + (agencyId ? `?agencyId=${encodeURIComponent(agencyId)}` : "")} className={authLinkClass}>
+            Sign in here
           </Link>
         </p>
-        <p className="text-center text-xs text-gray-500 leading-relaxed">
+        <p className="text-[12px] leading-relaxed text-[#5d6b73] dark:text-[#9aa4a8]">
           By creating an account, you agree to our{" "}
-          <Link to="/terms" className="text-gray-900 font-medium underline">
-            Terms of Service
-          </Link>{" "}
+          <Link to="/terms" className="font-medium text-[#10141a] underline dark:text-[#f4f6f7]">Terms of Service</Link>{" "}
           and{" "}
-          <Link to="/privacy" className="text-gray-900 font-medium underline">
-            Privacy Policy
-          </Link>
+          <Link to="/privacy" className="font-medium text-[#10141a] underline dark:text-[#f4f6f7]">Privacy Policy</Link>
         </p>
+      </div>
       </div>
     </div>
   )
