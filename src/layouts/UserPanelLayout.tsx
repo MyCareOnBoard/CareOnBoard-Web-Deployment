@@ -32,7 +32,7 @@ const navItems: NavItem[] = [
   { label: "Day Program", path: Routes.userPanel.dayProgram, icon: Sun },
   { label: "Help Center", path: Routes.userPanel.helpCenter, icon: CircleHelp },
   { label: "My Payroll", path: Routes.userPanel.payroll, icon: Wallet },
-  { label: "Settings", path: Routes.userPanel.settings, icon: Settings },
+  { label: "Settings", path: Routes.userPanel.profile, icon: Settings },
 ];
 
 const sidebarLogo = (collapsed: boolean) => collapsed

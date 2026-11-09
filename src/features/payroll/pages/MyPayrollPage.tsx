@@ -81,7 +81,7 @@ export function MyPayrollPage() {
   const [loadMore, loadMoreResult] = useLazyGetEmployeePayStatementsQuery();
   const statements = useMemo(() => currentData?.statements ?? [], [currentData]);
   const selectedStatement = statements.find(({ statementId }) => statementId === selectedStatementId) ?? null;
-  const setupHref = user?.userType === "agency_staff" ? "/agency/agency-settings?tab=myPayroll" : "/user-panel/settings?tab=payrollSetup";
+  const setupHref = user?.userType === "agency_staff" ? "/agency/agency-settings?tab=myPayroll" : "/user-panel/profile?tab=payroll";
   const isInitialLoading = !currentData && (isLoading || isFetching);
   const loadMoreArgs = loadMoreResult.originalArgs;
   const loadMoreMatchesCurrent = Boolean(scope && loadMoreArgs

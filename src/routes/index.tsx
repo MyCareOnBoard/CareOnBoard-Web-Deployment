@@ -43,6 +43,8 @@ const SettingsPage = lazy(() => import("@/pages/settings"));
 const AgencySettingsPage = lazy(() => import("@/pages/agency/agency-settings"));
 const StaffManagementPage = lazy(() => import("@/pages/agency/staff-management"));
 const ProfilePage = lazy(() => import("@/pages/profile"));
+const UserPanelProfilePage = lazy(() => import("@/pages/userPanel/profile"));
+const UserPanelSettingsRedirect = lazy(() => import("@/pages/userPanel/profile/SettingsRedirect"));
 const ApplicationStepper = lazy(() => import("@/pages/applicant/application"));
 const OnboardingSlider = lazy(() => import("@/pages/onboarding/components/OnboardingSlider"));
 const SuccessScreen = lazy(() => import("@/pages/onboarding/SuccessScreen"));
@@ -695,7 +697,7 @@ export const router = createBrowserRouter([
             },
             {
                 path: Routes.userPanel.settings,
-                Component: SettingsPage,
+                Component: UserPanelSettingsRedirect,
             },
             {
                 path: Routes.userPanel.payroll,
@@ -703,7 +705,7 @@ export const router = createBrowserRouter([
             },
             {
                 path: Routes.userPanel.profile,
-                Component: ProfilePage,
+                Component: UserPanelProfilePage,
             },
             {
                 path: Routes.userPanel.mileage,
