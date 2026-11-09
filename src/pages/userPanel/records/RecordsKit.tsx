@@ -55,8 +55,8 @@ export function StatusPill({label, tone}: {label: string; tone: Tone}) {
     return <span className={cn('inline-flex whitespace-nowrap rounded-full px-2.5 py-0.5 text-[12px] font-semibold', PILL[tone])}>{label}</span>;
 }
 
-export function SearchBox({value, onChange, placeholder, label}: {value: string; onChange: (value: string) => void; placeholder: string; label: string}) {
-    return <label className="relative w-full sm:w-[216px]">
+export function SearchBox({value, onChange, placeholder, label, className}: {value: string; onChange: (value: string) => void; placeholder: string; label: string; className?: string}) {
+    return <label className={cn('relative w-full sm:w-[216px]', className)}>
         <span className="sr-only">{label}</span>
         <input type="search" value={value} onChange={event => onChange(event.target.value)} placeholder={placeholder}
             className="h-10 w-full rounded-[8px] border border-[#e3e8ea] bg-white pl-3 pr-9 text-[13px] text-[#10141a] outline-none placeholder:text-[#8a979d] focus-visible:border-[#007679] focus-visible:ring-2 focus-visible:ring-[#007679]/20 dark:border-white/10 dark:bg-[#141b21] dark:text-[#f4f6f7]"/>
@@ -85,12 +85,12 @@ export function Pagination({page, pages, onPage, label}: {page: number; pages: n
     </nav>;
 }
 
-export function EmptyRecords({icon: Icon, title, body, action}: {icon: ComponentType<SVGProps<SVGSVGElement>>; title: string; body: string; action: ReactNode}) {
+export function EmptyRecords({icon: Icon, title, body, action}: {icon: ComponentType<SVGProps<SVGSVGElement>>; title: string; body: string; action?: ReactNode}) {
     return <div className="mx-auto flex max-w-[420px] flex-1 flex-col items-center justify-center py-16 text-center">
         <Icon className="h-10 w-10 text-[#8a979d]" strokeWidth={1.5} aria-hidden="true"/>
         <p className="mt-3 text-base font-semibold text-[#5d6b73] dark:text-[#c9d3d6]">{title}</p>
         <p className="mt-1.5 text-[13px] text-[#8a979d] dark:text-[#9aa4a8]">{body}</p>
-        <div className="mt-5 w-full max-w-[272px]">{action}</div>
+        {action && <div className="mt-5 w-full max-w-[272px]">{action}</div>}
     </div>;
 }
 
