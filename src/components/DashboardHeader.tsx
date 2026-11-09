@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 import { toggleDrawer } from "@/hooks/useSidebarDrawer";
 import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
 import { UserType } from "@/utils/auth/types/user.types";
-import { settingsRouteForUserType } from "./dashboardHeaderRoutes";
+import { careConnectDashboardUrl, settingsRouteForUserType } from "./dashboardHeaderRoutes";
 
 
 export function HeaderActionButton({ icon: Icon, ariaLabel, onClick }: { icon: ComponentType<{ className?: string }>; ariaLabel: string; onClick?: () => void }) {
@@ -75,7 +75,7 @@ export function UserAvatar({ userName, userImage }: { userName?: string; userIma
 }
 
 // Phones: the theme switch lives in the account menu to keep the header row short.
-function ThemeMenuItem() {
+export function ThemeMenuItem() {
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === "dark";
   const Icon = isDark ? Sun : Moon;
@@ -126,8 +126,10 @@ export function DashboardHeaderFrame({ centerContent, children, sidebarInset = f
 }
 
 export default function DashboardHeader(
-  { actions, centerContent, userName, userImage, userRole, onLogout, userType, sidebarInset, showSettings = true }: {
+  { actions, centerContent, userName, userImage, userRole, onLogout, userType, sidebarInset, showSettings = true, accountMenu }: {
     sidebarInset?: boolean;
+    /** Replaces the default account menu items; the user panel has its own. */
+    accountMenu?: ReactNode;
     /** Hide the settings shortcut when the layout's sidebar already links to settings. */
     showSettings?: boolean;
     actions?: ReactNode;
@@ -215,15 +217,7 @@ export default function DashboardHeader(
     return settingsRouteForUserType(userType as UserType);
   }
 
-  const getCareConnectDashboardUrl = () => {
-    const careConnectSegments: Partial<Record<UserType, string>> = {
-      [UserType.EMPLOYEE]: "user",
-      [UserType.AGENCY]: "agency",
-      [UserType.AGENCY_STAFF]: "agency",
-    }
-    const segment = careConnectSegments[userType as UserType];
-    return segment ? `https://care-connect-three-eosin.vercel.app/${segment}/dashboard` : null;
-  }
+  const getCareConnectDashboardUrl = () => careConnectDashboardUrl(userType as UserType);
 
   return (
     <DashboardHeaderFrame centerContent={centerContent} sidebarInset={sidebarInset}>
@@ -376,7 +370,9 @@ export default function DashboardHeader(
                   )}
                 </div>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[214px] z-[100] bg-[#f3f6f7] dark:bg-[#1b232b] border-[#e5e5e6] dark:border-white/10 rounded-xl p-0 backdrop-blur-sm">
+              {accountMenu ? <DropdownMenuContent align="end" sideOffset={8} className="z-[100] w-[300px] max-w-[calc(100vw-32px)] rounded-[14px] border-[#e8edef] bg-white p-2 dark:border-white/10 dark:bg-[#1b232b]">
+                {accountMenu}
+              </DropdownMenuContent> : <DropdownMenuContent align="end" className="w-[214px] z-[100] bg-[#f3f6f7] dark:bg-[#1b232b] border-[#e5e5e6] dark:border-white/10 rounded-xl p-0 backdrop-blur-sm">
                 <div className="py-0">
                   <div className="border-b border-[#dde5e6] dark:border-white/10 px-4 py-3">
                     <p className="truncate text-sm font-semibold text-[#10141a] dark:text-[#f4f6f7]">
@@ -448,7 +444,7 @@ export default function DashboardHeader(
                     <span className="font-medium text-[14px] text-[#d53411]">Logout</span>
                   </DropdownMenuItem>
                 </div>
-              </DropdownMenuContent>
+              </DropdownMenuContent>}
             </DropdownMenu>
           </div>
         )}

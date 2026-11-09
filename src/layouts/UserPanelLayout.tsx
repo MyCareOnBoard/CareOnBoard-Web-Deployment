@@ -16,6 +16,7 @@ import LogoMarkIcon from "@/assets/icons/logo.svg?react";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
 import { ScrollToTopButton } from "@/components/ScrollToTopButton";
 import { roleLabel } from "@/lib/roleLabel";
+import { UserPanelAccountMenu } from "@/layouts/UserPanelAccountMenu";
 
 const navItems: NavItem[] = [
   { label: "Dashboard", path: Routes.userPanel.dashboard, icon: LayoutDashboard },
@@ -74,6 +75,7 @@ export default function UserPanelDashboardLayout({ children }: { children?: Reac
   const excludedPage = isSc && excludedPaths.some((path) => location.pathname === path || location.pathname.startsWith(`${path}/`));
   const visibleNavItems = isSc ? navItems.filter((item) => !item.path || ![...excludedPaths, Routes.userPanel.notes.index, Routes.userPanel.planOfCare].includes(item.path)).map((item) => item.path === Routes.userPanel.shiftManagement ? { ...item, label: "Timesheets", path: Routes.userPanel.manualShiftManagement } : item.path === Routes.userPanel.clientsAndServices ? { ...item, label: "My Clients" } : item) : navItems;
   const [collapsed] = useSidebarCollapsed();
+  const userRole = roleLabel({ applicantType: user?.applicantType, role: user?.profile?.role || user?.role });
 
   const handleLogout = async () => {
     try {
@@ -90,11 +92,12 @@ export default function UserPanelDashboardLayout({ children }: { children?: Reac
       <DashboardHeader
         userName={user?.fullName}
         userImage={(user as any)?.profileImage || user?.photoURL}
-        userRole={roleLabel({ applicantType: user?.applicantType, role: user?.profile?.role || user?.role })}
+        userRole={userRole}
         userType={user?.userType || UserType.APPLICANT}
         onLogout={handleLogout}
         sidebarInset
         showSettings={false}
+        accountMenu={<UserPanelAccountMenu roleLabel={userRole} onLogout={handleLogout} />}
       />
       <DashboardSidebar navItems={visibleNavItems} variant="brand" logo={sidebarLogo} footer={<SidebarHelpCard />} />
       <main className={`ml-0 ${collapsed ? "md:ml-[88px]" : "md:ml-[248px]"} pt-[98px] pb-10 transition-[margin] duration-200`}>
