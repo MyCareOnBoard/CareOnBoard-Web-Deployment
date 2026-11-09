@@ -29,7 +29,7 @@ describe("PayStatementDetailModal", () => {
     expect(screen.getByText(/pay date jun 20, 2026/i)).toBeVisible();
     expect(screen.queryByText(/· paid jun 20, 2026/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /close pay statement/i })).toBeVisible();
-    await user.dblClick(screen.getByRole("button", { name: /download statement/i }));
+    await user.dblClick(screen.getByRole("button", { name: /download pdf/i }));
     expect(download).toHaveBeenCalledOnce();
     expect(download).toHaveBeenCalledWith({ employmentId: "employment-1", statementId: "statement-1" });
   });
@@ -37,7 +37,7 @@ describe("PayStatementDetailModal", () => {
   it("keeps processing and needs-attention guidance scoped to the same dialog without exposing unavailable downloads", () => {
     const view = render(<PayStatementDetailModal open statement={statement({ status: "processing", downloadAvailable: false })} currency="USD" employmentId="employment-1" onOpenChange={vi.fn()} />);
     expect(screen.getByText(/finalizing payroll/i)).toBeVisible();
-    expect(screen.queryByRole("button", { name: /download statement/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /download pdf/i })).not.toBeInTheDocument();
     view.rerender(<PayStatementDetailModal open statement={statement({ status: "needs_attention", downloadAvailable: false })} currency="USD" employmentId="employment-1" onOpenChange={vi.fn()} />);
     expect(screen.getByText(/agency must resolve/i)).toBeVisible();
   });
@@ -45,7 +45,7 @@ describe("PayStatementDetailModal", () => {
   it("keeps download failures in the open dialog and updates selected cached statement values without a detail fetch", async () => {
     download.mockRejectedValueOnce(new Error("download unavailable"));
     const view = render(<PayStatementDetailModal open statement={statement()} currency="USD" employmentId="employment-1" onOpenChange={vi.fn()} />);
-    await userEvent.setup().click(screen.getByRole("button", { name: /download statement/i }));
+    await userEvent.setup().click(screen.getByRole("button", { name: /download pdf/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/couldn't download/i);
     expect(screen.getByRole("dialog")).toBeVisible();
 

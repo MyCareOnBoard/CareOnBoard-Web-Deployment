@@ -116,7 +116,7 @@ describe("MyPayrollPage", () => {
     render(<MyPayrollPage />);
 
     await user.click(screen.getByRole("button", { name: /view details/i }));
-    await user.click(screen.getByRole("button", { name: /download statement/i }));
+    await user.click(screen.getByRole("button", { name: /download pdf/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/couldn't download/i);
     await user.click(screen.getByRole("button", { name: /close pay statement/i }));
     await user.click(screen.getByRole("button", { name: /view details/i }));
