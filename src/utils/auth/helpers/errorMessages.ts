@@ -106,6 +106,7 @@ export const VALIDATION_MESSAGES = {
     missingLowercase: 'Password must include at least one lowercase letter.',
     missingUppercase: 'Password must include at least one uppercase letter.',
     missingNumber: 'Password must include at least one number.',
+    missingSpecial: 'Password must include at least one special character, like ! or #.',
     tooWeak: 'Please choose a stronger password.',
   },
   confirmPassword: {

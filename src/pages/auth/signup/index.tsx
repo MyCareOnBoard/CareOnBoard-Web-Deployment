@@ -19,7 +19,7 @@ import {Routes} from "@/routes/constants";
 import {getAgencyInfo} from "@/lib/api/onboarding"
 import type {ApplicantType} from "@/pages/applicant/application/documentConfig"
 import {agencyCareReturnTo} from "@/utils/auth/helpers/agencyCareReturnTo"
-import {PASSWORD_RULES} from "@/lib/passwordRules"
+import {SIGNUP_PASSWORD_RULES} from "@/lib/passwordRules"
 import {cn} from "@/lib/utils"
 import {AuthStepHeader} from "@/pages/auth/components/AuthStepHeader"
 import {authInputClass, authLabelClass, authLinkClass, authPrimaryButtonClass} from "@/pages/auth/components/authFormStyles"
@@ -161,6 +161,9 @@ export default function SignUpPage() {
     if (!/(?=.*\d)/.test(password)) {
       return getValidationMessage('password', 'missingNumber')
     }
+    if (!/[^A-Za-z0-9\s]/.test(password)) {
+      return getValidationMessage('password', 'missingSpecial')
+    }
     return ""
   }
 
@@ -267,9 +270,9 @@ export default function SignUpPage() {
     return <Navigate to={`${invitation.pathname}${invitation.search}`} replace />
   }
 
-  const rulesMet = PASSWORD_RULES.filter((rule) => rule.test(password)).length
-  // 0-1 rules: weak (1 bar), 2-3: fair (2 bars), all 4: strong (3 bars).
-  const strength = !password ? -1 : rulesMet === PASSWORD_RULES.length ? 2 : rulesMet >= 2 ? 1 : 0
+  const rulesMet = SIGNUP_PASSWORD_RULES.filter((rule) => rule.test(password)).length
+  // 0-2 rules: weak (1 bar), 3-4: fair (2 bars), all 5: strong (3 bars).
+  const strength = !password ? -1 : rulesMet === SIGNUP_PASSWORD_RULES.length ? 2 : rulesMet >= 3 ? 1 : 0
 
   return (
     <div>
@@ -360,7 +363,7 @@ export default function SignUpPage() {
           </div>
           {errors.password && <p id="password-error" className={ERROR_TEXT}>{errors.password}</p>}
           <ul id="password-rules" className="flex flex-wrap gap-2 pt-2" aria-label="Password rules">
-            {PASSWORD_RULES.map((rule) => {
+            {SIGNUP_PASSWORD_RULES.map((rule) => {
               const ok = rule.test(password)
               return (
                 <li key={rule.label} className={cn("inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] transition-colors",

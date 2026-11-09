@@ -7,3 +7,9 @@ export const PASSWORD_RULES = [
 ];
 
 export const meetsPasswordRules = (value: string) => PASSWORD_RULES.every((rule) => rule.test(value));
+
+/** Sign up also asks for a special character (anything that isn't a letter, digit or space). */
+export const SIGNUP_PASSWORD_RULES = [
+  ...PASSWORD_RULES,
+  { label: "Special character", test: (value: string) => /[^A-Za-z0-9\s]/.test(value) },
+];

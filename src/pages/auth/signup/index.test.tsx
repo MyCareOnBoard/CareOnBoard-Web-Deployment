@@ -69,7 +69,14 @@ describe('signup form', () => {
     expect(signup).not.toHaveBeenCalled()
 
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Abc12345' } })
+    expect(rules.getByText('Special character').parentElement).toHaveTextContent('(not met)')
     fireEvent.click(submit)
-    await waitFor(() => expect(signup).toHaveBeenCalledWith('ama@example.com', 'Abc12345', 'Ama Mensah', 'a1', 'dsp'))
+    expect(await screen.findByText(/at least one special character/)).toBeInTheDocument()
+    expect(signup).not.toHaveBeenCalled()
+
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Abc1234!' } })
+    expect(rules.getByText('Special character').parentElement).toHaveTextContent('(met)')
+    fireEvent.click(submit)
+    await waitFor(() => expect(signup).toHaveBeenCalledWith('ama@example.com', 'Abc1234!', 'Ama Mensah', 'a1', 'dsp'))
   })
 })
