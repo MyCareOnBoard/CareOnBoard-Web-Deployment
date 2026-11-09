@@ -5,7 +5,8 @@
 
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import { Send, Check } from "lucide-react";
-import { format } from "date-fns";
+import { format, isToday, isYesterday } from "date-fns";
+import { cn } from "@/lib/utils";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Message } from "@/lib/hooks/useMessaging";
 import { getInitials, sanitizeText, validateImageUrl } from "@/lib/utils/string-utils";
@@ -14,13 +15,37 @@ interface MessageListProps {
   messages: Message[];
   currentUserId?: string;
   loading?: boolean;
+  variant?: "classic" | "panel";
+}
+
+/** "Today", "Yesterday" or "Monday, Nov 3" above each day's messages. */
+export function dayLabel(date: Date) {
+  if (isToday(date)) return "Today";
+  if (isYesterday(date)) return "Yesterday";
+  return format(date, "EEEE, MMM d");
+}
+
+type Attachment = NonNullable<Message["attachments"]>[number];
+
+function PanelAttachments({ attachments, own }: { attachments: Attachment[]; own: boolean }) {
+  return <div className={cn("flex flex-col gap-2", own && "items-end")}>
+    {attachments.map((att, index) => <a key={`${att.url}-${index}`} href={att.url} target="_blank" rel="noopener noreferrer" className="block max-w-full">
+      {att.type === "image"
+        ? <img src={att.url} alt={att.name || "Image attachment"} className="max-h-40 rounded-[10px] object-cover" />
+        : <span className={cn("inline-flex max-w-[220px] items-center rounded-[8px] px-3 py-1.5 text-[12px] underline-offset-2 hover:underline", own ? "bg-white/15 text-white" : "bg-white text-[#10141a] dark:bg-white/10 dark:text-[#f4f6f7]")}>
+          <span className="truncate">{att.name || "File attachment"}</span>
+        </span>}
+    </a>)}
+  </div>;
 }
 
 export const MessageList = React.memo(function MessageList({
   messages,
   currentUserId,
-  loading
+  loading,
+  variant = "classic",
 }: MessageListProps) {
+  const panel = variant === "panel";
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
 
@@ -68,6 +93,44 @@ export const MessageList = React.memo(function MessageList({
       validatedAvatar: validateImageUrl(msg.senderAvatar),
     }));
   }, [messages]);
+
+  if (loading && panel) {
+    return <div role="status" className="flex h-full items-center justify-center text-[13px] text-[#5d6b73] dark:text-[#9aa4a8]">Loading messages...</div>;
+  }
+
+  if (messages.length === 0 && panel) {
+    return <div className="flex h-full flex-col items-center justify-center gap-1 text-center">
+      <p className="text-[14px] font-medium text-[#5d6b73] dark:text-[#c9d3d6]">No messages yet</p>
+      <p className="text-[13px] text-[#8a979d] dark:text-[#9aa4a8]">Say hello to start the conversation.</p>
+    </div>;
+  }
+
+  if (panel) {
+    return (
+      <div ref={messagesContainerRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+        <ol className="space-y-3">
+          {formattedMessages.map((msg, index) => {
+            const own = msg.senderId === currentUserId;
+            const date = new Date(msg.createdAt);
+            const previous = formattedMessages[index - 1];
+            const newDay = !previous || new Date(previous.createdAt).toDateString() !== date.toDateString();
+            return <li key={msg.id}>
+              {newDay && <p className="my-3 flex justify-center"><span className="rounded-[6px] bg-[#f3f5f6] px-3 py-1 text-[12px] font-medium text-[#34434c] dark:bg-white/10 dark:text-[#c9d3d6]">{dayLabel(date)}</span></p>}
+              <div className={cn("flex flex-col", own ? "items-end" : "items-start")}>
+                <div className={cn("max-w-[78%] space-y-2 rounded-[18px] px-4 py-2.5 sm:max-w-[70%]", own ? "rounded-br-[6px] bg-[#003839] text-white dark:bg-[#00a3a7] dark:text-[#06292a]" : "rounded-bl-[6px] bg-[#e3f6f6] text-[#10141a] dark:bg-white/10 dark:text-[#f4f6f7]")}>
+                  {msg.sanitizedContent && <p className="whitespace-pre-wrap break-words text-[14px] leading-relaxed" dangerouslySetInnerHTML={{ __html: msg.sanitizedContent }} />}
+                  {msg.attachments && msg.attachments.length > 0 && <PanelAttachments attachments={msg.attachments} own={own} />}
+                </div>
+                <p className="mt-1 text-[11px] text-[#5d6b73] dark:text-[#9aa4a8]">
+                  {own ? `Sent ${format(date, "h:mm a")}` : `${msg.senderName ? `${msg.senderName} · ` : ""}${format(date, "h:mm a")}`}
+                </p>
+              </div>
+            </li>;
+          })}
+        </ol>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

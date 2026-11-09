@@ -9,7 +9,8 @@ import { Search, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Conversation, ConversationParticipant } from "@/lib/hooks/useMessaging";
-import { format } from "date-fns";
+import { format, isToday, isYesterday } from "date-fns";
+import { cn } from "@/lib/utils";
 import { formatRoleLabel, getInitials, sanitizeSearchQuery, validateImageUrl } from "@/lib/utils/string-utils";
 import { roleLabel, matchesAgencyMode, isProgramScopedRole } from "@/lib/roleLabel";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -36,6 +37,18 @@ export interface ConversationListProps {
    * field staff are hidden and the field-staff tab is relabelled. Omit to disable.
    */
   programMode?: AgencyMode | null;
+  /** "panel" is the caregiver/DSP look: round avatars, last message preview, teal selection. */
+  variant?: "classic" | "panel";
+}
+
+/** "2:20 PM" today, "Yesterday", else "Nov 3". */
+export function conversationTime(dateString: string | null | undefined): string {
+  if (!dateString) return "";
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return "";
+  if (isToday(date)) return format(date, "h:mm a");
+  if (isYesterday(date)) return "Yesterday";
+  return format(date, "MMM d");
 }
 
 /** Helper to check if conversation is a group chat */
@@ -173,6 +186,7 @@ export const ConversationList = React.memo(function ConversationList({
   onFilterChange,
   showAgencyName = false,
   programMode = null,
+  variant = "classic",
 }: ConversationListProps) {
   // Debounce search query to avoid filtering on every keystroke
   const sanitizedSearchQuery = useMemo(() => sanitizeSearchQuery(searchQuery), [searchQuery]);
@@ -283,6 +297,87 @@ export const ConversationList = React.memo(function ConversationList({
     }
     return 0;
   };
+
+  if (variant === "panel") {
+    return (
+      <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-[16px] border border-[#e8edef] bg-white dark:border-white/10 dark:bg-[#1b232b]">
+        <h2 className="sr-only">Conversations</h2>
+        {onSearchChange && (
+          <div className="shrink-0 p-3">
+            <label className="relative block">
+              <span className="sr-only">Search conversations</span>
+              <input type="search" value={searchQuery} onChange={(e) => onSearchChange(e.target.value)} placeholder="Search for your conversation here"
+                className="h-10 w-full rounded-[8px] border border-[#e3e8ea] bg-white pl-3 pr-9 text-[13px] text-[#10141a] outline-none placeholder:text-[#8a979d] focus-visible:border-[#007679] focus-visible:ring-2 focus-visible:ring-[#007679]/20 dark:border-white/10 dark:bg-[#141b21] dark:text-[#f4f6f7]" />
+              <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#5d6b73]" aria-hidden="true" />
+            </label>
+          </div>
+        )}
+        <div className="min-h-0 flex-1 overflow-y-auto pb-2">
+          {loading ? (
+            <div role="status" aria-label="Loading conversations" className="flex flex-col gap-1 px-3">
+              {[0, 1, 2, 3].map((row) => <div key={row} className="flex items-center gap-3 py-2.5">
+                <div className="h-10 w-10 shrink-0 animate-pulse rounded-full bg-[#edf1f2] motion-reduce:animate-none dark:bg-white/10" />
+                <div className="flex-1 space-y-2"><div className="h-3 w-2/3 animate-pulse rounded bg-[#edf1f2] motion-reduce:animate-none dark:bg-white/10" /><div className="h-3 w-full animate-pulse rounded bg-[#edf1f2] motion-reduce:animate-none dark:bg-white/10" /></div>
+              </div>)}
+            </div>
+          ) : filteredConversations.length === 0 ? (
+            <p className="px-4 py-12 text-center text-[13px] text-[#5d6b73] dark:text-[#9aa4a8]">
+              {debouncedSearchQuery ? "No conversations match your search." : "No conversations yet. Start one with New message."}
+            </p>
+          ) : (
+            <ul>
+              {filteredConversations.map((item) => {
+                const { otherParticipants, isGroup, primaryParticipant, ...conversation } = item;
+                const unreadCount = getUnreadCount(conversation as Conversation);
+                const isSelected = selectedConversationId === conversation.id;
+                const isOnline = !isGroup && primaryParticipant ? presenceMap[primaryParticipant.uid]?.status === "online" : false;
+                const displayName = isGroup ? getGroupDisplayName(otherParticipants, conversation.name) : primaryParticipant?.name || "Unknown";
+                const preview = conversation.lastMessagePreview || conversation.lastMessage
+                  || (isGroup ? `${otherParticipants.length + 1} members` : getParticipantRoleTag(primaryParticipant?.role || ""));
+                const time = conversationTime(conversation.lastMessageAt);
+                return (
+                  <li key={conversation.id}>
+                    <button type="button" onClick={() => onSelectConversation(conversation.id)} aria-current={isSelected ? "true" : undefined}
+                      className={cn("flex w-full cursor-pointer items-center gap-3 border-l-2 px-3 py-2.5 text-left transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#007679]",
+                        isSelected ? "border-[#007679] bg-[#e3f6f6] dark:bg-[#00a3a7]/15" : "border-transparent hover:bg-[#f3f5f6] dark:hover:bg-white/5")}>
+                      <span className="relative shrink-0">
+                        {isGroup ? <span className="grid h-10 w-10 place-items-center rounded-full bg-[#e3f6f6] text-[#007679] dark:bg-[#00a3a7]/20 dark:text-[#7fe0e2]"><Users className="h-5 w-5" aria-hidden="true" /></span>
+                          : <Avatar className="h-10 w-10 rounded-full">
+                            <AvatarImage src={validateImageUrl(primaryParticipant?.avatar) || undefined} alt="" className="rounded-full object-cover" />
+                            <AvatarFallback className="rounded-full bg-[#e3f6f6] text-[13px] font-semibold text-[#007679] dark:bg-[#00a3a7]/20 dark:text-[#7fe0e2]">{getInitials(displayName)}</AvatarFallback>
+                          </Avatar>}
+                        {isOnline && <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#20a35c] dark:border-[#1b232b]"><span className="sr-only">Online</span></span>}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="truncate text-[14px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">{displayName}</span>
+                          {time && <span className="shrink-0 text-[12px] text-[#5d6b73] dark:text-[#9aa4a8]">{time}</span>}
+                        </span>
+                        <span className="mt-0.5 flex items-center justify-between gap-2">
+                          <span className={cn("truncate text-[13px]", unreadCount > 0 ? "font-semibold text-[#10141a] dark:text-[#f4f6f7]" : "text-[#5d6b73] dark:text-[#9aa4a8]")}>{preview}</span>
+                          {unreadCount > 0 && <span className="grid h-[18px] min-w-[18px] shrink-0 place-items-center rounded-full bg-[#003839] px-1 text-[11px] font-semibold text-white dark:bg-[#7fe0e2] dark:text-[#06292a]">
+                            {unreadCount > 9 ? "9+" : unreadCount}<span className="sr-only"> unread</span>
+                          </span>}
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {hasMore && onLoadMore && !loading && (
+            <div className="flex justify-center px-4 py-3">
+              <button type="button" onClick={() => void onLoadMore()} disabled={loadingMore}
+                className="cursor-pointer text-[13px] font-semibold text-[#007679] hover:underline disabled:cursor-not-allowed disabled:opacity-50 dark:text-[#7fe0e2]">
+                {loadingMore ? "Loading more..." : "Load more conversations"}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full md:w-[380px] border-r border-[#e5e7eb] flex flex-col min-h-0 bg-white overflow-hidden">
@@ -478,7 +573,8 @@ export const ConversationList = React.memo(function ConversationList({
     prevProps.currentUserId === nextProps.currentUserId &&
     prevProps.filterTab === nextProps.filterTab &&
     prevProps.showAgencyName === nextProps.showAgencyName &&
-    prevProps.programMode === nextProps.programMode
+    prevProps.programMode === nextProps.programMode &&
+    prevProps.variant === nextProps.variant
   );
 });
 

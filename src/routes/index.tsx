@@ -38,6 +38,7 @@ const FamilyGrantAccessPage = lazy(() => import("@/pages/family/grant-access"));
 const ApplicantDashboardPage = lazy(() => import("@/pages/applicant/dashboard"));
 const DocumentsPage = lazy(() => import("@/pages/applicant/documents"));
 const HelpCenterPage = lazy(() => import("@/pages/help-center"));
+const FieldStaffHelpCenterPage = lazy(() => import("@/pages/userPanel/helpCenter"));
 const SettingsPage = lazy(() => import("@/pages/settings"));
 const AgencySettingsPage = lazy(() => import("@/pages/agency/agency-settings"));
 const StaffManagementPage = lazy(() => import("@/pages/agency/staff-management"));
@@ -690,7 +691,7 @@ export const router = createBrowserRouter([
             },
             {
                 path: Routes.userPanel.helpCenter,
-                Component: HelpCenterPage,
+                Component: FieldStaffHelpCenterPage,
             },
             {
                 path: Routes.userPanel.settings,

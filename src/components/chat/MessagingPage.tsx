@@ -4,10 +4,11 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { useParams } from "react-router";
+import { Link, useParams } from "react-router";
 import { router } from "@/routes";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { ConfirmDialog, ConfirmDialogContent } from "@/components/ui/confirm-dialog";
 import { useAuth } from "@/utils/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -42,6 +43,10 @@ export interface MessagingPageProps {
      * roles (staff/admin/super) always appear. Omit to disable scoping.
      */
     programMode?: AgencyMode | null;
+    /** "panel" is the caregiver/DSP layout: two cards, round avatars, teal bubbles. */
+    variant?: "classic" | "panel";
+    /** Shown as a "Check our FAQs" link in the panel header. */
+    faqHref?: string;
 }
 
 function MessagingPageContent({
@@ -52,7 +57,10 @@ function MessagingPageContent({
     showFilterTabs = false,
     showAgencyName = false,
     programMode = null,
+    variant = "classic",
+    faqHref,
 }: MessagingPageProps) {
+    const panel = variant === "panel";
     const { conversationId } = useParams<{ conversationId?: string }>();
     const { user } = useAuth();
     const { toast } = useToast();
@@ -239,9 +247,53 @@ function MessagingPageContent({
         return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
     }, [buttonColor]);
 
+    const conversationList = <ConversationList
+        conversations={messaging.conversations}
+        selectedConversationId={messaging.currentConversation?.id || null}
+        onSelectConversation={handleSelectConversation}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        loading={messaging.conversationsLoading}
+        hasMore={messaging.conversationPagination.hasMore}
+        loadingMore={messaging.conversationPagination.isLoadingMore}
+        onLoadMore={messaging.loadMoreConversations}
+        currentUserId={user?.uid}
+        filterTab={showFilterTabs ? activeTab : undefined}
+        onFilterChange={showFilterTabs ? handleFilterChange : undefined}
+        showAgencyName={showAgencyName}
+        programMode={programMode}
+        variant={variant}
+    />;
+    const chatPanel = <ChatPanel
+        conversation={messaging.currentConversation}
+        messages={messaging.currentMessages}
+        currentUserId={user?.uid}
+        loading={messaging.conversationLoading || messaging.messagesLoading}
+        showChatView={showChatView}
+        onBackToList={handleBackToList}
+        onSendMessage={handleSendMessage}
+        onDelete={handleOpenDeleteDialog}
+        variant={variant}
+    />;
+
     return (
         <>
-            <div className="flex flex-col h-[calc(100vh-160px)] min-h-0">
+            {panel ? <div className="flex h-[calc(100dvh-160px)] min-h-[480px] flex-col rounded-[20px] bg-white p-4 shadow-[0_1px_2px_rgba(16,40,44,0.06)] sm:p-6 dark:bg-[#1b232b]">
+                <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 pb-4">
+                    <h1 className="text-lg font-semibold text-[#10141a] dark:text-[#f4f6f7]">{pageTitle}</h1>
+                    <div className="flex items-center gap-2">
+                        {faqHref && <Link to={faqHref} className="inline-flex h-9 items-center rounded-full bg-[#10141a] px-4 text-[13px] font-medium text-white transition-colors hover:bg-[#2a3138] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] dark:bg-[#f4f6f7] dark:text-[#10141a] dark:hover:bg-white">Check our FAQs</Link>}
+                        <button type="button" onClick={() => setIsNewMessageModalOpen(true)}
+                            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full border border-[#e3e8ea] px-4 text-[13px] font-medium text-[#10141a] transition-colors hover:bg-[#f3f5f6] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] dark:border-white/15 dark:text-[#f4f6f7] dark:hover:bg-white/5">
+                            <Plus className="h-4 w-4" aria-hidden="true" />New message
+                        </button>
+                    </div>
+                </div>
+                <div className="flex min-h-0 flex-1 gap-4">
+                    <div className={cn(showChatView ? "hidden" : "flex", "min-h-0 w-full shrink-0 flex-col lg:flex lg:w-[300px] xl:w-[320px]")}>{conversationList}</div>
+                    {chatPanel}
+                </div>
+            </div> : <div className="flex flex-col h-[calc(100vh-160px)] min-h-0">
                 {/* Top Header with New Message Button */}
                 <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-[#e5e7eb] flex-shrink-0">
                     <h1 className="text-[20px] sm:text-[24px] md:text-[28px] font-bold text-[#10141a]">{pageTitle}</h1>
@@ -263,37 +315,13 @@ function MessagingPageContent({
                 <div className={`flex flex-1 overflow-hidden min-h-0 ${containerClassName}`}>
                     {/* Left Panel - Conversations List (independent scroll) */}
                     <div className={`${showChatView ? 'hidden' : 'flex'} lg:flex flex-col w-full lg:w-[380px] xl:w-[420px] border-r border-[#e5e7eb] flex-shrink-0 min-h-0 overflow-hidden`}>
-                        <ConversationList
-                            conversations={messaging.conversations}
-                            selectedConversationId={messaging.currentConversation?.id || null}
-                            onSelectConversation={handleSelectConversation}
-                            searchQuery={searchQuery}
-                            onSearchChange={setSearchQuery}
-                            loading={messaging.conversationsLoading}
-                            hasMore={messaging.conversationPagination.hasMore}
-                            loadingMore={messaging.conversationPagination.isLoadingMore}
-                            onLoadMore={messaging.loadMoreConversations}
-                            currentUserId={user?.uid}
-                            filterTab={showFilterTabs ? activeTab : undefined}
-                            onFilterChange={showFilterTabs ? handleFilterChange : undefined}
-                            showAgencyName={showAgencyName}
-                            programMode={programMode}
-                        />
+                        {conversationList}
                     </div>
 
                     {/* Right Panel - Chat Area */}
-                    <ChatPanel
-                        conversation={messaging.currentConversation}
-                        messages={messaging.currentMessages}
-                        currentUserId={user?.uid}
-                        loading={messaging.conversationLoading || messaging.messagesLoading}
-                        showChatView={showChatView}
-                        onBackToList={handleBackToList}
-                        onSendMessage={handleSendMessage}
-                        onDelete={handleOpenDeleteDialog}
-                    />
+                    {chatPanel}
                 </div>
-            </div>
+            </div>}
 
             {/* New Message Modal */}
             <NewMessageModal
