@@ -108,24 +108,24 @@ describe("user panel profile page", () => {
     await userEvent.type(screen.getByLabelText("Confirm password"), "short");
     await userEvent.click(screen.getByRole("button", { name: "Update" }));
     expect(screen.getByText("Enter your current password.")).toBeInTheDocument();
-    expect(screen.getByText("Meet all four rules below.")).toBeInTheDocument();
+    expect(screen.getByText("Meet all the rules below.")).toBeInTheDocument();
     expect(mocks.changePassword).not.toHaveBeenCalled();
 
     await userEvent.type(screen.getByLabelText("Current password"), "wrong");
     await userEvent.clear(screen.getByLabelText("New password"));
-    await userEvent.type(screen.getByLabelText("New password"), "NewPass12");
+    await userEvent.type(screen.getByLabelText("New password"), "NewPass1!");
     await userEvent.click(screen.getByRole("button", { name: "Update" }));
     expect(screen.getByText("The passwords don't match.")).toBeInTheDocument();
 
     await userEvent.clear(screen.getByLabelText("Confirm password"));
-    await userEvent.type(screen.getByLabelText("Confirm password"), "NewPass12");
+    await userEvent.type(screen.getByLabelText("Confirm password"), "NewPass1!");
     await userEvent.click(screen.getByRole("button", { name: "Update" }));
     expect(await screen.findByText("That password isn't right. Check it and try again.")).toBeInTheDocument();
 
     await userEvent.clear(screen.getByLabelText("Current password"));
     await userEvent.type(screen.getByLabelText("Current password"), "OldPass1");
     await userEvent.click(screen.getByRole("button", { name: "Update" }));
-    expect(mocks.changePassword).toHaveBeenLastCalledWith("OldPass1", "NewPass12");
+    expect(mocks.changePassword).toHaveBeenLastCalledWith("OldPass1", "NewPass1!");
     expect(await screen.findByText("Password updated successfully")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Go to home" }));

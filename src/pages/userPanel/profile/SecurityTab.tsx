@@ -105,7 +105,7 @@ function ChangePasswordDialog({ onClose, onDone }: { onClose: () => void; onDone
 
   const rulesOk = meetsPasswordRules(next);
   const currentMissing = submitted && !current ? "Enter your current password." : "";
-  const nextError = submitted && !rulesOk ? "Meet all four rules below." : submitted && current && next === current ? "Choose a password you aren't using now." : "";
+  const nextError = submitted && !rulesOk ? "Meet all the rules below." : submitted && current && next === current ? "Choose a password you aren't using now." : "";
   const confirmError = submitted && confirm !== next ? "The passwords don't match." : "";
 
   const submit = async (event: FormEvent) => {

@@ -114,7 +114,7 @@ export default function ForgotPasswordPage() {
             </p>
           </div>
           <Link to={Routes.auth.login}>
-            <Button className="w-full h-12 bg-[#17a2b8] hover:bg-[#148a9c] text-white rounded-2xl text-base font-semibold transition-all">
+            <Button className="w-full h-11 bg-[#003839] hover:bg-[#00494a] dark:bg-[#007679] dark:hover:bg-[#008a8d] text-white rounded-[10px] text-base font-semibold transition-all">
               Back to Login
             </Button>
           </Link>
@@ -149,7 +149,7 @@ export default function ForgotPasswordPage() {
           <Button
             type="submit"
             disabled={loading || !email || !!error}
-            className="w-full h-12 bg-[#00B4B8] hover:bg-[#148a9c] text-white rounded-2xl text-base font-semibold mt-4 disabled:opacity-70 disabled:cursor-not-allowed transition-all"
+            className="w-full h-11 bg-[#003839] hover:bg-[#00494a] dark:bg-[#007679] dark:hover:bg-[#008a8d] text-white rounded-[10px] text-base font-semibold mt-4 disabled:opacity-70 disabled:cursor-not-allowed transition-all"
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">
@@ -165,7 +165,7 @@ export default function ForgotPasswordPage() {
 
       <p className="text-center text-sm text-gray-600 pt-2">
         Remember your password?{" "}
-        <Link to={Routes.auth.login} className="text-[#17a2b8] hover:text-[#148a9c] font-semibold">
+        <Link to={Routes.auth.login} className="text-[#00494a] hover:text-[#007679] dark:text-[#5fd0cd] font-semibold">
           Login
         </Link>
       </p>

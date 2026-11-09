@@ -227,7 +227,7 @@ export default function ResetPasswordPage() {
         <CheckCircle2 className="w-12 h-12 text-green-600 mx-auto mb-4" aria-hidden="true" />
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Password updated</h1>
         <p className="text-gray-600 mb-8">Your password has been changed. You can now sign in with your new password.</p>
-        <Button asChild className="w-full h-12 rounded-2xl bg-[#17a2b8] hover:bg-[#148a9c]"><Link to={continuePath}>Continue</Link></Button>
+        <Button asChild className="w-full h-11 rounded-[10px] bg-[#003839] hover:bg-[#00494a] dark:bg-[#007679] dark:hover:bg-[#008a8d]"><Link to={continuePath}>Continue</Link></Button>
       </div>
     </div>
   }
@@ -244,12 +244,12 @@ export default function ResetPasswordPage() {
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Invalid Reset Link</h2>
             <p role="alert" className="text-gray-600 mb-8">{error || 'This password reset link is invalid or has already been used. Please request a new one.'}</p>
             {retryable && <Button className="w-full mb-4" onClick={() => setAttempt(value => value + 1)}>Try again</Button>}
-            <Button asChild className="w-full h-12 rounded-2xl bg-[#17a2b8] hover:bg-[#148a9c] mb-4">
+            <Button asChild className="w-full h-11 rounded-[10px] bg-[#003839] hover:bg-[#00494a] dark:bg-[#007679] dark:hover:bg-[#008a8d] mb-4">
               <Link to={Routes.auth.forgotPassword}>Request New Reset Link</Link>
             </Button>
             <Link
               to={Routes.auth.login}
-              className="inline-block text-sm text-[#17a2b8] hover:text-[#148a9c] font-medium"
+              className="inline-block text-sm text-[#00494a] hover:text-[#007679] dark:text-[#5fd0cd] font-medium"
             >
               Back to Login
             </Link>
@@ -426,7 +426,7 @@ export default function ResetPasswordPage() {
 
           <Button
             type="submit"
-            className="w-full h-12 rounded-2xl bg-[#17a2b8] hover:bg-[#148a9c] text-base font-semibold mt-6"
+            className="w-full h-11 rounded-[10px] bg-[#003839] hover:bg-[#00494a] dark:bg-[#007679] dark:hover:bg-[#008a8d] text-base font-semibold mt-6"
             disabled={loading || !!errors.password || !!errors.confirmPassword}
             aria-busy={loading}
           >
@@ -444,7 +444,7 @@ export default function ResetPasswordPage() {
         <div className="mt-6 text-center">
           <Link
             to={Routes.auth.login}
-            className="text-sm text-[#17a2b8] hover:text-[#148a9c] font-medium"
+            className="text-sm text-[#00494a] hover:text-[#007679] dark:text-[#5fd0cd] font-medium"
           >
             Back to Login
           </Link>
