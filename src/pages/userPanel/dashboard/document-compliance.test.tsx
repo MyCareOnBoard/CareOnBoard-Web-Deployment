@@ -1,6 +1,6 @@
 import {act, fireEvent, render, screen} from '@testing-library/react';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-const mocks = vi.hoisted(() => ({query: vi.fn(), refetch: vi.fn(), data: {pilotEnabled: true, items: [] as unknown[], evaluatedAt: null}, error: false, documents: [{id: 'doc', documentId: 'doc', documentType: 'cpr', fileUrl: '', status: 'available'}], trainings: [], saved: {documentId: 'doc', sourceRevision: {seconds: 100, nanoseconds: 500}} as {documentId?: string; sourceRevision?: {seconds: number; nanoseconds: number}}}));
+const mocks = vi.hoisted(() => ({query: vi.fn(), refetch: vi.fn(), data: {pilotEnabled: true, items: [] as unknown[], evaluatedAt: null}, error: false, documents: [{id: 'doc', documentId: 'doc', documentType: 'cpr', fileUrl: '', status: 'available'}], trainings: [], requests: [] as unknown[], saved: {documentId: 'doc', sourceRevision: {seconds: 100, nanoseconds: 500}} as {documentId?: string; sourceRevision?: {seconds: number; nanoseconds: number}}}));
 vi.mock('@/pages/agency/compliance-alerts/api', () => ({useGetDocumentComplianceQuery: mocks.query, useComplianceDateRefresh: vi.fn()}));
 vi.mock('react-router', () => ({useNavigate: () => vi.fn(), useSearchParams: () => [new URLSearchParams()], Link: ({to, children, ...rest}: any) => <a href={to} {...rest}>{children}</a>}));
 vi.mock('./useDashboardShifts', () => ({useDashboardShifts: () => ({shifts: [], loading: false, error: false, retry: vi.fn()}), upcomingShifts: () => []}));
@@ -10,6 +10,7 @@ vi.mock('@/lib/firebase', () => ({auth: {currentUser: null}}));
 vi.mock('@/lib/api/users', () => ({getUser: vi.fn()}));
 vi.mock('@/pages/userPanel/dashboard/api', () => ({
  useGetEmployeeDocumentsQuery: () => ({data: mocks.documents}),
+ useGetDocumentRequestsQuery: () => ({data: mocks.requests}),
  useGetEmployeeTrainingsQuery: () => ({data: mocks.trainings, refetch: vi.fn()}),
  useUpdateEmployeeInfoMutation: () => [vi.fn()], useCompleteTrainingMutation: () => [vi.fn()],
 }));
@@ -17,11 +18,18 @@ vi.mock('@/pages/userPanel/dashboard/components/uploadDocumentModal', () => ({de
 import Dashboard from './index';
 beforeEach(() => {
  vi.useFakeTimers(); vi.clearAllMocks(); mocks.error = false; mocks.saved = {documentId: 'doc', sourceRevision: {seconds: 100, nanoseconds: 500}}; mocks.data = {pilotEnabled: true, items: [], evaluatedAt: null};
- mocks.documents = [{id: 'doc', documentId: 'doc', documentType: 'cpr', fileUrl: '', status: 'available'}];
+ mocks.documents = [{id: 'doc', documentId: 'doc', documentType: 'cpr', fileUrl: '', status: 'available'}]; mocks.requests = [];
  mocks.query.mockImplementation(() => ({data: mocks.data, isError: mocks.error, refetch: mocks.refetch}));
 });
 afterEach(() => vi.useRealTimers());
 describe('upload compliance refresh', () => {
+ it('lists a document the agency requested and asks for it', () => {
+  mocks.requests = [{id: 'r1', documentType: 'drug-test', documentLabel: 'Drug Test', requestedAt: '2026-11-01T00:00:00.000Z', requestedExpiryDate: '2027-01-31', message: 'Before your next shift', outstanding: true}];
+  render(<Dashboard />);
+  expect(screen.getByRole('button', {name: 'Upload Drug Test'})).toBeInTheDocument();
+  expect(screen.getByText('Requested')).toBeInTheDocument();
+  expect(screen.getByText(/Your agency asked you to upload this document\. It should be valid through .*2027\. Note: Before your next shift/)).toBeInTheDocument();
+ });
  it('shows only actual resume records in the Resume slot', () => {
   mocks.documents = [{id: 'misc', documentId: 'misc', documentType: 'other', fileUrl: 'https://example.com/other.pdf', status: 'available'}];
   const {rerender} = render(<Dashboard />);

@@ -8,6 +8,8 @@ import {subTabCount, subTabList, subTabTrigger} from './subTabStyles';
 export interface DashboardDocument {
     type: string; label: string; id?: string; documentId?: string;
     fileUrl: string; status: string; expiryLabel?: string; reasonCode?: string | null;
+    /** Set while the agency's request for this document is still waiting on an upload. */
+    request?: {validThroughLabel?: string; message?: string};
 }
 const reviewReasons: Record<string, string> = {
     missing_expiry_date: 'No expiry date is recorded. Ask your agency to confirm whether one is required.',
@@ -24,6 +26,7 @@ const reviewReasons: Record<string, string> = {
 export const groups = ['Needs attention', 'Not uploaded', 'Checking status', 'Current', 'Available'] as const;
 export function groupFor(document: DashboardDocument) {
     if (!document.fileUrl) return 'Not uploaded';
+    if (document.request) return 'Needs attention';
     if (document.status === 'Updating expiry status…') return 'Checking status';
     if (document.status.toLowerCase() === 'current') return 'Current';
     if (['available', 'not applicable'].includes(document.status.toLowerCase())) return 'Available';
@@ -31,22 +34,31 @@ export function groupFor(document: DashboardDocument) {
 }
 function badge(document: DashboardDocument) {
     const status = document.status.toLowerCase();
+    if (document.request) return {label: 'Requested', color: 'bg-[#fff3d6] text-[#8a5200]'};
     if (!document.fileUrl) return {label: 'Not uploaded', color: 'bg-[#eef2f5] text-[#596065]'};
     if (status === 'expired') return {label: 'Expired', color: 'bg-[#fff0eb] text-[#b3371c]'};
     if (status === 'expiring' || status === 'expires today') return {label: status === 'expiring' ? 'Expiring soon' : 'Expires today', color: 'bg-[#fff3d6] text-[#8a5200]'};
     if (status === 'current') return {label: 'Current', color: 'bg-[#e6f6ed] text-[#187343]'};
     return {label: status === 'available' ? 'Uploaded' : document.status || 'Status unavailable', color: 'bg-[#edf3fa] text-[#375f84]'};
 }
+function requestText(request: NonNullable<DashboardDocument['request']>, onFile: boolean) {
+    const parts = [onFile ? 'Your agency asked for a new copy of this document.' : 'Your agency asked you to upload this document.'];
+    if (request.validThroughLabel) parts.push(`It should be valid through ${request.validThroughLabel}.`);
+    if (request.message) parts.push(`Note: ${request.message}`);
+    return parts.join(' ');
+}
 interface Props {
     documents: DashboardDocument[];
     loading: boolean; error: boolean; focusDocumentId?: string | null;
+    /** Scrolls to this document type's row, e.g. from a document request notification. */
+    focusDocumentType?: string | null;
     onRetry: () => void; onUpload: (type?: string) => void; onView: (url: string, title: string) => void;
     children?: ReactNode;
     /** Shown inside the dashboard's documents & trainings panel, which supplies its own heading. */
     embedded?: boolean;
 }
-export default function DashboardDocuments({documents, loading, error, focusDocumentId, onRetry, onUpload, onView, children, embedded = false}: Props) {
-    const focusDocument = documents.find(item => focusDocumentId && (item.id === focusDocumentId || item.documentId === focusDocumentId));
+export default function DashboardDocuments({documents, loading, error, focusDocumentId, focusDocumentType, onRetry, onUpload, onView, children, embedded = false}: Props) {
+    const focusDocument = documents.find(item => focusDocumentId ? item.id === focusDocumentId || item.documentId === focusDocumentId : Boolean(focusDocumentType) && item.type === focusDocumentType);
     const focusType = focusDocument?.type;
     const focusGroup = focusDocument ? groupFor(focusDocument) : undefined;
     const visibleGroups = groups.filter(group => documents.some(item => groupFor(item) === group));
@@ -98,12 +110,12 @@ export default function DashboardDocuments({documents, loading, error, focusDocu
                 <div className="divide-y divide-[#e5edef] dark:divide-white/10 rounded-[8px] border border-[#e3e8ea] bg-white dark:border-white/10 dark:bg-[#1b232b] px-4">
                     {documents.filter(item => groupFor(item) === group).map(item => {
                         const status = badge(item);
-                        const replace = ['expired', 'expiring', 'expires today', 'needs review'].includes(item.status.toLowerCase());
+                        const replace = Boolean(item.request) || ['expired', 'expiring', 'expires today', 'needs review'].includes(item.status.toLowerCase());
                         return <div key={item.type} id={'staff-document-' + item.type} tabIndex={-1} className="flex flex-wrap items-center gap-3 py-4 focus:outline-2 focus:outline-[#00b4b8]">
                             <FileText className="h-8 w-7 shrink-0 text-[#687e82]" aria-hidden="true"/>
                             <div className="min-w-0 flex-1 basis-40">
                                 <div className="flex flex-wrap items-center gap-2"><p className="break-words text-sm font-bold text-[#10141a] dark:text-[#f4f6f7]">{item.label}</p><span className={`rounded-full px-2 py-1 text-xs font-medium ${status.color}`}>{status.label}</span></div>
-                                <p className="mt-1 text-xs text-[#596065] dark:text-[#9aa4a8]">{!item.fileUrl ? 'Upload this document to your record.' : item.status.toLowerCase() === 'needs review' ? (reviewReasons[item.reasonCode ?? ''] ?? 'Your agency needs to review this document. Contact them for details.') : item.expiryLabel ? `${item.status.toLowerCase() === 'expired' ? 'Expired' : 'Expires'} ${item.expiryLabel}` : item.status === 'Updating expiry status…' ? 'Checking document expiry details.' : 'Document on file.'}</p>
+                                <p className="mt-1 text-xs text-[#596065] dark:text-[#9aa4a8]">{item.request ? requestText(item.request, Boolean(item.fileUrl)) : !item.fileUrl ? 'Upload this document to your record.' : item.status.toLowerCase() === 'needs review' ? (reviewReasons[item.reasonCode ?? ''] ?? 'Your agency needs to review this document. Contact them for details.') : item.expiryLabel ? `${item.status.toLowerCase() === 'expired' ? 'Expired' : 'Expires'} ${item.expiryLabel}` : item.status === 'Updating expiry status…' ? 'Checking document expiry details.' : 'Document on file.'}</p>
                             </div>
                             <div className="ml-auto flex shrink-0 items-center gap-1">
                                 {item.fileUrl && <Button type="button" variant="ghost" className="px-2 text-[#007f83]" aria-label={`View ${item.label}`} onClick={() => onView(item.fileUrl, item.label)}>View</Button>}

@@ -3,6 +3,7 @@ import { formatDistanceToNow } from "date-fns";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { Notification } from "@/lib/hooks/useNotifications";
+import { Routes } from "@/routes/constants";
 
 interface NotificationItemProps {
     notification: Notification;
@@ -20,13 +21,17 @@ export const NotificationItem = memo(function NotificationItem({
     onNavigate,
     onClose,
 }: NotificationItemProps) {
+    // Older document requests pointed at a /documents route that doesn't exist;
+    // requested documents live in the dashboard's Documents section.
+    const actionUrl = notification.type === 'documents_requested' && notification.actionUrl === '/documents'
+        ? `${Routes.userPanel.dashboard}?section=documents` : notification.actionUrl;
     const handleClick = useCallback(() => {
         onMarkAsRead(notification.id);
-        if (notification.actionUrl) {
-            onNavigate(notification.actionUrl);
+        if (actionUrl) {
+            onNavigate(actionUrl);
             onClose();
         }
-    }, [notification.id, notification.actionUrl, onMarkAsRead, onNavigate, onClose]);
+    }, [notification.id, actionUrl, onMarkAsRead, onNavigate, onClose]);
 
     const formattedTime = formatDistanceToNow(new Date(notification.createdAt), {
         addSuffix: true,

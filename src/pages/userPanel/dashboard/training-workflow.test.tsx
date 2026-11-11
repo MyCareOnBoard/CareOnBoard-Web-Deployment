@@ -19,6 +19,7 @@ vi.mock('@/pages/agency/trainings/TrainingCertificate', () => ({default: ({onUpl
 vi.mock('./api', () => ({
   userPanelDashboardApi: {util: {invalidateTags: (tags: unknown) => ({type: 'invalidate', payload: tags})}},
   useGetEmployeeDocumentsQuery: () => ({data: [], isLoading: state.documentsLoading, isError: state.documentsError, refetch: state.refreshDocuments}),
+  useGetDocumentRequestsQuery: () => ({data: []}),
   useUpdateEmployeeInfoMutation: () => [vi.fn()],
   useCompleteTrainingMutation: () => [vi.fn()],
   useGetEmployeeTrainingsQuery: (args: any) => {

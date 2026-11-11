@@ -40,3 +40,19 @@ export function getUserPanelDocumentTypes(user?: {applicantType?: string; role?:
   const program = programLabel({applicantType: user?.applicantType, role: user?.profile?.role || user?.role});
   return program === "HHA" ? HHA_DOCUMENT_TYPES : DSP_DOCUMENT_TYPES;
 }
+
+/**
+ * Adds the document types the agency requested that the staff member's program
+ * list doesn't already have (e.g. a CPR card requested from a DSP).
+ */
+export function withRequestedDocumentTypes(
+  types: UserPanelDocumentType[],
+  requests: {documentType: string; documentLabel: string}[],
+): UserPanelDocumentType[] {
+  const extra = requests.filter((request, index) => !types.some(type => type.value === request.documentType)
+    && requests.findIndex(other => other.documentType === request.documentType) === index);
+  if (!extra.length) return types;
+  const catalog = [...HHA_DOCUMENT_TYPES, ...DSP_DOCUMENT_TYPES];
+  return [...types, ...extra.map(request => catalog.find(type => type.value === request.documentType)
+    ?? {label: DOCUMENT_TYPE_LABELS[request.documentType] ?? request.documentLabel, value: request.documentType, requiresExpiry: false})];
+}

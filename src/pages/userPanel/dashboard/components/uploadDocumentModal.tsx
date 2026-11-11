@@ -1,6 +1,6 @@
 import type { SaveEmployeeDocumentResponse } from '../types';
 import React, {FormEvent, useState} from 'react';
-import {X} from 'lucide-react';
+import {CalendarDays, CloudUpload, FileCheck2, Info, X} from 'lucide-react';
 import {Button} from "@/components/ui/button";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 import {FileUpload} from "@/components/ui/file-upload";
@@ -16,14 +16,21 @@ interface FormData {
   expiryDate: Date | null;
 }
 
+/** What the agency asked for, keyed by document type. */
+export type RequestedDocuments = Record<string, {validThroughLabel?: string; message?: string}>;
+
 const tenYearsFromNow = new Date()
 tenYearsFromNow.setFullYear(new Date().getFullYear() + 10)
 
+const fieldLabel = "mb-1.5 block text-[13px] font-medium text-[#10141a] dark:text-[#f4f6f7]";
+const fieldBox = "h-11 w-full rounded-[8px] border border-[#e3e8ea] bg-white px-3.5 text-sm dark:border-white/10 dark:bg-[#141b21]";
+
 const UserPanelDocumentUpload = (
-  {isOpen, setIsOpen, onComplete, onError, initialDocumentType = '', documentTypes}: {
+  {isOpen, setIsOpen, onComplete, onError, initialDocumentType = '', documentTypes, requestedDocuments = {}}: {
     isOpen: boolean;
     initialDocumentType?: string;
     documentTypes: UserPanelDocumentType[];
+    requestedDocuments?: RequestedDocuments;
     setIsOpen: (value: boolean) => void;
     onComplete: (result: SaveEmployeeDocumentResponse) => void;
     onError: () => void;
@@ -37,7 +44,10 @@ const UserPanelDocumentUpload = (
   const [openDatePopover, setOpenDatePopover] = useState<boolean>(false);
   const [uploadFile, {isLoading: isUploading}] = useUploadDocumentMutation();
   const [saveDocument, {isLoading: isSavingDocument}] = useSaveDocumentMutation();
-  const expiryExpected = documentTypes.find(doc => doc.value === formData.type)?.requiresExpiry ?? false;
+  const selectedType = documentTypes.find(doc => doc.value === formData.type);
+  const expiryExpected = selectedType?.requiresExpiry ?? false;
+  const request = formData.type ? requestedDocuments[formData.type] : undefined;
+  const busy = isUploading || isSavingDocument;
 
   const handleCancel = () => {
     setIsOpen(false);
@@ -45,16 +55,9 @@ const UserPanelDocumentUpload = (
 
   if (!isOpen) return null;
 
-  const handleFileUpload = async (
-    files: FileList | null,
-  ) => {
-    try {
-      if (!files) return;
-      const file = files[0];
-      setFormData({...formData, file});
-    } catch (error) {
-      console.error("Error uploading file:", error);
-    }
+  const handleFileUpload = (files: FileList | null) => {
+    const file = files?.[0];
+    if (file) setFormData({...formData, file});
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -88,53 +91,63 @@ const UserPanelDocumentUpload = (
   const buttonText = () => {
     if (isUploading) return "Uploading...";
     if (isSavingDocument) return "Saving...";
-    return "Upload";
+    return "Upload document";
   }
 
 
   return (
     <>
       <div
-        className="fixed inset-0 bg-transparent bg-opacity-40 backdrop-blur z-40"
+        className="fixed inset-0 z-40 bg-[#10141a]/30 backdrop-blur-sm"
         onClick={() => setIsOpen(false)}
       />
       {/* Modal */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <form onSubmit={handleSubmit}
-              className="bg-white rounded-lg shadow-2xl w-full max-w-2xl relative animate-fadeIn p-6">
+      <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4">
+        <form onSubmit={handleSubmit} role="dialog" aria-modal="true" aria-labelledby="upload-document-title"
+              className="pointer-events-auto relative max-h-[calc(100vh-32px)] w-full max-w-[480px] overflow-y-auto rounded-[16px] bg-white p-5 shadow-[0_24px_48px_-12px_rgba(16,20,26,0.25)] animate-fadeIn sm:p-6 dark:bg-[#1b232b]">
           {/* Header */}
-          <div className="flex justify-between mb-3">
+          <div className="mb-5 flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">Upload Document</h2>
+              <h2 id="upload-document-title" className="text-[18px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">Upload document</h2>
+              <p className="mt-1 text-[13px] text-[#5d6b73] dark:text-[#9aa4a8]">Add a document to your record for your agency to review.</p>
             </div>
             <button
-              type={"button"}
+              type="button"
               onClick={handleCancel}
-              className="cursor-pointer text-gray-400 hover:text-gray-600 transition-colors"
-              aria-label="Close modal"
+              className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-[#e3e8ea] text-[#10141a] transition-colors hover:bg-[#f4f6f7] dark:border-white/10 dark:text-[#f4f6f7] dark:hover:bg-white/[0.06]"
+              aria-label="Close"
             >
-              <X className="w-5 h-5"/>
+              <X className="size-4"/>
             </button>
           </div>
-          <div className={"mb-6"}>
-            <div className={"mb-6"}>
-              <p className={"text-sm mb-1"}>Document Type</p>
-              <div>
-                <Select
-                  value={formData.type}
-                  onValueChange={(value) => setFormData({...formData, type: value})}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select document type"/>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {documentTypes.map((doc) => <SelectItem key={doc.value} value={doc.value}>{doc.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
+
+          {request && selectedType && <div className="mb-5 rounded-[8px] bg-[#f4f6f7] px-3.5 py-3 dark:bg-white/[0.06]">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-sm font-semibold text-[#10141a] dark:text-[#f4f6f7]">{selectedType.label}</p>
+              <span className="shrink-0 rounded-full bg-[#fff0eb] px-2 py-0.5 text-xs font-medium text-[#b3371c] dark:bg-[#d53411]/20 dark:text-[#f3a08c]">Requested</span>
             </div>
-            <div className={"mb-6"}>
-              <p className={"text-sm mb-1"}>Expiry Date{expiryExpected ? "" : " (optional)"}</p>
+            <p className="mt-1 text-[13px] text-[#5d6b73] dark:text-[#9aa4a8]">Your agency asked you to upload this document.</p>
+            {request.validThroughLabel && <p className="mt-0.5 text-xs text-[#5d6b73] dark:text-[#9aa4a8]">Valid through {request.validThroughLabel}</p>}
+            {request.message && <p className="mt-0.5 break-words text-xs text-[#5d6b73] dark:text-[#9aa4a8]">Note: {request.message}</p>}
+          </div>}
+
+          <div className="space-y-4">
+            <div>
+              <span id="upload-document-type" className={fieldLabel}>Document type</span>
+              <Select
+                value={formData.type}
+                onValueChange={(value) => setFormData({...formData, type: value})}
+              >
+                <SelectTrigger aria-labelledby="upload-document-type" className={`${fieldBox} data-[size=default]:h-11`}>
+                  <SelectValue placeholder="Select document type"/>
+                </SelectTrigger>
+                <SelectContent>
+                  {documentTypes.map((doc) => <SelectItem key={doc.value} value={doc.value}>{doc.label}{requestedDocuments[doc.value] ? ' (requested)' : ''}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <span id="upload-document-expiry" className={fieldLabel}>Expiry date{expiryExpected ? "" : " (optional)"}</span>
               <Popover
                 open={openDatePopover}
                 onOpenChange={(open) => setOpenDatePopover(open)}
@@ -142,19 +155,21 @@ const UserPanelDocumentUpload = (
                 <PopoverTrigger asChild>
                   <button
                     type="button"
-                    className="w-full h-full flex items-center focus:outline-none cursor-pointer"
+                    aria-labelledby="upload-document-expiry"
+                    className={`${fieldBox} flex cursor-pointer items-center justify-between gap-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00a3a7]/40`}
                   >
-                    <span className={"text-sm text-left text-[#B2B2B3] px-4 py-3 rounded-md border border-[#CCCCCD] w-full"}>
-                      {formData?.expiryDate
+                    <span className={formData.expiryDate ? "text-[#10141a] dark:text-[#f4f6f7]" : "text-[#8a959b]"}>
+                      {formData.expiryDate
                         ? new Date(formData.expiryDate).toDateString()
                         : "Select expiry date"}
                     </span>
+                    <CalendarDays className="size-4 text-[#687e82]" aria-hidden="true"/>
                   </button>
                 </PopoverTrigger>
-                <PopoverContent align="start" className="mt-3 w-auto border-none bg-white p-0 shadow-lg">
+                <PopoverContent align="start" className="mt-1 w-auto rounded-[12px] border border-[#e3e8ea] bg-white p-0 shadow-lg dark:border-white/10 dark:bg-[#1b232b]">
                   <Calendar
                     mode="single"
-                    className="bg-white"
+                    className="bg-transparent"
                     captionLayout="dropdown"
                     startMonth={new Date()}
                     endMonth={tenYearsFromNow}
@@ -163,7 +178,7 @@ const UserPanelDocumentUpload = (
                     disabled={{
                       before: new Date()
                     }}
-                    onSelect={async (date) => {
+                    onSelect={(date) => {
                       if (date) {
                         setFormData({...formData, expiryDate: date})
                         setOpenDatePopover(false);
@@ -181,46 +196,50 @@ const UserPanelDocumentUpload = (
                   />
                 </PopoverContent>
               </Popover>
-              {expiryExpected && !formData.expiryDate && <p className="text-sm my-1 text-[#596065]">Add the expiry date printed on this document. Without it, your agency can't assign you shifts until they record one.</p>}
             </div>
-            <div className={"mb-6"}>
-              <p className={"text-sm mb-1"}>Upload your document</p>
+            <div>
+              <span className={fieldLabel}>Document file</span>
               <FileUpload
-                name={"upload-i-9-form"}
-                className="h-[90px] w-full max-w-[100vw]"
-                label={isUploading ? "Uploading..." : "Upload Your Document"}
+                name="upload-document-file"
+                className="h-auto max-w-none rounded-[12px] border-[#e3e8ea] bg-white px-4 py-6 dark:border-white/10 dark:bg-[#141b21] [&>span]:flex-col [&>span]:gap-2 [&>span]:text-center"
+                icon={<span className="flex size-9 items-center justify-center rounded-full bg-[#f2f4f5] text-[#10141a] dark:bg-white/10 dark:text-[#f4f6f7]"><CloudUpload className="size-[18px]" aria-hidden="true"/></span>}
+                label={isUploading ? "Uploading..." : <span className="flex flex-col gap-1">
+                  <span className="text-[13px] text-[#10141a] dark:text-[#f4f6f7]"><span className="font-semibold text-[#007f83] dark:text-[#7fe0e2]">Click to upload</span> or drag and drop</span>
+                  <span className="text-[11px] text-[#5d6b73] dark:text-[#9aa4a8]">PDF, JPG, PNG or WEBP</span>
+                </span>}
                 accept=".pdf, .jpg, .png, .webp"
-                onChange={async (event) => {
-                  await handleFileUpload(event.target.files ?? null);
-                }}
+                onFilesSelected={handleFileUpload}
                 required={true}
               />
-              <p className={"text-sm my-1 text-[#B2B2B3]"}>These documents will be reviewed by the HR</p>
               {formData.file && (
-                <div className={"flex space-x-2 my-3 bg-[#00D84114] p-3 rounded"}>
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path opacity="0.4" d="M6.66675 5.83301H13.3334" stroke="#00944A" stroke-width="1.5"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"/>
-                    <path opacity="0.4" d="M6.66675 9.16699H10.0001" stroke="#00944A" stroke-width="1.5"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"/>
-                    <path
-                      d="M10.8333 17.917V17.5003C10.8333 15.1433 10.8333 13.9648 11.5655 13.2326C12.2978 12.5003 13.4763 12.5003 15.8333 12.5003H16.2499M16.6666 11.1196V8.33366C16.6666 5.19096 16.6666 3.61962 15.6903 2.6433C14.714 1.66699 13.1426 1.66699 9.99992 1.66699C6.85723 1.66699 5.28588 1.66699 4.30956 2.6433C3.33325 3.61961 3.33325 5.19096 3.33325 8.33366V12.1205C3.33325 14.8247 3.33325 16.1767 4.07164 17.0926C4.22082 17.2776 4.38934 17.4461 4.57436 17.5952C5.49018 18.3337 6.84227 18.3337 9.54642 18.3337C10.1344 18.3337 10.4283 18.3337 10.6976 18.2387C10.7536 18.2189 10.8084 18.1962 10.862 18.1706C11.1196 18.0473 11.3274 17.8395 11.7432 17.4237L15.6903 13.4767C16.172 12.9949 16.4128 12.7541 16.5398 12.4477C16.6666 12.1415 16.6666 11.8008 16.6666 11.1196Z"
-                      stroke="#00944A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                  <span>{formData?.file?.name}</span>
+                <div className="mt-2.5 flex items-center gap-2 rounded-[8px] bg-[#e6f6ed] px-3 py-2.5 text-sm text-[#187343] dark:bg-[#187343]/20 dark:text-[#8fd9ae]">
+                  <FileCheck2 className="size-4 shrink-0" aria-hidden="true"/>
+                  <span className="min-w-0 truncate">{formData.file.name}</span>
                 </div>
               )}
+            </div>
+            <div className="flex items-start gap-2 rounded-[8px] bg-[#fff6e5] px-3 py-2.5 text-[12px] leading-relaxed text-[#8a5200] dark:bg-[#a76000]/15 dark:text-[#f0c27a]">
+              <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true"/>
+              <p>{expiryExpected && !formData.expiryDate
+                ? "Add the expiry date printed on this document. Without it, your agency can't assign you shifts until they record one."
+                : "Your agency's HR team reviews every document you upload."}</p>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="flex items-center p-3 w-full">
+          <div className="mt-6 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
             <Button
-              type={"submit"}
-              disabled={isUploading || isSavingDocument || !formData.type || !formData.file}
-              className="w-full px-6 text-white font-medium bg-teal-500 hover:bg-teal-600 rounded-full transition-colors"
+              type="button"
+              variant="outline"
+              onClick={handleCancel}
+              className="h-10 rounded-[8px] border-[#e3e8ea] bg-white px-4 text-sm font-semibold text-[#10141a] hover:bg-[#f4f6f7] dark:border-white/10 dark:bg-transparent dark:text-[#f4f6f7] dark:hover:bg-white/[0.06]"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={busy || !formData.type || !formData.file}
+              className="h-10 rounded-[8px] bg-[#003839] px-4 text-sm font-semibold text-white hover:bg-[#00494a] dark:bg-[#00a3a7] dark:text-[#06292a] dark:hover:bg-[#33b5b8]"
             >
               {buttonText()}
             </Button>

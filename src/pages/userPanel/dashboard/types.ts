@@ -13,6 +13,18 @@ export interface GetEmployeeDocumentsResponse {
   agencyId?: string;
 }
 
+/** A document the staff member's agency asked them to upload (GET /documents/requests). */
+export interface EmployeeDocumentRequest {
+  id: string;
+  documentType: string;
+  documentLabel: string;
+  requestedAt: string | null;
+  requestedExpiryDate: string | null;
+  message: string;
+  /** True until a document of this type is uploaded after the request. */
+  outstanding: boolean;
+}
+
 export interface SaveEmployeeDocumentPayload {
   fileUrl: string;
   documentType: string;

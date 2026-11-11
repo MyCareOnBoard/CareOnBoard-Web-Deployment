@@ -7,6 +7,7 @@ import {
     UploadDocumentResponse
 } from "@/pages/applicant/application/types";
 import {
+    EmployeeDocumentRequest,
     GetEmployeeDocumentsResponse,
     GetEmployeeInfoResponse,
     SaveEmployeeDocumentPayload, SaveEmployeeDocumentResponse, UpdateEmployeeInfoPayload
@@ -26,6 +27,15 @@ export const userPanelDashboardApi = createApi({
                 requiresAuth: true
             }),
             transformResponse: normalizeDocumentResponse,
+            providesTags: ['EmployeeDocuments']
+        }),
+        getDocumentRequests: builder.query<EmployeeDocumentRequest[], void>({
+            query: () => ({
+                url: `/documents/requests`,
+                method: "GET",
+                requiresAuth: true
+            }),
+            transformResponse: (response: {requests?: EmployeeDocumentRequest[]}) => response?.requests ?? [],
             providesTags: ['EmployeeDocuments']
         }),
         uploadDocument: builder.mutation<UploadDocumentResponse, UploadDocumentPayload>({
@@ -91,6 +101,7 @@ export const userPanelDashboardApi = createApi({
 
 export const {
     useGetEmployeeDocumentsQuery,
+    useGetDocumentRequestsQuery,
     useUploadDocumentMutation,
     useSaveDocumentMutation,
     useGetEmployeeInfoQuery,

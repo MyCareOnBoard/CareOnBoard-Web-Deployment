@@ -13,12 +13,13 @@ import UserPanelDocumentUpload from "@/pages/userPanel/dashboard/components/uplo
 import {AnimatePresence, motion} from "framer-motion";
 import {
     useCompleteTrainingMutation,
+    useGetDocumentRequestsQuery,
     useGetEmployeeDocumentsQuery,
     useGetEmployeeTrainingsQuery,
     useUpdateEmployeeInfoMutation,
     userPanelDashboardApi
 } from "@/pages/userPanel/dashboard/api";
-import {getUserPanelDocumentTypes} from "@/pages/userPanel/dashboard/constants";
+import {getUserPanelDocumentTypes, withRequestedDocumentTypes} from "@/pages/userPanel/dashboard/constants";
 import {Routes} from "@/routes/constants";
 import {setUser, useAuth} from "@/utils/auth";
 import {getUser} from "@/lib/api/users";
@@ -72,9 +73,13 @@ export default function UserPanelDashboardPage() {
 
     const [searchParams] = useSearchParams();
     const focusDocumentId = searchParams.get('documentId');
+    const focusDocumentType = searchParams.get('documentType');
+    const documentsLinked = searchParams.get('section') === 'documents' || Boolean(focusDocumentType);
     const [upload, setUpload] = useState<(SaveEmployeeDocumentResponse & {savedAt: number}) | null>(null);
     const [withinUploadWindow, setWithinUploadWindow] = useState(false);
     const {data: employeeDocuments = [], isLoading: documentsLoading, isError: documentsError, refetch: refreshDocuments} = useGetEmployeeDocumentsQuery();
+    // A failed request list only hides the extra rows; the checklist still loads.
+    const {data: documentRequests = []} = useGetDocumentRequestsQuery(undefined, {skip: !user?.uid});
     const {currentData: trainingPage, isFetching: isTrainingLoading, isError: trainingError, refetch: refreshTrainings} = useGetEmployeeTrainingsQuery(
         {limit: 25, cursor: trainingCursor}, {refetchOnMountOrArgChange: true, refetchOnFocus: true});
     const [updateEmployeeInfo] = useUpdateEmployeeInfoMutation();
@@ -167,17 +172,21 @@ export default function UserPanelDashboardPage() {
 
     }, [employeeDocuments, compliance, complianceError]);
 
-    const documentTypes = useMemo(() => getUserPanelDocumentTypes(user), [user]);
+    const documentTypes = useMemo(() => withRequestedDocumentTypes(getUserPanelDocumentTypes(user), documentRequests), [user, documentRequests]);
     const dashboardDocuments = useMemo(() => documentTypes.map(type => {
         const document = getDocument(type.value);
+        const request = documentRequests.find(item => item.outstanding && item.documentType === type.value);
         return {type: type.value, label: type.label, fileUrl: document.fileUrl, status: document.status,
+            request: request ? {validThroughLabel: request.requestedExpiryDate ? civilDateLabel(request.requestedExpiryDate) : undefined, message: request.message || undefined} : undefined,
             id: 'id' in document ? document.id : undefined,
             documentId: 'documentId' in document ? document.documentId : undefined,
             reasonCode: 'reasonCode' in document ? document.reasonCode : undefined,
             expiryLabel: 'expiryDateKey' in document && document.expiryDateKey ? civilDateLabel(document.expiryDateKey)
                 : document.expiryDate ? formatDate(document.expiryDate) : undefined};
-    }), [documentTypes, getDocument]);
+    }), [documentTypes, getDocument, documentRequests]);
 
+    const requestedDocuments = useMemo(() => Object.fromEntries(dashboardDocuments
+        .flatMap(doc => doc.request ? [[doc.type, doc.request] as const] : [])), [dashboardDocuments]);
     const documentsNeedingAttention = useMemo(
         () => dashboardDocuments.filter(doc => groupFor(doc) === 'Needs attention').length,
         [dashboardDocuments]
@@ -325,6 +334,17 @@ export default function UserPanelDashboardPage() {
         setHubSection(section);
         hubRef.current?.scrollIntoView({behavior: "smooth", block: "start"});
     };
+    // A document request notification links here with ?section=documents.
+    useEffect(() => {
+        if (!documentsLinked) return;
+        setHubSection('documents');
+        // Wait a frame so the Documents panel is visible before scrolling.
+        const frame = window.requestAnimationFrame(() => {
+            const row = focusDocumentType ? window.document.getElementById('staff-document-' + focusDocumentType) : null;
+            (row ?? hubRef.current)?.scrollIntoView({behavior: "smooth", block: row ? "center" : "start"});
+        });
+        return () => window.cancelAnimationFrame(frame);
+    }, [documentsLinked, focusDocumentType, searchParams, documentsLoading]);
 
     const bannerMessage = useMemo(() => attentionMessage({
         expiredDocuments: expiredDocuments.map(doc => doc.label), documents: documentsNeedingAttention,
@@ -333,7 +353,7 @@ export default function UserPanelDashboardPage() {
 
     const documentsPanel = <>
         <DashboardDocuments key={user?.uid} embedded documents={dashboardDocuments}
-            loading={documentsLoading} error={documentsError} focusDocumentId={focusDocumentId}
+            loading={documentsLoading} error={documentsError} focusDocumentId={focusDocumentId} focusDocumentType={focusDocumentType}
             onRetry={() => {void refreshDocuments();}} onView={handleOpenDocument}
             onUpload={type => {setUploadDocumentType(type); setIsDocumentUploadModalOpen(true);}}>
             {(complianceError || compliance?.syncStatus === 'error') && <p role="alert" className="text-sm text-[#d53411]">We couldn't load document expiry status. Try again. Last checked: {compliance?.evaluatedAt ? new Date(compliance.evaluatedAt).toLocaleString() : 'Not yet checked'}. <button type="button" onClick={() => refreshCompliance()}>Retry</button></p>}
@@ -434,6 +454,7 @@ export default function UserPanelDashboardPage() {
             {isDocumentUploadModalOpen && <UserPanelDocumentUpload
                 initialDocumentType={uploadDocumentType}
                 documentTypes={documentTypes}
+                requestedDocuments={requestedDocuments}
                 isOpen={isDocumentUploadModalOpen}
                 setIsOpen={setIsDocumentUploadModalOpen}
                 onComplete={handleDocumentUploaded}
