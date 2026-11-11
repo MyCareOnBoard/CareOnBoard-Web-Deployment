@@ -68,8 +68,20 @@ export interface DocumentComplianceArgs { scopeKey?: string;
 export function complianceLabel(item?: DocumentComplianceItem): string {
   if (!item) return 'Updating expiry status…';
   if (item.syncStatus === 'error') return 'Expiry status unavailable';
+  if (item.condition === 'not_applicable' && item.reasonCode === 'nonexpiring') return 'No expiry';
   return ({current: 'Current', not_applicable: 'Not applicable', expiring: 'Expiring',
     due_today: 'Expires today', expired: 'Expired', needs_review: 'Needs review'})[item.condition];
+}
+const REVIEW_REASONS: Record<string, string> = {
+  missing_expiry_date: 'No expiry date', invalid_expiry_date: 'Expiry date unreadable',
+  duplicate_document_slot: 'Duplicate files', evidence_pending: 'Awaiting review', evidence_rejected: 'Rejected',
+  evidence_unavailable: 'File unavailable', missing_file: 'No file', invalid_identity: 'Staff record mismatch',
+  unknown_applicability: 'Expiry rule unknown', invalid_timezone: 'Agency time zone missing',
+  ownership_changed: 'Moved to another agency', source_deleted: 'File removed',
+};
+/** Short reason a document "Needs review", e.g. "No expiry date". */
+export function complianceReasonLabel(item?: DocumentComplianceItem): string | null {
+  return item?.condition === 'needs_review' && item.reasonCode ? REVIEW_REASONS[item.reasonCode] ?? null : null;
 }
 export function civilDateLabel(key?: string | null): string {
   if (!key) return '';

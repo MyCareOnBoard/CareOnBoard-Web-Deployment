@@ -20,6 +20,17 @@ export interface EmployeeDocument {
   verifiedBy?: string;
   notes?: string;
   agencyId?: string;
+  /** Whether this document type carries an expiry date. */
+  requiresExpiry?: boolean;
+  /** Agency review of the file. Staff uploads start pending; older records are accepted. */
+  review?: EmployeeDocumentReview;
+}
+
+export interface EmployeeDocumentReview {
+  status: 'pending' | 'accepted' | 'rejected';
+  reason: string | null;
+  reviewedAt: string | null;
+  submittedAt: string | null;
 }
 
 export interface ListEmployeeDocumentsResponse {
@@ -107,6 +118,41 @@ export async function deleteEmployeeDocument(employeeId: string, documentId: str
   } catch (err: any) {
     console.error('deleteEmployeeDocument error:', err);
     throw new Error(err.response?.data?.message || err.message || 'Failed to delete employee document');
+  }
+}
+
+function apiMessage(err: any, fallback: string): string {
+  return err?.response?.data?.message || err?.message || fallback;
+}
+
+/**
+ * Accept or reject a staff member's uploaded document. Accepting can also set the
+ * expiry date (YYYY-MM-DD); rejecting needs a reason the staff member will see.
+ * Endpoint: POST /employees/:employeeId/documents/:documentId/review
+ */
+export async function reviewEmployeeDocument(
+  employeeId: string,
+  documentId: string,
+  review: ({ decision: 'accept'; expiryDateKey?: string } | { decision: 'reject'; reason: string }) & { expectedUploadedAt?: string },
+): Promise<void> {
+  try {
+    await axiosClient.post(`/employees/${encodeURIComponent(employeeId)}/documents/${encodeURIComponent(documentId)}/review`, review);
+  } catch (err: any) {
+    console.error('reviewEmployeeDocument error:', err);
+    throw new Error(apiMessage(err, 'Failed to save the review'));
+  }
+}
+
+/**
+ * Set or correct a staff document's expiry date (YYYY-MM-DD).
+ * Endpoint: PATCH /employees/:employeeId/documents/:documentId/expiry
+ */
+export async function setEmployeeDocumentExpiry(employeeId: string, documentId: string, expiryDateKey: string): Promise<void> {
+  try {
+    await axiosClient.patch(`/employees/${encodeURIComponent(employeeId)}/documents/${encodeURIComponent(documentId)}/expiry`, { expiryDateKey });
+  } catch (err: any) {
+    console.error('setEmployeeDocumentExpiry error:', err);
+    throw new Error(apiMessage(err, 'Failed to save the expiry date'));
   }
 }
 

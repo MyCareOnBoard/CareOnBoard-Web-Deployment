@@ -25,11 +25,13 @@ interface ActivityTabProps {
   onRequestDocument: () => void;
   getDocumentStatusColor: (status: string) => string;
   getDocumentActionButton: (status: string, doc?: EmployeeDocument) => React.ReactNode;
+  onDocumentsChanged?: () => void;
 }
 
 export function ActivityTab({
   compliance, complianceError, refreshCompliance, focusDocumentId, focusDocumentKey,
-  dspName: _dspName,
+  dspId,
+  dspName,
   shifts,
   detailsLoading,
   trainingsLoading,
@@ -41,6 +43,7 @@ export function ActivityTab({
   onRequestDocument,
   getDocumentStatusColor,
   getDocumentActionButton,
+  onDocumentsChanged,
 }: ActivityTabProps) {
 
   return (
@@ -78,6 +81,9 @@ export function ActivityTab({
         onRequestDocument={onRequestDocument}
         getDocumentStatusColor={getDocumentStatusColor}
         getDocumentActionButton={getDocumentActionButton}
+        employeeId={dspId}
+        employeeName={dspName}
+        onDocumentsChanged={onDocumentsChanged}
       />
     </div>
   );

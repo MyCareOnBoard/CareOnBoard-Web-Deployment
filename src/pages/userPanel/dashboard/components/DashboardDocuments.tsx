@@ -10,6 +10,8 @@ export interface DashboardDocument {
     fileUrl: string; status: string; expiryLabel?: string; reasonCode?: string | null;
     /** Set while the agency's request for this document is still waiting on an upload. */
     request?: {validThroughLabel?: string; message?: string};
+    /** The agency's review of the uploaded file. */
+    review?: {status: string; reason?: string | null};
 }
 const reviewReasons: Record<string, string> = {
     missing_expiry_date: 'No expiry date is recorded. Ask your agency to confirm whether one is required.',
@@ -27,19 +29,27 @@ export const groups = ['Needs attention', 'Not uploaded', 'Checking status', 'Cu
 export function groupFor(document: DashboardDocument) {
     if (!document.fileUrl) return 'Not uploaded';
     if (document.request) return 'Needs attention';
-    if (document.status === 'Updating expiry status…') return 'Checking status';
+    if (document.review?.status === 'rejected') return 'Needs attention';
+    if (document.review?.status === 'pending' || document.status === 'Updating expiry status…') return 'Checking status';
     if (document.status.toLowerCase() === 'current') return 'Current';
-    if (['available', 'not applicable'].includes(document.status.toLowerCase())) return 'Available';
+    if (['available', 'not applicable', 'no expiry'].includes(document.status.toLowerCase())) return 'Available';
     return 'Needs attention';
 }
 function badge(document: DashboardDocument) {
     const status = document.status.toLowerCase();
     if (document.request) return {label: 'Requested', color: 'bg-[#fff3d6] text-[#8a5200]'};
     if (!document.fileUrl) return {label: 'Not uploaded', color: 'bg-[#eef2f5] text-[#596065]'};
+    if (document.review?.status === 'rejected') return {label: 'Rejected', color: 'bg-[#fff0eb] text-[#b3371c]'};
+    if (document.review?.status === 'pending') return {label: 'Awaiting review', color: 'bg-[#fff3d6] text-[#8a5200]'};
     if (status === 'expired') return {label: 'Expired', color: 'bg-[#fff0eb] text-[#b3371c]'};
     if (status === 'expiring' || status === 'expires today') return {label: status === 'expiring' ? 'Expiring soon' : 'Expires today', color: 'bg-[#fff3d6] text-[#8a5200]'};
     if (status === 'current') return {label: 'Current', color: 'bg-[#e6f6ed] text-[#187343]'};
     return {label: status === 'available' ? 'Uploaded' : document.status || 'Status unavailable', color: 'bg-[#edf3fa] text-[#375f84]'};
+}
+function reviewText(review: NonNullable<DashboardDocument['review']>) {
+    return review.status === 'rejected'
+        ? `Your agency rejected this file${review.reason ? `: ${review.reason}` : '.'} Upload a new copy.`
+        : 'Your agency is reviewing this document.';
 }
 function requestText(request: NonNullable<DashboardDocument['request']>, onFile: boolean) {
     const parts = [onFile ? 'Your agency asked for a new copy of this document.' : 'Your agency asked you to upload this document.'];
@@ -110,12 +120,13 @@ export default function DashboardDocuments({documents, loading, error, focusDocu
                 <div className="divide-y divide-[#e5edef] dark:divide-white/10 rounded-[8px] border border-[#e3e8ea] bg-white dark:border-white/10 dark:bg-[#1b232b] px-4">
                     {documents.filter(item => groupFor(item) === group).map(item => {
                         const status = badge(item);
-                        const replace = Boolean(item.request) || ['expired', 'expiring', 'expires today', 'needs review'].includes(item.status.toLowerCase());
+                        const reviewState = item.review?.status === 'pending' || item.review?.status === 'rejected' ? item.review : undefined;
+                        const replace = Boolean(item.request) || reviewState?.status === 'rejected' || ['expired', 'expiring', 'expires today', 'needs review'].includes(item.status.toLowerCase());
                         return <div key={item.type} id={'staff-document-' + item.type} tabIndex={-1} className="flex flex-wrap items-center gap-3 py-4 focus:outline-2 focus:outline-[#00b4b8]">
                             <FileText className="h-8 w-7 shrink-0 text-[#687e82]" aria-hidden="true"/>
                             <div className="min-w-0 flex-1 basis-40">
                                 <div className="flex flex-wrap items-center gap-2"><p className="break-words text-sm font-bold text-[#10141a] dark:text-[#f4f6f7]">{item.label}</p><span className={`rounded-full px-2 py-1 text-xs font-medium ${status.color}`}>{status.label}</span></div>
-                                <p className="mt-1 text-xs text-[#596065] dark:text-[#9aa4a8]">{item.request ? requestText(item.request, Boolean(item.fileUrl)) : !item.fileUrl ? 'Upload this document to your record.' : item.status.toLowerCase() === 'needs review' ? (reviewReasons[item.reasonCode ?? ''] ?? 'Your agency needs to review this document. Contact them for details.') : item.expiryLabel ? `${item.status.toLowerCase() === 'expired' ? 'Expired' : 'Expires'} ${item.expiryLabel}` : item.status === 'Updating expiry status…' ? 'Checking document expiry details.' : 'Document on file.'}</p>
+                                <p className="mt-1 text-xs text-[#596065] dark:text-[#9aa4a8]">{item.request ? requestText(item.request, Boolean(item.fileUrl)) : !item.fileUrl ? 'Upload this document to your record.' : reviewState ? reviewText(reviewState) : item.status.toLowerCase() === 'needs review' ? (reviewReasons[item.reasonCode ?? ''] ?? 'Your agency needs to review this document. Contact them for details.') : item.expiryLabel ? `${item.status.toLowerCase() === 'expired' ? 'Expired' : 'Expires'} ${item.expiryLabel}` : item.status === 'Updating expiry status…' ? 'Checking document expiry details.' : 'Document on file.'}</p>
                             </div>
                             <div className="ml-auto flex shrink-0 items-center gap-1">
                                 {item.fileUrl && <Button type="button" variant="ghost" className="px-2 text-[#007f83]" aria-label={`View ${item.label}`} onClick={() => onView(item.fileUrl, item.label)}>View</Button>}

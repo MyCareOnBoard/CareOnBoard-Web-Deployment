@@ -25,6 +25,22 @@ describe('grouped dashboard documents', () => {
         expect(props.onUpload).toHaveBeenCalledWith('Resume');
     });
 
+    it('shows the agency review of uploaded files', () => {
+        render(<DashboardDocuments {...props} documents={[
+            item('CPR', {review: {status: 'rejected', reason: 'Card is cut off'}}),
+            item('TB test', {review: {status: 'pending'}}),
+            item('Hep B', {status: 'No expiry', review: {status: 'accepted'}}),
+        ]}/>);
+        expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Needs attention 1', 'Checking status 1', 'Available 1']);
+        expect(screen.getByText('Rejected')).toBeInTheDocument();
+        expect(screen.getByText('Your agency rejected this file: Card is cut off Upload a new copy.')).toBeInTheDocument();
+        expect(screen.getByRole('button', {name: 'Replace CPR'})).toBeInTheDocument();
+        activateTab(screen.getAllByRole('tab')[1]);
+        expect(screen.getByText('Awaiting review')).toBeInTheDocument();
+        expect(screen.getByText('Your agency is reviewing this document.')).toBeInTheDocument();
+        expect(screen.queryByRole('button', {name: 'Replace TB test'})).not.toBeInTheDocument();
+    });
+
     it('offers both View and Replace for a document needing review', () => {
         const onUpload = vi.fn();
         render(<DashboardDocuments {...props} onUpload={onUpload} documents={[item('Diploma', {status: 'Needs review', reasonCode: 'missing_expiry_date', expiryLabel: 'Sep 1, 2026'})]}/>);

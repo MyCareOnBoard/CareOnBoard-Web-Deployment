@@ -1,4 +1,4 @@
-import { complianceLabel, civilDateLabel, type DocumentComplianceResponse } from '@/pages/agency/compliance-alerts/apiTypes';
+import { complianceLabel, complianceReasonLabel, civilDateLabel, type DocumentComplianceResponse } from '@/pages/agency/compliance-alerts/apiTypes';
 import {getApplicantDocs} from "@/pages/applicant/application/documentConfig";
 import { useState, useEffect, useRef } from "react";
 import { FileText, Plus } from "lucide-react";
@@ -6,6 +6,10 @@ import { DocumentPreviewModal } from "@/components/documents/DocumentPreviewModa
 import { Button } from "@/components/ui/button";
 import type { EmployeeDocument } from "@/lib/api/employee-documents";
 import { documentTypeLabel } from "@/lib/documentTypes";
+import { DocumentReviewDialog, type DocumentReviewMode } from "./DocumentReviewDialog";
+
+/** Expiry problems the agency fixes by entering the date. */
+const EXPIRY_FIXABLE = new Set(["missing_expiry_date", "invalid_expiry_date"]);
 
 interface DocumentsSectionProps {
   compliance?: DocumentComplianceResponse;
@@ -18,6 +22,10 @@ interface DocumentsSectionProps {
   onRequestDocument: () => void;
   getDocumentStatusColor: (status: string) => string;
   getDocumentActionButton: (status: string, doc?: EmployeeDocument) => React.ReactNode;
+  /** With these, rows offer Review (accept/reject) and Set expiry. */
+  employeeId?: string;
+  employeeName?: string;
+  onDocumentsChanged?: () => void;
 }
 
 export function DocumentsSection({
@@ -27,11 +35,14 @@ export function DocumentsSection({
   onRequestDocument,
   getDocumentStatusColor,
   getDocumentActionButton,
+  employeeId, employeeName, onDocumentsChanged,
 }: DocumentsSectionProps) {
   const slot=[...getApplicantDocs('dsp'),...getApplicantDocs('hha')].find(row=>row.id===focusDocumentKey);
   const slotRef=useRef<HTMLDivElement>(null);
   useEffect(()=>{if(slot&&!isLoading){slotRef.current?.focus();slotRef.current?.scrollIntoView?.({block:'nearest'});}},[slot?.id,isLoading]);
   const [preview, setPreview] = useState<EmployeeDocument | null>(null);
+  const [reviewing, setReviewing] = useState<{document: EmployeeDocument; mode: DocumentReviewMode} | null>(null);
+  const canReview = Boolean(employeeId && onDocumentsChanged);
 
   useEffect(() => {
     if (!focusDocumentId) return;
@@ -74,6 +85,9 @@ export function DocumentsSection({
             const issue = compliance?.items.find(item => item.documentId === doc.id);
             const pilot = compliance?.pilotEnabled !== false && Boolean(refreshCompliance);
             const status = pilot ? (complianceError || compliance?.syncStatus === 'error' ? 'Expiry status unavailable' : complianceLabel(issue)) : doc.status;
+            const reason = pilot ? complianceReasonLabel(issue) : null;
+            const review = doc.review?.status;
+            const fixExpiry = canReview && pilot && review !== 'pending' && EXPIRY_FIXABLE.has(issue?.reasonCode ?? '');
             return (
             <div key={doc.id} id={`document-${doc.id}`} tabIndex={-1} className="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-lg hover:bg-teal-50 transition-colors">
               <div className="flex items-center gap-3 flex-1">
@@ -83,9 +97,29 @@ export function DocumentsSection({
                 <span className="text-sm text-gray-900">{documentTypeLabel(doc.documentName)}</span>
               </div>
               <div className="flex items-center gap-3">
-                <span className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getDocumentStatusColor(pilot ? issue?.condition ?? 'pending' : doc.status)}`}>
-                  {status === 'expiring-soon' ? 'Expiring Soon' : status === 'unavailable' ? 'Unavailable' : status}{pilot && issue?.expiryDateKey ? ` · ${civilDateLabel(issue.expiryDateKey)}` : ''}
-                </span>
+                {review === 'pending' || review === 'rejected' ? (
+                  <span
+                    title={review === 'rejected' && doc.review?.reason ? `Reason: ${doc.review.reason}` : undefined}
+                    className={`px-3 py-1 rounded-full text-xs font-medium ${review === 'pending' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-700'}`}
+                  >
+                    {review === 'pending' ? 'Awaiting review' : 'Rejected · new copy requested'}
+                    {review === 'rejected' && doc.review?.reason ? <span className="sr-only">. Reason: {doc.review.reason}</span> : null}
+                  </span>
+                ) : (
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getDocumentStatusColor(pilot ? issue?.condition ?? 'pending' : doc.status)}`}>
+                    {status === 'expiring-soon' ? 'Expiring Soon' : status === 'unavailable' ? 'Unavailable' : status}{reason ? ` · ${reason}` : ''}{pilot && issue?.expiryDateKey ? ` · ${civilDateLabel(issue.expiryDateKey)}` : ''}
+                  </span>
+                )}
+                {canReview && review === 'pending' && (
+                  <Button type="button" size="sm" onClick={() => setReviewing({document: doc, mode: 'review'})} className="rounded-full bg-teal-500 hover:bg-teal-600 text-white">
+                    Review
+                  </Button>
+                )}
+                {fixExpiry && (
+                  <Button type="button" variant="outline" size="sm" onClick={() => setReviewing({document: doc, mode: 'expiry'})}>
+                    Set expiry
+                  </Button>
+                )}
                 {getDocumentActionButton(doc.status, doc)}
                 {doc.fileUrl ? (
                   <Button
@@ -102,6 +136,18 @@ export function DocumentsSection({
           );})
         )}
       </div>
+      {canReview && reviewing && (
+        <DocumentReviewDialog
+          employeeId={employeeId!}
+          employeeName={employeeName || 'this staff member'}
+          document={reviewing.document}
+          mode={reviewing.mode}
+          currentExpiryDateKey={compliance?.items.find(item => item.documentId === reviewing.document.id)?.expiryDateKey}
+          onClose={() => setReviewing(null)}
+          onSaved={() => onDocumentsChanged?.()}
+          onView={setPreview}
+        />
+      )}
       <DocumentPreviewModal
         open={preview !== null}
         onOpenChange={(open) => { if (!open) setPreview(null); }}

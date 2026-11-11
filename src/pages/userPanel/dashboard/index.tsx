@@ -181,6 +181,7 @@ export default function UserPanelDashboardPage() {
             id: 'id' in document ? document.id : undefined,
             documentId: 'documentId' in document ? document.documentId : undefined,
             reasonCode: 'reasonCode' in document ? document.reasonCode : undefined,
+            review: 'review' in document ? document.review : undefined,
             expiryLabel: 'expiryDateKey' in document && document.expiryDateKey ? civilDateLabel(document.expiryDateKey)
                 : document.expiryDate ? formatDate(document.expiryDate) : undefined};
     }), [documentTypes, getDocument, documentRequests]);

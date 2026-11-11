@@ -383,6 +383,7 @@ function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
           onRequestDocument={handleRequestDocument}
           getDocumentStatusColor={getDocumentStatusColor}
           getDocumentActionButton={getDocumentActionButton}
+          onDocumentsChanged={() => { void fetchDocuments(); void refreshCompliance(); }}
         />
       )}
 

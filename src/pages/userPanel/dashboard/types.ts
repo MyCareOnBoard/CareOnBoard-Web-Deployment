@@ -11,6 +11,8 @@ export interface GetEmployeeDocumentsResponse {
   expiryDate: string | null;
   expiryDateKey?: string | null;
   agencyId?: string;
+  /** The agency's review of this file; absent on older API responses (treated as accepted). */
+  review?: {status: 'pending' | 'accepted' | 'rejected'; reason: string | null};
 }
 
 /** A document the staff member's agency asked them to upload (GET /documents/requests). */
