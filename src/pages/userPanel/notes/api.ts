@@ -7,12 +7,23 @@ import {
   GetActivityLogResponse, UpdateActivityLogPayload,
 } from "@/pages/userPanel/notes/apiTypes";
 import {ActivityLog} from "@/lib/api/employees";
+import type {MyNotesResponse} from "@/lib/notes/notesList";
+
+export type NoteCommentKind = 'message' | 'change_request' | 'correction_request';
+export interface NoteComment {
+  id: string; kind: NoteCommentKind; body: string; section: string | null;
+  authorKind: 'employee' | 'reviewer'; authorName: string; createdAt: string | null;
+  resolved: boolean; resolvedAt: string | null;
+}
+export type NoteHistoryKind = 'clocked_out' | 'started' | 'submitted' | 'returned' | 'approved' | 'correction_requested' | 'sent_for_billing';
+export interface NoteHistoryEvent { kind: NoteHistoryKind; at: string; actorName: string; }
+type Envelope<T> = { success: boolean; data: T };
 
 
 export const userPanelNotesApi = createApi({
   reducerPath: "userPanelNotesApi",
   baseQuery: customBaseQuery,
-  tagTypes: ['ActivityLogs', 'SingleActivityLog'],
+  tagTypes: ['ActivityLogs', 'SingleActivityLog', 'MyNotes', 'NoteComments', 'NoteHistory'],
   keepUnusedDataFor: 300,
   endpoints: (builder) => ({
     getCareerContext: builder.query<CareerContext,{activityLogId:string;revisionChoices?:boolean;cursor?:string}>({
@@ -39,6 +50,32 @@ export const userPanelNotesApi = createApi({
       query:({activityLogId,receiptId})=>({url:`/employees/activity-logs/${activityLogId}/signatures/${receiptId}`,method:'GET',requiresAuth:true}),
       transformResponse:(response:CareerEnvelope<CareerSignature>)=>response.data,
     }),
+    /** The signed-in employee's worked shifts and where each note stands. */
+    getMyNotes: builder.query<MyNotesResponse, {startDate?: string; endDate?: string} | void>({
+      query: (params) => ({url: `/employees/my-notes`, method: 'GET', requiresAuth: true, params: params || undefined}),
+      transformResponse: (response: Envelope<MyNotesResponse>) => response.data,
+      providesTags: ['MyNotes'],
+    }),
+    getNoteComments: builder.query<NoteComment[], string>({
+      query: (activityLogId) => ({url: `/employees/activity-logs/${activityLogId}/comments`, method: 'GET', requiresAuth: true}),
+      transformResponse: (response: Envelope<NoteComment[]>) => response.data,
+      providesTags: (_result, _error, id) => [{type: 'NoteComments', id}],
+    }),
+    addNoteComment: builder.mutation<NoteComment, {activityLogId: string; body: string; kind?: NoteCommentKind; section?: string}>({
+      query: ({activityLogId, ...data}) => ({url: `/employees/activity-logs/${activityLogId}/comments`, method: 'POST', requiresAuth: true, data}),
+      transformResponse: (response: Envelope<NoteComment>) => response.data,
+      invalidatesTags: (_result, _error, {activityLogId}) => [{type: 'NoteComments', id: activityLogId}, {type: 'NoteHistory', id: activityLogId}],
+    }),
+    resolveNoteComment: builder.mutation<NoteComment, {activityLogId: string; commentId: string; resolved: boolean}>({
+      query: ({activityLogId, commentId, resolved}) => ({url: `/employees/activity-logs/${activityLogId}/comments/${commentId}`, method: 'PATCH', requiresAuth: true, data: {resolved}}),
+      transformResponse: (response: Envelope<NoteComment>) => response.data,
+      invalidatesTags: (_result, _error, {activityLogId}) => [{type: 'NoteComments', id: activityLogId}],
+    }),
+    getNoteHistory: builder.query<NoteHistoryEvent[], string>({
+      query: (activityLogId) => ({url: `/employees/activity-logs/${activityLogId}/history`, method: 'GET', requiresAuth: true}),
+      transformResponse: (response: Envelope<NoteHistoryEvent[]>) => response.data,
+      providesTags: (_result, _error, id) => [{type: 'NoteHistory', id}],
+    }),
     getAllActivityLogs: builder.query<ActivityLog[], void>({
       query: () => ({
         url: `/employees/activity-logs`,
@@ -62,7 +99,7 @@ export const userPanelNotesApi = createApi({
         requiresAuth: true,
         data
       }),
-      invalidatesTags: ['SingleActivityLog']
+      invalidatesTags: ['SingleActivityLog', 'MyNotes']
     }),
     updateActivityLog: builder.mutation<{ data: GetActivityLogResponse }, { activityLog: string, data: UpdateActivityLogPayload }>({
       query: ({ activityLog, data }) => ({
@@ -83,7 +120,7 @@ export const userPanelNotesApi = createApi({
       async onQueryStarted(_arg, {dispatch, queryFulfilled}) {
         try { await queryFulfilled; dispatch(complianceAlertsApi.util.invalidateTags(['ShiftNoteCompliance'])); } catch { /* Keep the current checked status on failure. */ }
       },
-      invalidatesTags: ['SingleActivityLog']
+      invalidatesTags: (_result, _error, {activityLog}) => ['SingleActivityLog', 'MyNotes', {type: 'NoteHistory', id: activityLog}]
     }),
     seedActivityLogs: builder.mutation<void, Record<string, any>[]>({
       query: (data) => ({
@@ -98,6 +135,7 @@ export const userPanelNotesApi = createApi({
 });
 
 export const {
+  useGetMyNotesQuery, useGetNoteCommentsQuery, useAddNoteCommentMutation, useResolveNoteCommentMutation, useGetNoteHistoryQuery,
   useGetCareerContextQuery, useSelectCareerRevisionMutation, useSaveCareerRowMutation, usePreviewCareerNotesMutation, useGetCareerSignaturesQuery, useGetCareerSignatureQuery,
   useGetAllActivityLogsQuery,
   useGetSingleActivityLogQuery,

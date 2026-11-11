@@ -2,7 +2,7 @@ import React from "react";
 import {Navigate, useNavigate} from "react-router";
 import {Routes} from "@/routes/constants";
 import {useEffectiveAgencyMode} from "@/hooks/useEffectiveAgencyMode";
-import {NoteCard, NoteCardType} from "@/pages/userPanel/notes";
+import {NoteCard, NoteCardType} from "@/pages/userPanel/notes/components/NoteCard";
 import {Button} from "@/components/ui/button";
 import {List} from "lucide-react";
 import UserIcon from "@/assets/icons/user-heroicon.svg?react";
