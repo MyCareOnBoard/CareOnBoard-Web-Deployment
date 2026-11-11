@@ -1,461 +1,350 @@
-import { noteServiceDate } from '@/lib/notes/noteTypes';
-import { useNoteOperation } from '@/lib/notes/useNoteOperation';
-import { NoteFieldErrors, focusNoteError } from '@/pages/shared/notes/NoteFieldErrors';
-import type { NoteFieldError } from '@/pages/userPanel/notes/apiTypes';
-import React, {useEffect, useState, useRef} from "react";
-import {Input} from "@/components/ui/input";
-import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
-import {Calendar} from "@/components/ui/calendar";
-import {format} from "date-fns";
-import InformationCircleIcon from "@/assets/icons/information-circle.svg?react";
-import VoiceInputButton from "@/components/VoiceInputButton";
-import ContentEditableCell from "@/components/ContentEditableCell";
-import {VoiceRecordingProvider} from "@/contexts/VoiceRecordingContext";
-import {Button} from "@/components/ui/button";
-import {Routes} from "@/routes/constants";
-import {ArrowLeft} from "lucide-react";
-import {useLocation, useNavigate} from "react-router";
-import {
-  useCreateOrUpdateActivityLogMutation,
-  useGetSingleActivityLogQuery,
-  useSubmitActivityLogNotesMutation
-} from "@/pages/userPanel/notes/api";
-import {useAuth} from "@/utils/auth";
-import {toast} from "sonner";
+import {useEffect, useMemo, useRef, useState} from 'react';
+import {Link, useLocation} from 'react-router';
+import {format} from 'date-fns';
+import {Car, ChevronRight, MapPin, Plus, Target, Users} from 'lucide-react';
+import {toast} from 'sonner';
+import {Routes} from '@/routes/constants';
+import {cn} from '@/lib/utils';
+import {useAuth} from '@/utils/auth';
+import {noteListLabel} from '@/lib/notes/notesList';
+import {noteServiceDate} from '@/lib/notes/noteTypes';
+import {useNoteOperation} from '@/lib/notes/useNoteOperation';
+import {NoteFieldErrors, focusNoteError} from '@/pages/shared/notes/NoteFieldErrors';
+import {useCreateOrUpdateActivityLogMutation, useSubmitActivityLogNotesMutation, useUpdateActivityLogMutation} from '@/pages/userPanel/notes/api';
+import type {NoteFieldError} from '@/pages/userPanel/notes/apiTypes';
+import NoteWorkspace from '@/pages/userPanel/notes/components/NoteWorkspace';
+import {NOTE_LINK, NoteSection, SectionChip} from '@/pages/userPanel/notes/components/NotesKit';
+import {FactGrid, NoteUnavailable, SegmentedChoice, SignOffCard, SignatureCard, TickedList, VisitDetailsCard, dayAtTime, type NoteIssue} from '@/pages/userPanel/notes/components/NotePageKit';
+import {ReviewFacts, ReviewTags} from '@/pages/userPanel/notes/components/ReviewDrawer';
+import {SectionRequests, sectionRequests} from '@/pages/userPanel/notes/components/NoteThread';
+import {useNoteVisit} from '@/pages/userPanel/notes/useNoteVisit';
+import type {SaveState, SubmitResult} from '@/pages/userPanel/notes/useSingleRowNote';
 
-const initialActivities = [
-  {id: "", date: undefined, units: "", strategies: "", activities: "", location: "", notes: ""},
-  {id: "", date: undefined, units: "", strategies: "", activities: "", location: "", notes: ""},
-  {id: "", date: undefined, units: "", strategies: "", activities: "", location: "", notes: ""},
-  {id: "", date: undefined, units: "", strategies: "", activities: "", location: "", notes: ""},
-  {id: "", date: undefined, units: "", strategies: "", activities: "", location: "", notes: ""},
-  {id: "", date: undefined, units: "", strategies: "", activities: "", location: "", notes: ""},
-  {id: "", date: undefined, units: "", strategies: "", activities: "", location: "", notes: ""},
-]
+/*
+ * Community inclusion, day habilitation and prevocational training logs: one row
+ * per place or activity, each with units, the support given and how the person
+ * took part.
+ */
 
 type ActivityRow = {
-  id: string;
-  date: Date | undefined;
-  units: string;
-  strategies: string;
-  activities: string;
-  location: string;
-  notes: string;
+    id: string;
+    date: Date | undefined;
+    units: string;
+    strategies: string;
+    activities: string;
+    location: string;
+    notes: string;
+    connections: string[];
 };
 
+const SUPPORT = ['Independent', 'Verbal prompts', 'Hands-on help'];
+const CONNECTIONS = ['Club or group members', 'Staff where we went', 'Members of the public', 'Shop or cafe staff', 'Friends', 'Family', 'Other'];
+const blank = (date: Date | undefined): ActivityRow => ({id: '', date, units: '', strategies: '', activities: '', location: '', notes: '', connections: []});
+const filled = (row: ActivityRow) => Boolean(row.units || row.strategies || row.activities.trim() || row.location.trim() || row.notes.trim());
+const complete = (row: ActivityRow) => Boolean(row.date && Number(row.units) > 0 && row.strategies.trim() && row.activities.trim() && row.location.trim() && row.notes.trim());
+const INPUT = 'h-10 w-full rounded-[8px] border border-[#e3e8ea] bg-white px-3 text-[14px] text-[#10141a] outline-none focus-visible:border-[#007679] focus-visible:ring-2 focus-visible:ring-[#007679]/20 disabled:opacity-70 dark:border-white/10 dark:bg-[#141b21] dark:text-[#f4f6f7]';
+const LABEL = 'block text-[12px] text-[#5d6b73] dark:text-[#9aa4a8]';
+
 interface ActivitiesLogTemplateProps {
-  title: string;
+    /** Kept for the older pages; the heading now comes from the note type. */
+    title: string;
 }
 
 export default function ActivitiesLogTemplate(props: ActivitiesLogTemplateProps) {
-  const id = new URLSearchParams(useLocation().search).get("id");
-  return <ActivitiesLogForm key={id} {...props} />;
+    const id = new URLSearchParams(useLocation().search).get('id');
+    if (!id) return <NoteUnavailable message="No note selected."/>;
+    return <ActivitiesLogForm key={id} activityLogId={id} {...props}/>;
 }
 
-function ActivitiesLogForm({title}: ActivitiesLogTemplateProps) {
-  const [openDatePopoverId, setOpenDatePopoverId] = useState<string | null>(null);
-  const [activities, setActivities] = useState<ActivityRow[]>(initialActivities);
-  const activitiesRef = useRef(activities);
-  activitiesRef.current = activities;
-  const {user} = useAuth();
+function ActivitiesLogForm({activityLogId}: ActivitiesLogTemplateProps & {activityLogId: string}) {
+    const {user} = useAuth();
+    const signer = user?.fullName ?? '';
+    const visitData = useNoteVisit(activityLogId, user?.agency?.name ?? '');
+    const {log: activityLog, item, timezone} = visitData;
+    const noteType = activityLog?.activityType || 'community-inclusion';
+    const inclusion = noteType === 'community-inclusion';
+    const words = inclusion ? {section: 'Places visited', one: 'place', add: 'Add a place', name: 'Place'} : {section: 'Activities', one: 'activity', add: 'Add an activity', name: 'Where'};
+    const [activities, setActivities] = useState<ActivityRow[]>([]);
+    const activitiesRef = useRef(activities);
+    activitiesRef.current = activities;
+    const operation = useNoteOperation();
+    const submitting = useRef(false);
+    const [flushing, setFlushing] = useState(false);
+    const [fieldErrors, setFieldErrors] = useState<NoteFieldError[]>([]);
+    const hydrated = useRef(false);
+    const failedSaves = useRef(new Set<string>());
+    const saveChain = useRef<Promise<void>>(Promise.resolve());
+    const [submittedIds, setSubmittedIds] = useState<string[]>([]);
+    const [mutateNote] = useCreateOrUpdateActivityLogMutation();
+    const [updateLog] = useUpdateActivityLogMutation();
+    const outcomeSave = useRef<Promise<unknown>>(Promise.resolve());
+    const [submitNotes, {isLoading: isSubmitting}] = useSubmitActivityLogNotesMutation();
+    const [outcome, setOutcome] = useState('');
+    const [confirmed, setConfirmed] = useState(false);
+    const [saveState, setSaveState] = useState<SaveState>('idle');
+    const [savedAt, setSavedAt] = useState<Date | null>(null);
 
-  const navigate = useNavigate();
-  const activityLogId = new URLSearchParams(useLocation().search).get("id");
+    const lockedIds = new Set([...submittedIds, ...(activityLog?.submittedNotes ?? []).map(note => note.id), ...(activityLog?.approvedNotes ?? []).map(note => note.id)]);
+    const busy = operation.pending || flushing;
 
-  const {data: activityLog, isLoading} = useGetSingleActivityLogQuery(activityLogId!, {
-    skip: !activityLogId
-  });
-  const operation = useNoteOperation();
-  const submitting = useRef(false);
-  const [flushing, setFlushing] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<NoteFieldError[]>([]);
-  const hydrated = useRef(false);
-  const failedSaves = useRef(new Set<string>());
-  const saveChain = useRef<Promise<void>>(Promise.resolve());
-  const [submittedIds, setSubmittedIds] = useState<string[]>([]);
-  const [mutateNote] = useCreateOrUpdateActivityLogMutation();
-  const [submitNotes, {isLoading: isSubmitting}] = useSubmitActivityLogNotesMutation();
+    /** Saves one row once it has a date. Saves run one after another so rows are never duplicated. */
+    const updateActivity = (_id: string, index: number, field: keyof ActivityRow, value: ActivityRow[keyof ActivityRow]) => {
+        if (busy || submitting.current || lockedIds.has(activitiesRef.current[index].id)) return;
+        activitiesRef.current = activitiesRef.current.map((row, i) => i === index ? {...row, [field]: value} : row);
+        setActivities(activitiesRef.current);
+        const saveKey = `activity:${index}`;
+        saveChain.current = saveChain.current.catch(() => {}).then(async () => {
+            failedSaves.current.add(saveKey);
+            const current = activitiesRef.current[index];
+            // A blank new row (say, one that only got the outing's connections) waits until it has content.
+            if (!current.id && !filled(current)) { failedSaves.current.delete(saveKey); return; }
+            if (!current.date) return;
+            setSaveState('saving');
+            try {
+                const {data} = await mutateNote({activityLog: activityLogId, data: {
+                    id: current.id,
+                    startDate: format(current.date, 'yyyy-MM-dd'),
+                    endDate: format(current.date, 'yyyy-MM-dd'),
+                    metadata: {units: current.units, strategies: current.strategies, activities: current.activities, location: current.location, notes: current.notes,
+                        ...(current.connections.length ? {connections: current.connections} : {})},
+                }}).unwrap();
+                failedSaves.current.delete(saveKey);
+                setSaveState('saved');
+                setSavedAt(new Date());
+                if (!current.id && data?.id) {
+                    activitiesRef.current = activitiesRef.current.map((row, i) => i === index ? {...row, id: data.id} : row);
+                    setActivities(activitiesRef.current);
+                }
+            } catch (error) {
+                setSaveState('error');
+                throw error;
+            }
+        });
+        void saveChain.current.catch(() => toast.error('Your changes could not be saved. Try again before submitting.'));
+    };
 
-  const currentDate = new Date().toLocaleDateString("en-US", {month: "long", day: "numeric"});
-
-  const lockedIds = new Set([...submittedIds, ...(activityLog?.submittedNotes ?? []).map(note => note.id), ...(activityLog?.approvedNotes ?? []).map(note => note.id)]);
-  const updateActivity = (_id: string, index: number, field: keyof ActivityRow, value: any) => {
-    if ((operation.pending || submitting.current) || lockedIds.has(activitiesRef.current[index].id)) return;
-    activitiesRef.current = activitiesRef.current.map((item, i) => i === index ? {...item, [field]: value} : item);
-    setActivities(activitiesRef.current);
-    const saveKey = `activity:${index}`;
-    saveChain.current = saveChain.current.catch(() => {}).then(async () => {
-        failedSaves.current.add(saveKey);
-        const current = activitiesRef.current[index];
-        const date = current.date;
-        const metadata = {units: current.units, strategies: current.strategies, activities: current.activities, location: current.location, notes: current.notes};
-        if (!(date)) return;
-        const {data} = await mutateNote({
-        activityLog: activityLogId!,
-        data: {
-          id: current.id,
-          startDate: format(date, "yyyy-MM-dd"),
-          endDate: format(date, "yyyy-MM-dd"),
-          metadata: metadata
-        }
-      }).unwrap();
-        failedSaves.current.delete(saveKey);
-        if (!current.id && data?.id) {
-          activitiesRef.current = activitiesRef.current.map((item, i) => i === index ? {...item, id: data.id} : item);
-          setActivities(activitiesRef.current);
-        }
-    });
-    void saveChain.current.catch(() => toast.error('Your changes could not be saved. Try again before submitting.'));
-  };
-
-  const formatDisplayDate = (date: Date | undefined) => {
-    if (!date) {
-      return "";
-    }
-    return format(date, "dd.MM.yy");
-  };
-
-  const handleSubmit = async () => {
-    if (submitting.current) return;
-    submitting.current = true; setFlushing(true);
-    try {
-      await saveChain.current.catch(() => {});
-      submitting.current = false;
-      for (const key of [...failedSaves.current]) {
-        const [kind, position] = key.split(':'); const index = Number(position);
-        if (kind === 'activity') updateActivity('', index, 'date', activitiesRef.current[index].date);
-      }
-      submitting.current = true;
-      await saveChain.current;
-      if (failedSaves.current.size) throw new Error("Some rows have unsaved changes. Check their dates and try saving again before submitting.");
-      const logNoteIds = [...activitiesRef.current].filter(row => row.id && !lockedIds.has(row.id)).map(row => row.id);
-      if (!logNoteIds.length) { toast.error('Save a service row before submitting.'); return; }
-      await operation.run({action: 'submit', resourceId: activityLogId!, noteIds: logNoteIds}, operationId => submitNotes({activityLog: activityLogId!, logNoteIds, operationId}).unwrap());
-      setSubmittedIds(previous => [...previous, ...logNoteIds]);
-      setFieldErrors([]);
-      toast.success('Note submitted successfully!');
-    } catch (error: any) {
-      const errors = error?.data?.fieldErrors ?? [];
-      setFieldErrors(errors);
-      focusNoteError(errors);
-      toast.error(error?.data?.message || error?.message || 'Failed to submit activity log.');
-    } finally { submitting.current = false; setFlushing(false); }
-  };
-
-  useEffect(() => {
-    if (isLoading || !activityLog || hydrated.current) return;
-    hydrated.current = true;
-    const notes = [...activityLog.notes, ...(activityLog.submittedNotes ?? []), ...(activityLog.approvedNotes ?? [])];
-    const modifyActivityNotes = notes.map((note) => ({
-          id: note.id,
-          date: noteServiceDate(note.startDate),
-          units: note.metadata?.units ?? "",
-          strategies: note.metadata?.strategies ?? "",
-          activities: note.metadata?.activities ?? "",
-          location: note.metadata?.location ?? "",
-          notes: note.metadata?.notes ?? "",
+    useEffect(() => {
+        if (!activityLog || hydrated.current) return;
+        hydrated.current = true;
+        const notes = [...activityLog.notes, ...(activityLog.submittedNotes ?? []), ...(activityLog.approvedNotes ?? [])];
+        const rows = notes.map(note => ({
+            id: note.id,
+            date: noteServiceDate(note.startDate),
+            units: note.metadata?.units != null ? String(note.metadata.units) : '',
+            strategies: note.metadata?.strategies ?? '',
+            activities: note.metadata?.activities ?? '',
+            location: note.metadata?.location ?? '',
+            notes: note.metadata?.notes ?? '',
+            connections: Array.isArray(note.metadata?.connections) ? note.metadata.connections.filter((value: unknown) => typeof value === 'string') : [],
         }));
-    activitiesRef.current = [...modifyActivityNotes, ...initialActivities.slice(modifyActivityNotes.length)];
-    setActivities(activitiesRef.current);
-  }, [isLoading, activityLog]);
+        activitiesRef.current = rows.length ? rows : [blank(noteServiceDate(activityLog.serviceDate ?? undefined))];
+        setActivities(activitiesRef.current);
+        setOutcome(typeof activityLog.metadata?.ISPOutcome === 'string' ? activityLog.metadata.ISPOutcome : '');
+    }, [activityLog]);
 
-  if (isLoading) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <div className="text-center">
-          <div
-            className="mb-4 inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-[#00b4b8] border-r-transparent"></div>
-          <p className="text-sm text-[#808081]">Loading notes...</p>
-        </div>
-      </div>
-    );
-  }
+    const editableRows = activities.filter(row => !lockedIds.has(row.id));
+    const locked = Boolean(activityLog) && (activityLog!.status !== 'active' || (!activityLog!.notes.length && lockedIds.size > 0)
+        || (submittedIds.length > 0 && editableRows.every(row => !row.id)));
+    const disabled = locked || busy;
+    const used = useMemo(() => activities.filter(filled), [activities]);
+    const totalUnits = used.reduce((sum, row) => sum + (Number(row.units) > 0 ? Number(row.units) : 0), 0);
+    const connections = [...new Set(activities.flatMap(row => row.connections))];
 
-  return (
-    <VoiceRecordingProvider pageTitle={title}>
-      <div className="min-h-[calc(100vh-200px)] pb-20">
-        {/* Page Header */}
-        <div className="mb-8 flex justify-between items-center">
-          <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a] font-['Urbanist',sans-serif]">
-            Notes
-          </h1>
-          <Button
-            onClick={() => navigate(Routes.userPanel.notes.index)}
-            className="flex items-center gap-2 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-6 py-3 h-auto font-semibold shadow-sm"
-          >
-            <ArrowLeft className="w-5 h-5"/>
-            Back to Notes
-          </Button>
-        </div>
+    /** The outing's connections are kept on each of its rows. */
+    const toggleConnection = (value: string) => {
+        const next = connections.includes(value) ? connections.filter(item => item !== value) : [...connections, value];
+        activitiesRef.current.forEach((row, index) => { if (!lockedIds.has(row.id)) updateActivity(row.id, index, 'connections', next); });
+    };
 
-        {/* Department Information */}
-        <div className="text-center mb-6 space-y-2">
-          <p className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif]">
-            New Jersey Department of Human Services
-          </p>
-          <p className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif]">
-            Division of Developmental Disabilities
-          </p>
-          <a
-            href="https://www.nj.gov/humanservice/add"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[14px] font-normal leading-[1.4] text-[#2b82ff] hover:underline font-['Urbanist',sans-serif]"
-          >
-            www.nj.gov/humanservice/add
-          </a>
-        </div>
+    const saveOutcome = (value: string) => {
+        if (disabled) return;
+        setOutcome(value);
+        outcomeSave.current = outcomeSave.current.catch(() => {}).then(() => updateLog({activityLog: activityLogId, data: {ISPOutcome: value}}).unwrap());
+        void outcomeSave.current.catch(() => toast.error("Couldn't save the outcome. Try again."));
+    };
 
-        {/* Form Title */}
-        <h2
-          className="text-[20px] font-semibold leading-[1.6] text-[#10141a] text-center mb-8 font-['Urbanist',sans-serif] whitespace-pre-wrap">
-          {title.replace(":serviceCode", activityLog?.metadata?.serviceCode ?? "")}
-        </h2>
+    /** Re-sends rows whose last save failed, then waits for every save. */
+    const flush = async () => {
+        await saveChain.current.catch(() => {});
+        for (const key of [...failedSaves.current]) {
+            const index = Number(key.split(':')[1]);
+            if (activitiesRef.current[index]) updateActivity('', index, 'date', activitiesRef.current[index].date);
+        }
+        await saveChain.current;
+        await outcomeSave.current;
+        if (failedSaves.current.size) throw new Error('Some rows have unsaved changes. Check their dates and try saving again before submitting.');
+    };
 
-        {/* Name of Individual */}
-        <div className="mb-6">
-          <p className="text-[14px] font-semibold leading-[1.4] text-black font-['Urbanist',sans-serif]">
-            Name of Individual : {activityLog?.metadata?.individual}
-          </p>
-        </div>
+    const saveDraft = async () => {
+        try {
+            await flush();
+            toast.success('Draft saved', {description: 'You can come back to it any time before it is due.'});
+        } catch (error: any) {
+            toast.error(error?.message || "Couldn't save. Check your connection and try again.");
+        }
+    };
 
-        {/* Activities Log Table */}
-        <div className="overflow-x-auto">
-          <div className="w-[1163px]">
-            {/* Table Header */}
-            <div className="border border-[#b2b2b3] rounded-tl-[2px] rounded-tr-[2px] overflow-hidden">
-              <div className="border-b border-[#b2b2b3] bg-[#eef4f5] h-[71px]">
-                <div className="grid grid-cols-[112px_120px_160px_230px_140px_1fr] gap-0 h-full">
-                  <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center text-center">
-                    <p className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif]">
-                      Date
-                    </p>
-                  </div>
-                  <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center text-center">
-                    <p className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif]">
-                      # of Units
-                    </p>
-                  </div>
-                  <div
-                    className="relative px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center text-center">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button type="button" className="absolute top-2 right-2 h-4 w-4 cursor-pointer">
-                          <InformationCircleIcon className="h-4 w-4 text-[#10141a]"/>
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent
-                        align="center"
-                        side="top"
-                        className="bg-white rounded-[6px] px-4 py-3 shadow-lg border-none w-[250px]"
-                        sideOffset={5}
-                      >
-                        <p className="text-[10px] font-normal leading-[1.6] text-black font-['Urbanist',sans-serif]">
-                          Strategies addressed from the Individual Service Plan (ISP)
-                        </p>
-                      </PopoverContent>
-                    </Popover>
-                    <p
-                      className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif] whitespace-pre-wrap">
-                      {"Strategies\nAddressed\nToday"}
-                    </p>
-                  </div>
-                  <div
-                    className="relative px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center text-center">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button type="button" className="absolute top-2 right-2 h-4 w-4 cursor-pointer">
-                          <InformationCircleIcon className="h-4 w-4 text-[#10141a]"/>
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent
-                        align="center"
-                        side="top"
-                        className="bg-white rounded-[6px] px-4 py-3 shadow-lg border-none w-[250px]"
-                        sideOffset={5}
-                      >
-                        <p
-                          className="text-[10px] font-normal leading-[1.6] text-black font-['Urbanist',sans-serif] whitespace-pre-wrap">
-                          {`can use calendars or other activity  lists that reflect today's activities, if  applicable`}
-                        </p>
-                      </PopoverContent>
-                    </Popover>
-                    <p
-                      className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif] whitespace-pre-wrap">
-                      {"Today\u2019s Activities to Address\nStrategies"}
-                    </p>
-                  </div>
-                  <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center text-center">
-                    <p
-                      className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif] whitespace-pre-wrap">
-                      {"Location of\nActivities"}
-                    </p>
-                  </div>
-                  <div className="px-4 py-3 flex items-center justify-center text-center">
-                    <p
-                      className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif] whitespace-pre-wrap">
-                      {"Notes Related to Today\u2019s Activities &\nProgress Toward Outcome(s)"}
-                    </p>
-                  </div>
-                </div>
-              </div>
+    const submit = async (): Promise<SubmitResult> => {
+        if (submitting.current) return 'failed';
+        submitting.current = true;
+        setFlushing(true);
+        try {
+            submitting.current = false;
+            await flush();
+            submitting.current = true;
+            const logNoteIds = activitiesRef.current.filter(row => row.id && !lockedIds.has(row.id)).map(row => row.id);
+            if (!logNoteIds.length) { toast.error('Save a row before submitting.'); return 'failed'; }
+            await operation.run({action: 'submit', resourceId: activityLogId, noteIds: logNoteIds}, operationId => submitNotes({activityLog: activityLogId, logNoteIds, operationId}).unwrap());
+            setSubmittedIds(previous => [...previous, ...logNoteIds]);
+            setFieldErrors([]);
+            return 'sent';
+        } catch (error: any) {
+            const errors = error?.data?.fieldErrors ?? [];
+            setFieldErrors(errors);
+            focusNoteError(errors);
+            toast.error("Couldn't submit", {description: error?.data?.message || error?.message || 'Check your connection and try again. Your draft is safe.'});
+            return 'failed';
+        } finally {
+            submitting.current = false;
+            setFlushing(false);
+        }
+    };
+
+    const issues = useMemo(() => {
+        const list: NoteIssue[] = [];
+        if (!used.length) list.push({id: 'rows', text: `Add at least one ${words.one}`, target: 'places'});
+        used.forEach(row => {
+            const index = activities.indexOf(row);
+            if (!complete(row)) list.push({id: `row-${index}`, text: `Finish ${words.one} ${index + 1}: name, activity, units, support and how they took part`, target: `place-${index}`});
+        });
+        if (!confirmed) list.push({id: 'sign-off', text: 'Tick the sign-off confirmation', target: 'sign-off'});
+        return list;
+    }, [used, activities, confirmed, words.one]);
+
+    const addRow = () => {
+        if (disabled) return;
+        activitiesRef.current = [...activitiesRef.current, blank(noteServiceDate(activityLog?.serviceDate ?? undefined))];
+        setActivities(activitiesRef.current);
+    };
+    const focus = (target: string) => document.getElementById(target)?.scrollIntoView({behavior: 'smooth', block: 'start'});
+    const dates = (activityLog?.serviceDates?.length ? activityLog.serviceDates : [activityLog?.serviceDate].filter(Boolean)) as string[];
+
+    const row = (entry: ActivityRow, index: number, attempted: boolean, comments: Parameters<typeof SectionRequests>[0]['comments']) => {
+        const rowLocked = disabled || lockedIds.has(entry.id);
+        const legacyStrategy = Boolean(entry.strategies) && !SUPPORT.includes(entry.strategies);
+        const missing = attempted && filled(entry) && !complete(entry);
+        const set = (field: keyof ActivityRow, value: ActivityRow[keyof ActivityRow]) => updateActivity(entry.id, index, field, value);
+        return <li key={index} id={`place-${index}`} data-note-id={entry.id} className={cn('scroll-mt-24 rounded-[10px] border p-3.5', missing ? 'border-[#e5484d]' : 'border-[#e3e8ea] dark:border-white/10')}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <label className="min-w-0 flex-1 basis-[220px]" data-note-field="location">
+                    <span className={LABEL}>{words.name}</span>
+                    <span className="relative mt-1 block">
+                        <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a979d]" aria-hidden="true"/>
+                        <input aria-label={words.name} value={entry.location} disabled={rowLocked} maxLength={200} placeholder={inclusion ? 'e.g. Somerset County Library' : 'Where did this happen?'}
+                            onChange={event => set('location', event.target.value)} className={cn(INPUT, 'pl-9')}/>
+                    </span>
+                </label>
+                <label className="w-[132px]" data-note-field="units">
+                    <span className={LABEL}>Units (15 min)</span>
+                    <input aria-label="Units (15 min)" type="number" inputMode="decimal" min={0} step="any" value={entry.units} disabled={rowLocked} onChange={event => set('units', event.target.value)} className={cn(INPUT, 'mt-1')}/>
+                </label>
+                {dates.length > 1 || !entry.date ? <label className="w-[170px]" data-note-field="startDate">
+                    <span className={LABEL}>Date</span>
+                    <select aria-label="Date" value={entry.date ? format(entry.date, 'yyyy-MM-dd') : ''} disabled={rowLocked} onChange={event => set('date', noteServiceDate(event.target.value))} className={cn(INPUT, 'mt-1 cursor-pointer')}>
+                        {!entry.date ? <option value="">Pick a date</option> : null}
+                        {dates.map(value => <option key={value} value={value}>{format(noteServiceDate(value)!, 'EEE d MMM')}</option>)}
+                    </select>
+                </label> : null}
             </div>
-
-            {/* Table Body */}
-            <div className="border border-[#b2b2b3] rounded-bl-[2px] rounded-br-[2px] border-t-0">
-              <div className="bg-[#eef4f5]">
-                {activities.map((activity, index) => (
-                  <div
-                    key={index}
-                    data-note-id={activity.id}
-                    className={`grid grid-cols-[112px_120px_160px_230px_140px_1fr] gap-0 min-h-[71px] transition-colors ${
-                      index < activities.length - 1 ? 'border-b border-[#b2b2b3]' : ''
-                    } hover:bg-white`}
-                  >
-                    {/* Date */}
-                    <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
-                      <Popover
-                        open={openDatePopoverId === String(index)}
-                        onOpenChange={(open) => { if (!lockedIds.has(activity.id) && !operation.pending) setOpenDatePopoverId(open ? String(index) : null); }}
-                      >
-                        <PopoverTrigger asChild>
-                          <button data-note-field="startDate" disabled={lockedIds.has(activity.id) || flushing}
-                            type="button"
-                            className="w-full h-full flex items-center justify-center focus:outline-none cursor-pointer"
-                          >
-                          <span
-                            className="text-[14px] font-normal leading-[1.4] text-[#10141a] font-['Urbanist',sans-serif]">
-                            {formatDisplayDate(activity.date)}
-                          </span>
-                          </button>
-                        </PopoverTrigger>
-                        <PopoverContent align="start" className="mt-3 w-auto border-none bg-white p-0 shadow-lg">
-                          <Calendar
-                            mode="single"
-                            className="bg-white"
-                            captionLayout="dropdown"
-                            startMonth={new Date(1924, 0)}
-                            endMonth={new Date()}
-                            selected={activity.date}
-                            disabled={{
-                              after: new Date()
-                            }}
-                            defaultMonth={activity.date ?? new Date()}
-                            onSelect={async (date) => {
-                              if (date) {
-                                await updateActivity(activity.id, index, 'date', date);
-                                setOpenDatePopoverId(null);
-                              }
-                            }}
-                            formatters={{
-                              formatMonthDropdown: (date) =>
-                                date.toLocaleString("default", {month: "long"}),
-                            }}
-                            classNames={{
-                              dropdown_root: "relative border-none shadow-none has-focus:ring-0",
-                              caption_label: "rounded-md pl-2 pr-2 flex items-center gap-1 text-sm h-8 [&>svg]:hidden",
-                            }}
-                            autoFocus={true}
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                    {/* Units */}
-                    <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
-                      <Input disabled={lockedIds.has(activity.id) || operation.pending || flushing}
-                        type="number"
-                        aria-label="Units" data-note-field="units"
-                        value={activity.units}
-                        onChange={(e) => updateActivity(activity.id, index, 'units', e.target.value)}
-                        className="h-auto p-0 border-0 bg-transparent text-center focus-visible:ring-0 text-[14px] w-full"
-                      />
-                    </div>
-                    {/* Strategies */}
-                    <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
-                      <ContentEditableCell fieldKey="strategies"
-                        readOnly={lockedIds.has(activity.id) || operation.pending || flushing}
-                        value={activity.strategies}
-                        onChange={(value) => updateActivity(activity.id, index, 'strategies', value)}
-                        fieldName="Strategies Addressed Today"
-                        pageTitle={title}
-                      />
-                    </div>
-                    {/* Activities */}
-                    <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
-                      <ContentEditableCell fieldKey="activities"
-                        readOnly={lockedIds.has(activity.id) || operation.pending || flushing}
-                        value={activity.activities}
-                        onChange={(value) => updateActivity(activity.id, index, 'activities', value)}
-                        fieldName="Today's Activities to Address Strategies"
-                        pageTitle={title}
-                      />
-                    </div>
-                    {/* Location */}
-                    <div className="px-4 py-3 border-r border-[#b2b2b3] flex items-center justify-center">
-                      <ContentEditableCell fieldKey="location"
-                        readOnly={lockedIds.has(activity.id) || operation.pending || flushing}
-                        value={activity.location}
-                        onChange={(value) => updateActivity(activity.id, index, 'location', value)}
-                        fieldName="Location of Activities"
-                        pageTitle={title}
-                      />
-                    </div>
-                    {/* Notes */}
-                    <div className="px-4 py-3 flex items-center justify-center">
-                      <ContentEditableCell fieldKey="notes"
-                        readOnly={lockedIds.has(activity.id) || operation.pending || flushing}
-                        value={activity.notes}
-                        onChange={(value) => updateActivity(activity.id, index, 'notes', value)}
-                        fieldName="Notes Related to Today's Activities & Progress Toward Outcome(s)"
-                        pageTitle={title}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <label className="mt-3 block" data-note-field="activities">
+                <span className={LABEL}>Activity</span>
+                <input aria-label="Activity" value={entry.activities} disabled={rowLocked} maxLength={300} placeholder="e.g. Monthly book club" onChange={event => set('activities', event.target.value)} className={cn(INPUT, 'mt-1')}/>
+            </label>
+            <div className="mt-3" data-note-field="strategies">
+                {legacyStrategy ? <label className="block">
+                    <span className={LABEL}>Strategies addressed</span>
+                    <input aria-label="Strategies addressed" value={entry.strategies} disabled={rowLocked} maxLength={300} onChange={event => set('strategies', event.target.value)} className={cn(INPUT, 'mt-1')}/>
+                </label> : <SegmentedChoice name={`support-${index}`} legend="Level of support" options={SUPPORT} value={entry.strategies} disabled={rowLocked} onChange={value => set('strategies', value)}/>}
             </div>
-          </div>
-        </div>
+            <SectionRequests comments={comments} section={`place-${index + 1}`} timezone={timezone}/>
+            <label className="mt-3 block" data-note-field="notes">
+                <span className={LABEL}>How they took part</span>
+                <textarea aria-label="How they took part" value={entry.notes} disabled={rowLocked} rows={3} maxLength={2000} placeholder="What did they do themselves, and how did it move them toward their outcome?"
+                    onChange={event => set('notes', event.target.value)} className={cn(INPUT, 'mt-1 h-auto py-2.5 leading-relaxed')}/>
+            </label>
+            {missing ? <p role="alert" className="mt-2 text-[12px] text-[#b3261e] dark:text-[#f3a08c]">Fill in every field for this {words.one}.</p> : null}
+        </li>;
+    };
 
-        <NoteFieldErrors errors={fieldErrors} />
-        {/* Total Units Label - Positioned below Units column */}
-        <div className="mt-4">
-          <p className="text-[14px] font-semibold leading-[1.4] text-black font-['Urbanist',sans-serif]">
-            Total Units : {activities.reduce((acc, activity) => acc + (Number(activity.units) || 0), 0)}
-          </p>
-        </div>
+    const supportOf = (entry: ActivityRow) => entry.strategies || 'Support not recorded';
 
-        {/* Completed By Section */}
-        <div className="mt-8">
-          <label
-            className="block text-[12px] font-normal leading-[normal] text-[#10141a] mb-1 font-['Urbanist',sans-serif]">
-            Completed by
-          </label>
-          <Input
-            type="text"
-            value={user?.fullName ?? ""}
-            placeholder="Enter name"
-            className="max-w-md"
-            disabled={true}
-          />
-          <p className="mt-2 text-[12px] font-normal leading-[normal] text-black font-['Urbanist',sans-serif]">
-            {currentDate}
-          </p>
-        </div>
-        <div className={"flex justify-end mt-3"}>
-          <Button
-            type={"button"}
-            onClick={handleSubmit}
-            disabled={isSubmitting || operation.pending || flushing}
-            className="flex items-center gap-2 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-6 py-3 h-auto font-semibold shadow-sm"
-          >
-            {isSubmitting ? "Submitting..." : "Submit"}
-          </Button>
-        </div>
-        {/* Floating Action Button */}
-        <VoiceInputButton minimal={false} />
-      </div>
-    </VoiceRecordingProvider>
-  );
+    return <NoteWorkspace activityLogId={activityLogId} noteType={noteType} title={noteListLabel(noteType)} visitData={visitData}
+        note={{locked, started: activities.some(entry => entry.id), busy, isSubmitting: isSubmitting || busy, retrySubmission: false, saveState, savedAt, saveDraft, submit}}
+        issues={issues} signer={signer} confirmed={confirmed} onConfirm={setConfirmed}
+        progress={() => [
+            {label: 'Visit details', detail: visitData.visit.verified ? 'Verified by EVV' : 'From your shift', state: 'done'},
+            {label: 'ISP outcome', detail: outcome ? 'Chosen' : 'Optional', state: 'done'},
+            {label: words.section, detail: used.length ? `${used.length} · ${totalUnits} units` : `Add a ${words.one}`, state: used.length && used.every(complete) ? 'done' : 'todo'},
+            {label: 'Sign-off', detail: confirmed ? 'Confirmed' : 'Tick the confirmation', state: confirmed ? 'done' : 'todo'},
+        ]}
+        review={{sections: [
+            {label: 'ISP outcome', content: <p className="text-[13px] text-[#10141a] dark:text-[#f4f6f7]">{outcome || 'None given'}</p>, onEdit: () => focus('outcome')},
+            {label: `${words.section} (${used.length})`, content: <ReviewFacts items={used.map(entry => ({label: entry.location || entry.activities, value: `${entry.units} units · ${supportOf(entry)}`}))}/>, onEdit: () => focus('places')},
+            ...(inclusion ? [{label: 'Community connections', content: <ReviewTags items={connections} empty="None chosen"/>, onEdit: () => focus('connections')}] : []),
+        ]}}
+        print={() => [
+            {title: 'ISP outcome', lines: [outcome || '—']},
+            ...used.map((entry, index) => ({title: `${index + 1}. ${entry.location} (${entry.units} units)`, lines: [`${entry.activities}. ${supportOf(entry)}. ${entry.notes}`]})),
+            ...(inclusion ? [{title: 'Community connections', lines: connections.length ? connections : ['—']}] : []),
+        ]}>
+        {({attempted, comments}) => {
+            const outcomeRequest = sectionRequests(comments, 'isp-outcome').length > 0;
+            return locked ? <>
+                <VisitDetailsCard visit={visitData.visit} noteType={noteType} billable/>
+                <NoteSection icon={<Target/>} title="ISP outcome"><p className="text-[14px] text-[#10141a] dark:text-[#f4f6f7]">{outcome || 'None given'}</p></NoteSection>
+                <NoteSection icon={<MapPin/>} title={words.section} aside={<SectionChip tone="neutral">{totalUnits} units</SectionChip>}>
+                    <ol className="flex flex-col gap-2">{used.map((entry, index) => <li key={index} className="rounded-[10px] border border-[#e3e8ea] p-3.5 dark:border-white/10">
+                        <p className="text-[14px] font-medium text-[#10141a] dark:text-[#f4f6f7]">{entry.location}</p>
+                        <FactGrid items={[{label: 'Activity', value: entry.activities}, {label: 'Level of support', value: supportOf(entry)}, {label: 'Units', value: entry.units}]}/>
+                        <p className="mt-2 whitespace-pre-wrap text-[13px] text-[#34434c] dark:text-[#c9d3d6]">{entry.notes}</p>
+                    </li>)}</ol>
+                </NoteSection>
+                {inclusion ? <NoteSection icon={<Users/>} title="Community connections"><TickedList items={connections}/></NoteSection> : null}
+                <SignatureCard signer={signer || 'Not recorded'} signedAt={item?.submittedAt ? dayAtTime(item.submittedAt, timezone) : 'Not recorded'}/>
+            </> : <>
+                <NoteFieldErrors errors={fieldErrors}/>
+                <VisitDetailsCard visit={visitData.visit} noteType={noteType}/>
+                <NoteSection id="outcome" icon={<Target/>} title="ISP outcome" invalid={attempted && outcomeRequest && !outcome.trim()}
+                    aside={outcomeRequest ? <SectionChip tone="red">Change requested</SectionChip> : activityLog?.metadata?.ISPOutcome ? <SectionChip>From ISP</SectionChip> : null}>
+                    <SectionRequests comments={comments} section="isp-outcome" timezone={timezone}/>
+                    <label htmlFor="isp-outcome" className={LABEL}>Outcome worked on</label>
+                    <textarea id="isp-outcome" value={outcome} disabled={disabled} rows={2} maxLength={500} onChange={event => setOutcome(event.target.value)} onBlur={event => { if (event.target.value !== (activityLog?.metadata?.ISPOutcome ?? '')) saveOutcome(event.target.value); }}
+                        placeholder="Which outcome from the client's ISP did this support?" className={cn(INPUT, 'mt-1 h-auto py-2.5')}/>
+                </NoteSection>
+                <NoteSection id="places" icon={<MapPin/>} title={words.section} aside={<SectionChip>{used.length} {used.length === 1 ? words.one : `${words.one === 'activity' ? 'activities' : 'places'}`} · {totalUnits} units</SectionChip>}>
+                    <ol className="flex flex-col gap-3">{activities.map((entry, index) => row(entry, index, attempted, comments))}</ol>
+                    <button type="button" onClick={addRow} disabled={disabled}
+                        className="mt-3 flex h-10 w-full cursor-pointer items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-[#c4cdd1] text-[13px] text-[#34434c] hover:bg-[#f7f9f9] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/20 dark:text-[#c9d3d6] dark:hover:bg-white/5">
+                        <Plus className="h-4 w-4" aria-hidden="true"/>{words.add}
+                    </button>
+                    {inclusion ? <p className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-[8px] bg-[#f4f6f6] px-3 py-2.5 text-[13px] text-[#34434c] dark:bg-white/5 dark:text-[#c9d3d6]">
+                        <span className="flex items-center gap-2"><Car className="h-4 w-4 text-[#5d6b73]" aria-hidden="true"/>Drove between places? Log the miles separately.</span>
+                        <Link to={Routes.userPanel.mileage} className={cn(NOTE_LINK, 'inline-flex items-center gap-1')}>Open Mileage<ChevronRight className="h-3.5 w-3.5" aria-hidden="true"/></Link>
+                    </p> : null}
+                </NoteSection>
+                {inclusion ? <NoteSection id="connections" icon={<Users/>} title="Community connections" description="Who did they talk to or spend time with? Choose all that apply.">
+                    <div className="flex flex-wrap gap-2" role="group" aria-label="Community connections">
+                        {CONNECTIONS.map(value => {
+                            const on = connections.includes(value);
+                            return <button key={value} type="button" aria-pressed={on} disabled={disabled} onClick={() => toggleConnection(value)}
+                                className={cn('h-8 cursor-pointer rounded-full border px-3 text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-60',
+                                    on ? 'border-[#5fb8b9] bg-[#e3f4f4] text-[#00494a] dark:border-[#5fd0cd]/60 dark:bg-[#00a3a7]/15 dark:text-[#7fe0e2]' : 'border-[#e3e8ea] text-[#34434c] hover:bg-[#f7f9f9] dark:border-white/10 dark:text-[#c9d3d6] dark:hover:bg-white/5')}>{value}</button>;
+                        })}
+                    </div>
+                </NoteSection> : null}
+                <SignOffCard confirmed={confirmed} onChange={setConfirmed} disabled={disabled} error={attempted && !confirmed}
+                    statement="I confirm this log is accurate and that I delivered these services myself." signer={signer} date={format(new Date(), 'd MMMM yyyy')}/>
+            </>;
+        }}
+    </NoteWorkspace>;
 }
-

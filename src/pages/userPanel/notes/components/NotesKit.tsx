@@ -114,7 +114,7 @@ const BANNER: Record<BannerTone, string> = {
 export function NoteBanner({tone, icon, children, action, role}: {tone: BannerTone; icon?: ReactNode; children: ReactNode; action?: ReactNode; role?: 'alert' | 'status'}) {
     return <div role={role} className={cn('flex flex-wrap items-start gap-3 rounded-[12px] border px-4 py-3 text-[14px]', BANNER[tone])}>
         {icon ? <span className="mt-0.5 shrink-0" aria-hidden="true">{icon}</span> : null}
-        <div className="min-w-0 flex-1">{children}</div>
+        <div className="min-w-0 flex-1 basis-[240px]">{children}</div>
         {action ? <div className="shrink-0">{action}</div> : null}
     </div>;
 }

@@ -67,9 +67,11 @@ describe('existing note forms', () => {
     let resolve!: (value: unknown) => void;
     mocks.save.mockImplementation(() => ({unwrap: () => new Promise(done => {resolve = done;})}));
     render(<ActivitiesLogTemplate title="Activities" />);
-    fireEvent.change(screen.getAllByRole('textbox', {name: 'Strategies Addressed Today'})[0], {target: {value: 'Updated strategy'}});
+    fireEvent.change(screen.getByRole('textbox', {name: 'Strategies addressed'}), {target: {value: 'Updated strategy'}});
     await waitFor(() => expect(mocks.save).toHaveBeenCalledTimes(1));
-    fireEvent.click(screen.getByRole('button', {name: 'Submit'}));
+    fireEvent.click(screen.getByRole('checkbox', {name: /I confirm this log is accurate/}));
+    fireEvent.click(screen.getByRole('button', {name: 'Review and submit'}));
+    fireEvent.click(await screen.findByRole('button', {name: 'Submit note'}));
     expect(mocks.submit).not.toHaveBeenCalled();
     await act(async () => {resolve({data: {id: 'new-row'}});});
     await waitFor(() => expect(mocks.submit).toHaveBeenCalledWith(expect.objectContaining({logNoteIds: ['new-row'], operationId: expect.any(String)})));
@@ -78,12 +80,12 @@ describe('existing note forms', () => {
     mocks.log.notes = [{id: 'row', startDate: '2026-09-12', metadata: {strategies: 'Before'}}];
     mocks.save.mockImplementation(() => ({unwrap: async () => {throw new Error('Offline');}}));
     render(<ActivitiesLogTemplate title="Activities" />);
-    fireEvent.change(screen.getAllByRole('textbox', {name: 'Strategies Addressed Today'})[0], {target: {value: 'Keep this draft'}});
+    fireEvent.change(screen.getByRole('textbox', {name: 'Strategies addressed'}), {target: {value: 'Keep this draft'}});
     await act(async () => {});
-    fireEvent.click(screen.getByRole('button', {name: 'Submit'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Save draft'}));
     await act(async () => {});
     expect(mocks.submit).not.toHaveBeenCalled();
-    expect(screen.getAllByRole('textbox', {name: 'Strategies Addressed Today'})[0]).toHaveValue('Keep this draft');
+    expect(screen.getByRole('textbox', {name: 'Strategies addressed'})).toHaveValue('Keep this draft');
   });
   it('keeps mixed supported-employment evidence visible with only drafts editable', () => {
     const note = (id: string, text: string) => ({id, startDate: '2026-09-12', metadata: {whatWasDone: text}});
@@ -121,12 +123,14 @@ describe('existing note forms', () => {
 });
 
 it('focuses the exact backend field error beside its row', async () => {
-  mocks.log.notes = [{id: 'row', startDate: '2026-09-12', metadata: {strategies: 'Goal', units: '1', activities: 'Walk', location: 'Park', notes: ''}}];
+  mocks.log.notes = [{id: 'row', startDate: '2026-09-12', metadata: {strategies: 'Goal', units: '1', activities: 'Walk', location: 'Park', notes: 'Too short'}}];
   mocks.submit.mockImplementation(() => ({unwrap: async () => {throw {status: 422, data: {fieldErrors: [{noteId: 'row', field: 'metadata.notes', code: 'required'}]}};}}));
   render(<ActivitiesLogTemplate title="Activities" />);
-  fireEvent.click(screen.getByRole('button', {name: 'Submit'}));
+  fireEvent.click(screen.getByRole('checkbox', {name: /I confirm this log is accurate/}));
+  fireEvent.click(screen.getByRole('button', {name: 'Review and submit'}));
+  fireEvent.click(await screen.findByRole('button', {name: 'Submit note'}));
   await screen.findByText('Enter a valid activity notes for row 1.');
-  await waitFor(() => expect(screen.getAllByRole('textbox', {name: "Notes Related to Today's Activities & Progress Toward Outcome(s)"})[0]).toHaveFocus());
+  await waitFor(() => expect(screen.getByRole('textbox', {name: 'How they took part'})).toHaveFocus());
 });
 it('retries uncertain HHA submission without resaving possibly locked evidence', async () => {
   mocks.submit.mockImplementationOnce(() => ({unwrap: async () => {throw {status: 'FETCH_ERROR'};}})).mockImplementation(() => ({unwrap: async () => undefined}));
@@ -174,8 +178,9 @@ it('displays agency-local timed fields and preserves existing instants when only
   mocks.log.timezone = 'America/New_York'; mocks.log.shiftId = 'shift';
   mocks.log.notes = [{id: 'timed', startDate: '2026-09-13T03:00:00.000Z', endDate: '2026-09-13T05:00:00.000Z', metadata: {activity: 'Original activity', description: 'Progress'}}];
   render(<CommunityBasedPage />);
-  expect(screen.getAllByLabelText('Time')[0]).toHaveValue('23:00');
-  expect(screen.getAllByLabelText('Time')[1]).toHaveValue('01:00');
+  fireEvent.click(screen.getByRole('button', {name: 'Edit entry 1'}));
+  expect(screen.getByLabelText('Start time')).toHaveValue('23:00');
+  expect(screen.getByLabelText('End time')).toHaveValue('01:00');
   fireEvent.change(screen.getByDisplayValue('Original activity'), {target: {value: 'Updated activity'}});
   await waitFor(() => expect(mocks.save).toHaveBeenCalled());
   expect(mocks.save.mock.calls[0][0].data).toMatchObject({startDate: '2026-09-13T03:00:00.000Z', endDate: '2026-09-13T05:00:00.000Z'});
@@ -204,9 +209,13 @@ it('preserves exact timed instants when a narrative autosave fails and Submit re
   mocks.log.notes = [{id: 'timed', ...dates, metadata: {activity: 'Original activity', description: 'Progress'}}];
   mocks.save.mockImplementationOnce(() => ({unwrap: async () => {throw new Error('Offline');}})).mockImplementation(() => ({unwrap: async () => ({data: {id: 'timed'}})}));
   render(<CommunityBasedPage />);
+  fireEvent.click(screen.getByRole('button', {name: 'Edit entry 1'}));
   fireEvent.change(screen.getByDisplayValue('Original activity'), {target: {value: 'Preserved narrative'}});
   await waitFor(() => expect(mocks.save).toHaveBeenCalledTimes(1));
-  fireEvent.click(screen.getByRole('button', {name: 'Submit'}));
+  fireEvent.click(screen.getByRole('checkbox', {name: /Increasing independence/}));
+  fireEvent.click(screen.getByRole('checkbox', {name: /I confirm this log is accurate/}));
+  fireEvent.click(screen.getByRole('button', {name: 'Review and submit'}));
+  fireEvent.click(await screen.findByRole('button', {name: 'Submit note'}));
   await waitFor(() => expect(mocks.submit).toHaveBeenCalled());
   expect(mocks.save).toHaveBeenCalledTimes(2);
   expect(mocks.save.mock.calls[1][0].data).toMatchObject({...dates, metadata: {activity: 'Preserved narrative'}});
