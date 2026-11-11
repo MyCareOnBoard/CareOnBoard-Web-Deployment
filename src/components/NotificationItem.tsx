@@ -21,10 +21,13 @@ export const NotificationItem = memo(function NotificationItem({
     onNavigate,
     onClose,
 }: NotificationItemProps) {
-    // Older document requests pointed at a /documents route that doesn't exist;
-    // requested documents live in the dashboard's Documents section.
+    // Older notifications pointed at routes that don't exist. Document requests live in the
+    // dashboard's Documents section; old upload notices only carry the staff member's login id,
+    // so they open the DSP list (new ones link straight to the profile).
     const actionUrl = notification.type === 'documents_requested' && notification.actionUrl === '/documents'
-        ? `${Routes.userPanel.dashboard}?section=documents` : notification.actionUrl;
+        ? `${Routes.userPanel.dashboard}?section=documents`
+        : notification.type === 'employee_document_uploaded' && notification.actionUrl?.startsWith('/employees/')
+            ? Routes.agency.dspManagement : notification.actionUrl;
     const handleClick = useCallback(() => {
         onMarkAsRead(notification.id);
         if (actionUrl) {

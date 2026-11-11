@@ -16,6 +16,9 @@ describe('NotificationItem', () => {
  it('sends old document requests to the dashboard Documents section instead of the missing /documents page', () => {
   expect(click({...base, actionUrl: '/documents'})).toHaveBeenCalledWith('/user-panel/dashboard?section=documents');
  });
+ it('sends old document upload notices to the DSP list instead of a missing page', () => {
+  expect(click({...base, type: 'employee_document_uploaded', actionUrl: '/employees/uid-1/documents'})).toHaveBeenCalledWith('/agency/dsp-management');
+ });
  it('follows the link a new document request carries', () => {
   const url = '/user-panel/dashboard?section=documents&documentType=drug-test';
   expect(click({...base, actionUrl: url})).toHaveBeenCalledWith(url);
