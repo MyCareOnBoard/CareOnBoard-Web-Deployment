@@ -21,16 +21,25 @@ describe('note operation retry identity', () => {
   });
 });
 
-const mocks = vi.hoisted(() => ({log: {} as any, save: vi.fn(), submit: vi.fn()}));
-vi.mock('react-router', () => ({useLocation: () => ({search: '?id=log'}), useNavigate: () => vi.fn()}));
+const mocks = vi.hoisted(() => ({log: {} as any, save: vi.fn(), submit: vi.fn(), navigate: vi.fn()}));
+vi.mock('react-router', () => ({useLocation: () => ({search: '?id=log'}), useNavigate: () => mocks.navigate, Link: ({to, children, ...rest}: any) => <a href={to} {...rest}>{children}</a>}));
 vi.mock('@/utils/auth', () => ({useAuth: () => ({user: {fullName: 'Aide'}})}));
 vi.mock('@/pages/userPanel/notes/api', () => ({
   useGetSingleActivityLogQuery: () => ({data: mocks.log, isLoading: false}),
   useCreateOrUpdateActivityLogMutation: () => [mocks.save, {isLoading: false}],
   useSubmitActivityLogNotesMutation: () => [mocks.submit, {isLoading: false}],
   useUpdateActivityLogMutation: () => [() => ({unwrap: async () => undefined})],
+  useGetMyNotesQuery: () => ({data: undefined}),
+  useGetNoteCommentsQuery: () => ({data: []}),
+  useGetNoteHistoryQuery: () => ({data: [], isLoading: false}),
+  useAddNoteCommentMutation: () => [vi.fn(), {isLoading: false}],
+  useResolveNoteCommentMutation: () => [vi.fn(), {isLoading: false}],
 }));
-vi.mock('@/contexts/VoiceRecordingContext', () => ({VoiceRecordingProvider: ({children}: any) => children}));
+vi.mock('@/contexts/VoiceRecordingContext', () => ({
+  VoiceRecordingProvider: ({children}: any) => children,
+  useVoiceRecording: () => ({startRecording: vi.fn(), registerActiveTarget: vi.fn(), isRecording: false, isActiveField: () => false}),
+  useVoiceSessionActions: () => ({acceptSession: vi.fn(), cancelSession: vi.fn(), recordingUi: {}}),
+}));
 vi.mock('@/components/VoiceInputButton', () => ({default: () => null}));
 vi.mock('@/components/ContentEditableCell', () => ({default: ({value, onChange, readOnly, fieldName, fieldKey}: any) => <div data-note-field={fieldKey}><textarea aria-label={fieldName} value={value ?? ''} readOnly={readOnly} onChange={e => onChange(e.target.value)} /></div>}));
 vi.mock('@/components/TimePicker', () => ({default: ({value, onChange, disabled}: any) => <input aria-label="Time" value={value} disabled={disabled} onChange={e => onChange(e.target.value)} />}));
@@ -39,7 +48,15 @@ import HhaServiceActivityLogPage from './hha-service-activity-log';
 import PersonalCareNoteForm from './hha-personal-care/PersonalCareNoteForm';
 import SupportedEmploymentPrePage from './supported-employment-pre';
 afterEach(cleanup);
+/** Fills the required HHA choices and opens the review drawer. */
+function reviewHha(description?: string) {
+  if (description !== undefined) fireEvent.change(screen.getByRole('textbox', {name: 'Describe the day'}), {target: {value: description}});
+  fireEvent.click(screen.getByRole('radio', {name: 'Fully engaged'}));
+  fireEvent.click(screen.getByRole('checkbox', {name: /I confirm this note is accurate/}));
+  fireEvent.click(screen.getByRole('button', {name: 'Review and submit'}));
+}
 beforeEach(() => {
+  mocks.navigate.mockReset();
   mocks.log = {id: 'log', status: 'active', notes: [], submittedNotes: [], approvedNotes: [], metadata: {}, serviceDate: '2026-09-12'};
   mocks.save.mockReset().mockImplementation(() => ({unwrap: async () => ({data: {id: 'saved-row'}})}));
   mocks.submit.mockReset().mockImplementation(() => ({unwrap: async () => undefined}));
@@ -80,10 +97,11 @@ describe('existing note forms', () => {
   });
   it('uses linked service date for a late HHA service note and flushes its draft', async () => {
     render(<HhaServiceActivityLogPage />);
-    fireEvent.change(screen.getByRole('textbox', {name: 'Activity'}), {target: {value: 'Assisted with activities'}});
-    fireEvent.click(screen.getByRole('button', {name: 'Submit'}));
+    reviewHha('Assisted with activities');
+    fireEvent.click(await screen.findByRole('button', {name: 'Submit note'}));
     await waitFor(() => expect(mocks.submit).toHaveBeenCalled());
-    expect(mocks.save.mock.calls[0][0].data).toMatchObject({startDate: '2026-09-12', endDate: '2026-09-12', metadata: {description: 'Assisted with activities'}});
+    expect(mocks.save.mock.calls.at(-1)![0].data).toMatchObject({startDate: '2026-09-12', endDate: '2026-09-12', metadata: {description: 'Assisted with activities', response: 'Fully engaged', confirmed: true}});
+    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith('/user-panel/notes', {state: {submittedNote: expect.objectContaining({activityLogId: 'log'})}}));
   });
   it('keeps personal-care service date separate from completion date', async () => {
     render(<PersonalCareNoteForm activityLogId="log" />);
@@ -97,7 +115,8 @@ describe('existing note forms', () => {
     mocks.log.approvedNotes = [{id: 'approved', metadata: {description: 'Approved care'}}];
     render(<HhaServiceActivityLogPage />);
     expect(screen.getByDisplayValue('Approved care')).toHaveAttribute('readonly');
-    expect(screen.getByRole('button', {name: 'Submitted'})).toBeDisabled();
+    expect(screen.queryByRole('button', {name: 'Review and submit'})).not.toBeInTheDocument();
+    expect(screen.getByRole('button', {name: 'Download PDF'})).toBeInTheDocument();
   });
 });
 
@@ -112,25 +131,34 @@ it('focuses the exact backend field error beside its row', async () => {
 it('retries uncertain HHA submission without resaving possibly locked evidence', async () => {
   mocks.submit.mockImplementationOnce(() => ({unwrap: async () => {throw {status: 'FETCH_ERROR'};}})).mockImplementation(() => ({unwrap: async () => undefined}));
   render(<HhaServiceActivityLogPage />);
-  fireEvent.change(screen.getByRole('textbox', {name: 'Activity'}), {target: {value: 'Care completed'}});
-  fireEvent.click(screen.getByRole('button', {name: 'Submit'}));
+  fireEvent.change(screen.getByRole('textbox', {name: 'Describe the day'}), {target: {value: 'Care completed'}});
+  reviewHha();
+  fireEvent.click(await screen.findByRole('button', {name: 'Submit note'}));
   await screen.findByText('Submission could not be confirmed. Submit again to retry safely before editing.');
   const firstKey = mocks.submit.mock.calls[0][0].operationId;
-  fireEvent.click(screen.getByRole('button', {name: 'Submit'}));
+  const saves = mocks.save.mock.calls.length;
+  fireEvent.click(screen.getByRole('button', {name: 'Submit note'}));
   await waitFor(() => expect(mocks.submit).toHaveBeenCalledTimes(2));
   expect(mocks.submit.mock.calls[1][0].operationId).toBe(firstKey);
-  expect(mocks.save).toHaveBeenCalledTimes(1);
+  expect(mocks.save).toHaveBeenCalledTimes(saves);
 });
 
 it('leaves another HHA draft editable after submitting only the selected row', async () => {
   mocks.log.notes = [{id: 'first', startDate: '2026-09-12', metadata: {description: 'First care'}}, {id: 'second', startDate: '2026-09-12', metadata: {description: 'Other draft'}}];
   render(<HhaServiceActivityLogPage />);
   expect(screen.getByText('Other draft')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', {name: 'Submit'}));
+  reviewHha();
+  fireEvent.click(await screen.findByRole('button', {name: 'Submit note'}));
   await waitFor(() => expect(mocks.submit).toHaveBeenCalledWith(expect.objectContaining({logNoteIds: ['first']})));
+});
+
+it('switches to another HHA draft row after saving the open one', async () => {
+  mocks.log.notes = [{id: 'first', startDate: '2026-09-12', metadata: {description: 'First care'}}, {id: 'second', startDate: '2026-09-12', metadata: {description: 'Other draft'}}];
+  render(<HhaServiceActivityLogPage />);
   fireEvent.click(screen.getByRole('button', {name: 'Edit draft'}));
-  await waitFor(() => expect(screen.getByRole('textbox', {name: 'Activity'})).toHaveValue('Other draft'));
-  expect(screen.getByRole('textbox', {name: 'Activity'})).not.toHaveAttribute('readonly');
+  await waitFor(() => expect(screen.getByRole('textbox', {name: 'Describe the day'})).toHaveValue('Other draft'));
+  expect(mocks.save.mock.calls[0][0].data).toMatchObject({id: 'first', metadata: {description: 'First care'}});
+  expect(screen.getByRole('textbox', {name: 'Describe the day'})).not.toBeDisabled();
 });
 
 import CommunityBasedPage from './community-based';
@@ -191,4 +219,27 @@ it('includes preview content in the operation identity', async () => {
  const retry=vi.fn(async (_id:string)=>undefined);
  await act(async()=>{await result.current.run({...intent,contentKey:'preview-2'},retry);});
  expect(retry.mock.calls[0][0]).not.toBe(failed.mock.calls[0][0]);
+});
+
+import PersonalCarePage from './hha-personal-care';
+it('lists what blocks a personal care note, then submits it signed', async () => {
+  render(<PersonalCarePage />);
+  fireEvent.click(screen.getByRole('button', {name: 'Review and submit'}));
+  expect(await screen.findByText('3 things to fix before you can submit')).toBeInTheDocument();
+  expect(screen.queryByRole('button', {name: 'Submit note'})).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('checkbox', {name: 'Oral care'}));
+  fireEvent.change(screen.getByRole('textbox', {name: 'How did the visit go?'}), {target: {value: 'Brushed teeth with prompting.'}});
+  fireEvent.click(screen.getByRole('checkbox', {name: /I confirm this note is accurate/}));
+  fireEvent.click(screen.getByRole('button', {name: 'Review and submit'}));
+  fireEvent.click(await screen.findByRole('button', {name: 'Submit note'}));
+  await waitFor(() => expect(mocks.submit).toHaveBeenCalled());
+  expect(mocks.save.mock.calls.at(-1)![0].data.metadata).toMatchObject({checkedActivities: ['Oral care'], narrative: 'Brushed teeth with prompting.', confirmed: true, completedBy: 'Aide'});
+});
+it('shows an approved personal care note read-only and offers a correction request', async () => {
+  mocks.log.approvedNotes = [{id: 'approved', startDate: '2026-09-12', metadata: {checkedActivities: ['Oral care'], narrative: 'All done', completedBy: 'Aide', completionDate: '2026-09-12'}}];
+  render(<PersonalCarePage />);
+  expect(screen.getByText('All done')).toBeInTheDocument();
+  expect(screen.queryByRole('checkbox', {name: 'Oral care'})).not.toBeInTheDocument();
+  fireEvent.click(screen.getAllByRole('button', {name: 'Request a correction'})[0]);
+  expect(await screen.findByRole('textbox', {name: 'What needs to change?'})).toBeInTheDocument();
 });

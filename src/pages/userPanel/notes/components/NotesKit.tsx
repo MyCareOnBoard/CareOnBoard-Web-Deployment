@@ -1,4 +1,4 @@
-import type {ReactNode} from 'react';
+import {useEffect, useState, type ReactNode} from 'react';
 import {Skeleton} from '@/components/ui/skeleton';
 import {cn} from '@/lib/utils';
 import {clientLabel, type NoteStatus, STATUS_LABEL} from '@/lib/notes/notesList';
@@ -60,21 +60,46 @@ export function NotesStatCard({label, value, note, urgent, loading}: {label: str
     </div>;
 }
 
-/** Card section used on the note pages. */
-export function NoteSection({id, title, description, aside, children, invalid, className}: {
-    id?: string; title: string; description?: ReactNode; aside?: ReactNode; children: ReactNode; invalid?: boolean; className?: string;
+/** Card section used on the note pages: icon and title in a header bar, content below. */
+export function NoteSection({id, icon, title, description, aside, children, invalid, className}: {
+    id?: string; icon?: ReactNode; title: string; description?: ReactNode; aside?: ReactNode; children: ReactNode; invalid?: boolean; className?: string;
 }) {
     return <section aria-labelledby={id ? `${id}-title` : undefined} id={id}
-        className={cn(NOTE_CARD, 'p-5', invalid && 'border-[#e5484d] ring-1 ring-[#e5484d]/40 dark:border-[#e5484d]', className)}>
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-                <h2 id={id ? `${id}-title` : undefined} className="text-[16px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">{title}</h2>
-                {description ? <p className="mt-0.5 text-[13px] text-[#5d6b73] dark:text-[#9aa4a8]">{description}</p> : null}
-            </div>
+        className={cn(NOTE_CARD, 'scroll-mt-24', invalid && 'border-[#e5484d] ring-1 ring-[#e5484d]/40 dark:border-[#e5484d]', className)}>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#edf1f2] px-5 py-3.5 dark:border-white/10">
+            <h2 id={id ? `${id}-title` : undefined} className="flex min-w-0 items-center gap-2.5 text-[15px] font-medium text-[#10141a] dark:text-[#f4f6f7]">
+                {icon ? <span className="shrink-0 text-[#00494a] dark:text-[#5fd0cd] [&>svg]:h-[18px] [&>svg]:w-[18px]" aria-hidden="true">{icon}</span> : null}
+                {title}
+            </h2>
             {aside}
         </div>
-        {children}
+        <div className="p-5">
+            {description ? <p className="mb-3 text-[13px] text-[#5d6b73] dark:text-[#9aa4a8]">{description}</p> : null}
+            {children}
+        </div>
     </section>;
+}
+
+/** Small teal pill used in section headers ("Verified by EVV", "3 of 16 selected"). */
+export function SectionChip({children, tone = 'teal', icon}: {children: ReactNode; tone?: 'teal' | 'red' | 'neutral'; icon?: ReactNode}) {
+    return <span className={cn('inline-flex items-center gap-1 whitespace-nowrap rounded-[6px] px-2 py-0.5 text-[12px] font-medium',
+        tone === 'teal' && 'bg-[#e3f4f4] text-[#00494a] dark:bg-[#00a3a7]/15 dark:text-[#7fe0e2]',
+        tone === 'red' && 'bg-[#fdeaea] text-[#b3261e] dark:bg-[#e5484d]/15 dark:text-[#f3a08c]',
+        tone === 'neutral' && 'bg-[#eef1f2] text-[#3d4a50] dark:bg-white/10 dark:text-[#c9d3d6]')}>
+        {icon ? <span aria-hidden="true" className="[&>svg]:h-3.5 [&>svg]:w-3.5">{icon}</span> : null}{children}
+    </span>;
+}
+
+/** Tracks the browser's online state. */
+export function useOnline() {
+    const [online, setOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine !== false);
+    useEffect(() => {
+        const update = () => setOnline(navigator.onLine !== false);
+        window.addEventListener('online', update);
+        window.addEventListener('offline', update);
+        return () => { window.removeEventListener('online', update); window.removeEventListener('offline', update); };
+    }, []);
+    return online;
 }
 
 export type BannerTone = 'red' | 'amber' | 'green' | 'blue' | 'neutral';

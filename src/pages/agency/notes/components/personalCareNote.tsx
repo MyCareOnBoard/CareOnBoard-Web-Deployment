@@ -127,6 +127,13 @@ export default function AgencyPersonalCareNote({
         </div>
       </div>
 
+      {typeof submittedNote?.notes?.[0]?.metadata?.narrative === "string" && submittedNote.notes[0].metadata.narrative.trim() ? (
+        <div className="mt-6 rounded-[20px] border border-white bg-[#FFFFFF4D] p-6 shadow-sm">
+          <p className="mb-1.5 text-[16px] font-semibold leading-[1.6] text-[#10141a]">Visit narrative</p>
+          <p className="whitespace-pre-wrap text-[14px] leading-[1.6] text-[#10141a]">{submittedNote.notes[0].metadata.narrative}</p>
+        </div>
+      ) : null}
+
       <div className="mt-6 rounded-[20px] border border-white bg-[#FFFFFF4D] p-6 shadow-sm">
         <p className="mb-1.5 text-[12px] font-medium leading-[1.4] text-[#808081]">Submitted by</p>
         <p className="text-[16px] font-semibold leading-[1.6] text-[#10141a]">

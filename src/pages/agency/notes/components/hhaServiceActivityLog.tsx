@@ -56,7 +56,7 @@ export default function AgencyHhaServiceActivityLog({
       </div>
 
       <div className="mt-4">
-        <ReadOnlyField label="Service goal" value={submittedNote?.metadata?.serviceGoal ?? ""} />
+        <ReadOnlyField label="Service goal" value={rows.find((note) => note.metadata?.serviceGoal)?.metadata?.serviceGoal ?? submittedNote?.metadata?.serviceGoal ?? ""} />
       </div>
 
       <div className="mt-8">
@@ -74,6 +74,7 @@ export default function AgencyHhaServiceActivityLog({
                 key={note.id}
                 className="border-b border-[#b2b2b3] px-4 py-3 text-[14px] text-[#10141a] font-['Urbanist',sans-serif] whitespace-pre-wrap"
               >
+                {note.metadata?.response ? <span className="mb-1 block text-[12px] text-[#808081]">Response: {note.metadata.response}</span> : null}
                 {[note.metadata?.activity, note.metadata?.description].filter(Boolean).join(" — ")}
               </div>
             ))

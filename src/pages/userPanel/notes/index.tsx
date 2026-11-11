@@ -11,7 +11,7 @@ import {
 } from '@/lib/notes/notesList';
 import {useGetMyNotesQuery} from './api';
 import {SearchBox} from '../records/RecordsKit';
-import {ClientCell, NOTE_CARD, NOTE_LINK, NOTE_PRIMARY, NOTE_SECONDARY, NoteBanner, NoteStatusBadge, NotesStatCard, ServiceChip} from './components/NotesKit';
+import {ClientCell, NOTE_CARD, NOTE_LINK, NOTE_PRIMARY, NOTE_SECONDARY, NoteBanner, NoteStatusBadge, NotesStatCard, ServiceChip, useOnline} from './components/NotesKit';
 import StartNoteDialog from './components/StartNoteDialog';
 import {useOpenNote} from './useOpenNote';
 
@@ -34,17 +34,6 @@ function readCache(uid?: string): MyNotesResponse | null {
 function writeCache(uid: string | undefined, data: MyNotesResponse) {
     if (!uid) return;
     try { localStorage.setItem(CACHE_KEY, JSON.stringify({uid, data})); } catch { /* storage full or blocked */ }
-}
-
-function useOnline() {
-    const [online, setOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine !== false);
-    useEffect(() => {
-        const update = () => setOnline(navigator.onLine !== false);
-        window.addEventListener('online', update);
-        window.addEventListener('offline', update);
-        return () => { window.removeEventListener('online', update); window.removeEventListener('offline', update); };
-    }, []);
-    return online;
 }
 
 function downloadCsv(csv: string) {
