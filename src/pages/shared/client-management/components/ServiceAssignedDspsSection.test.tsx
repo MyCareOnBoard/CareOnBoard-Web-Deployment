@@ -103,7 +103,10 @@ it.each(['ddd', 'hha'] as const)('asks only when medication is on, and both answ
   fireEvent.click(screen.getByRole('button', {name: 'Yes'}));
   expect(screen.getByRole('button', {name: 'Remove Grace from this service'})).toBeVisible();
   expect(screen.getByTestId('settings')).toHaveTextContent('{"underMedication":true,"trainingRequired":true}');
+  // Yes leads straight to verifying the certificate; an unsaved client is asked to save first.
+  expect(screen.getByRole('region', {name: 'Verify medication training for Grace'})).toHaveTextContent('Save the client first');
   fireEvent.click(screen.getByRole('switch', {name: 'Is this client under medication?'}));
+  expect(screen.queryByRole('region', {name: 'Verify medication training for Grace'})).toBeNull();
   expect(screen.getByTestId('settings')).toHaveTextContent('{"underMedication":false,"trainingRequired":false}');
 });
 

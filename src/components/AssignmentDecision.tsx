@@ -1,9 +1,27 @@
 import {AlertCircle, CheckCircle2, Loader2, RotateCw, XCircle} from 'lucide-react';
-import {useEffect, useId, useRef} from 'react';
+import {lazy, Suspense, useEffect, useId, useRef, useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {Checkbox} from '@/components/ui/checkbox';
 import {Textarea} from '@/components/ui/textarea';
 import {CHECKS_UNAVAILABLE, type AssignmentAcknowledgment, type AssignmentDecision as Decision} from '@/lib/api/assignment-decision';
+const ClientCompetencyPanel = lazy(() => import('@/pages/shared/client-details/components/ClientCompetencyPanel').then(m => ({default: m.ClientCompetencyPanel})));
+/** Client, staff member and program of a saved-client decision, read from its context key. */
+export function decisionScope(decision: Decision | null) {
+  try {
+    const [agencyId, clientId, employeeId, program] = JSON.parse(decision?.contextKey || '') as unknown[];
+    if (typeof agencyId !== 'string' || typeof clientId !== 'string' || clientId === 'new' || typeof employeeId !== 'string' || (program !== 'ddd' && program !== 'hha')) return null;
+    return {agencyId, clientId, employeeId, program: program as 'ddd' | 'hha'};
+  } catch {return null;}
+}
+function MedicationVerification({decision, refresh}: {decision: Decision; refresh: () => unknown}) {
+  const [open, setOpen] = useState(false);
+  const scope = decisionScope(decision);
+  if (!scope) return null;
+  return <div className="mt-2">
+    <Button type="button" variant="outline" size="sm" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? 'Close medication verification' : 'Verify medication training'}</Button>
+    {open && <Suspense fallback={<p role="status" className="mt-2">Loading verification…</p>}><ClientCompetencyPanel {...scope} only="medication_support" startVerifying onSaved={() => void refresh()} /></Suspense>}
+  </div>;
+}
 export type AssignmentConsentDraft = {reason: string; fingerprint?: string; consent: boolean};
 export type AssignmentConsentDrafts = Record<string, AssignmentConsentDraft>;
 export function assignmentAcknowledgments(decisions: Record<string, Decision>, drafts: AssignmentConsentDrafts): AssignmentAcknowledgment[] {
@@ -43,7 +61,8 @@ export function AssignmentDecision({decision, loading, error, refresh, draft, on
         {error && <p role="alert" className="px-5 pt-4">{error}</p>}
         <div className="divide-y divide-border px-5">{decision?.findings.map(f => <div className="flex gap-3 py-3" key={`${f.ruleId}:${f.code}`}>
           {f.severity === 'mandatory' ? <XCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-red-700" /> : <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />}
-          <div className="min-w-0"><p className="break-words">{f.message}</p><p className="mt-1 text-xs text-muted-foreground">{f.severity === 'mandatory' ? 'Required · resolve before assigning' : 'Warning · acknowledgment required'}</p></div>
+          <div className="min-w-0 flex-1"><p className="break-words">{f.message}</p><p className="mt-1 text-xs text-muted-foreground">{f.severity === 'mandatory' ? 'Required · resolve before assigning' : 'Warning · acknowledgment required'}</p>
+            {f.ruleId === 'medication_training' && decision && <MedicationVerification decision={decision} refresh={refresh} />}</div>
         </div>)}</div>
         {decision?.hasRestrictedFindings && <p className="px-5 py-3">An agency administrator must review requirements you cannot view.</p>}
         {!!passed.length && <details className="border-t border-[#dce6e8] px-5 py-3"><summary className="cursor-pointer text-muted-foreground">{passed.length} {passed.length === 1 ? 'check' : 'checks'} passed</summary><ul className="mt-2 space-y-2">{passed.map(check => <li key={check.ruleId} className="flex items-center gap-3"><CheckCircle2 aria-hidden="true" className="h-4 w-4 shrink-0 text-emerald-700" /><span>{check.label}</span></li>)}</ul></details>}

@@ -8,7 +8,12 @@ import {useAssignmentReviewScope} from '@/hooks/useAssignmentReview';
 import ReviewTrainingsModal from '@/pages/agency/trainings/reviewTrainingsModal';
 import {getClientCompetencies, saveClientCompetency, type CompetencyDTO, type CompetencyKey, type NeedsScope} from '@/lib/api/client-needs';
 
-type Props = NeedsScope & {employeeId: string; employeeName?: string; onViewNeeds?: () => void};
+type Props = NeedsScope & {employeeId: string; employeeName?: string; onViewNeeds?: () => void;
+  /** Show only this requirement, e.g. medication support from an assignment check. */
+  only?: CompetencyKey;
+  /** Open the "Record verification" form for `only` as soon as it can be recorded. */
+  startVerifying?: boolean;
+  onSaved?: () => void};
 type Editor = {key: CompetencyKey; result: 'verified' | 'not_verified'; basis: string; validUntil: string; certificate?: {trainingId: string; certificateId: string}};
 const names = {medication_support: 'Medication support', medical_acuity: 'Medical support', behavioral_acuity: 'Behavioral support'};
 const states = {needs_not_recorded: 'Needs not recorded', not_required: 'Not required', not_recorded: 'No verification recorded', verified: 'Verification recorded', not_verified: 'Not verified', needs_review: 'Needs review'};
@@ -19,7 +24,7 @@ export function ClientCompetencyPanel(props: Props) {
   const actorScope = useAssignmentReviewScope();
   return <CompetencyEditor key={JSON.stringify([actorScope, props.clientId, props.agencyId, props.program, props.employeeId])} {...props} />;
 }
-function CompetencyEditor({clientId, agencyId, program, employeeId, employeeName, onViewNeeds}: Props) {
+function CompetencyEditor({clientId, agencyId, program, employeeId, employeeName, onViewNeeds, only, startVerifying, onSaved}: Props) {
   const id = useId();
   const [data, setData] = useState<CompetencyDTO>();
   const [editor, setEditor] = useState<Editor>();
@@ -48,6 +53,14 @@ function CompetencyEditor({clientId, agencyId, program, employeeId, employeeName
   }, [clientId, agencyId, program, employeeId]);
   useEffect(() => {mounted.current = true; void load(); return () => {mounted.current = false; generation.current++; request.current?.abort();};}, [load]);
   const ready = data?.coverage === 'complete' ? data : undefined;
+  const autoOpened = useRef(false);
+  useEffect(() => {
+    if (!startVerifying || !only || autoOpened.current || !ready?.canVerify) return;
+    const row = ready.items.find(item => item.requirementKey === only);
+    if (!row || ['needs_not_recorded', 'not_required', 'verified'].includes(row.state)) return;
+    autoOpened.current = true;
+    setEditor({key: only, result: 'verified', basis: '', validUntil: ''});
+  }, [startVerifying, only, ready]);
   const item = ready?.items.find(row => row.requirementKey === editor?.key);
   const applicable = item && !['needs_not_recorded', 'not_required'].includes(item.state);
   async function save() {
@@ -60,6 +73,7 @@ function CompetencyEditor({clientId, agencyId, program, employeeId, employeeName
       if (!mounted.current || sequence !== generation.current) return;
       setData({...ready, needsRevision: saved.needsRevision, items: ready.items.map(row => row.requirementKey === saved.item.requirementKey ? saved.item : row)});
       setEditor(undefined); setPicker(false); setCalendar(false); setMessage('Review saved.');
+      onSaved?.();
     } catch (error) {
       if (!mounted.current || sequence !== generation.current) return;
       const status = (error as {response?: {status: number}})?.response?.status;
@@ -74,13 +88,14 @@ function CompetencyEditor({clientId, agencyId, program, employeeId, employeeName
     <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">Client-specific competency</h3>
       {!denied && <Button type="button" variant="outline" size="sm" disabled={loading || saving} onClick={() => void load()}>{conflict ? 'Reload competency records' : 'Refresh competency'}</Button>}
     </div>
-    <p className="my-2 text-muted-foreground">This records the agency's verification for this client. It does not confirm clinical clearance or change assignment eligibility.</p>
+    <p className="my-2 text-muted-foreground">This records the agency's verification for this client. A recorded verification backed by an accepted certificate meets the client-specific training check for this staff member's shifts. It does not confirm clinical clearance.</p>
     {onViewNeeds && <Button type="button" variant="link" className="px-0" onClick={onViewNeeds}>View recorded client needs</Button>}
     {loading && <p role="status">Loading competency records…</p>}
     {message && <p role="status">{message}</p>}
     {data?.coverage === 'restricted' && <p>Training records are restricted.</p>}
     {data?.coverage === 'unavailable' && <p>Competency records unavailable. Review the client needs first.</p>}
-    {ready?.items.map(row => <div key={row.requirementKey} className="mt-3 border-t border-border pt-3">
+    {ready && !ready.canVerify && only && <p>Only the agency owner can record this verification.</p>}
+    {ready?.items.filter(row => !only || row.requirementKey === only).map(row => <div key={row.requirementKey} className="mt-3 border-t border-border pt-3">
       <h4 className="font-medium">{names[row.requirementKey]}</h4><p>{states[row.state]}</p>
       {row.reasonCode && <p className="text-muted-foreground">{reasons[row.reasonCode] || 'The needs, employee or certificate records need review.'}</p>}
       {row.review && <div className="mt-1 break-words text-muted-foreground"><p>Recorded by {row.review.reviewerUid}{row.review.reviewedAt ? ` on ${new Date(row.review.reviewedAt).toLocaleString()}` : ''}. {row.review.basis}</p>

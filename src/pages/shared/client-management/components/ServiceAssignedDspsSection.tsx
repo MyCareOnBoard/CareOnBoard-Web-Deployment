@@ -1,5 +1,5 @@
 import { RosterAssignmentReview, useRosterReviewSelection, type ReviewRosterRow } from "@/components/AssignmentReviewRoster";
-import React, { useCallback, useEffect, useId, useRef, useState } from "react";
+import React, { lazy, Suspense, useCallback, useEffect, useId, useRef, useState } from "react";
 import {Switch} from "@/components/ui/switch";
 import {ConfirmDialog, ConfirmDialogContent} from "@/components/ui/confirm-dialog";
 import { Loader2, Plus, Trash2 } from "lucide-react";
@@ -10,6 +10,8 @@ import {
   useEffectiveAgencyMode,
   agencyModeToApplicantType,
 } from "@/hooks/useEffectiveAgencyMode";
+
+const ClientCompetencyPanel = lazy(() => import("@/pages/shared/client-details/components/ClientCompetencyPanel").then(m => ({ default: m.ClientCompetencyPanel })));
 
 export type AssignedDsp = { id: string; name: string };
 
@@ -186,6 +188,9 @@ function ServiceAssignedDspsEditor({
   useEffect(() => {setRejectedStaff(null);}, [review.scopeKey]);
   const [pendingStaff, setPendingStaff] = useState<{employee: Employee; slotId: string; scopeKey: string} | null>(null);
   useEffect(() => {setPendingStaff(null);}, [review.scopeKey, medication?.value.underMedication]);
+  // Staff the agency said has medication training: their certificate is verified for this client next.
+  const [verifyStaff, setVerifyStaff] = useState<{employee: Employee; scopeKey: string} | null>(null);
+  useEffect(() => {setVerifyStaff(null);}, [review.scopeKey, medication?.value.underMedication]);
   const [dspSearchSlotIds, setDspSearchSlotIds] = useState<string[]>([]);
 
   const addDspFromEmployee = useCallback(
@@ -201,6 +206,7 @@ function ServiceAssignedDspsEditor({
   const confirmMedicationTraining = (trainingRequired: boolean) => {
     if (!pendingStaff || pendingStaff.scopeKey !== review.scopeKey || !medication?.value.underMedication) return;
     medication.onChange({...medication.value, trainingRequired});
+    setVerifyStaff(trainingRequired ? {employee: pendingStaff.employee, scopeKey: pendingStaff.scopeKey} : null);
     addDspFromEmployee(pendingStaff.employee);
     removeSearchSlot(pendingStaff.slotId);
     setPendingStaff(null);
@@ -208,6 +214,7 @@ function ServiceAssignedDspsEditor({
 
   const removeDsp = (id: string) => {
     setRejectedStaff(null);
+    setVerifyStaff(current => current?.employee.id === id ? null : current);
     onChange(assignedDsps.filter((d) => d.id !== id));
   };
 
@@ -302,11 +309,31 @@ function ServiceAssignedDspsEditor({
           onConfirm={() => confirmMedicationTraining(true)}
           onCancel={() => confirmMedicationTraining(false)}
         >
-          <p className="text-sm text-muted-foreground">Both answers add this staff member. Yes keeps the medication training requirement on for this client; No turns it off. This does not verify a training certificate.</p>
+          <p className="text-sm text-muted-foreground">Both answers add this staff member. Yes keeps the medication training requirement on and opens verification: choose their accepted medication training certificate so their shifts with this client can be scheduled. No turns the requirement off for this client.</p>
         </ConfirmDialogContent>
       </ConfirmDialog>
+      {verifyStaff && verifyStaff.scopeKey === review.scopeKey && <MedicationVerificationStep employee={verifyStaff.employee} clientId={review.clientId} agencyId={review.agencyId} program={review.program} onClose={() => setVerifyStaff(null)} />}
       {selectedStaff && <div className="mt-4">{rejectedStaff?.id === selectedStaff.id && <p className="text-sm text-muted-foreground">Staff selection cleared. You can search for another staff member.</p>}<RosterAssignmentReview key={selectedStaff.id} row={reviewRow} employeeId={selectedStaff.id} employeeName={selectedStaff.name} onBlocked={clearBlockedStaff} selectionCleared={rejectedStaff?.id === selectedStaff.id} /></div>}
     </div>
+  );
+}
+
+function MedicationVerificationStep({employee, clientId, agencyId, program, onClose}: {employee: Employee; clientId?: string | null; agencyId?: string | null; program?: string | null; onClose: () => void}) {
+  const name = employee.fullName || "this staff member";
+  const scope = clientId && agencyId && (program === "ddd" || program === "hha") ? {clientId, agencyId, program: program as "ddd" | "hha"} : null;
+  return (
+    <section aria-label={`Verify medication training for ${name}`} className="mt-4 rounded-[16px] border border-[#dce6e8] bg-white p-4 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-semibold text-[#10141a]">Verify {name}'s medication training</p>
+        <Button type="button" variant="ghost" size="sm" onClick={onClose}>Close</Button>
+      </div>
+      {scope ? <>
+        <p className="mt-1 text-muted-foreground">Choose their accepted medication training certificate. Until it's verified, {name} can't be scheduled for this client's shifts. Verification uses the client's saved medication setting, so save the client first if you just turned it on.</p>
+        <Suspense fallback={<p role="status" className="mt-2">Loading verification…</p>}>
+          <ClientCompetencyPanel {...scope} employeeId={employee.id} employeeName={employee.fullName} only="medication_support" startVerifying />
+        </Suspense>
+      </> : <p className="mt-1 text-muted-foreground">Save the client first. Then use "Verify medication training" on the shift's assignment check to choose {name}'s accepted medication training certificate.</p>}
+    </section>
   );
 }
 

@@ -88,3 +88,22 @@ it('explains rejected validity without discarding the selected certificate or de
   expect(screen.getByLabelText('Verification basis')).toHaveValue('Reviewed for this client');
   expect(screen.queryByRole('button', {name: 'Reload competency records'})).toBeNull();
 });
+it('shows one requirement, opens its verification form and reports the save', async () => {
+  const onSaved = vi.fn();
+  vi.mocked(saveClientCompetency).mockResolvedValue({needsRevision: 2, item: {...ready.items[0], state: 'verified', reviewRevision: 1}});
+  render(<ClientCompetencyPanel {...scope} only="medication_support" startVerifying onSaved={onSaved} />);
+  expect(await screen.findByLabelText('Verification basis')).toBeInTheDocument();
+  expect(screen.queryByText('Medical support')).toBeNull();
+  fireEvent.change(screen.getByLabelText('Verification basis'), {target: {value: 'Med admin course'}});
+  fireEvent.click(screen.getByRole('button', {name: 'Choose completion certificate'}));
+  fireEvent.click(screen.getByRole('button', {name: 'Pick accepted certificate'}));
+  fireEvent.click(screen.getByRole('button', {name: 'Save verification'}));
+  await screen.findByText('Verification recorded');
+  expect(onSaved).toHaveBeenCalledOnce();
+});
+it('tells staff without owner rights who can record a single requirement', async () => {
+  vi.mocked(getClientCompetencies).mockResolvedValue({...structuredClone(ready), canVerify: false});
+  render(<ClientCompetencyPanel {...scope} only="medication_support" startVerifying />);
+  expect(await screen.findByText('Only the agency owner can record this verification.')).toBeInTheDocument();
+  expect(screen.queryByLabelText('Verification basis')).toBeNull();
+});

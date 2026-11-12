@@ -1,5 +1,6 @@
 import {render, screen, fireEvent} from '@testing-library/react';
 import {expect, it, vi} from 'vitest';
+vi.mock('@/pages/shared/client-details/components/ClientCompetencyPanel', () => ({ClientCompetencyPanel: (props: {clientId: string; employeeId: string; program: string; only?: string; startVerifying?: boolean; onSaved?: () => void}) => <button onClick={props.onSaved}>Competency {props.clientId} {props.employeeId} {props.program} {props.only} {String(props.startVerifying)}</button>}));
 import {AssignmentDecision, assignmentAcknowledgments} from './AssignmentDecision';
 import type {AssignmentDecision as Decision} from '@/lib/api/assignment-decision';
 import {rosterAcknowledgments, rosterSubmissionBlocked, rosterPreviewKey} from './AssignmentReviewRoster';
@@ -63,4 +64,15 @@ it('requires a completed preview for every changed staff selection and ignores r
  expect(rosterSubmissionBlocked(state, [], [{...row, code: 'changed'}], 'ddd')).toBe(true);
  expect(rosterSubmissionBlocked(state, [], [{...row, assignedDsps: [...row.assignedDsps, {id: 'other'}]}], 'ddd')).toBe(true);
  expect(rosterSubmissionBlocked({...state, decisions: {[contextKey]: {...d, decision: 'BLOCKED'}}}, [row], [{...row, assignedDsps: []}], 'ddd')).toBe(false);
+});
+it('offers medication verification on a saved client\'s medication finding and rechecks after saving', async () => {
+  const refresh = vi.fn();
+  const blocked: Decision = {...warning, decision: 'BLOCKED', canAcknowledge: false, contextKey: JSON.stringify(['agency', 'client-a', 'staff-a', 'ddd', 'shift', 'shift-a', null, '2026-11-12', '2026-11-12', '09:00', '10:00']),
+    findings: [{ruleId: 'medication_training', ruleVersion: 1, severity: 'mandatory', code: 'medication_evidence_required', message: 'Medication training needed'}]};
+  const {rerender} = render(<AssignmentDecision decision={blocked} refresh={refresh} onChange={vi.fn()} />);
+  fireEvent.click(screen.getByRole('button', {name: 'Verify medication training'}));
+  fireEvent.click(await screen.findByRole('button', {name: 'Competency client-a staff-a ddd medication_support true'}));
+  expect(refresh).toHaveBeenCalledOnce();
+  rerender(<AssignmentDecision decision={{...blocked, contextKey: JSON.stringify(['agency', 'new', 'staff-a', 'ddd'])}} refresh={refresh} onChange={vi.fn()} />);
+  expect(screen.queryByRole('button', {name: 'Verify medication training'})).toBeNull();
 });

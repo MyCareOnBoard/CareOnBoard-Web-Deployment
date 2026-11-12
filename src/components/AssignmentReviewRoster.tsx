@@ -70,7 +70,7 @@ export function useRosterReviewSelection(row: ReviewRosterRow | undefined) {
   const scope = useContext(RosterContext);
   const localId = useRef(Math.random().toString(36));
   const rowKey = row?.id || localId.current;
-  return {medication: scope?.medication, scopeKey: JSON.stringify([scope?.clientId, scope?.agencyId, scope?.program]), available: !!scope, agencyId: scope?.agencyId, program: scope?.program, select: (employeeId: string) => scope?.select(JSON.stringify([rowKey, employeeId])), selectedEmployee: scope?.selected ? (() => {const [key, employee] = JSON.parse(scope.selected); return key === rowKey ? employee as string : undefined;})() : undefined};
+  return {medication: scope?.medication, scopeKey: JSON.stringify([scope?.clientId, scope?.agencyId, scope?.program]), available: !!scope, agencyId: scope?.agencyId, clientId: scope?.clientId, program: scope?.program, select: (employeeId: string) => scope?.select(JSON.stringify([rowKey, employeeId])), selectedEmployee: scope?.selected ? (() => {const [key, employee] = JSON.parse(scope.selected); return key === rowKey ? employee as string : undefined;})() : undefined};
 }
 
 export function RosterAssignmentReview({row, employeeId, employeeName, onBlocked, selectionCleared}: {row?: ReviewRosterRow; employeeId: string; employeeName: string; onBlocked?: () => void; selectionCleared?: boolean}) {
