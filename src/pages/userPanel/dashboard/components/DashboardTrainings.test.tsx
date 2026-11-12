@@ -26,6 +26,19 @@ describe('focused dashboard trainings', () => {
         expect(screen.getByRole('status', {name: 'Loading trainings'})).toBeInTheDocument();
     });
 
+    it('lists newly assigned agency trainings ahead of reviews, newest first', () => {
+        render(<DashboardTrainings {...props} trainings={[
+            training('Pending', {reviewState: 'awaiting_review'}),
+            training('Older assignment', {source: 'manual', createdAt: '2026-10-01T00:00:00.000Z'}),
+            training('New assignment', {source: 'manual', createdAt: '2026-11-12T00:00:00.000Z'}),
+        ]}/>);
+        const tabs = screen.getAllByRole('tab');
+        expect(tabs[0]).toHaveTextContent('Assigned');
+        expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
+        const rows = screen.getAllByRole('button', {name: /assignment, Assigned/});
+        expect(rows.map(row => row.getAttribute('aria-label'))).toEqual(['New assignment, Assigned', 'Older assignment, Assigned']);
+    });
+
     it('puts urgent courses first and preserves drafts across grouped tabs', () => {
         render(<DashboardTrainings {...props} trainings={[
             training('Later', {dueDateKey: '2026-12-28'}),

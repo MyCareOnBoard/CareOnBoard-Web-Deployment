@@ -9,7 +9,7 @@ import type {TrainingData} from '@/pages/agency/trainings/trainingApi';
 import {trainingPolicyLabel} from '@/pages/agency/trainings/TrainingPolicyFields';
 
 export const groupOrder = ['Expired', 'Overdue', 'Required before work', 'Required before HHA services', 'Not approved',
-    'Due today', 'Due soon', 'Renewal due', 'In review', 'Upcoming', 'Assigned', 'Details needed',
+    'Due today', 'Due soon', 'Renewal due', 'Assigned', 'In review', 'Upcoming', 'Details needed',
     'Updating requirements', 'Not assessed', 'Approved', 'Not currently required'];
 
 export function trainingGroup(training: TrainingData): string {
@@ -29,6 +29,10 @@ export function trainingGroup(training: TrainingData): string {
 function priority(training: TrainingData) {
     const index = groupOrder.indexOf(trainingGroup(training));
     return index < 0 ? groupOrder.length : index;
+}
+function createdTime(training: TrainingData) {
+    const value = Date.parse(String(training.createdAt ?? ''));
+    return Number.isNaN(value) ? 0 : value;
 }
 function dateLabel(value: string) {
     const date = parseISO(value);
@@ -70,7 +74,9 @@ interface Props {
 export default function DashboardTrainings({trainings, loading, error, hasMore, assessmentIncomplete, onLoadMore, onRetry, renderTraining, embedded = false}: Props) {
     const [expanded, setExpanded] = useState<string>();
     const [activeGroup, setActiveGroup] = useState<string>();
-    const sorted = [...trainings].sort((a, b) => priority(a) - priority(b) || (a.dueDateKey ?? '9999').localeCompare(b.dueDateKey ?? '9999'));
+    // Within a group, deadlines first, then the most recently assigned.
+    const sorted = [...trainings].sort((a, b) => priority(a) - priority(b) || (a.dueDateKey ?? '9999').localeCompare(b.dueDateKey ?? '9999')
+        || createdTime(b) - createdTime(a));
 
     const open = expanded ?? sorted[0]?.id ?? '';
     const groupsPresent = Array.from(new Set(sorted.map(trainingGroup)));

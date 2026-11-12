@@ -15,6 +15,8 @@ export interface TrainingData {
     id?: string; name: string; timeFrame: string; assignedDsp: string; trainingType: string;
     completedAt: string | null; status: string; approved: boolean; source?: 'manual' | 'policy';
     requiresCertificate?: boolean; certificateId?: string | null; certificateName?: string | null;
+    /** ISO time the training was assigned. */
+    createdAt?: string | null;
 }
 export interface TrainingStaff { id: string; fullName: string; profilePictureUrl: string; status: string; assignedCount: number; requiredCount?: number; }
 export interface TrainingStaffPage { items: TrainingStaff[]; nextCursor: string | null; }

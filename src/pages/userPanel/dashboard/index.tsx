@@ -48,7 +48,8 @@ function getGreeting(): string {
 const lapsedTrainingGroups = new Set(['Expired', 'Overdue']);
 
 // Groups ahead of "In review" in groupOrder are the ones worth surfacing on the
-// dashboard header — overdue/expired/required items, not informational ones.
+// dashboard header — overdue/expired/required items and trainings the agency assigned
+// that aren't done yet, not informational ones.
 const urgentTrainingGroups = new Set(groupOrder.slice(0, groupOrder.indexOf('In review')));
 
 
@@ -75,6 +76,8 @@ export default function UserPanelDashboardPage() {
     const focusDocumentId = searchParams.get('documentId');
     const focusDocumentType = searchParams.get('documentType');
     const documentsLinked = searchParams.get('section') === 'documents' || Boolean(focusDocumentType);
+    // An assigned-training notification links here with ?section=trainings.
+    const trainingsLinked = !documentsLinked && searchParams.get('section') === 'trainings';
     const [upload, setUpload] = useState<(SaveEmployeeDocumentResponse & {savedAt: number}) | null>(null);
     const [withinUploadWindow, setWithinUploadWindow] = useState(false);
     const {data: employeeDocuments = [], isLoading: documentsLoading, isError: documentsError, refetch: refreshDocuments} = useGetEmployeeDocumentsQuery();
@@ -337,11 +340,17 @@ export default function UserPanelDashboardPage() {
 
     // Open on whichever section needs the person, unless they've picked one.
     const activeHubSection: HubSection = hubSection
-        ?? (!documentsLoading && documentsNeedingAttention === 0 && trainingsNeedingAttention > 0 ? 'trainings' : 'documents');
+        ?? (!documentsLoading && !documentsError && documentsNeedingAttention === 0 && trainingsNeedingAttention > 0 ? 'trainings' : 'documents');
     const openHubSection = (section: HubSection) => {
         setHubSection(section);
         hubRef.current?.scrollIntoView({behavior: "smooth", block: "start"});
     };
+    useEffect(() => {
+        if (!trainingsLinked) return;
+        setHubSection('trainings');
+        const frame = window.requestAnimationFrame(() => hubRef.current?.scrollIntoView({behavior: "smooth", block: "start"}));
+        return () => window.cancelAnimationFrame(frame);
+    }, [trainingsLinked, searchParams]);
     // A document request notification links here with ?section=documents.
     useEffect(() => {
         if (!documentsLinked) return;
