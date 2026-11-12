@@ -20,6 +20,11 @@ const states = {needs_not_recorded: 'Needs not recorded', not_required: 'Not req
 const reasons: Record<string, string> = {employee_changed: 'The employee identity changed.', self_review: 'The recorded reviewer now matches this employee.', needs_changed: 'Client needs changed.', evidence_changed: 'The completion certificate changed.', evidence_ownership_changed: 'The certificate no longer matches this employee and agency.', evidence_not_accepted: 'The current certificate is not accepted.', invalid_validity: 'The recorded validity date needs review.', invalid_timezone: 'The agency time zone needs review.', validity_expired: 'The recorded validity date has passed.', validity_expires_today: 'The recorded validity date is today.'};
 const conflicts: Record<string, string> = {CLIENT_NEEDS_CHANGED: 'Client needs changed.', COMPETENCY_REVIEW_CHANGED: 'Another review was saved.', TRAINING_EVIDENCE_CHANGED: 'Certificate changed.'};
 
+// What still has to be filled in before a review can be saved, worded for the hint under the form.
+function missingFields(editor: Editor): string[] {
+  return [...(editor.result === 'verified' && !editor.certificate ? ['choose a completion certificate'] : []), ...(!editor.basis.trim() ? ['write the verification basis'] : [])];
+}
+
 export function ClientCompetencyPanel(props: Props) {
   const actorScope = useAssignmentReviewScope();
   return <CompetencyEditor key={JSON.stringify([actorScope, props.clientId, props.agencyId, props.program, props.employeeId])} {...props} />;
@@ -64,7 +69,7 @@ function CompetencyEditor({clientId, agencyId, program, employeeId, employeeName
   const item = ready?.items.find(row => row.requirementKey === editor?.key);
   const applicable = item && !['needs_not_recorded', 'not_required'].includes(item.state);
   async function save() {
-    if (!ready?.canVerify || !editor || !item || saving || loading || conflict || !applicable || !editor.basis.trim() || (editor.result === 'verified' && !editor.certificate)) return;
+    if (!ready?.canVerify || !editor || !item || saving || loading || conflict || !applicable || missingFields(editor).length > 0) return;
     const sequence = generation.current;
     setSaving(true); setMessage('');
     try {
@@ -105,7 +110,8 @@ function CompetencyEditor({clientId, agencyId, program, employeeId, employeeName
       </div>}
       {editor?.key === row.requirementKey && ready.canVerify && <fieldset disabled={saving || loading} className="mt-3 min-w-0 space-y-3">
         <p>{editor.result === 'verified' ? 'Record verification' : 'Record not verified'}</p>
-        <div><label htmlFor={`${id}-basis`}>Verification basis</label><Textarea id={`${id}-basis`} maxLength={500} value={editor.basis} onChange={event => setEditor({...editor, basis: event.target.value})} /></div>
+        <div><label htmlFor={`${id}-basis`}>Verification basis <span className="text-muted-foreground">(required)</span></label><Textarea id={`${id}-basis`} aria-required="true" aria-describedby={`${id}-basis-hint`} maxLength={500} placeholder="Example: Reviewed the certificate and observed this staff member supporting the client." value={editor.basis} onChange={event => setEditor({...editor, basis: event.target.value})} />
+          <p id={`${id}-basis-hint`} className="mt-1 text-xs text-muted-foreground">Say how you confirmed this staff member can support this client.</p></div>
         {editor.result === 'verified' && <>
           <Button type="button" variant="outline" disabled={conflict || !applicable} onClick={() => setPicker(true)}>Choose completion certificate</Button>
           {editor.certificate && <p>Completion certificate selected.</p>}
@@ -115,7 +121,8 @@ function CompetencyEditor({clientId, agencyId, program, employeeId, employeeName
           <p className="text-muted-foreground">Leave empty if no validity date was recorded.</p>
         </>}
         {!applicable && <p>The current needs do not require this verification. Review the client needs before continuing.</p>}
-        <div className="flex flex-wrap gap-2"><Button type="button" disabled={conflict || !applicable || !editor.basis.trim() || (editor.result === 'verified' && !editor.certificate)} onClick={() => void save()}>Save verification</Button>
+        {applicable && !conflict && missingFields(editor).length > 0 && <p id={`${id}-missing`} className="text-xs font-medium text-[#88601d]">To save, {missingFields(editor).join(' and ')}.</p>}
+        <div className="flex flex-wrap gap-2"><Button type="button" aria-describedby={applicable && !conflict && missingFields(editor).length ? `${id}-missing` : undefined} disabled={conflict || !applicable || missingFields(editor).length > 0} onClick={() => void save()}>Save verification</Button>
           <Button type="button" variant="outline" onClick={() => {setEditor(undefined); setPicker(false); setCalendar(false);}}>Cancel</Button></div>
       </fieldset>}
     </div>)}

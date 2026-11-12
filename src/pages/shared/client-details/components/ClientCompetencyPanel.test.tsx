@@ -17,7 +17,7 @@ beforeEach(() => {vi.resetAllMocks(); context.scope = 'owner:agency:staging'; vi
 
 async function editVerification() {
   fireEvent.click(await screen.findByRole('button', {name: 'Record verification for Medication support'}));
-  fireEvent.change(screen.getByLabelText('Verification basis'), {target: {value: 'Reviewed for this client'}});
+  fireEvent.change(screen.getByLabelText(/Verification basis/), {target: {value: 'Reviewed for this client'}});
   fireEvent.click(screen.getByRole('button', {name: 'Choose completion certificate'}));
   fireEvent.click(screen.getByRole('button', {name: 'Pick accepted certificate'}));
 }
@@ -47,7 +47,7 @@ it('retains basis, clears evidence and requires explicit reload after a conflict
   fireEvent.click(screen.getByRole('button', {name: 'Save verification'}));
   await screen.findByRole('button', {name: 'Reload competency records'});
   expect(screen.getByText('Certificate changed. Reload and review the current records before saving.')).toBeVisible();
-  expect(screen.getByLabelText('Verification basis')).toHaveValue('Reviewed for this client');
+  expect(screen.getByLabelText(/Verification basis/)).toHaveValue('Reviewed for this client');
   expect(screen.getByRole('button', {name: 'Save verification'})).toBeDisabled();
   expect(screen.queryByText('Completion certificate selected.')).toBeNull();
   fireEvent.click(screen.getByRole('button', {name: 'Reload competency records'}));
@@ -66,16 +66,16 @@ it('ignores late writes and clears private drafts when authority changes', async
   await screen.findByText('Training records are restricted.');
   await act(async () => finish({needsRevision: 2, item: {...ready.items[0], state: 'verified', reviewRevision: 1}}));
   expect(screen.queryByText('Verification recorded')).toBeNull();
-  expect(screen.queryByLabelText('Verification basis')).toBeNull();
+  expect(screen.queryByLabelText(/Verification basis/)).toBeNull();
 });
 it('keeps basis on service failure and sends no evidence for a not-verified review', async () => {
   vi.mocked(saveClientCompetency).mockRejectedValue({response: {status: 503}});
   render(<ClientCompetencyPanel {...scope} />);
   fireEvent.click(await screen.findByRole('button', {name: 'Record not verified for Medication support'}));
-  fireEvent.change(screen.getByLabelText('Verification basis'), {target: {value: 'Evidence does not address client needs'}});
+  fireEvent.change(screen.getByLabelText(/Verification basis/), {target: {value: 'Evidence does not address client needs'}});
   fireEvent.click(screen.getByRole('button', {name: 'Save verification'}));
   await screen.findByText('Verification could not be saved. Try again.');
-  expect(screen.getByLabelText('Verification basis')).toHaveValue('Evidence does not address client needs');
+  expect(screen.getByLabelText(/Verification basis/)).toHaveValue('Evidence does not address client needs');
   expect(saveClientCompetency).toHaveBeenCalledWith(expect.anything(), 'employee-a', 'medication_support', {expectedNeedsRevision: 2, expectedReviewRevision: 0, result: 'not_verified', basis: 'Evidence does not address client needs'});
 });
 it('explains rejected validity without discarding the selected certificate or demanding a reload', async () => {
@@ -85,18 +85,22 @@ it('explains rejected validity without discarding the selected certificate or de
   fireEvent.click(screen.getByRole('button', {name: 'Save verification'}));
   await screen.findByText("Choose a validity date after today in the agency's time zone, or leave it empty if no date was recorded.");
   expect(screen.getByText('Completion certificate selected.')).toBeVisible();
-  expect(screen.getByLabelText('Verification basis')).toHaveValue('Reviewed for this client');
+  expect(screen.getByLabelText(/Verification basis/)).toHaveValue('Reviewed for this client');
   expect(screen.queryByRole('button', {name: 'Reload competency records'})).toBeNull();
 });
 it('shows one requirement, opens its verification form and reports the save', async () => {
   const onSaved = vi.fn();
   vi.mocked(saveClientCompetency).mockResolvedValue({needsRevision: 2, item: {...ready.items[0], state: 'verified', reviewRevision: 1}});
   render(<ClientCompetencyPanel {...scope} only="medication_support" startVerifying onSaved={onSaved} />);
-  expect(await screen.findByLabelText('Verification basis')).toBeInTheDocument();
+  expect(await screen.findByLabelText(/Verification basis/)).toBeInTheDocument();
   expect(screen.queryByText('Medical support')).toBeNull();
-  fireEvent.change(screen.getByLabelText('Verification basis'), {target: {value: 'Med admin course'}});
+  expect(screen.getByText('To save, choose a completion certificate and write the verification basis.')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', {name: 'Choose completion certificate'}));
   fireEvent.click(screen.getByRole('button', {name: 'Pick accepted certificate'}));
+  expect(screen.getByRole('button', {name: 'Save verification'})).toBeDisabled();
+  expect(screen.getByText('To save, write the verification basis.')).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText(/Verification basis/), {target: {value: 'Med admin course'}});
+  expect(screen.queryByText(/^To save,/)).toBeNull();
   fireEvent.click(screen.getByRole('button', {name: 'Save verification'}));
   await screen.findByText('Verification recorded');
   expect(onSaved).toHaveBeenCalledOnce();
@@ -105,5 +109,5 @@ it('tells staff without owner rights who can record a single requirement', async
   vi.mocked(getClientCompetencies).mockResolvedValue({...structuredClone(ready), canVerify: false});
   render(<ClientCompetencyPanel {...scope} only="medication_support" startVerifying />);
   expect(await screen.findByText('Only the agency owner can record this verification.')).toBeInTheDocument();
-  expect(screen.queryByLabelText('Verification basis')).toBeNull();
+  expect(screen.queryByLabelText(/Verification basis/)).toBeNull();
 });
