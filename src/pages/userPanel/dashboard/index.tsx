@@ -139,7 +139,7 @@ export default function UserPanelDashboardPage() {
         });
     };
 
-    const getDocument = useCallback((documentType: string) => {
+    const getDocument = useCallback((documentType: string, requiresExpiry = false) => {
         const employeeDocument = employeeDocuments.find(doc => doc.documentType === documentType);
         if (!employeeDocument) return {
             status: "Not uploaded",
@@ -147,10 +147,17 @@ export default function UserPanelDashboardPage() {
             expiryDate: null
         };
 
-        const issue = compliance?.items.find(item => item.documentId === ('id' in employeeDocument ? employeeDocument.id : undefined) || item.documentId === ('documentId' in employeeDocument ? employeeDocument.documentId : undefined));
-        if (compliance?.pilotEnabled !== false) return {...employeeDocument,
+        const documentId = 'id' in employeeDocument ? employeeDocument.id : 'documentId' in employeeDocument ? employeeDocument.documentId : undefined;
+        const issue = compliance?.items.find(item => item.documentId === documentId);
+        // Without an expiry record for this file (the background expiry check hasn't picked it up yet),
+        // show what the file itself says instead of "Updating expiry status…" forever. A file just
+        // uploaded from this page keeps the "Updating" state while the page waits for the check.
+        const awaitingCheck = !compliance || complianceError || compliance.syncStatus === 'error' || (pending && upload?.documentId === documentId);
+        if (compliance?.pilotEnabled !== false && (issue || awaitingCheck)) return {...employeeDocument,
             status: complianceError || compliance?.syncStatus === 'error' ? 'Expiry status unavailable' : complianceLabel(issue),
             expiryDateKey: issue?.expiryDateKey, reasonCode: issue?.reasonCode};
+        if (compliance?.pilotEnabled !== false && requiresExpiry && !employeeDocument.expiryDate)
+            return {...employeeDocument, status: 'Needs review', reasonCode: 'missing_expiry_date'};
         let status = employeeDocument.status
 
         // get days until expiry (normalize both dates to midnight to avoid sub-day rounding issues)
@@ -170,11 +177,11 @@ export default function UserPanelDashboardPage() {
             status
         }
 
-    }, [employeeDocuments, compliance, complianceError]);
+    }, [employeeDocuments, compliance, complianceError, pending, upload]);
 
     const documentTypes = useMemo(() => withRequestedDocumentTypes(getUserPanelDocumentTypes(user), documentRequests), [user, documentRequests]);
     const dashboardDocuments = useMemo(() => documentTypes.map(type => {
-        const document = getDocument(type.value);
+        const document = getDocument(type.value, type.requiresExpiry);
         const request = documentRequests.find(item => item.outstanding && item.documentType === type.value);
         return {type: type.value, label: type.label, fileUrl: document.fileUrl, status: document.status,
             request: request ? {validThroughLabel: request.requestedExpiryDate ? civilDateLabel(request.requestedExpiryDate) : undefined, message: request.message || undefined} : undefined,

@@ -30,6 +30,13 @@ describe('upload compliance refresh', () => {
   expect(screen.getByText('Requested')).toBeInTheDocument();
   expect(screen.getByText(/Your agency asked you to upload this document\. It should be valid through .*2027\. Note: Before your next shift/)).toBeInTheDocument();
  });
+ it('shows a file without an expiry record from its own details instead of updating forever', () => {
+  mocks.requests = [{id: 'r1', documentType: 'cpr-certification', documentLabel: 'CPR Certification', requestedAt: '2026-11-01T00:00:00.000Z', outstanding: false}];
+  mocks.documents = [{id: 'cpr', documentId: 'cpr', documentType: 'cpr-certification', fileUrl: 'https://example.com/cpr.pdf', status: 'available', expiryDate: null}];
+  render(<Dashboard />);
+  expect(screen.queryByText('Updating expiry status…')).not.toBeInTheDocument();
+  expect(screen.getByText(/No expiry date is recorded/)).toBeInTheDocument();
+ });
  it('shows only actual resume records in the Resume slot', () => {
   mocks.documents = [{id: 'misc', documentId: 'misc', documentType: 'other', fileUrl: 'https://example.com/other.pdf', status: 'available'}];
   const {rerender} = render(<Dashboard />);
