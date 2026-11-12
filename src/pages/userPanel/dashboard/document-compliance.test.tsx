@@ -44,6 +44,8 @@ describe('upload compliance refresh', () => {
   expect(screen.queryByRole('button', {name: 'View Resume'})).not.toBeInTheDocument();
   mocks.documents = [{id: 'resume', documentId: 'resume', documentType: 'resume', fileUrl: 'https://example.com/resume.pdf', status: 'available'}];
   rerender(<Dashboard />);
+  // An uploaded resume moves to the Available tab, which isn't the one open by default.
+  fireEvent.mouseDown(screen.getByRole('tab', {name: /^Available/}), {button: 0, ctrlKey: false});
   expect(screen.getByRole('button', {name: 'View Resume'})).toBeInTheDocument();
  });
  it('treats a missing issue as pending and stops after its exact revision was evaluated before the HTTP response', () => {
