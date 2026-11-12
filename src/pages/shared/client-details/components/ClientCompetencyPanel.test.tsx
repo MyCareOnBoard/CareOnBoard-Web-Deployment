@@ -6,7 +6,7 @@ import {getClientCompetencies, saveClientCompetency, type CompetencyDTO} from '@
 const context = vi.hoisted(() => ({scope: 'owner:agency:staging'}));
 vi.mock('@/hooks/useAssignmentReview', () => ({useAssignmentReviewScope: () => context.scope}));
 vi.mock('@/lib/api/client-needs', () => ({getClientCompetencies: vi.fn(), saveClientCompetency: vi.fn()}));
-vi.mock('@/pages/agency/trainings/reviewTrainingsModal', () => ({default: ({open, readOnly, onSelectCertificate}: any) => open ? <button onClick={() => {expect(readOnly).toBe(true); onSelectCertificate({trainingId: 'training-a', certificateId: 'a'.repeat(64)});}}>Pick accepted certificate</button> : null}));
+vi.mock('@/pages/agency/trainings/reviewTrainingsModal', () => ({default: ({open, readOnly, onSelectCertificate}: any) => open ? <button onClick={() => {expect(readOnly).toBe(true); onSelectCertificate({trainingId: 'training-a', certificateId: 'a'.repeat(64), name: 'Medication administration'});}}>Pick accepted certificate</button> : null}));
 const scope = {clientId: 'client-a', agencyId: 'agency-a', program: 'ddd' as const, employeeId: 'employee-a'};
 const ready: CompetencyDTO = {coverage: 'complete', canVerify: true, needsRevision: 2, items: [
   {requirementKey: 'medication_support', state: 'not_recorded', reviewRevision: 0},
@@ -97,6 +97,7 @@ it('shows one requirement, opens its verification form and reports the save', as
   expect(screen.getByText('To save, choose a completion certificate and write the verification basis.')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', {name: 'Choose completion certificate'}));
   fireEvent.click(screen.getByRole('button', {name: 'Pick accepted certificate'}));
+  expect(screen.getByText('Medication administration')).toBeInTheDocument();
   expect(screen.getByRole('button', {name: 'Save verification'})).toBeDisabled();
   expect(screen.getByText('To save, write the verification basis.')).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText(/Verification basis/), {target: {value: 'Med admin course'}});

@@ -55,7 +55,7 @@ interface ReviewTrainingsModalProps {
     agencyId?: string;
     readOnly?: boolean;
     onApprovalChange?: (trainingId: string, approved: boolean) => void;
-    onSelectCertificate?: (certificate: {trainingId: string; certificateId: string}) => void;
+    onSelectCertificate?: (certificate: {trainingId: string; certificateId: string; name?: string}) => void;
 }
 
 export default function ReviewTrainingsModal(
@@ -217,7 +217,7 @@ export default function ReviewTrainingsModal(
                                 {training.requiresCertificate && <>
                                     <TrainingCertificate key={employee.id + '-' + training.id + '-' + open} training={training} showPolicySummary={false} canEditHireDate={user?.userType==='agency' || user?.userType==='agency_staff' && user.profile?.accessList?.includes('DSP Management')===true}/>
                                     {onSelectCertificate && certificateSelectable(training) &&
-                                        <Button type="button" size="sm" variant="outline" className="rounded-full" aria-label={`Select certificate for ${training.name}`} onClick={() => onSelectCertificate({trainingId: training.id!, certificateId: training.certificateId!})}>Select certificate</Button>}
+                                        <Button type="button" size="sm" variant="outline" className="rounded-full" aria-label={`Select certificate for ${training.name}`} onClick={() => onSelectCertificate({trainingId: training.id!, certificateId: training.certificateId!, name: training.name})}>Select certificate</Button>}
                                     {training.source === 'policy' && <PolicyEvidenceReview training={training} readOnly={readOnly || training.policyContextState !== 'current'} onChanged={() => {
                                         const generation = requestGeneration.current;
                                         void loadTrainings({employeeId: employee.id, agencyId, limit: 25, mode, scopeKey}).unwrap().then(page=>{if(generation===requestGeneration.current){setCourses(page.items);setNextCursor(page.nextCursor);setPendingAssignments(page.summary?.policyPendingAssignmentCount ?? 0);}}).catch(()=>toast.error('Unable to reload trainings'));

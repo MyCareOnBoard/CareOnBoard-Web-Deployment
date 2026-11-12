@@ -196,7 +196,7 @@ describe('agency training pagination', () => {
     const selected = vi.fn();
     render(<ReviewTrainingsModal open onOpenChange={vi.fn()} employee={{id: 'employee-1', fullName: 'Ada', role: 'Staff'}} readOnly onSelectCertificate={selected} />);
     fireEvent.click(await screen.findByRole('button', {name: 'Select certificate for Accepted CPR'}));
-    expect(selected).toHaveBeenCalledWith({trainingId: 'accepted', certificateId: 'a'.repeat(64)});
+    expect(selected).toHaveBeenCalledWith({trainingId: 'accepted', certificateId: 'a'.repeat(64), name: 'Accepted CPR'});
     expect(screen.getAllByRole('button', {name: /Select certificate for/})).toHaveLength(1);
     expect(state.approval).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', {name: /Approve|Request changes/})).toBeNull();
