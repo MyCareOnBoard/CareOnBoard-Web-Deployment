@@ -15,6 +15,7 @@ import CurrentShiftCard, { useClockInOpen } from "./components/CurrentShiftCard"
 import { nextUpcomingShift } from "./timeline";
 import { useNow } from "./useNow";
 import ShiftDetailsDialog from "./components/ShiftDetailsDialog";
+import { useOpenNote } from "@/pages/userPanel/notes/useOpenNote";
 import ManualTimesheetDialog from "@/pages/userPanel/manualShiftManagement/ManualTimesheetDialog";
 import { createEmployeeActivityLog } from "@/lib/api/employees";
 import { getClientBasicInfo } from "@/lib/notes/clientBasicInfo";
@@ -89,9 +90,10 @@ const checkLocationMatch = (
 
 export default function ShiftManagementPage() {
   const { user } = useAuth();
-  const [noteSearchParams, setNoteSearchParams] = useSearchParams();
+  const [noteSearchParams] = useSearchParams();
   const selectedNoteShift = noteSearchParams.get('shiftId');
-  const openShiftNote = (shiftId: string) => setNoteSearchParams(previous => { const next = new URLSearchParams(previous); next.set('shiftId', shiftId); return next; });
+  // "Write shift note" goes straight to the note page, like "Fill now" on the Notes page.
+  const { open: openNote, startingShift: noteStartingShiftId } = useOpenNote();
 
   const [selectedDay, setSelectedDay] = useState(() => startOfDay(new Date()));
   const [windowStart, setWindowStart] = useState(() => addDays(startOfDay(new Date()), -DAYS_BEFORE));
@@ -414,7 +416,8 @@ export default function ShiftManagementPage() {
         actionLabel={isOpenShiftCurrent ? (currentShift?.actionStatus === ShiftActionStatus.CLOCK_IN ? 'Clock in' : 'Clock out') : undefined}
         onAction={isOpenShiftCurrent ? handleShiftAction : undefined}
         actionDisabled={clockInLocked}
-        onNote={shiftId => { setOpenShift(null); openShiftNote(shiftId); }}
+        onNote={note => { void openNote(note); }}
+        noteStartingShiftId={noteStartingShiftId}
         onAddHours={() => { setOpenShift(null); setTimesheetOpen(true); }}
         upNext={openShift !== null && openShift.id === upNextId}
         userPosition={userCoords}

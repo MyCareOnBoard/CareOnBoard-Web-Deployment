@@ -1,6 +1,6 @@
 import {lazy, Suspense, useState, type ReactNode} from 'react';
 import {format} from 'date-fns';
-import {Car, Check, CirclePlus, Clock, ExternalLink, Lock, MessageCircle, Navigation, PencilLine, X} from 'lucide-react';
+import {Car, Check, CirclePlus, Clock, ExternalLink, Loader2, Lock, MessageCircle, Navigation, PencilLine, X} from 'lucide-react';
 import {useNavigate} from 'react-router';
 import {Dialog, DialogContent, DialogDescription, DialogTitle} from '@/components/ui/dialog';
 import {CloseButton, PANEL_BODY, SIDE_PANEL, SIDE_PANEL_OVERLAY} from '@/pages/userPanel/records/RecordsKit';
@@ -87,6 +87,8 @@ function splitClock(minutes: number) {
     return {time, period};
 }
 
+export interface ShiftNoteTarget {shiftId: string; noteType: string; activityLogId: string | null}
+
 interface Props {
     shift: Shift | null;
     onClose: () => void;
@@ -95,7 +97,10 @@ interface Props {
     onAction?: () => void;
     /** Clock in isn't open yet (it opens 5 minutes before the start). */
     actionDisabled?: boolean;
-    onNote?: (shiftId: string) => void;
+    /** Opens the shift's note page, the same place "Fill now" on the Notes page goes. */
+    onNote?: (note: ShiftNoteTarget) => void;
+    /** The shift whose note is being opened (a new note is created first). */
+    noteStartingShiftId?: string | null;
     /** Opens the manual timesheet, for hours worked on a missed shift. */
     onAddHours?: () => void;
     /** This is the next shift still to come today, labelled "Up next". */
@@ -114,7 +119,7 @@ export default function ShiftDetailsDialog(props: Props) {
     </Dialog>;
 }
 
-function ShiftPanel({shift, actionLabel, onAction, actionDisabled, onNote, onAddHours, upNext, userPosition, viewer}: Props & {shift: Shift}) {
+function ShiftPanel({shift, actionLabel, onAction, actionDisabled, onNote, noteStartingShiftId, onAddHours, upNext, userPosition, viewer}: Props & {shift: Shift}) {
     const navigate = useNavigate();
     const now = useNow();
     const tone = shiftTone(shift, now);
@@ -200,9 +205,16 @@ function ShiftPanel({shift, actionLabel, onAction, actionDisabled, onNote, onAdd
         </button>;
         if (locked) hint = 'Clock in turns on 5 minutes before the shift starts.';
     } else if (tone === 'completed' && onNote && noteInfo.button) {
-        buttons = <button type="button" onClick={() => onNote(shift.id)}
-            className={cn(buttonBase, PRIMARY)}>
-            <PencilLine className="h-4 w-4" aria-hidden="true"/>{noteInfo.button}
+        const opening = noteStartingShiftId === shift.id;
+        const target: ShiftNoteTarget = {
+            shiftId: shift.id,
+            noteType: note.currentData?.noteType || shift.notesType || '',
+            activityLogId: note.currentData?.activityLogId ?? null,
+        };
+        buttons = <button type="button" onClick={() => onNote(target)} disabled={opening} aria-busy={opening}
+            className={cn(buttonBase, PRIMARY, 'disabled:cursor-wait disabled:opacity-80')}>
+            {opening ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true"/> : <PencilLine className="h-4 w-4" aria-hidden="true"/>}
+            {opening ? 'Opening note…' : noteInfo.button}
         </button>;
     } else if (tone === 'missed') {
         buttons = <>
