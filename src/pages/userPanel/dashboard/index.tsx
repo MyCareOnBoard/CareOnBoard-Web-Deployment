@@ -147,7 +147,7 @@ export default function UserPanelDashboardPage() {
             expiryDate: null
         };
 
-        const documentId = 'id' in employeeDocument ? employeeDocument.id : 'documentId' in employeeDocument ? employeeDocument.documentId : undefined;
+        const documentId = employeeDocument.id || employeeDocument.documentId;
         const issue = compliance?.items.find(item => item.documentId === documentId);
         // Without an expiry record for this file (the background expiry check hasn't picked it up yet),
         // show what the file itself says instead of "Updating expiry status…" forever. A file just
