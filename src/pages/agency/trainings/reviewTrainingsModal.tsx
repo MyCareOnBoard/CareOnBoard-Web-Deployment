@@ -7,7 +7,8 @@ import {
     DialogContent,
     DialogTitle,
 } from "@/components/ui/dialog";
-import {TrainingData, useApproveTrainingMutation, useLazyGetEmployeeTrainingsQuery} from "./trainingApi";
+import {TrainingData, useApproveTrainingMutation, useDeleteTrainingMutation, useLazyGetEmployeeTrainingsQuery} from "./trainingApi";
+import {ConfirmDialog, ConfirmDialogContent} from '@/components/ui/confirm-dialog';
 import {useAuth} from "@/utils/auth";
 import {toast} from "sonner";
 import TrainingCertificate from './TrainingCertificate';
@@ -21,6 +22,11 @@ import {Skeleton} from '@/components/ui/skeleton';
 function isAwaitingReview(training: TrainingData): boolean {
     if (training.source === 'policy') return training.policyContextState === 'current' && training.reviewState === 'awaiting_review';
     return !training.approved && training.status !== 'Changes Requested' && !!training.requiresCertificate && !!training.certificateId;
+}
+
+// Trainings the agency assigned that aren't done yet can be removed; automatic and completed ones stay.
+function deletable(training: TrainingData): boolean {
+    return training.source !== 'policy' && !!training.id && training.approved !== true && training.status !== 'Completed';
 }
 
 // Which assigned trainings can back a client-specific review, and why the others can't yet.
@@ -73,6 +79,8 @@ export default function ReviewTrainingsModal(
     const [loadError, setLoadError] = useState(false);
     const [pendingApproval, setPendingApproval] = useState<string | null>(null);
     const [approveTraining] = useApproveTrainingMutation();
+    const [deleteTraining, {isLoading: deleting}] = useDeleteTrainingMutation();
+    const [pendingDelete, setPendingDelete] = useState<TrainingData | null>(null);
     const [loadTrainings, {isFetching}] = useLazyGetEmployeeTrainingsQuery();
     const requestGeneration = useRef(0);
 
@@ -91,6 +99,27 @@ export default function ReviewTrainingsModal(
         // Release this subscription without canceling a request reused by StrictMode or another view.
         return () => { active = false; requestGeneration.current++; request.unsubscribe?.(); };
     }, [open, employee?.id, agencyId, mode, scopeKey, loadTrainings]);
+
+    const confirmDelete = async () => {
+        const training = pendingDelete;
+        if (readOnly || !employee || !training?.id || deleting) return;
+        const generation = requestGeneration.current;
+        try {
+            await deleteTraining({employeeId: employee.id, trainingId: training.id}).unwrap();
+            if (generation !== requestGeneration.current) return;
+            setCourses(current => current.filter(item => item.id !== training.id));
+            toast.success(`${training.name} deleted`);
+            // Page cursors point at a loaded row, so start the list again from the first page.
+            void loadTrainings({...(scopeKey ? {scopeKey} : {}), employeeId: employee.id, agencyId, limit: 25, mode}).unwrap()
+                .then(page => {if (generation === requestGeneration.current) {setCourses(page.items); setNextCursor(page.nextCursor); setPendingAssignments(page.summary?.policyPendingAssignmentCount ?? 0);}})
+                .catch(() => {/* The deleted row is already gone from the list; a later reopen reloads it. */});
+        } catch (error) {
+            const message = (error as {data?: {error?: string}})?.data?.error;
+            if (generation === requestGeneration.current) toast.error(message && message !== 'Request failed' ? message : 'Unable to delete the training. Try again.');
+        } finally {
+            setPendingDelete(null);
+        }
+    };
 
     const handleToggle = async (trainingId: string, approved?: boolean) => {
         if (readOnly || !employee || pendingApproval) return;
@@ -199,6 +228,8 @@ export default function ReviewTrainingsModal(
                                     </div>}
                                     {training.source !== 'policy' && !training.certificateId && <p className="text-xs text-[#627476]">Waiting for a completion certificate.</p>}
                                 </>}
+                                {!readOnly && deletable(training) && <Button type="button" size="sm" variant="outline" className="rounded-full border-[#e8b4a6] text-[#b14d35] hover:bg-[#fff1eb]"
+                                    disabled={deleting || pendingApproval !== null} aria-label={`Delete ${training.name}`} onClick={() => setPendingDelete(training)}>Delete training</Button>}
                                 {onSelectCertificate && training.source !== 'policy' && !certificateSelectable(training) && <p className="text-xs font-medium text-[#88601d]">{selectionHint(training)}</p>}
                                 {!readOnly && !training.requiresCertificate && training.source !== 'policy' && <div className="flex items-center gap-3">
                                     <p className="text-sm">Approve</p>
@@ -230,6 +261,12 @@ export default function ReviewTrainingsModal(
                     }}>Load more trainings</Button>}
                 </div>
             </DialogContent>
+            <ConfirmDialog open={!!pendingDelete} onOpenChange={next => {if (!next && !deleting) setPendingDelete(null);}}>
+                <ConfirmDialogContent className="max-w-md" title="Delete training?"
+                    description={`Remove "${pendingDelete?.name ?? 'this training'}" from ${employee.fullName}'s trainings? ${pendingDelete?.certificateId ? 'The certificate they uploaded for it is removed too. ' : ''}This can't be undone.`}
+                    confirmText="Delete training" cancelText="Keep training" isLoading={deleting} loadingText="Deleting…"
+                    onConfirm={() => void confirmDelete()} onCancel={() => setPendingDelete(null)} />
+            </ConfirmDialog>
         </Dialog>
     );
 }

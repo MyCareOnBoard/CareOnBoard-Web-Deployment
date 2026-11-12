@@ -32,6 +32,7 @@ vi.mock('./trainingApi', () => ({
   useSaveTrainingMutation: () => [vi.fn(), {isLoading: false}],
   useApproveTrainingMutation: () => [state.approval],
   usePolicyEvidenceMutation: () => [state.policyMutation, {isLoading: false}],
+  useDeleteTrainingMutation: () => [vi.fn(), {isLoading: false}],
 }));
 
 describe('agency training pagination', () => {

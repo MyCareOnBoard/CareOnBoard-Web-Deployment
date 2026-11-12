@@ -52,6 +52,10 @@ export const employeeTrainingsApi = createApi({
             query: ({trainingId, approved, certificateId}) => ({url: `/agencies/trainings/${trainingId}/approve`, method: 'PATCH', data: {approved, ...(certificateId ? {certificateId} : {})}, requiresAuth: true}),
             invalidatesTags: (_result, _error, {employeeId}) => [{type: 'EmployeeTrainings', id: employeeId}, {type: 'TrainingStaff', id: 'LIST'}],
         }),
+        deleteTraining: builder.mutation<void, {employeeId: string; trainingId: string}>({
+            query: ({trainingId}) => ({url: `/agencies/trainings/${encodeURIComponent(trainingId)}`, method: 'DELETE', requiresAuth: true}),
+            invalidatesTags: (_result, _error, {employeeId}) => [{type: 'EmployeeTrainings', id: employeeId}, {type: 'TrainingStaff', id: 'LIST'}],
+        }),
     }),
 });
-export const {useGetEmployeesNonPaginatedQuery, useSaveTrainingMutation, useGetTrainingsQuery, useLazyGetEmployeeTrainingsQuery, useGetEmployeeTrainingsQuery, useApproveTrainingMutation, usePolicyEvidenceMutation} = employeeTrainingsApi;
+export const {useDeleteTrainingMutation, useGetEmployeesNonPaginatedQuery, useSaveTrainingMutation, useGetTrainingsQuery, useLazyGetEmployeeTrainingsQuery, useGetEmployeeTrainingsQuery, useApproveTrainingMutation, usePolicyEvidenceMutation} = employeeTrainingsApi;

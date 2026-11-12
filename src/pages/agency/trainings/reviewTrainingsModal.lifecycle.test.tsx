@@ -1,7 +1,7 @@
 import {StrictMode} from 'react';
 import {Provider} from 'react-redux';
 import {configureStore} from '@reduxjs/toolkit';
-import {act, render, screen} from '@testing-library/react';
+import {act, fireEvent, render, screen, waitFor} from '@testing-library/react';
 import {expect, it, vi} from 'vitest';
 import {employeeTrainingsApi, type TrainingPage} from './trainingApi';
 import ReviewTrainingsModal from './reviewTrainingsModal';
@@ -62,4 +62,26 @@ it('explains which trainings can back a client review and what to do when none c
   expect(screen.getByText("This training has no certificate step, so it can't be used.")).toBeInTheDocument();
   expect(screen.getByText('Not selectable yet: approve this certificate in Review trainings first.')).toBeInTheDocument();
   expect(screen.queryByRole('button', {name: /Select certificate/})).not.toBeInTheDocument();
+});
+
+it('deletes an uncompleted assigned training after confirmation and keeps completed ones', async () => {
+  const page = (items: TrainingPage['items']) => ({data: {items, nextCursor: null, summary: null, localDate: null}});
+  const base = {assignedDsp: 'employee-1', trainingType: 'manual', timeFrame: '', completedAt: null, source: 'manual' as const, requiresCertificate: true};
+  const items = [
+    {...base, id: 'open', name: 'Medication administration', status: 'Not Completed', approved: false},
+    {...base, id: 'done', name: 'First aid', status: 'Completed', approved: true, certificateId: 'b'.repeat(64)},
+  ];
+  request.mockReset();
+  request.mockImplementation(({method}: {method?: string}) => Promise.resolve(method === 'DELETE' ? {data: {success: true}} : page(items.slice(1))));
+  request.mockImplementationOnce(() => Promise.resolve(page(items)));
+  const store = configureStore({
+    reducer: {[employeeTrainingsApi.reducerPath]: employeeTrainingsApi.reducer},
+    middleware: getDefault => getDefault().concat(employeeTrainingsApi.middleware),
+  });
+  render(<Provider store={store}><ReviewTrainingsModal open onOpenChange={vi.fn()} employee={{id: 'employee-1', fullName: 'New Demo', role: 'DSP'}} /></Provider>);
+  fireEvent.click(await screen.findByRole('button', {name: 'Delete Medication administration'}));
+  expect(screen.queryByRole('button', {name: 'Delete First aid'})).not.toBeInTheDocument();
+  fireEvent.click(await screen.findByRole('button', {name: 'Delete training'}));
+  await waitFor(() => expect(screen.queryByText('Medication administration')).not.toBeInTheDocument());
+  expect(request).toHaveBeenCalledWith(expect.objectContaining({url: '/agencies/trainings/open', method: 'DELETE'}));
 });
