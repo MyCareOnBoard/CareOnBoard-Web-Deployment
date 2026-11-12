@@ -1,11 +1,7 @@
 import {ComplianceReviewList, ComplianceSkeleton, ComplianceBadge, complianceTone} from './CompliancePresentation';
 import { ClipboardCheck, Clock3, PauseCircle, ShieldOff, RefreshCw } from 'lucide-react';
 import { lazy, Suspense, useState } from "react";
-import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/utils/auth";
-import { canReviewCareer } from "@/lib/api/career-reconciliation";
-import { Routes } from "@/routes/constants";
 import { useGetShiftNoteComplianceQuery } from "./api";
 import { shiftNoteLabels, civilDateLabel } from "./apiTypes";
 import {
@@ -29,7 +25,6 @@ export default function ShiftNotesSection({
   onPage,
   onPrevious,
 }: SourceProps) {
-  const { user } = useAuth();
   const [selectedId, setSelectedId] = useState<string | null>();
   const query = useGetShiftNoteComplianceQuery(
     {
@@ -109,8 +104,7 @@ export default function ShiftNotesSection({
               {item.syncStatus === 'pending' && <p className="mt-3 text-sm">Your change is saved. The list status is updating.</p>}
               {item.syncStatus === 'unavailable' && <p className="mt-3 text-sm">Note status unavailable</p>}
               {view.shiftId === item.shiftId && renderDetail(item.shiftId)}
-              <div className="compliance-actions"><Button className="compliance-primary" onClick={() => onSelect({shiftId: view.shiftId === item.shiftId ? undefined : item.shiftId})}>{view.shiftId === item.shiftId ? "Close shift note" : "Open shift note"}</Button>
-              {mode === 'ddd' && item.noteType === 'career-planning' && canReviewCareer(user) && <Link className="text-sm text-[#008b90] underline" to={Routes.agency.careerReconciliation + '?' + new URLSearchParams({clientId: item.clientId, agencyId})}>Usage &amp; reconciliation</Link>}</div>
+              <div className="compliance-actions"><Button className="compliance-primary" onClick={() => onSelect({shiftId: view.shiftId === item.shiftId ? undefined : item.shiftId})}>{view.shiftId === item.shiftId ? "Close shift note" : "Open shift note"}</Button></div>
             </>,
           }))}/>
           {!data.items.length && !query.error && (data.nextCursor || coverage === 'ready') && (

@@ -1,4 +1,3 @@
-import {validCareerReviewId} from '@/lib/api/career-reconciliation';
 import {useSearchParams} from 'react-router';
 import {useAssignmentReviewScope} from '@/hooks/useAssignmentReview';
 import {canAccessBillingChild} from '@/lib/agency/agency-billing-permissions';
@@ -63,6 +62,9 @@ import {
 } from "./utils/savedClaimUtils";
 
 const PROGRAM_NAMES = { ddd: "DDD", hha: "HHA", sc: "Support Coordination" } as const;
+// Ids from the ?claimId=&clientId= deep link become path segments, so reject slashes and control characters.
+const validReportParamId = (value: unknown): value is string =>
+  typeof value === "string" && value.length > 0 && value.length <= 512 && !/[\/\\\x00-\x1f]/.test(value);
 
 const GenerateClaimModal = lazy(() => import("./components/GenerateClaimModal"));
 const ClaimReportModal = lazy(() => import("./components/claim-report/ClaimReportModal"));
@@ -523,7 +525,7 @@ export function ClaimsDashboardContent() {
   useEffect(()=>{
     setReportSelectionError('');
     if(reportClaimId===null && reportClientId===null)return;
-    if(!validCareerReviewId(reportClaimId)||!validCareerReviewId(reportClientId)||(reportAgencyId && reportAgencyId!==agencyId)){
+    if(!validReportParamId(reportClaimId)||!validReportParamId(reportClientId)||(reportAgencyId && reportAgencyId!==agencyId)){
       setReportSelectionError('This report selection is unavailable. Open a claim from the billing workspace.');return;
     }
     if(!canViewReport){setReportSelectionError('Claims View access is required to open this report.');return;}

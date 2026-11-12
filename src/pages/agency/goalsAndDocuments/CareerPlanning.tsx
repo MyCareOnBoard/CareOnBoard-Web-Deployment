@@ -1,6 +1,5 @@
 import {CareerPlanDate} from './CareerPlanDate';
 export {CareerPlanDate} from './CareerPlanDate';
-import {canReviewCareer} from '@/lib/api/career-reconciliation';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useBlocker, useSearchParams } from 'react-router';
 import { Button } from '@/components/ui/button';
@@ -519,7 +518,6 @@ export default function CareerPlanningPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Career Planning</h1>
-      {clientId && canReviewCareer(user) && <Button variant="outline" asChild><Link to={(user?.userType==='super_admin'?Routes.superAdmin.careerReconciliation:Routes.agency.careerReconciliation)+'?'+new URLSearchParams({clientId,...(agencyId?{agencyId}:{})})}>Usage &amp; reconciliation</Link></Button>}
       {pageNotice && <p role="status">{pageNotice}</p>}
       <label className="block">
         Find client

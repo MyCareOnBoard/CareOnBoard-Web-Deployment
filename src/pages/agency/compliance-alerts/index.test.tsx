@@ -19,7 +19,6 @@ vi.mock('@/hooks/useAssignmentReview', () => ({useAssignmentReviewScope: () => J
 vi.mock('@/lib/baseQuery', () => ({customBaseQuery: mocks.request}));
 vi.mock('@/hooks/use-toast', () => ({useToast: () => ({toast: vi.fn()})}));
 vi.mock('@/lib/api/employee-documents', () => ({sendDocumentAlert: mocks.alert}));
-vi.mock('@/lib/api/career-reconciliation', () => ({canReviewCareer: () => false}));
 import ComplianceAlertsPage from './index';
 import AgencyLayout from '@/layouts/AgencyLayout';
 import agencyModeReducer, {type AgencyMode} from '@/store/redux/agencyModeSlice';

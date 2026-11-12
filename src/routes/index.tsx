@@ -1,5 +1,4 @@
 import { lazy } from "react";
-const CareerReconciliationPage = lazy(() => import('@/pages/agency/goalsAndDocuments/CareerReconciliation'));
 import { createBrowserRouter } from "react-router";
 import { Routes } from "@/routes/constants";
 import { preloadDirectAgencyPayrollRoute } from "@/routes/preloadDirectPayrollRoute";
@@ -636,9 +635,6 @@ export const router = createBrowserRouter([
                 path: Routes.agency.goalsAndDocuments.careerPlanning, Component: CareerPlanningPage,
             },
             {
-                path: Routes.agency.careerReconciliation, Component: CareerReconciliationPage,
-            },
-            {
                 path: Routes.agency.goalsAndDocuments.naturalSupportsTraining,
                 Component: NaturalSupportsTraining,
             },
@@ -977,9 +973,6 @@ export const router = createBrowserRouter([
             },
             {
                 path: Routes.superAdmin.careerPlanning, Component: CareerPlanningPage,
-            },
-            {
-                path: Routes.superAdmin.careerReconciliation, Component: CareerReconciliationPage,
             },
             {
                 path: Routes.superAdmin.clientDetails,
