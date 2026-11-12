@@ -23,6 +23,18 @@ function isAwaitingReview(training: TrainingData): boolean {
     return !training.approved && training.status !== 'Changes Requested' && !!training.requiresCertificate && !!training.certificateId;
 }
 
+// Which assigned trainings can back a client-specific review, and why the others can't yet.
+function certificateSelectable(training: TrainingData): boolean {
+    return training.source !== 'policy' && training.approved === true && training.status === 'Completed' && !!training.id && /^[a-f0-9]{64}$/.test(training.certificateId || '');
+}
+function selectionHint(training: TrainingData): string {
+    if (!training.requiresCertificate) return "This training has no certificate step, so it can't be used.";
+    if (!training.certificateId) return 'Not selectable yet: the staff member needs to upload a completion certificate.';
+    if (isAwaitingReview(training)) return 'Not selectable yet: approve this certificate in Review trainings first.';
+    if (training.status === 'Changes Requested') return 'Not selectable: changes were requested on this certificate.';
+    return 'Not selectable: this certificate is not approved.';
+}
+
 interface ReviewTrainingsModalProps {
     scopeKey?: string;
     open: boolean;
@@ -126,7 +138,16 @@ export default function ReviewTrainingsModal(
                         </div>
                         <Button type="button" variant="ghost" size="icon-sm" aria-label="Close training review" onClick={handleClose} className="rounded-full bg-[#f5f9f9] text-[#627476]"><X className="size-4"/></Button>
                     </div>
-                    {onSelectCertificate && <p className="mt-2 text-sm text-[#627476]">Select an accepted completion certificate for this client review.</p>}
+                    {onSelectCertificate && <p className="mt-2 text-sm text-[#627476]">Choose the training whose certificate shows {employee.fullName} is trained for this client, then click <span className="font-medium text-[#162a2c]">Select certificate</span> on it. Only trainings you assigned with an approved certificate can be selected; automatic trainings can't.</p>}
+                    {onSelectCertificate && !isFetching && !loadError && !courses.some(certificateSelectable) && <div role="note" className="mt-3 rounded-[14px] bg-[#faf3e4] px-4 py-3 text-sm text-[#5f4413]">
+                        <p className="font-semibold">No certificate can be selected{nextCursor ? ' in the trainings loaded so far' : ' yet'}.</p>
+                        <ol className="mt-1 list-decimal space-y-0.5 pl-5">
+                            <li>Assign {employee.fullName} a training such as "Medication administration" from their Training tab.</li>
+                            <li>{employee.fullName} uploads the completion certificate.</li>
+                            <li>Approve the certificate in Review trainings.</li>
+                            <li>Come back here and click Select certificate on that training.</li>
+                        </ol>
+                    </div>}
                     <div className="mt-5 flex items-center gap-3">
                         <div className="h-11 w-10 shrink-0 overflow-hidden rounded-[10px] bg-[#00b4b8]">
                             {employee.profilePictureUrl ? <img src={employee.profilePictureUrl} alt={employee.fullName} className="h-full w-full object-cover"/> : <div className="flex h-full items-center justify-center text-xl font-semibold text-white">{employee.fullName?.charAt(0).toUpperCase()}</div>}
@@ -166,7 +187,7 @@ export default function ReviewTrainingsModal(
                                 {training.completedAt && <p className="text-xs text-[#627476]">Completed in {typeof training.completedAt === 'string' ? training.completedAt : new Date((training.completedAt as any)?._seconds * 1000).toLocaleDateString()}</p>}
                                 {training.requiresCertificate && <>
                                     <TrainingCertificate key={employee.id + '-' + training.id + '-' + open} training={training} showPolicySummary={false} canEditHireDate={user?.userType==='agency' || user?.userType==='agency_staff' && user.profile?.accessList?.includes('DSP Management')===true}/>
-                                    {onSelectCertificate && training.source !== 'policy' && training.approved === true && training.status === 'Completed' && training.id && /^[a-f0-9]{64}$/.test(training.certificateId || '') &&
+                                    {onSelectCertificate && certificateSelectable(training) &&
                                         <Button type="button" size="sm" variant="outline" className="rounded-full" aria-label={`Select certificate for ${training.name}`} onClick={() => onSelectCertificate({trainingId: training.id!, certificateId: training.certificateId!})}>Select certificate</Button>}
                                     {training.source === 'policy' && <PolicyEvidenceReview training={training} readOnly={readOnly || training.policyContextState !== 'current'} onChanged={() => {
                                         const generation = requestGeneration.current;
@@ -178,6 +199,7 @@ export default function ReviewTrainingsModal(
                                     </div>}
                                     {training.source !== 'policy' && !training.certificateId && <p className="text-xs text-[#627476]">Waiting for a completion certificate.</p>}
                                 </>}
+                                {onSelectCertificate && training.source !== 'policy' && !certificateSelectable(training) && <p className="text-xs font-medium text-[#88601d]">{selectionHint(training)}</p>}
                                 {!readOnly && !training.requiresCertificate && training.source !== 'policy' && <div className="flex items-center gap-3">
                                     <p className="text-sm">Approve</p>
                                     <button onClick={() => handleToggle(training?.id || '')} aria-label={`${training.approved ? 'Disapprove' : 'Approve'} ${training.name}`} aria-pressed={training.approved} disabled={pendingApproval !== null}

@@ -43,3 +43,23 @@ it('loads a shared training request during StrictMode effect replay', async () =
     store.dispatch(employeeTrainingsApi.util.resetApiState());
   }
 });
+
+it('explains which trainings can back a client review and what to do when none can', async () => {
+  const page = (items: TrainingPage['items']) => ({data: {items, nextCursor: null, summary: null, localDate: null}});
+  const base = {assignedDsp: 'employee-1', trainingType: 'manual', timeFrame: '', completedAt: null, source: 'manual' as const};
+  request.mockResolvedValueOnce(page([
+    {...base, id: 'legacy', name: 'New test', status: 'Completed', approved: true, requiresCertificate: false},
+    {...base, id: 'pending', name: 'Medication administration', status: 'Awaiting Review', approved: false, requiresCertificate: true, certificateId: 'a'.repeat(64)},
+  ]));
+  const store = configureStore({
+    reducer: {[employeeTrainingsApi.reducerPath]: employeeTrainingsApi.reducer},
+    middleware: getDefault => getDefault().concat(employeeTrainingsApi.middleware),
+  });
+  const onSelectCertificate = vi.fn();
+  render(<Provider store={store}><ReviewTrainingsModal open readOnly onOpenChange={vi.fn()} onSelectCertificate={onSelectCertificate} employee={{id: 'employee-1', fullName: 'New Demo', role: 'DSP'}} /></Provider>);
+  expect(await screen.findByText('No certificate can be selected yet.')).toBeInTheDocument();
+  expect(screen.getByText(/Assign New Demo a training such as "Medication administration"/)).toBeInTheDocument();
+  expect(screen.getByText("This training has no certificate step, so it can't be used.")).toBeInTheDocument();
+  expect(screen.getByText('Not selectable yet: approve this certificate in Review trainings first.')).toBeInTheDocument();
+  expect(screen.queryByRole('button', {name: /Select certificate/})).not.toBeInTheDocument();
+});
