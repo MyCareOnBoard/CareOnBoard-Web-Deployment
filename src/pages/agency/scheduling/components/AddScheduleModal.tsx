@@ -2253,7 +2253,7 @@ export default function AddScheduleModal({
           });
         } else {
           toast({
-            title: failures[0]?.reason?.response?.data?.code || "Scheduling Failed",
+            title: "Scheduling Failed",
             description: failures[0]?.reason?.response?.data?.error || "Failed to schedule shifts. Please try again.",
             variant: "destructive",
           });
@@ -2298,7 +2298,7 @@ export default function AddScheduleModal({
       console.error("Failed to create schedule.");
       clearDeniedDecision(error);
       toast({
-        title: error?.response?.data?.code || "Scheduling Failed",
+        title: "Scheduling Failed",
         description: error?.response?.data?.error || "Failed to create schedule. Please try again.",
         variant: "destructive",
       });
