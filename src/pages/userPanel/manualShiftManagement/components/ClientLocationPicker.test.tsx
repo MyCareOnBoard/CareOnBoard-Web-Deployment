@@ -37,7 +37,7 @@ describe('ClientLocationPicker', () => {
         const onChange = vi.fn();
         render(<ClientLocationPicker clients={clients} loading={false} error={false} value={null} onChange={onChange} onRetry={vi.fn()}/>);
         fireEvent.click(screen.getByRole('button', {name: /^Client and location/}));
-        expect(screen.getByRole('group', {name: 'Client KC6HPS'})).toBeTruthy();
+        expect(screen.getByRole('group', {name: 'KC6HPS'})).toBeTruthy();
         expect(screen.getByText('No address on file. Enter where you worked')).toBeTruthy();
         fireEvent.click(screen.getByRole('option', {name: /210 Main St/}));
         expect(onChange).toHaveBeenCalledWith(clients[0], clients[0].locations[1]);
@@ -46,7 +46,7 @@ describe('ClientLocationPicker', () => {
     it('shows the chosen client and location on the field', () => {
         render(<ClientLocationPicker clients={clients} loading={false} error={false}
             value={{clientId: 'kc6hps0001', locationId: 'primaryAddress'}} onChange={vi.fn()} onRetry={vi.fn()}/>);
-        expect(screen.getByText('Client KC6HPS')).toBeTruthy();
+        expect(screen.getByText('KC6HPS')).toBeTruthy();
         expect(screen.getByText('Primary · 12 Grand Quest Complex, Newark, NJ, 07102')).toBeTruthy();
     });
 

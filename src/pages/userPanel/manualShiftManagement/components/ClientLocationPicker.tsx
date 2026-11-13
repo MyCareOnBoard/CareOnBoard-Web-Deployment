@@ -12,7 +12,7 @@ export interface ClientLocationValue {
     locationId: string;
 }
 
-export const assignedClientLabel = (clientId: string) => `Client ${shortClientId(clientId) ?? ''}`.trim();
+export const assignedClientLabel = (clientId: string) => shortClientId(clientId) ?? '';
 
 export const locationKindLabel = (location: Pick<AssignedTimesheetLocation, 'kind' | 'serviceName'>) =>
     location.kind === 'primary' ? 'Primary location' : location.serviceName ? `Service location · ${location.serviceName}` : 'Service location';

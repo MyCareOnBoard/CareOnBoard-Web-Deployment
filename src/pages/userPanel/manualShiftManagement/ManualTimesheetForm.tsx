@@ -45,7 +45,7 @@ const canSeeClientNames = (user?: {applicantType?: string; role?: string} | null
 
 const clientLabel = (client: Partial<Client>, showNames: boolean) => {
     if (showNames && client.firstName && client.lastName) return `${client.firstName} ${client.lastName}`;
-    return client.id ? `Client ${shortClientId(client.id)}` : '';
+    return client.id ? shortClientId(client.id) ?? '' : '';
 };
 
 const initials = (name: string) =>
