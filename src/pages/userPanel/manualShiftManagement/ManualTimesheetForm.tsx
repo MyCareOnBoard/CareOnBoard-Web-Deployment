@@ -8,9 +8,10 @@ import {useGooglePlacesAutocomplete} from '@/hooks/useGooglePlacesAutocomplete';
 import {useReverseGeocode} from '@/hooks/useReverseGeocode';
 import {searchClients, type Client} from '@/lib/api/clients';
 import {
-    createShift, deleteShift, formatShiftLocation, listShifts, updateShift,
+    createShift, deleteShift, formatShiftLocation, listAssignedTimesheetClients, listShifts, updateShift,
     ShiftActionStatus, ShiftStatus, ShiftType, SubmissionStatus,
-    type CreateShiftRequest, type Shift, type ShiftLocation,
+    type AssignedTimesheetClient, type AssignedTimesheetLocation, type CreateShiftRequest,
+    type ServiceLocationSource, type Shift, type ShiftLocation,
 } from '@/lib/api/shifts';
 import DigitalSignatureModal from '@/pages/applicant/application/components/DigitalSignature';
 import {useCheckSignatureStatusQuery, useSignDocumentMutation} from '@/pages/applicant/application/api';
@@ -18,11 +19,12 @@ import ConfirmShiftModal from './components/ConfirmShiftModal';
 import SuccessModal from './components/SuccessModal';
 import SignatureDropzone from './components/SignatureDropzone';
 import WeekEntries from './components/WeekEntries';
+import ClientLocationPicker, {assignedClientLabel, OTHER_LOCATION_ID} from './components/ClientLocationPicker';
 import {Hint} from '@/pages/userPanel/records/RecordsKit';
 import {shortClientId} from '@/pages/userPanel/dashboard/components/UpcomingTasks';
 import {
-    buildManualShiftRequests, dateFromKey, daysToFix, emptyWeek, hasEntries, weekFrom, weeksFromDrafts,
-    type Signature, type TimesheetWeek,
+    buildManualShiftRequests, dateFromKey, daysToFix, emptyWeek, hasEntries, matchDraftLocation, weekFrom, weeksFromDrafts,
+    type PayrollLocationSource, type Signature, type TimesheetWeek,
 } from './timesheetEntries';
 
 type SignatureTarget = 'client' | 'user';
@@ -66,12 +68,34 @@ export function useTimesheetState({enabled}: {enabled: boolean}) {
     const [location, setLocation] = useState('');
     // Structured location, stored the way the agency panel stores it.
     const [selectedLocation, setSelectedLocation] = useState<ShiftLocation | null>(null);
+    // Field staff pick client + location together from their assigned clients.
+    const [pickedLocationId, setPickedLocationId] = useState<string | null>(null);
+    const [payrollSource, setPayrollSource] = useState<PayrollLocationSource | null>(null);
+    const [draftLocationSource, setDraftLocationSource] = useState<ServiceLocationSource | null>(null);
+    const [assignedClients, setAssignedClients] = useState<AssignedTimesheetClient[]>([]);
+    const [assignedLoading, setAssignedLoading] = useState(false);
+    const [assignedError, setAssignedError] = useState(false);
+    const [assignedLoaded, setAssignedLoaded] = useState(false);
+    const [assignedRequest, setAssignedRequest] = useState(0);
     const [weeks, setWeeks] = useState<TimesheetWeek[]>([emptyWeek()]);
     const [clientSignature, setClientSignature] = useState<Signature | null>(null);
     const [userSignature, setUserSignature] = useState<Signature | null>(null);
     const [signatureTarget, setSignatureTarget] = useState<SignatureTarget | null>(null);
     const loadedFor = useRef<string | null>(null);
     const showNames = canSeeClientNames(user);
+
+    // Field staff only: the clients they're assigned to through client services.
+    useEffect(() => {
+        if (!enabled || showNames || !user?.id) return;
+        const controller = new AbortController();
+        setAssignedLoading(true);
+        setAssignedError(false);
+        listAssignedTimesheetClients({signal: controller.signal})
+            .then(clients => { setAssignedClients(clients); setAssignedLoaded(true); })
+            .catch(() => { if (!controller.signal.aborted) setAssignedError(true); })
+            .finally(() => { if (!controller.signal.aborted) setAssignedLoading(false); });
+        return () => controller.abort();
+    }, [enabled, showNames, user?.id, assignedRequest]);
 
     const {data: savedClientSignature} = useCheckSignatureStatusQuery(SIGNATURE_CONTEXT.client, {skip: !enabled || !user?.uid});
     const {data: savedUserSignature} = useCheckSignatureStatusQuery(SIGNATURE_CONTEXT.user, {skip: !enabled || !user?.uid});
@@ -99,6 +123,8 @@ export function useTimesheetState({enabled}: {enabled: boolean}) {
             if (clientId) setClient({id: clientId, label: clientLabel({...draftClient, id: clientId}, showNames)});
             setLocation(formatShiftLocation(first.location) || '');
             if (first.location && typeof first.location === 'object') setSelectedLocation(first.location as ShiftLocation);
+            setDraftLocationSource(first.serviceLocationSource ?? null);
+            setPickedLocationId(null);
             const [week1, week2] = weeksFromDrafts(drafts);
             setWeeks(week2.entries.length > 0 ? [week1, week2] : [week1]);
         }).catch(() => {
@@ -133,12 +159,48 @@ export function useTimesheetState({enabled}: {enabled: boolean}) {
         setClient({id: '', label: ''});
         setLocation('');
         setSelectedLocation(null);
+        setPickedLocationId(null);
+        setPayrollSource(null);
+        setDraftLocationSource(null);
         setClientSignature(null);
         setUserSignature(null);
     }, []);
 
+    // Once both have loaded, match a restored draft to one of the assigned client's locations.
+    useEffect(() => {
+        if (showNames || !assignedLoaded || !client.id || pickedLocationId !== null) return;
+        const assigned = assignedClients.find(item => item.id === client.id);
+        if (!assigned) {
+            // The draft's client is no longer assigned to them: make them pick again.
+            setClient({id: '', label: ''});
+            return;
+        }
+        const match = matchDraftLocation(assigned.locations, draftLocationSource, location);
+        setPickedLocationId(match?.id ?? OTHER_LOCATION_ID);
+        setPayrollSource(match?.source && match.payrollSourceFrom ? {source: match.source, from: match.payrollSourceFrom} : null);
+    }, [showNames, assignedLoaded, assignedClients, client.id, pickedLocationId, draftLocationSource, location]);
+
+    const pickAssigned = useCallback((picked: AssignedTimesheetClient, pickedLocation: AssignedTimesheetLocation | null) => {
+        setClient({id: picked.id, label: assignedClientLabel(picked.id)});
+        setDraftLocationSource(null);
+        if (pickedLocation) {
+            setPickedLocationId(pickedLocation.id);
+            setLocation(pickedLocation.display);
+            setSelectedLocation(pickedLocation.location);
+            setPayrollSource(pickedLocation.source && pickedLocation.payrollSourceFrom
+                ? {source: pickedLocation.source, from: pickedLocation.payrollSourceFrom} : null);
+        } else {
+            setPickedLocationId(OTHER_LOCATION_ID);
+            setLocation('');
+            setSelectedLocation(null);
+            setPayrollSource(null);
+        }
+    }, []);
+
     return {
         loadingDrafts, client, setClient, location, setLocation, selectedLocation, setSelectedLocation,
+        pickedLocationId, payrollSource, pickAssigned,
+        assignedClients, assignedLoading, assignedError, reloadAssigned: () => setAssignedRequest(count => count + 1),
         weeks, setWeeks, clientSignature, setClientSignature, userSignature, setUserSignature,
         signatureTarget, setSignatureTarget, reset,
     };
@@ -161,6 +223,7 @@ export default function ManualTimesheetForm({state, onSubmitted, pinnedFooter = 
     const {user} = useAuth();
     const {
         loadingDrafts, client, setClient, location, setLocation, selectedLocation, setSelectedLocation,
+        pickedLocationId, payrollSource, pickAssigned, assignedClients, assignedLoading, assignedError, reloadAssigned,
         weeks, setWeeks, clientSignature, setClientSignature, userSignature, setUserSignature,
         signatureTarget, setSignatureTarget,
     } = state;
@@ -294,7 +357,8 @@ export default function ManualTimesheetForm({state, onSubmitted, pinnedFooter = 
             return false;
         }
         if (!client.id) {
-            fail('Choose a client', `Search for and pick the client before you ${action}.`);
+            fail(showNames ? 'Choose a client' : 'Choose a client and location',
+                showNames ? `Search for and pick the client before you ${action}.` : `Pick the client and where you worked before you ${action}.`);
             return false;
         }
         if (location.trim().length < 3) {
@@ -320,6 +384,7 @@ export default function ManualTimesheetForm({state, onSubmitted, pinnedFooter = 
             agencyId: user?.agencyId || '',
             clientId: client.id,
             location: selectedLocation || location.trim(),
+            payrollSource: showNames ? null : payrollSource,
             clientSignature,
             userSignature,
         }).map(request => ({...request, ...status}));
@@ -354,6 +419,7 @@ export default function ManualTimesheetForm({state, onSubmitted, pinnedFooter = 
                 status: row.status,
                 submissionStatus: row.submissionStatus,
                 type: row.type,
+                ...(row.serviceLocationSource ? {serviceLocationSource: row.serviceLocationSource} : {}),
             });
         });
         const removals = drafts.filter(draft => !dates.has(draft.date)).map(draft => deleteShift(draft.id));
@@ -485,7 +551,7 @@ export default function ManualTimesheetForm({state, onSubmitted, pinnedFooter = 
                     </span>
                 </div>
 
-                <div ref={clientBoxRef} className="relative">
+                {showNames ? <div ref={clientBoxRef} className="relative">
                     <label htmlFor="timesheet-client" className={labelClass}>Client name</label>
                     <div className="relative">
                         <input id="timesheet-client" value={clientQuery ?? client.label} autoComplete="off" placeholder="Search client here"
@@ -507,10 +573,12 @@ export default function ManualTimesheetForm({state, onSubmitted, pinnedFooter = 
                                     {result.address && <span className="mt-0.5 block truncate text-xs text-[#5d6b73] dark:text-[#9aa4a8]">{result.address}</span>}
                                 </button>)}
                     </div>}
-                </div>
+                </div> : <ClientLocationPicker clients={assignedClients} loading={assignedLoading} error={assignedError}
+                    value={client.id && pickedLocationId ? {clientId: client.id, locationId: pickedLocationId} : null}
+                    onChange={pickAssigned} onRetry={reloadAssigned}/>}
 
-                <div ref={locationBoxRef} className="relative">
-                    <label htmlFor="timesheet-location" className={labelClass}>Location</label>
+                {(showNames || pickedLocationId === OTHER_LOCATION_ID) && <div ref={locationBoxRef} className={cn('relative', !showNames && 'md:col-span-3')}>
+                    <label htmlFor="timesheet-location" className={labelClass}>{showNames ? 'Location' : 'Where did you work?'}</label>
                     <div className="relative">
                         <input id="timesheet-location" value={location} autoComplete="off" placeholder="Search for location here"
                             onChange={event => { setLocation(event.target.value); setSelectedLocation(null); locationAutocomplete.handleInputChange(event.target.value); }}
@@ -530,7 +598,7 @@ export default function ManualTimesheetForm({state, onSubmitted, pinnedFooter = 
                             <span className="line-clamp-2">{suggestion.description}</span>
                         </button>)}
                     </div>}
-                </div>
+                </div>}
             </div>
 
             {weeks.map((week, index) => <WeekEntries key={index} weekNumber={index + 1} week={week}

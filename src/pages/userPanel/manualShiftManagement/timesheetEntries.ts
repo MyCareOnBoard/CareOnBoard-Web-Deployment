@@ -1,5 +1,5 @@
 import {addDays, format} from 'date-fns';
-import {ShiftStatus, ShiftType, SubmissionStatus, type CreateShiftRequest, type Shift, type ShiftLocation} from '@/lib/api/shifts';
+import {ShiftStatus, ShiftType, SubmissionStatus, type AssignedTimesheetLocation, type CreateShiftRequest, type ServiceLocationSource, type Shift, type ShiftLocation} from '@/lib/api/shifts';
 import {clockMinutes, shiftDateTime, toDateKey} from '@/pages/userPanel/dashboard/overviewStats';
 
 export interface DayEntry {
@@ -87,12 +87,19 @@ function clockIso(date: string, time: string, nextDay = false): string | undefin
  * (draft on save, submitted on submit). Signatures are uploaded separately;
  * `signatureInfo` only records which kinds were used.
  */
-export function buildManualShiftRequests({weeks, employeeId, agencyId, clientId, location, clientSignature, userSignature}: {
+/** A client address confirmed for payroll: shifts on or after `from` name it by source. */
+export interface PayrollLocationSource {
+    source: ServiceLocationSource;
+    from: string;
+}
+
+export function buildManualShiftRequests({weeks, employeeId, agencyId, clientId, location, payrollSource, clientSignature, userSignature}: {
     weeks: TimesheetWeek[];
     employeeId: string;
     agencyId: string;
     clientId: string;
     location: ShiftLocation | string;
+    payrollSource?: PayrollLocationSource | null;
     clientSignature: Signature | null;
     userSignature: Signature | null;
 }): CreateShiftRequest[] {
@@ -122,8 +129,29 @@ export function buildManualShiftRequests({weeks, employeeId, agencyId, clientId,
                 day: format(dateFromKey(entry.date), 'EEEE'),
                 sessionDuration: `${Math.floor(minutes / 60)}h ${minutes % 60}m`,
                 signatureInfo,
+                // The server sets the location from a confirmed source, which payroll needs.
+                ...(payrollSource && entry.date >= payrollSource.from ? {serviceLocationSource: payrollSource.source} : {}),
             };
         }));
+}
+
+/**
+ * The assigned-client location a saved draft used: the confirmed address it named by source,
+ * else the one whose address matches the saved text. Undefined means another address.
+ */
+export function matchDraftLocation(
+    locations: AssignedTimesheetLocation[],
+    source: ServiceLocationSource | null,
+    savedAddress: string,
+): AssignedTimesheetLocation | undefined {
+    if (source) {
+        const bySource = locations.find(location => location.source === source);
+        if (bySource) return bySource;
+    }
+    const text = savedAddress.trim().toLowerCase();
+    if (!text) return undefined;
+    return locations.find(location =>
+        location.display.toLowerCase() === text || (location.location.address || '').trim().toLowerCase() === text);
 }
 
 /** Rebuilds the form's weeks from saved draft shifts. */

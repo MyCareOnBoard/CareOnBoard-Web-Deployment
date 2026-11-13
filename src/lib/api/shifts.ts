@@ -654,6 +654,38 @@ export const listShifts = async (
     }
 };
 
+export interface AssignedTimesheetLocation {
+    /** "primaryAddress", "secondaryAddress" or "service-<n>" for a location named on a service row. */
+    id: string;
+    kind: "primary" | "service";
+    source: ServiceLocationSource | null;
+    display: string;
+    location: ShiftLocation;
+    /** Service the location comes from, for locations named on a service row. */
+    serviceName: string | null;
+    /** First date a shift here can send serviceLocationSource; null means send the location itself. */
+    payrollSourceFrom: string | null;
+}
+
+/** A client the signed-in staff member is assigned to through a service. Never carries a name. */
+export interface AssignedTimesheetClient {
+    id: string;
+    type: "ddd" | "hha";
+    services: { code: string | null; name: string | null }[];
+    locations: AssignedTimesheetLocation[];
+}
+
+/** Clients the signed-in DSP or caregiver is assigned to through client services, with their locations. */
+export const listAssignedTimesheetClients = async (
+    options?: { signal?: AbortSignal },
+): Promise<AssignedTimesheetClient[]> => {
+    const response = await axiosClient.get<{ success: boolean; clients?: AssignedTimesheetClient[] }>(
+        `${SHIFT_BASE}/assigned-clients`,
+        { signal: options?.signal },
+    );
+    return Array.isArray(response.data?.clients) ? response.data.clients : [];
+};
+
 export const listCalendarShifts = async (
     params: CalendarShiftsParams,
     options?: { signal?: AbortSignal },

@@ -1,7 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
-import {ShiftType, SubmissionStatus, type Shift} from '@/lib/api/shifts';
+import {ShiftType, SubmissionStatus, type AssignedTimesheetLocation, type Shift} from '@/lib/api/shifts';
 import {
-    buildManualShiftRequests, daysToFix, entryDateLabel, entryMinutes, hasEntries, to12Hour, to24Hour,
+    buildManualShiftRequests, daysToFix, entryDateLabel, entryMinutes, hasEntries, matchDraftLocation, to12Hour, to24Hour,
     weekFrom, weekHours, weeksFromDrafts, type TimesheetWeek,
 } from './timesheetEntries';
 
@@ -103,5 +103,31 @@ describe('weeksFromDrafts', () => {
         expect(week1.entries[1]).toEqual({date: '2026-11-03', checkIn: '08:00 AM', checkOut: '12:00 PM'});
         expect(week2.startDate).toBe('2026-11-10');
         expect(weeksFromDrafts([])[1].entries).toEqual([]);
+    });
+});
+
+describe('payroll location source', () => {
+    it('names the confirmed source only on days from its effective date', () => {
+        const rows = buildManualShiftRequests({
+            weeks: [week('2026-11-16', {'2026-11-16': ['08:00', '09:00'], '2026-11-18': ['08:00', '09:00']})],
+            employeeId: 'emp-1', agencyId: 'agency-1', clientId: 'client-1',
+            location: {address: '12 Grand Quest Complex'},
+            payrollSource: {source: 'primaryAddress', from: '2026-11-17'},
+            clientSignature: null, userSignature: null,
+        });
+        expect(rows.map(row => [row.date, row.serviceLocationSource])).toEqual([
+            ['2026-11-16', undefined],
+            ['2026-11-18', 'primaryAddress'],
+        ]);
+    });
+
+    it('matches a saved draft to its location by source, then by address', () => {
+        const locations = [
+            {id: 'primaryAddress', kind: 'primary', source: 'primaryAddress', display: '12 Grand Quest Complex, Newark, NJ', location: {address: '12 Grand Quest Complex'}, serviceName: null, payrollSourceFrom: null},
+            {id: 'service-0', kind: 'service', source: null, display: 'Bright Path Day Program', location: {address: 'Bright Path Day Program'}, serviceName: 'Day Habilitation', payrollSourceFrom: null},
+        ] as AssignedTimesheetLocation[];
+        expect(matchDraftLocation(locations, 'primaryAddress', '')?.id).toBe('primaryAddress');
+        expect(matchDraftLocation(locations, null, 'bright path day program')?.id).toBe('service-0');
+        expect(matchDraftLocation(locations, null, '1 Elsewhere Rd')).toBeUndefined();
     });
 });
