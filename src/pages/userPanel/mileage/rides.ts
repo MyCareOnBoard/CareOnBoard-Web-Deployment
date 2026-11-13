@@ -37,10 +37,10 @@ export function groupRides(rides: MileageRide[], now: Date = new Date()): RideGr
     };
 }
 
-/** Field staff see clients by a short id only: "Client ABC123". */
-export const rideClientLabel = (ride: Pick<MileageRide, 'clientId'>) => ride.clientId ? `Client ${shortClientId(ride.clientId)}` : null;
+/** Field staff see clients by a short id only: "ABC123". */
+export const rideClientLabel = (ride: Pick<MileageRide, 'clientId'>) => ride.clientId ? shortClientId(ride.clientId) ?? null : null;
 
-/** The ride's headline: its purpose, else the client it was for ("Client ABC123"). */
+/** The ride's headline: its purpose, else the client it was for ("ABC123"). */
 export function rideTitle(ride: MileageRide) {
     return ride.purpose?.trim() || rideClientLabel(ride) || 'Agency trip';
 }

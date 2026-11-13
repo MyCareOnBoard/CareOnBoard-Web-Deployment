@@ -50,7 +50,7 @@ describe('labels', () => {
         const forClient = ride({clientId: 'abcdef123456', clientName: 'Jane Doe'});
         expect(rideClientLabel(forClient)).not.toContain('Jane');
         expect(rideTitle(forClient)).not.toContain('Jane');
-        expect(rideTitle(forClient)).toBe('Client ABCDEF');
+        expect(rideTitle(forClient)).toBe('ABCDEF');
         expect(rideTitle(ride({purpose: ' Supplies '}))).toBe('Supplies');
         expect(rideTitle(ride({}))).toBe('Agency trip');
     });

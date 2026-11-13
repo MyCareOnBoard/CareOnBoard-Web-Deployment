@@ -40,8 +40,8 @@ it("shows field staff the client id, never the name", async () => {
   const table = screen.getByRole("table");
   expect(within(table).getAllByText("ABC123").length).toBeGreaterThan(0);
   expect(within(table).getAllByText("Not uploaded").length).toBeGreaterThan(0);
-  await userEvent.click(screen.getByRole("button", { name: "View plan for Client #ABC123" }));
-  expect(await screen.findByRole("dialog")).toHaveTextContent("Client #ABC123");
+  await userEvent.click(screen.getByRole("button", { name: "View plan for ABC123" }));
+  expect(await screen.findByRole("dialog")).toHaveTextContent("ABC123");
   expect(screen.getByRole("dialog")).not.toHaveTextContent("Jane Doe");
 });
 

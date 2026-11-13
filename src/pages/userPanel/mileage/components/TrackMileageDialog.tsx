@@ -67,7 +67,7 @@ export default function TrackMileageDialog({open, onOpenChange, onCreated, clien
         setUseNow(false);
     }, [open, draft, clientIds]);
 
-    const clientOptions = useMemo(() => clientIds.map(value => ({value, label: `Client ${shortClientId(value)}`})), [clientIds]);
+    const clientOptions = useMemo(() => clientIds.map(value => ({value, label: shortClientId(value) ?? value})), [clientIds]);
     const when = useNow ? null : date && time ? new Date(`${date}T${time}`) : null;
     const missing = type === 'agency' ? !purpose.trim() : !clientId;
     const badTime = !useNow && (!when || Number.isNaN(when.getTime()));

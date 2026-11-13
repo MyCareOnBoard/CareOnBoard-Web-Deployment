@@ -47,9 +47,9 @@ describe("overview and search", () => {
 });
 
 it("labels clients by short id unless names are allowed", () => {
-  expect(clientLabel(plan("a"), false)).toBe("Client #AXYZ12");
+  expect(clientLabel(plan("a"), false)).toBe("AXYZ12");
   expect(clientLabel(plan("a"), true)).toBe("Jane Doe");
-  expect(clientLabel(plan("a", { clientName: "" }), true)).toBe("Client #AXYZ12");
+  expect(clientLabel(plan("a", { clientName: "" }), true)).toBe("AXYZ12");
 });
 
 it("builds goals links and formats dates", () => {

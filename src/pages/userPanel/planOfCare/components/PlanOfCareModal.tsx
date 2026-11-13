@@ -9,7 +9,7 @@ import { formatDate, PLAN_STATUS_LABEL, PLAN_STATUS_TONE, planStatus } from "../
 interface PlanOfCareModalProps {
   open: boolean;
   plan: PlanOfCare;
-  /** "Client #ABC123" for field staff; the name only for support coordinators. */
+  /** The short id ("ABC123") for field staff; the name only for support coordinators. */
   clientLabel: string;
   onClose: () => void;
 }

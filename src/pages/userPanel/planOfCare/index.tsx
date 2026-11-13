@@ -123,7 +123,7 @@ function PlanRow({ plan, now, showNames, onView }: { plan: PlanOfCare; now: Date
   // Below md the row stacks into a small card; from md up it is a table row.
   return <tr className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 border-b border-[#edf1f2] px-2 py-3.5 text-[14px] text-[#34434c] md:table-row md:p-0 dark:border-white/10 dark:text-[#c9d3d6]">
     <th scope="row" className={cn("font-semibold text-[#10141a] md:font-normal dark:text-[#f4f6f7]", CELL)}>
-      <span className={cn("font-normal", MUTED)}>{showNames ? "Client: " : "Client #ID: "}</span>{showNames ? label : label.replace(/^Client #/, "")}
+      <span className={cn("font-normal", MUTED)}>{showNames ? "Client: " : "Client #ID: "}</span>{label}
     </th>
     <td className="justify-self-end md:hidden">{pill}</td>
     <td className={cn("col-span-2", CELL)}><span className={MUTED}>Service: </span>{serviceLabel(plan) ?? "—"}</td>

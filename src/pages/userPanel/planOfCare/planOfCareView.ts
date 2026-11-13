@@ -63,7 +63,7 @@ export function planStatus(plan: PlanOfCare, now: Date = new Date()): PlanStatus
 export function clientLabel(plan: PlanOfCare, showNames: boolean) {
   const name = plan.clientName?.trim();
   if (showNames && name) return name;
-  return `Client #${shortClientId(plan.clientId) ?? "—"}`;
+  return shortClientId(plan.clientId) ?? "—";
 }
 
 export const serviceLabel = (plan: PlanOfCare) => plan.serviceName || plan.service || plan.serviceCode || null;

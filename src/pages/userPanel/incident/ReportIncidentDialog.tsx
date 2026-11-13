@@ -52,7 +52,7 @@ export default function ReportIncidentDialog({open, onOpenChange, onSubmitted, c
         setWitnesses([]);
     }, [open, clientIds]);
 
-    const clientOptions = useMemo(() => clientIds.map(value => ({value, label: `Client ${shortClientId(value)}`})), [clientIds]);
+    const clientOptions = useMemo(() => clientIds.map(value => ({value, label: shortClientId(value) ?? value})), [clientIds]);
 
     const addWitness = () => {
         const name = witnessDraft.replace(/,/g, ' ').trim();

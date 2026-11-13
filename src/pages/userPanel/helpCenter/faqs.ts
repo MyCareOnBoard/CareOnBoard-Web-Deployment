@@ -11,7 +11,7 @@ export const FIELD_STAFF_FAQS: Faq[] = [
   },
   {
     question: "Why do I see a client ID instead of a name?",
-    answer: "To protect client privacy, caregivers and DSPs see each client by a short ID, such as Client #AB12CD. Your agency will tell you who the client is and where to go before your first visit.",
+    answer: "To protect client privacy, caregivers and DSPs see each client by a short ID, such as AB12CD. Your agency will tell you who the client is and where to go before your first visit.",
   },
   {
     question: "Where can I read a client's plan of care?",
