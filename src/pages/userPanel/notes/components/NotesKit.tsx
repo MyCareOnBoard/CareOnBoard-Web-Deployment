@@ -35,7 +35,7 @@ export function ServiceChip({code}: {code: string | null}) {
     return <span className="inline-flex rounded-[6px] border border-[#e3e8ea] px-2 py-0.5 text-[12px] font-medium text-[#34434c] dark:border-white/10 dark:text-[#c9d3d6]">{code}</span>;
 }
 
-/** Avatar with two letters from the short id, plus "Client 4F2A9C". Never a name. */
+/** Avatar with two letters from the short id, plus the short id "4F2A9C". Never a name. */
 export function ClientCell({clientId, sub}: {clientId: string | null; sub?: ReactNode}) {
     const label = clientLabel(clientId);
     const initials = clientId ? clientId.slice(0, 2).toUpperCase() : 'CL';

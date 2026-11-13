@@ -10,7 +10,7 @@ const item = (over: Partial<MyNoteItem> = {}): MyNoteItem => ({
 
 describe('notes list helpers', () => {
     it('shows only the short client id', () => {
-        expect(clientLabel('abcdef123')).toBe('Client ABCDEF');
+        expect(clientLabel('abcdef123')).toBe('ABCDEF');
         expect(clientLabel(null)).toBe('Client');
     });
 
@@ -53,6 +53,6 @@ describe('notes list helpers', () => {
         const csv = notesCsv([item({serviceCode: '=HYPERLINK("x")'})], now, 'UTC');
         expect(csv.split('\r\n')[0]).toBe('"Client","Note type","Service","Shift date","Shift time","Due","Status"');
         expect(csv).toContain(`"'=HYPERLINK(""x"")"`);
-        expect(csv).toContain('"Client ABCDEF"');
+        expect(csv).toContain('"ABCDEF"');
     });
 });

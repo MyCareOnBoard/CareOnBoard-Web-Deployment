@@ -34,7 +34,7 @@ describe('Notes list', () => {
         renderPage();
         expect(screen.getByRole('heading', {name: 'Notes'})).toBeInTheDocument();
         const table = screen.getByRole('table');
-        expect(within(table).getAllByText('Client ABCDEF').length).toBe(3);
+        expect(within(table).getAllByText('ABCDEF').length).toBe(3);
         expect(within(table).getAllByText('Overdue').length).toBeGreaterThan(0);
         expect(within(table).getByText('Approved 09:12, 8 Nov')).toBeInTheDocument();
         expect(screen.getAllByRole('button', {name: /^Fill now/}).length).toBe(2);
@@ -72,7 +72,7 @@ describe('Notes list', () => {
         unmount();
         query.mockReturnValue({data: undefined, isLoading: false, isError: true, isFetching: false, refetch: vi.fn(), fulfilledTimeStamp: undefined});
         renderPage();
-        expect(screen.getAllByText('Client ABCDEF').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('ABCDEF').length).toBeGreaterThan(0);
     });
 
     it('starts a note from the picker', () => {

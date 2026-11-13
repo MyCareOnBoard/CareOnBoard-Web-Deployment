@@ -72,7 +72,7 @@ const LIST_LABELS: Record<string, string> = {
 export const noteListLabel = (noteType: string) => LIST_LABELS[noteType] ?? getNoteTitle(noteType);
 
 /** "Client 4F2A9C": field staff only ever see the short client id. */
-export const clientLabel = (clientId: string | null) => clientId ? `Client ${clientId.slice(0, 6).toUpperCase()}` : 'Client';
+export const clientLabel = (clientId: string | null) => clientId ? clientId.slice(0, 6).toUpperCase() : 'Client';
 
 const late = (item: MyNoteItem, now: Date) => Date.parse(item.dueAt) < now.getTime();
 
