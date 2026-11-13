@@ -97,7 +97,7 @@ export function shiftTitle(shift: Shift) {
 /** Field staff see clients by a short id only, never by name. */
 export function clientLabel(shift: Shift) {
     const id = shift.clientId || (shift.client as {id?: string} | undefined)?.id;
-    return id ? `Client ${shortClientId(id)}` : 'Client not set';
+    return id ? shortClientId(id) ?? '' : 'Client not set';
 }
 
 /** Clock in opens this long before the scheduled start. */

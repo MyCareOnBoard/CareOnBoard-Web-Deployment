@@ -86,7 +86,7 @@ describe('shiftTitle and clientLabel', () => {
         expect(shiftTitle(shift({serviceCode: 'T1019', client} as Partial<Shift>))).toBe('Personal care');
         expect(shiftTitle(shift({serviceCode: 'S5125'}))).toBe('S5125');
         expect(shiftTitle(shift({}))).toBe('Scheduled shift');
-        expect(clientLabel(shift({clientId: 'abcdef123', client} as Partial<Shift>))).toBe('Client ABCDEF');
+        expect(clientLabel(shift({clientId: 'abcdef123', client} as Partial<Shift>))).toBe('ABCDEF');
         expect(clientLabel(shift({}))).toBe('Client not set');
     });
 });
