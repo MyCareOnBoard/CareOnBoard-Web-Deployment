@@ -1,4 +1,5 @@
 import {ShiftStatus, type Shift} from '@/lib/api/shifts';
+import {shiftInstants, shiftViewerDate} from '@/lib/shift-time';
 
 export interface OverviewStats {
     completedThisMonth: number;
@@ -52,12 +53,9 @@ export function shiftDateTime(dateKey?: string, time?: string): Date | null {
 
 /** Scheduled length of a shift in hours (overnight shifts wrap past midnight). */
 export function scheduledHours(shift: Shift) {
-    const start = shiftDateTime(shift.date, shift.startTime);
-    const end = shiftDateTime(shift.date, shift.endTime);
-    if (!start || !end) return 0;
-    let minutes = (end.getTime() - start.getTime()) / 60_000;
-    if (minutes <= 0) minutes += 24 * 60; // overnight shift
-    return minutes / 60;
+    const span = shiftInstants(shift); // overnight shifts end the next day
+    if (!span?.end) return 0;
+    return (span.end.getTime() - span.start.getTime()) / 3_600_000;
 }
 
 /** Hours between clock in and clock out, or until now while the shift is running. */
@@ -79,13 +77,13 @@ export function computeOverviewStats(shifts: Shift[], now: Date = new Date()): O
     weekEndDate.setDate(weekEndDate.getDate() + 6);
     const weekEnd = toDateKey(weekEndDate);
 
-    const thisMonth = shifts.filter(shift => shift.date?.startsWith(monthPrefix));
+    const thisMonth = shifts.filter(shift => shiftViewerDate(shift).startsWith(monthPrefix));
     const completedThisMonth = thisMonth.filter(shift => shift.status === ShiftStatus.COMPLETED).length;
-    const completedLastMonth = shifts.filter(shift => shift.date?.startsWith(lastMonth) && shift.status === ShiftStatus.COMPLETED).length;
+    const completedLastMonth = shifts.filter(shift => shiftViewerDate(shift).startsWith(lastMonth) && shift.status === ShiftStatus.COMPLETED).length;
     const expiredThisMonth = thisMonth.filter(shift => shift.status === ShiftStatus.EXPIRED).length;
-    const thisWeek = shifts.filter(shift => shift.date >= weekStart && shift.date <= weekEnd);
+    const thisWeek = shifts.filter(shift => shiftViewerDate(shift) >= weekStart && shiftViewerDate(shift) <= weekEnd);
     const clients = new Set(shifts
-        .filter(shift => shift.clientId && (shift.date?.startsWith(monthPrefix) || shift.date >= today))
+        .filter(shift => shift.clientId && (shiftViewerDate(shift).startsWith(monthPrefix) || shiftViewerDate(shift) >= today))
         .map(shift => shift.clientId));
 
     return {
@@ -96,6 +94,6 @@ export function computeOverviewStats(shifts: Shift[], now: Date = new Date()): O
         hoursScheduled: thisWeek.reduce((sum, shift) => sum + scheduledHours(shift), 0),
         completionRate: completedThisMonth + expiredThisMonth ? completedThisMonth / (completedThisMonth + expiredThisMonth) : null,
         activeClients: clients.size,
-        shiftsToday: shifts.filter(shift => shift.date === today).length,
+        shiftsToday: shifts.filter(shift => shiftViewerDate(shift) === today).length,
     };
 }

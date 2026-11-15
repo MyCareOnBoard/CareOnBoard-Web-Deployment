@@ -1,8 +1,8 @@
-import { parseISO } from "date-fns";
 import { detectShiftAnomalyCodes } from "@/lib/shift-anomaly-detection";
 import type { AnomalyCode, Shift } from "@/lib/api/shifts";
 import { ShiftStatus } from "@/lib/api/shifts";
 import { SHIFT_ROW_PILL } from "@/lib/shift-visual-tokens";
+import { shiftEndOrEndOfDay } from "@/lib/shift-time";
 
 export type ShiftRowStatusInfo = {
   label: string;
@@ -56,42 +56,9 @@ export function isShiftMissed(shift: Shift): boolean {
   if (shift.status === ShiftStatus.COMPLETED) return false;
   if (shift.clockedInAt) return false;
   if (!shift.date) return false;
-
-  const date = parseISO(shift.date);
-  let endDateTime: Date;
-
-  if (shift.endTime) {
-    const parsedTime = parseShiftEndTimeToParts(shift.endTime);
-    if (parsedTime) {
-      endDateTime = new Date(
-        date.getFullYear(),
-        date.getMonth(),
-        date.getDate(),
-        parsedTime.hours,
-        parsedTime.minutes,
-      );
-    } else {
-      endDateTime = new Date(
-        date.getFullYear(),
-        date.getMonth(),
-        date.getDate(),
-        23,
-        59,
-        59,
-      );
-    }
-  } else {
-    endDateTime = new Date(
-      date.getFullYear(),
-      date.getMonth(),
-      date.getDate(),
-      23,
-      59,
-      59,
-    );
-  }
-
-  return endDateTime.getTime() < Date.now();
+  // Scheduled end (in the shift's zone; overnight shifts end the next day), else end of its day.
+  const endDateTime = shiftEndOrEndOfDay(shift);
+  return Boolean(endDateTime && endDateTime.getTime() < Date.now());
 }
 
 /** Same rules as Scheduling “Recent shifts” status pill. */

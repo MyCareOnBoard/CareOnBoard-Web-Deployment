@@ -118,6 +118,8 @@ export interface UserAgency {
   name?: string
   status?: "active" | "inactive" | "pending" | "suspended"
   supportedClientTypes?: ("ddd" | "hha" | "sc")[]
+  /** IANA zone shift times are entered in. */
+  timezone?: string
 }
 
 

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { shiftZoneSuffix } from "@/lib/shift-time";
 import { eachMonthOfInterval, format } from "date-fns";
 import { AlertTriangle, Building2, ChevronLeft, ChevronRight, X } from "lucide-react";
 import ShiftMonthGrid from "@/components/shifts/ShiftMonthGrid";
@@ -54,6 +55,7 @@ function toCalendarShift(
     date: shift.date,
     startTime: shift.startTime || null,
     endTime: shift.endTime || null,
+    ...(shift.timeZone ? { timeZone: shift.timeZone } : {}),
     status: shift.status || null,
     clientId: shift.clientId || null,
     clientName: populatedName(shift.client),
@@ -107,7 +109,7 @@ function ShiftSummary({ shift, showBadge }: { shift: NormalizedCalendarShift; sh
     <div className="flex min-w-0 flex-col gap-0.5 text-left">
       <div className="flex min-w-0 items-center gap-1">
         <span className="truncate text-[10px] font-semibold text-[#10141a]">{shift.clientName || "Unknown client"}</span>
-        <span className="shrink-0 text-[9px] font-medium text-[#516263]">{timeLabel(shift.startTime)}–{timeLabel(shift.endTime)}</span>
+        <span className="shrink-0 text-[9px] font-medium text-[#516263]">{timeLabel(shift.startTime)}–{timeLabel(shift.endTime)}{shiftZoneSuffix(shift)}</span>
       </div>
       <span className="truncate text-[9px] font-medium text-[#526061]">{shift.staffName || "Unassigned"}</span>
       <span className="inline-flex max-w-full items-center gap-1 truncate text-[9px] font-semibold text-[#076669]">
@@ -271,7 +273,7 @@ export default function SuperAdminShiftsCalendar({
             getEntryDate={(shift) => shift.date}
             getEntryAriaLabel={(shift) => [
               shift.clientName || "Unknown client",
-              `${timeLabel(shift.startTime)}–${timeLabel(shift.endTime)}`,
+              `${timeLabel(shift.startTime)}–${timeLabel(shift.endTime)}${shiftZoneSuffix(shift)}`,
               `Caregiver ${shift.staffName || "Unassigned"}`,
               shift.agencyName,
               `Status ${statusLabel(shift.status)}`,

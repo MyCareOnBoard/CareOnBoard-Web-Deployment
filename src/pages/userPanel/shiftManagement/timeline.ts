@@ -1,5 +1,6 @@
 import {ShiftStatus, formatShiftLocation, type Shift} from '@/lib/api/shifts';
-import {clockMinutes, shiftDateTime, workedHours} from '@/pages/userPanel/dashboard/overviewStats';
+import {shiftStartAt, viewerShiftTimes} from '@/lib/shift-time';
+import {workedHours} from '@/pages/userPanel/dashboard/overviewStats';
 import {shortClientId} from '@/pages/userPanel/dashboard/components/UpcomingTasks';
 
 const DAY_MINUTES = 24 * 60;
@@ -23,11 +24,13 @@ export function formatClock(minutes: number) {
     return `${display}:${String(minutes % 60).padStart(2, '0')} ${hours < 12 ? 'am' : 'pm'}`;
 }
 
-/** Start/end minutes for a shift; overnight shifts are cut at midnight, missing ends get an hour. */
+/** Start/end minutes for a shift on the viewer's clock; overnight shifts are cut at midnight, missing ends get an hour. */
 export function shiftSpan(shift: Shift): {start: number; end: number} | null {
-    const start = clockMinutes(shift.startTime);
+    // Minutes on the viewer's clock: converted when the viewer is in another time zone.
+    const times = viewerShiftTimes(shift);
+    const start = times.startMinutes;
     if (start === null) return null;
-    let end = clockMinutes(shift.endTime);
+    let end = times.endMinutes;
     if (end === null) end = start + 60;
     if (end <= start) end = DAY_MINUTES;
     return {start, end: Math.min(end, DAY_MINUTES)};
@@ -82,7 +85,7 @@ export function shiftTone(shift: Shift, now: Date = new Date()): ShiftTone {
     if (shift.status === ShiftStatus.EXPIRED) return 'missed';
     if (shift.status === ShiftStatus.ONGOING || (shift.clockedInAt && !shift.clockedOutAt)) return 'ongoing';
     const span = shiftSpan(shift);
-    const startsAt = shiftDateTime(shift.date, shift.startTime);
+    const startsAt = shiftStartAt(shift);
     if (span && startsAt && startsAt.getTime() + (span.end - span.start) * 60_000 < now.getTime()) return 'missed';
     return 'upcoming';
 }
@@ -105,7 +108,7 @@ export const CLOCK_IN_OPENS_BEFORE_MS = 5 * 60_000;
 
 /** When Clock in becomes available for a shift, or null when the start time can't be read. */
 export function clockInOpensAt(shift: Shift): Date | null {
-    const start = shiftDateTime(shift.date, shift.startTime);
+    const start = shiftStartAt(shift);
     return start ? new Date(start.getTime() - CLOCK_IN_OPENS_BEFORE_MS) : null;
 }
 
@@ -122,13 +125,13 @@ export function formatDuration(minutes: number) {
 export function nextUpcomingShift(shifts: Shift[], now: Date = new Date(), excludeId?: string): Shift | null {
     return shifts
         .filter(shift => shift.id !== excludeId && shiftTone(shift, now) === 'upcoming')
-        .map(shift => ({shift, start: shiftDateTime(shift.date, shift.startTime)?.getTime() ?? Infinity}))
+        .map(shift => ({shift, start: shiftStartAt(shift)?.getTime() ?? Infinity}))
         .sort((a, b) => a.start - b.start)[0]?.shift ?? null;
 }
 
 /** "in 1h 59m" until a shift starts, or null once it has. */
 export function startsIn(shift: Shift, now: Date) {
-    const start = shiftDateTime(shift.date, shift.startTime);
+    const start = shiftStartAt(shift);
     const minutes = start ? Math.ceil((start.getTime() - now.getTime()) / 60_000) : 0;
     return minutes > 0 ? `in ${formatDuration(minutes)}` : null;
 }
@@ -162,7 +165,7 @@ export function clockTimes(shift: Shift) {
 
 /** How the clock in compared with the scheduled start: "On time", "12 min late" or "5 min early". */
 export function clockInTiming(shift: Shift): string | null {
-    const start = shiftDateTime(shift.date, shift.startTime);
+    const start = shiftStartAt(shift);
     const clockedIn = shift.clockedInAt ? new Date(shift.clockedInAt) : null;
     if (!start || !clockedIn || Number.isNaN(clockedIn.getTime())) return null;
     const minutes = Math.round((clockedIn.getTime() - start.getTime()) / 60_000);

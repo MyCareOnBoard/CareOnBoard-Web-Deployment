@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { shiftTimeLabel } from "@/lib/shift-time";
 import { useLocation, useNavigate } from "react-router";
 import {
   AlertTriangle,
@@ -440,7 +441,7 @@ export default function ShiftMaintenancePage({
                           </td>
                           {isSuperAdmin ? <td className="px-4 py-4 text-[#4f5c5e]">{agencyNameFor(anomaly.agencyId)}</td> : null}
                           <td className="px-4 py-4 text-[#4f5c5e]">{anomalyDspLabel(anomaly)}</td>
-                          <td className="whitespace-nowrap px-4 py-4 text-[#4f5c5e]">{anomaly.startTime || "—"} – {anomaly.endTime || "—"}</td>
+                          <td className="whitespace-nowrap px-4 py-4 text-[#4f5c5e]">{shiftTimeLabel(anomaly, anomaly.startTime) || "—"} – {shiftTimeLabel(anomaly, anomaly.endTime) || "—"}</td>
                           <td className="px-4 py-4"><Badge variant="outline" className="capitalize">{anomaly.status}</Badge></td>
                           <td className="px-4 py-4">
                             <div className="flex max-w-[240px] flex-wrap gap-1.5">

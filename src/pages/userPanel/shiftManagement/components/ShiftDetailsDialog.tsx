@@ -6,7 +6,7 @@ import {Dialog, DialogContent, DialogDescription, DialogTitle} from '@/component
 import {CloseButton, PANEL_BODY, SIDE_PANEL, SIDE_PANEL_OVERLAY} from '@/pages/userPanel/records/RecordsKit';
 import type {Shift} from '@/lib/api/shifts';
 import {Routes} from '@/routes/constants';
-import {shiftDateTime} from '@/pages/userPanel/dashboard/overviewStats';
+import {viewerShiftRange, viewerShiftTimes} from '@/lib/shift-time';
 import {useGetShiftNoteComplianceDetailQuery} from '@/pages/agency/compliance-alerts/api';
 import type {ShiftNoteState} from '@/pages/agency/compliance-alerts/apiTypes';
 import {cn} from '@/lib/utils';
@@ -126,7 +126,9 @@ function ShiftPanel({shift, actionLabel, onAction, actionDisabled, onNote, noteS
     const span = shiftSpan(shift);
     const scheduled = span ? span.end - span.start : null;
     const worked = workedMinutes(shift, now);
-    const day = shiftDateTime(shift.date, '12:00 PM');
+    // The shift's day on the viewer's clock (times are converted to the viewer's zone).
+    const times = viewerShiftTimes(shift);
+    const day = /^\d{4}-\d{2}-\d{2}$/.test(times.dateKey) ? new Date(`${times.dateKey}T12:00:00`) : null;
     const address = shiftAddress(shift);
     const directions = directionsUrl(shift);
     const opensAt = clockInOpensAt(shift);
@@ -262,7 +264,8 @@ function ShiftPanel({shift, actionLabel, onAction, actionDisabled, onNote, noteS
                         <span className="text-[12px] text-[#5d6b73] dark:text-[#9aa4a8]">End</span>
                         <span className="text-[24px] font-semibold leading-tight text-[#10141a] tabular-nums dark:text-[#f4f6f7]">{end.time} <span className="text-[14px] font-normal text-[#5d6b73] dark:text-[#9aa4a8]">{end.period}</span></span>
                     </div>
-                </div> : <p className="text-[16px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">{shift.startTime}{shift.endTime ? ` – ${shift.endTime}` : ''}</p>}
+                </div> : <p className="text-[16px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">{viewerShiftRange(shift)}</p>}
+                {times.agencyLabel && <p className="mt-2 text-[12px] text-[#5d6b73] dark:text-[#9aa4a8]">Shown in your time zone. Agency time: {times.agencyLabel}</p>}
             </div>
 
             {address && <div className="overflow-hidden rounded-[12px] border border-[#e8edef] dark:border-white/10">

@@ -19,7 +19,7 @@ export function normalizeTimestampToDisplayString(value: unknown): string {
 }
 
 /**
- * Format clock time like Scheduling "Recent shifts" (12h with AM/PM).
+ * Format clock time like Scheduling "Recent shifts" (12h with AM/PM), on the viewer's clock.
  * Empty / invalid → `--:-- --` for list row parity with scheduling templates.
  */
 export function formatShiftRowClockDisplay(time?: unknown): string {
@@ -27,13 +27,11 @@ export function formatShiftRowClockDisplay(time?: unknown): string {
   if (!str) return "--:-- --";
   try {
     if (str.includes("AM") || str.includes("PM")) return str;
-    const timePart = str.split("T")[1];
-    if (!timePart) return "--:-- --";
-    const [hours, minutes] = timePart.split(":");
-    const hour = parseInt(hours, 10);
-    const ampm = hour >= 12 ? "PM" : "AM";
-    const formattedHour = hour % 12 || 12;
-    return `${formattedHour}:${(minutes || "00").split(".")[0]} ${ampm}`;
+    if (!str.includes("T")) return "--:-- --";
+    // Clock instants are UTC ISO strings: show them on the viewer's clock.
+    const date = new Date(str);
+    if (Number.isNaN(date.getTime())) return "--:-- --";
+    return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
   } catch {
     return "--:-- --";
   }

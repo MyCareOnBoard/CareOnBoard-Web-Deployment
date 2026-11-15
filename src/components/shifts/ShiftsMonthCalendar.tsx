@@ -17,6 +17,7 @@ import { listShifts, type Shift } from "@/lib/api/shifts";
 import { detectShiftAnomalyCodes } from "@/lib/shift-anomaly-detection";
 import { getShiftDayCellSurfaceStyle } from "@/lib/shift-day-cell-surface";
 import { formatShiftRowClockDisplay } from "@/lib/shift-row-time";
+import { shiftZoneSuffix } from "@/lib/shift-time";
 import { getShiftStatusBadgePresentation } from "@/lib/shift-status-badge";
 import { ANOMALY_CHIP_CLASS } from "@/lib/shift-visual-tokens";
 import { cn } from "@/lib/utils";
@@ -67,8 +68,9 @@ function formatHmCompact(value?: string): string {
 function formatShiftWindow(shift: Shift): string {
   const start = formatHmCompact(shift.startTime);
   const end = formatHmCompact(shift.endTime || "");
-  if (start && end) return `${start}–${end}`;
-  return start || end || "—";
+  const zone = shiftZoneSuffix(shift);
+  if (start && end) return `${start}–${end}${zone}`;
+  return start || end ? `${start || end}${zone}` : "—";
 }
 
 function getClientName(shift: Shift): string {

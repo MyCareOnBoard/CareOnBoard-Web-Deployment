@@ -1,4 +1,5 @@
 import {NotificationContext} from "@/components/compliance/NotificationContext";
+import { shiftTimeLabel } from "@/lib/shift-time";
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 import { format, parseISO } from "date-fns";
@@ -517,8 +518,8 @@ export default function AgencyShiftDetailsPage({ readOnly = false }: AgencyShift
           <h2 className="mb-2 text-[18px] font-semibold text-[#10141a]">Schedule</h2>
           <dl>
             <DetailRow label="Date" value={shift.date ? format(parseISO(shift.date), "MMMM d, yyyy") : "—"} />
-            <DetailRow label="Scheduled start" value={shift.startTime || "—"} />
-            <DetailRow label="Scheduled end" value={shift.endTime || "—"} />
+            <DetailRow label="Scheduled start" value={shiftTimeLabel(shift, shift.startTime) || "—"} />
+            <DetailRow label="Scheduled end" value={shiftTimeLabel(shift, shift.endTime) || "—"} />
             <DetailRow label="Location" value={formatShiftLocation(shift.location) || "—"} />
             <DetailRow
               label="Status"

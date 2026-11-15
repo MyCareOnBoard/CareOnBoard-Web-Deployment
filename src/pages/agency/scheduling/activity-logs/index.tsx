@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { parseISO } from "date-fns";
 import { ArrowUpRight, ChevronLeft, ChevronRight, Loader2, Plus, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { listShifts, Shift, ShiftStatus } from "@/lib/api/shifts";
@@ -16,6 +15,7 @@ import { shiftToScheduleFormData } from "../shift-to-schedule-form";
 import ShiftDetailsModal from "@/components/ShiftDetailsModal";
 import { detectShiftAnomalyCodes } from "@/lib/shift-anomaly-detection";
 import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
+import { shiftEndOrEndOfDay } from "@/lib/shift-time";
 
 type ActivityFilter = "all" | "active" | "completed" | "missed" | "incomplete";
 
@@ -57,62 +57,13 @@ const formatTime = (time?: unknown): string => {
   }
 };
 
-const parseTimeToParts = (time: string): { hours: number; minutes: number } | null => {
-  const match = time.match(/(\d{1,2})[.:](\d{2})[:]?([AaPp][Mm])/);
-  if (!match) return null;
-
-  let hours = parseInt(match[1], 10);
-  const minutes = parseInt(match[2], 10);
-  const period = match[3].toUpperCase();
-
-  if (period === "PM" && hours !== 12) hours += 12;
-  if (period === "AM" && hours === 12) hours = 0;
-
-  return { hours, minutes };
-};
-
 const isShiftMissed = (shift: Shift): boolean => {
   if (shift.status === ShiftStatus.COMPLETED) return false;
   if (shift.clockedInAt) return false;
   if (!shift.date) return false;
-
-  const date = parseISO(shift.date);
-  let endDateTime: Date;
-
-  if (shift.endTime) {
-    const parsedTime = parseTimeToParts(shift.endTime);
-    if (parsedTime) {
-      endDateTime = new Date(
-        date.getFullYear(),
-        date.getMonth(),
-        date.getDate(),
-        parsedTime.hours,
-        parsedTime.minutes
-      );
-    } else {
-      // If endTime exists but can't be parsed, use end of day
-      endDateTime = new Date(
-        date.getFullYear(),
-        date.getMonth(),
-        date.getDate(),
-        23,
-        59,
-        59
-      );
-    }
-  } else {
-    // If no endTime, use end of day
-    endDateTime = new Date(
-      date.getFullYear(),
-      date.getMonth(),
-      date.getDate(),
-      23,
-      59,
-      59
-    );
-  }
-
-  return endDateTime.getTime() < Date.now();
+  // Scheduled end in the shift's time zone (overnight-aware), else the end of its day.
+  const endDateTime = shiftEndOrEndOfDay(shift);
+  return Boolean(endDateTime && endDateTime.getTime() < Date.now());
 };
 
 const INCOMPLETE_PILL_STYLE = {

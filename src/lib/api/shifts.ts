@@ -1,4 +1,5 @@
 import type { AssignmentReviewEnvelope } from "./assignment-review";
+import { shiftEndAt, shiftInstants, shiftStartAt, shiftViewerDate } from "@/lib/shift-time";
 import type { AssignmentAcknowledgment, AssignmentDecisionEnvelope } from "./assignment-decision";
 /**
  * Shift Management API Service
@@ -86,6 +87,8 @@ export interface Shift {
     location?: ShiftLocation;
     startTime: string;
     endTime?: string;
+    /** IANA zone the date/startTime/endTime are written in (the agency's). */
+    timeZone?: string | null;
     availableAt?: string;
     clockedInAt?: string;
     clockedOutAt?: string;
@@ -300,6 +303,8 @@ export interface CompactCalendarShift {
     date: string;
     startTime: string | null;
     endTime: string | null;
+    /** IANA zone the times are written in; missing from older API responses. */
+    timeZone?: string | null;
     status: ShiftStatus | null;
     clientId: string | null;
     clientName: string | null;
@@ -368,6 +373,7 @@ function compactCalendarShift(value: unknown, month: string): CompactCalendarShi
         date: value.date,
         startTime: value.startTime,
         endTime: value.endTime,
+        ...(typeof value.timeZone === "string" ? { timeZone: value.timeZone } : {}),
         status: value.status as ShiftStatus | null,
         clientId: value.clientId,
         clientName: value.clientName,
@@ -494,83 +500,41 @@ export interface CategorizedShifts {
     previous: Shift[];
 }
 
-const parseShiftDateTime = (timeStr?: string, dateStr?: string): Date | null => {
-    if (!timeStr || !dateStr) return null;
-    try {
-        const timeMatch = timeStr.match(/(\d+):(\d+):?\s*(AM|PM)/i);
-        if (!timeMatch) return null;
-
-        let hours = parseInt(timeMatch[1], 10);
-        const minutes = parseInt(timeMatch[2], 10);
-        const period = timeMatch[3].toUpperCase();
-
-        if (period === 'PM' && hours !== 12) {
-            hours += 12;
-        } else if (period === 'AM' && hours === 12) {
-            hours = 0;
-        }
-
-        const date = new Date(dateStr);
-        date.setHours(hours, minutes, 0, 0);
-        return date;
-    } catch {
-        return null;
-    }
-};
-
-const timeToMinutes = (timeStr?: string): number => {
-    if (!timeStr) return 0;
-    const match = timeStr.match(/(\d+):(\d+):?\s*(AM|PM)/i);
-    if (!match) return 0;
-
-    let hours = parseInt(match[1], 10);
-    const minutes = parseInt(match[2], 10);
-    const period = match[3].toUpperCase();
-
-    if (period === 'PM' && hours !== 12) {
-        hours += 12;
-    } else if (period === 'AM' && hours === 12) {
-        hours = 0;
-    }
-
-    return hours * 60 + minutes;
-};
-
 export const categorizeShifts = (shifts: Shift[]): CategorizedShifts => {
     const now = new Date();
-    // Shift dates are local calendar days; the UTC date is already tomorrow on US evenings.
+    // "Today" on the viewer's clock; each shift's day is its start on the viewer's clock
+    // (shift times are written in the agency's zone and converted).
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const dayOf = (shift: Shift) => shiftViewerDate(shift);
+    const startMs = (shift: Shift) => shiftStartAt(shift)?.getTime() ?? Number.POSITIVE_INFINITY;
 
     const current: Shift[] = [];
     const upcoming: Shift[] = [];
     const previous: Shift[] = [];
 
     for (const shift of shifts) {
-        const isToday = shift.date === today;
-        const endDateTime = parseShiftDateTime(shift.endTime, shift.date);
-        const startDateTime = parseShiftDateTime(shift.startTime, shift.date);
-        const isPast = endDateTime ? endDateTime < now : shift.date < today;
+        const day = dayOf(shift);
+        const isToday = day === today;
+        const endDateTime = shiftInstants(shift)?.end ?? shiftEndAt(shift);
+        const startDateTime = shiftStartAt(shift);
+        const isPast = endDateTime ? endDateTime < now : day < today;
 
         if (shift.status === ShiftStatus.COMPLETED || shift.status === ShiftStatus.EXPIRED || isPast) {
             previous.push(shift);
         } else if (isToday && (shift.status === ShiftStatus.ONGOING || shift.status === ShiftStatus.AVAILABLE)) {
             current.push(shift);
-        } else if (shift.date > today || (isToday && startDateTime && startDateTime > now)) {
+        } else if (day > today || (isToday && startDateTime && startDateTime > now)) {
             upcoming.push(shift);
-        } else if (shift.status === ShiftStatus.PENDING && shift.date >= today) {
+        } else if (shift.status === ShiftStatus.PENDING && day >= today) {
             upcoming.push(shift);
         }
     }
 
-    current.sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+    current.sort((a, b) => startMs(a) - startMs(b));
 
-    upcoming.sort((a, b) => {
-        const dateCompare = a.date.localeCompare(b.date);
-        if (dateCompare !== 0) return dateCompare;
-        return timeToMinutes(a.startTime) - timeToMinutes(b.startTime);
-    });
+    upcoming.sort((a, b) => startMs(a) - startMs(b));
 
-    previous.sort((a, b) => b.date.localeCompare(a.date));
+    previous.sort((a, b) => dayOf(b).localeCompare(dayOf(a)));
 
     return {
         current: current[0] || null,
@@ -1055,6 +1019,7 @@ export interface ShiftAnomaly {
     date: string;
     startTime: string | null;
     endTime: string | null;
+    timeZone?: string | null;
     status: ShiftStatus;
     employeeId: string | null;
     clientId: string | null;

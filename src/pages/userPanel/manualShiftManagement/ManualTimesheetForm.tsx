@@ -19,6 +19,7 @@ import ConfirmShiftModal from './components/ConfirmShiftModal';
 import SuccessModal from './components/SuccessModal';
 import SignatureDropzone from './components/SignatureDropzone';
 import WeekEntries from './components/WeekEntries';
+import {dateKeyIn, shiftTimeZone, shiftZoneSuffix} from '@/lib/shift-time';
 import ClientLocationPicker, {assignedClientLabel, OTHER_LOCATION_ID} from './components/ClientLocationPicker';
 import {Hint} from '@/pages/userPanel/records/RecordsKit';
 import {shortClientId} from '@/pages/userPanel/dashboard/components/UpcomingTasks';
@@ -233,6 +234,9 @@ export default function ManualTimesheetForm({state, onSubmitted, pinnedFooter = 
     const showNames = canSeeClientNames(user);
     const employeeName = user?.fullName || 'You';
     const agencyName = user?.agency?.name || '';
+    // Times on the form are the agency's wall-clock times; warn when this device is elsewhere.
+    const agencyZone = shiftTimeZone({timeZone: user?.agency?.timezone});
+    const agencyZoneNote = shiftZoneSuffix({timeZone: agencyZone, date: dateKeyIn(new Date(), agencyZone), startTime: '12:00 PM'}).trim();
 
     const [saving, setSaving] = useState(false);
     const [submitting, setSubmitting] = useState(false);
@@ -600,6 +604,10 @@ export default function ManualTimesheetForm({state, onSubmitted, pinnedFooter = 
                     </div>}
                 </div>}
             </div>
+
+            {agencyZoneNote && <p className="rounded-[8px] bg-[#fff3d6] px-3 py-2 text-[13px] text-[#8a5200] dark:bg-[#f29d0c]/20 dark:text-[#f7c46b]">
+                Enter times in the agency's time zone ({agencyZoneNote}). Your device is set to a different time zone.
+            </p>}
 
             {weeks.map((week, index) => <WeekEntries key={index} weekNumber={index + 1} week={week}
                 onChange={next => setWeek(index, next)}

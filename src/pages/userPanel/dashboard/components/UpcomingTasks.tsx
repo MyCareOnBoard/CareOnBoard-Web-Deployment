@@ -3,6 +3,7 @@ import {CalendarClock} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Skeleton} from '@/components/ui/skeleton';
 import {ShiftStatus, type Shift} from '@/lib/api/shifts';
+import {shiftViewerDate, viewerShiftRange} from '@/lib/shift-time';
 import {toDateKey} from '../overviewStats';
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
@@ -12,7 +13,7 @@ export const shortClientId = (clientId?: string) => clientId ? clientId.slice(0,
 
 function tagFor(shift: Shift, today: string) {
     if (shift.status === ShiftStatus.ONGOING) return {label: 'In progress', className: 'bg-[#e6f6ed] text-[#187343] dark:bg-[#187343]/20 dark:text-[#7fd6a3]'};
-    if (shift.date === today) return {label: 'Today', className: 'bg-[#fff3d6] text-[#8a5200] dark:bg-[#f29d0c]/20 dark:text-[#f7c46b]'};
+    if (shiftViewerDate(shift) === today) return {label: 'Today', className: 'bg-[#fff3d6] text-[#8a5200] dark:bg-[#f29d0c]/20 dark:text-[#f7c46b]'};
     return {label: 'Upcoming', className: 'bg-[#eaf2ff] text-[#1f63c7] dark:bg-[#2b82ff]/20 dark:text-[#9cc0e6]'};
 }
 
@@ -43,7 +44,8 @@ export default function UpcomingTasks({shifts, loading, error, onRetry, viewAllP
             <p className="text-[13px] text-[#5d6b73] dark:text-[#9aa4a8]">New shifts will show here when they're assigned to you.</p>
         </div> : <ul className="mt-2">
             {visible.map(shift => {
-                const [, month, day] = shift.date.split('-');
+                // Day and times on the viewer's clock (converted from the agency's zone).
+                const [, month, day] = shiftViewerDate(shift).split('-');
                 const tag = tagFor(shift, today);
                 const client = shortClientId(shift.clientId);
                 return <li key={shift.id} className="flex gap-3 border-t border-[#edf2f3] py-3 first:border-t-0 dark:border-white/10">
@@ -53,7 +55,7 @@ export default function UpcomingTasks({shifts, loading, error, onRetry, viewAllP
                     </div>
                     <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-2">
-                            <p className="text-[14px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">{shift.startTime}{shift.endTime ? ` – ${shift.endTime}` : ''}</p>
+                            <p className="text-[14px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">{viewerShiftRange(shift)}</p>
                             <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${tag.className}`}>{tag.label}</span>
                         </div>
                         <p className="mt-0.5 text-[13px] text-[#5d6b73] dark:text-[#9aa4a8]">

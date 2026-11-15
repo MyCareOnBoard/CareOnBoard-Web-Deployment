@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { shiftDeleteConfirmMessage } from "@/lib/shift-delete-confirm";
 import { getShiftRowStatusInfo } from "@/lib/shift-row-status";
 import { formatShiftRowClockDisplay } from "@/lib/shift-row-time";
+import { shiftTimeLabel } from "@/lib/shift-time";
 import { detectShiftAnomalyCodes } from "@/lib/shift-anomaly-detection";
 import { DspShiftScheduleListRow } from "./DspShiftScheduleListRow";
 import { ConfirmDialog, ConfirmDialogContent } from "@/components/ui/confirm-dialog";
@@ -307,8 +308,8 @@ export function ShiftsTab({
     if (shiftsTab === "ongoing") {
       clockedInDisplay = shift.clockedInAt
         ? formatShiftRowClockDisplay(shift.clockedInAt)
-        : shift.startTime || "--:-- --";
-      clockedOutDisplay = shift.endTime ?? "--:-- --";
+        : shiftTimeLabel(shift, shift.startTime) || "--:-- --";
+      clockedOutDisplay = shiftTimeLabel(shift, shift.endTime) || "--:-- --";
     } else if (shiftsTab === "previous") {
       clockedInDisplay = formatShiftRowClockDisplay(shift.clockedInAt);
       clockedOutDisplay = formatShiftRowClockDisplay(shift.clockedOutAt);

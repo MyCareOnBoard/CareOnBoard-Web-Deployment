@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router";
 import { CalendarDays, CirclePlus } from "lucide-react";
 import { addDays, differenceInCalendarDays, format, startOfDay } from "date-fns";
 import { Shift, ShiftActionStatus, ShiftStatus, formatShiftLocation, categorizeShifts, clockIn as apiClockIn, clockOut as apiClockOut } from "@/lib/api/shifts";
-import { convertTimeToISODate } from "@/lib/shift-expiry";
+import { shiftInstants, shiftViewerDate } from "@/lib/shift-time";
 import { ClockOutModal } from "./ClockOutModal";
 import { ClockInModal } from "./ClockInModal";
 import { LocationErrorModal } from "./LocationErrorModal";
@@ -40,14 +40,11 @@ const safeFormat = (value: string | null | undefined, pattern: string): string =
   return isNaN(d.getTime()) ? "" : format(d, pattern);
 };
 
-const calculateRemainingMinutes = (endTime: string, date: string): number => {
-  try {
-    const endDateTime = convertTimeToISODate(endTime, date);
-    return Math.max(0, Math.floor((endDateTime.getTime() - Date.now()) / 60_000));
-  } catch (error) {
-    console.error('Error calculating remaining minutes:', error);
-    return 0;
-  }
+/** Minutes until the shift's scheduled end (read in its time zone; overnight shifts end the next day). */
+const calculateRemainingMinutes = (shift: Shift): number => {
+  const endDateTime = shiftInstants(shift)?.end;
+  if (!endDateTime) return 0;
+  return Math.max(0, Math.floor((endDateTime.getTime() - Date.now()) / 60_000));
 };
 
 const GEOFENCE_RADIUS_METERS = 91.44; // 300 ft — must match server CLOCK_GEOFENCE_RADIUS_METERS default
@@ -117,14 +114,21 @@ export default function ShiftManagementPage() {
   // Clock in / Clock out bar whichever days the strip shows.
   const stripShifts = useEmployeeShifts({
     agencyId: user?.agencyId, employeeId: user?.profile?.id, client: true,
-    startDate: toDateKey(windowStart), endDate: toDateKey(addDays(windowStart, STRIP_DAYS - 1)),
+    // One extra day each side: shift dates are the agency's calendar, which can differ
+    // from the viewer's by a day; shifts are placed on the viewer's day below.
+    startDate: toDateKey(addDays(windowStart, -1)), endDate: toDateKey(addDays(windowStart, STRIP_DAYS)),
   });
   const todayKey = toDateKey(new Date());
-  const todayShifts = useEmployeeShifts({
+  const todayLoad = useEmployeeShifts({
     agencyId: user?.agencyId, employeeId: user?.profile?.id, client: true,
-    startDate: todayKey, endDate: todayKey,
+    startDate: toDateKey(addDays(new Date(), -1)), endDate: toDateKey(addDays(new Date(), 1)),
   });
-  const currentShift = useMemo(() => categorizeShifts(todayShifts.shifts).current, [todayShifts.shifts]);
+  const todayList = useMemo(
+    () => todayLoad.shifts.filter(shift => shiftViewerDate(shift) === todayKey),
+    [todayLoad.shifts, todayKey],
+  );
+  const todayShifts = { ...todayLoad, shifts: todayList };
+  const currentShift = useMemo(() => categorizeShifts(todayList).current, [todayList]);
   const clockInWindow = useClockInOpen(currentShift);
   const clockInLocked = currentShift?.actionStatus === ShiftActionStatus.CLOCK_IN && !clockInWindow.open;
   const reloadShifts = () => { stripShifts.reload(); todayShifts.reload(); };
@@ -132,13 +136,13 @@ export default function ShiftManagementPage() {
   const currentRunning = currentShift?.status === ShiftStatus.ONGOING || currentShift?.actionStatus === ShiftActionStatus.CLOCK_OUT;
   // The shift after the one in the Clock in / Clock out card (or the next one at all when there is none).
   const nextShift = useMemo(
-    () => nextUpcomingShift(todayShifts.shifts, now, currentShift?.actionStatus ? currentShift.id : undefined),
-    [todayShifts.shifts, now, currentShift],
+    () => nextUpcomingShift(todayList, now, currentShift?.actionStatus ? currentShift.id : undefined),
+    [todayList, now, currentShift],
   );
   const upNextId = currentShift?.actionStatus && !currentRunning ? currentShift.id : nextShift?.id;
 
   const selectedKey = toDateKey(selectedDay);
-  const dayShifts = useMemo(() => stripShifts.shifts.filter(shift => shift.date === selectedKey), [stripShifts.shifts, selectedKey]);
+  const dayShifts = useMemo(() => stripShifts.shifts.filter(shift => shiftViewerDate(shift) === selectedKey), [stripShifts.shifts, selectedKey]);
 
   const selectDay = (date: Date) => {
     const day = startOfDay(date);
@@ -148,7 +152,7 @@ export default function ShiftManagementPage() {
   };
 
   useEffect(() => {
-    const update = () => setTimeRemaining(currentShift ? calculateRemainingMinutes(currentShift.endTime || '', currentShift.date) : null);
+    const update = () => setTimeRemaining(currentShift ? calculateRemainingMinutes(currentShift) : null);
     update();
     const interval = setInterval(update, 60000);
     return () => clearInterval(interval);

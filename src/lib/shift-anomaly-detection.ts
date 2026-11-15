@@ -1,4 +1,4 @@
-import { parseISO } from "date-fns";
+import { shiftDateTime, shiftEndOrEndOfDay, shiftTimeZone, shiftZoneToday } from "@/lib/shift-time";
 import type { AnomalyCode, Shift, ShiftAnomaly } from "@/lib/api/shifts";
 import { ShiftStatus } from "@/lib/api/shifts";
 
@@ -21,61 +21,14 @@ function isShiftMissed(shift: Shift): boolean {
   if (shift.status === ShiftStatus.COMPLETED) return false;
   if (shift.clockedInAt) return false;
   if (!shift.date) return false;
-
-  const date = parseISO(shift.date);
-  let endDateTime: Date;
-
-  if (shift.endTime) {
-    const parsedTime = parseTimeToParts(shift.endTime);
-    if (parsedTime) {
-      endDateTime = new Date(
-        date.getFullYear(),
-        date.getMonth(),
-        date.getDate(),
-        parsedTime.hours,
-        parsedTime.minutes
-      );
-    } else {
-      endDateTime = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59);
-    }
-  } else {
-    endDateTime = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59);
-  }
-
-  return endDateTime.getTime() < Date.now();
-}
-
-function scheduledEndDateTime(shift: Shift): Date | null {
-  if (!shift.date) return null;
-  const date = parseISO(shift.date);
-  if (shift.endTime) {
-    const parsedTime = parseTimeToParts(shift.endTime);
-    if (parsedTime) {
-      return new Date(
-        date.getFullYear(),
-        date.getMonth(),
-        date.getDate(),
-        parsedTime.hours,
-        parsedTime.minutes
-      );
-    }
-  }
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59);
+  const endDateTime = shiftEndOrEndOfDay(shift);
+  return Boolean(endDateTime && endDateTime.getTime() < Date.now());
 }
 
 /** Parsed scheduled end only when `endTime` parses; otherwise null (matches maintenance API fallback). */
 function parsedScheduledEndOrNull(shift: Shift): Date | null {
   if (!shift.date || !shift.endTime) return null;
-  const date = parseISO(shift.date);
-  const parsedTime = parseTimeToParts(shift.endTime);
-  if (!parsedTime) return null;
-  return new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-    parsedTime.hours,
-    parsedTime.minutes,
-  );
+  return shiftDateTime(shift.date, shift.endTime, shiftTimeZone(shift));
 }
 
 function hasInvalidScheduledWindow(shift: Shift): boolean {
@@ -92,8 +45,8 @@ function hasIncompleteClockOut(shift: Shift): boolean {
   if (!shift.clockedInAt || shift.clockedOutAt) return false;
   if (shift.status === ShiftStatus.COMPLETED) return false;
   if (!shift.date) return false;
-  const todayUtc = new Date().toISOString().slice(0, 10);
-  const isPast = shift.date < todayUtc;
+  // "Today" in the shift's zone, which its date is written in.
+  const isPast = shift.date < shiftZoneToday(shift);
   const endDt = parsedScheduledEndOrNull(shift);
   const endIsPast = endDt ? Date.now() > endDt.getTime() : isPast;
   return endIsPast;

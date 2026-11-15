@@ -21,6 +21,7 @@ import { VoiceRecordingProvider } from "@/contexts/VoiceRecordingContext";
 import VoiceInputButton from "@/components/VoiceInputButton";
 import VoiceEnabledTextarea from "@/components/VoiceEnabledTextarea";
 import { roleLabel } from "@/lib/roleLabel";
+import { dateKeyIn, shiftEndOrEndOfDay, shiftTimeZone, shiftZoneSuffix, zonedDateTime } from "@/lib/shift-time";
 
 const REASON_MAX = 500;
 
@@ -77,25 +78,22 @@ function parseClockToDate(value: unknown): Date | null {
   return null;
 }
 
-/** Match legacy save: UTC time-of-day from stored clock matches draft HH:mm from TimePicker. */
-function clockedAtToHHmm(value: unknown): string {
+/** HH:mm of a stored clock instant on the shift's own clock (its time zone). */
+function clockedAtToHHmm(value: unknown, timeZone: string): string {
   const d = parseClockToDate(value);
   if (!d) return "";
-  const h = d.getUTCHours();
-  const m = d.getUTCMinutes();
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone });
 }
 
-function hhmmToIso(hhmm: string, shiftDateStr: string | undefined): string | null {
+/** Instant for a draft HH:mm on the shift's date, read in the shift's time zone. */
+function hhmmToIso(hhmm: string, shiftDateStr: string | undefined, timeZone: string): string | null {
   if (!hhmm || !/^\d{2}:\d{2}$/.test(hhmm)) return null;
   const [hStr, mStr] = hhmm.split(":");
   const hours = parseInt(hStr, 10);
   const minutes = parseInt(mStr, 10);
   if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
-  const shiftDate = shiftDateStr ? parseISO(shiftDateStr) : new Date();
-  return new Date(
-    Date.UTC(shiftDate.getFullYear(), shiftDate.getMonth(), shiftDate.getDate(), hours, minutes, 0, 0)
-  ).toISOString();
+  const dateKey = shiftDateStr?.slice(0, 10) || dateKeyIn(new Date(), timeZone);
+  return zonedDateTime(dateKey, hours * 60 + minutes, timeZone)?.toISOString() ?? null;
 }
 
 /** 12h label for a draft HH:mm (matches TimePicker display, no timezone shift). */
@@ -109,40 +107,12 @@ function formatDraftHHmmLabel(hhmm: string): string {
   return `${String(displayHour).padStart(2, "0")}:${min} ${displayPeriod}`;
 }
 
-const parseTimeToParts = (time: string): { hours: number; minutes: number } | null => {
-  const match = time.match(/(\d{1,2})[.:](\d{2})[:]?([AaPp][Mm])/);
-  if (!match) return null;
-  let hours = parseInt(match[1], 10);
-  const minutes = parseInt(match[2], 10);
-  const period = match[3].toUpperCase();
-  if (period === "PM" && hours !== 12) hours += 12;
-  if (period === "AM" && hours === 12) hours = 0;
-  return { hours, minutes };
-};
-
 const isShiftMissed = (s: Shift): boolean => {
   if (s.status === ShiftStatus.COMPLETED) return false;
   if (s.clockedInAt) return false;
   if (!s.date) return false;
-  const date = parseISO(s.date);
-  let endDateTime: Date;
-  if (s.endTime) {
-    const parsedTime = parseTimeToParts(s.endTime);
-    if (parsedTime) {
-      endDateTime = new Date(
-        date.getFullYear(),
-        date.getMonth(),
-        date.getDate(),
-        parsedTime.hours,
-        parsedTime.minutes
-      );
-    } else {
-      endDateTime = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59);
-    }
-  } else {
-    endDateTime = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59);
-  }
-  return endDateTime.getTime() < Date.now();
+  const endDateTime = shiftEndOrEndOfDay(s);
+  return Boolean(endDateTime && endDateTime.getTime() < Date.now());
 };
 
 function getStatusCallout(s: Shift, codes: AnomalyCode[]) {
@@ -214,8 +184,8 @@ export default function ShiftDetailsModal({
   }, [shift, fetchedShift]);
 
   const resetDraftsFromShift = useCallback((s: Shift) => {
-    setDraftClockIn(clockedAtToHHmm(s.clockedInAt));
-    setDraftClockOut(clockedAtToHHmm(s.clockedOutAt));
+    setDraftClockIn(clockedAtToHHmm(s.clockedInAt, shiftTimeZone(s)));
+    setDraftClockOut(clockedAtToHHmm(s.clockedOutAt, shiftTimeZone(s)));
     setDraftResolveLateClockIn(false);
     setDraftCompleted(s.status === ShiftStatus.COMPLETED);
     setDraftApproved(Boolean(s.approved));
@@ -312,8 +282,9 @@ export default function ShiftDetailsModal({
     }
 
     const maintenanceReason = reason.trim();
-    const serverIn = clockedAtToHHmm(resolvedShift.clockedInAt);
-    const serverOut = clockedAtToHHmm(resolvedShift.clockedOutAt);
+    const zone = shiftTimeZone(resolvedShift);
+    const serverIn = clockedAtToHHmm(resolvedShift.clockedInAt, zone);
+    const serverOut = clockedAtToHHmm(resolvedShift.clockedOutAt, zone);
     const inNorm = draftClockIn.trim();
     const outNorm = draftClockOut.trim();
     const serverCompleted = resolvedShift.status === ShiftStatus.COMPLETED;
@@ -324,11 +295,11 @@ export default function ShiftDetailsModal({
     };
 
     if (inNorm !== serverIn) {
-      const iso = hhmmToIso(inNorm, resolvedShift.date);
+      const iso = hhmmToIso(inNorm, resolvedShift.date, zone);
       if (iso) payload.clockedInAt = iso;
     }
     if (outNorm !== serverOut) {
-      const iso = hhmmToIso(outNorm, resolvedShift.date);
+      const iso = hhmmToIso(outNorm, resolvedShift.date, zone);
       if (iso) payload.clockedOutAt = iso;
     }
 
@@ -532,6 +503,11 @@ export default function ShiftDetailsModal({
                   </span>
                 </TimePicker>
               </div>
+              {shiftZoneSuffix(resolvedShift) ? (
+                <p className="mt-1 text-[11px] text-[#808081]">
+                  Clock times are in the agency's time zone ({shiftZoneSuffix(resolvedShift).trim()}).
+                </p>
+              ) : null}
               {showResolveLateClockIn ? (
                 <div className="mt-3 flex items-center justify-between gap-3 border-t border-[rgba(0,0,0,0.06)] pt-3">
                   <div className="min-w-0">

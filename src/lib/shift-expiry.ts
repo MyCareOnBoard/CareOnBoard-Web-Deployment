@@ -1,52 +1,33 @@
 import type { Shift } from "@/lib/api/shifts";
+import {
+  DEFAULT_SHIFT_TIME_ZONE,
+  shiftDateTime,
+  shiftEndOrEndOfDay,
+  shiftTimeZone,
+} from "@/lib/shift-time";
 
 export const GRACE_MS = 15 * 60 * 1000;
 export const EXPIRE_AFTER_START_MS = 60 * 60 * 1000;
 
-/** Match shift card time parsing (12h with optional dot before minutes). */
-export function convertTimeToISODate(timeStringReplaced: string, dateString: string): Date {
-  const timeString = timeStringReplaced.replace(".", ":");
-  const timeMatch = timeString.match(/(\d+):(\d+):?\s*(AM|PM)/i);
-  if (!timeMatch) {
+/**
+ * Instant for a shift time on its date, read in the shift's zone (`timeZone`, default
+ * New York). Throws when the time can't be read.
+ */
+export function convertTimeToISODate(
+  timeString: string,
+  dateString: string,
+  timeZone: string = DEFAULT_SHIFT_TIME_ZONE,
+): Date {
+  const date = shiftDateTime(dateString?.slice(0, 10), timeString, timeZone);
+  if (!date) {
     throw new Error(`Invalid time format: ${timeString}`);
   }
-
-  let hours = parseInt(timeMatch[1], 10);
-  const minutes = parseInt(timeMatch[2], 10);
-  const period = timeMatch[3].toUpperCase();
-
-  if (period === "PM" && hours !== 12) {
-    hours += 12;
-  } else if (period === "AM" && hours === 12) {
-    hours = 0;
-  }
-
-  const date = new Date(dateString);
-  date.setHours(hours, minutes, 0, 0);
-
   return date;
 }
 
 function isPastScheduledEndWithoutClockIn(shift: Shift, now: Date): boolean {
-  if (!shift.date) return false;
-  try {
-    let endDateTime: Date;
-    if (shift.endTime) {
-      endDateTime = convertTimeToISODate(shift.endTime, shift.date);
-      if (shift.startTime) {
-        const startDateTime = convertTimeToISODate(shift.startTime, shift.date);
-        if (endDateTime.getTime() <= startDateTime.getTime()) {
-          endDateTime = new Date(endDateTime.getTime() + 24 * 60 * 60 * 1000);
-        }
-      }
-    } else {
-      const d = new Date(shift.date);
-      endDateTime = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59);
-    }
-    return endDateTime.getTime() < now.getTime();
-  } catch {
-    return false;
-  }
+  const end = shiftEndOrEndOfDay(shift);
+  return Boolean(end && end.getTime() < now.getTime());
 }
 
 export type ShiftExpiryState = {
@@ -81,7 +62,7 @@ export function getExpiryState(shift: Shift, now: Date): ShiftExpiryState | null
   }
 
   try {
-    const startDateTime = convertTimeToISODate(shift.startTime, shift.date);
+    const startDateTime = convertTimeToISODate(shift.startTime, shift.date, shiftTimeZone(shift));
     const t = now.getTime();
     const graceEnd = startDateTime.getTime() + GRACE_MS;
     const hardExpiry = startDateTime.getTime() + EXPIRE_AFTER_START_MS;

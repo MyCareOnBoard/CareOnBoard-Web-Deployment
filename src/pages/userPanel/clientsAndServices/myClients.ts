@@ -1,5 +1,6 @@
 import {ShiftStatus, type Shift} from '@/lib/api/shifts';
-import {shiftDateTime, toDateKey} from '@/pages/userPanel/dashboard/overviewStats';
+import {shiftEndOrEndOfDay, shiftInstants, shiftStartAt, shiftViewerDate} from '@/lib/shift-time';
+import {toDateKey} from '@/pages/userPanel/dashboard/overviewStats';
 import {shortClientId} from '@/pages/userPanel/dashboard/components/UpcomingTasks';
 import {shiftTitle} from '@/pages/userPanel/shiftManagement/timeline';
 
@@ -33,10 +34,9 @@ interface ShiftClient {
 export function isAhead(shift: Shift, now: Date) {
     if (shift.status === ShiftStatus.COMPLETED || shift.status === ShiftStatus.EXPIRED || shift.clockedOutAt) return false;
     if (shift.status === ShiftStatus.ONGOING || shift.clockedInAt) return true;
-    const start = shiftDateTime(shift.date, shift.startTime);
-    const end = shiftDateTime(shift.date, shift.endTime);
-    const finish = start && end && end <= start ? new Date(end.getTime() + 86_400_000) : end;
-    return (finish ?? start ?? new Date(`${shift.date}T23:59:59`)) > now;
+    const span = shiftInstants(shift); // overnight shifts end the next day
+    const finish = span?.end ?? span?.start ?? shiftEndOrEndOfDay(shift);
+    return finish ? finish > now : false;
 }
 
 /** "Newark, NJ" from the client's address: its city and state when saved, else read from "12 Main St, Newark, NJ 07102". */
@@ -59,7 +59,7 @@ export function clientStatus(status?: string | null): ClientStatus {
     return 'active';
 }
 
-const startTime = (shift: Shift) => shiftDateTime(shift.date, shift.startTime)?.getTime() ?? new Date(`${shift.date}T00:00:00`).getTime();
+const startTime = (shift: Shift) => shiftStartAt(shift)?.getTime() ?? new Date(`${shift.date}T00:00:00`).getTime();
 
 /** Groups the employee's shifts into one row per client, clients with the soonest visit first. */
 export function buildClientRows(shifts: Shift[], now: Date = new Date()): ClientRow[] {
@@ -93,12 +93,12 @@ export function clientsOverview(rows: ClientRow[], shifts: Shift[], now: Date = 
     const today = toDateKey(now);
     const monthStart = today.slice(0, 8) + '01';
     const services = new Set(shifts
-        .filter(shift => shift.clientId && shift.date >= monthStart)
+        .filter(shift => shift.clientId && shiftViewerDate(shift) >= monthStart)
         .map(shift => `${shift.clientId}|${shift.serviceAuthorizationId || shift.serviceCode || shiftTitle(shift)}`));
     return {
         assignedClients: rows.length,
         activeServices: services.size,
-        servicesToday: shifts.filter(shift => shift.date === today).length,
+        servicesToday: shifts.filter(shift => shiftViewerDate(shift) === today).length,
     };
 }
 
