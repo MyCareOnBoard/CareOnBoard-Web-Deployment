@@ -2,6 +2,7 @@ import {fireEvent, render, screen} from '@testing-library/react';
 import {beforeEach, expect, it, vi} from 'vitest';
 const mocks = vi.hoisted(() => ({findings: vi.fn()}));
 vi.mock('./api', () => ({complianceAlertsApi: {injectEndpoints: () => ({useAgencyFindingsQuery: mocks.findings})}}));
+vi.mock('./FindingActions', () => ({FindingActions: ({findingId, status}: any) => <div data-testid="actions">{findingId}:{status}</div>}));
 import AgencyFindings from './AgencyFindings';
 const props = {scopeKey: 's', agencyId: 'a1', viewerId: 'v', mode: 'ddd', view: {source: 'documentation_patterns' as const}, onApply: vi.fn(), onSelect: vi.fn(), onPage: vi.fn(), onPrevious: vi.fn()};
 const item = {id: 'f1', employeeId: 'e1', employeeName: 'Ada Lee', status: 'open', severity: 'high', metrics: {numerator: 4, denominator: 8}, topFields: [{key: 'activities', count: 3}], recurrenceCount: 0, lastSeenAt: null, explanation: null};

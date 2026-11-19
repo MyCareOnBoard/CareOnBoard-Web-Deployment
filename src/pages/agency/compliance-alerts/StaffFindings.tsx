@@ -1,4 +1,5 @@
 import {complianceAlertsApi} from './api';
+import {FindingActions} from './FindingActions';
 import {ComplianceBadge, ComplianceSkeleton} from './CompliancePresentation';
 
 export type FindingEvidence = {id: string; occurredAt: string | null; outcome: string; source: string; noteType: string | null; fields: string[]; noteId: string | null; shiftId: string | null; activityLogId: string | null};
@@ -6,6 +7,7 @@ export type StaffFinding = {
   id: string; status: 'open' | 'recurred' | 'resolved' | 'dismissed'; severity: 'low' | 'medium' | 'high' | null; program: string | null;
   metrics: {numerator: number; denominator: number} | null; topFields: Array<{key: string; count: number}>;
   trend: string | null; explanation: string | null; recurrenceCount: number; lastSeenAt: string | null; resolvedAt: string | null;
+  reviewCount?: number; lastReviewedAt?: string | null; dismissedAt?: string | null; dismissReason?: string | null;
   evidence: FindingEvidence[];
 };
 type Args = {employeeId: string; agencyId: string; mode: string; scopeKey: string};
@@ -35,9 +37,11 @@ export function StaffFindings(args: Args) {
       <div className="flex flex-wrap items-center gap-2">
         {finding.severity && <ComplianceBadge tone={severityTone[finding.severity]}>{finding.severity[0].toUpperCase() + finding.severity.slice(1)} severity</ComplianceBadge>}
         <ComplianceBadge tone={finding.status === 'resolved' || finding.status === 'dismissed' ? 'success' : 'warning'}>{statusLabel[finding.status]}</ComplianceBadge>
+        {(finding.reviewCount ?? 0) > 0 && <span className="text-xs text-[#5e7378]">Reviewed {finding.reviewCount}× · last {fmt(finding.lastReviewedAt ?? null)}</span>}
         {finding.recurrenceCount > 0 && <span className="text-xs text-[#5e7378]">Returned {finding.recurrenceCount} time{finding.recurrenceCount === 1 ? '' : 's'}</span>}
       </div>
       {finding.explanation && <p className="text-sm">{finding.explanation}</p>}
+      {finding.status === 'dismissed' && finding.dismissReason && <p className="text-sm">Dismissed: {finding.dismissReason}</p>}
       {finding.evidence.length > 0 && <details>
         <summary className="cursor-pointer text-sm font-semibold">Evidence ({finding.evidence.length} records)</summary>
         <ul className="mt-2 divide-y divide-[#dce7e8] text-sm">{finding.evidence.map(item => <li key={item.id} className="py-2">
@@ -46,6 +50,7 @@ export function StaffFindings(args: Args) {
           {item.fields.length > 0 && <span> · Missing: {item.fields.join(', ')}</span>}
         </li>)}</ul>
       </details>}
+      <FindingActions findingId={finding.id} status={finding.status} onDone={() => void query.refetch()}/>
     </article>)}
   </section>;
 }

@@ -2,6 +2,7 @@ import {render, screen} from '@testing-library/react';
 import {beforeEach, expect, it, vi} from 'vitest';
 const mocks = vi.hoisted(() => ({findings: vi.fn()}));
 vi.mock('./api', () => ({complianceAlertsApi: {injectEndpoints: () => ({useStaffFindingsQuery: mocks.findings})}}));
+vi.mock('./FindingActions', () => ({FindingActions: ({findingId, status}: any) => <div data-testid="actions">{findingId}:{status}</div>}));
 import {StaffFindings} from './StaffFindings';
 const args = {employeeId: 'e1', agencyId: 'a1', mode: 'ddd', scopeKey: 's'};
 const finding = {id: 'f1', status: 'open', severity: 'high', program: 'ddd', metrics: {numerator: 4, denominator: 8}, topFields: [], trend: null,
