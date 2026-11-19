@@ -20,9 +20,17 @@ it('shows the explanation, severity and evidence', () => {
 it('says plainly when there is nothing, and when loading fails', () => {
   mocks.findings.mockReturnValue({currentData: {findings: []}, refetch: vi.fn()});
   const {rerender} = render(<StaffFindings {...args}/>);
-  expect(screen.getByText('No documentation patterns found.')).toBeInTheDocument();
+  expect(screen.getByText('No compliance patterns found.')).toBeInTheDocument();
   mocks.findings.mockReturnValue({error: {status: 500}, refetch: vi.fn()});
   rerender(<StaffFindings {...args}/>);
   expect(screen.getByRole('alert')).toHaveTextContent('could not be loaded');
-  expect(screen.queryByText('No documentation patterns found.')).not.toBeInTheDocument();
+  expect(screen.queryByText('No compliance patterns found.')).not.toBeInTheDocument();
+});
+it('names the rule and describes attendance evidence without a "Missing" prefix', () => {
+  const attendance = {...finding, id: 'f2', ruleId: 'shift.clock_out', evidence: [{...finding.evidence[0], noteType: null, fields: ['missing_clock_out']}]};
+  mocks.findings.mockReturnValue({currentData: {findings: [attendance]}, refetch: vi.fn()});
+  render(<StaffFindings {...args}/>);
+  expect(screen.getByText('Clock-out')).toBeInTheDocument();
+  expect(screen.getByText(/No clock-out/)).toBeInTheDocument();
+  expect(screen.queryByText(/Missing:/)).not.toBeInTheDocument();
 });

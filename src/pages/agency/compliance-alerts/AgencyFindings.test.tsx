@@ -29,5 +29,13 @@ it('applies filters, warns on truncation, hides review without staff access, and
   mocks.findings.mockReturnValue({error: {status: 500}, refetch: vi.fn()});
   rerender(<AgencyFindings {...props}/>);
   expect(screen.getByRole('alert')).toHaveTextContent('could not be loaded');
-  expect(screen.queryByText(/No documentation patterns match/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/No compliance patterns match/)).not.toBeInTheDocument();
+});
+it('labels each pattern by type, words shift patterns as shifts, and filters by type', () => {
+  mocks.findings.mockReturnValue({currentData: {items: [{...item, id: 'f2', ruleId: 'shift.punctuality', topFields: [{key: 'late_start', count: 4}]}], total: 1, truncated: false, nextCursor: null}, refetch: vi.fn()});
+  render(<AgencyFindings {...props}/>);
+  expect(screen.getByText('Punctuality')).toBeInTheDocument();
+  expect(screen.getByText(/4 of the last 8 shifts affected; most often Late start/)).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Pattern type'), {target: {value: 'shift.clock_out'}});
+  expect(props.onApply).toHaveBeenCalledWith({ruleId: 'shift.clock_out'});
 });

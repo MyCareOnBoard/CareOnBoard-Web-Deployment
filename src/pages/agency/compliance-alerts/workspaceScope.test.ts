@@ -1,10 +1,10 @@
 import {describe, expect, it} from 'vitest';
 import {getComplianceSources, parseComplianceView, complianceHref} from './workspaceScope';
 const staff = (accessList: string[], agencyModes: unknown = ['ddd', 'hha', 'sc']) => ({userType: 'agency_staff', profile: {accessList, agencyModes}, agency: {supportedClientTypes: ['ddd', 'hha', 'sc']}});
-describe('documentation patterns URL', () => {
+describe('compliance patterns URL', () => {
   it('accepts only its own filters', () => {
-    expect(parseComplianceView(new URLSearchParams('source=documentation_patterns&findingStatus=resolved&severity=high'))).toEqual({ok: true, view: {section: 'shifts', source: 'documentation_patterns', findingStatus: 'resolved', severity: 'high'}});
-    for (const query of ['source=documentation_patterns&severity=urgent', 'source=documentation_patterns&findingStatus=bad', 'source=documentation_patterns&employeeId=e1', 'source=shift_notes&severity=high'])
+    expect(parseComplianceView(new URLSearchParams('source=documentation_patterns&findingStatus=resolved&severity=high&ruleId=shift.clock_out'))).toEqual({ok: true, view: {section: 'shifts', source: 'documentation_patterns', findingStatus: 'resolved', severity: 'high', ruleId: 'shift.clock_out'}});
+    for (const query of ['source=documentation_patterns&severity=urgent', 'source=documentation_patterns&ruleId=nope', 'source=documentation_patterns&ruleId=toString', 'source=documentation_patterns&findingStatus=bad', 'source=documentation_patterns&employeeId=e1', 'source=shift_notes&severity=high'])
       expect(parseComplianceView(new URLSearchParams(query)).ok).toBe(false);
   });
 });

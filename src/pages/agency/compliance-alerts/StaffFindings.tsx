@@ -1,10 +1,11 @@
 import {complianceAlertsApi} from './api';
 import {FindingActions} from './FindingActions';
+import {fieldLabel, ruleLabel} from './findingLabels';
 import {ComplianceBadge, ComplianceSkeleton} from './CompliancePresentation';
 
 export type FindingEvidence = {id: string; occurredAt: string | null; outcome: string; source: string; noteType: string | null; fields: string[]; noteId: string | null; shiftId: string | null; activityLogId: string | null};
 export type StaffFinding = {
-  id: string; status: 'open' | 'recurred' | 'resolved' | 'dismissed'; severity: 'low' | 'medium' | 'high' | null; program: string | null;
+  id: string; ruleId?: string; status: 'open' | 'recurred' | 'resolved' | 'dismissed'; severity: 'low' | 'medium' | 'high' | null; program: string | null;
   metrics: {numerator: number; denominator: number} | null; topFields: Array<{key: string; count: number}>;
   trend: string | null; explanation: string | null; recurrenceCount: number; lastSeenAt: string | null; resolvedAt: string | null;
   reviewCount?: number; lastReviewedAt?: string | null; dismissedAt?: string | null; dismissReason?: string | null;
@@ -27,14 +28,15 @@ const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString() : 
 export function StaffFindings(args: Args) {
   const query = useStaffFindingsQuery(args, {refetchOnMountOrArgChange: true});
   const findings = query.currentData?.findings;
-  return <section aria-label="Documentation patterns" className="space-y-3 border-t border-[#dce7e8] pt-4">
-    <h3 className="font-bold">Documentation patterns</h3>
-    <p className="text-xs text-[#5e7378]">Based on submitted service notes. These are advisory and need a person to review them.</p>
-    {query.isFetching && !findings && <ComplianceSkeleton label="Checking documentation patterns…" detail={false}/>}
-    {!!query.error && !findings && <p role="alert" className="text-sm">Documentation patterns could not be loaded. <button type="button" className="underline" onClick={() => void query.refetch()}>Try again</button></p>}
-    {findings && !findings.length && <p className="text-sm">No documentation patterns found.</p>}
+  return <section aria-label="Compliance patterns" className="space-y-3 border-t border-[#dce7e8] pt-4">
+    <h3 className="font-bold">Compliance patterns</h3>
+    <p className="text-xs text-[#5e7378]">Based on submitted service notes and completed shifts. These are advisory and need a person to review them.</p>
+    {query.isFetching && !findings && <ComplianceSkeleton label="Checking compliance patterns…" detail={false}/>}
+    {!!query.error && !findings && <p role="alert" className="text-sm">Compliance patterns could not be loaded. <button type="button" className="underline" onClick={() => void query.refetch()}>Try again</button></p>}
+    {findings && !findings.length && <p className="text-sm">No compliance patterns found.</p>}
     {findings?.map(finding => <article key={finding.id} className="space-y-2 rounded-lg border border-[#dce7e8] p-3">
       <div className="flex flex-wrap items-center gap-2">
+        <ComplianceBadge tone="neutral">{ruleLabel(finding.ruleId)}</ComplianceBadge>
         {finding.severity && <ComplianceBadge tone={severityTone[finding.severity]}>{finding.severity[0].toUpperCase() + finding.severity.slice(1)} severity</ComplianceBadge>}
         <ComplianceBadge tone={finding.status === 'resolved' || finding.status === 'dismissed' ? 'success' : 'warning'}>{statusLabel[finding.status]}</ComplianceBadge>
         {(finding.reviewCount ?? 0) > 0 && <span className="text-xs text-[#5e7378]">Reviewed {finding.reviewCount}× · last {fmt(finding.lastReviewedAt ?? null)}</span>}
@@ -47,7 +49,7 @@ export function StaffFindings(args: Args) {
         <ul className="mt-2 divide-y divide-[#dce7e8] text-sm">{finding.evidence.map(item => <li key={item.id} className="py-2">
           <span className="font-medium">{fmt(item.occurredAt)}</span>
           {item.noteType && <span className="text-[#5e7378]"> · {item.noteType}</span>}
-          {item.fields.length > 0 && <span> · Missing: {item.fields.join(', ')}</span>}
+          {item.fields.length > 0 && <span> · {!finding.ruleId || finding.ruleId === 'note.required_fields' ? 'Missing: ' : ''}{item.fields.map(fieldLabel).join(', ')}</span>}
         </li>)}</ul>
       </details>}
       <FindingActions findingId={finding.id} status={finding.status} onDone={() => void query.refetch()}/>
