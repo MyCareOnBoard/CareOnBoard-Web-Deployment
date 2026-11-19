@@ -4,7 +4,8 @@ export type Source =
   | "client_documents"
   | "manual_audits"
   | "unsigned_form485"
-  | "shift_notes";
+  | "shift_notes"
+  | "documentation_patterns";
 export type Section = "staff" | "clients" | "shifts";
 export interface ComplianceView {
   initialRunId?: string;
@@ -24,6 +25,8 @@ export interface ComplianceView {
   cursor?: string;
   staffCursor?: string;
   auditId?: string;
+  findingStatus?: "active" | "resolved" | "all";
+  severity?: "high" | "medium" | "low";
   auditView?: "follow_up_needed" | "recorded" | "drafts" | "discarded";
 }
 export type ViewParseResult =
@@ -50,6 +53,7 @@ export const sourceSection: Record<Source, Section> = {
   manual_audits: "clients",
   unsigned_form485: "clients",
   shift_notes: "shifts",
+  documentation_patterns: "shifts",
 };
 export const sourceLabels: Record<Source, string> = {
   document_expiry: "Staff compliance",
@@ -58,6 +62,7 @@ export const sourceLabels: Record<Source, string> = {
   manual_audits: "Manual audits",
   unsigned_form485: "Unsigned Form 485",
   shift_notes: "Shift notes",
+  documentation_patterns: "Documentation patterns",
 };
 const validPrograms = (value: unknown): value is string[] =>
   Array.isArray(value) &&
@@ -120,6 +125,7 @@ export function getComplianceSources(
     (has("Scheduling") || has("Shift Management"))
   )
     sources.push("shift_notes");
+  if (mode !== "sc" && has("Notes")) sources.push("documentation_patterns");
   return sources;
 }
 export const validComplianceId = (value: string) =>
@@ -166,7 +172,9 @@ export function parseComplianceView(params: URLSearchParams): ViewParseResult {
             ? ["clientId", "auditId", "auditView"]
           : source === "unsigned_form485"
             ? ["clientId"]
-            : ["employeeId", "shiftId", "stateGroup", "startDate", "endDate"]),
+            : source === "documentation_patterns"
+              ? ["findingStatus", "severity"]
+              : ["employeeId", "shiftId", "stateGroup", "startDate", "endDate"]),
   ];
   if (Object.keys(raw).some((key) => !allowed.includes(key) || raw[key] === ""))
     return fail();
@@ -224,6 +232,8 @@ export function parseComplianceView(params: URLSearchParams): ViewParseResult {
     return fail();
   if (source === "unsigned_form485" && raw.mode && raw.mode !== "hha")
     return fail();
+  if (raw.findingStatus && !["active", "resolved", "all"].includes(raw.findingStatus)) return fail();
+  if (raw.severity && !["high", "medium", "low"].includes(raw.severity)) return fail();
   if (raw.auditView && !["follow_up_needed", "recorded", "drafts", "discarded"].includes(raw.auditView)) return fail();
   if (source === "manual_audits" && ((raw.auditId && !raw.clientId) || (raw.auditId && raw.cursor))) return fail();
   if (
