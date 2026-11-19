@@ -1,5 +1,6 @@
 import {complianceAlertsApi} from './api';
 import {Button} from '@/components/ui/button';
+import {FindingActions} from './FindingActions';
 import {ComplianceBadge, ComplianceSkeleton} from './CompliancePresentation';
 import {SourcePage, type SourceProps} from './SourceControls';
 
@@ -49,6 +50,7 @@ export default function AgencyFindings({view, scopeKey, agencyId, mode, onApply,
             {item.recurrenceCount > 0 && <span className="text-xs text-[#5e7378]">Returned {item.recurrenceCount}×</span>}
           </div>
           {item.metrics && <p className="text-sm">{item.metrics.numerator} of the last {item.metrics.denominator} records incomplete{item.topFields[0] ? `; most often missing ${item.topFields[0].key}` : ''}.</p>}
+          <FindingActions findingId={item.id} status={item.status} name={item.employeeName || undefined} onDone={() => void query.refetch()}/>
           {onOpenStaff && <Button type="button" variant="ghost" size="sm" className="h-9 px-3 text-[#007f84]" aria-label={`Review ${item.employeeName || 'staff member'}`} onClick={() => onOpenStaff(item.employeeId)}>Review staff</Button>}
         </li>)}</ul>}
       <SourcePage cursor={view.cursor} next={data.nextCursor} loading={query.isFetching} onNext={() => onPage(data.nextCursor!)} onPrevious={() => onPrevious()}/>
