@@ -21,6 +21,7 @@ import StaffChecks from "./StaffChecks";
 import ClientChecks from "./ClientChecks";
 import ShiftNotesSection from "./ShiftNotesSection";
 import ManualAuditsSection from "./ManualAuditsSection";
+import AgencyFindings from "./AgencyFindings";
 const restricted =
   "You do not have access to these records. Ask your agency administrator.";
 export default function ComplianceAlertsPage() {
@@ -299,6 +300,17 @@ function Workspace({
           <ClientChecks key={source} {...props} />
         )}
         {source === "manual_audits" && <ManualAuditsSection key={source} {...props} />}
+        {source === "documentation_patterns" && (
+          <AgencyFindings
+            key={source}
+            {...props}
+            onOpenStaff={
+              sources.includes("document_expiry")
+                ? (employeeId) => setView({ source: "document_expiry", section: "staff", employeeId, ...(mode === "ddd" || mode === "hha" ? { mode } : {}) })
+                : undefined
+            }
+          />
+        )}
         {source === "shift_notes" && (
           <ShiftNotesSection key={source} {...props} />
         )}

@@ -1,0 +1,32 @@
+import {fireEvent, render, screen} from '@testing-library/react';
+import {beforeEach, expect, it, vi} from 'vitest';
+const mocks = vi.hoisted(() => ({findings: vi.fn()}));
+vi.mock('./api', () => ({complianceAlertsApi: {injectEndpoints: () => ({useAgencyFindingsQuery: mocks.findings})}}));
+import AgencyFindings from './AgencyFindings';
+const props = {scopeKey: 's', agencyId: 'a1', viewerId: 'v', mode: 'ddd', view: {source: 'documentation_patterns' as const}, onApply: vi.fn(), onSelect: vi.fn(), onPage: vi.fn(), onPrevious: vi.fn()};
+const item = {id: 'f1', employeeId: 'e1', employeeName: 'Ada Lee', status: 'open', severity: 'high', metrics: {numerator: 4, denominator: 8}, topFields: [{key: 'activities', count: 3}], recurrenceCount: 0, lastSeenAt: null, explanation: null};
+beforeEach(() => vi.clearAllMocks());
+it('lists patterns, opens the staff view and pages', () => {
+  const open = vi.fn();
+  mocks.findings.mockReturnValue({currentData: {items: [item], total: 1, truncated: false, nextCursor: 'n1'}, refetch: vi.fn()});
+  render(<AgencyFindings {...props} onOpenStaff={open}/>);
+  expect(mocks.findings).toHaveBeenCalledWith(expect.objectContaining({status: 'active', agencyId: 'a1'}), expect.anything());
+  expect(screen.getByText('Ada Lee')).toBeInTheDocument();
+  expect(screen.getByText(/4 of the last 8 records incomplete; most often missing activities/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', {name: 'Review Ada Lee'}));
+  expect(open).toHaveBeenCalledWith('e1');
+  fireEvent.click(screen.getByRole('button', {name: 'Next page'}));
+  expect(props.onPage).toHaveBeenCalledWith('n1');
+});
+it('applies filters, warns on truncation, hides review without staff access, and separates errors from empty', () => {
+  mocks.findings.mockReturnValue({currentData: {items: [item], total: 200, truncated: true, nextCursor: null}, refetch: vi.fn()});
+  const {rerender} = render(<AgencyFindings {...props}/>);
+  expect(screen.getByRole('status')).toHaveTextContent('first 200');
+  expect(screen.queryByRole('button', {name: /Review Ada/})).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Pattern severity'), {target: {value: 'high'}});
+  expect(props.onApply).toHaveBeenCalledWith({severity: 'high'});
+  mocks.findings.mockReturnValue({error: {status: 500}, refetch: vi.fn()});
+  rerender(<AgencyFindings {...props}/>);
+  expect(screen.getByRole('alert')).toHaveTextContent('could not be loaded');
+  expect(screen.queryByText(/No documentation patterns match/)).not.toBeInTheDocument();
+});
