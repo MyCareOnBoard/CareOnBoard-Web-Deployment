@@ -6,6 +6,7 @@ import {Button} from '@/components/ui/button';
 import {ArrowRight, Bell} from 'lucide-react';
 import {complianceAlertsApi} from './api';
 import {ComplianceBadge, ComplianceReviewList, ComplianceSkeleton, complianceTone, type ComplianceReviewItem} from './CompliancePresentation';
+import {StaffFindings} from './StaffFindings';
 import {SourceFilters, SourceNotice, SourcePage, visibleSourceData, type SourceProps} from './SourceControls';
 
 type Check = {id:string;label:string;state:string;message?:string;href?:string;documentId?:string;employeeId?:string};
@@ -72,7 +73,7 @@ export function StaffWorkspace(props:SourceProps) {
   return <section aria-label="Staff compliance" className="p-4 sm:p-6">
     <h2 className="text-xl font-bold">Staff compliance</h2>
     <p className="mt-2 text-sm text-[#5e7378]">Documents, training, CPR and client-specific requirements. Counts show issues needing attention. A + means some checks are incomplete.</p>
-    {view.employeeId?<><Button variant="outline" className="my-4" onClick={()=>onApply({employeeId:undefined,cursor:undefined})}>All staff</Button><WorkspaceSummary key={view.employeeId} kind="staff" id={view.employeeId} {...{agencyId,mode,scopeKey}}/></>:<>
+    {view.employeeId?<><Button variant="outline" className="my-4" onClick={()=>onApply({employeeId:undefined,cursor:undefined})}>All staff</Button><WorkspaceSummary key={view.employeeId} kind="staff" id={view.employeeId} {...{agencyId,mode,scopeKey}}/><StaffFindings key={`findings:${view.employeeId}`} employeeId={view.employeeId} {...{agencyId,mode,scopeKey}}/></>:<>
       <SourceFilters view={view} onApply={onApply} hideExpiry><Button type="button" variant="outline" disabled={query.isFetching} onClick={()=>void query.refetch()}>Refresh staff</Button></SourceFilters>
       <SourceNotice error={query.error} hasData={!!data} retry={query.refetch} reset={()=>onPage()}/>
       {query.isFetching && !data && <ComplianceSkeleton label="Loading staff compliance…"/>}
