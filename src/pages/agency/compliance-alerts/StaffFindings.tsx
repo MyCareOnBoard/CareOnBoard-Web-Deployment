@@ -29,7 +29,7 @@ export function StaffFindings(args: Args) {
     <h3 className="font-bold">Documentation patterns</h3>
     <p className="text-xs text-[#5e7378]">Based on submitted service notes. These are advisory and need a person to review them.</p>
     {query.isFetching && !findings && <ComplianceSkeleton label="Checking documentation patterns…" detail={false}/>}
-    {query.error && !findings && <p role="alert" className="text-sm">Documentation patterns could not be loaded. <button type="button" className="underline" onClick={() => void query.refetch()}>Try again</button></p>}
+    {!!query.error && !findings && <p role="alert" className="text-sm">Documentation patterns could not be loaded. <button type="button" className="underline" onClick={() => void query.refetch()}>Try again</button></p>}
     {findings && !findings.length && <p className="text-sm">No documentation patterns found.</p>}
     {findings?.map(finding => <article key={finding.id} className="space-y-2 rounded-lg border border-[#dce7e8] p-3">
       <div className="flex flex-wrap items-center gap-2">
