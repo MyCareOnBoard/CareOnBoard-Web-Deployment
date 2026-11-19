@@ -1,3 +1,5 @@
+import { RULE_LABELS } from "./findingLabels";
+
 export type Source =
   | "document_expiry"
   | "training"
@@ -27,6 +29,7 @@ export interface ComplianceView {
   auditId?: string;
   findingStatus?: "active" | "resolved" | "all";
   severity?: "high" | "medium" | "low";
+  ruleId?: string;
   auditView?: "follow_up_needed" | "recorded" | "drafts" | "discarded";
 }
 export type ViewParseResult =
@@ -62,7 +65,7 @@ export const sourceLabels: Record<Source, string> = {
   manual_audits: "Manual audits",
   unsigned_form485: "Unsigned Form 485",
   shift_notes: "Shift notes",
-  documentation_patterns: "Documentation patterns",
+  documentation_patterns: "Compliance patterns",
 };
 const validPrograms = (value: unknown): value is string[] =>
   Array.isArray(value) &&
@@ -173,7 +176,7 @@ export function parseComplianceView(params: URLSearchParams): ViewParseResult {
           : source === "unsigned_form485"
             ? ["clientId"]
             : source === "documentation_patterns"
-              ? ["findingStatus", "severity"]
+              ? ["findingStatus", "severity", "ruleId"]
               : ["employeeId", "shiftId", "stateGroup", "startDate", "endDate"]),
   ];
   if (Object.keys(raw).some((key) => !allowed.includes(key) || raw[key] === ""))
@@ -233,6 +236,7 @@ export function parseComplianceView(params: URLSearchParams): ViewParseResult {
   if (source === "unsigned_form485" && raw.mode && raw.mode !== "hha")
     return fail();
   if (raw.findingStatus && !["active", "resolved", "all"].includes(raw.findingStatus)) return fail();
+  if (raw.ruleId && !Object.prototype.hasOwnProperty.call(RULE_LABELS, raw.ruleId)) return fail();
   if (raw.severity && !["high", "medium", "low"].includes(raw.severity)) return fail();
   if (raw.auditView && !["follow_up_needed", "recorded", "drafts", "discarded"].includes(raw.auditView)) return fail();
   if (source === "manual_audits" && ((raw.auditId && !raw.clientId) || (raw.auditId && raw.cursor))) return fail();

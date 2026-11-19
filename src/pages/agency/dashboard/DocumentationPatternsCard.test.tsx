@@ -12,7 +12,7 @@ it('shows counts and opens the list', () => {
   expect(mocks.summary).toHaveBeenCalledWith({agencyId: 'a1', mode: 'hha'}, {skip: false});
   expect(screen.getByText('high severity').previousSibling).toHaveTextContent('2');
   expect(screen.getByText(/5 active · 4 staff · 1 came back/)).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', {name: 'Open documentation patterns'}));
+  fireEvent.click(screen.getByRole('button', {name: 'Open compliance patterns'}));
   expect(mocks.navigate).toHaveBeenCalledWith(expect.stringContaining('source=documentation_patterns'));
 });
 it('marks totals as lower bounds when the backend was truncated', () => {
@@ -23,7 +23,7 @@ it('marks totals as lower bounds when the backend was truncated', () => {
 it('says plainly when there are none, and renders nothing on error or for SC', () => {
   mocks.summary.mockReturnValue({data: {...data, active: 0}, isLoading: false});
   const {container, rerender} = render(<DocumentationPatternsCard agencyId="a1"/>);
-  expect(screen.getByText('No active documentation patterns.')).toBeInTheDocument();
+  expect(screen.getByText('No active compliance patterns.')).toBeInTheDocument();
   mocks.summary.mockReturnValue({data: undefined, isLoading: false, error: {status: 403}});
   rerender(<DocumentationPatternsCard agencyId="a1"/>);
   expect(container).toBeEmptyDOMElement();

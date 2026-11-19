@@ -9,7 +9,7 @@ it('records a review with an optional note and refreshes', async () => {
   const done = vi.fn();
   render(<FindingActions findingId="f1" status="open" name="Ada" onDone={done}/>);
   fireEvent.click(screen.getByRole('button', {name: 'Mark reviewed for Ada'}));
-  fireEvent.change(screen.getByLabelText('Mark documentation reviewed'), {target: {value: '  talked it through '}});
+  fireEvent.change(screen.getByLabelText('Mark pattern reviewed'), {target: {value: '  talked it through '}});
   fireEvent.click(screen.getByRole('button', {name: 'Save review'}));
   await waitFor(() => expect(done).toHaveBeenCalled());
   expect(mocks.run).toHaveBeenCalledWith({findingId: 'f1', action: 'review', note: 'talked it through'});

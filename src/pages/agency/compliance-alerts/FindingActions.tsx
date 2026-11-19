@@ -12,8 +12,8 @@ const actionsApi = complianceAlertsApi.injectEndpoints({endpoints: builder => ({
 export const {useRecordFindingActionMutation} = actionsApi;
 
 const copy = {
-  review: {open: 'Mark reviewed', title: 'Mark documentation reviewed', hint: 'Optional note. This records that you reviewed these notes; it does not contact the staff member.', submit: 'Save review', done: 'Review recorded'},
-  dismiss: {open: 'Dismiss', title: 'Dismiss this pattern', hint: 'Required. Say why this is not a real documentation gap. The pattern will not come back.', submit: 'Dismiss pattern', done: 'Pattern dismissed'},
+  review: {open: 'Mark reviewed', title: 'Mark pattern reviewed', hint: 'Optional note. This records that you reviewed this pattern; it does not contact the staff member.', submit: 'Save review', done: 'Review recorded'},
+  dismiss: {open: 'Dismiss', title: 'Dismiss this pattern', hint: 'Required. Say why this is not a real compliance gap. The pattern will not come back.', submit: 'Dismiss pattern', done: 'Pattern dismissed'},
 } as const;
 
 export function FindingActions({findingId, status, name, onDone}: {findingId: string; status: string; name?: string; onDone: () => void}) {
