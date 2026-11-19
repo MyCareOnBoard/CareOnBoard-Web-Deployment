@@ -37,7 +37,7 @@ export default function AgencyFindings({view, scopeKey, agencyId, mode, onApply,
       <Button type="button" variant="outline" disabled={query.isFetching} onClick={() => void query.refetch()}>Refresh</Button>
     </div>
     {query.isFetching && !data && <ComplianceSkeleton label="Loading documentation patterns…"/>}
-    {query.error && !data && <p role="alert" className="text-sm">Documentation patterns could not be loaded. Refresh to try again.</p>}
+    {!!query.error && !data && <p role="alert" className="text-sm">Documentation patterns could not be loaded. Refresh to try again.</p>}
     {data && <>
       {data.truncated && <p role="status" className="mb-3 text-sm">Showing the first {data.total} patterns only; narrow the filters to see others.</p>}
       {!data.items.length ? <p className="py-4 text-sm">No documentation patterns match these filters.</p> :
