@@ -20,6 +20,7 @@ import AnalyticsDateRangeModal from "../analytics/components/AnalyticsDateRangeM
 import ShareReportModal from "../analytics/components/ShareReportModal";
 import OverviewCards from "../analytics/components/OverviewCards";
 import ComplianceInsights from "../analytics/components/ComplianceInsights";
+import DocumentationPatternsCard from "./DocumentationPatternsCard";
 import RiskTrends from "../analytics/components/RiskTrends";
 import OperationalEfficiency, { type OperationalMetric } from "../analytics/components/OperationalEfficiency";
 import BillingSummary from "../analytics/components/BillingSummary";
@@ -581,6 +582,8 @@ export default function AgencyDashboardPage() {
           <div className="print-card">
             <OverviewCards availability={summary?.complianceAvailability} populationTotal={summary?.populationTotal} data={summary?.overview} isLoading={isAnalyticsLoading} />
           </div>
+
+          <DocumentationPatternsCard agencyId={user?.agencyId || ""} mode={effectiveMode}/>
 
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
             <div className="print-card">
