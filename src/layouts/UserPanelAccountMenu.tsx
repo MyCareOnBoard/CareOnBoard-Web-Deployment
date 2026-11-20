@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { type ComponentType, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useDispatch } from "react-redux";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
@@ -39,8 +39,19 @@ export function formatAddress(info: Pick<ProfileInfo, "address" | "city" | "stat
 // Last address seen, so reopening the menu doesn't flash without it while it refreshes.
 let lastAddress: { uid: string; address: string } | null = null;
 
-/** The account menu content for field staff, opened from the avatar in the header. */
-export function UserPanelAccountMenu({ roleLabel, onLogout }: { roleLabel: string; onLogout: () => void }) {
+export type AccountMenuLink = { label: string; path: string; icon: ComponentType<{ className?: string; strokeWidth?: number }>; activePaths?: string[] };
+
+const FIELD_STAFF_LINKS: AccountMenuLink[] = [{ label: "Profile & Settings", path: Routes.userPanel.profile, icon: UserRound }];
+
+/** The account menu content opened from the avatar in the header (field staff by default; the agency panel reuses it). */
+export function UserPanelAccountMenu({ roleLabel, onLogout, links = FIELD_STAFF_LINKS, fieldStaff = true, careConnectUserType = UserType.EMPLOYEE }: {
+  roleLabel: string;
+  onLogout: () => void;
+  links?: AccountMenuLink[];
+  /** Field staff only: the home address and the work-availability switch. */
+  fieldStaff?: boolean;
+  careConnectUserType?: UserType;
+}) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -50,14 +61,13 @@ export function UserPanelAccountMenu({ roleLabel, onLogout }: { roleLabel: strin
   const [saving, setSaving] = useState(false);
   const available = Boolean(user?.profile?.workAvailability ?? user?.workAvailability);
   const agencyName = user?.agency?.name?.replace(/\s+/g, " ").trim();
-  const careConnectUrl = careConnectDashboardUrl(UserType.EMPLOYEE);
-  const onProfile = location.pathname === Routes.userPanel.profile;
+  const careConnectUrl = careConnectDashboardUrl(careConnectUserType);
   const { theme, toggleTheme } = useTheme();
 
   // The menu content only mounts while open, so this refreshes the address each time it opens.
   const uid = user?.uid;
   useEffect(() => {
-    if (!uid) return;
+    if (!uid || !fieldStaff) return;
     let live = true;
     getProfileInfo().then((info) => {
       const next = formatAddress(info);
@@ -65,7 +75,7 @@ export function UserPanelAccountMenu({ roleLabel, onLogout }: { roleLabel: strin
       if (live) setAddress(next);
     }).catch(() => undefined);
     return () => { live = false; };
-  }, [uid]);
+  }, [uid, fieldStaff]);
 
   const toggleAvailability = async () => {
     if (saving || !user) return;
@@ -89,24 +99,27 @@ export function UserPanelAccountMenu({ roleLabel, onLogout }: { roleLabel: strin
     <div className="rounded-[12px] bg-[#003839] p-4 text-white">
       <p className="truncate text-[18px] leading-tight">{user?.fullName || "User"}</p>
       <p className="mt-1.5 text-[14px] text-white/90"><span className="font-semibold text-white">{roleLabel}</span>{agencyName && <> at {agencyName}</>}</p>
-      {address && <p className="mt-3 flex items-start gap-2 text-[13px] text-white/85">
+      {fieldStaff && address && <p className="mt-3 flex items-start gap-2 text-[13px] text-white/85">
         <MapPin className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
         <span className="min-w-0 break-words">{address}</span>
       </p>}
-      <DropdownMenuItem role="menuitemcheckbox" aria-checked={available} disabled={saving}
+      {fieldStaff && <DropdownMenuItem role="menuitemcheckbox" aria-checked={available} disabled={saving}
         onSelect={(event) => { event.preventDefault(); void toggleAvailability(); }}
         className="-mx-2 mt-3 flex cursor-pointer items-center justify-between gap-3 rounded-[8px] px-2 py-1.5 text-[15px] font-semibold text-white outline-none focus:bg-white/10 data-[highlighted]:bg-white/10 data-[disabled]:opacity-70">
         Available for work?
         <MenuSwitch on={available} className={available ? "bg-[#20c05c]" : "bg-white/25"} />
-      </DropdownMenuItem>
+      </DropdownMenuItem>}
     </div>
 
     <div className="mt-2 flex flex-col gap-0.5">
-      <DropdownMenuItem className={cn(ITEM, onProfile && "bg-[#f3f5f6] font-semibold dark:bg-white/5")} aria-current={onProfile ? "page" : undefined}
-        onSelect={() => navigate(Routes.userPanel.profile)}>
-        <UserRound className="h-5 w-5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-        Profile &amp; Settings
-      </DropdownMenuItem>
+      {links.map(({ label, path, icon: Icon, activePaths = [path] }) => {
+        const active = activePaths.includes(location.pathname);
+        return <DropdownMenuItem key={path} className={cn(ITEM, active && "bg-[#f3f5f6] font-semibold dark:bg-white/5")} aria-current={active ? "page" : undefined}
+          onSelect={() => navigate(path)}>
+          <Icon className="h-5 w-5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+          {label}
+        </DropdownMenuItem>;
+      })}
       <div className="flex min-h-11 items-center gap-3 px-3 text-[15px] text-[#10141a] dark:text-[#f4f6f7]">
         <SunMoon className="h-5 w-5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
         <span id="account-menu-theme" className="flex-1">Theme</span>

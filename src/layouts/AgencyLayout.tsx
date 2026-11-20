@@ -7,7 +7,9 @@ import { useAuth } from "@/utils/auth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Routes } from "@/routes/constants";
 import DashboardHeader from "@/components/DashboardHeader";
-import DashboardSidebar, { NavItem } from "@/components/DashboardSidebar";
+import DashboardSidebar, { NavItem, brandSidebarLogo } from "@/components/DashboardSidebar";
+import { UserPanelAccountMenu, type AccountMenuLink } from "@/layouts/UserPanelAccountMenu";
+import { SidebarHelpCard } from "@/layouts/UserPanelLayout";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
 import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
 import { UserType } from "@/utils/auth/types/user.types";
@@ -47,7 +49,17 @@ import {
     CalendarClock,
     Brain,
     Heart,
+    HelpCircle,
+    Lock,
+    UserRound,
 } from "lucide-react";
+
+// Same entries as the agency's previous account menu, in the user panel's menu.
+const agencyAccountLinks: AccountMenuLink[] = [
+    { label: "Profile", path: Routes.common.profile.replace(":userType", "agency"), icon: UserRound },
+    { label: "Settings", path: Routes.agency.agencySettings, icon: Lock, activePaths: [Routes.agency.agencySettings, Routes.common.settings.replace(":userType", "agency")] },
+    { label: "Help Center", path: Routes.common.helpCenter.replace(":userType", "agency"), icon: HelpCircle },
+];
 
 /** Canonical scope for the scheduling hub; legacy token "Scheduling" still honored in accessList. */
 const SHIFT_MANAGEMENT_ACCESS_KEY = "Shift Management";
@@ -271,6 +283,8 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
         }
     }, [user]);
 
+    const userRole = user?.userType === UserType.AGENCY ? "Agency Administrator" : (user as any)?.role || "Agency Staff";
+
     const modeToggle =
         supportsBoth && effectiveMode ? (
             <AgencyModeToggle mode={effectiveMode} modes={supportedTypes} onSelect={handleModeToggle} />
@@ -301,20 +315,24 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
                 <DashboardHeader
                     userName={user?.fullName}
                     userImage={(user as any)?.profileImage || user?.photoURL}
-                    userRole={user?.userType === UserType.AGENCY ? "Agency Administrator" : (user as any)?.role || "Agency Staff"}
+                    userRole={userRole}
                     userType={user?.userType || UserType.APPLICANT}
                     onLogout={handleLogout}
                     centerContent={modeToggle}
+                    sidebarInset={!needsModeSelection}
+                    showSettings={false}
+                    variant="panel"
+                    accountMenu={<UserPanelAccountMenu roleLabel={userRole} onLogout={handleLogout} links={agencyAccountLinks} fieldStaff={false} careConnectUserType={user?.userType ?? UserType.AGENCY} />}
                 />
 
                 {needsModeSelection ? (
                     <ModeSelectionScreen modes={supportedTypes} onSelect={handleModeSelect} />
                 ) : (
                     <>
-                        <DashboardSidebar navItems={navItems} />
-                        <main className={`ml-0 ${collapsed ? "md:ml-[112px]" : "md:ml-[240px]"} pt-[130px] pb-10 transition-[margin] duration-200`}>
-                            <AnnouncementBanner endpoint="/agencyAnnouncements/announcements/mine" viewAllPath={Routes.agency.announcements} className="mx-8 mb-4" />
-                            <div key={`${agencyId}:${effectiveMode}`} className="px-8">{children ?? <Outlet />}</div>
+                        <DashboardSidebar navItems={navItems} variant="brand" logo={brandSidebarLogo} footer={navItems.some((item) => item.path === Routes.agency.support) ? <SidebarHelpCard to={Routes.agency.support} /> : undefined} />
+                        <main className={`ml-0 ${collapsed ? "md:ml-[88px]" : "md:ml-[248px]"} pt-[98px] pb-10 transition-[margin] duration-200`}>
+                            <AnnouncementBanner endpoint="/agencyAnnouncements/announcements/mine" viewAllPath={Routes.agency.announcements} className="mx-4 mb-4 sm:mx-8" />
+                            <div key={`${agencyId}:${effectiveMode}`} className="px-4 sm:px-8">{children ?? <Outlet />}</div>
                         </main>
                         <TooltipProvider>
                             <Tooltip>
