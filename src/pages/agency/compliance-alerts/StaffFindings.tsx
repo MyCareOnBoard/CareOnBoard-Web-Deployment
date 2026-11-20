@@ -3,7 +3,7 @@ import {FindingActions} from './FindingActions';
 import {fieldLabel, ruleLabel} from './findingLabels';
 import {ComplianceBadge, ComplianceSkeleton} from './CompliancePresentation';
 
-export type FindingEvidence = {id: string; occurredAt: string | null; outcome: string; source: string; noteType: string | null; fields: string[]; noteId: string | null; shiftId: string | null; activityLogId: string | null};
+export type FindingEvidence = {id: string; occurredAt: string | null; outcome: string; source: string; noteType: string | null; label?: string | null; fields: string[]; noteId: string | null; shiftId: string | null; activityLogId: string | null};
 export type StaffFinding = {
   id: string; ruleId?: string; status: 'open' | 'recurred' | 'resolved' | 'dismissed'; severity: 'low' | 'medium' | 'high' | null; program: string | null;
   metrics: {numerator: number; denominator: number} | null; topFields: Array<{key: string; count: number}>;
@@ -48,7 +48,7 @@ export function StaffFindings(args: Args) {
         <summary className="cursor-pointer text-sm font-semibold">Evidence ({finding.evidence.length} records)</summary>
         <ul className="mt-2 divide-y divide-[#dce7e8] text-sm">{finding.evidence.map(item => <li key={item.id} className="py-2">
           <span className="font-medium">{fmt(item.occurredAt)}</span>
-          {item.noteType && <span className="text-[#5e7378]"> · {item.noteType}</span>}
+          {(item.label || item.noteType) && <span className="text-[#5e7378]"> · {item.label || item.noteType}</span>}
           {item.fields.length > 0 && <span> · {!finding.ruleId || finding.ruleId === 'note.required_fields' ? 'Missing: ' : ''}{item.fields.map(fieldLabel).join(', ')}</span>}
         </li>)}</ul>
       </details>}

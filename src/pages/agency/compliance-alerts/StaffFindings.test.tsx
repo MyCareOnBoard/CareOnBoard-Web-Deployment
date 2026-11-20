@@ -34,3 +34,12 @@ it('names the rule and describes attendance evidence without a "Missing" prefix'
   expect(screen.getByText(/No clock-out/)).toBeInTheDocument();
   expect(screen.queryByText(/Missing:/)).not.toBeInTheDocument();
 });
+it('shows the document type and "Expired" for document renewal patterns', () => {
+  const doc = {...finding, id: 'f3', ruleId: 'document.expiry_lapse', evidence: [{...finding.evidence[0], noteType: null, label: 'CPR', fields: ['expired_document']}]};
+  mocks.findings.mockReturnValue({currentData: {findings: [doc]}, refetch: vi.fn()});
+  render(<StaffFindings {...args}/>);
+  expect(screen.getByText('Document renewals')).toBeInTheDocument();
+  expect(screen.getByText(/CPR/)).toBeInTheDocument();
+  expect(screen.getByText(/Expired/)).toBeInTheDocument();
+  expect(screen.queryByText(/Missing:/)).not.toBeInTheDocument();
+});

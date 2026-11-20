@@ -53,7 +53,7 @@ export default function AgencyFindings({view, scopeKey, agencyId, mode, onApply,
             <ComplianceBadge tone={item.status === 'resolved' || item.status === 'dismissed' ? 'success' : 'warning'}>{statusLabel[item.status]}</ComplianceBadge>
             {item.recurrenceCount > 0 && <span className="text-xs text-[#5e7378]">Returned {item.recurrenceCount}×</span>}
           </div>
-          {item.metrics && <p className="text-sm">{item.metrics.numerator} of the last {item.metrics.denominator} {item.ruleId === 'note.required_fields' || !item.ruleId ? 'records incomplete' : 'shifts affected'}{item.topFields[0] ? `; most often ${fieldLabel(item.topFields[0].key)}` : ''}.</p>}
+          {item.metrics && <p className="text-sm">{item.metrics.numerator} of the last {item.metrics.denominator} {!item.ruleId || item.ruleId === 'note.required_fields' ? 'records incomplete' : item.ruleId === 'document.expiry_lapse' ? 'documents lapsed' : 'shifts affected'}{item.topFields[0] ? `; most often ${fieldLabel(item.topFields[0].key)}` : ''}.</p>}
           <FindingActions findingId={item.id} status={item.status} name={item.employeeName || undefined} onDone={() => void query.refetch()}/>
           {onOpenStaff && <Button type="button" variant="ghost" size="sm" className="h-9 px-3 text-[#007f84]" aria-label={`Review ${item.employeeName || 'staff member'}`} onClick={() => onOpenStaff(item.employeeId)}>Review staff</Button>}
         </li>)}</ul>}
