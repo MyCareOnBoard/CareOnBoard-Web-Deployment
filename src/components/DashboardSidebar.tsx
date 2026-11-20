@@ -6,6 +6,13 @@ import { isNavGroupActive, resolveActiveNavPath } from "@/lib/nav-utils";
 import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
 import { closeDrawer, useSidebarDrawer } from "@/hooks/useSidebarDrawer";
 import { useIsMobile } from "@/hooks/use-mobile";
+import LogoNameIcon from "@/assets/icons/green-green-logo.svg?react";
+import LogoMarkIcon from "@/assets/icons/logo.svg?react";
+
+/** Logo for the brand sidebar: the mark when collapsed, the full name otherwise. */
+export const brandSidebarLogo = (collapsed: boolean) => collapsed
+  ? <LogoMarkIcon aria-label="Care on Board" role="img" className="h-9 w-auto" />
+  : <LogoNameIcon aria-label="Care on Board" role="img" className="h-auto w-[196px]" />;
 
 export type NavSubItem = {
   label: string;
@@ -30,8 +37,9 @@ export type NavItem = {
   children?: NavSubItem[];
 };
 
+// Brand: force strokes to currentColor so SVG icons with baked-in colours read on the dark panel.
 const iconClassName = (isActive: boolean, variant: SidebarVariant = "default") =>
-  variant === "brand" ? "h-5 w-5 shrink-0 text-current" : cn(
+  variant === "brand" ? "h-5 w-5 shrink-0 text-current [&_*]:stroke-current [&_*]:fill-transparent" : cn(
     "h-5 w-5 shrink-0",
     isActive
       ? "[&_*]:stroke-white [&_*]:fill-transparent [&_path]:stroke-white [&_path]:fill-transparent [&_circle]:stroke-white [&_circle]:fill-transparent [&_rect]:stroke-white [&_rect]:fill-transparent"
