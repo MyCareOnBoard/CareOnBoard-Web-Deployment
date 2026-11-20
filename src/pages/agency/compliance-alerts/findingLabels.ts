@@ -4,8 +4,9 @@ export const RULE_LABELS: Record<string, string> = {
   'note.required_fields': 'Service notes',
   'shift.punctuality': 'Punctuality',
   'shift.clock_out': 'Clock-out',
+  'document.expiry_lapse': 'Document renewals',
 };
 export const ruleLabel = (ruleId?: string | null) => (ruleId && RULE_LABELS[ruleId]) || 'Compliance';
 
-const FIELD_LABELS: Record<string, string> = {late_start: 'Late start', missing_clock_out: 'No clock-out'};
+const FIELD_LABELS: Record<string, string> = {late_start: 'Late start', missing_clock_out: 'No clock-out', expired_document: 'Expired'};
 export const fieldLabel = (key: string) => FIELD_LABELS[key] || key;

@@ -39,3 +39,10 @@ it('labels each pattern by type, words shift patterns as shifts, and filters by 
   fireEvent.change(screen.getByLabelText('Pattern type'), {target: {value: 'shift.clock_out'}});
   expect(props.onApply).toHaveBeenCalledWith({ruleId: 'shift.clock_out'});
 });
+it('words document patterns as documents and offers the Document renewals type', () => {
+  mocks.findings.mockReturnValue({currentData: {items: [{...item, id: 'f4', ruleId: 'document.expiry_lapse', metrics: {numerator: 3, denominator: 5}, topFields: []}], total: 1, truncated: false, nextCursor: null}, refetch: vi.fn()});
+  render(<AgencyFindings {...props}/>);
+  expect(screen.getByText('Document renewals', {selector: 'span'})).toBeInTheDocument();
+  expect(screen.getByText(/3 of the last 5 documents lapsed/)).toBeInTheDocument();
+  expect(screen.getByRole('option', {name: 'Document renewals'})).toBeInTheDocument();
+});
