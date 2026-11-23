@@ -1,14 +1,15 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import { Home, MapPin, Settings } from "lucide-react";
 import DashboardSidebar, { type NavItem } from "./DashboardSidebar";
 
+const navigate = vi.hoisted(() => vi.fn());
 // setupTests mocks useLocation globally; point it at the Settings page here.
 vi.mock("react-router", async () => ({
   ...(await vi.importActual<typeof import("react-router")>("react-router")),
   useLocation: () => ({ pathname: "/agency/settings", search: "", hash: "", state: null, key: "test" }),
-  useNavigate: () => vi.fn(),
+  useNavigate: () => navigate,
 }));
 vi.mock("@/hooks/useSidebarCollapsed", () => ({ useSidebarCollapsed: () => [false, vi.fn()] }));
 vi.mock("@/hooks/use-mobile", () => ({ useIsMobile: () => false }));
@@ -39,5 +40,24 @@ describe("DashboardSidebar brand sections", () => {
   it("keeps the default variant free of section headings", () => {
     render(<MemoryRouter><DashboardSidebar navItems={items} /></MemoryRouter>);
     expect(screen.queryByText("Operations")).not.toBeInTheDocument();
+  });
+
+  it("runs a sub-item's onSelect instead of navigating (Care & support panels)", () => {
+    const onSelect = vi.fn();
+    navigate.mockClear();
+    render(
+      <MemoryRouter>
+        <DashboardSidebar variant="brand" navItems={[{ label: "Care & support", path: "/user-panel/incident", icon: MapPin, children: [
+          { label: "Incidents", path: "/user-panel/incident" },
+          { label: "Community inclusion", path: "/user-panel/community-inclusion", onSelect },
+        ] }]} />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Care & support" }));
+    fireEvent.click(screen.getByRole("button", { name: "Community inclusion" }));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(navigate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Incidents" }));
+    expect(navigate).toHaveBeenCalledWith("/user-panel/incident");
   });
 });

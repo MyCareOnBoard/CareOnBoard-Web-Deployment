@@ -15,6 +15,7 @@ import {
     shiftAddress, shiftSpan, shiftTitle, shiftTone, startsIn, workedMinutes, type ShiftTone,
 } from '../timeline';
 import {useNow} from '../useNow';
+import {useCarePanel} from '@/components/ci/carePanel';
 
 const ShiftMap = lazy(() => import('./ShiftMap'));
 const hasMapsKey = Boolean(import.meta.env.VITE_GOOGLE_PLACES_API_KEY);
@@ -119,7 +120,7 @@ export default function ShiftDetailsDialog(props: Props) {
     </Dialog>;
 }
 
-function ShiftPanel({shift, actionLabel, onAction, actionDisabled, onNote, noteStartingShiftId, onAddHours, upNext, userPosition, viewer}: Props & {shift: Shift}) {
+function ShiftPanel({shift, onClose, actionLabel, onAction, actionDisabled, onNote, noteStartingShiftId, onAddHours, upNext, userPosition, viewer}: Props & {shift: Shift}) {
     const navigate = useNavigate();
     const now = useNow();
     const tone = shiftTone(shift, now);
@@ -138,7 +139,8 @@ function ShiftPanel({shift, actionLabel, onAction, actionDisabled, onNote, noteS
     const [showRoute, setShowRoute] = useState(false);
     const [routeSummary, setRouteSummary] = useState<string | null>(null);
     // Part of a community inclusion / day program outing: attendance is taken for the whole group.
-    const outingRoute = shift.ciSessionId ? (shift.notesType === 'day-habilitation' ? Routes.userPanel.dayProgram : Routes.userPanel.communityInclusion) : null;
+    const outingProgram = shift.ciSessionId ? (shift.notesType === 'day-habilitation' ? 'day' as const : 'ci' as const) : null;
+    const carePanel = useCarePanel();
 
     // Only ended shifts have a note to look up.
     const needsNote = tone === 'completed' && Boolean(onNote && viewer?.agencyId && viewer.viewerId);
@@ -277,7 +279,7 @@ function ShiftPanel({shift, actionLabel, onAction, actionDisabled, onNote, noteS
                 </Suspense>
                 <div className="flex items-center justify-between gap-3 px-3.5 py-3">
                     <div className="flex min-w-0 flex-col gap-0.5">
-                        <span className="text-[12px] text-[#5d6b73] dark:text-[#9aa4a8]">{outingRoute ? 'Outing place' : "Client's address"}</span>
+                        <span className="text-[12px] text-[#5d6b73] dark:text-[#9aa4a8]">{outingProgram ? 'Outing place' : "Client's address"}</span>
                         <span className="text-[14px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">{address}</span>
                         {geo && <span className="text-[12px] text-[#5d6b73] dark:text-[#9aa4a8]">{geo}</span>}
                     </div>
@@ -300,9 +302,9 @@ function ShiftPanel({shift, actionLabel, onAction, actionDisabled, onNote, noteS
                 </div>}
             </div>}
 
-            {outingRoute && <div className="flex items-center justify-between gap-3 rounded-[12px] border border-[#e8edef] px-4 py-3 dark:border-white/10">
+            {outingProgram && <div className="flex items-center justify-between gap-3 rounded-[12px] border border-[#e8edef] px-4 py-3 dark:border-white/10">
                 <span className="text-[13px] text-[#34434c] dark:text-[#dbe3e6]">This shift is part of a group outing.</span>
-                <button type="button" onClick={() => navigate(`${outingRoute}?date=${encodeURIComponent(shift.date)}`)}
+                <button type="button" onClick={() => { onClose(); carePanel.open(outingProgram, {date: shift.date}); }}
                     className="inline-flex h-9 shrink-0 cursor-pointer items-center rounded-[6px] border border-[#e3e8ea] px-3 text-[13px] font-semibold text-[#10141a] hover:bg-[#f3f5f6] dark:border-white/10 dark:text-[#f4f6f7] dark:hover:bg-white/5">Take attendance</button>
             </div>}
 

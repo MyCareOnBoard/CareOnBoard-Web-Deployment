@@ -58,6 +58,16 @@ describe("field staff header role", () => {
     expect(screen.queryByText("Shift Management")).not.toBeInTheDocument();
     expect(screen.queryByText("Community Inclusion")).not.toBeInTheDocument();
     expect(screen.queryByText("Day Program")).not.toBeInTheDocument();
+    expect(screen.queryByText("Care & support")).not.toBeInTheDocument();
+    expect(screen.getByText("Incident")).toBeInTheDocument();
+  });
+
+  it("groups incidents, community inclusion and day program under Care & support for staff", () => {
+    state.user = { uid: "dsp-user", userType: "employee" };
+    render(<MemoryRouter><UserPanelDashboardLayout /></MemoryRouter>);
+    expect(screen.getByText("Care & support")).toBeInTheDocument();
+    expect(screen.queryByText("Community Inclusion")).not.toBeInTheDocument();
+    expect(screen.queryByText("Incident")).not.toBeInTheDocument();
   });
   beforeEach(() => {
     state.user = {

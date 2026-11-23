@@ -128,3 +128,50 @@ export function CiWeeklyLogGrid({ week, title = "This week's activity logs", not
     </section>
   );
 }
+
+/** Narrow version of the week for side panels: one card per client with the seven days in a row. */
+export function CiWeekList({ week, emptyText = "No attended days this week yet." }: { week: CiWeek | null; emptyText?: string }) {
+  const dates = week ? weekDates(week.weekStart) : [];
+  const due = week?.dueAt ? new Date(week.dueAt) : null;
+  return (
+    <section aria-label="This week's logs" className="flex flex-col gap-3">
+      {week && (
+        <p className="text-[13px] text-[#5b636b] dark:text-[#9aa4a8]">
+          {formatCivilDate(week.weekStart, { day: "numeric", month: "short" })} – {formatCivilDate(week.weekEnd, { day: "numeric", month: "short" })}
+          {due && <> · logs due {new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(due)}</>}
+        </p>
+      )}
+      {!week || week.rows.length === 0 ? (
+        <p className="rounded-[12px] border border-[#e8edef] px-4 py-6 text-center text-[13px] text-[#5b636b] dark:border-white/10 dark:text-[#9aa4a8]">{week ? emptyText : "Loading…"}</p>
+      ) : (
+        <ul className="flex flex-col gap-3">
+          {week.rows.map((row) => (
+            <li key={row.id} className="rounded-[12px] border border-[#e8edef] p-3 dark:border-white/10">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[14px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">{row.clientName || `Client ${row.clientRef}`}</p>
+                <CiWeekStateBadge row={row} />
+              </div>
+              <div className="mt-2 grid grid-cols-7 gap-1">
+                {dates.map((d) => (
+                  <div key={d} className="flex flex-col items-center gap-1">
+                    <span className="text-[11px] text-[#5b636b] dark:text-[#9aa4a8]">{formatCivilDate(d, { weekday: "narrow" })}</span>
+                    <CellMark cell={row.days[d] || "none"} />
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2 text-[12px] text-[#5b636b] dark:text-[#9aa4a8]">
+                {row.logsSubmitted} of {row.logsRequired} logs submitted
+                {row.flags.length > 0 && <span className="text-[#8a5a00] dark:text-[#ffd27a]"> · {row.flags.length} item{row.flags.length === 1 ? "" : "s"} to check</span>}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+      <ul className="flex flex-wrap items-center gap-3 text-xs text-[#5b636b] dark:text-[#9aa4a8]">
+        {legend.map((cell) => (
+          <li key={cell} className="flex items-center gap-1.5"><CellMark cell={cell} />{DAY_CELL_LABELS[cell]}</li>
+        ))}
+      </ul>
+    </section>
+  );
+}

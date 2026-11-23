@@ -18,6 +18,8 @@ export type NavSubItem = {
   label: string;
   path: string;
   accessKey?: string;
+  /** Opens something over the current page (e.g. a side panel) instead of navigating to `path`. */
+  onSelect?: () => void;
 };
 
 /** "brand": full-height teal panel used by the employee (user) panel. */
@@ -134,7 +136,12 @@ function NavGroup({
               <button
                 key={child.path}
                 type="button"
-                onClick={() => navigate(child.path)}
+                onClick={() => {
+                  if (child.onSelect) {
+                    child.onSelect();
+                    closeDrawer();
+                  } else navigate(child.path);
+                }}
                 className={cn(
                   "flex h-[40px] w-full items-center gap-2 rounded-[12px] px-3 text-left text-[13px] font-medium transition cursor-pointer",
                   isChildActive

@@ -1,6 +1,10 @@
-import { CiStaffAttendancePage } from "@/components/ci/CiStaffAttendancePage";
+import { Navigate, useSearchParams } from "react-router";
+import { Routes } from "@/routes/constants";
+import { careSearch } from "@/components/ci/carePanel";
 
-/** Staff: community inclusion outings, attendance and this week's logs. */
+/** Old link: community inclusion now opens as a Care & support panel over Shift management. */
 export default function UserCommunityInclusionPage() {
-  return <CiStaffAttendancePage program="ci" />;
+  const [searchParams] = useSearchParams();
+  const date = searchParams.get("date") || undefined;
+  return <Navigate replace to={{ pathname: Routes.userPanel.shiftManagement, search: careSearch("ci", { date }) }} />;
 }

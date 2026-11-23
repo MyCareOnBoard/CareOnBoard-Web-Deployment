@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router";
 import { Users } from "lucide-react";
 import { formatShiftLocation, type Shift } from "@/lib/api/shifts";
-import { Routes } from "@/routes/constants";
+import { useCarePanel } from "@/components/ci/carePanel";
 import { viewerShiftRange } from "@/lib/shift-time";
 import { ciApi, CI_NOTE_TYPES, formatCivilDate, type CiWeek } from "@/lib/api/ci-tracker";
 
@@ -11,6 +10,7 @@ import { ciApi, CI_NOTE_TYPES, formatCivilDate, type CiWeek } from "@/lib/api/ci
 export function CiDashboardCard({ upcoming, all }: { upcoming: Shift[]; all: Shift[] }) {
   const outingShifts = useMemo(() => upcoming.filter((s) => s.ciSessionId && CI_NOTE_TYPES.includes(s.notesType || "")), [upcoming]);
   const [week, setWeek] = useState<CiWeek | null>(null);
+  const carePanel = useCarePanel();
   const enabled = outingShifts.length > 0;
   useEffect(() => {
     if (!enabled) return;
@@ -23,7 +23,7 @@ export function CiDashboardCard({ upcoming, all }: { upcoming: Shift[]; all: Shi
   const next = outingShifts[0];
   const groupSize = new Set(all.filter((s) => s.ciSessionId === next.ciSessionId).map((s) => s.id)).size || 1;
   const outstanding = week?.rows.reduce((sum, r) => sum + r.missingDates.length + r.incompleteDates.length, 0) ?? 0;
-  const route = next.notesType === "day-habilitation" ? Routes.userPanel.dayProgram : Routes.userPanel.communityInclusion;
+  const program = next.notesType === "day-habilitation" ? "day" as const : "ci" as const;
 
   return (
     <section aria-label="Group outings" className="rounded-[20px] bg-white p-5 shadow-[0_1px_2px_rgba(16,40,44,0.06)] dark:bg-[#1b232b]">
@@ -40,7 +40,7 @@ export function CiDashboardCard({ upcoming, all }: { upcoming: Shift[]; all: Shi
           {outstanding ? `${outstanding} outing log${outstanding === 1 ? "" : "s"} to finish this week.` : "Outing logs are up to date this week."}
         </p>
       )}
-      <Link to={`${route}?date=${encodeURIComponent(next.date)}`} className="mt-3 inline-block text-[13px] font-semibold text-[#007679] underline underline-offset-2 dark:text-[#7fe0e2]">Take attendance</Link>
+      <button type="button" onClick={() => carePanel.open(program, { date: next.date })} className="mt-3 inline-block cursor-pointer text-[13px] font-semibold text-[#007679] underline underline-offset-2 dark:text-[#7fe0e2]">Take attendance</button>
     </section>
   );
 }

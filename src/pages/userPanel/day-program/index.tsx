@@ -1,6 +1,10 @@
-import { CiStaffAttendancePage } from "@/components/ci/CiStaffAttendancePage";
+import { Navigate, useSearchParams } from "react-router";
+import { Routes } from "@/routes/constants";
+import { careSearch } from "@/components/ci/carePanel";
 
-/** Staff: day program sessions, attendance and this week's logs. */
+/** Old link: day program now opens as a Care & support panel over Shift management. */
 export default function UserDayProgramPage() {
-  return <CiStaffAttendancePage program="day" />;
+  const [searchParams] = useSearchParams();
+  const date = searchParams.get("date") || undefined;
+  return <Navigate replace to={{ pathname: Routes.userPanel.shiftManagement, search: careSearch("day", { date }) }} />;
 }
