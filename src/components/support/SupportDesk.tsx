@@ -10,6 +10,7 @@ import {
   getSuggestedReply,
   getSupportQueue,
   replyToCase,
+  transferCaseToCareOnboard,
   supportErrorCode,
   supportErrorMessage,
   updateCase,
@@ -241,6 +242,19 @@ export function SupportDesk({ desk, headerSlot }: { desk: Desk; headerSlot?: Rea
                 onReply={(text, internal) => run(() => replyToCase(open.case.id, text, internal), internal ? "The note was not saved." : "Your reply was not sent.")}
                 onUpdate={(patch) => run(() => updateCase(open.case.id, patch), "The case was not updated.")}
                 onSaveArticle={(draft) => { setArticleDraft(draft); setTab("articles"); }}
+                onTransfer={desk === "agency" ? async (note) => {
+                  setBusy(true);
+                  try {
+                    await transferCaseToCareOnboard(open.case.id, note);
+                    toast.success("Sent to CareOnboard support. They'll reply to the person directly.");
+                    selectCase(null);
+                    void loadQueue();
+                  } catch (error) {
+                    toast.error(supportErrorMessage(error, "The case was not sent."));
+                  } finally {
+                    setBusy(false);
+                  }
+                } : undefined}
               />
             ) : selectedId ? (
               <div className="grid flex-1 place-items-center"><Loader2 aria-label="Loading case" className="h-6 w-6 animate-spin text-[#5d6b73]" /></div>
@@ -273,6 +287,7 @@ function CaseQueueList({ queue, error, selectedId, onSelect, desk }: { queue: Su
             <span className="flex items-center gap-2">
               <span className="truncate text-[13.5px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">{item.requesterName}</span>
               {desk === "corporate" && item.agencyName && <span className="truncate text-[12px] text-[#5d6b73]">· {item.agencyName}</span>}
+              {desk === "corporate" && item.requesterType === "employee" && <span className="shrink-0 rounded-full bg-[#eef1ff] px-1.5 text-[11px] text-[#3446a8] dark:bg-[#3446a8]/25 dark:text-[#aab6ff]">Field staff</span>}
               <span className="ml-auto shrink-0 text-[11.5px] text-[#8a969c]">{formatTime(item.lastMessageAt)}</span>
             </span>
             <span className="mt-0.5 block truncate text-[12.5px] text-[#10141a] dark:text-[#f4f6f7]">{item.subject}</span>
@@ -300,7 +315,7 @@ function DetailRow({ label, children }: { label: string; children: ReactNode }) 
   );
 }
 
-function CaseDetail({ detail, desk, myUid, team, categories, busy, onBack, onReply, onUpdate, onSaveArticle }: {
+function CaseDetail({ detail, desk, myUid, team, categories, busy, onBack, onReply, onUpdate, onSaveArticle, onTransfer }: {
   detail: SupportCaseDetail;
   desk: Desk;
   myUid?: string;
@@ -311,6 +326,8 @@ function CaseDetail({ detail, desk, myUid, team, categories, busy, onBack, onRep
   onReply: (text: string, internal: boolean) => Promise<boolean>;
   onUpdate: (patch: Parameters<typeof updateCase>[1]) => Promise<boolean>;
   onSaveArticle: (draft: ArticleDraft) => void;
+  /** Agency desk only: pass the case to CareOnboard support. */
+  onTransfer?: (note: string) => Promise<void>;
 }) {
   const { case: item, messages, notes = [], requester, relatedCases = [] } = detail;
   const [mode, setMode] = useState<"reply" | "note">("reply");
@@ -318,9 +335,13 @@ function CaseDetail({ detail, desk, myUid, team, categories, busy, onBack, onRep
   const [suggesting, setSuggesting] = useState(false);
   const [issueUrl, setIssueUrl] = useState(item.linkedIssue?.url ?? "");
   const [issueLabel, setIssueLabel] = useState(item.linkedIssue?.label ?? "");
+  const [transferring, setTransferring] = useState(false);
+  const [transferNote, setTransferNote] = useState("");
   useEffect(() => {
     setSuggestion(undefined);
     setMode("reply");
+    setTransferring(false);
+    setTransferNote("");
     setIssueUrl(item.linkedIssue?.url ?? "");
     setIssueLabel(item.linkedIssue?.label ?? "");
   }, [item.id, item.linkedIssue?.url, item.linkedIssue?.label]);
@@ -436,6 +457,31 @@ function CaseDetail({ detail, desk, myUid, team, categories, busy, onBack, onRep
           </DetailRow>
           {item.status === "waiting" && item.replyDueAt && (
             <DetailRow label="Reply target"><span className={cn(item.overdue && "font-semibold text-[#b42318]")}>{relativeDue(item.replyDueAt)}</span></DetailRow>
+          )}
+          {item.transferredFrom && (
+            <DetailRow label="Passed on">
+              {item.transferredFrom.byName ? `By ${item.transferredFrom.byName}` : "By the agency"}{item.agencyName ? ` at ${item.agencyName}` : ""}{item.transferredFrom.at ? `, ${formatTime(item.transferredFrom.at)}` : ""}
+            </DetailRow>
+          )}
+          {onTransfer && item.status !== "resolved" && (
+            <DetailRow label="CareOnboard support">
+              {transferring ? (
+                <form className="flex flex-col gap-1.5" onSubmit={(e) => { e.preventDefault(); void onTransfer(transferNote.trim()); }}>
+                  <label htmlFor={`transfer-${item.id}`} className="text-[12px] text-[#5d6b73]">Note for CareOnboard (optional, the person won&apos;t see it)</label>
+                  <textarea id={`transfer-${item.id}`} value={transferNote} maxLength={2000} rows={3} onChange={(e) => setTransferNote(e.target.value)}
+                    className="w-full resize-y rounded-[8px] border border-[#e3e8ea] bg-white p-2 text-[13px] outline-none focus:border-[#007679] dark:border-white/15 dark:bg-[#1b232b]" />
+                  <p className="text-[12px] text-[#5d6b73]">The case leaves your queue and CareOnboard replies to the person here.</p>
+                  <div className="flex gap-1.5">
+                    <button type="submit" className={primaryButton} disabled={busy}>Send</button>
+                    <button type="button" className={secondaryButton} onClick={() => setTransferring(false)}>Cancel</button>
+                  </div>
+                </form>
+              ) : (
+                <button type="button" className="cursor-pointer text-[13px] font-medium text-[#007679] hover:underline dark:text-[#7fd3d3]" onClick={() => setTransferring(true)}>
+                  Send to CareOnboard support
+                </button>
+              )}
+            </DetailRow>
           )}
           {item.context?.page && <DetailRow label="Asked from"><code className="text-[12px]">{item.context.page}</code></DetailRow>}
           {desk === "corporate" && (

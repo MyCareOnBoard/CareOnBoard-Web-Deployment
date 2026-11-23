@@ -316,6 +316,7 @@ function CaseView({ detail, busy, deskName, onBack, onSend, onFeedback, onAskPer
           <h2 className="truncate text-[15px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">{item.subject || "Question"}</h2>
           <p className="text-[12px] text-[#5d6b73] dark:text-[#9aa4a8]">
             {item.caseNumber}
+            {item.desk === "corporate" && deskName !== "CareOnboard" ? " · CareOnboard support" : ""}
             {item.assigneeName && item.status !== "ai" ? ` · ${item.assigneeName} is helping you` : ""}
           </p>
         </div>

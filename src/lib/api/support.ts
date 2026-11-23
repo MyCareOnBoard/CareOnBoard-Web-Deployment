@@ -45,6 +45,8 @@ export interface SupportCase {
   firstResponseAt?: string | null;
   resolvedBy?: string | null;
   linkedIssue?: { url: string; label?: string } | null;
+  /** Set when the agency or the assistant passed the case to CareOnboard support. */
+  transferredFrom?: { byName: string | null; at: string | null } | null;
   context?: { page?: string; label?: string } | null;
   overdue?: boolean;
 }
@@ -183,6 +185,8 @@ export interface CreateCaseInput {
   category?: string | null;
   priority?: "normal" | "high";
   urgent?: boolean;
+  /** Field staff only: "corporate" asks CareOnboard support directly. Normally the assistant decides. */
+  desk?: SupportDesk;
   context?: { page?: string; label?: string } | null;
 }
 
@@ -211,6 +215,9 @@ export const updateCase = (
   id: string,
   patch: Partial<{ priority: SupportPriority; category: string | null; assigneeId: string | null; status: "resolved" | "waiting"; linkedIssue: { url: string; label?: string } | null }>,
 ) => data<SupportCaseDetail>(axiosClient.patch(`${BASE}/queue/${id}`, patch));
+/** Pass an agency case to CareOnboard support. It leaves the agency's queue. */
+export const transferCaseToCareOnboard = (id: string, note?: string) =>
+  data<{ id: string; desk: SupportDesk }>(axiosClient.post(`${BASE}/queue/${id}/transfer`, { note }));
 export const getSuggestedReply = (id: string) =>
   data<{ reply: string | null; articles: { id: string; title: string; used: boolean }[] }>(axiosClient.get(`${BASE}/queue/${id}/suggestion`));
 

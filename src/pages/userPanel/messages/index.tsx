@@ -48,7 +48,11 @@ export default function MessagesPage() {
           Check our FAQs
         </Link>
       </div>
-      <AskSupportPanel deskName="your agency" contextPage={BASE} />
+      <AskSupportPanel
+        deskName="your agency"
+        contextPage={BASE}
+        intro="The assistant answers from the help articles right away. If it can't, it passes your question to your agency's support team, or to CareOnboard support if it's a problem with the app itself."
+      />
     </div>
   );
 }
