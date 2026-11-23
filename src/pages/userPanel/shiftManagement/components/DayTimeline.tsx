@@ -23,6 +23,25 @@ const toneLabel: Record<ShiftTone, string> = {
 /** "11:15 Am" as in the designs' current-time tag. */
 const nowTag = (minutes: number) => formatClock(minutes).replace(/ (a|p)m$/, (_, period: string) => ` ${period.toUpperCase()}m`);
 
+/** Keeps one shift per group outing (the earliest started, else the first) and counts its clients. */
+export function groupOutings(shifts: Shift[]): {cards: Shift[]; groupSize: Map<string, number>} {
+    const groupSize = new Map<string, number>();
+    const lead = new Map<string, Shift>();
+    for (const shift of shifts) {
+        const id = shift.ciSessionId;
+        if (!id) continue;
+        groupSize.set(id, (groupSize.get(id) ?? 0) + 1);
+        const current = lead.get(id);
+        if (!current || (!current.clockedInAt && shift.clockedInAt)) lead.set(id, shift);
+    }
+    return {cards: shifts.filter(shift => !shift.ciSessionId || lead.get(shift.ciSessionId) === shift), groupSize};
+}
+
+const cardSubtitle = (shift: Shift, groupSize: Map<string, number>) => {
+    const size = shift.ciSessionId ? groupSize.get(shift.ciSessionId) ?? 1 : 0;
+    return size ? `Group · ${size} client${size === 1 ? '' : 's'}` : clientLabel(shift);
+};
+
 interface Props {
     shifts: Shift[];
     /** Draw the current-time line (only when the selected day is today). */
@@ -32,7 +51,9 @@ interface Props {
 
 /** One day's shifts against the clock: a coloured bar for each shift's length and a card beside it. */
 export default function DayTimeline({shifts, showNow, onOpen}: Props) {
-    const items = useMemo(() => layoutDay(shifts, CARD_MIN_SPAN), [shifts]);
+    // A group outing has one shift per client; show it as one card ("Group · 6 clients").
+    const {cards, groupSize} = useMemo(() => groupOutings(shifts), [shifts]);
+    const items = useMemo(() => layoutDay(cards, CARD_MIN_SPAN), [cards]);
     const {first, last} = visibleHours(items);
     const hours = Array.from({length: last - first + 1}, (_, index) => first + index);
     const lanes = Math.max(1, ...items.map(item => item.lanes));
@@ -72,13 +93,13 @@ export default function DayTimeline({shifts, showNow, onOpen}: Props) {
                         style={{top: top(item.start), left: `calc(${LABEL_WIDTH}px + ${lanePart} * ${item.lane})`, width: `calc(${lanePart} - 8px)`}}>
                         <span className={cn('absolute left-0 top-0 w-1 rounded-full', toneBar[tone])} style={{height: Math.max(top(item.end) - top(item.start), 8)}} aria-hidden="true"/>
                         <button type="button" onClick={() => onOpen(item.shift)}
-                            aria-label={[shiftTitle(item.shift), range, clientLabel(item.shift), ...(item.shift.ciSessionId ? ['Group outing'] : []), toneLabel[tone]].join(', ')}
+                            aria-label={[shiftTitle(item.shift), range, cardSubtitle(item.shift, groupSize), toneLabel[tone]].join(', ')}
                             className="absolute left-2 top-1.5 flex w-[calc(100%-8px)] max-w-[240px] cursor-pointer flex-col items-start justify-start gap-1.5 overflow-hidden rounded-[6px] border border-[#e3e8ea] bg-white px-2.5 py-2 text-left transition-colors hover:border-[#c9d3d6] hover:bg-[#f7f9f9] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#007679] dark:border-white/10 dark:bg-[#1b232b] dark:hover:bg-white/[0.04]"
                             style={{height: CARD_HEIGHT - 8}}>
                             <span className="w-full truncate text-[14px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">{shiftTitle(item.shift)}</span>
                             <span className="flex w-full flex-col">
                                 <span className="truncate text-[13px] font-medium text-[#10141a] dark:text-[#dbe3e6]">{range}</span>
-                                <span className="truncate text-[12px] text-[#5d6b73] dark:text-[#9aa4a8]">{clientLabel(item.shift)}{item.shift.ciSessionId ? ' · Group outing' : ''}</span>
+                                <span className="truncate text-[12px] text-[#5d6b73] dark:text-[#9aa4a8]">{cardSubtitle(item.shift, groupSize)}</span>
                             </span>
                         </button>
                     </li>;

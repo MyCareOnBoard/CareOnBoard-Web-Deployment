@@ -20,6 +20,8 @@ export interface SubmittedNoteSummary {
   approvedAt?: string | null;
   noteCount: number;
   status: "submitted" | "approved";
+  /** Community inclusion / day program logs: the reviewer's goal alignment, once approved. */
+  goalAlignment?: 'aligned' | 'partly' | 'not_aligned' | null;
 }
 
 export interface PaginationInfo {
