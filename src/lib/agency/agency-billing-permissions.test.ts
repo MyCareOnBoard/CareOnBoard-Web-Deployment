@@ -8,11 +8,12 @@ import {
 } from "./agency-billing-permissions";
 
 describe("agency billing permissions", () => {
-  it("freezes the ten canonical scopes in display order", () => {
+  it("freezes the twelve canonical scopes in display order", () => {
     expect(AGENCY_BILLING_SCOPES).toEqual([
       "Billing Overview", "Claims View", "Claims Management", "Payroll View", "Payroll Management",
       "Payroll Approval",
       "Expenses View", "Expenses Management", "Timesheets View", "Timesheets Approval",
+      "EVV View", "EVV Management",
     ]);
   });
 
@@ -30,6 +31,8 @@ describe("agency billing permissions", () => {
     expect(canAccessBillingChild(UserType.AGENCY_STAFF, ["Payroll Approval"], "Payroll View")).toBe(true);
     expect(canAccessBillingChild(UserType.AGENCY_STAFF, ["Expenses Management"], "Expenses View")).toBe(true);
     expect(canAccessBillingChild(UserType.AGENCY_STAFF, ["Timesheets Approval"], "Timesheets View")).toBe(true);
+    expect(canAccessBillingChild(UserType.AGENCY_STAFF, ["EVV Management"], "EVV View")).toBe(true);
+    expect(canAccessBillingChild(UserType.AGENCY_STAFF, ["EVV View"], "EVV Management")).toBe(false);
     expect(canAccessBillingChild(UserType.AGENCY_STAFF, ["Payroll Management"], "Claims View")).toBe(false);
     expect(canAccessBillingChild(UserType.AGENCY_STAFF, ["Payroll Approval"], "Claims View")).toBe(false);
   });

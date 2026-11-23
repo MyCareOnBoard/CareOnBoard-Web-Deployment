@@ -131,6 +131,7 @@ const allNavItems: AgencyNavItem[] = [
             { label: "Claims dashboard", path: Routes.agency.billing.claims, accessKey: "Claims View" },
             { label: "DSP expenses", path: Routes.agency.billing.expenses, accessKey: "Expenses View" },
             { label: "Submitted timesheets", path: Routes.agency.billing.staffTimesheets, accessKey: "Timesheets View" },
+            { label: "HHAeXchange EVV", path: Routes.agency.billing.evv, accessKey: "EVV View" },
         ],
     },
     // { label: "Reports", path: Routes.agency.reports.index, icon: ReportIcon, accessKey: "Reports" },

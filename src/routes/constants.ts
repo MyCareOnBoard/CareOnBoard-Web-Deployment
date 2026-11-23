@@ -49,6 +49,7 @@ export const Routes = {
             claims: "/agency/billing/claims",
             expenses: "/agency/billing/expenses",
             staffTimesheets: "/agency/billing/staff-timesheets",
+            evv: "/agency/billing/evv",
         },
         staffTimesheet: "/agency/staff-timesheet",
         aiAutomation: "/agency/automations",

@@ -2,6 +2,7 @@ import {NotificationContext} from "@/components/compliance/NotificationContext";
 import { shiftTimeLabel } from "@/lib/shift-time";
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
+import EvvShiftNotice from "@/pages/agency/billing/evv/EvvShiftNotice";
 import { format, parseISO } from "date-fns";
 import { ArrowLeft, Loader2, StickyNote } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -369,6 +370,7 @@ export default function AgencyShiftDetailsPage({ readOnly = false }: AgencyShift
     <>
       <div className="space-y-5">
         <NotificationContext notificationId={new URLSearchParams(location.search).get("notificationId")} expectedShiftId={shiftId} expectedClientId={shift.clientId}/>
+        {actor === "agency" ? <EvvShiftNotice shiftId={shiftId} /> : null}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-4">
             <button
