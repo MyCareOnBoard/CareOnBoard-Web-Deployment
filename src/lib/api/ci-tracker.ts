@@ -93,14 +93,30 @@ export interface CiSession {
   notes: string;
   cancelReason: string | null;
   roster: CiRosterEntry[];
-  counts: { total: number; attended: number; absent: number; scheduled: number };
+  /** People on the outing who are not clients (family, peers): headcount and ratio only. */
+  guests?: CiGuest[];
+  counts: { total: number; attended: number; absent: number; scheduled: number; guests?: number };
   shiftIds?: string[];
+  /** Returned after saving attendance, e.g. more people present than the staff ratio allows. */
+  warnings?: CiWarning[];
 }
+
+export interface CiGuest {
+  id: string;
+  name: string;
+  present: boolean;
+  signIn: string | null;
+  signOut: string | null;
+}
+
+export const MAX_GUESTS = 20;
+export const newGuestId = () => `g${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
 export interface CiWarning {
   code: "RATIO_EXCEEDED" | "NO_APPROVED_GOALS";
   clientId?: string;
   allowed?: number;
+  clientCount?: number;
 }
 
 export interface CiShiftTemplate {
@@ -245,7 +261,9 @@ export const ciApi = {
   },
   updateSession: async (id: string, patch: Partial<Omit<CreateCiSessionInput, "program" | "date" | "clientIds">> & { addClientIds?: string[]; removeClientIds?: string[] }) =>
     unwrap<CiSession>(await axiosClient.patch(`${BASE}/sessions/${encodeURIComponent(id)}`, patch)),
-  saveAttendance: async (id: string, marks: CiAttendanceMark[]) => unwrap<CiSession>(await axiosClient.put(`${BASE}/sessions/${encodeURIComponent(id)}/attendance`, { marks })),
+  /** `guests`, when given, replaces the outing's guest list. */
+  saveAttendance: async (id: string, marks: CiAttendanceMark[], guests?: CiGuest[]) =>
+    unwrap<CiSession>(await axiosClient.put(`${BASE}/sessions/${encodeURIComponent(id)}/attendance`, guests ? { marks, guests } : { marks })),
   cancelSession: async (id: string, reason: string) => unwrap<CiSession>(await axiosClient.post(`${BASE}/sessions/${encodeURIComponent(id)}/cancel`, { reason })),
 
   rosterSuggestions: async (params: { date: string; program: CiProgram; locationId?: string }, signal?: AbortSignal) =>

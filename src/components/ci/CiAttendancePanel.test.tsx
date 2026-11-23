@@ -56,6 +56,24 @@ describe("CiAttendancePanel", () => {
     expect(marks.find((m) => m.clientId === "c2")).toMatchObject({ attendance: "absent", absenceReason: "Sick" });
   });
 
+  it("adds guests who aren't clients and sends them with the save", async () => {
+    render(<MemoryRouter><CiAttendancePanel program="ci" date="2026-11-23" view="attendance" onClose={vi.fn()} /></MemoryRouter>);
+    await screen.findByText("Client ABC123");
+    fireEvent.change(screen.getByLabelText("Guest name"), { target: { value: "  Sam (sister) " } });
+    fireEvent.click(screen.getByRole("button", { name: "Add guest" }));
+    fireEvent.change(screen.getByLabelText("Guest name"), { target: { value: "Peer" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add guest" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove guest Peer" }));
+    expect(screen.getByText("Sam (sister)")).toBeInTheDocument();
+    expect(screen.getByText(/2 clients · 1 guest/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save attendance" }));
+    await waitFor(() => expect(api.saveAttendance).toHaveBeenCalledTimes(1));
+    const [, marks, guests] = api.saveAttendance.mock.calls[0] as [string, unknown[], Array<{ name: string; present: boolean }>];
+    expect(marks).toEqual([]);
+    expect(guests).toHaveLength(1);
+    expect(guests[0]).toMatchObject({ name: "Sam (sister)", present: true });
+  });
+
   it("opens on this week's logs when asked", async () => {
     render(<MemoryRouter><CiAttendancePanel program="ci" date="2026-11-23" view="week" onClose={vi.fn()} /></MemoryRouter>);
     expect(await screen.findByText("Client ABC123")).toBeInTheDocument();

@@ -14,10 +14,13 @@ import {
   nowClock,
   todayCivil,
   ATTENDANCE_LABELS,
+  MAX_GUESTS,
+  newGuestId,
   CI_PROGRAMS,
   type CiAttendanceMark,
   type CiProgram,
   type CiRosterEntry,
+  type CiGuest,
   type CiSession,
   type CiWeek,
 } from "@/lib/api/ci-tracker";
@@ -136,6 +139,9 @@ function AttendanceBody({ program, initialDate, onBusy, onDirty, onFooter }: {
   const [sessions, setSessions] = useState<CiSession[] | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>({});
+  // Guests (people who aren't clients); null until changed, then the whole new list.
+  const [guestDraft, setGuestDraft] = useState<CiGuest[] | null>(null);
+  const [guestName, setGuestName] = useState("");
   const [absentFor, setAbsentFor] = useState<string | null>(null);
   const [absentReason, setAbsentReason] = useState("");
   const [saving, setSaving] = useState(false);
@@ -158,10 +164,19 @@ function AttendanceBody({ program, initialDate, onBusy, onDirty, onFooter }: {
   }, [date, program]);
 
   const session = sessions?.find((s) => s.id === sessionId) ?? null;
-  useEffect(() => { setDraft({}); setAbsentFor(null); }, [sessionId]);
+  useEffect(() => { setDraft({}); setGuestDraft(null); setGuestName(""); setAbsentFor(null); }, [sessionId]);
   useEffect(() => { onBusy(saving || clocking); }, [saving, clocking, onBusy]);
 
-  const dirty = Object.keys(draft).length > 0;
+  const guests = guestDraft ?? session?.guests ?? [];
+  const dirty = Object.keys(draft).length > 0 || guestDraft !== null;
+  const editGuest = (id: string, patch: Partial<CiGuest>) => setGuestDraft(guests.map((g) => (g.id === id ? { ...g, ...patch } : g)));
+  const addGuest = () => {
+    const name = guestName.trim();
+    if (!name || guests.length >= MAX_GUESTS) return;
+    setGuestDraft([...guests, { id: newGuestId(), name, present: true, signIn: nowClock(), signOut: null }]);
+    setGuestName("");
+  };
+  const undo = () => { setDraft({}); setGuestDraft(null); };
   useEffect(() => { onDirty(dirty); }, [dirty, onDirty]);
   useEffect(() => () => onDirty(false), [onDirty]);
   const effective = (entry: CiRosterEntry, mark?: CiAttendanceMark) => ({
@@ -188,16 +203,20 @@ function AttendanceBody({ program, initialDate, onBusy, onDirty, onFooter }: {
       }
       return next;
     });
+    if (guests.some((g) => g.present && !g.signIn)) setGuestDraft(guests.map((g) => (g.present && !g.signIn ? { ...g, signIn: now } : g)));
   };
 
   async function save() {
     if (!session || !dirty) return;
     setSaving(true);
     try {
-      const updated = await ciApi.saveAttendance(session.id, Object.values(draft));
+      const updated = await ciApi.saveAttendance(session.id, Object.values(draft), guestDraft ?? undefined);
       setSessions((prev) => prev?.map((s) => (s.id === updated.id ? updated : s)) ?? prev);
-      setDraft({});
-      toast({ title: "Attendance saved" });
+      undo();
+      const ratio = updated.warnings?.find((w) => w.code === "RATIO_EXCEEDED");
+      toast(ratio
+        ? { title: "Attendance saved", description: `${ratio.clientCount ?? "More"} people are here, more than your staff ratio allows (${ratio.allowed}). Let your agency know if you need help.` }
+        : { title: "Attendance saved" });
     } catch (err) {
       toast({ title: "Attendance not saved", description: apiErrorMessage(err, "Please try again."), variant: "destructive" });
     } finally {
@@ -245,11 +264,11 @@ function AttendanceBody({ program, initialDate, onBusy, onDirty, onFooter }: {
   // The footer lives in the panel shell; keep it in step with this body's state.
   const footer = useMemo(() => (
     <div className="flex items-center justify-end gap-3">
-      {dirty && <button type="button" className={BUTTON} disabled={saving} onClick={() => setDraft({})}>Undo changes</button>}
+      {dirty && <button type="button" className={BUTTON} disabled={saving} onClick={undo}>Undo changes</button>}
       <button type="button" className={PRIMARY} disabled={!session || !dirty || saving} onClick={() => void save()}>{saving ? "Saving…" : "Save attendance"}</button>
     </div>
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ), [dirty, saving, session, draft]);
+  ), [dirty, saving, session, draft, guestDraft]);
   useEffect(() => { onFooter(footer); }, [footer, onFooter]);
   useEffect(() => () => onFooter(null), [onFooter]);
 
@@ -284,7 +303,7 @@ function AttendanceBody({ program, initialDate, onBusy, onDirty, onFooter }: {
             <p className="text-[14px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">{formatClock(session.startTime)} – {formatClock(session.endTime)}</p>
             <p className={`mt-0.5 flex flex-wrap items-center gap-3 ${SUB}`}>
               <span className="inline-flex items-center gap-1"><MapPin aria-hidden="true" className="h-3.5 w-3.5" />{session.location?.name || "No place set"}</span>
-              <span className="inline-flex items-center gap-1"><Users aria-hidden="true" className="h-3.5 w-3.5" />Group · {session.roster.length} client{session.roster.length === 1 ? "" : "s"}</span>
+              <span className="inline-flex items-center gap-1"><Users aria-hidden="true" className="h-3.5 w-3.5" />Group · {session.roster.length} client{session.roster.length === 1 ? "" : "s"}{guests.length ? ` · ${guests.length} guest${guests.length === 1 ? "" : "s"}` : ""}</span>
             </p>
             {session.notes && <p className="mt-1 text-[13px] text-[#2a3138] dark:text-[#c9d1d4]">{session.notes}</p>}
           </div>
@@ -338,6 +357,49 @@ function AttendanceBody({ program, initialDate, onBusy, onDirty, onFooter }: {
               );
             })}
           </ul>
+
+          <section aria-labelledby="ci-guests" className="flex flex-col gap-3">
+            <div>
+              <h3 id="ci-guests" className="text-[14px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">Guests</h3>
+              <p className={SUB}>People who aren't clients, like a family member or a peer. They count toward the group size only: no shift, log or billing.</p>
+            </div>
+            {guests.length > 0 && (
+              <ul aria-label="Guests" className="flex flex-col gap-3">
+                {guests.map((guest) => (
+                  <li key={guest.id} className="rounded-[12px] border border-dashed border-[#d5dde0] p-3 dark:border-white/15">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="min-w-0 truncate text-[14px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">{guest.name}</p>
+                      <span className={SUB}>{guest.present ? "Here" : "Not here"}</span>
+                    </div>
+                    {guest.present && (
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        <label className="flex flex-col gap-1 text-[12px] font-medium text-[#5d6b73] dark:text-[#9aa4a8]">Sign in
+                          <input type="time" className={FIELD} value={guest.signIn || ""} onChange={(e) => editGuest(guest.id, { signIn: e.target.value || null })} />
+                        </label>
+                        <label className="flex flex-col gap-1 text-[12px] font-medium text-[#5d6b73] dark:text-[#9aa4a8]">Sign out
+                          <input type="time" className={FIELD} value={guest.signOut || ""} onChange={(e) => editGuest(guest.id, { signOut: e.target.value || null })} />
+                        </label>
+                      </div>
+                    )}
+                    <div className="mt-2 flex gap-4">
+                      <button type="button" className="cursor-pointer text-[13px] font-medium text-[#007679] underline underline-offset-2 dark:text-[#7fe0e2]"
+                        onClick={() => editGuest(guest.id, guest.present ? { present: false, signIn: null, signOut: null } : { present: true, signIn: nowClock() })}>
+                        {guest.present ? "Not here" : "Mark here"}
+                      </button>
+                      <button type="button" aria-label={`Remove guest ${guest.name}`} className="cursor-pointer text-[13px] font-medium text-[#b42318] underline underline-offset-2 dark:text-[#ffb4a9]"
+                        onClick={() => setGuestDraft(guests.filter((g) => g.id !== guest.id))}>Remove</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {guests.length < MAX_GUESTS ? (
+              <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); addGuest(); }}>
+                <input aria-label="Guest name" placeholder="Guest name" value={guestName} maxLength={80} onChange={(e) => setGuestName(e.target.value)} className={`${FIELD} flex-1 px-3`} />
+                <button type="submit" className={`${BUTTON} h-10`} disabled={!guestName.trim()}>Add guest</button>
+              </form>
+            ) : <p className={SUB}>An outing can have up to {MAX_GUESTS} guests.</p>}
+          </section>
         </>
       )}
 

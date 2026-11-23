@@ -248,8 +248,13 @@ export function CiProgramPage({ program }: { program: CiProgram }) {
           <span className="flex items-center gap-1.5 font-medium"><MapPin aria-hidden="true" className="h-4 w-4 text-[#0b5c5d]" />{session.location?.name || "No location"}{session.location?.address?.address ? ` · ${session.location.address.address}` : ""}</span>
           <span className="flex items-center gap-1.5"><Clock aria-hidden="true" className="h-4 w-4 text-[#0b5c5d]" />{formatClock(session.startTime)} – {formatClock(session.endTime)}</span>
           <span className="flex items-center gap-1.5"><UserRound aria-hidden="true" className="h-4 w-4 text-[#0b5c5d]" />Lead {leadName}</span>
-          <span className="flex items-center gap-1.5"><Users aria-hidden="true" className="h-4 w-4 text-[#0b5c5d]" />{session.roster.length} clients · {staffCount} staff</span>
+          <span className="flex items-center gap-1.5"><Users aria-hidden="true" className="h-4 w-4 text-[#0b5c5d]" />{session.roster.length} clients{session.guests?.length ? ` · ${session.guests.length} guest${session.guests.length === 1 ? "" : "s"}` : ""} · {staffCount} staff</span>
           <Link to={`${Routes.agency.scheduling}?date=${session.date}`} className="ml-auto font-medium text-[#0b5c5d] underline underline-offset-2 dark:text-[#7fd3d3]">Open in Shift management</Link>
+          {session.guests?.length ? (
+            <span className="basis-full text-[13px] text-[#2a3138] dark:text-[#c9d1d4]">
+              Guests (not clients, no shift or billing): {session.guests.map((g) => `${g.name}${g.present ? (g.signIn ? ` ${formatClock(g.signIn)}${g.signOut ? `–${formatClock(g.signOut)}` : ""}` : "") : " (not here)"}`).join(", ")}
+            </span>
+          ) : null}
         </div>
       ) : sessions && !loadError ? (
         <div className="rounded-[12px] border border-dashed border-[#cfd5d9] px-5 py-6 text-sm text-[#5b636b] dark:border-white/15 dark:text-[#9aa4a8]">
