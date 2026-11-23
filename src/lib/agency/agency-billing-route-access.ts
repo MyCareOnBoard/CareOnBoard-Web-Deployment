@@ -8,6 +8,7 @@ export const AGENCY_BILLING_MAIN_ROUTE_ACCESS = Object.freeze([
   { pattern: Routes.agency.billing.claims, required: "Claims View" },
   { pattern: Routes.agency.billing.expenses, required: "Expenses View" },
   { pattern: Routes.agency.billing.staffTimesheets, required: "Timesheets View" },
+  { pattern: Routes.agency.billing.evv, required: "EVV View" },
 ] as const satisfies readonly { pattern: string; required: AgencyBillingScope }[]);
 
 export const AGENCY_BILLING_ROUTE_ACCESS = Object.freeze([

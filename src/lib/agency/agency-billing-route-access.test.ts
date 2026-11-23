@@ -5,13 +5,14 @@ import { AGENCY_BILLING_ROUTE_ACCESS, getAgencyBillingRouteAccess } from "./agen
 
 describe("agency billing route access", () => {
   it("maps all direct billing paths with exact matching", () => {
-    expect(AGENCY_BILLING_ROUTE_ACCESS).toHaveLength(8);
+    expect(AGENCY_BILLING_ROUTE_ACCESS).toHaveLength(9);
     for (const [pathname, required] of [
       ["/agency/billing/financial-overview", "Billing Overview"],
       ["/agency/billing/payroll-management", "Payroll View"],
       ["/agency/billing/claims", "Claims View"],
       ["/agency/billing/expenses", "Expenses View"],
       ["/agency/billing/staff-timesheets", "Timesheets View"],
+      ["/agency/billing/evv", "EVV View"],
       ["/agency/billing-and-approvals", "Claims View"],
       ["/agency/billing-and-approvals/client/client-1", "Claims View"],
       ["/agency/billing-and-approvals/dsp/dsp-1", "Claims View"],

@@ -108,6 +108,7 @@ const BillingClaimsDashboardPage = lazy(() =>
 const BillingExpensesDashboardPage = lazy(() =>
     import("@/pages/agency/billing/pages").then((module) => ({ default: module.ExpensesDashboard }))
 );
+const BillingEvvPage = lazy(() => import("@/pages/agency/billing/evv"));
 const AgencyBillingIndexRedirect = lazy(() =>
     import("@/pages/agency/billing/BillingIndexRedirect").then((module) => ({ default: module.AgencyBillingIndexRedirect }))
 );
@@ -434,6 +435,10 @@ export const router = createBrowserRouter([
             {
                 path: Routes.agency.billing.staffTimesheets,
                 Component: StaffTimesheetsApprovalPage,
+            },
+            {
+                path: Routes.agency.billing.evv,
+                Component: BillingEvvPage,
             },
             {
                 path: Routes.agency.staffTimesheet,
