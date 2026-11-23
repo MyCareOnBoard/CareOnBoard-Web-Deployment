@@ -9,7 +9,7 @@ import { Routes } from "@/routes/constants";
 import DashboardHeader from "@/components/DashboardHeader";
 import DashboardSidebar, { NavItem, brandSidebarLogo } from "@/components/DashboardSidebar";
 import { UserPanelAccountMenu, type AccountMenuLink } from "@/layouts/UserPanelAccountMenu";
-import { SidebarHelpCard } from "@/layouts/UserPanelLayout";
+import { AgencyProgramSwitch, AgencyTopBarDate } from "@/components/agency/AgencyShell";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
 import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
 import { UserType } from "@/utils/auth/types/user.types";
@@ -99,27 +99,29 @@ function filterNavItemsByMode(items: AgencyNavItem[], mode: AgencyMode | null): 
     return items.filter((item) => !item.programTypes || item.programTypes.includes(mode));
 }
 
+// Order, sections and labels follow the new agency design (Figma, Agency frames).
 const allNavItems: AgencyNavItem[] = [
-    { label: "Dashboard", path: Routes.agency.dashboard, icon: HomeIcon },
-    { label: "Shift Management", path: Routes.agency.scheduling, icon: SchedulingIcon, accessKey: SHIFT_MANAGEMENT_ACCESS_KEY, programTypes: ["ddd", "hha"] },
+    { section: "Overview", label: "Dashboard", path: Routes.agency.dashboard, icon: HomeIcon },
+    { section: "Overview", label: "Analytics", path: Routes.agency.analytics, icon: AnalyticsIcon, accessKey: "Analytics" },
+    { section: "Overview", label: "AI automation", path: Routes.agency.aiAutomation, icon: AiIcon, accessKey: "AI Automation" },
+    { section: "Operations", label: "Shift management", path: Routes.agency.scheduling, icon: SchedulingIcon, accessKey: SHIFT_MANAGEMENT_ACCESS_KEY, programTypes: ["ddd", "hha"] },
+    { section: "Operations", label: "Task management", path: Routes.agency.tasks, icon: ClipboardList, accessKey: "DSP Management" },
+    { section: "Operations", label: "Timesheet", path: Routes.agency.staffTimesheet, icon: CalendarClock },
+    { section: "Operations", label: "Mileage", path: Routes.agency.mileage, icon: MileageIcon, accessKey: "Mileage" },
+    { section: "Operations", label: "Community inclusion", path: Routes.agency.communityInclusions, icon: CommunityInclusionIcon, accessKey: "Community Inclusion", programTypes: ["ddd"] },
+    { section: "Operations", label: "Day program", path: Routes.agency.dayProgram, icon: Sun, programTypes: ["ddd"] },
+    { section: "People", label: "DSP management", path: Routes.agency.dspManagement, icon: DSPManagementIcon, accessKey: "DSP Management" },
+    { section: "People", label: "Client management", path: Routes.agency.clients, icon: UsersRound, accessKey: "Client Management" },
+    { section: "People", label: "Staff management", path: Routes.agency.staffManagement, icon: UsersRound, accessKey: "Staff Management" },
+    { section: "People", label: "Applicants", path: Routes.agency.applicantDirectory, icon: ApplicantDirectoryIcon, accessKey: "Applicant Directory" },
+    { section: "People", label: "Agency care", path: Routes.agencyCare.home, icon: Network },
+    { section: "Care & compliance", label: "Compliance alerts", path: Routes.agency.complianceAlerts, icon: ShieldAlert, accessKey: "Compliance Alerts" },
+    { section: "Care & compliance", label: "Notes", path: Routes.agency.notes, icon: NotesIcon, accessKey: "Notes", programTypes: ["ddd", "hha"] },
+    { section: "Care & compliance", label: "Goals & documents", path: Routes.agency.goalsAndDocuments.index, icon: GoaslAndDocumentsIcon, accessKey: "Goals & Documents", programTypes: ["ddd"] },
+    { section: "Care & compliance", label: "Trainings", path: Routes.agency.trainings, icon: Network, accessKey: "Trainings" },
+    { section: "Care & compliance", label: "Incidents", path: Routes.agency.incident, icon: IncidentIcon, accessKey: "Incident" },
     {
-        label: "DSP Management",
-        path: Routes.agency.dspManagement,
-        icon: DSPManagementIcon,
-        accessKey: "DSP Management",
-    },
-    { label: "Task Management", path: Routes.agency.tasks, icon: ClipboardList, accessKey: "DSP Management" },
-    { label: "Client Management", path: Routes.agency.clients, icon: UsersRound, accessKey: "Client Management" },
-    { label: "Agency Care", path: Routes.agencyCare.home, icon: Network },
-    { label: "Applicants Directory", path: Routes.agency.applicantDirectory, icon: ApplicantDirectoryIcon, accessKey: "Applicant Directory" },
-    { label: "AI Automation", path: Routes.agency.aiAutomation, icon: AiIcon, accessKey: "AI Automation" },
-    { label: "Compliance Alerts", path: Routes.agency.complianceAlerts, icon: ShieldAlert, accessKey: "Compliance Alerts" },
-    { label: "Analytics", path: Routes.agency.analytics, icon: AnalyticsIcon, accessKey: "Analytics" },
-    { label: "Notes", path: Routes.agency.notes, icon: NotesIcon, accessKey: "Notes", programTypes: ["ddd", "hha"] },
-    { label: "Timesheet", path: Routes.agency.staffTimesheet, icon: CalendarClock },
-    { label: "Community Inclusion", path: Routes.agency.communityInclusions, icon: CommunityInclusionIcon, accessKey: "Community Inclusion", programTypes: ["ddd"] },
-    { label: "Day Program", path: Routes.agency.dayProgram, icon: Sun, programTypes: ["ddd"] },
-    {
+        section: "Finance",
         label: "Billing",
         path: Routes.agency.billing.index,
         icon: BillingIcon,
@@ -132,38 +134,20 @@ const allNavItems: AgencyNavItem[] = [
         ],
     },
     // { label: "Reports", path: Routes.agency.reports.index, icon: ReportIcon, accessKey: "Reports" },
-    { label: "Goals & Documents", path: Routes.agency.goalsAndDocuments.index, icon: GoaslAndDocumentsIcon, accessKey: "Goals & Documents", programTypes: ["ddd"] },
-    { label: "Trainings", path: Routes.agency.trainings, icon: Network, accessKey: "Trainings" },
-    { label: "Mileage", path: Routes.agency.mileage, icon: MileageIcon, accessKey: "Mileage" },
-    { label: "Incident", path: Routes.agency.incident, icon: IncidentIcon, accessKey: "Incident" },
-    { label: "Support", path: Routes.agency.support, icon: SupportIcon, accessKey: "Support" },
-    { label: "Announcements", path: Routes.agency.announcements, icon: Megaphone },
-    { label: "My Payroll", path: Routes.agency.myPayroll, icon: BillingIcon, staffOnly: true },
-    { label: "Staff Management", path: Routes.agency.staffManagement, icon: UsersRound, accessKey: "Staff Management" },
+    { section: "Finance", label: "My payroll", path: Routes.agency.myPayroll, icon: BillingIcon, staffOnly: true },
+    { section: "Communication", label: "Support", path: Routes.agency.support, icon: SupportIcon, accessKey: "Support" },
+    { section: "Communication", label: "Announcements", path: Routes.agency.announcements, icon: Megaphone },
+    // Pinned to the bottom of the sidebar with Collapse menu.
     { label: "Settings", path: Routes.agency.agencySettings, icon: Settings },
 ];
 
-// ─── Mode Toggle ──────────────────────────────────────────────────────────────
+// ─── Mode selection ───────────────────────────────────────────────────────────
 
-const programLabels: Record<AgencyMode, string> = { ddd: "DDD", hha: "HHA", sc: "Support Coordination" };
 const programCards = {
     ddd: { icon: Brain, title: "DDD Program", description: "Manage Direct Support Professionals for individuals with developmental disabilities", badge: "DSP Management" },
     hha: { icon: Heart, title: "HHA Program", description: "Manage Home Health Aides providing in-home care services to patients", badge: "Caregiver Management" },
     sc: { icon: Network, title: "Support Coordination", description: "Manage Support Coordinators helping individuals access services and supports", badge: "Coordinator Management" },
 };
-
-function AgencyModeToggle({ mode, modes, onSelect }: { mode: AgencyMode; modes: AgencyMode[]; onSelect: (mode: AgencyMode) => void }) {
-    return <div className="flex items-center gap-0.5 rounded-full bg-white/60 p-1 border border-white/40 backdrop-blur-sm shadow-sm" aria-label="Agency program">
-        {modes.map((value) => {
-            const Icon = programCards[value].icon;
-            return <button key={value} type="button" aria-label={programLabels[value]} aria-pressed={mode === value}
-                onClick={() => onSelect(value)} className={cn("flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[13px] font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8]", mode === value ? "bg-[#00b4b8] text-white shadow-sm" : "text-[#808081] hover:text-[#10141a]")}>
-                <Icon aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
-                <span className="hidden sm:inline">{programLabels[value]}</span>
-            </button>;
-        })}
-    </div>;
-}
 
 function ModeSelectionScreen({ modes, onSelect }: { modes: AgencyMode[]; onSelect: (mode: AgencyMode) => void }) {
     return <div className="flex min-h-[calc(100vh-98px)] items-center justify-center mt-[98px]">
@@ -255,7 +239,7 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
     // Staff-management label reflects the selected mode (or agency's types when mode is null).
     const dspManagementLabel = useMemo(() => {
         const typesForLabel = effectiveMode ? [effectiveMode] : supportedTypes;
-        return `${staffLabels(typesForLabel).title} Management`;
+        return `${staffLabels(typesForLabel).title} management`;
     }, [effectiveMode, supportedTypes]);
 
     // Build filtered nav items.
@@ -277,6 +261,12 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
         });
     }, [user, effectiveMode, complianceEntryMode, dspManagementLabel]);
 
+    // Settings is pinned to the bottom of the sidebar, next to Collapse menu.
+    const [mainNavItems, bottomNavItems] = useMemo(() => [
+        navItems.filter((item) => item.path !== Routes.agency.agencySettings),
+        navItems.filter((item) => item.path === Routes.agency.agencySettings),
+    ], [navItems]);
+
     useEffect(() => {
         if (!user || (user?.userType !== UserType.AGENCY && user?.userType !== UserType.AGENCY_STAFF)) {
             navigate(Routes.auth.login, { replace: true });
@@ -285,9 +275,10 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
 
     const userRole = user?.userType === UserType.AGENCY ? "Agency Administrator" : (user as any)?.role || "Agency Staff";
 
-    const modeToggle =
+    // The program switch sits at the top of the sidebar, under the logo, as in the new design.
+    const programSwitch = (sidebarCollapsed: boolean) =>
         supportsBoth && effectiveMode ? (
-            <AgencyModeToggle mode={effectiveMode} modes={supportedTypes} onSelect={handleModeToggle} />
+            <AgencyProgramSwitch mode={effectiveMode} modes={supportedTypes} onSelect={handleModeToggle} collapsed={sidebarCollapsed} />
         ) : null;
 
     const billingRoute = getAgencyBillingRouteAccess(location.pathname);
@@ -311,15 +302,16 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
     return (
         <ProtectedRoute>
             {!canRenderCurrentRoute ? <Navigate to={Routes.agency.dashboard} replace /> :
-            <div className="relative min-h-screen bg-[#eef4f5] dark:bg-[#10141a] overflow-x-hidden">
+            <div className={cn("relative min-h-screen overflow-x-hidden", needsModeSelection ? "bg-[#eef4f5] dark:bg-[#10141a]" : "bg-[#003839] dark:bg-[#002c2d]")}>
                 <DashboardHeader
                     userName={user?.fullName}
                     userImage={(user as any)?.profileImage || user?.photoURL}
                     userRole={userRole}
                     userType={user?.userType || UserType.APPLICANT}
                     onLogout={handleLogout}
-                    centerContent={modeToggle}
                     sidebarInset={!needsModeSelection}
+                    surface={needsModeSelection ? "page" : "card"}
+                    leading={needsModeSelection ? undefined : <AgencyTopBarDate />}
                     showSettings={false}
                     variant="panel"
                     accountMenu={<UserPanelAccountMenu roleLabel={userRole} onLogout={handleLogout} links={agencyAccountLinks} fieldStaff={false} careConnectUserType={user?.userType ?? UserType.AGENCY} />}
@@ -329,8 +321,12 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
                     <ModeSelectionScreen modes={supportedTypes} onSelect={handleModeSelect} />
                 ) : (
                     <>
-                        <DashboardSidebar navItems={navItems} variant="brand" logo={brandSidebarLogo} footer={navItems.some((item) => item.path === Routes.agency.support) ? <SidebarHelpCard to={Routes.agency.support} /> : undefined} />
-                        <main className={`ml-0 ${collapsed ? "md:ml-[88px]" : "md:ml-[248px]"} pt-[98px] pb-10 transition-[margin] duration-200`}>
+                        <DashboardSidebar navItems={mainNavItems} bottomNavItems={bottomNavItems} variant="brand" density="compact" collapseAtBottom logo={brandSidebarLogo} header={programSwitch} />
+                        {/* The page sits in a white card on the teal background; the top bar is fixed over its first 76px. */}
+                        <main className={cn(
+                            "relative mx-4 mb-4 mt-4 min-h-[calc(100vh-32px)] rounded-[20px] bg-white pb-10 pt-[76px] transition-[margin] duration-200 dark:bg-[#151c22]",
+                            collapsed ? "md:ml-[96px]" : "md:ml-[256px]",
+                        )}>
                             <AnnouncementBanner endpoint="/agencyAnnouncements/announcements/mine" viewAllPath={Routes.agency.announcements} className="mx-4 mb-4 sm:mx-8" />
                             <div key={`${agencyId}:${effectiveMode}`} className="px-4 sm:px-8">{children ?? <Outlet />}</div>
                         </main>

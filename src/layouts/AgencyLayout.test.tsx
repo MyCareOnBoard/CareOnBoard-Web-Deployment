@@ -22,7 +22,7 @@ vi.mock("@/components/ProtectedRoute", () => ({ ProtectedRoute: ({ children }: a
 vi.mock("@/components/DashboardHeader", () => ({
   default: ({ userRole }: { userRole: string }) => <div data-testid="dashboard-header-role">{userRole}</div>,
 }));
-vi.mock("@/components/DashboardSidebar", () => ({ default: ({ navItems }: any) => <nav>{navItems.map((item: any) => <div key={item.label}><span data-path={item.path}>{item.label}</span>{item.children?.map((child: any) => <span key={child.path} data-child-path={child.path}>{child.label}</span>)}</div>)}</nav> }));
+vi.mock("@/components/DashboardSidebar", () => ({ brandSidebarLogo: () => null, default: ({ navItems }: any) => <nav>{navItems.map((item: any) => <div key={item.label}><span data-path={item.path}>{item.label}</span>{item.children?.map((child: any) => <span key={child.path} data-child-path={child.path}>{child.label}</span>)}</div>)}</nav> }));
 vi.mock("@/components/AnnouncementBanner", () => ({ default: () => <div /> }));
 vi.mock("@/hooks/useSidebarCollapsed", () => ({ useSidebarCollapsed: () => [false] }));
 vi.mock("@/hooks/useEffectiveAgencyMode", () => ({ useEffectiveAgencyMode: () => state.mode }));
@@ -139,7 +139,7 @@ describe("AgencyDashboardLayout billing authorization", () => {
 
     render(<MemoryRouter><AgencyDashboardLayout /></MemoryRouter>);
 
-    expect(screen.getByText("My Payroll")).toHaveAttribute("data-path", "/agency/my-payroll");
+    expect(screen.getByText("My payroll")).toHaveAttribute("data-path", "/agency/my-payroll");
   });
 
   it("allows agency staff to directly open My Payroll without mounting a billing permission check", () => {
@@ -161,7 +161,7 @@ describe("AgencyDashboardLayout billing authorization", () => {
 
     render(<MemoryRouter><AgencyDashboardLayout><Child /></AgencyDashboardLayout></MemoryRouter>);
 
-    expect(screen.queryByText("My Payroll")).not.toBeInTheDocument();
+    expect(screen.queryByText("My payroll")).not.toBeInTheDocument();
     expect(screen.queryByText("Owner payroll child")).not.toBeInTheDocument();
     expect(mounted).not.toHaveBeenCalled();
     expect(screen.getByTestId("route-redirect")).toHaveAttribute("data-to", "/agency/dashboard");
@@ -223,7 +223,7 @@ describe('Compliance Alerts source entry', () => {
     state.user={uid:'staff',userType:'agency_staff',profile:{accessList},agency:{supportedClientTypes:['ddd']}};
     render(<MemoryRouter><AgencyDashboardLayout><p>Workspace child</p></AgencyDashboardLayout></MemoryRouter>);
     expect(!!screen.queryByText('Workspace child')).toBe(allowed);
-    expect(!!screen.queryByText('Compliance Alerts')).toBe(allowed);
+    expect(!!screen.queryByText('Compliance alerts')).toBe(allowed);
   });
 });
 
@@ -236,9 +236,9 @@ describe("Agency Care navigation", () => {
 
     render(<MemoryRouter><AgencyDashboardLayout /></MemoryRouter>);
 
-    const item = screen.getByText("Agency Care");
+    const item = screen.getByText("Agency care");
     expect(item).toHaveAttribute("data-path", "/agency-care");
-    expect(item.parentElement?.previousElementSibling).toHaveTextContent("Client Management");
+    expect(item.parentElement?.previousElementSibling).toHaveTextContent("Applicants");
   });
 });
 
@@ -255,7 +255,7 @@ describe("Staff Management access", () => {
     const mounted = vi.fn();
     function Child() { mounted(); return <p>Staff page</p>; }
     render(<MemoryRouter><AgencyDashboardLayout><Child /></AgencyDashboardLayout></MemoryRouter>);
-    expect(!!screen.queryByText("Staff Management")).toBe(allowed);
+    expect(!!screen.queryByText("Staff management")).toBe(allowed);
     expect(mounted).toHaveBeenCalledTimes(allowed ? 1 : 0);
   });
 });

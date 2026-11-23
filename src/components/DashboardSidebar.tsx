@@ -1,4 +1,4 @@
-import { type ComponentType, ReactNode, useEffect, useMemo, useState } from "react";
+import { type ComponentType, Fragment, ReactNode, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -35,7 +35,12 @@ export type NavItem = {
   accessKey?: string;
   staffOnly?: boolean;
   children?: NavSubItem[];
+  /** Brand variant: a heading is shown above the first item of each section (e.g. "Operations"). */
+  section?: string;
 };
+
+/** Brand variant row height: "compact" fits the agency's longer menu. */
+export type SidebarDensity = "regular" | "compact";
 
 // Brand: force strokes to currentColor so SVG icons with baked-in colours read on the dark panel.
 const iconClassName = (isActive: boolean, variant: SidebarVariant = "default") =>
@@ -54,6 +59,7 @@ function NavGroup({
   collapsed,
   onToggle,
   variant,
+  density = "regular",
 }: {
   item: NavItem;
   activePath: string;
@@ -62,8 +68,10 @@ function NavGroup({
   collapsed: boolean;
   onToggle: () => void;
   variant: SidebarVariant;
+  density?: SidebarDensity;
 }) {
   const brand = variant === "brand";
+  const brandRow = density === "compact" ? "h-[34px]" : "h-[44px]";
   const navigate = useNavigate();
   const { icon: Icon, label, path, children = [] } = item;
 
@@ -76,7 +84,7 @@ function NavGroup({
         onClick={() => path && navigate(path)}
         className={cn(
           "flex w-full items-center justify-center transition cursor-pointer",
-          brand ? "h-[44px] rounded-[12px] text-white" : "h-[52px] rounded-[60px]",
+          brand ? cn(brandRow, "rounded-[12px] text-white") : "h-[52px] rounded-[60px]",
           brand
             ? isGroupActive ? "bg-white/15" : "text-white/85 hover:bg-white/10"
             : isGroupActive ? "bg-[#00b4b8]" : "text-[#808081] hover:bg-white/40 dark:text-[#9aa4a8] dark:hover:bg-white/5"
@@ -100,7 +108,7 @@ function NavGroup({
         onClick={onToggle}
         className={cn(
           "flex w-full items-center gap-3 text-sm transition cursor-pointer",
-          brand ? "h-[44px] rounded-[12px] px-3" : "h-[52px] rounded-[60px] px-4 font-semibold backdrop-blur-[22px]",
+          brand ? cn(brandRow, "rounded-[12px] px-3") : "h-[52px] rounded-[60px] px-4 font-semibold backdrop-blur-[22px]",
           brand
             ? isGroupActive ? "font-semibold text-white" : "font-medium text-white/85 hover:bg-white/10 hover:text-white"
             : isGroupActive ? "font-medium text-white" : "font-medium text-[#808081] hover:bg-white/40 dark:text-[#9aa4a8] dark:hover:bg-white/5"
@@ -152,13 +160,16 @@ function NavLinkButton({
   isActive,
   collapsed,
   variant,
+  density = "regular",
 }: {
   item: NavItem;
   isActive: boolean;
   collapsed: boolean;
   variant: SidebarVariant;
+  density?: SidebarDensity;
 }) {
   const brand = variant === "brand";
+  const brandRow = density === "compact" ? "h-[34px]" : "h-[44px]";
   const navigate = useNavigate();
   const { icon: Icon, label, path } = item;
 
@@ -175,7 +186,7 @@ function NavLinkButton({
       onClick={() => navigate(path)}
       className={cn(
         "flex w-full items-center text-sm transition cursor-pointer",
-        brand ? "h-[44px] rounded-[12px]" : "h-[52px] rounded-[60px] font-semibold backdrop-blur-[22px]",
+        brand ? cn(brandRow, "rounded-[12px]") : "h-[52px] rounded-[60px] font-semibold backdrop-blur-[22px]",
         collapsed ? "justify-center" : brand ? "gap-3 px-3" : "gap-3 px-4",
         brand
           ? isActive ? "bg-white/15 font-semibold text-white" : "font-medium text-white/85 hover:bg-white/10 hover:text-white"
@@ -188,12 +199,18 @@ function NavLinkButton({
   );
 }
 
+const NO_ITEMS: NavItem[] = [];
+
 export default function DashboardSidebar({
   navItems,
   footer,
   activePath: activePathOverride,
   variant = "default",
   logo,
+  header,
+  bottomNavItems = NO_ITEMS,
+  collapseAtBottom = false,
+  density = "regular",
 }: {
   footer?: ReactNode;
   navItems: NavItem[];
@@ -201,6 +218,13 @@ export default function DashboardSidebar({
   variant?: SidebarVariant;
   /** Brand variant only: the logo shown at the top of the panel, given the collapsed state. */
   logo?: (collapsed: boolean) => ReactNode;
+  /** Brand variant only: shown under the logo (the agency's program switch), given the collapsed state. */
+  header?: (collapsed: boolean) => ReactNode;
+  /** Brand variant only: links pinned to the bottom of the panel, above Collapse menu (agency Settings). */
+  bottomNavItems?: NavItem[];
+  /** Brand variant only: put Collapse menu at the bottom of the panel instead of above the menu. */
+  collapseAtBottom?: boolean;
+  density?: SidebarDensity;
 }) {
   const brand = variant === "brand";
   const location = useLocation();
@@ -217,10 +241,67 @@ export default function DashboardSidebar({
     closeDrawer();
   }, [location.pathname, isMobile]);
 
+  const allItems = useMemo(() => [...navItems, ...bottomNavItems], [navItems, bottomNavItems]);
   const activePath = useMemo(
-    () => activePathOverride ?? resolveActiveNavPath(location.pathname, navItems),
-    [activePathOverride, location.pathname, navItems]
+    () => activePathOverride ?? resolveActiveNavPath(location.pathname, allItems),
+    [activePathOverride, location.pathname, allItems]
   );
+  const collapseBottom = brand && collapseAtBottom;
+  const headerContent = header?.(effectiveCollapsed);
+
+  const collapseButton = (
+    <button
+      type="button"
+      onClick={toggleCollapsed}
+      title={effectiveCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+      aria-label={effectiveCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+      className={cn(
+        "hidden h-[44px] w-full shrink-0 items-center text-[13px] font-medium transition cursor-pointer md:flex",
+        brand
+          ? "rounded-[12px] text-white/85 hover:bg-white/10 hover:text-white"
+          : "rounded-[60px] text-[#808081] dark:text-[#9aa4a8] hover:bg-white/40 dark:hover:bg-white/5",
+        effectiveCollapsed ? "justify-center" : brand ? "gap-3 px-3" : "gap-3 px-4"
+      )}
+    >
+      {effectiveCollapsed ? <PanelLeftOpen className="h-5 w-5 shrink-0" /> : <PanelLeftClose className="h-5 w-5 shrink-0" />}
+      {!effectiveCollapsed && <span className="flex-1 whitespace-nowrap text-left">Collapse menu</span>}
+    </button>
+  );
+
+  const renderItem = (item: NavItem) => {
+    if (item.children?.length) {
+      const isOnGroupRoute = isNavGroupActive(location.pathname, item);
+      const isExpanded = expandedGroups[item.label] ?? isOnGroupRoute;
+      return (
+        <NavGroup
+          key={item.label}
+          item={item}
+          activePath={activePath}
+          isExpanded={isExpanded}
+          isGroupActive={isOnGroupRoute}
+          collapsed={effectiveCollapsed}
+          variant={variant}
+          density={density}
+          onToggle={() => {
+            setExpandedGroups((current) => ({
+              ...current,
+              [item.label]: !isExpanded,
+            }));
+          }}
+        />
+      );
+    }
+    return (
+      <NavLinkButton
+        key={item.label}
+        item={item}
+        isActive={activePath === item.path}
+        collapsed={effectiveCollapsed}
+        variant={variant}
+        density={density}
+      />
+    );
+  };
 
   return (
     <>
@@ -248,63 +329,33 @@ export default function DashboardSidebar({
         )}
       >
         {brand && logo && <div className={cn("flex shrink-0 items-center pb-2", effectiveCollapsed ? "justify-center" : "px-2")}>{logo(effectiveCollapsed)}</div>}
+        {brand && headerContent && <div className="shrink-0">{headerContent}</div>}
         {/* Brand: the logo stays put; the menu and help card scroll together below it. */}
         <div className={cn(brand ? "-mx-1 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overflow-x-hidden px-1 scrollbar-hide" : "space-y-3")}>
-        <button
-          type="button"
-          onClick={toggleCollapsed}
-          title={effectiveCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          aria-label={effectiveCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className={cn(
-            "hidden h-[44px] w-full shrink-0 items-center text-[13px] font-medium transition cursor-pointer md:flex",
-            brand
-              ? "rounded-[12px] text-white/85 hover:bg-white/10 hover:text-white"
-              : "rounded-[60px] text-[#808081] dark:text-[#9aa4a8] hover:bg-white/40 dark:hover:bg-white/5",
-            effectiveCollapsed ? "justify-center" : brand ? "gap-3 px-3" : "gap-3 px-4"
-          )}
-        >
-          {effectiveCollapsed ? <PanelLeftOpen className="h-5 w-5 shrink-0" /> : <PanelLeftClose className="h-5 w-5 shrink-0" />}
-          {!effectiveCollapsed && <span className="flex-1 whitespace-nowrap text-left">Collapse menu</span>}
-        </button>
+        {!collapseBottom && collapseButton}
         <nav aria-label="Main" className={cn("space-y-1", brand ? "pb-2" : "pb-4")}>
-          {navItems.map((item) => {
-            if (item.children?.length) {
-              const isOnGroupRoute = isNavGroupActive(location.pathname, item);
-              const isExpanded = expandedGroups[item.label] ?? isOnGroupRoute;
-              const isGroupActive = isOnGroupRoute;
-
-              return (
-                <NavGroup
-                  key={item.label}
-                  item={item}
-                  activePath={activePath}
-                  isExpanded={isExpanded}
-                  isGroupActive={isGroupActive}
-                  collapsed={effectiveCollapsed}
-                  variant={variant}
-                  onToggle={() => {
-                    setExpandedGroups((current) => ({
-                      ...current,
-                      [item.label]: !isExpanded,
-                    }));
-                  }}
-                />
-              );
-            }
-
+          {navItems.map((item, index) => {
+            // Brand: a section heading (or a divider when collapsed) where a new section starts.
+            const startsSection = brand && item.section && item.section !== navItems[index - 1]?.section;
+            if (!startsSection) return renderItem(item);
             return (
-              <NavLinkButton
-                key={item.label}
-                item={item}
-                isActive={activePath === item.path}
-                collapsed={effectiveCollapsed}
-                variant={variant}
-              />
+              <Fragment key={`section:${item.section}:${item.label}`}>
+                {effectiveCollapsed
+                  ? index > 0 && <div aria-hidden="true" className="mx-3 my-2 h-px bg-white/10" />
+                  : <p className={cn("px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/55", index > 0 ? "pt-3" : "pt-1")}>{item.section}</p>}
+                {renderItem(item)}
+              </Fragment>
             );
           })}
         </nav>
-        {!effectiveCollapsed && (brand ? <div className="mt-auto shrink-0 pt-2">{footer}</div> : footer)}
+        {!effectiveCollapsed && (brand ? footer && <div className="mt-auto shrink-0 pt-2">{footer}</div> : footer)}
         </div>
+        {collapseBottom && (
+          <div className="shrink-0 space-y-1 border-t border-white/10 pt-2">
+            {bottomNavItems.map(renderItem)}
+            {collapseButton}
+          </div>
+        )}
       </aside>
     </>
   );

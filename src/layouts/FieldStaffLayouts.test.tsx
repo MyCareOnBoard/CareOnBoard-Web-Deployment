@@ -21,6 +21,7 @@ vi.mock("@/components/DashboardHeader", () => ({
   ),
 }));
 vi.mock("@/components/DashboardSidebar", () => ({
+  brandSidebarLogo: () => null,
   default: ({ navItems }: { navItems: Array<{ label: string; path: string }> }) => (
     <nav>{navItems.map((item) => <span key={item.path} data-path={item.path}>{item.label}</span>)}</nav>
   ),

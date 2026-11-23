@@ -12,7 +12,7 @@ vi.mock('@/hooks/useEffectiveAgencyMode', async () => {
 });
 vi.mock('@/components/ProtectedRoute', () => ({ProtectedRoute: ({children}: any) => children}));
 vi.mock('@/components/DashboardHeader', () => ({default: () => null}));
-vi.mock('@/components/DashboardSidebar', () => ({default: () => null}));
+vi.mock('@/components/DashboardSidebar', () => ({brandSidebarLogo: () => null, default: () => null}));
 vi.mock('@/components/AnnouncementBanner', () => ({default: () => null}));
 vi.mock('@/hooks/useSidebarCollapsed', () => ({useSidebarCollapsed: () => [false]}));
 vi.mock('@/hooks/useAssignmentReview', () => ({useAssignmentReviewScope: () => JSON.stringify([mocks.database,mocks.user])}));

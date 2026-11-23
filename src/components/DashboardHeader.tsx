@@ -91,13 +91,44 @@ function ThemeMenuItem() {
 }
 
 // Shared dashboard chrome without the native panel's notification requests.
-export function DashboardHeaderFrame({ centerContent, children, sidebarInset = false }: {
+export function DashboardHeaderFrame({ centerContent, children, sidebarInset = false, surface = "page", leading }: {
   centerContent?: ReactNode;
   children: ReactNode;
   /** The layout uses a full-height sidebar that carries the logo; start the header beside it. */
   sidebarInset?: boolean;
+  /**
+   * "card": the new agency layout. The page is a white rounded card on the teal background and this
+   * bar is the card's top 76px, fixed while the card scrolls (the layout's main adds pt-[76px]).
+   */
+  surface?: "page" | "card";
+  /** Shown left of the actions, after the mobile menu button (the agency's date line). */
+  leading?: ReactNode;
 }) {
   const [collapsed] = useSidebarCollapsed();
+  if (surface === "card") {
+    return (
+      <header className={cn(
+        "fixed left-0 right-0 top-0 z-50 bg-[#003839] px-4 pt-4 dark:bg-[#002c2d] md:pl-0 md:transition-[left] md:duration-200",
+        collapsed ? "md:left-[96px]" : "md:left-[256px]"
+      )}>
+        <div className="flex h-[76px] items-center justify-between gap-2 rounded-t-[20px] bg-white px-4 sm:px-8 dark:bg-[#151c22]">
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              type="button"
+              aria-label="Open navigation menu"
+              onClick={toggleDrawer}
+              className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-[50px] text-[#4b535b] cursor-pointer transition-colors hover:bg-[#f3f5f6] md:hidden dark:text-[#9aa4a8] dark:hover:bg-white/5"
+            >
+              <Menu className="w-6 h-6" />
+            </button>
+            {leading}
+          </div>
+          {centerContent && <div className="flex items-center">{centerContent}</div>}
+          {children}
+        </div>
+      </header>
+    );
+  }
   return (
     <header className={cn(
       "fixed left-0 right-0 top-0 z-50 h-[98px] bg-[#eef4f5] dark:bg-[#10141a]",
@@ -126,8 +157,10 @@ export function DashboardHeaderFrame({ centerContent, children, sidebarInset = f
 }
 
 export default function DashboardHeader(
-  { actions, centerContent, userName, userImage, userRole, onLogout, userType, sidebarInset, showSettings = true, accountMenu, variant = "classic" }: {
+  { actions, centerContent, userName, userImage, userRole, onLogout, userType, sidebarInset, showSettings = true, accountMenu, variant = "classic", surface, leading }: {
     sidebarInset?: boolean;
+    surface?: "page" | "card";
+    leading?: ReactNode;
     /** Replaces the default account menu items (the user panel has its own). */
     accountMenu?: ReactNode;
     /** "panel": the redesigned user panel header. Its account menu carries the Care Connect link and theme switch, and the bell uses the new style. */
@@ -223,7 +256,7 @@ export default function DashboardHeader(
   const panel = variant === "panel";
 
   return (
-    <DashboardHeaderFrame centerContent={centerContent} sidebarInset={sidebarInset}>
+    <DashboardHeaderFrame centerContent={centerContent} sidebarInset={sidebarInset} surface={surface} leading={leading}>
         {actions ?? (
           <div className="flex items-center gap-[10px]">
             {!panel && getCareConnectDashboardUrl() && (
