@@ -1,16 +1,34 @@
-import { useId, useState } from "react";
-import { Link } from "react-router";
-import { Plus, X } from "lucide-react";
+import { useId, useState, type FormEvent } from "react";
+import { Link, useNavigate } from "react-router";
+import { toast } from "sonner";
+import { Loader2, Plus, Search, X } from "lucide-react";
+import { createSupportCase, supportErrorMessage } from "@/lib/api/support";
 import { cn } from "@/lib/utils";
 import { Routes } from "@/routes/constants";
 import { FIELD_STAFF_FAQS } from "./faqs";
 
 const CONTACT = Routes.userPanel.messages;
 
-/** Caregiver and DSP help: common questions plus a way to reach the agency. */
+/** Caregiver and DSP help: ask the assistant, common questions, and a way to reach the agency. */
 export default function FieldStaffHelpCenterPage() {
   const [open, setOpen] = useState<number | null>(0);
   const baseId = useId();
+  const navigate = useNavigate();
+  const [question, setQuestion] = useState("");
+  const [asking, setAsking] = useState(false);
+
+  const ask = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!question.trim() || asking) return;
+    setAsking(true);
+    try {
+      const created = await createSupportCase({ content: question.trim(), context: { page: Routes.userPanel.helpCenter } });
+      navigate(`${CONTACT}?case=${created.case.id}`);
+    } catch (error) {
+      toast.error(supportErrorMessage(error, "Your question was not sent. Try again."));
+      setAsking(false);
+    }
+  };
 
   return <div className="flex min-h-[calc(100vh-200px)] flex-col">
     <div className="flex flex-1 flex-col rounded-[20px] bg-white p-4 shadow-[0_1px_2px_rgba(16,40,44,0.06)] sm:p-6 dark:bg-[#1b232b]">
@@ -20,6 +38,20 @@ export default function FieldStaffHelpCenterPage() {
           Contact support agency
         </Link>
       </div>
+
+      <form onSubmit={ask} className="mb-2 flex flex-col gap-2 rounded-[14px] bg-[#f2fbfb] p-3 sm:flex-row sm:items-center dark:bg-[#00686b]/15">
+        <label htmlFor={`${baseId}-ask`} className="sr-only">Ask a question</label>
+        <span className="relative flex-1">
+          <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#5d6b73]" />
+          <input id={`${baseId}-ask`} value={question} onChange={(event) => setQuestion(event.target.value)} maxLength={4000}
+            placeholder="Ask anything, for example: how do I fix a missed clock out?"
+            className="h-10 w-full rounded-[10px] border border-[#cfeaea] bg-white pl-9 pr-3 text-[14px] text-[#10141a] outline-none focus:border-[#007679] focus:ring-2 focus:ring-[#007679]/20 dark:border-white/15 dark:bg-[#1b232b] dark:text-[#f4f6f7]" />
+        </span>
+        <button type="submit" disabled={asking || !question.trim()} className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-[10px] bg-[#007679] px-5 text-[14px] font-semibold text-white transition-colors hover:bg-[#00686b] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] disabled:cursor-not-allowed disabled:opacity-50">
+          {asking && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />}{asking ? "Finding an answer…" : "Ask"}
+        </button>
+      </form>
+      <p className="mb-4 px-1 text-[12px] text-[#5d6b73] dark:text-[#9aa4a8]">Our assistant answers from your agency&apos;s help articles and hands you to a person if it can&apos;t help.</p>
 
       <div className="grid flex-1 gap-6 lg:grid-cols-[minmax(0,1fr)_268px]">
         <section aria-labelledby={`${baseId}-faq`}>

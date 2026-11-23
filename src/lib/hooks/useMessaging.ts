@@ -210,10 +210,11 @@ function composeConversationWindows(
   continuation: Conversation[],
 ): Conversation[] {
   const firstWindowIds = new Set(firstWindow.map(({ id }) => id));
+  // Support cases live on the support desk, not in the chat list.
   return [
     ...firstWindow,
     ...continuation.filter(({ id }) => !firstWindowIds.has(id)),
-  ];
+  ].filter((conversation) => (conversation.type as string) !== "support");
 }
 
 function refreshContinuationCopies(

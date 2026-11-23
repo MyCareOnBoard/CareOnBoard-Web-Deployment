@@ -47,6 +47,8 @@ export interface MessagingPageProps {
     variant?: "classic" | "panel";
     /** Shown as a "Check our FAQs" link in the panel header. */
     faqHref?: string;
+    /** Extra controls beside the title, such as a switch to the support desk. */
+    headerSlot?: React.ReactNode;
 }
 
 function MessagingPageContent({
@@ -59,6 +61,7 @@ function MessagingPageContent({
     programMode = null,
     variant = "classic",
     faqHref,
+    headerSlot,
 }: MessagingPageProps) {
     const panel = variant === "panel";
     const { conversationId } = useParams<{ conversationId?: string }>();
@@ -280,7 +283,10 @@ function MessagingPageContent({
         <>
             {panel ? <div className="flex h-[calc(100dvh-160px)] min-h-[480px] flex-col rounded-[20px] bg-white p-4 shadow-[0_1px_2px_rgba(16,40,44,0.06)] sm:p-6 dark:bg-[#1b232b]">
                 <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 pb-4">
-                    <h1 className="text-lg font-semibold text-[#10141a] dark:text-[#f4f6f7]">{pageTitle}</h1>
+                    <div className="flex flex-wrap items-center gap-3">
+                        <h1 className="text-lg font-semibold text-[#10141a] dark:text-[#f4f6f7]">{pageTitle}</h1>
+                        {headerSlot}
+                    </div>
                     <div className="flex items-center gap-2">
                         {faqHref && <Link to={faqHref} className="inline-flex h-9 items-center rounded-full bg-[#10141a] px-4 text-[13px] font-medium text-white transition-colors hover:bg-[#2a3138] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] dark:bg-[#f4f6f7] dark:text-[#10141a] dark:hover:bg-white">Check our FAQs</Link>}
                         <button type="button" onClick={() => setIsNewMessageModalOpen(true)}
@@ -296,7 +302,10 @@ function MessagingPageContent({
             </div> : <div className="flex flex-col h-[calc(100vh-160px)] min-h-0">
                 {/* Top Header with New Message Button */}
                 <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-[#e5e7eb] flex-shrink-0">
-                    <h1 className="text-[20px] sm:text-[24px] md:text-[28px] font-bold text-[#10141a]">{pageTitle}</h1>
+                    <div className="flex flex-wrap items-center gap-3">
+                        <h1 className="text-[20px] sm:text-[24px] md:text-[28px] font-bold text-[#10141a]">{pageTitle}</h1>
+                        {headerSlot}
+                    </div>
                     <Button
                         onClick={() => setIsNewMessageModalOpen(true)}
                         className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 text-white rounded-lg font-medium text-sm sm:text-base"

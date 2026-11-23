@@ -1,9 +1,6 @@
-import { useState } from "react";
+import { useLocation } from "react-router";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { submitQuestion, QuestionCategory } from "@/lib/api/help-center";
-import { useToast } from "@/hooks/use-toast";
+import { AskSupportPanel } from "@/components/support/AskSupportPanel";
 
 const faqData = [
   {
@@ -34,49 +31,7 @@ const faqData = [
 ];
 
 export default function HelpCenterPage() {
-  const [question, setQuestion] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { toast } = useToast();
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!question.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a question before submitting.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const response = await submitQuestion({
-        question: question.trim(),
-        category: "general" as QuestionCategory,
-      });
-
-      if (response.success) {
-        toast({
-          title: "Success!",
-          description: response.message || "Your question has been submitted successfully. We'll get back to you soon.",
-          variant: "success",
-        });
-        setQuestion("");
-      }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to submit your question. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
+  const { pathname } = useLocation();
   return (
     <div className="mx-auto max-w-[1147px]">
       {/* Page Title */}
@@ -85,7 +40,7 @@ export default function HelpCenterPage() {
       </div>
 
       {/* FAQ Accordion */}
-      <div className="mb-[158px]">
+      <div className="mb-16">
         <Accordion type="single" collapsible defaultValue="item-0" className="w-full">
           {faqData.map((faq, index) => (
             <AccordionItem key={index} value={`item-${index}`}>
@@ -96,27 +51,19 @@ export default function HelpCenterPage() {
         </Accordion>
       </div>
 
-      {/* Contact Form */}
-      <div className="mx-auto w-full max-w-[496px]">
-        <div className="mb-3 text-center">
-          <p className="text-[20px] font-normal leading-[1.6] text-[#111111]">
-            Still have questions? Drop your questions below
-          </p>
-        </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            type="text"
-            placeholder="Submit your question"
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            className="w-full"
+      {/* Ask support: the assistant answers first, then a person. */}
+      <section aria-labelledby="help-center-ask" className="mb-16">
+        <h2 id="help-center-ask" className="mb-1 text-[20px] font-semibold text-[#111111]">Still have questions?</h2>
+        <p className="mb-4 text-[14px] text-[#5d6b73]">Ask below. Our assistant answers right away when it can, and passes your question to a person when it can&apos;t.</p>
+        <div className="flex h-[620px] flex-col">
+          <AskSupportPanel
+            deskName="the support team"
+            contextPage={pathname}
+            showUrgentOption={false}
+            placeholder="For example: which documents do I still need to upload?"
           />
-          <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? "Sending..." : "Send us"}
-          </Button>
-        </form>
-      </div>
+        </div>
+      </section>
     </div>
   );
 }
-
