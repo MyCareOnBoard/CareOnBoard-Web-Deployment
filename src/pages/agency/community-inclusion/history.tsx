@@ -114,7 +114,7 @@ export default function CommunityInclusionHistoryPage() {
                     <ArrowLeft className="w-6 h-6 text-[#10141a]" />
                 </button>
                 <h1 className="text-[24px] sm:text-[28px] md:text-[32px] lg:text-[40px] font-semibold leading-[1.4] sm:leading-[1.6] text-[#10141a]">
-                    Client Management
+                    Legacy community inclusion attendance
                 </h1>
             </div>
 

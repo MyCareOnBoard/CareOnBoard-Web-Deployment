@@ -15,6 +15,9 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 
+/** Goals documents that community inclusion / day program logs link to once approved. */
+const CI_GOAL_TYPES = new Set<string>([DocumentType.COMMUNITY_INCLUSION_INDIVIDUALIZED_GOALS, DocumentType.DAY_HABILITATION_INDIVIDUALIZED_GOALS]);
+
 const documentTypeLabels: Record<string, string> = {
     natural_supports_training: "Natural Supports Training",
     community_inclusion_services: "Community Inclusion Services",
@@ -180,6 +183,11 @@ export default function GoalsAndDocumentsList() {
                                         >
                                             {document.status === "submitted" ? "Submitted" : "Draft"}
                                         </span>
+                                        {document.status === "submitted" && CI_GOAL_TYPES.has(document.documentType) && (
+                                            <span className={`px-3 py-1 rounded-full text-[12px] font-medium ${document.approval?.status === "approved" ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"}`}>
+                                                {document.approval?.status === "approved" ? `Goals approved (v${document.approval.version})` : "Needs approval"}
+                                            </span>
+                                        )}
                                     </div>
 
                                     <div className="flex items-center gap-6 text-[14px] text-[#808081]">

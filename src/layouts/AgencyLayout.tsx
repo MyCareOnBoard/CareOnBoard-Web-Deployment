@@ -10,7 +10,7 @@ import DashboardHeader from "@/components/DashboardHeader";
 import DashboardSidebar, { NavItem, brandSidebarLogo } from "@/components/DashboardSidebar";
 import { UserPanelAccountMenu, type AccountMenuLink } from "@/layouts/UserPanelAccountMenu";
 import { AgencyProgramSwitch, AgencyTopBarDate } from "@/components/agency/AgencyShell";
-import AnnouncementBanner from "@/components/AnnouncementBanner";
+import { AgencyAnnouncementPill, AgencyGlobalSearch } from "@/components/agency/AgencyTopBarTools";
 import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
 import { UserType } from "@/utils/auth/types/user.types";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -311,7 +311,11 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
                     onLogout={handleLogout}
                     sidebarInset={!needsModeSelection}
                     surface={needsModeSelection ? "page" : "card"}
-                    leading={needsModeSelection ? undefined : <AgencyTopBarDate />}
+                    leading={needsModeSelection ? undefined : <div className="flex min-w-0 items-center gap-3">
+                        <AgencyTopBarDate />
+                        <AgencyAnnouncementPill endpoint="/agencyAnnouncements/announcements/mine" viewAllPath={Routes.agency.announcements} />
+                        <AgencyGlobalSearch navItems={navItems} agencyId={agencyId} />
+                    </div>}
                     showSettings={false}
                     variant="panel"
                     accountMenu={<UserPanelAccountMenu roleLabel={userRole} onLogout={handleLogout} links={agencyAccountLinks} fieldStaff={false} careConnectUserType={user?.userType ?? UserType.AGENCY} />}
@@ -327,7 +331,6 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
                             "relative mx-4 mb-4 mt-4 min-h-[calc(100vh-32px)] rounded-[20px] bg-white pb-10 pt-[76px] transition-[margin] duration-200 dark:bg-[#151c22]",
                             collapsed ? "md:ml-[96px]" : "md:ml-[256px]",
                         )}>
-                            <AnnouncementBanner endpoint="/agencyAnnouncements/announcements/mine" viewAllPath={Routes.agency.announcements} className="mx-4 mb-4 sm:mx-8" />
                             <div key={`${agencyId}:${effectiveMode}`} className="px-4 sm:px-8">{children ?? <Outlet />}</div>
                         </main>
                         <TooltipProvider>

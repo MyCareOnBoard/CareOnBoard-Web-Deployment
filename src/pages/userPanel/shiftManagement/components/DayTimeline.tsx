@@ -72,13 +72,13 @@ export default function DayTimeline({shifts, showNow, onOpen}: Props) {
                         style={{top: top(item.start), left: `calc(${LABEL_WIDTH}px + ${lanePart} * ${item.lane})`, width: `calc(${lanePart} - 8px)`}}>
                         <span className={cn('absolute left-0 top-0 w-1 rounded-full', toneBar[tone])} style={{height: Math.max(top(item.end) - top(item.start), 8)}} aria-hidden="true"/>
                         <button type="button" onClick={() => onOpen(item.shift)}
-                            aria-label={[shiftTitle(item.shift), range, clientLabel(item.shift), toneLabel[tone]].join(', ')}
+                            aria-label={[shiftTitle(item.shift), range, clientLabel(item.shift), ...(item.shift.ciSessionId ? ['Group outing'] : []), toneLabel[tone]].join(', ')}
                             className="absolute left-2 top-1.5 flex w-[calc(100%-8px)] max-w-[240px] cursor-pointer flex-col items-start justify-start gap-1.5 overflow-hidden rounded-[6px] border border-[#e3e8ea] bg-white px-2.5 py-2 text-left transition-colors hover:border-[#c9d3d6] hover:bg-[#f7f9f9] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#007679] dark:border-white/10 dark:bg-[#1b232b] dark:hover:bg-white/[0.04]"
                             style={{height: CARD_HEIGHT - 8}}>
                             <span className="w-full truncate text-[14px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">{shiftTitle(item.shift)}</span>
                             <span className="flex w-full flex-col">
                                 <span className="truncate text-[13px] font-medium text-[#10141a] dark:text-[#dbe3e6]">{range}</span>
-                                <span className="truncate text-[12px] text-[#5d6b73] dark:text-[#9aa4a8]">{clientLabel(item.shift)}</span>
+                                <span className="truncate text-[12px] text-[#5d6b73] dark:text-[#9aa4a8]">{clientLabel(item.shift)}{item.shift.ciSessionId ? ' · Group outing' : ''}</span>
                             </span>
                         </button>
                     </li>;

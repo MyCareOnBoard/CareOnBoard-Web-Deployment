@@ -13,6 +13,7 @@ const AgencyInfoTab = lazy(() => import("./components/AgencyInfoTab"));
 const NotificationsTab = lazy(() => import("./components/NotificationTab"));
 const AgencyPayrollSetupTab = lazy(() => import("./components/AgencyPayrollSetupTab"));
 const MyPayrollTab = lazy(() => import("@/features/payroll/components/MyPayrollTab"));
+const CommunityInclusionSettingsTab = lazy(() => import("./components/CommunityInclusionSettingsTab"));
 
 
 
@@ -27,6 +28,10 @@ export default function AgencySettingsPage() {
   const accessList = user?.profile?.accessList ?? [];
   const canOpenPayrollSetup = canManageEmployeePayroll(user?.userType, accessList)
     || user?.canOpenAgencyPayrollSetup === true;
+  // Community inclusion / day program settings: DDD agencies, owner or staff with Notes access.
+  const supportedTypes: readonly string[] = user?.agency?.supportedClientTypes ?? [];
+  const canManageCommunityInclusion = supportedTypes.includes("ddd")
+    && (user?.userType === UserType.AGENCY || (isAgencyStaff && accessList.includes("Notes")));
 
   const tabs = useMemo(() => {
 
@@ -42,10 +47,11 @@ export default function AgencySettingsPage() {
 
     if (isAgencyStaff) items.push({ id: "myPayroll", label: "Payroll Setup" });
     if (canOpenPayrollSetup) items.push({ id: "payrollSetup", label: "Agency Payroll Setup" });
+    if (canManageCommunityInclusion) items.push({ id: "communityInclusion", label: "Community Inclusion" });
 
     return items;
 
-  }, [isAgencyStaff, canOpenPayrollSetup]);
+  }, [isAgencyStaff, canOpenPayrollSetup, canManageCommunityInclusion]);
 
 
 
@@ -157,6 +163,14 @@ export default function AgencySettingsPage() {
 
           </TabPanel>
 
+        )}
+
+        {canManageCommunityInclusion && visitedTabs.has("communityInclusion") && (
+          <TabPanel tabId="communityInclusion" activeTab={activeTab}>
+            <Suspense fallback={<SettingsTabSkeleton variant="form" cardCount={3} />}>
+              <CommunityInclusionSettingsTab />
+            </Suspense>
+          </TabPanel>
         )}
 
         {canOpenPayrollSetup && visitedTabs.has("payrollSetup") && user?.uid && user.agencyId && (

@@ -46,3 +46,9 @@ it('retains uncertain return identity and blocks approval', async () => {
   await waitFor(() => expect(mocks.reject).toHaveBeenCalledTimes(2));
   expect(mocks.reject.mock.calls[1][0]).toEqual(payload);
 });
+it('sends the goal alignment with approve and return', async () => {
+  render(<EditableNoteActions submissionId="s" onEdit={vi.fn()} canEdit={false} goalAlignment={{ value: 'partly', comment: 'Link the library visit to goal 2' }} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+  await waitFor(() => expect(mocks.approve).toHaveBeenCalledTimes(1));
+  expect(mocks.approve.mock.calls[0][0]).toMatchObject({ submissionId: 's', goalAlignment: { value: 'partly', comment: 'Link the library visit to goal 2' } });
+});

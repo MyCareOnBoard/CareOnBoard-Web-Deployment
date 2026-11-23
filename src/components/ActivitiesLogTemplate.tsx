@@ -19,6 +19,7 @@ import {ReviewFacts, ReviewTags} from '@/pages/userPanel/notes/components/Review
 import {SectionRequests, sectionRequests} from '@/pages/userPanel/notes/components/NoteThread';
 import {useNoteVisit} from '@/pages/userPanel/notes/useNoteVisit';
 import type {SaveState, SubmitResult} from '@/pages/userPanel/notes/useSingleRowNote';
+import {ciApi, CI_PROGRESS, type CiGoal, type CiLocation, type CiProgram} from '@/lib/api/ci-tracker';
 
 /*
  * Community inclusion, day habilitation and prevocational training logs: one row
@@ -35,11 +36,19 @@ type ActivityRow = {
     location: string;
     notes: string;
     connections: string[];
+    /** Community inclusion / day program: the saved place picked, if any. */
+    locationId: string;
+    /** Approved goals this row worked on, and progress per goal. */
+    goalIds: string[];
+    progress: Record<string, string>;
 };
+
+/** Note types whose rows link to the client's approved goals. */
+const GOAL_PROGRAMS: Record<string, CiProgram> = {'community-inclusion': 'ci', 'day-habilitation': 'day'};
 
 const SUPPORT = ['Independent', 'Verbal prompts', 'Hands-on help'];
 const CONNECTIONS = ['Club or group members', 'Staff where we went', 'Members of the public', 'Shop or cafe staff', 'Friends', 'Family', 'Other'];
-const blank = (date: Date | undefined): ActivityRow => ({id: '', date, units: '', strategies: '', activities: '', location: '', notes: '', connections: []});
+const blank = (date: Date | undefined): ActivityRow => ({id: '', date, units: '', strategies: '', activities: '', location: '', notes: '', connections: [], locationId: '', goalIds: [], progress: {}});
 const filled = (row: ActivityRow) => Boolean(row.units || row.strategies || row.activities.trim() || row.location.trim() || row.notes.trim());
 const complete = (row: ActivityRow) => Boolean(row.date && Number(row.units) > 0 && row.strategies.trim() && row.activities.trim() && row.location.trim() && row.notes.trim());
 const INPUT = 'h-10 w-full rounded-[8px] border border-[#e3e8ea] bg-white px-3 text-[14px] text-[#10141a] outline-none focus-visible:border-[#007679] focus-visible:ring-2 focus-visible:ring-[#007679]/20 disabled:opacity-70 dark:border-white/10 dark:bg-[#141b21] dark:text-[#f4f6f7]';
@@ -83,14 +92,26 @@ function ActivitiesLogForm({activityLogId}: ActivitiesLogTemplateProps & {activi
     const [confirmed, setConfirmed] = useState(false);
     const [saveState, setSaveState] = useState<SaveState>('idle');
     const [savedAt, setSavedAt] = useState<Date | null>(null);
+    const goalProgram = GOAL_PROGRAMS[noteType] ?? null;
+    const clientId = typeof activityLog?.metadata?.clientId === 'string' ? activityLog.metadata.clientId : null;
+    const [goals, setGoals] = useState<CiGoal[] | null>(null);
+    const [places, setPlaces] = useState<CiLocation[]>([]);
+    useEffect(() => {
+        if (!goalProgram || !clientId) return;
+        const controller = new AbortController();
+        ciApi.clientGoals(clientId, goalProgram, controller.signal).then(res => setGoals(res.approved?.goals ?? [])).catch(() => { if (!controller.signal.aborted) setGoals([]); });
+        ciApi.listLocations().then(setPlaces).catch(() => undefined);
+        return () => controller.abort();
+    }, [goalProgram, clientId]);
 
     const lockedIds = new Set([...submittedIds, ...(activityLog?.submittedNotes ?? []).map(note => note.id), ...(activityLog?.approvedNotes ?? []).map(note => note.id)]);
     const busy = operation.pending || flushing;
 
     /** Saves one row once it has a date. Saves run one after another so rows are never duplicated. */
-    const updateActivity = (_id: string, index: number, field: keyof ActivityRow, value: ActivityRow[keyof ActivityRow]) => {
+    const updateActivity = (_id: string, index: number, field: keyof ActivityRow, value: ActivityRow[keyof ActivityRow]) => patchActivity(index, {[field]: value});
+    const patchActivity = (index: number, patch: Partial<ActivityRow>) => {
         if (busy || submitting.current || lockedIds.has(activitiesRef.current[index].id)) return;
-        activitiesRef.current = activitiesRef.current.map((row, i) => i === index ? {...row, [field]: value} : row);
+        activitiesRef.current = activitiesRef.current.map((row, i) => i === index ? {...row, ...patch} : row);
         setActivities(activitiesRef.current);
         const saveKey = `activity:${index}`;
         saveChain.current = saveChain.current.catch(() => {}).then(async () => {
@@ -106,7 +127,8 @@ function ActivitiesLogForm({activityLogId}: ActivitiesLogTemplateProps & {activi
                     startDate: format(current.date, 'yyyy-MM-dd'),
                     endDate: format(current.date, 'yyyy-MM-dd'),
                     metadata: {units: current.units, strategies: current.strategies, activities: current.activities, location: current.location, notes: current.notes,
-                        ...(current.connections.length ? {connections: current.connections} : {})},
+                        ...(current.connections.length ? {connections: current.connections} : {}),
+                        ...(goalProgram ? {locationId: current.locationId || null, goalIds: current.goalIds, progress: current.progress} : {})},
                 }}).unwrap();
                 failedSaves.current.delete(saveKey);
                 setSaveState('saved');
@@ -136,6 +158,9 @@ function ActivitiesLogForm({activityLogId}: ActivitiesLogTemplateProps & {activi
             location: note.metadata?.location ?? '',
             notes: note.metadata?.notes ?? '',
             connections: Array.isArray(note.metadata?.connections) ? note.metadata.connections.filter((value: unknown) => typeof value === 'string') : [],
+            locationId: typeof note.metadata?.locationId === 'string' ? note.metadata.locationId : '',
+            goalIds: Array.isArray(note.metadata?.goalIds) ? note.metadata.goalIds.filter((value: unknown) => typeof value === 'string') : [],
+            progress: note.metadata?.progress && typeof note.metadata.progress === 'object' ? note.metadata.progress : {},
         }));
         activitiesRef.current = rows.length ? rows : [blank(noteServiceDate(activityLog.serviceDate ?? undefined))];
         setActivities(activitiesRef.current);
@@ -217,9 +242,13 @@ function ActivitiesLogForm({activityLogId}: ActivitiesLogTemplateProps & {activi
             const index = activities.indexOf(row);
             if (!complete(row)) list.push({id: `row-${index}`, text: `Finish ${words.one} ${index + 1}: name, activity, units, support and how they took part`, target: `place-${index}`});
         });
+        if (goalProgram && goals?.length) used.forEach(row => {
+            const index = activities.indexOf(row);
+            if (!row.goalIds.length) list.push({id: `goal-${index}`, text: `Pick the goal ${words.one} ${index + 1} worked on`, target: `place-${index}`});
+        });
         if (!confirmed) list.push({id: 'sign-off', text: 'Tick the sign-off confirmation', target: 'sign-off'});
         return list;
-    }, [used, activities, confirmed, words.one]);
+    }, [used, activities, confirmed, words.one, goalProgram, goals]);
 
     const addRow = () => {
         if (disabled) return;
@@ -241,7 +270,13 @@ function ActivitiesLogForm({activityLogId}: ActivitiesLogTemplateProps & {activi
                     <span className="relative mt-1 block">
                         <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a979d]" aria-hidden="true"/>
                         <input aria-label={words.name} value={entry.location} disabled={rowLocked} maxLength={200} placeholder={inclusion ? 'e.g. Somerset County Library' : 'Where did this happen?'}
-                            onChange={event => set('location', event.target.value)} className={cn(INPUT, 'pl-9')}/>
+                            list={goalProgram && places.length ? 'ci-saved-places' : undefined}
+                            onChange={event => {
+                                const value = event.target.value;
+                                if (!goalProgram) return set('location', value);
+                                const match = places.find(place => place.name.toLowerCase() === value.trim().toLowerCase());
+                                patchActivity(index, {location: value, locationId: match?.id ?? ''});
+                            }} className={cn(INPUT, 'pl-9')}/>
                     </span>
                 </label>
                 <label className="w-[132px]" data-note-field="units">
@@ -266,6 +301,8 @@ function ActivitiesLogForm({activityLogId}: ActivitiesLogTemplateProps & {activi
                     <input aria-label="Strategies addressed" value={entry.strategies} disabled={rowLocked} maxLength={300} onChange={event => set('strategies', event.target.value)} className={cn(INPUT, 'mt-1')}/>
                 </label> : <SegmentedChoice name={`support-${index}`} legend="Level of support" options={SUPPORT} value={entry.strategies} disabled={rowLocked} onChange={value => set('strategies', value)}/>}
             </div>
+            {goalProgram ? <GoalPicker goals={goals} entry={entry} disabled={rowLocked} missing={attempted && filled(entry) && Boolean(goals?.length) && !entry.goalIds.length}
+                onChange={(goalIds, progress) => patchActivity(index, {goalIds, progress})}/> : null}
             <SectionRequests comments={comments} section={`place-${index + 1}`} timezone={timezone}/>
             <label className="mt-3 block" data-note-field="notes">
                 <span className={LABEL}>How they took part</span>
@@ -323,6 +360,7 @@ function ActivitiesLogForm({activityLogId}: ActivitiesLogTemplateProps & {activi
                 </NoteSection>
                 <NoteSection id="places" icon={<MapPin/>} title={words.section} aside={<SectionChip>{used.length} {used.length === 1 ? words.one : `${words.one === 'activity' ? 'activities' : 'places'}`} · {totalUnits} units</SectionChip>}>
                     <ol className="flex flex-col gap-3">{activities.map((entry, index) => row(entry, index, attempted, comments))}</ol>
+                    {goalProgram && places.length ? <datalist id="ci-saved-places">{places.map(place => <option key={place.id} value={place.name}/>)}</datalist> : null}
                     <button type="button" onClick={addRow} disabled={disabled}
                         className="mt-3 flex h-10 w-full cursor-pointer items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-[#c4cdd1] text-[13px] text-[#34434c] hover:bg-[#f7f9f9] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/20 dark:text-[#c9d3d6] dark:hover:bg-white/5">
                         <Plus className="h-4 w-4" aria-hidden="true"/>{words.add}
@@ -347,4 +385,41 @@ function ActivitiesLogForm({activityLogId}: ActivitiesLogTemplateProps & {activi
             </>;
         }}
     </NoteWorkspace>;
+}
+
+/** Approved goals a community inclusion / day program row worked on, with progress for each. */
+function GoalPicker({goals, entry, disabled, missing, onChange}: {
+    goals: CiGoal[] | null;
+    entry: ActivityRow;
+    disabled: boolean;
+    missing: boolean;
+    onChange: (goalIds: string[], progress: Record<string, string>) => void;
+}) {
+    if (goals === null) return <p className="mt-3 text-[12px] text-[#5d6b73]">Loading goals…</p>;
+    if (!goals.length) return <p className="mt-3 rounded-[6px] bg-[#fff4e0] px-3 py-2 text-[12px] text-[#a15c00] dark:bg-[#f29d0c]/15 dark:text-[#f7c46b]">This client's goals haven't been approved yet. Ask the office to approve them so you can link this row.</p>;
+    const toggle = (id: string) => {
+        const goalIds = entry.goalIds.includes(id) ? entry.goalIds.filter(item => item !== id) : [...entry.goalIds, id];
+        const progress = Object.fromEntries(Object.entries(entry.progress).filter(([key]) => goalIds.includes(key)));
+        onChange(goalIds, progress);
+    };
+    return <fieldset className="mt-3" data-note-field="goalIds">
+        <legend className={LABEL}>Goals worked on</legend>
+        <ul className={cn('mt-1 flex flex-col gap-1.5 rounded-[8px] border p-2', missing ? 'border-[#e5484d]' : 'border-[#e3e8ea] dark:border-white/10')}>
+            {goals.map(goal => {
+                const checked = entry.goalIds.includes(goal.id);
+                return <li key={goal.id} className="flex flex-wrap items-center gap-2">
+                    <label className="flex min-w-0 flex-1 basis-[220px] cursor-pointer items-start gap-2 text-[13px] text-[#10141a] dark:text-[#f4f6f7]">
+                        <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#007679]" checked={checked} disabled={disabled} onChange={() => toggle(goal.id)}/>
+                        <span>{goal.number ? `${goal.number}. ` : ''}{goal.description}</span>
+                    </label>
+                    {checked ? <select aria-label={`Progress on goal ${goal.number || goal.description}`} value={entry.progress[goal.id] ?? ''} disabled={disabled}
+                        onChange={event => onChange(entry.goalIds, {...entry.progress, [goal.id]: event.target.value})} className={cn(INPUT, 'h-8 w-[150px] cursor-pointer text-[13px]')}>
+                        <option value="">Progress…</option>
+                        {CI_PROGRESS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select> : null}
+                </li>;
+            })}
+        </ul>
+        {missing ? <p role="alert" className="mt-1 text-[12px] text-[#b3261e] dark:text-[#f3a08c]">Pick at least one goal.</p> : null}
+    </fieldset>;
 }

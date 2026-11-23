@@ -69,3 +69,9 @@ export interface SubmittedNoteDetails {
     email?: string;
   };
 }
+
+/** Reviewer's judgement of how well a community inclusion / day program log matches the client's goals. */
+export interface GoalAlignmentInput {
+  value: 'aligned' | 'partly' | 'not_aligned';
+  comment?: string;
+}

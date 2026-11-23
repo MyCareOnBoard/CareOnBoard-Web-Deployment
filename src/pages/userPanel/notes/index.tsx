@@ -14,6 +14,8 @@ import {SearchBox} from '../records/RecordsKit';
 import {ClientCell, NOTE_CARD, NOTE_LINK, NOTE_PRIMARY, NOTE_SECONDARY, NoteBanner, NoteStatusBadge, NotesStatCard, ServiceChip, useOnline} from './components/NotesKit';
 import StartNoteDialog from './components/StartNoteDialog';
 import {useOpenNote} from './useOpenNote';
+import {CiWeeklyDueBanner} from '@/components/ci/CiWeeklyDueBanner';
+import {CI_NOTE_TYPES} from '@/lib/api/ci-tracker';
 
 const PAGE_SIZE = 7;
 const CACHE_KEY = 'careonboard:notes-list:v1';
@@ -233,6 +235,7 @@ export default function NotesPage() {
                 action={<button type="button" onClick={dismissToast} aria-label="Dismiss" className="cursor-pointer"><X className="h-4 w-4"/></button>}>
                 <span className="font-semibold">Note submitted</span> · {clientLabel(toast.clientId)}{toast.serviceDate ? `, ${serviceDay(toast.serviceDate)}` : ''}. Sent to your coordinator.
             </NoteBanner>}
+            <CiWeeklyDueBanner enabled={online && items.some(item => CI_NOTE_TYPES.includes(item.noteType))}/>
             {source?.truncated && <NoteBanner tone="neutral" role="status">Showing the 500 most recent shifts from the last 60 days.</NoteBanner>}
 
             <section aria-label="Overview" className="grid grid-cols-2 gap-3 xl:grid-cols-4">

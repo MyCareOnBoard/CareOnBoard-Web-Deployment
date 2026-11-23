@@ -49,6 +49,7 @@ import {
 } from "@/pages/agency/scheduling/weeklyDistributionSchedule";
 import { staffLabels } from "@/lib/roleLabel";
 import type { AgencyMode } from "@/store/redux/agencyModeSlice";
+import { CiOutingForm } from "@/components/ci/CiOutingForm";
 import type {
   OperationalAgencyDataAdapter,
   OperationalClientOption,
@@ -363,6 +364,10 @@ export default function AddScheduleModal({
   const [formData, setFormData] = useState<ScheduleFormData>(initialFormData);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  /** "Group outing": one community inclusion or day program outing, one shift per client. */
+  const [groupOuting, setGroupOuting] = useState(false);
+  const canScheduleOuting = mode !== "edit" && agencyMode !== "hha" && agencyMode !== "sc" && supportedClientTypes.includes("ddd");
+  useEffect(() => { if (!isOpen) setGroupOuting(false); }, [isOpen]);
 
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
@@ -2329,7 +2334,7 @@ export default function AddScheduleModal({
             {/* Title Bar - Fixed */}
             <div className="flex items-center justify-between p-5 pb-0 shrink-0">
               <h2 className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
-                {mode === "edit" ? "Edit Schedule" : "Add new Schedule"}
+                {mode === "edit" ? "Edit Schedule" : groupOuting ? "Add group outing" : "Add new Schedule"}
               </h2>
               <button
                 type="button"
@@ -2342,6 +2347,29 @@ export default function AddScheduleModal({
               </button>
             </div>
 
+            {canScheduleOuting && (
+              <label className="mx-5 mt-4 flex shrink-0 cursor-pointer items-center justify-between gap-3 rounded-xl border border-[#e4e7ea] px-4 py-3">
+                <span>
+                  <span className="block text-[14px] font-medium text-[#10141a]">Group outing</span>
+                  <span className="block text-[12px] text-[#5b636b]">Community inclusion or day program with several clients</span>
+                </span>
+                <input type="checkbox" role="switch" className="h-5 w-5 accent-[#00B5B8]" checked={groupOuting} onChange={(e) => setGroupOuting(e.target.checked)} disabled={isSubmitting} />
+              </label>
+            )}
+            {groupOuting && canScheduleOuting ? (
+              <CiOutingForm
+                agencyId={agencyId}
+                onCancel={onClose}
+                onCreated={(shifts, close) => {
+                  if (close) onClose();
+                  if (!shifts.length || !onShiftsUpdated) return;
+                  // Parents replace their list with what we pass, so send the refreshed list.
+                  listShifts({ limit: 100, agencyId, client: true, employee: true })
+                    .then((response) => onShiftsUpdated(response.shifts || []))
+                    .catch(() => undefined);
+                }}
+              />
+            ) : (<>
             {/* Form - Scrollable */}
             <div className="flex-1 overflow-y-auto px-5 py-4">
               <div className="flex flex-col gap-4">
@@ -3342,6 +3370,7 @@ export default function AddScheduleModal({
                 )}
               </Button>
             </div>
+            </>)}
           </div>
         </div>
       )}

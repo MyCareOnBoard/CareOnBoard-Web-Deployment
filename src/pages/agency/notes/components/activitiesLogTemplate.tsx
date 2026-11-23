@@ -9,6 +9,8 @@ import {useUpdateSubmittedNoteMutation} from "@/pages/agency/notes/api";
 import {format} from "date-fns";
 import {SubmittedNoteDetails} from "@/pages/agency/notes/apiTypes";
 import InformationCircleIcon from "@/assets/icons/information-circle.svg?react";
+import {CiLogReview} from "@/components/ci/CiLogReview";
+import type {CiProgram} from "@/lib/api/ci-tracker";
 
 
 type ActivityRow = {
@@ -37,10 +39,12 @@ interface AgencyActivitiesLogTemplateProps {
   isLoading: boolean;
   submittedNote?: SubmittedNoteDetails;
   readOnly?: boolean;
+  /** Community inclusion / day program logs show goals, places and the alignment review. */
+  ciProgram?: CiProgram;
 }
 
 export default function AgencyActivitiesLogTemplate(
-  {title, submissionId, isLoading, submittedNote, readOnly = false}: AgencyActivitiesLogTemplateProps
+  {title, submissionId, isLoading, submittedNote, readOnly = false, ciProgram}: AgencyActivitiesLogTemplateProps
 ) {
   const isEditable = !readOnly && submittedNote?.status === "submitted";
   const [openDatePopoverId, setOpenDatePopoverId] = useState<string | null>(null);
@@ -415,6 +419,8 @@ export default function AgencyActivitiesLogTemplate(
             </div>
           </div>
         </div>
+
+        {ciProgram && submittedNote && <CiLogReview submittedNote={submittedNote} program={ciProgram} readOnly={readOnly} />}
 
         {/* Submitted By Section */}
         <div className="mt-8">

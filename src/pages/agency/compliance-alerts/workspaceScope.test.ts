@@ -13,9 +13,10 @@ describe('workspace access and URL boundary', () => {
   it('intersects workspace with independent source grants', () => {
     expect(getComplianceSources(staff(['Compliance Alerts', 'Trainings']), 'ddd')).toEqual(['document_expiry', 'training']);
     expect(getComplianceSources(staff(['Compliance Alerts', 'Client Management']), 'hha')).toEqual(['client_documents', 'manual_audits', 'unsigned_form485']);
-    expect(getComplianceSources(staff(['Compliance Alerts', 'Notes', 'Scheduling']), 'ddd')).toEqual(['shift_notes', 'documentation_patterns']);
-    expect(getComplianceSources(staff(['Compliance Alerts', 'Notes', 'Shift Management']), 'ddd')).toEqual(['shift_notes', 'documentation_patterns']);
-    expect(getComplianceSources(staff(['Compliance Alerts', 'Notes']), 'ddd')).toEqual(['documentation_patterns']);
+    expect(getComplianceSources(staff(['Compliance Alerts', 'Notes', 'Scheduling']), 'ddd')).toEqual(['shift_notes', 'documentation_patterns', 'community_inclusion']);
+    expect(getComplianceSources(staff(['Compliance Alerts', 'Notes', 'Shift Management']), 'ddd')).toEqual(['shift_notes', 'documentation_patterns', 'community_inclusion']);
+    expect(getComplianceSources(staff(['Compliance Alerts', 'Notes']), 'ddd')).toEqual(['documentation_patterns', 'community_inclusion']);
+    expect(getComplianceSources(staff(['Compliance Alerts', 'Notes']), 'hha')).toEqual(['documentation_patterns']);
     expect(getComplianceSources(staff(['Compliance Alerts', 'Notes']), 'sc')).toEqual([]);
     expect(getComplianceSources(staff(['Compliance Alerts']), 'ddd')).toEqual([]);
     expect(getComplianceSources(staff(['Trainings']), 'ddd')).toEqual([]);
@@ -32,12 +33,14 @@ describe('workspace access and URL boundary', () => {
     }
   });
   it('retains owner and SC staff capabilities without broadening explicit grants', () => {
-    expect(getComplianceSources({userType: 'agency', agency: {supportedClientTypes: ['ddd']}}, 'ddd')).toEqual(['document_expiry', 'training', 'client_documents', 'manual_audits', 'shift_notes', 'documentation_patterns']);
+    expect(getComplianceSources({userType: 'agency', agency: {supportedClientTypes: ['ddd']}}, 'ddd')).toEqual(['document_expiry', 'training', 'client_documents', 'manual_audits', 'shift_notes', 'documentation_patterns', 'community_inclusion']);
     expect(getComplianceSources(staff(['Compliance Alerts', 'DSP Management', 'Trainings', 'Client Management']), 'sc')).toEqual(['document_expiry', 'training']);
     for (const grant of [[], 'ddd', ['bad'], ['ddd', 'ddd']]) expect(getComplianceSources(staff(['Compliance Alerts', 'Trainings'], grant), 'ddd')).toEqual([]);
   });
   it('parses legacy notification and allowed selections', () => {
     expect(parseComplianceView(new URLSearchParams('shiftId=shift-1'))).toEqual({ok: true, view: {section: 'shifts', source: 'shift_notes', shiftId: 'shift-1'}});
+    expect(parseComplianceView(new URLSearchParams('source=community_inclusion&startDate=2026-11-22'))).toEqual({ok: true, view: {section: 'shifts', source: 'community_inclusion', startDate: '2026-11-22'}});
+    expect(parseComplianceView(new URLSearchParams('source=community_inclusion&employeeId=e1')).ok).toBe(false);
     expect(parseComplianceView(new URLSearchParams('section=staff&source=training&employeeId=employee'))).toMatchObject({ok: true, view: {source: 'training', employeeId: 'employee'}});
   });
   it.each(['source=bad','section=clients&source=training','source=training&startDate=2026-09-01','source=training&mode=sc','source=training&employeeId=a%2Fb','source=shift_notes&startDate=2026-02-30','source=shift_notes&startDate=2026-09-18&endDate=2026-09-17','source=unsigned_form485&mode=ddd','source=client_documents&clientId=c&search=a','source=training&source=training'])('rejects invalid URL %s', query => {

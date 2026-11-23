@@ -43,9 +43,9 @@ export default function SubmittedNoteModal({ isOpen, submissionId, readOnly, sco
       case "community-based":
         return <CommunityBasedNote {...commonProps} />;
       case "community-inclusion":
-        return <ActivitiesLogTemplate {...commonProps} title="Community Inclusion Services – Activities Log (:serviceCode)" />;
+        return <ActivitiesLogTemplate {...commonProps} title="Community Inclusion Services – Activities Log (:serviceCode)" ciProgram="ci" />;
       case "day-habilitation":
-        return <ActivitiesLogTemplate {...commonProps} title="Day Habilitation Services – Activities Log (:serviceCode)" />;
+        return <ActivitiesLogTemplate {...commonProps} title="Day Habilitation Services – Activities Log (:serviceCode)" ciProgram="day" />;
       case "prevocational-training":
         return <ActivitiesLogTemplate {...commonProps} title="Prevocational Training Services – Activities Log (:serviceCode)" />;
       case "supported-employment-pre":

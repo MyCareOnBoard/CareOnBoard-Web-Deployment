@@ -135,6 +135,10 @@ export interface Shift {
     completedBy?: string;
     goalsType?: string;
     goalsAndDocumentsId?: string;
+    /** Group outing this shift belongs to, and the attendance marked on it. */
+    ciSessionId?: string | null;
+    attendanceOutcome?: 'attended' | 'absent' | null;
+    attendanceReason?: string | null;
     employee?: Employee;
     agency?: Agency;
     anomalyCodes?: AnomalyCode[];
@@ -164,6 +168,8 @@ export interface CreateShiftRequest {
     commentedBy?: string;
     goalsType?: string;
     goalsAndDocumentsId?: string;
+    /** Group outing (community inclusion / day program) this per-client shift belongs to. */
+    ciSessionId?: string;
     serviceCode?: string;
     serviceLocationSource?: ServiceLocationSource;
     schedulingType?: string;

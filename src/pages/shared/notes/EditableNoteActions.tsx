@@ -3,14 +3,17 @@ import {careerUncertain} from '@/lib/api/career-planning';
 import { useNoteOperation } from '@/lib/notes/useNoteOperation';
 import { CornerDownLeft } from "lucide-react";
 import { useApproveSubmittedNotesMutation, useRejectSubmittedNotesMutation } from "@/pages/agency/notes/api";
+import type { GoalAlignmentInput } from "@/pages/agency/notes/apiTypes";
 
 interface EditableNoteActionsProps {
   submissionId: string;
   onEdit: () => void;
   canEdit?: boolean;
+  /** Community inclusion / day program reviews: sent with approve and return. */
+  goalAlignment?: GoalAlignmentInput;
 }
 
-export default function EditableNoteActions({ submissionId, onEdit, canEdit = true }: EditableNoteActionsProps) {
+export default function EditableNoteActions({ submissionId, onEdit, canEdit = true, goalAlignment }: EditableNoteActionsProps) {
   const [approveNotes, { isLoading: isApproving }] = useApproveSubmittedNotesMutation();
   const [rejectNotes, { isLoading: isRejecting }] = useRejectSubmittedNotesMutation();
   const operation = useNoteOperation();
@@ -20,7 +23,7 @@ export default function EditableNoteActions({ submissionId, onEdit, canEdit = tr
 
   const approve = async () => {
     try {
-      await operation.run({action: 'approve', resourceId: submissionId}, operationId => approveNotes({submissionId, operationId}).unwrap());
+      await operation.run({action: 'approve', resourceId: submissionId}, operationId => approveNotes({submissionId, operationId, goalAlignment}).unwrap());
       setUnknownAction(null);setErrorMessage('');
     } catch (error) {
       setUnknownAction(careerUncertain(error)?'approve':null);setErrorMessage(careerUncertain(error)?'Approval could not be confirmed. Check approval before another action.':'Unable to approve these notes. Please try again.');
@@ -29,7 +32,7 @@ export default function EditableNoteActions({ submissionId, onEdit, canEdit = tr
 
   const reject = async () => {
     try {
-      await operation.run({action: 'return', resourceId: submissionId}, operationId => rejectNotes({submissionId, operationId}).unwrap());
+      await operation.run({action: 'return', resourceId: submissionId}, operationId => rejectNotes({submissionId, operationId, goalAlignment}).unwrap());
       setUnknownAction(null);setErrorMessage('');
     } catch (error) {
       setUnknownAction(careerUncertain(error)?'return':null);setErrorMessage(careerUncertain(error)?'Return could not be confirmed. Check return before another action.':'Unable to return these notes. Please try again.');

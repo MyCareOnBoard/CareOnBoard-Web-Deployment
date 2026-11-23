@@ -18,6 +18,7 @@ import {
     useSubmitGoalDocumentMutation
 } from "../api";
 import {DocumentType, IndividualizedGoalsDocument} from "@/lib/api/goals-and-documents";
+import {CiGoalApproval} from "@/components/ci/CiGoalApproval";
 
 interface Outcome {
     outcomeNumber: string;
@@ -41,7 +42,7 @@ export default function IndividualizedGoalsTemplate(
         skip: !documentType || !!firebaseId,
     });
 
-    const {data: firebaseDocument, isLoading: isLoadingFirebaseDoc} = useGetGoalDocumentByFirebaseIdQuery(firebaseId!, {
+    const {data: firebaseDocument, isLoading: isLoadingFirebaseDoc, refetch: refetchFirebaseDocument} = useGetGoalDocumentByFirebaseIdQuery(firebaseId!, {
         skip: !firebaseId,
     });
     const [upsertDocument] = useUpsertGoalDocumentByTypeMutation();
@@ -242,6 +243,9 @@ export default function IndividualizedGoalsTemplate(
 
                 {/* Form Container */}
                 <div className="px-8">
+                    {!isUserPanel && firebaseDocument?.collectionType === "submitted" && (
+                        <CiGoalApproval document={firebaseDocument} onApproved={() => void refetchFirebaseDocument()}/>
+                    )}
                     {/* Header Section */}
                     <div className="text-center mb-6 space-y-2">
                         <p className="text-[14px] font-normal leading-[1.4] text-black font-['Urbanist',sans-serif]">

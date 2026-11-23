@@ -1,4 +1,5 @@
 import type { SaveEmployeeDocumentResponse } from './types';
+import {CiDashboardCard} from '@/components/ci/CiDashboardCard';
 import { useGetDocumentComplianceQuery, useComplianceDateRefresh } from '@/pages/agency/compliance-alerts/api';
 import { complianceLabel, civilDateLabel } from '@/pages/agency/compliance-alerts/apiTypes';
 import React, {useState, useCallback, useEffect, useMemo, useRef} from "react";
@@ -465,6 +466,7 @@ export default function UserPanelDashboardPage() {
                 <div className="flex min-w-0 flex-col gap-5">
                     <UpcomingTasks shifts={nextShifts} loading={shiftsLoading} error={shiftsError} onRetry={retryShifts}
                         viewAllPath={isSupportCoordinator ? Routes.userPanel.manualShiftManagement : Routes.userPanel.shiftManagement}/>
+                    {!isSupportCoordinator && <CiDashboardCard upcoming={nextShifts} all={shifts}/>}
                     <QuickActions supportCoordinator={isSupportCoordinator}/>
                 </div>
             </div>

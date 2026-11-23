@@ -1,7 +1,7 @@
 import { complianceAlertsApi } from '@/pages/agency/compliance-alerts/api';
 import {createApi} from "@reduxjs/toolkit/query/react";
 import {customBaseQuery} from "@/lib/baseQuery";
-import {SubmittedNotesResponse, SubmittedNotesQueryParams, SubmittedNoteDetails} from "./apiTypes";
+import {SubmittedNotesResponse, SubmittedNotesQueryParams, SubmittedNoteDetails, GoalAlignmentInput} from "./apiTypes";
 
 export const agencyNotesApi = createApi({
   reducerPath: "agencyNotesApi",
@@ -31,9 +31,9 @@ export const agencyNotesApi = createApi({
       },
       providesTags: ['SubmittedNotes']
     }),
-    approveSubmittedNotes: builder.mutation<void, {submissionId: string; operationId: string}>({
-      query: ({submissionId, operationId}) => ({
-        data: {operationId},
+    approveSubmittedNotes: builder.mutation<void, {submissionId: string; operationId: string; goalAlignment?: GoalAlignmentInput}>({
+      query: ({submissionId, operationId, goalAlignment}) => ({
+        data: goalAlignment ? {operationId, goalAlignment} : {operationId},
         url: `/employees/submitted-notes/${submissionId}/approve`,
         method: "POST",
         requiresAuth: true
@@ -43,9 +43,9 @@ export const agencyNotesApi = createApi({
       },
       invalidatesTags: (_result,error) => error ? [] : ['SubmittedNotes', 'SubmittedNoteDetails']
     }),
-    rejectSubmittedNotes: builder.mutation<void, {submissionId: string; operationId: string}>({
-      query: ({submissionId, operationId}) => ({
-        data: {operationId},
+    rejectSubmittedNotes: builder.mutation<void, {submissionId: string; operationId: string; goalAlignment?: GoalAlignmentInput}>({
+      query: ({submissionId, operationId, goalAlignment}) => ({
+        data: goalAlignment ? {operationId, goalAlignment} : {operationId},
         url: `/employees/submitted-notes/${submissionId}/reject`,
         method: "POST",
         requiresAuth: true

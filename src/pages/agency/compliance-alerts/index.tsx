@@ -21,6 +21,7 @@ import StaffChecks from "./StaffChecks";
 import ClientChecks from "./ClientChecks";
 import ShiftNotesSection from "./ShiftNotesSection";
 import ManualAuditsSection from "./ManualAuditsSection";
+import CommunityInclusionSection from "./CommunityInclusionSection";
 import AgencyFindings from "./AgencyFindings";
 const restricted =
   "You do not have access to these records. Ask your agency administrator.";
@@ -313,6 +314,9 @@ function Workspace({
         )}
         {source === "shift_notes" && (
           <ShiftNotesSection key={source} {...props} />
+        )}
+        {source === "community_inclusion" && (
+          <CommunityInclusionSection key={source} {...props} />
         )}
       </div>
     </>

@@ -118,6 +118,10 @@ export interface GoalDocument {
     updatedAt: string;
     submittedAt?: string;
     shiftId?: string;
+    /** Which collection the document came from (by-id reads only). */
+    collectionType?: "draft" | "submitted";
+    /** Community inclusion / day program goals the agency approved for log rows to link to. */
+    approval?: { status: "approved"; version: number } | null;
 }
 
 // ==================== Request/Response Types ====================
