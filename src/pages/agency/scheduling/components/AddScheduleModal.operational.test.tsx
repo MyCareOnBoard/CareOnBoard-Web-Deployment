@@ -297,7 +297,7 @@ describe("AddScheduleModal operational data boundary", () => {
 
     expect(screen.getByRole("radio", { name: /1 Old Main St — saved for this shift/i })).toBeChecked();
 
-    fireEvent.click(screen.getByRole("button", { name: "10 August" }));
+    fireEvent.click(screen.getByRole("button", { name: "Mon 10 Aug 2026" }));
     const changedDate = screen.getAllByRole("button", { name: "9" }).find(
       (button) => !button.hasAttribute("disabled"),
     );
@@ -308,9 +308,9 @@ describe("AddScheduleModal operational data boundary", () => {
     expect(screen.queryByText(/1 Old Main St/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("radio")).not.toBeInTheDocument();
     expect(screen.getByText(/no confirmed payroll service location for the shift date/i)).toBeVisible();
-    expect(screen.getByRole("button", { name: "Schedule" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save as draft" }));
     expect(screen.getByText(
       "Confirm a client payroll service location that is effective on the shift date.",
     )).toBeVisible();
@@ -345,7 +345,7 @@ describe("AddScheduleModal operational data boundary", () => {
     expect(screen.queryByText(/1 Old Main St/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("radio")).not.toBeInTheDocument();
     expect(screen.getByText(/no confirmed payroll service location for the shift date/i)).toBeVisible();
-    expect(screen.getByRole("button", { name: "Schedule" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
   });
 
   it("clears stale payroll location options while a rerendered edit client is loading", async () => {
@@ -470,7 +470,7 @@ describe("AddScheduleModal operational data boundary", () => {
       "This client has no confirmed payroll service location for the shift date. Add one on the client record before scheduling.",
     )).toBeVisible();
 
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save as draft" }));
 
     expect(screen.getByText(
       "Confirm a client payroll service location that is effective on the shift date.",
@@ -485,7 +485,7 @@ describe("AddScheduleModal operational data boundary", () => {
     fireEvent.change(screen.getByPlaceholderText("Search client name..."), {
       target: { value: "Typed but not selected" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save as draft" }));
 
     expect(screen.getByText("Choose a client from the search results.")).toBeVisible();
     expect(shiftApi.updateShift).not.toHaveBeenCalled();
@@ -638,7 +638,7 @@ describe("AddScheduleModal operational data boundary", () => {
       onShiftsUpdated,
     }));
     await act(async () => Promise.resolve());
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save as draft" }));
     expect(shiftApi.updateShift).toHaveBeenCalledTimes(1);
     expect(shiftApi.updateShift).toHaveBeenCalledWith(
       "shift-1",
@@ -671,10 +671,10 @@ describe("AddScheduleModal operational data boundary", () => {
     render(modalElement(data, {mode: "edit", editData: editableShift({serviceAuthorizationId: "service-1"})}));
     await act(async () => Promise.resolve());
     expect(getAssignmentDecision).toHaveBeenCalledWith(expect.objectContaining({agencyId: "agency-b", clientId: "client-1", input: expect.objectContaining({employeeId: "staff-1", program: "ddd", kind: "shift", date: "2026-08-10", serviceAuthorizationId: "service-1"})}), expect.any(AbortSignal));
-    expect(screen.getByRole("button", {name: "Save"})).toBeDisabled();
+    expect(screen.getByRole("button", {name: "Save as draft" })).toBeDisabled();
     expect(screen.getByText("Blocked · no applicable assignment checks enabled")).toBeVisible();
     expect(screen.getByText("Staff selection cleared. Resolve the requirements, then select staff again.")).toBeVisible();
-    fireEvent.click(screen.getByRole("button", {name: "Save"}));
+    fireEvent.click(screen.getByRole("button", {name: "Save as draft" }));
     expect(shiftApi.updateShift).not.toHaveBeenCalled();
   });
   it('rejects a failing staff selection without blocking selection of another staff member', async () => {
@@ -686,7 +686,7 @@ describe("AddScheduleModal operational data boundary", () => {
     await act(async () => Promise.resolve());
     expect(screen.getByText('Staff not selected · requirements not met')).toBeVisible();
     expect(screen.queryByText('Blocked · requirements need attention')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', {name: 'Save'})).toBeEnabled();
+    expect(screen.getByRole('button', {name: 'Save as draft'})).toBeEnabled();
     fireEvent.click(screen.getByRole('button', {name: 'Select DSP'}));
     vi.mocked(getAssignmentDecision).mockResolvedValue({state: 'ready', decision: 'CLEARED', fingerprint: 'b'.repeat(64), policyRevision: 1, evaluatedAt: '2026-08-10T12:00:00Z', contextKey: 'other', findings: [], hasRestrictedFindings: false, canAcknowledge: false});
     fireEvent.click(screen.getByRole('button', {name: 'Other Staff'}));
@@ -715,7 +715,7 @@ describe("AddScheduleModal operational data boundary", () => {
     render(modalElement(data, {mode: "edit", editData: editableShift({serviceAuthorizationId: "service-1"})}));
     await act(async () => Promise.resolve());
     expect(getAssignmentDecision).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole("button", {name: "Save"}));
+    fireEvent.click(screen.getByRole("button", {name: "Save as draft" }));
     await act(async () => Promise.resolve());
     expect(shiftApi.updateShift).toHaveBeenCalledTimes(1);
     expect(getAssignmentDecision).toHaveBeenCalledTimes(1);

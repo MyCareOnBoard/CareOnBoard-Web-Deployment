@@ -6,6 +6,8 @@
  */
 import axiosClient from "../axios";
 import { createShift, ShiftStatus, ShiftType, SubmissionStatus, type Shift } from "./shifts";
+import { listEmployees, type Employee } from "./employees";
+import { createGoalDocument, getDocumentsByClient, DocumentType, SubmissionStatus as GoalStatus, type GoalDocument } from "./goals-and-documents";
 
 const BASE = "/communityInclusions";
 
@@ -419,4 +421,43 @@ export async function createOutingShifts(args: {
     }
   }
   return results;
+}
+
+/** Every DSP in the agency, paged 100 at a time (the API's limit), for staff pickers. */
+export async function listProgramStaff(agencyId: string | undefined, signal?: AbortSignal): Promise<Employee[]> {
+  const staff: Employee[] = [];
+  let cursor: string | undefined;
+  for (let page = 0; page < 20; page += 1) {
+    const res = await listEmployees({ agencyId, role: "dsp", limit: 100, cursor, signal });
+    staff.push(...res.employees);
+    cursor = res.nextCursor ?? undefined;
+    if (!cursor) break;
+  }
+  return staff;
+}
+
+/** A client's goals document of this type (approved first, then submitted, then a draft), or null. */
+export async function findProgramGoalsDocument(clientId: string, goalsType: string): Promise<GoalDocument | null> {
+  const { documents = [] } = await getDocumentsByClient(clientId, goalsType as DocumentType);
+  const rank = (d: GoalDocument) => (d.approval?.status === "approved" ? 0 : d.status === GoalStatus.SUBMITTED ? 1 : 2);
+  return [...documents].sort((a, b) => rank(a) - rank(b))[0] ?? null;
+}
+
+/**
+ * Community inclusion and day program goals live in one Individualized Goals document per
+ * client (not one per shift). Starts a draft on Goals & documents for each client that has
+ * none yet, so the agency sees what still needs writing. Returns how many drafts it started.
+ */
+export async function ensureProgramGoalsDocuments(
+  agencyId: string,
+  program: CiProgram,
+  clients: { id: string; name: string }[],
+): Promise<number> {
+  const goalsType = CI_PROGRAMS[program].goalsType as DocumentType;
+  const results = await Promise.allSettled(clients.map(async (client) => {
+    if (await findProgramGoalsDocument(client.id, goalsType)) return false;
+    await createGoalDocument({ agencyId, clientId: client.id, documentType: goalsType, status: GoalStatus.DRAFT, metadata: { name: client.name } as never });
+    return true;
+  }));
+  return results.filter((r) => r.status === "fulfilled" && r.value).length;
 }

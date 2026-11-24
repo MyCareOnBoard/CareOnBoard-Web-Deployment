@@ -2,7 +2,7 @@ import { detectShiftAnomalyCodes } from "@/lib/shift-anomaly-detection";
 import type { AnomalyCode, Shift } from "@/lib/api/shifts";
 import { ShiftStatus } from "@/lib/api/shifts";
 import { SHIFT_ROW_PILL } from "@/lib/shift-visual-tokens";
-import { shiftEndOrEndOfDay } from "@/lib/shift-time";
+import { shiftEndOrEndOfDay, shiftStartAt } from "@/lib/shift-time";
 
 export type ShiftRowStatusInfo = {
   label: string;
@@ -52,13 +52,21 @@ export function parseShiftEndTimeToParts(time: string): { hours: number; minutes
   return { hours, minutes };
 }
 
-export function isShiftMissed(shift: Shift): boolean {
+/** A shift with no clock-in counts as missed this long after its scheduled start. */
+export const MISSED_AFTER_START_MINUTES = 15;
+
+export function isShiftMissed(shift: Shift, options?: { now?: number }): boolean {
+  const now = options?.now ?? Date.now();
   if (shift.status === ShiftStatus.COMPLETED) return false;
   if (shift.clockedInAt) return false;
   if (!shift.date) return false;
-  // Scheduled end (in the shift's zone; overnight shifts end the next day), else end of its day.
-  const endDateTime = shiftEndOrEndOfDay(shift);
-  return Boolean(endDateTime && endDateTime.getTime() < Date.now());
+  // 15 minutes after the scheduled start (in the shift's zone); without a readable start,
+  // the scheduled end, else the end of its day.
+  const start = shiftStartAt(shift);
+  const cutoff = start
+    ? new Date(start.getTime() + MISSED_AFTER_START_MINUTES * 60_000)
+    : shiftEndOrEndOfDay(shift);
+  return Boolean(cutoff && cutoff.getTime() < now);
 }
 
 /** Same rules as Scheduling “Recent shifts” status pill. */

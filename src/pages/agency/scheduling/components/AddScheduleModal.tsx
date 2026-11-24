@@ -4,7 +4,9 @@ import { assignmentDecisionError, parseAssignmentDecisions, type AssignmentDecis
 import { useAssignmentReview, useAssignmentReviewScope } from "@/hooks/useAssignmentReview";
 import { assignmentReviewMetadata, assignmentSaveMessage, type AssignmentReviewEnvelope } from "@/lib/api/assignment-review";
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { X, ChevronDown, Calendar, Upload, ChevronLeft, ChevronRight, FileText, Loader2, ExternalLink, Clock } from "lucide-react";
+import { X, ChevronDown, Calendar, Upload, ChevronLeft, ChevronRight, FileText, Loader2, ExternalLink, Clock, UserRound } from "lucide-react";
+import { DrawerNote, DrawerSection, DrawerSegmented, DRAWER_FIELD, DRAWER_PRIMARY, DRAWER_SECONDARY } from "@/components/agency/ScheduleDrawerParts";
+import { clock24, formatDuration, scheduledMinutes } from "../shift-board";
 import { Button } from "@/components/ui/button";
 import TimePicker from "@/components/TimePicker";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, eachDayOfInterval as eachDayOfIntervalDateFns, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, parseISO, isValid } from "date-fns";
@@ -18,6 +20,7 @@ import type { CreateActivityLogRequest } from "@/lib/api/employees";
 import ScheduleSuccessModal from "./ScheduleSuccessModal";
 import ScheduleSavedModal from "./ScheduleSavedModal";
 import { DocumentType } from "@/lib/api/goals-and-documents";
+import { findProgramGoalsDocument } from "@/lib/api/ci-tracker";
 import { noteTypesForClientType, getNoteTitle, HHA_PERSONAL_CARE, HHA_SERVICE_LOG } from "@/lib/notes/noteTypes";
 import { resolveHhaNoteType } from "@/pages/agency/scheduling/utils/resolveHhaNoteType";
 import { getClientBasicInfo } from "@/lib/notes/clientBasicInfo";
@@ -27,6 +30,7 @@ import {
   serializeIspOutcomesForShift,
 } from "@/pages/agency/scheduling/isp-outcomes";
 import { findOutcomeStatementsForServiceCode } from "@/pages/shared/client-management/utils/outcomeServices";
+import { programNoteDefaults } from "@/pages/agency/scheduling/program-note-defaults";
 import { getClientServicesForOperations } from "@/pages/shared/client-management/utils/clientServicesForOperations";
 import {
   sanitizeWeeklyPartsFromUnknown,
@@ -148,17 +152,21 @@ function shiftIspOutcomeApiValue(displayText: string): string | undefined {
   return serializeIspOutcomesForShift(parseIspOutcomesFromDisplayText(displayText));
 }
 
+/** The service row's own outcomes plus the ISP outcome statements it is listed under. */
+function ispOutcomesForService(client: Client | null, svc: ClientService | null | undefined, serviceCode: string): string[] {
+  const fromNested =
+    client?.outcomes?.length && serviceCode
+      ? findOutcomeStatementsForServiceCode(client.outcomes, serviceCode)
+      : [];
+  return [...new Set([...(svc?.outcomes ?? []), ...fromNested])].filter(Boolean);
+}
+
 function resolveIspOutcomeShiftPayload(
   client: Client | null,
   services: ClientService[],
   data: ScheduleFormData,
 ): string | undefined {
-  const svc = pickSelectedServiceRow(services, data);
-  const fromNested =
-    client?.outcomes?.length && data.serviceCode
-      ? findOutcomeStatementsForServiceCode(client.outcomes, data.serviceCode)
-      : [];
-  const merged = [...new Set([...(svc?.outcomes ?? []), ...fromNested])].filter(Boolean);
+  const merged = ispOutcomesForService(client, pickSelectedServiceRow(services, data), data.serviceCode);
   if (merged.length > 0) {
     return serializeIspOutcomesForShift(merged);
   }
@@ -170,12 +178,7 @@ function resolveIspOutcomeActivityLabel(
   services: ClientService[],
   data: ScheduleFormData,
 ): string {
-  const svc = pickSelectedServiceRow(services, data);
-  const fromNested =
-    client?.outcomes?.length && data.serviceCode
-      ? findOutcomeStatementsForServiceCode(client.outcomes, data.serviceCode)
-      : [];
-  const merged = [...new Set([...(svc?.outcomes ?? []), ...fromNested])].filter(Boolean);
+  const merged = ispOutcomesForService(client, pickSelectedServiceRow(services, data), data.serviceCode);
   if (merged.length) return merged.join("; ");
   return parseIspOutcomesFromDisplayText(data.ispOutcome).join("; ");
 }
@@ -244,16 +247,6 @@ export interface WeekdaySchedule {
   clockOutTime: string;
 }
 
-const clockInTimeOptions = [
-  "08:00:AM", "08:30:AM", "09:00:AM", "09:30:AM", "10.00:AM",
-  "10.30:AM", "11.30:AM", "12.00:PM", "12.30:PM"
-];
-
-const clockOutTimeOptions = [
-  "08:00:AM", "08:30:AM", "09:00:AM", "09:30:AM", "10.00:AM",
-  "10.30:AM", "11.30:AM", "12.00:PM", "12.30:PM"
-];
-
 const WEEKDAY_OPTIONS = [
   { label: "Sat", dayIndex: 6 },
   { label: "Sun", dayIndex: 0 },
@@ -268,15 +261,16 @@ const WEEKDAY_LABEL_BY_INDEX = Object.fromEntries(
   WEEKDAY_OPTIONS.map((option) => [option.dayIndex, option.label]),
 ) as Record<number, string>;
 
+// Plan-year goal documents a shift works toward. Annual updates are yearly reviews filled in on
+// Goals & documents, not something a shift produces, so they aren't offered here.
 const DDD_GOALS_TYPES: { id: string; title: string }[] = [
-  { id: DocumentType.COMMUNITY_INCLUSION_SERVICES, title: "Community Inclusion Services" },
   { id: DocumentType.COMMUNITY_INCLUSION_INDIVIDUALIZED_GOALS, title: "Community Inclusion – Individualized Goals" },
-  { id: DocumentType.DAY_HABILITATION_SERVICES, title: "Day Habilitation Services" },
   { id: DocumentType.DAY_HABILITATION_INDIVIDUALIZED_GOALS, title: "Day Habilitation – Individualized Goals" },
-  { id: DocumentType.PREVOCATIONAL_TRAINING_SERVICES, title: "Prevocational Training Services" },
   { id: DocumentType.PREVOCATIONAL_TRAINING_INDIVIDUALIZED_GOALS, title: "Prevocational Training – Individualized Goals" },
   { id: DocumentType.NATURAL_SUPPORTS_TRAINING, title: "Natural Supports Training" },
 ];
+/** Each of these is one document per client, shared by all of the client's shifts. */
+const PER_CLIENT_GOALS_TYPES: ReadonlySet<string> = new Set(DDD_GOALS_TYPES.map((t) => t.id));
 
 
 const initialFormData: ScheduleFormData = {
@@ -936,12 +930,11 @@ export default function AddScheduleModal({
   /** Read-only copy shown in the modal: always the selected service's outcomes when available. */
   const ispOutcomeDisplay = useMemo(() => {
     if (isHhaClient) return "";
-    if (selectedService?.outcomes && selectedService.outcomes.length > 0) {
-      return ispOutcomesToDisplayText(selectedService.outcomes);
-    }
+    const outcomes = ispOutcomesForService(selectedClient, selectedService, formData.serviceCode);
+    if (outcomes.length > 0) return ispOutcomesToDisplayText(outcomes);
     if (!formData.serviceCode) return "";
     return formData.ispOutcome;
-  }, [isHhaClient, selectedService, formData.serviceCode, formData.ispOutcome]);
+  }, [isHhaClient, selectedClient, selectedService, formData.serviceCode, formData.ispOutcome]);
 
   const weeklyDistributionFingerprint = useMemo(() => {
     if (isHhaClient) return "";
@@ -1082,6 +1075,9 @@ export default function AddScheduleModal({
 
       setFormData((prev) => ({
         ...prev,
+        ...(selectedClient?.type === "ddd" && agencyMode !== "hha"
+          ? programNoteDefaults(service?.code || "", prev)
+          : {}),
         serviceAuthorizationId: value,
         serviceCode: service?.code || "",
         billingRate: service?.clientRate || "",
@@ -1098,7 +1094,7 @@ export default function AddScheduleModal({
       setSelectedWeeklyDistributionIndex(null);
       setSelectedDistributionSnapshot(null);
     },
-    [selectedClientServices, verifyAndApplyDsp],
+    [selectedClientServices, verifyAndApplyDsp, selectedClient?.type, agencyMode],
   );
 
   const handleWeeklyDistributionChange = useCallback(
@@ -1876,6 +1872,34 @@ export default function AddScheduleModal({
     }
   };
 
+  /** What Schedule will create, for the summary box and the button ("Schedule 12 shifts"). */
+  const plannedShifts = useMemo(() => {
+    if (!isOpen || mode === "edit") return [];
+    // Counting doesn't need the staff member, so preview with a placeholder when none is picked yet.
+    return buildShiftRequests({ ...formData, assignedDspId: formData.assignedDspId || "preview" })
+      .filter((request) => request.date && request.startTime && request.endTime);
+  }, [isOpen, mode, formData, selectedWeekdays, configuringWeekday, agencyId, selectedClientServices, selectedClient]);
+  const plannedSummary = useMemo(() => {
+    if (!plannedShifts.length) return null;
+    const minutes = plannedShifts.reduce((sum, request) => sum + (scheduledMinutes(request) ?? 0), 0);
+    const dates = plannedShifts.map((request) => parseISO(request.date)).filter(isValid).sort((a, b) => a.getTime() - b.getTime());
+    if (!dates.length) return null;
+    if (plannedShifts.length === 1) {
+      return <>1 shift on <strong className="font-semibold">{format(dates[0], "EEE d MMM yyyy")}</strong>, {formatDuration(minutes)}.</>;
+    }
+    const dayOrder = [...new Set(dates.map((d) => (d.getDay() + 6) % 7))].sort((a, b) => a - b);
+    const dayNames = dayOrder.map((d) => format(new Date(2024, 0, 1 + d), "EEE"));
+    const dayList = dayNames.length > 1 ? `${dayNames.slice(0, -1).join(", ")} and ${dayNames[dayNames.length - 1]}` : dayNames[0];
+    const first = dates[0];
+    const last = dates[dates.length - 1];
+    return (
+      <>
+        <strong className="font-semibold">{plannedShifts.length} shifts will be created</strong>: {dayList} from{" "}
+        {format(first, first.getFullYear() === last.getFullYear() ? "d MMM" : "d MMM yyyy")} to {format(last, "d MMM yyyy")}, {formatDuration(minutes)} in total.
+      </>
+    );
+  }, [plannedShifts]);
+
   const [reviewOccurrence, setReviewOccurrence] = useState(0);
   const reviewRequests = useMemo(() => {
     if (!isOpen || !formData.clientId || selectedClient?.id !== formData.clientId || !formData.assignedDspId || !formData.serviceCode || !pickSelectedServiceRow(selectedClientServices, formData) || agencyMode === "sc") return [];
@@ -2193,29 +2217,40 @@ export default function AddScheduleModal({
           .map((result) => result.value.shift)
           .filter((shift): shift is NonNullable<typeof shift> => shift != null);
 
-        // Create goal documents with shiftId at top level
-        const goalResults = await Promise.all(
-          successfulShifts.map((shift) =>
-            data.createGoalDocument(
-              formData.clientId,
-              shift.id,
-              {
-                documentType: formData.goalsType as DocumentType,
-                metadata: {
-                  name: formData.client,
-                  completedBy: formData.assignedDsp,
-                  completionDate: shift.date || format(new Date(), "yyyy-MM-dd"),
-                } as any,
-              },
-              { signal: operation.controller.signal },
-            ).catch((err) => {
-              if (isCurrentMutation(operation.generation, operation.controller)) {
-                console.error("Failed to create goal document:", err);
-              }
-              return null;
-            })
-          )
-        );
+        const createGoalDoc = (shift: (typeof successfulShifts)[number]) =>
+          data.createGoalDocument(
+            formData.clientId,
+            shift.id,
+            {
+              documentType: formData.goalsType as DocumentType,
+              metadata: {
+                name: formData.client,
+                completedBy: formData.assignedDsp,
+                completionDate: shift.date || format(new Date(), "yyyy-MM-dd"),
+              } as any,
+            },
+            { signal: operation.controller.signal },
+          ).catch((err) => {
+            if (isCurrentMutation(operation.generation, operation.controller)) {
+              console.error("Failed to create goal document:", err);
+            }
+            return null;
+          });
+
+        // Goals are written once per client (from the ISP), not once per
+        // shift: reuse the client's existing document, or start a single
+        // draft and link every shift.
+        let goalResults: ({ id?: string } | null)[];
+        if (PER_CLIENT_GOALS_TYPES.has(formData.goalsType) && successfulShifts.length > 0) {
+          // undefined = the lookup failed: skip rather than risk a duplicate draft.
+          const existing = await findProgramGoalsDocument(formData.clientId, formData.goalsType).catch(() => undefined);
+          if (!isCurrentMutation(operation.generation, operation.controller)) return;
+          const shared = existing === undefined ? null : existing ?? (await createGoalDoc(successfulShifts[0]));
+          goalResults = successfulShifts.map(() => shared);
+        } else {
+          // Create goal documents with shiftId at top level
+          goalResults = await Promise.all(successfulShifts.map(createGoalDoc));
+        }
         if (!isCurrentMutation(operation.generation, operation.controller)) return;
 
         // Update shifts with goalsAndDocumentsId
@@ -2314,51 +2349,63 @@ export default function AddScheduleModal({
     }
   };
 
+  const kindSwitch = canScheduleOuting ? (
+    <DrawerSegmented
+      label="What are you scheduling?"
+      value={groupOuting ? "outing" : "single"}
+      options={[{ value: "single", label: "One client" }, { value: "outing", label: "Group outing" }]}
+      onChange={(next) => setGroupOuting(next === "outing")}
+      disabled={isSubmitting}
+    />
+  ) : null;
+
   return (
     <>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-end pr-8">
+        <div className="fixed inset-0 z-50 flex justify-end p-2 sm:p-3">
           {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/30 backdrop-blur-sm"
             onClick={onClose}
           />
 
-          {/* Modal */}
+          {/* Drawer */}
           <div
             role="dialog"
             aria-modal="true"
             aria-label="Schedule editor"
-            className="relative bg-white rounded-[30px] border border-[rgba(255,255,255,0.3)] w-full max-w-[500px] max-h-[90vh] shadow-xl flex flex-col"
+            className="relative flex h-full w-full max-w-[560px] flex-col overflow-hidden rounded-[20px] bg-white shadow-xl dark:bg-[#141b21]"
           >
-            {/* Title Bar - Fixed */}
-            <div className="flex items-center justify-between p-5 pb-0 shrink-0">
-              <h2 className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
-                {mode === "edit" ? "Edit Schedule" : groupOuting ? "Add group outing" : "Add new Schedule"}
-              </h2>
+            <div className="flex shrink-0 items-start gap-3 px-6 pb-4 pt-6">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-[#dcdfe2] text-[#0b5c5d] dark:border-white/15 dark:text-[#7fd3d3]">
+                <Calendar aria-hidden="true" className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-[20px] font-medium leading-tight text-[#10141a] dark:text-[#f4f6f7]">
+                  {mode === "edit" ? "Edit schedule" : groupOuting && canScheduleOuting ? "Schedule a group outing" : "Add schedule"}
+                </h2>
+                <p className="mt-1 text-[13px] text-[#5b636b] dark:text-[#9aa4a8]">
+                  {groupOuting && canScheduleOuting
+                    ? "One outing for several clients. Each client gets their own shift, linked together."
+                    : `Assign a ${labels.noun} to a client for one shift or a repeating pattern.`}
+                </p>
+                <p className="mt-1 text-[12px] font-medium text-[#0b5c5d] dark:text-[#7fd3d3]">Scheduling for {agencyName}</p>
+              </div>
               <button
                 type="button"
                 aria-label="Close schedule editor"
                 onClick={onClose}
                 disabled={isSubmitting}
-                className="bg-[#eff2f3] border border-[rgba(255,255,255,0.3)] rounded-full p-2 hover:bg-gray-200 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-full border border-[#dcdfe2] text-[#10141a] transition-colors hover:bg-[#f4f5f6] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:text-[#f4f6f7]"
               >
-                <X className="w-4 h-4 text-[#10141a]" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            {canScheduleOuting && (
-              <label className="mx-5 mt-4 flex shrink-0 cursor-pointer items-center justify-between gap-3 rounded-xl border border-[#e4e7ea] px-4 py-3">
-                <span>
-                  <span className="block text-[14px] font-medium text-[#10141a]">Group outing</span>
-                  <span className="block text-[12px] text-[#5b636b]">Community inclusion or day program with several clients</span>
-                </span>
-                <input type="checkbox" role="switch" className="h-5 w-5 accent-[#00B5B8]" checked={groupOuting} onChange={(e) => setGroupOuting(e.target.checked)} disabled={isSubmitting} />
-              </label>
-            )}
             {groupOuting && canScheduleOuting ? (
               <CiOutingForm
                 agencyId={agencyId}
+                kindSwitch={kindSwitch}
                 onCancel={onClose}
                 onCreated={(shifts, close) => {
                   if (close) onClose();
@@ -2371,24 +2418,16 @@ export default function AddScheduleModal({
               />
             ) : (<>
             {/* Form - Scrollable */}
-            <div className="flex-1 overflow-y-auto px-5 py-4">
-              <div className="flex flex-col gap-4">
-                <div
-                  role="status"
-                  className="rounded-xl border border-[#00b4b8]/30 bg-[#00b4b8]/10 px-4 py-3"
-                >
-                  <p className="text-[12px] font-medium uppercase tracking-wide text-[#006f72]">
-                    Selected operational agency
-                  </p>
-                  <p className="mt-0.5 text-[15px] font-semibold text-[#10141a]">
-                    Scheduling for {agencyName}
-                  </p>
-                </div>
+            <div className="flex-1 overflow-y-auto border-t border-[#eceef0] dark:border-white/10">
+              <DrawerSection title="Client and service">
+                {kindSwitch}
                 {/* Client Field */}
                 <div className="flex flex-col gap-1 relative">
-                  <label className="text-[12px] font-normal text-[#10141a]">Client</label>
-                  <div className={`bg-white border rounded-xl h-11 px-4 flex items-center ${errors.client ? "border-[#D53411]" : "border-[#cccccd]"}`}>
+                  <label htmlFor="schedule-client" className="text-[13px] font-medium text-[#2a3138]">Client</label>
+                  <div className={`bg-white border rounded-[10px] h-11 px-4 flex items-center gap-2.5 ${errors.client ? "border-[#D53411]" : "border-[#dcdfe2]"}`}>
+                    <UserRound aria-hidden="true" className="h-4 w-4 shrink-0 text-[#5b636b]" />
                     <input
+                      id="schedule-client"
                       type="text"
                       value={formData.client}
                       onChange={(e) => {
@@ -2428,7 +2467,7 @@ export default function AddScheduleModal({
                     )}
                   </div>
                   {errors.client && (
-                    <span className="text-[12px] font-normal text-[#D53411]">{errors.client}</span>
+                    <span className="text-[12px] font-normal text-[#b42318]">{errors.client}</span>
                   )}
                   {formData.clientId && selectedPayrollLocationOption ? (
                     <span className="text-[12px] font-normal text-[#808081]">
@@ -2438,7 +2477,7 @@ export default function AddScheduleModal({
                   ) : null}
                   {/* Client Dropdown */}
                   {showClientDropdown && clientSearchResults.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#dcdfe2] rounded-xl shadow-lg z-20 max-h-[200px] overflow-y-auto">
                       {clientSearchResults.map((client) => (
                         <button
                           key={client.id}
@@ -2457,20 +2496,19 @@ export default function AddScheduleModal({
                     </div>
                   )}
                 </div>
-
                 {payrollClient ? (
                   <fieldset
                     className="flex flex-col gap-2"
                     aria-invalid={Boolean(errors.serviceLocation)}
                   >
-                    <legend className="text-[12px] font-normal text-[#10141a]">
+                    <legend className="text-[13px] font-medium text-[#2a3138]">
                       Service location for payroll
                     </legend>
                     {payrollLocationOptions.length > 0 ? payrollLocationOptions.map((option) => {
                       return (
                         <label
                           key={option.source}
-                          className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#cccccd] bg-white px-4 py-3"
+                          className="flex cursor-pointer items-start gap-3 rounded-[10px] border border-[#dcdfe2] bg-white px-4 py-3"
                         >
                           <input
                             type="radio"
@@ -2503,16 +2541,16 @@ export default function AddScheduleModal({
                       </p>
                     ) : null}
                     {errors.serviceLocation ? (
-                      <p role="alert" className="text-[12px] font-normal text-[#D53411]">
+                      <p role="alert" className="text-[12px] font-normal text-[#b42318]">
                         {errors.serviceLocation}
                       </p>
                     ) : null}
                   </fieldset>
                 ) : null}
-
+                <div className="grid gap-4 sm:grid-cols-2">
                 {/* Service */}
                 <div className="flex flex-col gap-1 relative">
-                  <label className="text-[12px] font-normal text-[#10141a]">Service</label>
+                  <label className="text-[13px] font-medium text-[#2a3138]">Service</label>
                   <div ref={serviceDropdownRef} className="relative">
                     <button
                       type="button"
@@ -2522,8 +2560,8 @@ export default function AddScheduleModal({
                         setShowClientDropdown(false);
                         setShowServiceDropdown((open) => !open);
                       }}
-                      className={`flex h-11 w-full items-center gap-3 rounded-xl border bg-white px-4 ${
-                        errors.serviceCode ? "border-[#D53411]" : "border-[#cccccd]"
+                      className={`flex h-11 w-full items-center gap-3 rounded-[10px] border bg-white px-4 ${
+                        errors.serviceCode ? "border-[#D53411]" : "border-[#dcdfe2]"
                       } ${selectedClientServices.length === 0 || !hasAnySelectableService ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
                     >
                       <span className="min-w-0 flex-1 truncate text-left text-[14px] font-normal text-black">
@@ -2532,7 +2570,7 @@ export default function AddScheduleModal({
                       <ChevronDown className="h-5 w-5 shrink-0 text-[#10141a]" />
                     </button>
                     {showServiceDropdown && selectedClientServices.length > 0 ? (
-                      <div className="absolute top-full left-0 right-0 z-20 mt-1 max-h-[200px] overflow-y-auto rounded-xl border border-[#cccccd] bg-white shadow-lg">
+                      <div className="absolute top-full left-0 right-0 z-20 mt-1 max-h-[200px] overflow-y-auto rounded-[10px] border border-[#dcdfe2] bg-white shadow-lg">
                         {selectedClientServices.map((service) => {
                           const authEnded = isServiceAuthorizationEndDatePast(service);
                           return (
@@ -2569,7 +2607,7 @@ export default function AddScheduleModal({
                     ) : null}
                   </div>
                   {errors.serviceCode && (
-                    <span className="text-[12px] font-normal text-[#D53411]">{errors.serviceCode}</span>
+                    <span className="text-[12px] font-normal text-[#b42318]">{errors.serviceCode}</span>
                   )}
                   {selectedService ? (
                     <span className="text-[12px] font-normal text-[#808081]">
@@ -2593,33 +2631,17 @@ export default function AddScheduleModal({
                         }`}
                     </span>
                   )}
-                  {selectedClient && mode !== "edit" && (
-                    <div className="mt-2 flex flex-col gap-2">
-                      <label className="text-[12px] font-normal text-[#10141a]">
-                        Billing coverage
-                      </label>
-                      <CoverageFields
-                        value={{
-                          coverage: formData.coverage ?? COVERAGE.PAYER,
-                          splitMode: formData.splitMode ?? null,
-                          splitValue: formData.splitValue ?? null,
-                        }}
-                        onChange={(next) => setFormData((prev) => ({ ...prev, ...next }))}
-                      />
-                    </div>
-                  )}
                 </div>
-
                 {/* Assign DSP / Caregiver */}
                 <div className="flex flex-col gap-1 relative">
-                  <label className="text-[12px] font-normal text-[#10141a]">Assign {labels.noun}</label>
+                  <label className="text-[13px] font-medium text-[#2a3138]">Assign {labels.noun}</label>
                   {!formData.serviceCode ? (
                     <>
                       <span className="text-[12px] font-normal text-[#808081]">
                         Select a service first to choose an assigned {labels.noun}.
                       </span>
                       {errors.assignedDsp ? (
-                        <span className="text-[12px] font-normal text-[#D53411]">{errors.assignedDsp}</span>
+                        <span className="text-[12px] font-normal text-[#b42318]">{errors.assignedDsp}</span>
                       ) : null}
                     </>
                   ) : selectedService?.assignedDsps && selectedService.assignedDsps.length > 0 ? (
@@ -2628,7 +2650,7 @@ export default function AddScheduleModal({
                         <button
                           type="button"
                           onClick={() => setShowAssignDspDropdown((open) => !open)}
-                          className={`flex h-11 w-full cursor-pointer items-center gap-3 rounded-xl border bg-white px-4 ${errors.assignedDsp ? "border-[#D53411]" : "border-[#cccccd]"}`}
+                          className={`flex h-11 w-full cursor-pointer items-center gap-3 rounded-[10px] border bg-white px-4 ${errors.assignedDsp ? "border-[#D53411]" : "border-[#dcdfe2]"}`}
                         >
                           <span className="flex-1 text-left text-[14px] font-normal text-black">
                             {formData.assignedDsp || `Select ${labels.noun}`}
@@ -2636,7 +2658,7 @@ export default function AddScheduleModal({
                           <ChevronDown className="h-5 w-5 shrink-0 text-[#10141a]" />
                         </button>
                         {showAssignDspDropdown ? (
-                          <div className="absolute top-full left-0 right-0 z-20 mt-1 max-h-[200px] overflow-y-auto rounded-xl border border-[#cccccd] bg-white shadow-lg">
+                          <div className="absolute top-full left-0 right-0 z-20 mt-1 max-h-[200px] overflow-y-auto rounded-[10px] border border-[#dcdfe2] bg-white shadow-lg">
                             {selectedService.assignedDsps.map((dsp) => (
                               <button
                                 key={dsp.id}
@@ -2655,7 +2677,7 @@ export default function AddScheduleModal({
                         ) : null}
                       </div>
                       {errors.assignedDsp ? (
-                        <span className="text-[12px] font-normal text-[#D53411]">{errors.assignedDsp}</span>
+                        <span className="text-[12px] font-normal text-[#b42318]">{errors.assignedDsp}</span>
                       ) : null}
                     </>
                   ) : (
@@ -2665,12 +2687,27 @@ export default function AddScheduleModal({
                         then schedule.
                       </span>
                       {errors.assignedDsp ? (
-                        <span className="text-[12px] font-normal text-[#D53411]">{errors.assignedDsp}</span>
+                        <span className="text-[12px] font-normal text-[#b42318]">{errors.assignedDsp}</span>
                       ) : null}
                     </>
                   )}
                 </div>
-
+                </div>
+                  {selectedClient && mode !== "edit" && (
+                    <div className="flex flex-col gap-2">
+                      <label className="text-[13px] font-medium text-[#2a3138]">
+                        Billing coverage
+                      </label>
+                      <CoverageFields
+                        value={{
+                          coverage: formData.coverage ?? COVERAGE.PAYER,
+                          splitMode: formData.splitMode ?? null,
+                          splitValue: formData.splitValue ?? null,
+                        }}
+                        onChange={(next) => setFormData((prev) => ({ ...prev, ...next }))}
+                      />
+                    </div>
+                  )}
             {agencyMode !== "sc" && (formData.assignedDspId || retainedStaff) && <div className="col-span-full">
               {reviewRequests.length > 1 && <label className="mb-2 flex flex-col gap-1 text-sm">Assignment to review
                 <select aria-label="Assignment to review" className="rounded-xl border border-[#cccccd] bg-white p-2" value={Math.min(reviewOccurrence, reviewRequests.length - 1)} onChange={event => setReviewOccurrence(Number(event.target.value))}>
@@ -2683,9 +2720,12 @@ export default function AddScheduleModal({
                 draft={currentDecision ? consentDrafts[currentDecision.contextKey] : undefined}
                 onChange={draft => {if (currentDecision) setConsentDrafts(previous => ({...previous, [currentDecision.contextKey]: draft}));}} />
             </div>}
+              </DrawerSection>
 
+              <DrawerSection title="Notes and goals">
+                <div className="grid gap-4 sm:grid-cols-2">
                 <div className="flex flex-col gap-1 relative">
-                  <label className="text-[12px] font-normal text-[#10141a]">Notes Type</label>
+                  <label className="text-[13px] font-medium text-[#2a3138]">Notes type</label>
                   <button
                     type="button"
                     disabled={notesAutoResolved}
@@ -2693,7 +2733,7 @@ export default function AddScheduleModal({
                       if (notesAutoResolved) return;
                       setShowNotesTypeDropdown(!showNotesTypeDropdown);
                     }}
-                    className={`bg-white border border-[#cccccd] rounded-xl h-11 px-4 flex items-center gap-3 ${
+                    className={`bg-white border border-[#dcdfe2] rounded-[10px] h-11 px-4 flex items-center gap-3 ${
                       notesAutoResolved ? "cursor-not-allowed opacity-70" : "cursor-pointer"
                     }`}
                   >
@@ -2714,10 +2754,11 @@ export default function AddScheduleModal({
                   )}
 
                   {!notesAutoResolved && showNotesTypeDropdown && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-10">
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#dcdfe2] rounded-xl shadow-lg z-10">
                       {noteTypes.map((notesType) => (
                         <button
                           key={notesType.id}
+                          type="button"
                           onClick={() => {
                             setFormData(prev => ({ ...prev, notesType: notesType.id }));
                             setShowNotesTypeDropdown(false);
@@ -2730,19 +2771,19 @@ export default function AddScheduleModal({
                     </div>
                   )}
                 </div>
-
                 {!isHhaClient && !isHhaAgencyMode && (
                 <div className="flex flex-col gap-1 relative">
-                  <label className="text-[12px] font-normal text-[#10141a]">Goals Type</label>
+                  <label className="text-[13px] font-medium text-[#2a3138]">Goals type</label>
                   <button
+                    type="button"
                     onClick={() => {
                       setShowGoalsTypeDropdown(!showGoalsTypeDropdown);
                     }}
-                    className="bg-white border border-[#cccccd] rounded-xl h-11 px-4 flex items-center gap-3 cursor-pointer"
+                    className="bg-white border border-[#dcdfe2] rounded-[10px] h-11 px-4 flex items-center gap-3 cursor-pointer"
                   >
                     <span className="flex-1 text-left text-[14px] font-normal text-black">
                       {formData.goalsType
-                        ? goalsTypes.find((elt) => elt.id === formData.goalsType)?.title
+                        ? goalsTypes.find((elt) => elt.id === formData.goalsType)?.title ?? "Select goals type"
                         : "Select goals type"
                       }
                     </span>
@@ -2750,10 +2791,11 @@ export default function AddScheduleModal({
                   </button>
 
                   {showGoalsTypeDropdown && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#cccccd] rounded-xl shadow-lg z-10 max-h-[200px] overflow-y-auto">
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#dcdfe2] rounded-xl shadow-lg z-10 max-h-[200px] overflow-y-auto">
                       {goalsTypes.map((goalsType) => (
                         <button
                           key={goalsType.id}
+                          type="button"
                           onClick={() => {
                             setFormData(prev => ({ ...prev, goalsType: goalsType.id }));
                             setShowGoalsTypeDropdown(false);
@@ -2767,10 +2809,10 @@ export default function AddScheduleModal({
                   )}
                 </div>
                 )}
-
+                </div>
                 {showWeeklyDistributionPicker && (
                   <div className="flex flex-col gap-1">
-                    <label className="text-[12px] font-normal text-[#10141a]">
+                    <label className="text-[13px] font-medium text-[#2a3138]">
                       Weekly distribution week
                     </label>
                     <select
@@ -2780,10 +2822,10 @@ export default function AddScheduleModal({
                           : String(selectedWeeklyDistributionIndex)
                       }
                       onChange={(e) => handleWeeklyDistributionChange(e.target.value)}
-                      className={`bg-white border rounded-xl h-11 px-4 text-[14px] font-normal text-[#10141a] ${
+                      className={`bg-white border rounded-[10px] h-11 px-4 text-[14px] font-normal text-[#10141a] ${
                         errors.weeklyDistribution || weeklyDistributionCapError
                           ? "border-[#D53411]"
-                          : "border-[#b2b2b3]"
+                          : "border-[#dcdfe2]"
                       }`}
                     >
                       <option value="manual">Manual date range</option>
@@ -2799,80 +2841,60 @@ export default function AddScheduleModal({
                       </span>
                     ) : null}
                     {errors.weeklyDistribution || weeklyDistributionCapError ? (
-                      <span className="text-[12px] font-normal text-[#D53411]">
+                      <span className="text-[12px] font-normal text-[#b42318]">
                         {errors.weeklyDistribution ?? weeklyDistributionCapError}
                       </span>
                     ) : null}
                   </div>
                 )}
+              </DrawerSection>
 
-                {/* Scheduling Type */}
-                <div className="flex flex-col gap-1">
-                  <label className="text-[12px] font-normal text-[#10141a]">Scheduling Type</label>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => {
-                        setFormData(prev => ({ ...prev, schedulingType: "one-time" }));
-                        clearError("schedulingType");
-                      }}
-                      className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${formData.schedulingType === "one-time"
-                        ? "bg-[#00b4b8] text-white"
-                        : errors.schedulingType
-                          ? "border border-[#D53411] text-[#10141a]"
-                          : "border border-[#808081] text-[#10141a]"
-                        }`}
-                    >
-                      One time
-                    </button>
-                    <button
-                      onClick={() => {
-                        setFormData(prev => ({ ...prev, schedulingType: "recurring" }));
-                        clearError("schedulingType");
-                      }}
-                      className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${formData.schedulingType === "recurring"
-                        ? "bg-[#00b4b8] text-white"
-                        : errors.schedulingType
-                          ? "border border-[#D53411] text-[#10141a]"
-                          : "border border-[#808081] text-[#10141a]"
-                        }`}
-                    >
-                      Recurring
-                    </button>
-                  </div>
-                  {errors.schedulingType && (
-                    <span className="text-[12px] font-normal text-[#D53411]">{errors.schedulingType}</span>
-                  )}
-                </div>
+              <DrawerSection title="When">
+                <DrawerSegmented
+                  label="Scheduling type"
+                  value={formData.schedulingType}
+                  invalid={Boolean(errors.schedulingType)}
+                  options={[{ value: "one-time", label: "One time" }, { value: "recurring", label: "Recurring" }]}
+                  onChange={(next) => {
+                    setFormData(prev => ({ ...prev, schedulingType: next }));
+                    clearError("schedulingType");
+                  }}
+                />
+                {errors.schedulingType && (
+                  <span className="-mt-2 text-[12px] font-normal text-[#b42318]">{errors.schedulingType}</span>
+                )}
 
                 {/* Date Fields - Conditional based on scheduling type */}
                 {formData.schedulingType === "recurring" ? (
-                  <>
-                    {/* Select Starting Date */}
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {/* Starts on */}
                     <div className="flex flex-col gap-1 relative">
-                      <label className="text-[12px] font-normal text-[#10141a]">Select Starting Date</label>
+                      <label className="text-[13px] font-medium text-[#2a3138]">Starts on</label>
                       <button
+                        type="button"
                         onClick={() => {
                           setShowStartDatePicker(!showStartDatePicker);
                           setShowEndDatePicker(false);
                         }}
-                        className={`bg-white border rounded-xl h-11 px-4 flex items-center gap-3 cursor-pointer ${errors.startDate ? "border-[#D53411]" : showStartDatePicker ? "border-[#2b82ff]" : "border-[#b2b2b3]"
+                        className={`bg-white border rounded-[10px] h-11 px-4 flex items-center gap-3 cursor-pointer ${errors.startDate ? "border-[#D53411]" : showStartDatePicker ? "border-[#0b8a8c]" : "border-[#dcdfe2]"
                           }`}
                       >
                         <span className={`flex-1 text-left text-[14px] font-normal ${formData.startDate ? "text-[#10141a]" : "text-[#b2b2b3]"}`}>
-                          {formData.startDate ? format(formData.startDate, "d MMMM") : "Select date"}
+                          {formData.startDate ? format(formData.startDate, "d MMM yyyy") : "Select date"}
                         </span>
                         <Calendar className="w-5 h-5 text-[#10141a]" />
                       </button>
                       {errors.startDate && (
-                        <span className="text-[12px] font-normal text-[#D53411]">{errors.startDate}</span>
+                        <span className="text-[12px] font-normal text-[#b42318]">{errors.startDate}</span>
                       )}
 
                       {/* Start Date Picker Dropdown */}
                       {showStartDatePicker && (
-                        <div className="absolute top-full right-0 mt-1 bg-white rounded-xl border border-[#cccccd] z-10 overflow-hidden w-[320px]">
+                        <div className="absolute top-full left-0 mt-1 bg-white rounded-[10px] border border-[#dcdfe2] z-10 overflow-hidden w-[320px]">
                           {/* Month Navigation */}
                           <div className="flex items-center justify-center gap-2.5 px-5 py-2">
                             <button
+                              type="button"
                               onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
                               className="w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded cursor-pointer"
                             >
@@ -2882,6 +2904,7 @@ export default function AddScheduleModal({
                               {format(currentMonth, "MMMM yyyy")}
                             </span>
                             <button
+                              type="button"
                               onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
                               className="w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded cursor-pointer"
                             >
@@ -2909,11 +2932,12 @@ export default function AddScheduleModal({
                                   return (
                                     <button
                                       key={dayIndex}
+                                      type="button"
                                       onClick={() => handleStartDateSelect(day)}
                                       className={`
                                   flex-1 flex items-center justify-center p-2 text-center transition-colors cursor-pointer
                                   ${isSelected
-                                          ? "bg-[#2B82FF] text-white rounded-[6px] font-semibold"
+                                          ? "bg-[#003839] text-white rounded-[6px] font-semibold"
                                           : isCurrentMonth
                                             ? "text-[#10141a] font-medium hover:bg-[#e5e5e6] hover:rounded-[6px]"
                                             : "text-[#b2b2b3] font-medium hover:bg-[#f0f0f0] hover:rounded-[6px]"
@@ -2933,32 +2957,34 @@ export default function AddScheduleModal({
                       )}
                     </div>
 
-                    {/* Select End Date */}
+                    {/* Ends on */}
                     <div className="flex flex-col gap-1 relative">
-                      <label className="text-[12px] font-normal text-[#10141a]">Select End Date</label>
+                      <label className="text-[13px] font-medium text-[#2a3138]">Ends on</label>
                       <button
+                        type="button"
                         onClick={() => {
                           setShowEndDatePicker(!showEndDatePicker);
                           setShowStartDatePicker(false);
                         }}
-                        className={`bg-white border rounded-xl h-11 px-4 flex items-center gap-3 cursor-pointer ${errors.endDate ? "border-[#D53411]" : showEndDatePicker ? "border-[#2b82ff]" : "border-[#b2b2b3]"
+                        className={`bg-white border rounded-[10px] h-11 px-4 flex items-center gap-3 cursor-pointer ${errors.endDate ? "border-[#D53411]" : showEndDatePicker ? "border-[#0b8a8c]" : "border-[#dcdfe2]"
                           }`}
                       >
                         <span className={`flex-1 text-left text-[14px] font-normal ${formData.endDate ? "text-[#10141a]" : "text-[#b2b2b3]"}`}>
-                          {formData.endDate ? format(formData.endDate, "d MMMM") : "Select date"}
+                          {formData.endDate ? format(formData.endDate, "d MMM yyyy") : "Select date"}
                         </span>
                         <Calendar className="w-5 h-5 text-[#10141a]" />
                       </button>
                       {errors.endDate && (
-                        <span className="text-[12px] font-normal text-[#D53411]">{errors.endDate}</span>
+                        <span className="text-[12px] font-normal text-[#b42318]">{errors.endDate}</span>
                       )}
 
                       {/* End Date Picker Dropdown */}
                       {showEndDatePicker && (
-                        <div className="absolute top-full right-0 mt-1 bg-white rounded-xl border border-[#cccccd] z-10 overflow-hidden w-[320px]">
+                        <div className="absolute top-full right-0 mt-1 bg-white rounded-[10px] border border-[#dcdfe2] z-10 overflow-hidden w-[320px]">
                           {/* Month Navigation */}
                           <div className="flex items-center justify-center gap-2.5 px-5 py-2">
                             <button
+                              type="button"
                               onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
                               className="w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded cursor-pointer"
                             >
@@ -2968,6 +2994,7 @@ export default function AddScheduleModal({
                               {format(currentMonth, "MMMM yyyy")}
                             </span>
                             <button
+                              type="button"
                               onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
                               className="w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded cursor-pointer"
                             >
@@ -2995,11 +3022,12 @@ export default function AddScheduleModal({
                                   return (
                                     <button
                                       key={dayIndex}
+                                      type="button"
                                       onClick={() => handleEndDateSelect(day)}
                                       className={`
                                   flex-1 flex items-center justify-center p-2 text-center transition-colors cursor-pointer
                                   ${isSelected
-                                          ? "bg-[#2B82FF] text-white rounded-[6px] font-semibold"
+                                          ? "bg-[#003839] text-white rounded-[6px] font-semibold"
                                           : isCurrentMonth
                                             ? "text-[#10141a] font-medium hover:bg-[#e5e5e6] hover:rounded-[6px]"
                                             : "text-[#b2b2b3] font-medium hover:bg-[#f0f0f0] hover:rounded-[6px]"
@@ -3018,31 +3046,33 @@ export default function AddScheduleModal({
                         </div>
                       )}
                     </div>
-                  </>
+                  </div>
                 ) : (
                   /* Select Date - for one-time scheduling */
                   <div className="flex flex-col gap-1 relative">
-                    <label className="text-[12px] font-normal text-[#10141a]">Select Date</label>
+                    <label className="text-[13px] font-medium text-[#2a3138]">Date</label>
                     <button
+                      type="button"
                       onClick={openOneTimeDatePicker}
-                      className={`bg-white border rounded-xl h-11 px-4 flex items-center gap-3 cursor-pointer ${errors.date ? "border-[#D53411]" : showDatePicker ? "border-[#2b82ff]" : "border-[#b2b2b3]"
+                      className={`bg-white border rounded-[10px] h-11 px-4 flex items-center gap-3 cursor-pointer ${errors.date ? "border-[#D53411]" : showDatePicker ? "border-[#0b8a8c]" : "border-[#dcdfe2]"
                         }`}
                     >
                       <span className={`flex-1 text-left text-[14px] font-normal ${formData.date ? "text-[#10141a]" : "text-[#b2b2b3]"}`}>
-                        {formData.date ? format(formData.date, "d MMMM") : "Select date"}
+                        {formData.date ? format(formData.date, "EEE d MMM yyyy") : "Select date"}
                       </span>
                       <Calendar className="w-5 h-5 text-[#10141a]" />
                     </button>
                     {errors.date && (
-                      <span className="text-[12px] font-normal text-[#D53411]">{errors.date}</span>
+                      <span className="text-[12px] font-normal text-[#b42318]">{errors.date}</span>
                     )}
 
                     {/* Date Picker Dropdown */}
                     {showDatePicker && (
-                      <div className="absolute top-full right-0 mt-1 bg-white rounded-xl border border-[#cccccd] z-10 overflow-hidden w-[320px]">
+                      <div className="absolute top-full right-0 mt-1 bg-white rounded-[10px] border border-[#dcdfe2] z-10 overflow-hidden w-[320px]">
                         {/* Month Navigation */}
                         <div className="flex items-center justify-center gap-2.5 px-5 py-2">
                           <button
+                            type="button"
                             onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
                             className="w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded cursor-pointer"
                           >
@@ -3052,6 +3082,7 @@ export default function AddScheduleModal({
                             {format(currentMonth, "MMMM yyyy")}
                           </span>
                           <button
+                            type="button"
                             onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
                             className="w-5 h-5 flex items-center justify-center hover:bg-gray-100 rounded cursor-pointer"
                           >
@@ -3090,7 +3121,7 @@ export default function AddScheduleModal({
                                         : "cursor-pointer"
                                       }
                                 ${isSelected
-                                        ? "bg-[#2B82FF] text-white rounded-[6px] font-semibold"
+                                        ? "bg-[#003839] text-white rounded-[6px] font-semibold"
                                         : isAllowed && isCurrentMonth
                                           ? "text-[#10141a] font-medium hover:bg-[#e5e5e6] hover:rounded-[6px]"
                                           : isAllowed
@@ -3114,10 +3145,10 @@ export default function AddScheduleModal({
                 )}
 
                 {/* Weekdays Selection */}
-                <div className="flex flex-col gap-1">
-                  <label className="text-[12px] font-normal text-[#10141a]">Weekdays</label>
-                  <div className="flex flex-wrap gap-2">
-                    {WEEKDAY_OPTIONS.map((weekday) => {
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[13px] font-medium text-[#2a3138]">{formData.schedulingType === "recurring" ? "Repeats on" : "Day"}</span>
+                  <div className="grid grid-cols-7 gap-1.5">
+                    {[...WEEKDAY_OPTIONS].sort((a, b) => ((a.dayIndex + 6) % 7) - ((b.dayIndex + 6) % 7)).map((weekday) => {
                       const isSelected = selectedWeekdays.some(w => w.dayIndex === weekday.dayIndex);
                       const isConfiguring = configuringWeekday?.dayIndex === weekday.dayIndex;
                       const isEnabled = enabledWeekdayIndices.has(weekday.dayIndex);
@@ -3126,15 +3157,16 @@ export default function AddScheduleModal({
                           key={weekday.dayIndex}
                           type="button"
                           disabled={!isEnabled}
+                          aria-pressed={isSelected}
                           onClick={() => handleWeekdayToggle(weekday.label, weekday.dayIndex)}
-                          className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium transition-colors ${
+                          className={`h-9 rounded-[8px] text-[13px] font-medium transition-colors ${
                             !isEnabled
-                              ? "border border-[#e0e0e0] text-[#b2b2b3] cursor-not-allowed opacity-60"
-                              : isSelected
-                                ? "bg-[#00b4b8] text-white border-[0.5px] border-[#808081] cursor-pointer"
-                                : isConfiguring
-                                  ? "bg-[#ffa500] text-white border-[0.5px] border-[#ff8c00] cursor-pointer"
-                                  : "border border-[#808081] text-[#10141a] cursor-pointer"
+                              ? "cursor-not-allowed bg-[#f4f5f6] text-[#b2b8bc] opacity-60 dark:bg-white/5"
+                              : isConfiguring
+                                ? "cursor-pointer bg-[#fff4d6] text-[#8a5a00] ring-1 ring-[#e0a800]"
+                                : isSelected
+                                  ? "cursor-pointer bg-[#003839] text-white dark:bg-[#00a3a7] dark:text-[#06292a]"
+                                  : "cursor-pointer bg-[#f4f5f6] text-[#10141a] hover:bg-[#eceef0] dark:bg-white/5 dark:text-[#f4f6f7]"
                           }`}
                         >
                           {weekday.label}
@@ -3143,132 +3175,39 @@ export default function AddScheduleModal({
                     })}
                   </div>
                   {configuringWeekday && (
-                    <p className="text-[12px] font-normal text-[#ffa500] mt-1">
-                      Now select clock in and clock out times for {configuringWeekday.day}
+                    <p className="text-[12px] font-normal text-[#8a5a00]">
+                      Now set the clock in and clock out times for {configuringWeekday.day}.
                     </p>
                   )}
                 </div>
 
-                {/* Clock In Time */}
-                <div className="flex flex-col gap-1">
-                  <label className="text-[12px] font-normal text-[#10141a]">Clock In Time</label>
-                  <div className="flex flex-wrap gap-2">
-                    {/* Custom time badge if selected time is not in predefined list */}
-                    {formData.clockInTime && !clockInTimeOptions.includes(formData.clockInTime) && (
-                      <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-[6px] bg-[#00b4b8] text-white">
-                        <span className="text-[14px] font-medium">{formData.clockInTime}</span>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {([
+                    { key: "clockInTime", label: "Clock in", value: formData.clockInTime, error: errors.clockInTime },
+                    { key: "clockOutTime", label: "Clock out", value: formData.clockOutTime, error: errors.clockOutTime },
+                  ] as const).map((field) => (
+                    <div key={field.key} className="flex flex-col gap-1.5">
+                      <span className="text-[13px] font-medium text-[#2a3138]">{field.label}</span>
+                      <TimePicker
+                        value={convertTo24Hour(field.value)}
+                        onChange={(time24h) => {
+                          const time12h = convertTo12Hour(time24h);
+                          setFormData(prev => ({ ...prev, [field.key]: time12h }));
+                          clearError(field.key);
+                        }}
+                      >
                         <button
                           type="button"
-                          onClick={() => {
-                            setFormData(prev => ({ ...prev, clockInTime: "" }));
-                          }}
-                          className="ml-1 hover:opacity-70 transition-opacity"
+                          aria-label={`${field.label} time${field.value ? `: ${clock24(field.value)}` : ""}`}
+                          className={`${DRAWER_FIELD} cursor-pointer ${field.error ? "border-[#b42318]" : ""}`}
                         >
-                          <X className="w-3.5 h-3.5" />
+                          <Clock aria-hidden="true" className="h-4 w-4 shrink-0 text-[#5b636b]" />
+                          <span className={field.value ? "" : "text-[#8a979d]"}>{field.value ? clock24(field.value) : "Set time"}</span>
                         </button>
-                      </div>
-                    )}
-
-                    {clockInTimeOptions.map((time, index) => (
-                      <button
-                        key={`${time}-${index}`}
-                        onClick={() => {
-                          setFormData(prev => ({ ...prev, clockInTime: time }));
-                          clearError("clockInTime");
-                        }}
-                        className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${formData.clockInTime === time
-                          ? "bg-[#00b4b8] text-white"
-                          : errors.clockInTime
-                            ? "border border-[#D53411] text-[#10141a]"
-                            : "border border-[#808081] text-[#10141a]"
-                          }`}
-                      >
-                        {time}
-                      </button>
-                    ))}
-                    <TimePicker
-                      value={convertTo24Hour(formData.clockInTime)}
-                      onChange={(time24h) => {
-                        const time12h = convertTo12Hour(time24h);
-                        setFormData(prev => ({ ...prev, clockInTime: time12h }));
-                        clearError("clockInTime");
-                      }}
-                    >
-                      <button
-                        type="button"
-                        className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${errors.clockInTime
-                          ? "border border-[#D53411] text-[#10141a]"
-                          : "border border-[#808081] text-[#10141a]"
-                          }`}
-                      >
-                        Enter Time
-                      </button>
-                    </TimePicker>
-                  </div>
-                  {errors.clockInTime && (
-                    <span className="text-[12px] font-normal text-[#D53411]">{errors.clockInTime}</span>
-                  )}
-                </div>
-
-                {/* Clock Out Time */}
-                <div className="flex flex-col gap-1">
-                  <label className="text-[12px] font-normal text-[#10141a]">Clock Out Time</label>
-                  <div className="flex flex-wrap gap-2">
-                    {/* Custom time badge if selected time is not in predefined list */}
-                    {formData.clockOutTime && !clockOutTimeOptions.includes(formData.clockOutTime) && (
-                      <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-[6px] bg-[#00b4b8] text-white">
-                        <span className="text-[14px] font-medium">{formData.clockOutTime}</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFormData(prev => ({ ...prev, clockOutTime: "" }));
-                          }}
-                          className="ml-1 hover:opacity-70 transition-opacity"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    )}
-
-                    {clockOutTimeOptions.map((time, index) => (
-                      <button
-                        key={`${time}-${index}`}
-                        onClick={() => {
-                          setFormData(prev => ({ ...prev, clockOutTime: time }));
-                          clearError("clockOutTime");
-                        }}
-                        className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${formData.clockOutTime === time
-                          ? "bg-[#00b4b8] text-white"
-                          : errors.clockOutTime
-                            ? "border border-[#D53411] text-[#10141a]"
-                            : "border border-[#808081] text-[#10141a]"
-                          }`}
-                      >
-                        {time}
-                      </button>
-                    ))}
-                    <TimePicker
-                      value={convertTo24Hour(formData.clockOutTime)}
-                      onChange={(time24h) => {
-                        const time12h = convertTo12Hour(time24h);
-                        setFormData(prev => ({ ...prev, clockOutTime: time12h }));
-                        clearError("clockOutTime");
-                      }}
-                    >
-                      <button
-                        type="button"
-                        className={`px-2.5 py-1.5 rounded-[6px] text-[14px] font-medium cursor-pointer transition-colors ${errors.clockOutTime
-                          ? "border border-[#D53411] text-[#10141a]"
-                          : "border border-[#808081] text-[#10141a]"
-                          }`}
-                      >
-                        Enter Time
-                      </button>
-                    </TimePicker>
-                  </div>
-                  {errors.clockOutTime && (
-                    <span className="text-[12px] font-normal text-[#D53411]">{errors.clockOutTime}</span>
-                  )}
+                      </TimePicker>
+                      {field.error && <span className="text-[12px] font-normal text-[#b42318]">{field.error}</span>}
+                    </div>
+                  ))}
                 </div>
 
                 {/* Selected Weekdays Display */}
@@ -3277,20 +3216,24 @@ export default function AddScheduleModal({
                     {selectedWeekdays.map((weekday) => (
                       <div
                         key={weekday.dayIndex}
-                        className="flex items-center gap-2 h-[36px] px-2 rounded-lg bg-[rgba(0,216,65,0.08)] border-b border-[rgba(255,255,255,0.3)]"
+                        className="flex items-center gap-2 h-[36px] px-2 rounded-lg bg-[#f4f5f6] dark:bg-white/5"
                       >
-                        <Clock className="w-5 h-5 text-[#00d841] shrink-0" />
+                        <Clock className="w-5 h-5 text-[#0b8a8c] shrink-0" />
                         <span className="text-[14px] font-medium leading-[1.4] text-[#10141a]">
-                          {weekday.day} ( {weekday.clockInTime}-{weekday.clockOutTime} )
+                          {weekday.day}: {clock24(weekday.clockInTime)} – {clock24(weekday.clockOutTime)}
                         </span>
                       </div>
                     ))}
                   </div>
                 )}
 
+                {plannedSummary && <DrawerNote>{plannedSummary}</DrawerNote>}
+              </DrawerSection>
+
+              <DrawerSection title="Plan">
                 {!isHhaClient ? (
                   <div className="flex flex-col gap-1">
-                    <label className="text-[12px] font-normal text-[#10141a]">ISP Outcome</label>
+                    <label className="text-[13px] font-medium text-[#2a3138]">ISP outcome</label>
                     <textarea
                       readOnly
                       rows={4}
@@ -3302,16 +3245,16 @@ export default function AddScheduleModal({
                             ? ""
                             : "No ISP outcomes on file for this service"
                       }
-                      className="w-full rounded-xl border border-[#e0e0e0] bg-[#f5f5f5] px-4 py-3 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none resize-none cursor-default min-h-[100px]"
+                      className="w-full rounded-[10px] border border-[#e0e0e0] bg-[#f5f5f5] px-4 py-3 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none resize-none cursor-default min-h-[100px]"
                     />
                   </div>
                 ) : null}
 
                 {/* Plan of Care */}
                 <div className="flex flex-col gap-1">
-                  <label className="text-[12px] font-normal text-[#10141a]">Plan of care</label>
+                  <label className="text-[13px] font-medium text-[#2a3138]">Plan of care</label>
                   {!pocDocument?.url && (
-                    <label className="bg-white border border-[#cccccd] rounded-xl px-4 py-3 flex items-center justify-center gap-3 cursor-pointer hover:bg-gray-50 transition-colors">
+                    <label className="bg-white border border-[#dcdfe2] rounded-xl px-4 py-3 flex items-center justify-center gap-3 cursor-pointer hover:bg-gray-50 transition-colors">
                       <span className="flex-1 text-[14px] font-normal text-black placeholder:text-[#b2b2b3] outline-none bg-transparent cursor-not-allowed">
                         No plan of care available
                       </span>
@@ -3342,33 +3285,40 @@ export default function AddScheduleModal({
                     </div>
                   )}
                 </div>
-              </div>
+              </DrawerSection>
             </div>
 
             {/* Action Buttons - Fixed (used for both create and edit) */}
-            <div className="flex gap-3 p-5 pt-0 shrink-0">
-              <Button
+            <div className="flex shrink-0 gap-3 border-t border-[#eceef0] px-6 py-4 dark:border-white/10">
+              <button
+                type="button"
                 onClick={handleSaveDraft}
                 disabled={isSubmitting || (assignmentChanged && assignmentSubmissionBlocked)}
-                variant="outline"
-                className="flex-1 border-[#00B5B8] text-[#00B5B8] rounded-full px-4 py-3 h-auto text-[14px] font-semibold hover:bg-[#00B5B8]/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                className={DRAWER_SECONDARY}
               >
-                {currentAcknowledgments.length && assignmentChanged ? "Save with warnings" : "Save"}
-              </Button>
-              <Button
+                {currentAcknowledgments.length && assignmentChanged ? "Save with warnings" : "Save as draft"}
+              </button>
+              <button
+                type="button"
                 onClick={handleSubmit}
                 disabled={isSubmitting || !isFormValid || (assignmentChanged && assignmentSubmissionBlocked) || (mode === "edit" && formData.submissionStatus === SubmissionStatus.SUBMITTED)}
-                className="flex-1 bg-[#00B5B8] hover:bg-[#00A0A4] text-white rounded-full px-4 py-3 h-auto text-[14px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                className={DRAWER_PRIMARY}
               >
                 {isSubmitting ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                     Scheduling...
                   </>
+                ) : currentAcknowledgments.length ? (
+                  "Assign with warnings"
+                ) : mode === "edit" ? (
+                  "Save changes"
+                ) : plannedShifts.length > 1 ? (
+                  `Schedule ${plannedShifts.length} shifts`
                 ) : (
-                  currentAcknowledgments.length ? "Assign with warnings" : "Schedule"
+                  "Schedule"
                 )}
-              </Button>
+              </button>
             </div>
             </>)}
           </div>

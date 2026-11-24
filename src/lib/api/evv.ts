@@ -1,5 +1,5 @@
 /**
- * HHAeXchange EVV integration API (evvIntegration function).
+ * HHAeXchange EVV integration API (evvIntegration function), New Jersey aggregator spec.
  *
  * Agency owners and staff with "EVV View" read; "EVV Management" changes settings, links
  * members, enters reason codes, resubmits and voids. Member ids come back as the last 4
@@ -24,12 +24,14 @@ export type EvvSettings = {
   effectiveEnvironment: "sandbox" | "production";
   goLiveDate: string | null;
   programs: Record<EvvProgram, boolean>;
+  /** HHAeXchange offices; hhaxOfficeId is the office-level NPI (agencies with several offices). */
   offices: { hhaxOfficeId: string; name: string }[];
   defaultOfficeId: string | null;
   payers: EvvCode[];
   reasonCodes: EvvCode[];
   actionCodes: EvvCode[];
   missedReasonCodes: EvvCode[];
+  missedActionCodes: EvvCode[];
   taskCodes: EvvCode[];
   credentialsConfigured: boolean;
   sendsEnabled: boolean;
@@ -39,7 +41,7 @@ export type EvvSettings = {
 };
 
 export type EvvSettingsInput = Partial<Pick<EvvSettings,
-  "enabled" | "environment" | "goLiveDate" | "programs" | "offices" | "defaultOfficeId" | "payers" | "reasonCodes" | "actionCodes" | "missedReasonCodes" | "taskCodes">>;
+  "enabled" | "environment" | "goLiveDate" | "programs" | "offices" | "defaultOfficeId" | "payers" | "reasonCodes" | "actionCodes" | "missedReasonCodes" | "missedActionCodes" | "taskCodes">>;
 
 export type EvvVisit = {
   shiftId: string;
@@ -67,6 +69,11 @@ export type EvvVisit = {
 
 export type EvvReason = { reasonCode: string; actionCode: string | null; note: string | null; by?: string | null; at?: unknown };
 
+/** HHAeXchange's limit on reason notes. */
+export const EVV_NOTE_MAX = 256;
+/** Edit reason 222 ("Other") is not payable without a note. */
+export const EVV_NOTE_REQUIRED_REASONS: readonly string[] = ["222"];
+
 export type EvvVisitDetail = {
   visit: EvvVisit & { missedReason: EvvReason | null; exception: EvvReason | null; changeReason: EvvReason | null; voidReason: EvvReason | null };
   versions: { version: number; createdAt: string | null; issues: EvvIssue[]; visit: Record<string, unknown> }[];
@@ -93,14 +100,14 @@ export type EvvCaregiver = {
   employeeId: string;
   name: string;
   status: string | null;
-  caregiverCode: string | null;
   syncState: "not_synced" | "synced" | "pending" | "failed" | "needs_info";
   lastSyncedAt: string | null;
   lastError: string | null;
-  missing: ("name" | "dateOfBirth")[];
+  missing: ("name" | "dateOfBirth" | "address")[];
 };
 
-export type EvvMemberQualifier = "medicaid_id" | "mco_member_id";
+/** New Jersey identifies members by Medicaid id only. */
+export type EvvMemberQualifier = "medicaid_id";
 
 export type EvvClient = {
   clientId: string;
@@ -115,7 +122,7 @@ export type EvvClient = {
     memberIdLast4: string | null;
     payerId: string;
     officeId: string | null;
-    hhaxPatientId: string | null;
+    admissionId: string | null;
     updatedAt: string | null;
   };
 };
@@ -125,14 +132,7 @@ export type EvvMemberLinkInput = {
   memberId: string;
   payerId: string;
   officeId?: string | null;
-  hhaxPatientId?: string | null;
-};
-
-export type EvvMemberLookup = {
-  found: boolean;
-  hhaxPatientId: string | null;
-  active: boolean | null;
-  checks: { firstName: boolean; lastName: boolean; dateOfBirth: boolean } | null;
+  admissionId?: string | null;
 };
 
 export type EvvVisitQuery = {
@@ -161,7 +161,7 @@ export const evvApi = {
     unwrap<{ visits: EvvVisit[]; nextCursor: string | null }>(await axiosClient.get(`${BASE}/visits`, { params, signal })),
   getVisit: async (shiftId: string, signal?: AbortSignal) => unwrap<EvvVisitDetail>(await axiosClient.get(`${BASE}/visits/${id(shiftId)}`, { signal })),
   resubmit: async (shiftId: string) => unwrap<{ visit: EvvVisit }>(await axiosClient.post(`${BASE}/visits/${id(shiftId)}/resubmit`)),
-  setReason: async (shiftId: string, input: { kind: "missed" | "exception" | "change"; reasonCode: string; actionCode?: string | null; note?: string | null }) =>
+  setReason: async (shiftId: string, input: { kind: "missed" | "exception" | "change"; reasonCode: string; actionCode: string; note?: string | null }) =>
     unwrap<{ visit: EvvVisit; outcome: string }>(await axiosClient.post(`${BASE}/visits/${id(shiftId)}/reasons`, input)),
   voidVisit: async (shiftId: string, input: { reasonCode: string; note?: string | null }) =>
     unwrap<{ state: EvvVisitState }>(await axiosClient.post(`${BASE}/visits/${id(shiftId)}/void`, input)),
@@ -170,7 +170,6 @@ export const evvApi = {
   syncCaregiver: async (employeeId: string) => unwrap<{ queued: boolean }>(await axiosClient.post(`${BASE}/caregivers/${id(employeeId)}/sync`)),
 
   listClients: async (signal?: AbortSignal) => unwrap<{ clients: EvvClient[]; truncated: boolean }>(await axiosClient.get(`${BASE}/clients`, { signal })),
-  lookupMember: async (clientId: string, input: EvvMemberLinkInput) => unwrap<EvvMemberLookup>(await axiosClient.post(`${BASE}/clients/${id(clientId)}/lookup`, input)),
   linkMember: async (clientId: string, input: EvvMemberLinkInput) =>
     unwrap<{ linkState: "linked"; visitsRechecked: number }>(await axiosClient.put(`${BASE}/clients/${id(clientId)}/link`, input)),
 

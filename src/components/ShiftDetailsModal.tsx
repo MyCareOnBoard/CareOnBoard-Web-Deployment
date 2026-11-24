@@ -21,7 +21,8 @@ import { VoiceRecordingProvider } from "@/contexts/VoiceRecordingContext";
 import VoiceInputButton from "@/components/VoiceInputButton";
 import VoiceEnabledTextarea from "@/components/VoiceEnabledTextarea";
 import { roleLabel } from "@/lib/roleLabel";
-import { dateKeyIn, shiftEndOrEndOfDay, shiftTimeZone, shiftZoneSuffix, zonedDateTime } from "@/lib/shift-time";
+import { dateKeyIn, shiftTimeZone, shiftZoneSuffix, zonedDateTime } from "@/lib/shift-time";
+import { isShiftMissed } from "@/lib/shift-row-status";
 
 const REASON_MAX = 500;
 
@@ -107,13 +108,6 @@ function formatDraftHHmmLabel(hhmm: string): string {
   return `${String(displayHour).padStart(2, "0")}:${min} ${displayPeriod}`;
 }
 
-const isShiftMissed = (s: Shift): boolean => {
-  if (s.status === ShiftStatus.COMPLETED) return false;
-  if (s.clockedInAt) return false;
-  if (!s.date) return false;
-  const endDateTime = shiftEndOrEndOfDay(s);
-  return Boolean(endDateTime && endDateTime.getTime() < Date.now());
-};
 
 function getStatusCallout(s: Shift, codes: AnomalyCode[]) {
   if (codes.includes("missed")) {

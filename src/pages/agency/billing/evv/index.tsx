@@ -360,9 +360,15 @@ function ClientsTab({ settings, canManage, program, onLinked }: { settings: EvvS
 const SYNC_LABELS: Record<EvvCaregiver["syncState"], string> = {
   not_synced: "Not sent yet",
   synced: "Synced",
-  pending: "Retrying",
+  pending: "Waiting for HHAeXchange",
   failed: "Failed",
   needs_info: "Needs info",
+};
+
+const MISSING_LABELS: Record<EvvCaregiver["missing"][number], string> = {
+  name: "first or last name",
+  dateOfBirth: "date of birth",
+  address: "home state and ZIP code",
 };
 
 function CaregiversTab({ canManage }: { canManage: boolean }) {
@@ -398,7 +404,6 @@ function CaregiversTab({ canManage }: { canManage: boolean }) {
             <thead className="bg-[#f7f8f9] text-xs uppercase text-[#5b636b] dark:bg-white/5">
               <tr>
                 <th className="px-4 py-3 font-medium">Caregiver</th>
-                <th className="px-4 py-3 font-medium">HHAeXchange code</th>
                 <th className="px-4 py-3 font-medium">Sync</th>
                 <th className="px-4 py-3 font-medium"><span className="sr-only">Actions</span></th>
               </tr>
@@ -408,9 +413,8 @@ function CaregiversTab({ canManage }: { canManage: boolean }) {
                 <tr key={caregiver.employeeId} className="border-t border-[#eef0f2] dark:border-white/5">
                   <td className="px-4 py-3 font-medium">
                     {caregiver.name}
-                    {caregiver.missing.length > 0 && <span className="ml-2 text-xs text-[#9a5b00]">Missing {caregiver.missing.map((m) => (m === "dateOfBirth" ? "date of birth" : "last name")).join(" and ")}</span>}
+                    {caregiver.missing.length > 0 && <span className="ml-2 text-xs text-[#9a5b00]">Missing {caregiver.missing.map((m) => MISSING_LABELS[m]).join(", ")}</span>}
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs">{caregiver.caregiverCode ?? "—"}</td>
                   <td className="px-4 py-3">
                     {SYNC_LABELS[caregiver.syncState] ?? caregiver.syncState}
                     {caregiver.lastError && <span className="block text-xs text-[#b42318]">{caregiver.lastError}</span>}
@@ -418,7 +422,7 @@ function CaregiversTab({ canManage }: { canManage: boolean }) {
                   <td className="px-4 py-3 text-right">
                     {canManage && (
                       <button type="button" className={EVV_GHOST_BUTTON} disabled={busy === caregiver.employeeId || caregiver.missing.length > 0} onClick={() => void sync(caregiver)}>
-                        {caregiver.caregiverCode ? "Resend" : "Send now"}
+                        {caregiver.lastSyncedAt ? "Resend" : "Send now"}
                       </button>
                     )}
                   </td>

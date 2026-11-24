@@ -20,6 +20,8 @@ import {
     useSubmitGoalDocumentMutation
 } from "../api";
 import {DocumentType, AnnualUpdateDocument} from "@/lib/api/goals-and-documents";
+import {clientDisplayName, goalsBackRoute, rememberDocumentId, useClientGoalDraft} from "./useClientGoalDraft";
+import {planYearDatesForDocument} from "../goal-forms";
 
 export default function AnnualUpdateTemplate(
     {pageTitle, documentType}: {pageTitle: string, documentType: DocumentType}
@@ -31,12 +33,18 @@ export default function AnnualUpdateTemplate(
     const documentId = new URLSearchParams(location.search).get("id");
     const firebaseId = new URLSearchParams(location.search).get("firebaseId");
     const isUserPanel = location.pathname.startsWith("/user-panel/");
-    const backRoute = isUserPanel ? Routes.userPanel.planOfCare : Routes.agency.goalsAndDocuments.index;
     const backLabel = isUserPanel ? "Back to Plan of Care" : "Back to Goals & Documents";
     
-    const {data: document, isLoading} = useGetSingleGoalDocumentQuery(documentType, {
-        skip: !documentType || !!firebaseId,
+    const forClient = useClientGoalDraft(documentType);
+    const backRoute = goalsBackRoute(isUserPanel, forClient.clientId || new URLSearchParams(location.search).get("clientId"));
+
+    const {data: agencyDraft, isLoading} = useGetSingleGoalDocumentQuery(documentType, {
+        skip: !documentType || !!firebaseId || !!forClient.clientId,
     });
+    // Opened for a client: work on that client's draft, never another client's.
+    const document = forClient.clientId ? forClient.draft ?? undefined : agencyDraft;
+    const [savedId, setSavedId] = useState<string | null>(null);
+    const currentId = savedId ?? document?.id ?? documentId;
 
     const {data: firebaseDocument, isLoading: isLoadingFirebaseDoc} = useGetGoalDocumentByFirebaseIdQuery(firebaseId!, {
         skip: !firebaseId,
@@ -74,7 +82,7 @@ export default function AnnualUpdateTemplate(
             const metadata = sourceDoc.metadata as AnnualUpdateDocument;
             setFormData({
                 name: metadata.name || "",
-                clientId: (metadata as any).clientId || "",
+                clientId: (metadata as any).clientId || sourceDoc.clientId || "",
                 ispStartDate: metadata.ispStartDate || "",
                 ispEndDate: metadata.ispEndDate || "",
                 activitiesDescription: metadata.activitiesDescription || "",
@@ -91,6 +99,19 @@ export default function AnnualUpdateTemplate(
         }
     }, [document, firebaseDocument]);
 
+    // Opened for a client: fill in the client's name and ISP plan year where the form is blank.
+    useEffect(() => {
+        if (!forClient.clientId || !forClient.ready || firebaseId) return;
+        const plan = planYearDatesForDocument(forClient.client, documentType);
+        setFormData((prev) => ({
+            ...prev,
+            clientId: forClient.clientId,
+            name: prev.name || clientDisplayName(forClient.client),
+            ispStartDate: prev.ispStartDate || plan.start,
+            ispEndDate: prev.ispEndDate || plan.end,
+        }));
+    }, [forClient.clientId, forClient.ready, forClient.client, forClient.draft, documentType, firebaseId]);
+
     useEffect(() => {
         return () => {
             if (clientSearchTimeoutRef.current) clearTimeout(clientSearchTimeoutRef.current);
@@ -106,13 +127,13 @@ export default function AnnualUpdateTemplate(
                     data: { 
                         metadata: data, 
                         agencyId: user?.agencyId,
-                        clientId: data.clientId || undefined
+                        clientId: data.clientId || forClient.clientId || undefined
                     }
                 }).unwrap();
                 
-                if (result.id && !documentId) {
-                    const newUrl = `${location.pathname}?id=${result.id}`;
-                    window.history.replaceState({}, '', newUrl);
+                if (result.id) {
+                    setSavedId(result.id);
+                    if (!documentId && !firebaseId) rememberDocumentId(result.id);
                 }
             } catch (error) {
                 console.error('Failed to save document:', error);
@@ -179,7 +200,7 @@ export default function AnnualUpdateTemplate(
             return;
         }
         
-        if (!document?.id) {
+        if (!currentId) {
             toast.error('Please save the document first before submitting');
             return;
         }
@@ -190,7 +211,7 @@ export default function AnnualUpdateTemplate(
         }
         
         try {
-            await submitDocument(document?.id ?? "").unwrap();
+            await submitDocument(currentId).unwrap();
             toast.success('Document submitted successfully!');
             navigate(backRoute);
         } catch (error: any) {
@@ -551,12 +572,12 @@ export default function AnnualUpdateTemplate(
                         <div className={"flex justify-between items-center"}>
                             <div className="text-sm text-gray-500">
                                 {isSaving && "Saving draft..."}
-                                {!isSaving && document?.id && "Draft saved"}
+                                {!isSaving && currentId && "Draft saved"}
                             </div>
                             <Button
                                 type={"button"}
                                 onClick={handleSubmit}
-                                disabled={isSubmitting || !documentId}
+                                disabled={isSubmitting || !currentId}
                                 className="flex items-center gap-2 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-6 py-3 h-auto font-semibold shadow-sm disabled:opacity-50"
                             >
                                 {isSubmitting ? "Submitting..." : "Submit"}

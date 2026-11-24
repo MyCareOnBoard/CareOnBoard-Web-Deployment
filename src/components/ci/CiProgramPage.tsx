@@ -2,19 +2,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router";
 import {
   AlertTriangle, ArrowLeft, ArrowRight, Building2, Clock, Download, FileClock, Loader2, LogIn, LogOut,
-  MapPin, Search, UserPlus, UserRound, Users, UserX,
+  MapPin, Search, Settings, UserPlus, UserRound, Users, UserX,
 } from "lucide-react";
 import { AgencyPageHeader, AgencyStatCard } from "@/components/agency/AgencyShell";
 import { CiWeeklyLogGrid } from "@/components/ci/CiWeeklyLogGrid";
 import { CiAddClientPanel } from "@/components/ci/CiAddClientPanel";
+import { CiSettingsDialog } from "@/components/ci/CiSettingsDialog";
+import { UserType } from "@/utils/auth/types";
 import { useAuth } from "@/utils/auth";
 import { useToast } from "@/hooks/use-toast";
 import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
-import { listEmployees } from "@/lib/api/employees";
 import { cn } from "@/lib/utils";
 import { Routes } from "@/routes/constants";
 import {
-  ATTENDANCE_LABELS, CI_PROGRAMS, addDays, apiErrorMessage, ciApi, formatCivilDate, formatClock, nowClock, rosterLabel, todayCivil,
+  ATTENDANCE_LABELS, CI_PROGRAMS, addDays, apiErrorMessage, ciApi, formatCivilDate, formatClock, listProgramStaff, nowClock, rosterLabel, todayCivil,
   type CiAttendance, type CiAttendanceMark, type CiDashboard, type CiProgram, type CiRosterEntry, type CiSession,
 } from "@/lib/api/ci-tracker";
 
@@ -68,6 +69,9 @@ export function CiProgramPage({ program }: { program: CiProgram }) {
   const { toast } = useToast();
   const { user } = useAuth();
   const agencyId = user?.agencyId || user?.agency?.id || "";
+  // Settings are saved by the agency or its office staff (the API allows both).
+  const canEditSettings = user?.userType === UserType.AGENCY || user?.userType === UserType.AGENCY_STAFF;
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [params, setParams] = useSearchParams();
   const date = /^\d{4}-\d{2}-\d{2}$/.test(params.get("date") || "") ? (params.get("date") as string) : todayCivil();
   const weekStartParam = params.get("weekStart");
@@ -115,8 +119,8 @@ export function CiProgramPage({ program }: { program: CiProgram }) {
   useEffect(() => {
     if (!agencyId) return;
     const controller = new AbortController();
-    listEmployees({ agencyId, role: "dsp", limit: 200, signal: controller.signal })
-      .then((res) => setStaffNames(new Map(res.employees.map((e) => [e.id, e.fullName?.trim() || "Staff member"]))))
+    listProgramStaff(agencyId, controller.signal)
+      .then((employees) => setStaffNames(new Map(employees.map((e) => [e.id, e.fullName?.trim() || "Staff member"]))))
       .catch(() => undefined);
     return () => controller.abort();
   }, [agencyId]);
@@ -200,12 +204,16 @@ export function CiProgramPage({ program }: { program: CiProgram }) {
 
   return (
     <div className="flex flex-col gap-5 px-4 py-2 sm:px-6">
+      {canEditSettings && <CiSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />}
       <AgencyPageHeader
         icon={copy.icon}
         title={copy.title}
         description={copy.description}
         actions={
           <>
+            {canEditSettings && (
+              <button type="button" className={BUTTON} onClick={() => setSettingsOpen(true)}><Settings aria-hidden="true" className="h-4 w-4" />Settings</button>
+            )}
             <button type="button" className={BUTTON} onClick={() => navigate(copy.history)}><FileClock aria-hidden="true" className="h-4 w-4" />History</button>
             <button type="button" className={BUTTON} disabled={!session} onClick={() => setAddOpen(true)}><UserPlus aria-hidden="true" className="h-4 w-4" />Add attendee</button>
             <button type="button" className={PRIMARY} disabled={!dirty || saving} onClick={save}>
@@ -336,7 +344,15 @@ export function CiProgramPage({ program }: { program: CiProgram }) {
                     </td>
                     <td className="px-3 py-2.5">
                       {e.goalsApproved === false ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-[#8a5a00] dark:text-[#ffd27a]"><AlertTriangle aria-hidden="true" className="h-3.5 w-3.5" />No approved goals</span>
+                        canEditSettings ? (
+                          <Link
+                            to={`${Routes.agency.goalsAndDocuments.index}?clientId=${encodeURIComponent(e.clientId)}`}
+                            title="Open this client's forms on Goals & documents"
+                            className="inline-flex items-center gap-1 text-xs font-medium text-[#8a5a00] underline underline-offset-2 dark:text-[#ffd27a]"
+                          >
+                            <AlertTriangle aria-hidden="true" className="h-3.5 w-3.5" />No approved goals
+                          </Link>
+                        ) : <span className="inline-flex items-center gap-1 text-xs font-medium text-[#8a5a00] dark:text-[#ffd27a]"><AlertTriangle aria-hidden="true" className="h-3.5 w-3.5" />No approved goals</span>
                       ) : <span className="text-xs text-[#2a3138] dark:text-[#c9d1d4]">Approved</span>}
                     </td>
                     <td className="px-3 py-2.5 text-right">
