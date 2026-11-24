@@ -1,37 +1,25 @@
-import React, { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router";
+import { Bell, CircleCheck, Ellipsis, Eye, Hourglass, ListChecks, ListTodo, Pencil, Plus, Trash2, TriangleAlert } from "lucide-react";
+import { toast } from "sonner";
 import { selectUser } from "@/utils/auth/store/authSelectors";
-import AddTaskModal from "@/components/tasks/AddTaskModal";
-import EditTaskModal from "@/components/tasks/EditTaskModal";
-import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { ConfirmDialog, ConfirmDialogContent } from "@/components/ui/confirm-dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AgencyPageHeader, AgencyProgressBar, AgencyStatCard } from "@/components/agency/AgencyShell";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { DotGridIcon, menuItemClassName } from "@/components/ui/dot-grid-menu";
-import { Plus, Pencil, Trash2, Search, ClipboardList, BellRing, Eye } from "lucide-react";
+  AgencyFilterSelect, AgencyListCard, AgencyPagination, AgencyPerson, AgencyPill, AgencySearchField, AgencySegmented,
+  agencyMenuContent, agencyMenuItem, agencyOutlineButton, agencyPrimaryButton, agencyRowMenuButton,
+  agencyTd, agencyTh, agencyTheadRow, agencyTr, type AgencyTone,
+} from "@/components/agency/AgencyListKit";
 import { Routes } from "@/routes/constants";
+import { cn } from "@/lib/utils";
 import type { Department, StaffMember, StaffTask } from "@/components/tasks/types";
-import {
-  useGetTasksQuery,
-  useCreateTaskMutation,
-  useUpdateTaskMutation,
-  useDeleteTaskMutation,
-} from "./api";
+import { useGetTasksQuery, useCreateTaskMutation, useUpdateTaskMutation, useDeleteTaskMutation } from "./api";
 import { useListAgencyStaffQuery } from "@/lib/api/agency-staff";
 import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
+import TaskFormDialog, { type TaskFormValues } from "./TaskFormDialog";
 
 const departments: Department[] = [
   { value: "hr", label: "HR" },
@@ -43,46 +31,52 @@ const departments: Department[] = [
   { value: "admin", label: "Admin" },
 ];
 
-const STATUS_META: Record<string, { border: string; dot: string }> = {
-  "Open":        { border: "border-[#FF6C10] text-[#FF6C10]",  dot: "bg-[#FF6C10]" },
-  "In Progress": { border: "border-[#2b82ff] text-[#2b82ff]",  dot: "bg-[#2b82ff]" },
-  "Completed":   { border: "border-[#0eaf52] text-[#0eaf52]",  dot: "bg-[#0eaf52]" },
-};
+type StatusFilter = "All" | StaffTask["status"];
+type SortKey = "listed" | "due" | "priority" | "title";
 
-const PRIORITY_META: Record<string, { border: string; dot: string }> = {
-  "High":   { border: "border-[#ef4444] text-[#ef4444]",  dot: "bg-[#ef4444]" },
-  "Medium": { border: "border-[#FF6C10] text-[#FF6C10]",  dot: "bg-[#FF6C10]" },
-  "Low":    { border: "border-[#b2b2b3] text-[#b2b2b3]",  dot: "bg-[#b2b2b3]" },
-};
+const PAGE_SIZE = 10;
+const DAY = 86_400_000;
 
-type StatusFilter = "All" | "Open" | "In Progress" | "Completed";
+const STATUS_TONE: Record<StaffTask["status"], AgencyTone> = { "Open": "grey", "In Progress": "slate", "Completed": "green" };
+const STATUS_LABEL: Record<StaffTask["status"], string> = { "Open": "Open", "In Progress": "In progress", "Completed": "Completed" };
+const PRIORITY_TONE: Record<StaffTask["priority"], AgencyTone> = { High: "red", Medium: "amber", Low: "grey" };
+const PRIORITY_RANK: Record<StaffTask["priority"], number> = { High: 0, Medium: 1, Low: 2 };
 
-// Shared column template (header/rows/skeleton) — must stay a full, literal
-// class string (incl. the md: prefix) so Tailwind's JIT detects it.
-// All tracks are fixed or fr (no content-based `auto`) so the separate header and
-// row grids resolve to identical column widths and stay aligned.
-const TASK_GRID = "gap-2 md:grid-cols-[minmax(150px,2fr)_minmax(72px,0.9fr)_100px_95px_85px_100px_72px]";
+/** "2026-11-25" is that local day; anything else goes through Date. */
+function parseDay(value?: string) {
+  if (!value) return null;
+  const plain = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  const date = plain ? new Date(Number(plain[1]), Number(plain[2]) - 1, Number(plain[3])) : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
 
-function SkeletonRow() {
-  return (
-    <div className={`grid grid-cols-1 border-b border-[#e5e5e6] px-4 py-4 md:items-center ${TASK_GRID}`}>
-      <div className="flex items-center gap-2.5">
-        <Skeleton className="w-2 h-2 rounded-full shrink-0" />
-        <div className="min-w-0 flex-1 space-y-1.5">
-          <Skeleton className="h-3.5 w-36 max-w-full" />
-          <Skeleton className="w-24 h-3" />
-        </div>
-      </div>
-      <Skeleton className="h-3.5 w-24" />
-      <Skeleton className="w-20 h-6 rounded-full" />
-      <Skeleton className="h-3.5 w-16" />
-      <Skeleton className="w-16 h-6 rounded-full" />
-      <Skeleton className="w-20 h-6 rounded-full" />
-      <div className="flex items-center md:justify-self-start">
-        <Skeleton className="rounded-md h-8 w-8" />
-      </div>
-    </div>
-  );
+function startOfToday() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+}
+
+/** Days from today to the due date (negative when late), or null without a date. */
+function daysUntil(task: StaffTask) {
+  const due = parseDay(task.dueDate);
+  return due ? Math.round((due.getTime() - startOfToday()) / DAY) : null;
+}
+
+const isOverdue = (task: StaffTask) => task.status !== "Completed" && (daysUntil(task) ?? 0) < 0;
+
+function dueText(task: StaffTask) {
+  const due = parseDay(task.dueDate);
+  if (!due) return { date: task.dueDate || "No due date", note: null as string | null, late: false };
+  const date = due.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  if (task.status === "Completed") return { date, note: null, late: false };
+  const days = daysUntil(task)!;
+  if (days < 0) return { date, note: `${-days} day${days === -1 ? "" : "s"} overdue`, late: true };
+  if (days === 0) return { date, note: "Due today", late: false };
+  return { date, note: `In ${days} day${days === 1 ? "" : "s"}`, late: false };
+}
+
+function formatActivityDate(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
 export default function StaffTasksPage() {
@@ -90,15 +84,16 @@ export default function StaffTasksPage() {
   const currentUser = useSelector(selectUser);
   const mode = useEffectiveAgencyMode();
 
-  const [searchQuery,    setSearchQuery]   = useState("");
-  const [staffFilter,    setStaffFilter]   = useState("");
-  const [statusFilter,   setStatusFilter]  = useState<StatusFilter>("All");
-  const [showAddModal,   setShowAddModal]  = useState(false);
-  const [viewingTask,    setViewingTask]   = useState<StaffTask | null>(null);
-  const [editingTask,    setEditingTask]   = useState<StaffTask | null>(null);
-  const [showEditModal,  setShowEditModal] = useState(false);
-  const [deletingTaskId,   setDeletingTaskId]   = useState<string | null>(null);
-  const [isDeleting,       setIsDeleting]       = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [staffFilter, setStaffFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
+  const [sortKey, setSortKey] = useState<SortKey>("listed");
+  const [page, setPage] = useState(1);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<StaffTask | null>(null);
+  const [viewingTask, setViewingTask] = useState<StaffTask | null>(null);
+  const [deletingTask, setDeletingTask] = useState<StaffTask | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
 
   // refetchOnMountOrArgChange + isFetching keep the skeleton showing on every
@@ -112,10 +107,7 @@ export default function StaffTasksPage() {
   const [updateTask] = useUpdateTaskMutation();
   const [deleteTask] = useDeleteTaskMutation();
 
-  const tasks: StaffTask[] = useMemo(
-    () => (tasksResponse?.data ?? []) as StaffTask[],
-    [tasksResponse],
-  );
+  const tasks: StaffTask[] = useMemo(() => (tasksResponse?.data ?? []) as StaffTask[], [tasksResponse]);
 
   const staffList: StaffMember[] = useMemo(
     () =>
@@ -125,431 +117,306 @@ export default function StaffTasksPage() {
         .sort((a, b) => a.name.localeCompare(b.name)),
     [staffResponse],
   );
+  const staffById = useMemo(() => new Map(staffList.map((s) => [s.id, s])), [staffList]);
+  const departmentLabel = (value: string) => departments.find((d) => d.value === value)?.label;
 
-  const staffMap = useMemo(
-    () => Object.fromEntries(staffList.map((s) => [s.id, s.name])),
-    [staffList],
-  );
+  const counts = useMemo(() => ({
+    All: tasks.length,
+    Open: tasks.filter((t) => t.status === "Open").length,
+    "In Progress": tasks.filter((t) => t.status === "In Progress").length,
+    Completed: tasks.filter((t) => t.status === "Completed").length,
+    overdue: tasks.filter(isOverdue).length,
+  }), [tasks]);
 
-  const filtered = useMemo(() =>
-    tasks.filter((t) => {
-      if (searchQuery && !t.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+  const filtered = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const list = tasks.filter((t) => {
+      if (query && ![t.title, t.description].some((text) => text?.toLowerCase().includes(query))) return false;
       if (staffFilter && t.staffMember !== staffFilter) return false;
       if (statusFilter !== "All" && t.status !== statusFilter) return false;
       return true;
-    }),
-    [tasks, searchQuery, staffFilter, statusFilter],
-  );
+    });
+    if (sortKey === "title") return [...list].sort((a, b) => a.title.localeCompare(b.title));
+    if (sortKey === "priority") return [...list].sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority]);
+    if (sortKey === "due") {
+      return [...list].sort((a, b) => (parseDay(a.dueDate)?.getTime() ?? Infinity) - (parseDay(b.dueDate)?.getTime() ?? Infinity));
+    }
+    return list;
+  }, [tasks, searchQuery, staffFilter, statusFilter, sortKey]);
+
+  // Back to the first page whenever the list changes shape.
+  useEffect(() => { setPage(1); }, [searchQuery, staffFilter, statusFilter, sortKey, mode]);
+  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const shown = filtered.slice((Math.min(page, pages) - 1) * PAGE_SIZE, Math.min(page, pages) * PAGE_SIZE);
 
   const isLoading = tasksLoading || staffLoading;
+  const completedShare = counts.All ? Math.round((counts.Completed / counts.All) * 100) : 0;
 
-  const handleCreateTask = async (task: {
-    title: string; description: string; department: string;
-    staffMember: string; dueDate: string; priority: "High" | "Medium" | "Low";
-  }) => { await createTask({ ...task, ...(mode ? { mode } : {}) }); };
+  const openAdd = () => { setEditingTask(null); setFormOpen(true); };
+  const openEdit = (task: StaffTask) => { setViewingTask(null); setEditingTask(task); setFormOpen(true); };
 
-  const handleUpdateTask = async (
-    taskId: string,
-    data: Partial<Omit<StaffTask, "id" | "activities">>,
-  ) => { await updateTask({ taskId, data }).unwrap(); };
+  const handleSubmit = async (values: TaskFormValues) => {
+    if (editingTask) {
+      await updateTask({ taskId: editingTask.id, data: values }).unwrap();
+      toast.success("Task updated.");
+    } else {
+      const { status: _status, ...create } = values;
+      await createTask({ ...create, ...(mode ? { mode } : {}) }).unwrap();
+      toast.success("Task created.");
+    }
+  };
 
   const handleDeleteConfirm = async () => {
-    if (!deletingTaskId) return;
+    if (!deletingTask) return;
     setIsDeleting(true);
     try {
-      await deleteTask(deletingTaskId).unwrap();
-      if (viewingTask?.id === deletingTaskId) setViewingTask(null);
-      setDeletingTaskId(null);
+      await deleteTask(deletingTask.id).unwrap();
+      if (viewingTask?.id === deletingTask.id) setViewingTask(null);
+      setDeletingTask(null);
+      toast.success("Task deleted.");
+    } catch {
+      toast.error("The task could not be deleted. Try again.");
     } finally {
       setIsDeleting(false);
     }
   };
 
-  const handleStatusChange = async (taskId: string, status: StaffTask["status"]) => {
-    setUpdatingStatusId(taskId);
+  const handleStatusChange = async (task: StaffTask, status: StaffTask["status"]) => {
+    setUpdatingStatusId(task.id);
     try {
-      await updateTask({ taskId, data: { status } }).unwrap();
+      await updateTask({ taskId: task.id, data: { status } }).unwrap();
+      setViewingTask((prev) => (prev && prev.id === task.id ? { ...prev, status } : prev));
+    } catch {
+      toast.error("The status could not be updated. Try again.");
     } finally {
       setUpdatingStatusId(null);
     }
   };
 
-  const openEdit = (task: StaffTask) => {
-    setEditingTask(task);
-    setShowEditModal(true);
-  };
-
-  const tableHead = (
-    <div className={`hidden border-b border-[#e5e5e6] bg-[#f9fafb] px-4 py-3 md:grid ${TASK_GRID}`}>
-      {["Task", "Assigned to", "Department", "Due date", "Priority", "Status", "Actions"].map((h) => (
-        <span key={h} className="text-left text-[12px] font-semibold text-[#808081] uppercase tracking-wide">
-          {h}
-        </span>
-      ))}
-    </div>
-  );
+  const filtersOn = !!searchQuery.trim() || !!staffFilter || statusFilter !== "All";
 
   return (
-    <div className="min-h-[calc(100vh-200px)] px-4 sm:px-6 lg:px-0">
-      {/* Page header */}
-      <div className="mb-4 sm:mb-6">
-        <h1 className="text-[28px] sm:text-[32px] lg:text-[40px] font-bold leading-[1.4] text-[#10141a]">
-          Task Manager
-        </h1>
+    <div className="pb-6">
+      <AgencyPageHeader
+        icon={ListChecks}
+        title="Task management"
+        description="Assign follow-ups to staff, set priority and track them to done."
+        actions={<>
+          <button type="button" onClick={() => navigate(Routes.agency.reminders)} className={agencyOutlineButton}>
+            <Bell aria-hidden="true" className="h-4 w-4" />Reminders
+          </button>
+          <button type="button" onClick={openAdd} className={agencyPrimaryButton}>
+            <Plus aria-hidden="true" className="h-4 w-4" />Add task
+          </button>
+        </>}
+      />
+
+      <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <AgencyStatCard icon={ListTodo} label="Open" value={isLoading ? "—" : counts.Open} footnote="Not started yet." />
+        <AgencyStatCard icon={Hourglass} label="In progress" value={isLoading ? "—" : counts["In Progress"]} footnote="Being worked on." />
+        <AgencyStatCard icon={TriangleAlert} label="Overdue" value={isLoading ? "—" : counts.overdue}
+          extra={!isLoading && counts.overdue > 0 ? <AgencyPill tone="red">Act today</AgencyPill> : null}
+          footnote="Past their due date." />
+        <AgencyStatCard icon={CircleCheck} label="Completed" value={isLoading ? "—" : counts.Completed}
+          footnote={isLoading ? undefined : counts.All ? `Of ${counts.All} task${counts.All === 1 ? "" : "s"} (${completedShare}%).` : "No tasks yet."}>
+          {!isLoading && counts.All > 0 && <AgencyProgressBar value={completedShare} label="Tasks completed" />}
+        </AgencyStatCard>
       </div>
 
-      {/* Main card */}
-      <div className="min-w-0 overflow-hidden bg-white shadow-sm rounded-xl sm:rounded-2xl">
-
-        {/* Card header */}
-        <div className="p-4 sm:p-6 border-b border-[#e5e7eb]">
-          <div className="flex flex-col gap-4 mb-1 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-            <div>
-              <h2 className="text-[20px] sm:text-[22px] font-bold text-[#10141a]">All Tasks</h2>
-              <p className="mt-0.5 text-[13px] sm:text-[14px] text-[#6b7280]">
-                Create and assign tasks to agency staff members
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={() => navigate(Routes.agency.reminders)}
-                className="flex flex-1 sm:flex-none items-center justify-center gap-2 px-5 py-2.5 rounded-full border border-[#00b4b8] bg-white text-[#008f93] text-[14px] font-semibold hover:bg-[#f0fbfb] transition-colors cursor-pointer"
-              >
-                <BellRing className="w-4 h-4" />
-                Reminders
-              </button>
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="flex flex-1 sm:flex-none items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-[#00b4b8] text-white text-[14px] font-semibold hover:bg-[#00a0a4] transition-colors cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                Add Task
-              </button>
-            </div>
-          </div>
-
-          {/* Filter bar */}
-          <div className="flex flex-wrap items-center gap-2 mt-4">
-            {/* Search */}
-            <div className="relative flex items-center gap-2 border border-[#e5e7eb] rounded-full px-3 h-9 min-w-[200px]">
-              <Search className="h-3.5 w-3.5 text-[#808081] shrink-0" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search tasks…"
-                className="h-full border-0 bg-transparent px-0 py-0 text-[13px] text-[#10141a] placeholder:text-[#808081] outline-none focus:ring-0 min-w-0 w-full"
-              />
-            </div>
-
-            {/* Staff filter */}
-            <select
-              value={staffFilter}
-              onChange={(e) => setStaffFilter(e.target.value)}
-              className="h-9 px-3 rounded-full border border-[#e5e7eb] text-[13px] text-[#6b7280] outline-none focus:border-[#00b4b8] bg-white transition-colors cursor-pointer"
-            >
-              <option value="">All Staff</option>
-              {staffList.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-
-            <div className="h-5 w-px bg-[#e5e7eb]" />
-
-            {/* Status pills */}
-            <div className="flex flex-wrap items-center gap-1">
-              {(["All", "Open", "In Progress", "Completed"] as const).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setStatusFilter(s)}
-                  className={`px-3 py-1 rounded-full text-[13px] font-medium border transition-colors ${
-                    statusFilter === s
-                      ? "bg-[#00b4b8] border-[#00b4b8] text-white"
-                      : "border-[#e5e7eb] text-[#6b7280] hover:border-[#cccccd]"
-                  }`}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-
-            {!isLoading && (
-              <span className="ml-auto text-[13px] text-[#6b7280]">
-                {filtered.length} of {tasks.length}
-              </span>
-            )}
+      <AgencyListCard label="Tasks" className="mt-5">
+        <div className="flex flex-col gap-3 p-4 xl:flex-row xl:items-center">
+          <AgencySegmented label="Status" value={statusFilter} onChange={setStatusFilter}
+            options={(["All", "Open", "In Progress", "Completed"] as const).map((value) => ({
+              value, label: value === "All" ? "All" : STATUS_LABEL[value], count: isLoading ? undefined : counts[value],
+            }))} />
+          <div className="flex flex-wrap items-center gap-2.5 xl:ml-auto">
+            <AgencySearchField label="Search tasks" placeholder="Search tasks" value={searchQuery} onChange={setSearchQuery} className="min-w-[200px] flex-1 xl:w-[220px] xl:flex-none" />
+            <AgencyFilterSelect label="Staff" value={staffFilter} onChange={setStaffFilter}
+              options={[{ value: "", label: "All" }, ...staffList.map((s) => ({ value: s.id, label: s.name }))]} className="max-w-[240px]" />
+            <AgencyFilterSelect label="Sort by" value={sortKey} onChange={(value) => setSortKey(value as SortKey)}
+              options={[
+                { value: "listed", label: "Default" },
+                { value: "due", label: "Due date" },
+                { value: "priority", label: "Priority" },
+                { value: "title", label: "Title" },
+              ]} />
           </div>
         </div>
 
-        {/* Table body */}
         {isLoading ? (
-          <div className="overflow-x-auto">
-            {tableHead}
-            {Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} />)}
+          <div aria-hidden="true" className="space-y-px border-t border-[#eceef0] dark:border-white/10">
+            {[0, 1, 2, 3, 4].map((i) => <div key={i} className="h-[66px] animate-pulse bg-[#f8f9fa] dark:bg-white/5" />)}
+            <span role="status" className="sr-only">Loading tasks</span>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="p-8 text-center sm:p-12">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#f3f4f6]">
-              <ClipboardList className="h-7 w-7 text-[#b2b2b3]" />
-            </div>
-            <p className="text-[14px] font-semibold text-[#10141a]">
-              {tasks.length === 0 ? "No tasks yet" : "No tasks match your filters"}
+          <div className="border-t border-[#eceef0] px-6 py-14 text-center dark:border-white/10">
+            <p className="text-[16px] font-medium text-[#10141a] dark:text-[#f4f6f7]">{tasks.length === 0 ? "No tasks yet" : "No tasks match"}</p>
+            <p className="mt-1 text-[14px] text-[#4b535b] dark:text-[#9aa4a8]">
+              {tasks.length === 0 ? "Add a task to assign a follow-up to someone on your team." : "Try another search, staff member or status."}
             </p>
-            <p className="mt-1 text-[13px] text-[#6b7280]">
-              {tasks.length === 0
-                ? "Click \"Add Task\" to create your first task"
-                : "Try adjusting your search, staff, or status filter"}
-            </p>
+            {tasks.length === 0 ? (
+              <button type="button" onClick={openAdd} className={cn(agencyPrimaryButton, "mt-5")}><Plus aria-hidden="true" className="h-4 w-4" />Add task</button>
+            ) : filtersOn && (
+              <button type="button" onClick={() => { setSearchQuery(""); setStaffFilter(""); setStatusFilter("All"); }} className={cn(agencyOutlineButton, "mt-5")}>Clear filters</button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
-            {tableHead}
-            {filtered.map((task) => {
-              const isCreator  = task.createdBy === currentUser?.uid;
-              const deptLabel  = departments.find((d) => d.value === task.department)?.label ?? "—";
-              const staffName  = staffMap[task.staffMember] ?? "—";
-              const statusMeta = STATUS_META[task.status];
-              const priMeta    = PRIORITY_META[task.priority];
-
-              return (
-                <div
-                  key={task.id}
-                  className={`grid grid-cols-1 border-b border-[#e5e5e6] px-4 py-4 transition-colors last:border-b-0 hover:bg-[#f9fafb] md:items-center ${TASK_GRID}`}
-                >
-                  {/* Title + description */}
-                  <div className="min-w-0">
-                    <div className="flex items-start gap-2.5">
-                      <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${priMeta?.dot ?? "bg-[#b2b2b3]"}`} />
-                      <div className="min-w-0">
-                        <p className="text-[14px] font-semibold text-[#10141a] truncate">{task.title}</p>
-                        {task.description && (
-                          <p className="text-[13px] text-[#6b7280] truncate mt-0.5">{task.description}</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="text-[14px] text-[#10141a]">
-                    <span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] md:hidden">Assigned to</span>
-                    {staffName}
-                  </div>
-
-                  <div>
-                    <span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] md:hidden">Department</span>
-                    {task.department ? (
-                      <span className="rounded-full border border-[#e5e7eb] bg-transparent px-3 py-1 text-[13px] font-medium text-[#6b7280]">
-                        {deptLabel}
-                      </span>
-                    ) : (
-                      <span className="text-[13px] text-[#b2b2b3]">—</span>
-                    )}
-                  </div>
-
-                  <div className="text-[14px] text-[#6b7280]">
-                    <span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] md:hidden">Due date</span>
-                    {task.dueDate || <span className="text-[#b2b2b3]">—</span>}
-                  </div>
-
-                  <div>
-                    <span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] md:hidden">Priority</span>
-                    <span className={`rounded-full border bg-transparent px-3 py-1 text-[13px] font-medium ${priMeta?.border ?? ""}`}>
-                      {task.priority}
-                    </span>
-                  </div>
-
-                  <div>
-                    <span className="mr-2 text-[11px] font-semibold uppercase text-[#808081] md:hidden">Status</span>
-                    <span className={`rounded-full border bg-transparent px-3 py-1 text-[13px] font-medium ${statusMeta?.border ?? ""}`}>
-                      {task.status}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center md:justify-self-start">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          type="button"
-                          aria-label="Task actions"
-                          className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md bg-white transition-colors hover:bg-[#e5e5e6] active:bg-[#e5e5e6]"
-                        >
-                          <DotGridIcon />
+            <table className="w-full min-w-[900px]">
+              <thead>
+                <tr className={agencyTheadRow}>
+                  <th scope="col" className={agencyTh}>Task</th>
+                  <th scope="col" className={agencyTh}>Assigned to</th>
+                  <th scope="col" className={agencyTh}>Department</th>
+                  <th scope="col" className={agencyTh}>Due date</th>
+                  <th scope="col" className={agencyTh}>Priority</th>
+                  <th scope="col" className={agencyTh}>Status</th>
+                  <th scope="col" className={agencyTh}><span className="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((task) => {
+                  const isCreator = task.createdBy === currentUser?.uid;
+                  const assignee = staffById.get(task.staffMember);
+                  const due = dueText(task);
+                  return (
+                    <tr key={task.id} className={agencyTr}>
+                      <td className={cn(agencyTd, "max-w-[320px]")}>
+                        <button type="button" onClick={() => setViewingTask(task)}
+                          className="block max-w-full cursor-pointer truncate rounded text-left font-medium text-[#10141a] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] dark:text-[#f4f6f7]">
+                          {task.title}
                         </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="z-[100] min-w-[160px] rounded-xl border-0 bg-white p-0 shadow-lg">
-                        <DropdownMenuItem className={menuItemClassName} onClick={() => setViewingTask(task)}>
-                          <Eye className="mr-2 h-3.5 w-3.5" />
-                          View
-                        </DropdownMenuItem>
-                        {isCreator && (
-                          <>
-                            <DropdownMenuItem className={menuItemClassName} onClick={() => openEdit(task)}>
-                              <Pencil className="mr-2 h-3.5 w-3.5" />
-                              Edit
+                        {task.description && <span className="mt-0.5 block truncate text-[12px] text-[#6b737a] dark:text-[#9aa4a8]">{task.description}</span>}
+                      </td>
+                      <td className={agencyTd}>
+                        {assignee ? <AgencyPerson name={assignee.name} detail={assignee.role} /> : <span className="text-[#6b737a]">Not assigned</span>}
+                      </td>
+                      <td className={agencyTd}>{departmentLabel(task.department) ?? <span className="text-[#6b737a]">—</span>}</td>
+                      <td className={cn(agencyTd, "whitespace-nowrap")}>
+                        <span className={cn("block", due.late && "text-[#c4262e] dark:text-[#ff9d94]")}>{due.date}</span>
+                        {due.note && <span className="mt-0.5 block text-[12px] text-[#6b737a] dark:text-[#9aa4a8]">{due.note}</span>}
+                      </td>
+                      <td className={agencyTd}><AgencyPill tone={PRIORITY_TONE[task.priority] ?? "grey"}>{task.priority}</AgencyPill></td>
+                      <td className={agencyTd}><AgencyPill tone={STATUS_TONE[task.status] ?? "grey"}>{STATUS_LABEL[task.status] ?? task.status}</AgencyPill></td>
+                      <td className={cn(agencyTd, "w-12 text-right")}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button type="button" aria-label={`Actions for ${task.title}`} className={agencyRowMenuButton}>
+                              <Ellipsis aria-hidden="true" className="h-4 w-4" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" sideOffset={6} className={agencyMenuContent}>
+                            <DropdownMenuItem className={agencyMenuItem} onSelect={() => setViewingTask(task)}>
+                              <Eye aria-hidden="true" className="h-4 w-4 text-[#007679] dark:text-[#7fd3d3]" />View
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className={`${menuItemClassName} text-[#ef4444] hover:bg-[#fef2f2] focus:bg-[#fef2f2] focus:text-[#ef4444]`}
-                              onClick={() => setDeletingTaskId(task.id)}
-                            >
-                              <Trash2 className="mr-2 h-3.5 w-3.5" />
-                              Delete
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              );
-            })}
+                            {isCreator && <>
+                              <DropdownMenuItem className={agencyMenuItem} onSelect={() => openEdit(task)}>
+                                <Pencil aria-hidden="true" className="h-4 w-4 text-[#007679] dark:text-[#7fd3d3]" />Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className={cn(agencyMenuItem, "text-[#b42318] dark:text-[#f8a1a1]")} onSelect={() => setDeletingTask(task)}>
+                                <Trash2 aria-hidden="true" className="h-4 w-4" />Delete
+                              </DropdownMenuItem>
+                            </>}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
-      </div>
 
-      {/* ── Task detail modal ── */}
+        {!isLoading && filtered.length > 0 && (
+          <AgencyPagination summary={`Showing ${shown.length} of ${filtered.length} task${filtered.length === 1 ? "" : "s"}`}
+            page={Math.min(page, pages)} pages={pages} onPage={setPage} />
+        )}
+      </AgencyListCard>
+
+      {/* Task details */}
       <Dialog open={!!viewingTask} onOpenChange={(open) => { if (!open) setViewingTask(null); }}>
-        <DialogContent className="w-[520px] p-[20px] backdrop-blur bg-white border border-[rgba(255,255,255,0.3)] rounded-[30px] flex flex-col gap-[16px]">
+        <DialogContent className="w-[calc(100vw-32px)] max-w-[560px] gap-0 rounded-[20px] p-0">
           {viewingTask && (() => {
-            const deptLabel  = departments.find((d) => d.value === viewingTask.department)?.label ?? "—";
-            const staffName  = staffMap[viewingTask.staffMember] ?? "—";
-            const isCreator  = viewingTask.createdBy  === currentUser?.uid;
+            const isCreator = viewingTask.createdBy === currentUser?.uid;
             const isAssigned = viewingTask.staffMember === currentUser?.uid;
-            const statusMeta = STATUS_META[viewingTask.status];
-            const priMeta    = PRIORITY_META[viewingTask.priority];
+            const assignee = staffById.get(viewingTask.staffMember);
+            const due = dueText(viewingTask);
             return (
               <>
-                <DialogHeader>
-                  <DialogTitle className="text-[20px] font-bold text-[#10141a] leading-snug pr-6">
-                    {viewingTask.title}
-                  </DialogTitle>
-                  <div className="flex flex-wrap items-center gap-2 mt-2">
-                    <span className={`px-3 py-1 rounded-full text-[13px] font-medium border bg-transparent ${statusMeta?.border ?? ""}`}>
-                      {viewingTask.status}
-                    </span>
-                    <span className={`px-3 py-1 rounded-full text-[13px] font-medium border bg-transparent ${priMeta?.border ?? ""}`}>
-                      {viewingTask.priority} priority
-                    </span>
-                  </div>
-                </DialogHeader>
-
-                <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                  <div>
-                    <p className="mb-0.5 text-[12px] font-semibold text-[#808081] uppercase tracking-wide">Assigned to</p>
-                    <p className="text-[14px] font-semibold text-[#10141a]">{staffName}</p>
-                  </div>
-                  <div>
-                    <p className="mb-0.5 text-[12px] font-semibold text-[#808081] uppercase tracking-wide">Department</p>
-                    <p className="text-[14px] text-[#6b7280]">{deptLabel}</p>
-                  </div>
-                  <div>
-                    <p className="mb-0.5 text-[12px] font-semibold text-[#808081] uppercase tracking-wide">Due date</p>
-                    <p className="text-[14px] text-[#6b7280]">{viewingTask.dueDate || "—"}</p>
+                <div className="border-b border-[#eceef0] px-5 py-4 pr-12 dark:border-white/10">
+                  <DialogTitle className="text-[20px] font-medium leading-snug">{viewingTask.title}</DialogTitle>
+                  <DialogDescription className="sr-only">Task details</DialogDescription>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <AgencyPill tone={STATUS_TONE[viewingTask.status] ?? "grey"}>{STATUS_LABEL[viewingTask.status] ?? viewingTask.status}</AgencyPill>
+                    <AgencyPill tone={PRIORITY_TONE[viewingTask.priority] ?? "grey"}>{viewingTask.priority} priority</AgencyPill>
                   </div>
                 </div>
-
-                {viewingTask.description && (
-                  <div>
-                    <p className="mb-1 text-[12px] font-semibold text-[#808081] uppercase tracking-wide">Description</p>
-                    <p className="text-[14px] text-[#6b7280] leading-relaxed">{viewingTask.description}</p>
-                  </div>
-                )}
-
-                {viewingTask.activities.length > 0 && (
-                  <div>
-                    <p className="mb-2 text-[12px] font-semibold text-[#808081] uppercase tracking-wide">Activity log</p>
-                    <ul className="space-y-1.5 max-h-36 overflow-y-auto">
-                      {viewingTask.activities.map((a) => (
-                        <li key={a.id} className="flex items-start gap-2 text-[13px] text-[#6b7280]">
-                          <span className="shrink-0 text-[#b2b2b3]">{a.createdAt}</span>
-                          <span>— {a.description}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {isAssigned && !isCreator && (
-                  <div>
-                    <p className="mb-2 text-[12px] font-semibold text-[#808081] uppercase tracking-wide">Update status</p>
-                    <div className="flex items-center gap-2">
-                      {(["Open", "In Progress", "Completed"] as const).map((s) => {
-                        const m = STATUS_META[s];
-                        return (
-                          <button
-                            key={s}
-                            disabled={updatingStatusId === viewingTask.id}
-                            onClick={async () => {
-                              await handleStatusChange(viewingTask.id, s);
-                              setViewingTask((prev) => prev ? { ...prev, status: s } : prev);
-                            }}
-                            className={`px-3 py-1 rounded-full text-[13px] font-medium border transition-colors ${
-                              viewingTask.status === s
-                                ? `${m.border} font-semibold`
-                                : "border-[#e5e7eb] text-[#6b7280] hover:border-[#cccccd]"
-                            } disabled:opacity-50`}
-                          >
-                            {s}
-                          </button>
-                        );
-                      })}
+                <div className="max-h-[calc(100vh-240px)] space-y-4 overflow-y-auto px-5 py-4 text-[14px]">
+                  <dl className="grid gap-x-6 gap-y-3 rounded-[12px] bg-[#f8f9fa] p-4 sm:grid-cols-3 dark:bg-white/5">
+                    <div><dt className="text-[12px] text-[#6b737a] dark:text-[#9aa4a8]">Assigned to</dt><dd className="mt-0.5 font-medium text-[#10141a] dark:text-[#f4f6f7]">{assignee?.name ?? "Not assigned"}</dd></div>
+                    <div><dt className="text-[12px] text-[#6b737a] dark:text-[#9aa4a8]">Department</dt><dd className="mt-0.5 text-[#10141a] dark:text-[#f4f6f7]">{departmentLabel(viewingTask.department) ?? "—"}</dd></div>
+                    <div>
+                      <dt className="text-[12px] text-[#6b737a] dark:text-[#9aa4a8]">Due date</dt>
+                      <dd className={cn("mt-0.5 text-[#10141a] dark:text-[#f4f6f7]", due.late && "text-[#c4262e] dark:text-[#ff9d94]")}>{due.date}{due.note ? ` · ${due.note}` : ""}</dd>
                     </div>
-                  </div>
-                )}
-
-                <DialogFooter className="flex justify-end gap-2 pt-1">
-                  <Button variant="outline" onClick={() => setViewingTask(null)}>Close</Button>
-                  {isCreator && (
-                    <>
-                      <Button
-                        variant="outline"
-                        className="gap-1.5"
-                        onClick={() => { openEdit(viewingTask); setViewingTask(null); }}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />Edit
-                      </Button>
-                      <Button
-                        className="bg-[#ef4444] hover:bg-[#dc2626] text-white gap-1.5"
-                        onClick={() => { setDeletingTaskId(viewingTask.id); setViewingTask(null); }}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />Delete
-                      </Button>
-                    </>
+                  </dl>
+                  {viewingTask.description && (
+                    <div>
+                      <h3 className="mb-1 text-[13px] font-medium text-[#4b535b] dark:text-[#9aa4a8]">Description</h3>
+                      <p className="whitespace-pre-wrap leading-6 text-[#10141a] dark:text-[#e6eaec]">{viewingTask.description}</p>
+                    </div>
                   )}
-                </DialogFooter>
+                  {viewingTask.activities.length > 0 && (
+                    <div>
+                      <h3 className="mb-1.5 text-[13px] font-medium text-[#4b535b] dark:text-[#9aa4a8]">Activity</h3>
+                      <ul className="max-h-40 space-y-1.5 overflow-y-auto">
+                        {viewingTask.activities.map((a) => (
+                          <li key={a.id} className="flex gap-2 text-[13px] text-[#2a3138] dark:text-[#c9d1d4]">
+                            <span className="shrink-0 text-[#6b737a] dark:text-[#9aa4a8]">{formatActivityDate(a.createdAt)}</span>
+                            <span>{a.description}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {isAssigned && !isCreator && (
+                    <div>
+                      <h3 className="mb-1.5 text-[13px] font-medium text-[#4b535b] dark:text-[#9aa4a8]">Update status</h3>
+                      <AgencySegmented label="Update status" value={viewingTask.status}
+                        onChange={(status) => { if (status !== viewingTask.status && updatingStatusId !== viewingTask.id) void handleStatusChange(viewingTask, status); }}
+                        options={(["Open", "In Progress", "Completed"] as const).map((value) => ({ value, label: STATUS_LABEL[value] }))}
+                        className={cn("w-fit", updatingStatusId === viewingTask.id && "pointer-events-none opacity-60")} />
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-wrap justify-end gap-2.5 border-t border-[#eceef0] px-5 py-4 dark:border-white/10">
+                  {isCreator && <>
+                    <button type="button" onClick={() => { setDeletingTask(viewingTask); setViewingTask(null); }}
+                      className={cn(agencyOutlineButton, "text-[#b42318] dark:text-[#f8a1a1]")}><Trash2 aria-hidden="true" className="h-4 w-4" />Delete</button>
+                    <button type="button" onClick={() => openEdit(viewingTask)} className={agencyOutlineButton}><Pencil aria-hidden="true" className="h-4 w-4" />Edit</button>
+                  </>}
+                  <button type="button" onClick={() => setViewingTask(null)} className={agencyPrimaryButton}>Close</button>
+                </div>
               </>
             );
           })()}
         </DialogContent>
       </Dialog>
 
-      {/* ── Add Task modal ── */}
-      <AddTaskModal
-        open={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        onOpenChange={setShowAddModal}
-        departments={departments}
-        staff={staffList}
-        onCreateTask={handleCreateTask}
-      />
+      <TaskFormDialog open={formOpen} onOpenChange={setFormOpen} task={editingTask} departments={departments} staff={staffList} onSubmit={handleSubmit} />
 
-      {/* ── Edit Task modal ── */}
-      <EditTaskModal
-        open={showEditModal}
-        onOpenChange={setShowEditModal}
-        task={editingTask}
-        departments={departments}
-        staff={staffList}
-        onUpdateTask={handleUpdateTask}
-      />
-
-      {/* ── Delete confirmation ── */}
-      <DeleteConfirmationModal
-        isOpen={!!deletingTaskId}
-        onClose={() => { if (!isDeleting) setDeletingTaskId(null); }}
-        onConfirm={handleDeleteConfirm}
-        isDeleting={isDeleting}
-        title="Delete task?"
-        message="This action cannot be undone. The task and all its activity notes will be permanently removed."
-      />
+      <ConfirmDialog open={!!deletingTask} onOpenChange={(open) => { if (!open && !isDeleting) setDeletingTask(null); }}>
+        <ConfirmDialogContent
+          title="Delete task?"
+          description="This cannot be undone. The task and all its activity notes will be permanently removed."
+          confirmText="Delete"
+          loadingText="Deleting…"
+          isLoading={isDeleting}
+          onConfirm={() => void handleDeleteConfirm()}
+          onCancel={() => setDeletingTask(null)}
+        />
+      </ConfirmDialog>
     </div>
   );
 }
