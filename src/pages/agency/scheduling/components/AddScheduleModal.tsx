@@ -20,6 +20,7 @@ import type { CreateActivityLogRequest } from "@/lib/api/employees";
 import ScheduleSuccessModal from "./ScheduleSuccessModal";
 import ScheduleSavedModal from "./ScheduleSavedModal";
 import { DocumentType } from "@/lib/api/goals-and-documents";
+import { PROGRAM_GOALS_TYPES, findProgramGoalsDocument } from "@/lib/api/ci-tracker";
 import { noteTypesForClientType, getNoteTitle, HHA_PERSONAL_CARE, HHA_SERVICE_LOG } from "@/lib/notes/noteTypes";
 import { resolveHhaNoteType } from "@/pages/agency/scheduling/utils/resolveHhaNoteType";
 import { getClientBasicInfo } from "@/lib/notes/clientBasicInfo";
@@ -2215,29 +2216,39 @@ export default function AddScheduleModal({
           .map((result) => result.value.shift)
           .filter((shift): shift is NonNullable<typeof shift> => shift != null);
 
-        // Create goal documents with shiftId at top level
-        const goalResults = await Promise.all(
-          successfulShifts.map((shift) =>
-            data.createGoalDocument(
-              formData.clientId,
-              shift.id,
-              {
-                documentType: formData.goalsType as DocumentType,
-                metadata: {
-                  name: formData.client,
-                  completedBy: formData.assignedDsp,
-                  completionDate: shift.date || format(new Date(), "yyyy-MM-dd"),
-                } as any,
-              },
-              { signal: operation.controller.signal },
-            ).catch((err) => {
-              if (isCurrentMutation(operation.generation, operation.controller)) {
-                console.error("Failed to create goal document:", err);
-              }
-              return null;
-            })
-          )
-        );
+        const createGoalDoc = (shift: (typeof successfulShifts)[number]) =>
+          data.createGoalDocument(
+            formData.clientId,
+            shift.id,
+            {
+              documentType: formData.goalsType as DocumentType,
+              metadata: {
+                name: formData.client,
+                completedBy: formData.assignedDsp,
+                completionDate: shift.date || format(new Date(), "yyyy-MM-dd"),
+              } as any,
+            },
+            { signal: operation.controller.signal },
+          ).catch((err) => {
+            if (isCurrentMutation(operation.generation, operation.controller)) {
+              console.error("Failed to create goal document:", err);
+            }
+            return null;
+          });
+
+        // Community inclusion and day program goals are written once per
+        // client (from the ISP), not once per shift: reuse the client's
+        // existing document, or start a single draft and link every shift.
+        let goalResults: ({ id?: string } | null)[];
+        if (PROGRAM_GOALS_TYPES.has(formData.goalsType) && successfulShifts.length > 0) {
+          const existing = await findProgramGoalsDocument(formData.clientId, formData.goalsType).catch(() => null);
+          if (!isCurrentMutation(operation.generation, operation.controller)) return;
+          const shared = existing ?? (await createGoalDoc(successfulShifts[0]));
+          goalResults = successfulShifts.map(() => shared);
+        } else {
+          // Create goal documents with shiftId at top level
+          goalResults = await Promise.all(successfulShifts.map(createGoalDoc));
+        }
         if (!isCurrentMutation(operation.generation, operation.controller)) return;
 
         // Update shifts with goalsAndDocumentsId

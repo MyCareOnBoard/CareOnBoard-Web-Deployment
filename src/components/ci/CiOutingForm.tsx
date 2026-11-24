@@ -12,6 +12,7 @@ import {
   ciApi,
   apiErrorMessage,
   createOutingShifts,
+  ensureProgramGoalsDocuments,
   CI_LOCATION_CATEGORIES,
   CI_PROGRAMS,
   listProgramStaff,
@@ -136,6 +137,10 @@ export function CiOutingForm({ agencyId, kindSwitch, onCancel, onCreated }: {
       const results = await createOutingShifts({ agencyId, sessionId: session.id, employeeId: leadId, template: shiftTemplate, clientIds: [...clients] });
       const created = results.flatMap((r) => (r.ok && r.shift ? [r.shift] : []));
       const failed = results.filter((r) => !r.ok);
+      // Start one draft Individualized Goals document per client that has
+      // none yet, so Goals & documents shows what still needs writing.
+      const scheduled = results.filter((r) => r.ok).map((r) => ({ id: r.clientId, name: suggestions?.find((s) => s.clientId === r.clientId)?.clientName || "" }));
+      void ensureProgramGoalsDocuments(agencyId, program, scheduled).catch(() => undefined);
       if (failed.length) {
         setFailures(failed.map((f) => ({ name: nameOf(f.clientId), error: f.error || "" })));
         toast({ title: `Outing saved: ${results.length - failed.length} of ${results.length} shifts created`, description: "The clients below are on the roster without a shift.", variant: "destructive" });
