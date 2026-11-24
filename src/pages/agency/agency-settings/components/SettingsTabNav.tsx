@@ -1,4 +1,4 @@
-export type SettingsTabId = "account" | "agencyInfo" | "notification" | "myPayroll" | "payrollSetup" | "communityInclusion" | "evv";
+export type SettingsTabId = "account" | "agencyInfo" | "notification" | "myPayroll" | "payrollSetup" | "evv";
 
 export type SettingsTabItem = {
   id: SettingsTabId;
