@@ -144,6 +144,13 @@ function ClockCell({ shift }: { shift: Shift }) {
   );
 }
 
+/** The day in "?date=YYYY-MM-DD" (e.g. an outing's "Open in Shift management" link), else today. */
+function dateFromSearch(search: string): Date {
+  const param = new URLSearchParams(search).get("date");
+  const parsed = param && /^\d{4}-\d{2}-\d{2}$/.test(param) ? parseISO(param) : null;
+  return parsed && !Number.isNaN(parsed.getTime()) ? parsed : new Date();
+}
+
 export default function SchedulingPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -159,7 +166,7 @@ export default function SchedulingPage() {
   const effectiveTypes = selectedMode ? [selectedMode] : agency.supportedClientTypes;
   const labels = staffLabels([...effectiveTypes]);
   const { toast } = useToast();
-  const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(() => dateFromSearch(location.search));
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [page, setPage] = useState(1);
@@ -266,7 +273,7 @@ export default function SchedulingPage() {
 
   useEffect(() => {
     deleteRequestVersion.current += 1;
-    setSelectedDate(new Date());
+    setSelectedDate(dateFromSearch(location.search));
     setCalendarOpen(false);
     setPage(1);
     setTab("all");

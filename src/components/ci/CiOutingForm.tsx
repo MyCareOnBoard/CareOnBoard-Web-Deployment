@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { formatDuration, scheduledMinutes } from "@/pages/agency/scheduling/shift-board";
 import { useToast } from "@/hooks/use-toast";
 import type { Employee } from "@/lib/api/employees";
+import { PlaceSearchInput } from "@/components/ci/PlaceSearchInput";
 import type { Shift } from "@/lib/api/shifts";
 import {
   ciApi,
@@ -17,6 +18,7 @@ import {
   formatCivilDate,
   todayCivil,
   type CiLocation,
+  type CiAddress,
   type CiLocationCategory,
   type CiProgram,
   type CiRosterSuggestion,
@@ -46,7 +48,7 @@ export function CiOutingForm({ agencyId, kindSwitch, onCancel, onCreated }: {
   const [endTime, setEndTime] = useState("14:00");
   const [places, setPlaces] = useState<CiLocation[]>([]);
   const [placeId, setPlaceId] = useState("");
-  const [newPlace, setNewPlace] = useState<{ name: string; category: CiLocationCategory }>({ name: "", category: "library" });
+  const [newPlace, setNewPlace] = useState<{ name: string; category: CiLocationCategory; address: CiAddress | null }>({ name: "", category: "library", address: null });
   const [staff, setStaff] = useState<Employee[]>([]);
   const [leadId, setLeadId] = useState("");
   const [otherStaff, setOtherStaff] = useState<Set<string>>(new Set());
@@ -95,7 +97,8 @@ export function CiOutingForm({ agencyId, kindSwitch, onCancel, onCreated }: {
   const overRatio = ratio != null && staffCount > 0 && clients.size > ratio * staffCount;
   const withoutGoals = [...clients].filter((id) => suggestions?.find((s) => s.clientId === id)?.goalsApproved === false).length;
   const timesValid = !!startTime && !!endTime && endTime > startTime;
-  const placeValid = placeId !== NEW_PLACE || newPlace.name.trim().length > 0;
+  const placeRequired = !!settings?.requireLibraryLocation;
+  const placeValid = placeId === NEW_PLACE ? newPlace.name.trim().length > 0 : !placeRequired || !!placeId;
   const canSave = !busy && !!date && timesValid && placeValid && !!leadId && clients.size > 0 && clients.size <= MAX_ROSTER;
 
   const toggle = (set: Set<string>, id: string) => {
@@ -109,15 +112,22 @@ export function CiOutingForm({ agencyId, kindSwitch, onCancel, onCreated }: {
     setBusy(true);
     setFailures([]);
     try {
+      // A new place is saved to the agency's places first, so it can be picked again
+      // and counts as a saved place when the agency requires one.
+      let locationId = placeId === NEW_PLACE ? "" : placeId;
+      if (placeId === NEW_PLACE) {
+        const created = await ciApi.createLocation({ name: newPlace.name.trim(), category: newPlace.category, ...(newPlace.address ? { address: newPlace.address } : {}) });
+        setPlaces((list) => [...list, created]);
+        setPlaceId(created.id);
+        locationId = created.id;
+      }
       const { session, shiftTemplate } = await ciApi.createSession({
         program,
         date,
         startTime,
         endTime,
         serviceCode: CI_PROGRAMS[program].serviceCodes[0],
-        ...(placeId === NEW_PLACE
-          ? { location: { name: newPlace.name.trim(), category: newPlace.category } }
-          : placeId ? { locationId: placeId } : {}),
+        ...(locationId ? { locationId } : {}),
         leadEmployeeId: leadId,
         employeeIds: [...new Set([leadId, ...otherStaff])],
         clientIds: [...clients],
@@ -236,17 +246,24 @@ export function CiOutingForm({ agencyId, kindSwitch, onCancel, onCreated }: {
           <label className="flex flex-col gap-1.5">
             <span className={DRAWER_LABEL}>Place</span>
             <select className={DRAWER_FIELD} value={placeId} onChange={(e) => setPlaceId(e.target.value)}>
-              <option value="">No place yet</option>
+              <option value="">{placeRequired ? "Choose a place" : "No place yet"}</option>
               {places.filter((p) => p.active !== false).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               <option value={NEW_PLACE}>New place…</option>
             </select>
           </label>
+          {placeRequired && !placeId && <span className={DRAWER_HINT}>Your agency requires a saved place for each outing.</span>}
           {placeId === NEW_PLACE && (
             <div className="grid grid-cols-[1fr_auto] gap-2">
-              <input className={DRAWER_FIELD} placeholder="Place name, e.g. Ocean County Library" value={newPlace.name} onChange={(e) => setNewPlace((p) => ({ ...p, name: e.target.value }))} aria-label="New place name" />
+              <PlaceSearchInput
+                value={newPlace.name}
+                placeholder="Search a place, e.g. Ocean County Library"
+                onChange={(name) => setNewPlace((p) => ({ ...p, name, address: null }))}
+                onPick={(picked) => setNewPlace((p) => ({ name: picked.name, category: picked.category ?? p.category, address: picked.address }))}
+              />
               <select className={DRAWER_FIELD} value={newPlace.category} onChange={(e) => setNewPlace((p) => ({ ...p, category: e.target.value as CiLocationCategory }))} aria-label="Place type">
                 {CI_LOCATION_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
+              {newPlace.address?.address && <span className={cn(DRAWER_HINT, "col-span-2")}>{newPlace.address.address}</span>}
             </div>
           )}
           <label className="flex flex-col gap-1.5">
