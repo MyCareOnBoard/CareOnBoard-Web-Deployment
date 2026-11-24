@@ -211,6 +211,10 @@ function Workspace({
     onSelect,
     onPage,
     onPrevious,
+    onOpenPatterns: sources.includes("documentation_patterns")
+      ? (employeeId: string) =>
+          setView({ source: "documentation_patterns", section: "patterns", employeeId, ...(mode === "ddd" || mode === "hha" ? { mode } : {}) })
+      : undefined,
   };
   const sections = [...new Set(sources.map((item) => sourceSection[item]))];
   return (
