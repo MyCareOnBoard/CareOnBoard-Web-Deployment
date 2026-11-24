@@ -839,7 +839,7 @@ export default function SchedulingPage() {
                 Needs cover
               </button>
             ) : undefined}
-            footnote="No clock-in before the scheduled end."
+            footnote="No clock-in 15 min after the start."
           />
           <AgencyStatCard
             icon={ClipboardList}

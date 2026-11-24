@@ -29,6 +29,7 @@ import {
   serializeIspOutcomesForShift,
 } from "@/pages/agency/scheduling/isp-outcomes";
 import { findOutcomeStatementsForServiceCode } from "@/pages/shared/client-management/utils/outcomeServices";
+import { programNoteDefaults } from "@/pages/agency/scheduling/program-note-defaults";
 import { getClientServicesForOperations } from "@/pages/shared/client-management/utils/clientServicesForOperations";
 import {
   sanitizeWeeklyPartsFromUnknown,
@@ -150,17 +151,21 @@ function shiftIspOutcomeApiValue(displayText: string): string | undefined {
   return serializeIspOutcomesForShift(parseIspOutcomesFromDisplayText(displayText));
 }
 
+/** The service row's own outcomes plus the ISP outcome statements it is listed under. */
+function ispOutcomesForService(client: Client | null, svc: ClientService | null | undefined, serviceCode: string): string[] {
+  const fromNested =
+    client?.outcomes?.length && serviceCode
+      ? findOutcomeStatementsForServiceCode(client.outcomes, serviceCode)
+      : [];
+  return [...new Set([...(svc?.outcomes ?? []), ...fromNested])].filter(Boolean);
+}
+
 function resolveIspOutcomeShiftPayload(
   client: Client | null,
   services: ClientService[],
   data: ScheduleFormData,
 ): string | undefined {
-  const svc = pickSelectedServiceRow(services, data);
-  const fromNested =
-    client?.outcomes?.length && data.serviceCode
-      ? findOutcomeStatementsForServiceCode(client.outcomes, data.serviceCode)
-      : [];
-  const merged = [...new Set([...(svc?.outcomes ?? []), ...fromNested])].filter(Boolean);
+  const merged = ispOutcomesForService(client, pickSelectedServiceRow(services, data), data.serviceCode);
   if (merged.length > 0) {
     return serializeIspOutcomesForShift(merged);
   }
@@ -172,12 +177,7 @@ function resolveIspOutcomeActivityLabel(
   services: ClientService[],
   data: ScheduleFormData,
 ): string {
-  const svc = pickSelectedServiceRow(services, data);
-  const fromNested =
-    client?.outcomes?.length && data.serviceCode
-      ? findOutcomeStatementsForServiceCode(client.outcomes, data.serviceCode)
-      : [];
-  const merged = [...new Set([...(svc?.outcomes ?? []), ...fromNested])].filter(Boolean);
+  const merged = ispOutcomesForService(client, pickSelectedServiceRow(services, data), data.serviceCode);
   if (merged.length) return merged.join("; ");
   return parseIspOutcomesFromDisplayText(data.ispOutcome).join("; ");
 }
@@ -928,12 +928,11 @@ export default function AddScheduleModal({
   /** Read-only copy shown in the modal: always the selected service's outcomes when available. */
   const ispOutcomeDisplay = useMemo(() => {
     if (isHhaClient) return "";
-    if (selectedService?.outcomes && selectedService.outcomes.length > 0) {
-      return ispOutcomesToDisplayText(selectedService.outcomes);
-    }
+    const outcomes = ispOutcomesForService(selectedClient, selectedService, formData.serviceCode);
+    if (outcomes.length > 0) return ispOutcomesToDisplayText(outcomes);
     if (!formData.serviceCode) return "";
     return formData.ispOutcome;
-  }, [isHhaClient, selectedService, formData.serviceCode, formData.ispOutcome]);
+  }, [isHhaClient, selectedClient, selectedService, formData.serviceCode, formData.ispOutcome]);
 
   const weeklyDistributionFingerprint = useMemo(() => {
     if (isHhaClient) return "";
@@ -1074,6 +1073,9 @@ export default function AddScheduleModal({
 
       setFormData((prev) => ({
         ...prev,
+        ...(selectedClient?.type === "ddd" && agencyMode !== "hha"
+          ? programNoteDefaults(service?.code || "", prev)
+          : {}),
         serviceAuthorizationId: value,
         serviceCode: service?.code || "",
         billingRate: service?.clientRate || "",
@@ -1090,7 +1092,7 @@ export default function AddScheduleModal({
       setSelectedWeeklyDistributionIndex(null);
       setSelectedDistributionSnapshot(null);
     },
-    [selectedClientServices, verifyAndApplyDsp],
+    [selectedClientServices, verifyAndApplyDsp, selectedClient?.type, agencyMode],
   );
 
   const handleWeeklyDistributionChange = useCallback(

@@ -15,7 +15,7 @@ import { shiftToScheduleFormData } from "../shift-to-schedule-form";
 import ShiftDetailsModal from "@/components/ShiftDetailsModal";
 import { detectShiftAnomalyCodes } from "@/lib/shift-anomaly-detection";
 import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
-import { shiftEndOrEndOfDay } from "@/lib/shift-time";
+import { isShiftMissed } from "@/lib/shift-row-status";
 
 type ActivityFilter = "all" | "active" | "completed" | "missed" | "incomplete";
 
@@ -57,14 +57,6 @@ const formatTime = (time?: unknown): string => {
   }
 };
 
-const isShiftMissed = (shift: Shift): boolean => {
-  if (shift.status === ShiftStatus.COMPLETED) return false;
-  if (shift.clockedInAt) return false;
-  if (!shift.date) return false;
-  // Scheduled end in the shift's time zone (overnight-aware), else the end of its day.
-  const endDateTime = shiftEndOrEndOfDay(shift);
-  return Boolean(endDateTime && endDateTime.getTime() < Date.now());
-};
 
 const INCOMPLETE_PILL_STYLE = {
   label: "Incomplete",
@@ -234,7 +226,7 @@ export default function ActivityLogsPage() {
       case "completed":
         return shifts.filter((shift) => shift.status === ShiftStatus.COMPLETED);
       case "missed":
-        return shifts.filter(isShiftMissed);
+        return shifts.filter((shift) => isShiftMissed(shift));
       case "incomplete":
         return incompleteShifts;
       default:
