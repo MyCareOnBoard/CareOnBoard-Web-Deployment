@@ -202,7 +202,8 @@ function shift(id: string, agencyId: string, firstName: string) {
   return {
     id,
     agencyId,
-    date: "2026-07-28",
+    // Today, so the week view on Shift management shows it.
+    date: new Date().toLocaleDateString("en-CA"),
     startTime: "09:00:AM",
     endTime: "11:00:AM",
     status: "available",
@@ -252,7 +253,7 @@ describe("shared operational shift pages", () => {
     };
     renderScheduling("agency", agency("agency-a", "Atlas Care"));
 
-    expect(await screen.findByRole("heading", { name: "Shift Management" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Shift management" })).toBeVisible();
     await waitFor(() => expect(api.listShifts).toHaveBeenCalledTimes(1));
     const agencyRequest = api.listShifts.mock.calls[0][0];
 
@@ -265,7 +266,7 @@ describe("shared operational shift pages", () => {
     };
     renderScheduling("super_admin", agency("agency-b", "Beacon Supports"));
 
-    expect(await screen.findByRole("heading", { name: "Shift Management" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Shift management" })).toBeVisible();
     await waitFor(() => expect(api.listShifts).toHaveBeenCalledTimes(1));
     expect(api.listShifts.mock.calls[0][0]).toEqual({
       ...agencyRequest,
@@ -273,11 +274,37 @@ describe("shared operational shift pages", () => {
     });
   });
 
+  it("loads the selected week and shows a group outing as one row with its clients inside", async () => {
+    api.listShifts.mockResolvedValueOnce({
+      success: true,
+      shifts: [
+        { ...shift("solo", "agency-b", "Solo"), status: "completed" },
+        { ...shift("o-1", "agency-b", "Ava"), ciSessionId: "outing-1" },
+        { ...shift("o-2", "agency-b", "Ben"), ciSessionId: "outing-1" },
+      ],
+    });
+    auth.user = { uid: "super-user", userType: "super_admin", profile: { accessList: ["Shift Management"] } };
+    renderScheduling("super_admin", agency("agency-b", "Beacon Supports"));
+
+    expect(await screen.findByText("2 clients · group")).toBeVisible();
+    const request = api.listShifts.mock.calls[0][0];
+    expect(request.startDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(request.endDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(screen.queryByText("Ava Client")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Show the clients on Group outing" }));
+    expect(screen.getByText("Ava Client")).toBeVisible();
+    expect(screen.getByText("Ben Client")).toBeVisible();
+
+    await userEvent.click(screen.getByRole("tab", { name: /Completed/ }));
+    expect(screen.getByText("Solo Client")).toBeVisible();
+    expect(screen.queryByText("2 clients · group")).not.toBeInTheDocument();
+  });
+
   it("uses the operational maintenance route only when that capability is present", async () => {
     auth.user = { uid: "agency-user", userType: "agency", agencyId: "agency-a" };
     renderScheduling("agency", agency("agency-a", "Atlas Care"));
 
-    expect(await screen.findByText("No shifts yet. Add a schedule to get started.")).toBeVisible();
+    expect(await screen.findByText("No shifts this week. Add a schedule to get started.")).toBeVisible();
     await userEvent.click(await screen.findByRole("button", {
       name: "Open shift maintenance: review problem shifts and activity history",
     }));
@@ -288,7 +315,7 @@ describe("shared operational shift pages", () => {
     cleanup();
     auth.user = { uid: "super-user", userType: "super_admin", profile: { accessList: ["Shift Management"] } };
     renderScheduling("super_admin", agency("agency-b", "Beacon Supports"));
-    expect(await screen.findByText("No shifts yet. Add a schedule to get started.")).toBeVisible();
+    expect(await screen.findByText("No shifts this week. Add a schedule to get started.")).toBeVisible();
     expect(screen.queryByRole("button", {
       name: "Open shift maintenance: review problem shifts and activity history",
     })).not.toBeInTheDocument();
@@ -673,7 +700,7 @@ describe("shared operational shift pages", () => {
     const selectedAgency = agency("agency-b", "Beacon Supports");
     renderScheduling("super_admin", selectedAgency);
 
-    await userEvent.click(await screen.findByRole("button", { name: "Add Schedule" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Add schedule" }));
 
     expect(screen.getByRole("dialog", { name: "Schedule editor" })).toBeVisible();
     expect(modalCapture.addScheduleProps).toMatchObject({
