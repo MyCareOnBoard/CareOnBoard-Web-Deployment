@@ -424,7 +424,7 @@ export default function AccountSettingsTab() {
               title={
                 <span className="inline-flex items-center gap-2 normal-case">
                   <MapPin className="h-4 w-4 text-[#00b4b8]" />
-                  Enable location
+                  <h4>Enable location</h4>
                 </span>
               }
               description={

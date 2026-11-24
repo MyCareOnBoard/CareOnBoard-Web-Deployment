@@ -1,7 +1,10 @@
 import { useState, useEffect, lazy, Suspense, useMemo, useCallback } from "react";
 import { Navigate, useSearchParams } from "react-router";
 import AccountTab from "./components/AccountTab";
-import SettingsTabNav, { SettingsTabId, SettingsTabItem } from "./components/SettingsTabNav";
+import { Settings } from "lucide-react";
+import type { SettingsTabId, SettingsTabItem } from "./components/SettingsTabNav";
+import AgencySettingsNav from "./components/AgencySettingsNav";
+import { AgencyPageHeader } from "@/components/agency/AgencyShell";
 import SettingsTabSkeleton from "./components/SettingsTabSkeleton";
 import { TabPanel } from "@/pages/shared/settings";
 import { useAuth } from "@/utils/auth";
@@ -40,15 +43,16 @@ export default function AgencySettingsPage() {
 
       { id: "account", label: "Account" },
 
-      { id: "agencyInfo", label: "Agency Information" },
+      { id: "agencyInfo", label: "Agency information" },
 
       { id: "notification", label: "Notifications" },
 
     ];
 
-    if (isAgencyStaff) items.push({ id: "myPayroll", label: "Payroll Setup" });
-    if (canOpenPayrollSetup) items.push({ id: "payrollSetup", label: "Agency Payroll Setup" });
-    if (canViewEvv) items.push({ id: "evv", label: "HHAeXchange EVV" });
+    if (isAgencyStaff) items.push({ id: "myPayroll", label: "Payroll setup" });
+    if (canOpenPayrollSetup) items.push({ id: "payrollSetup", label: "Agency payroll setup" });
+    // HHAeXchange EVV is the only integration so far.
+    if (canViewEvv) items.push({ id: "evv", label: "Integrations" });
 
     return items;
 
@@ -81,27 +85,19 @@ export default function AgencySettingsPage() {
 
   return (
 
-    <div className="min-w-0">
+    <div className="min-w-0 pb-6">
 
-      <div className="mb-6">
+      <AgencyPageHeader
+        icon={Settings}
+        title="Settings"
+        description="Your account, agency details, notifications and payroll setup."
+      />
 
-        <h1 className="text-[40px] font-semibold leading-[1.4] text-[#10141a]">Settings</h1>
+      <div className="mt-5 grid min-w-0 gap-5 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-6">
 
-        <p className="mt-1 text-[14px] text-[#808081]">
+      <AgencySettingsNav tabs={tabs} activeTab={activeTab} onChange={handleTabChange} className="lg:sticky lg:top-24 lg:self-start" />
 
-          Manage your account, agency profile, and notifications.
-
-        </p>
-
-      </div>
-
-
-
-      <SettingsTabNav tabs={tabs} activeTab={activeTab} onChange={handleTabChange} className="mb-6" />
-
-
-
-      <div className="mt-6 flex min-w-0 flex-col gap-4">
+      <div className="flex min-w-0 flex-col gap-4">
 
         <TabPanel tabId="account" activeTab={activeTab}>
 
@@ -181,6 +177,8 @@ export default function AgencySettingsPage() {
             </Suspense>
           </TabPanel>
         )}
+
+      </div>
 
       </div>
 
