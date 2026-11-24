@@ -5,7 +5,7 @@ import { getNoteTitle } from "@/lib/notes/noteTypes";
 import { cn } from "@/lib/utils";
 import { formatDuration, scheduledMinutes } from "@/pages/agency/scheduling/shift-board";
 import { useToast } from "@/hooks/use-toast";
-import { listEmployees, type Employee } from "@/lib/api/employees";
+import type { Employee } from "@/lib/api/employees";
 import type { Shift } from "@/lib/api/shifts";
 import {
   ciApi,
@@ -13,6 +13,7 @@ import {
   createOutingShifts,
   CI_LOCATION_CATEGORIES,
   CI_PROGRAMS,
+  listProgramStaff,
   formatCivilDate,
   todayCivil,
   type CiLocation,
@@ -62,8 +63,8 @@ export function CiOutingForm({ agencyId, kindSwitch, onCancel, onCreated }: {
     const controller = new AbortController();
     ciApi.listLocations().then(setPlaces).catch(() => undefined);
     ciApi.getSettings().then(setSettings).catch(() => undefined);
-    listEmployees({ agencyId, role: "dsp", limit: 200, signal: controller.signal })
-      .then((res) => setStaff(res.employees.filter((e) => e.workAvailability !== false)))
+    listProgramStaff(agencyId, controller.signal)
+      .then((employees) => setStaff(employees.filter((e) => e.workAvailability !== false)))
       .catch(() => undefined);
     return () => controller.abort();
   }, [agencyId]);

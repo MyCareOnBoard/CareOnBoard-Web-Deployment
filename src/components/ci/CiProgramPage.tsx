@@ -10,11 +10,10 @@ import { CiAddClientPanel } from "@/components/ci/CiAddClientPanel";
 import { useAuth } from "@/utils/auth";
 import { useToast } from "@/hooks/use-toast";
 import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
-import { listEmployees } from "@/lib/api/employees";
 import { cn } from "@/lib/utils";
 import { Routes } from "@/routes/constants";
 import {
-  ATTENDANCE_LABELS, CI_PROGRAMS, addDays, apiErrorMessage, ciApi, formatCivilDate, formatClock, nowClock, rosterLabel, todayCivil,
+  ATTENDANCE_LABELS, CI_PROGRAMS, addDays, apiErrorMessage, ciApi, formatCivilDate, formatClock, listProgramStaff, nowClock, rosterLabel, todayCivil,
   type CiAttendance, type CiAttendanceMark, type CiDashboard, type CiProgram, type CiRosterEntry, type CiSession,
 } from "@/lib/api/ci-tracker";
 
@@ -115,8 +114,8 @@ export function CiProgramPage({ program }: { program: CiProgram }) {
   useEffect(() => {
     if (!agencyId) return;
     const controller = new AbortController();
-    listEmployees({ agencyId, role: "dsp", limit: 200, signal: controller.signal })
-      .then((res) => setStaffNames(new Map(res.employees.map((e) => [e.id, e.fullName?.trim() || "Staff member"]))))
+    listProgramStaff(agencyId, controller.signal)
+      .then((employees) => setStaffNames(new Map(employees.map((e) => [e.id, e.fullName?.trim() || "Staff member"]))))
       .catch(() => undefined);
     return () => controller.abort();
   }, [agencyId]);

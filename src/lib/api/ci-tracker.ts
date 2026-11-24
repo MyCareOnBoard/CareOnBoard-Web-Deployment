@@ -6,6 +6,7 @@
  */
 import axiosClient from "../axios";
 import { createShift, ShiftStatus, ShiftType, SubmissionStatus, type Shift } from "./shifts";
+import { listEmployees, type Employee } from "./employees";
 
 const BASE = "/communityInclusions";
 
@@ -419,4 +420,17 @@ export async function createOutingShifts(args: {
     }
   }
   return results;
+}
+
+/** Every DSP in the agency, paged 100 at a time (the API's limit), for staff pickers. */
+export async function listProgramStaff(agencyId: string | undefined, signal?: AbortSignal): Promise<Employee[]> {
+  const staff: Employee[] = [];
+  let cursor: string | undefined;
+  for (let page = 0; page < 20; page += 1) {
+    const res = await listEmployees({ agencyId, role: "dsp", limit: 100, cursor, signal });
+    staff.push(...res.employees);
+    cursor = res.nextCursor ?? undefined;
+    if (!cursor) break;
+  }
+  return staff;
 }
