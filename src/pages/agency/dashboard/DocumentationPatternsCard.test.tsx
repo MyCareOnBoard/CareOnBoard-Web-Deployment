@@ -10,7 +10,7 @@ it('shows counts and opens the list', () => {
   mocks.summary.mockReturnValue({data, isLoading: false});
   render(<DocumentationPatternsCard agencyId="a1" mode="hha"/>);
   expect(mocks.summary).toHaveBeenCalledWith({agencyId: 'a1', mode: 'hha'}, {skip: false});
-  expect(screen.getByText('high severity').previousSibling).toHaveTextContent('2');
+  expect(screen.getByText('high severity').parentElement?.firstChild).toHaveTextContent('2');
   expect(screen.getByText(/5 active · 4 staff · 1 came back/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', {name: 'Open patterns'}));
   expect(mocks.navigate).toHaveBeenCalledWith(expect.stringContaining('source=documentation_patterns'));

@@ -7,10 +7,11 @@ import { useAuth } from "@/utils/auth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Routes } from "@/routes/constants";
 import DashboardHeader from "@/components/DashboardHeader";
-import DashboardSidebar, { NavItem, brandSidebarLogo } from "@/components/DashboardSidebar";
+import DashboardSidebar, { NavItem } from "@/components/DashboardSidebar";
 import { UserPanelAccountMenu, type AccountMenuLink } from "@/layouts/UserPanelAccountMenu";
-import { AgencyProgramSwitch, AgencyTopBarDate } from "@/components/agency/AgencyShell";
+import { AgencyProgramSwitch, AgencyTopBarDate, agencySidebarLogo } from "@/components/agency/AgencyShell";
 import { AgencyAnnouncementPill, AgencyGlobalSearch } from "@/components/agency/AgencyTopBarTools";
+import { useAgencyNavBadges } from "@/components/agency/useAgencyNavBadges";
 import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
 import { UserType } from "@/utils/auth/types/user.types";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -262,11 +263,23 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
         });
     }, [user, effectiveMode, complianceEntryMode, dspManagementLabel]);
 
+    // Red counts on Compliance alerts (expired staff documents) and Support (cases needing a reply).
+    const badges = useAgencyNavBadges({
+        agencyId,
+        mode: complianceEntryMode,
+        complianceVisible: navItems.some((item) => item.path === Routes.agency.complianceAlerts)
+            && getComplianceSources(user, complianceEntryMode).includes("document_expiry"),
+        supportVisible: navItems.some((item) => item.path === Routes.agency.support),
+    });
+
     // Settings is pinned to the bottom of the sidebar, next to Collapse menu.
     const [mainNavItems, bottomNavItems] = useMemo(() => [
-        navItems.filter((item) => item.path !== Routes.agency.agencySettings),
+        navItems
+            .filter((item) => item.path !== Routes.agency.agencySettings)
+            .map((item) => item.path === Routes.agency.complianceAlerts ? { ...item, badge: badges.compliance }
+                : item.path === Routes.agency.support ? { ...item, badge: badges.support } : item),
         navItems.filter((item) => item.path === Routes.agency.agencySettings),
-    ], [navItems]);
+    ], [navItems, badges.compliance, badges.support]);
 
     useEffect(() => {
         if (!user || (user?.userType !== UserType.AGENCY && user?.userType !== UserType.AGENCY_STAFF)) {
@@ -274,7 +287,7 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
         }
     }, [user]);
 
-    const userRole = user?.userType === UserType.AGENCY ? "Agency Administrator" : (user as any)?.role || "Agency Staff";
+    const userRole = user?.userType === UserType.AGENCY ? "Agency admin" : (user as any)?.role || "Agency staff";
 
     // The program switch sits at the top of the sidebar, under the logo, as in the new design.
     const programSwitch = (sidebarCollapsed: boolean) =>
@@ -312,11 +325,11 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
                     onLogout={handleLogout}
                     sidebarInset={!needsModeSelection}
                     surface={needsModeSelection ? "page" : "card"}
-                    leading={needsModeSelection ? undefined : <div className="flex min-w-0 items-center gap-3">
-                        <AgencyTopBarDate />
+                    leading={needsModeSelection ? undefined : <AgencyTopBarDate />}
+                    extraActions={needsModeSelection ? undefined : <>
                         <AgencyAnnouncementPill endpoint="/agencyAnnouncements/announcements/mine" viewAllPath={Routes.agency.announcements} />
                         <AgencyGlobalSearch navItems={navItems} agencyId={agencyId} />
-                    </div>}
+                    </>}
                     showSettings={false}
                     variant="panel"
                     accountMenu={<UserPanelAccountMenu roleLabel={userRole} onLogout={handleLogout} links={agencyAccountLinks} fieldStaff={false} careConnectUserType={user?.userType ?? UserType.AGENCY} />}
@@ -326,10 +339,10 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
                     <ModeSelectionScreen modes={supportedTypes} onSelect={handleModeSelect} />
                 ) : (
                     <>
-                        <DashboardSidebar navItems={mainNavItems} bottomNavItems={bottomNavItems} variant="brand" density="compact" collapseAtBottom logo={brandSidebarLogo} header={programSwitch} />
+                        <DashboardSidebar navItems={mainNavItems} bottomNavItems={bottomNavItems} variant="brand" density="compact" activeStyle="solid" collapseAtBottom logo={agencySidebarLogo} header={programSwitch} />
                         {/* The page sits in a white card on the teal background; the top bar is fixed over its first 76px. */}
                         <main className={cn(
-                            "relative mx-4 mb-4 mt-4 min-h-[calc(100vh-32px)] rounded-[20px] bg-white pb-10 pt-[76px] transition-[margin] duration-200 dark:bg-[#151c22]",
+                            "relative mx-4 mb-4 mt-4 min-h-[calc(100vh-32px)] rounded-[24px] bg-white pb-10 pt-[76px] transition-[margin] duration-200 dark:bg-[#151c22]",
                             collapsed ? "md:ml-[96px]" : "md:ml-[256px]",
                         )}>
                             <div key={`${agencyId}:${effectiveMode}`} className="px-4 sm:px-8">{children ?? <Outlet />}</div>

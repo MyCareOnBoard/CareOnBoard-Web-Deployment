@@ -39,10 +39,41 @@ export type NavItem = {
   children?: NavSubItem[];
   /** Brand variant: a heading is shown above the first item of each section (e.g. "Operations"). */
   section?: string;
+  /** Brand variant: a count shown at the end of the row (e.g. open compliance alerts). Hidden when 0. */
+  badge?: number;
 };
 
 /** Brand variant row height: "compact" fits the agency's longer menu. */
 export type SidebarDensity = "regular" | "compact";
+
+/** Brand variant active row: "soft" is a translucent white wash (user panel), "solid" a teal fill (agency design). */
+export type SidebarActiveStyle = "soft" | "solid";
+
+const SOLID_ACTIVE = "bg-[#0f7e7d] font-semibold text-white";
+
+/** Brand row colours for a plain link or a group's collapsed icon. */
+const brandRowTone = (isActive: boolean, activeStyle: SidebarActiveStyle) => activeStyle === "solid"
+  ? isActive ? SOLID_ACTIVE : "font-medium text-white hover:bg-white/10"
+  : isActive ? "bg-white/15 font-semibold text-white" : "font-medium text-white/85 hover:bg-white/10 hover:text-white";
+
+function formatBadge(count: number) {
+  return count > 99 ? "99+" : String(count);
+}
+
+/** Red count at the end of a brand row; a dot on the icon when the sidebar is collapsed. */
+function NavBadge({ count, collapsed }: { count?: number; collapsed: boolean }) {
+  if (!count || count < 1) return null;
+  if (collapsed) {
+    return <span aria-hidden="true" className="absolute right-[18px] top-[5px] h-2 w-2 rounded-full bg-[#e5484d] ring-2 ring-[#003839] dark:ring-[#002c2d]" />;
+  }
+  return (
+    <span aria-hidden="true" className="grid h-[18px] min-w-[20px] shrink-0 place-items-center rounded-full bg-[#e5484d] px-1.5 text-[11px] font-semibold leading-none text-white tabular-nums">
+      {formatBadge(count)}
+    </span>
+  );
+}
+
+const labelWithBadge = (label: string, count?: number) => count && count > 0 ? `${label}, ${formatBadge(count)} new` : label;
 
 // Brand: force strokes to currentColor so SVG icons with baked-in colours read on the dark panel.
 const iconClassName = (isActive: boolean, variant: SidebarVariant = "default") =>
@@ -62,6 +93,7 @@ function NavGroup({
   onToggle,
   variant,
   density = "regular",
+  activeStyle = "soft",
 }: {
   item: NavItem;
   activePath: string;
@@ -71,11 +103,13 @@ function NavGroup({
   onToggle: () => void;
   variant: SidebarVariant;
   density?: SidebarDensity;
+  activeStyle?: SidebarActiveStyle;
 }) {
   const brand = variant === "brand";
+  const solid = brand && activeStyle === "solid";
   const brandRow = density === "compact" ? "h-[34px]" : "h-[44px]";
   const navigate = useNavigate();
-  const { icon: Icon, label, path, children = [] } = item;
+  const { icon: Icon, label, path, children = [], badge } = item;
 
   // Collapsed: no room for the submenu — the icon just jumps to the group's landing route.
   if (collapsed) {
@@ -83,16 +117,18 @@ function NavGroup({
       <button
         type="button"
         title={label}
+        aria-label={brand ? labelWithBadge(label, badge) : undefined}
         onClick={() => path && navigate(path)}
         className={cn(
-          "flex w-full items-center justify-center transition cursor-pointer",
+          "relative flex w-full items-center justify-center transition cursor-pointer",
           brand ? cn(brandRow, "rounded-[12px] text-white") : "h-[52px] rounded-[60px]",
           brand
-            ? isGroupActive ? "bg-white/15" : "text-white/85 hover:bg-white/10"
+            ? brandRowTone(isGroupActive, activeStyle)
             : isGroupActive ? "bg-[#00b4b8]" : "text-[#808081] hover:bg-white/40 dark:text-[#9aa4a8] dark:hover:bg-white/5"
         )}
       >
         <Icon className={iconClassName(isGroupActive, variant)} />
+        {brand && <NavBadge count={badge} collapsed />}
       </button>
     );
   }
@@ -102,7 +138,7 @@ function NavGroup({
       className={cn(
         "overflow-hidden transition-colors",
         brand ? "rounded-[14px]" : "rounded-[20px]",
-        isGroupActive && (brand ? "bg-white/15" : "bg-[#00b4b8]")
+        isGroupActive && (brand ? solid ? "bg-white/[0.07]" : "bg-white/15" : "bg-[#00b4b8]")
       )}
     >
       <button
@@ -112,12 +148,13 @@ function NavGroup({
           "flex w-full items-center gap-3 text-sm transition cursor-pointer",
           brand ? cn(brandRow, "rounded-[12px] px-3") : "h-[52px] rounded-[60px] px-4 font-semibold backdrop-blur-[22px]",
           brand
-            ? isGroupActive ? "font-semibold text-white" : "font-medium text-white/85 hover:bg-white/10 hover:text-white"
+            ? isGroupActive ? "font-semibold text-white" : solid ? "font-medium text-white hover:bg-white/10" : "font-medium text-white/85 hover:bg-white/10 hover:text-white"
             : isGroupActive ? "font-medium text-white" : "font-medium text-[#808081] hover:bg-white/40 dark:text-[#9aa4a8] dark:hover:bg-white/5"
         )}
       >
         <Icon className={iconClassName(isGroupActive, variant)} />
         <span className="flex-1 whitespace-nowrap text-left">{label}</span>
+        {brand && <NavBadge count={badge} collapsed={false} />}
         <ChevronDown
           className={cn(
             "h-4 w-4 shrink-0 transition-transform duration-200",
@@ -145,7 +182,7 @@ function NavGroup({
                 className={cn(
                   "flex h-[40px] w-full items-center gap-2 rounded-[12px] px-3 text-left text-[13px] font-medium transition cursor-pointer",
                   isChildActive
-                    ? brand ? "bg-white/20 text-white" : "bg-[#009a9e] text-white"
+                    ? brand ? solid ? SOLID_ACTIVE : "bg-white/20 text-white" : "bg-[#009a9e] text-white"
                     : isGroupActive || brand
                       ? "text-white/90 hover:bg-white/15"
                       : "text-[#808081] hover:bg-white/40 dark:text-[#9aa4a8] dark:hover:bg-white/5"
@@ -168,17 +205,19 @@ function NavLinkButton({
   collapsed,
   variant,
   density = "regular",
+  activeStyle = "soft",
 }: {
   item: NavItem;
   isActive: boolean;
   collapsed: boolean;
   variant: SidebarVariant;
   density?: SidebarDensity;
+  activeStyle?: SidebarActiveStyle;
 }) {
   const brand = variant === "brand";
   const brandRow = density === "compact" ? "h-[34px]" : "h-[44px]";
   const navigate = useNavigate();
-  const { icon: Icon, label, path } = item;
+  const { icon: Icon, label, path, badge } = item;
 
   if (!path) {
     return null;
@@ -188,20 +227,21 @@ function NavLinkButton({
     <button
       type="button"
       title={collapsed ? label : undefined}
-      aria-label={label}
+      aria-label={brand ? labelWithBadge(label, badge) : label}
       aria-current={isActive ? "page" : undefined}
       onClick={() => navigate(path)}
       className={cn(
-        "flex w-full items-center text-sm transition cursor-pointer",
+        "relative flex w-full items-center text-sm transition cursor-pointer",
         brand ? cn(brandRow, "rounded-[12px]") : "h-[52px] rounded-[60px] font-semibold backdrop-blur-[22px]",
         collapsed ? "justify-center" : brand ? "gap-3 px-3" : "gap-3 px-4",
         brand
-          ? isActive ? "bg-white/15 font-semibold text-white" : "font-medium text-white/85 hover:bg-white/10 hover:text-white"
+          ? brandRowTone(isActive, activeStyle)
           : isActive ? "bg-[#00b4b8] font-medium text-white" : "font-medium text-[#808081] hover:bg-white/40 dark:text-[#9aa4a8] dark:hover:bg-white/5"
       )}
     >
       <Icon className={iconClassName(isActive, variant)} />
       {!collapsed && <span className="flex-1 whitespace-nowrap text-left">{label}</span>}
+      {brand && <NavBadge count={badge} collapsed={collapsed} />}
     </button>
   );
 }
@@ -218,6 +258,7 @@ export default function DashboardSidebar({
   bottomNavItems = NO_ITEMS,
   collapseAtBottom = false,
   density = "regular",
+  activeStyle = "soft",
 }: {
   footer?: ReactNode;
   navItems: NavItem[];
@@ -232,6 +273,8 @@ export default function DashboardSidebar({
   /** Brand variant only: put Collapse menu at the bottom of the panel instead of above the menu. */
   collapseAtBottom?: boolean;
   density?: SidebarDensity;
+  /** Brand variant only: how the current page's row is highlighted. */
+  activeStyle?: SidebarActiveStyle;
 }) {
   const brand = variant === "brand";
   const location = useLocation();
@@ -265,7 +308,7 @@ export default function DashboardSidebar({
       className={cn(
         "hidden h-[44px] w-full shrink-0 items-center text-[13px] font-medium transition cursor-pointer md:flex",
         brand
-          ? "rounded-[12px] text-white/85 hover:bg-white/10 hover:text-white"
+          ? cn("rounded-[12px] hover:bg-white/10 hover:text-white", activeStyle === "solid" ? "text-white" : "text-white/85")
           : "rounded-[60px] text-[#808081] dark:text-[#9aa4a8] hover:bg-white/40 dark:hover:bg-white/5",
         effectiveCollapsed ? "justify-center" : brand ? "gap-3 px-3" : "gap-3 px-4"
       )}
@@ -289,6 +332,7 @@ export default function DashboardSidebar({
           collapsed={effectiveCollapsed}
           variant={variant}
           density={density}
+          activeStyle={activeStyle}
           onToggle={() => {
             setExpandedGroups((current) => ({
               ...current,
@@ -306,6 +350,7 @@ export default function DashboardSidebar({
         collapsed={effectiveCollapsed}
         variant={variant}
         density={density}
+        activeStyle={activeStyle}
       />
     );
   };
@@ -349,7 +394,7 @@ export default function DashboardSidebar({
               <Fragment key={`section:${item.section}:${item.label}`}>
                 {effectiveCollapsed
                   ? index > 0 && <div aria-hidden="true" className="mx-3 my-2 h-px bg-white/10" />
-                  : <p className={cn("px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/55", index > 0 ? "pt-3" : "pt-1")}>{item.section}</p>}
+                  : <p className={cn("px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.1em]", activeStyle === "solid" ? "text-[#8fbcbb]" : "text-white/55", index > 0 ? "pt-3" : "pt-1")}>{item.section}</p>}
                 {renderItem(item)}
               </Fragment>
             );

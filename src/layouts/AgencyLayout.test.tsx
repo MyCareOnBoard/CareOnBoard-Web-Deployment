@@ -26,6 +26,7 @@ vi.mock("@/components/DashboardSidebar", () => ({ brandSidebarLogo: () => null, 
 vi.mock("@/components/AnnouncementBanner", () => ({ default: () => <div /> }));
 vi.mock("@/hooks/useSidebarCollapsed", () => ({ useSidebarCollapsed: () => [false] }));
 vi.mock("@/hooks/useEffectiveAgencyMode", () => ({ useEffectiveAgencyMode: () => state.mode }));
+vi.mock("@/components/agency/useAgencyNavBadges", () => ({ useAgencyNavBadges: () => ({}) }));
 
 const DIRECT_BILLING_ROUTE_CASES = [
   { path: "/agency/billing/financial-overview", view: "Billing Overview", implied: undefined, unrelated: "Payroll View" },
@@ -109,11 +110,11 @@ describe("AgencyDashboardLayout billing authorization", () => {
     expect(screen.queryByText("Billing")).not.toBeInTheDocument();
   });
 
-  it("labels an agency owner as Agency Administrator instead of using a stored staff role", () => {
+  it("labels an agency owner as Agency admin instead of using a stored staff role", () => {
     routing.pathname = "/agency/dashboard";
     state.user = { ...state.user, userType: "agency", role: "Agency Staff", profile: { accessList: [] } };
     render(<MemoryRouter><AgencyDashboardLayout /></MemoryRouter>);
-    expect(screen.getByTestId("dashboard-header-role")).toHaveTextContent("Agency Administrator");
+    expect(screen.getByTestId("dashboard-header-role")).toHaveTextContent("Agency admin");
   });
 
   it("fails closed when staff scopes are missing", () => {
