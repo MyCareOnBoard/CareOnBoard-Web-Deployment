@@ -37,6 +37,19 @@ describe("DashboardSidebar brand sections", () => {
     expect(screen.getByRole("button", { name: "Settings" }).compareDocumentPosition(collapse) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it("shows a brand row's badge count, announces it, and hides it at zero", () => {
+    render(
+      <MemoryRouter>
+        <DashboardSidebar variant="brand" activeStyle="solid" navItems={[
+          { label: "Compliance alerts", path: "/agency/compliance", icon: MapPin, badge: 3 },
+          { label: "Support", path: "/agency/support", icon: MapPin, badge: 0 },
+        ]} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("button", { name: "Compliance alerts, 3 new" })).toHaveTextContent("3");
+    expect(screen.getByRole("button", { name: "Support" })).toHaveTextContent(/^Support$/);
+  });
+
   it("keeps the default variant free of section headings", () => {
     render(<MemoryRouter><DashboardSidebar navItems={items} /></MemoryRouter>);
     expect(screen.queryByText("Operations")).not.toBeInTheDocument();

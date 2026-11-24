@@ -1,653 +1,228 @@
-import {useAssignmentReviewScope} from "@/hooks/useAssignmentReview";
-import {matchesReportScope,printParams} from "../analytics/analyticsScope";
-import CurrentRecordsLinks from "../analytics/components/CurrentRecordsLinks";
-import React, { useState } from "react";
-import { ChevronRight, ArrowUpRight, ChevronLeft, Clock3, WandSparkles, UserRoundCog } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useNavigate } from "react-router";
-import { Routes } from "@/routes/constants";
-import {
-  useGetExpiredDocumentsQuery
-} from "@/pages/agency/compliance-alerts/api";
-import { useAuth } from "@/utils/auth";
-import { useGetClientStatsQuery, useGetDSPStatsQuery, useGetShiftStatsQuery } from "@/pages/agency/dashboard/api";
-import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { ChevronDown, Download, House, Link2, RefreshCw, Share2, Smartphone } from "lucide-react";
 import { toast } from "sonner";
+import { useAssignmentReviewScope } from "@/hooks/useAssignmentReview";
+import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
+import { AgencyPageHeader, agencyProgramName } from "@/components/agency/AgencyShell";
+import { ClientsIcon, WorkforceIcon } from "@/components/agency/AgencyIcons";
+import {
+    DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useGetAnalyticsSummaryQuery } from "@/lib/api/reports";
 import { staffLabels } from "@/lib/roleLabel";
-
-import OperationReportHeader from "../analytics/components/AnalyticsReportHeader";
+import { Routes } from "@/routes/constants";
+import { useAuth } from "@/utils/auth";
+import { useGetDocumentComplianceQuery } from "@/pages/agency/compliance-alerts/api";
+import { getComplianceSources } from "@/pages/agency/compliance-alerts/workspaceScope";
+import { useGetClientStatsQuery, useGetDSPStatsQuery } from "@/pages/agency/dashboard/api";
+import { matchesReportScope, printParams } from "../analytics/analyticsScope";
 import AnalyticsDateRangeModal from "../analytics/components/AnalyticsDateRangeModal";
 import ShareReportModal from "../analytics/components/ShareReportModal";
-import OverviewCards from "../analytics/components/OverviewCards";
-import ComplianceInsights from "../analytics/components/ComplianceInsights";
 import DocumentationPatternsCard from "./DocumentationPatternsCard";
-import RiskTrends from "../analytics/components/RiskTrends";
-import OperationalEfficiency, { type OperationalMetric } from "../analytics/components/OperationalEfficiency";
-import BillingSummary from "../analytics/components/BillingSummary";
+import BillingSummaryCard from "./components/BillingSummaryCard";
+import DashboardKpis from "./components/DashboardKpis";
+import NeedsAttentionCard from "./components/NeedsAttentionCard";
+import OperationalEfficiencyCard from "./components/OperationalEfficiencyCard";
+import PeopleSummaryCard from "./components/PeopleSummaryCard";
+import RiskIndicatorsCard from "./components/RiskIndicatorsCard";
+import RiskTrendsCard from "./components/RiskTrendsCard";
 
-import { useGetAnalyticsSummaryQuery } from "@/lib/api/reports";
-import type { AnalyticsSummaryData } from "@/lib/api/reports";
-import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
+const EXPIRING_PAGE = 25;
 
-function buildOperationalMetrics(data: AnalyticsSummaryData["operationalEfficiency"]): OperationalMetric[] {
-  return [
-    {
-      id: "completion",
-      title: "Shift completion rate",
-      value: data.completionRate.value,
-      path: Routes.agency.shifts,
-      trend: data.completionRate.trend,
-      icon: Clock3,
-      chartColor: "#12B5B0",
-      data: data.completionRate.sparkline,
-    },
-    {
-      id: "ontime",
-      title: "On-time start rate",
-      value: data.onTimeRate.value,
-      path: Routes.agency.shifts, 
-      trend: data.onTimeRate.trend,
-      icon: WandSparkles,
-      chartColor: "#12B5B0",
-      data: data.onTimeRate.sparkline,
-    },
-    {
-      id: "manual",
-      title: "Manual interventions",
-      value: data.manualRate.value,
-      path: Routes.agency.shifts,
-      trend: data.manualRate.trend,
-      icon: UserRoundCog,
-      chartColor: "#E5484D",
-      data: data.manualRate.sparkline,
-    },
-  ];
+/** Field-staff names per program, singular and plural. */
+const STAFF_NOUNS = { ddd: ["DSP", "DSPs"], hha: ["caregiver", "caregivers"], sc: ["coordinator", "coordinators"] } as const;
+
+/** "23 Oct – 22 Nov 2026" from two YYYY-MM-DD dates (local calendar days). */
+function formatPeriod(start?: string, end?: string) {
+    const parse = (value?: string) => {
+        const match = value && /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+        return match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : undefined;
+    };
+    const from = parse(start), to = parse(end);
+    if (!from || !to) return undefined;
+    const day = (date: Date, withYear: boolean) => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", ...(withYear ? { year: "numeric" } : {}) }).format(date);
+    return `${day(from, from.getFullYear() !== to.getFullYear())} – ${day(to, true)}`;
 }
 
+const outlineButton = "inline-flex h-10 cursor-pointer items-center gap-2 rounded-[10px] border border-[#dcdfe2] bg-white px-3.5 text-[14px] font-semibold text-[#10141a] transition-colors hover:bg-[#f4f6f7] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:bg-transparent dark:text-[#f4f6f7] dark:hover:bg-white/5";
+const menuItem = "cursor-pointer gap-2.5 rounded-[8px] px-3 py-2 text-[14px] text-[#10141a] focus:bg-[#f2f7f7] dark:text-[#f4f6f7] dark:focus:bg-white/5";
+
 export default function AgencyDashboardPage() {
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  // Scope everything to the active DDD/HHA view, matching the compliance-alerts page.
-  const effectiveMode = useEffectiveAgencyMode();
-  const effectiveTypes = effectiveMode ? [effectiveMode] : user?.agency?.supportedClientTypes;
-  const labels = staffLabels(effectiveTypes);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [dateRange, setDateRange] = React.useState({ startDate: "", endDate: "" });
-  const [showDateModal, setShowDateModal] = React.useState(false);
-  const [showShareModal, setShowShareModal] = React.useState(false);
-  const itemsPerPage = 10;
+    const { user } = useAuth();
+    const agencyId = user?.agencyId || user?.agency?.id || "";
+    // Everything is scoped to the active DDD/HHA/SC view, matching the compliance-alerts page.
+    const mode = useEffectiveAgencyMode();
+    const labels = staffLabels(mode ? [mode] : user?.agency?.supportedClientTypes);
+    const [nounSingular, nounPlural] = mode ? STAFF_NOUNS[mode] : [labels.noun, labels.nounPlural];
+    const accessList = user?.profile?.accessList ?? [];
+    const can = (key: string) => user?.userType === "agency" || accessList.includes(key);
 
-  const shiftsData = [
-    { day: "SUN", scheduled: 0, completed: 0, ongoing: 0, date: "5 January" },
-    { day: "MON", scheduled: 0, completed: 0, ongoing: 0, date: "6 January" },
-    { day: "TUE", scheduled: 0, completed: 0, ongoing: 0, date: "7 January" },
-    { day: "WED", scheduled: 0, completed: 0, ongoing: 0, date: "8 January" },
-    { day: "THUR", scheduled: 0, completed: 0, ongoing: 0, date: "9 January" },
-    { day: "FRI", scheduled: 0, completed: 0, ongoing: 0, date: "10 January" },
-    { day: "SAT", scheduled: 0, completed: 0, ongoing: 0, date: "11 January" },
-  ];
+    const [dateRange, setDateRange] = useState({ startDate: "", endDate: "" });
+    const [showDateModal, setShowDateModal] = useState(false);
+    const [showShareModal, setShowShareModal] = useState(false);
 
-  const [hoveredShift, setHoveredShift] = useState<number | null>(null);
-  const { data: expiredDocsData, isLoading: isLoadingAlerts } = useGetExpiredDocumentsQuery(
-    { agencyId: user?.agencyId || "", mode: effectiveMode ?? undefined },
-    { skip: !user?.agencyId }
-  );
-  const expiredDocuments = expiredDocsData?.data || [];
+    const { data: dspStats, isLoading: loadingDsp } = useGetDSPStatsQuery(
+        { agencyId, type: mode ?? undefined }, { skip: !agencyId });
+    const { data: clientStats, isLoading: loadingClients } = useGetClientStatsQuery(
+        { agencyId, type: mode ?? undefined }, { skip: !agencyId });
 
-  const { data: clientStatsData, isLoading: isLoadingClients } = useGetClientStatsQuery(
-    { agencyId: user?.agencyId || "", type: effectiveMode ?? undefined },
-    { skip: !user?.agencyId }
-  );
-  const clients = clientStatsData?.stats || { active: 0, inactive: 0, total: 0 };
-
-  const { data: dspStatsData, isLoading: isLoadingDsp } = useGetDSPStatsQuery(
-    { agencyId: user?.agencyId || "", type: effectiveMode ?? undefined },
-    { skip: !user?.agencyId }
-  );
-  const dspStats = dspStatsData?.stats || { active: 0, inactive: 0, total: 0 };
-
-  const { data: shiftStatsData, isLoading: isLoadingShifts } = useGetShiftStatsQuery(
-    { agencyId: user?.agencyId || "", range: "lastWeek" },
-    { skip: !user?.agencyId || !effectiveMode || effectiveMode === "sc" }
-  );
-  const shifts = shiftStatsData?.buckets || [];
-
-
-  const scopeKey = JSON.stringify([useAssignmentReviewScope(),user?.agencyId || user?.agency?.id,user?.agency?.status,effectiveMode]);
-  const { currentData: analyticsResponse, isLoading: isLoadingAnalytics, isFetching: isFetchingAnalytics, isError: analyticsError, refetch: refreshAnalytics } = useGetAnalyticsSummaryQuery(
-    {
-      startDate: dateRange.startDate || undefined,
-      endDate: dateRange.endDate || undefined,
-      mode: effectiveMode ?? undefined,
-      scopeKey,
-    },
-    { refetchOnMountOrArgChange: true }
-  );
-
-  const summary = !analyticsError && analyticsResponse?.success && matchesReportScope(analyticsResponse.data.reportScope,{mode:effectiveMode ?? undefined,startDate:dateRange.startDate || undefined,endDate:dateRange.endDate || undefined}) ? analyticsResponse.data : undefined;
-  const reportQuery = printParams(summary?.reportScope);
-  const reportDisabled = isLoadingAnalytics || isFetchingAnalytics || !summary || !reportQuery;
-  const widgetScope = JSON.stringify([scopeKey,dateRange,summary?.reportScope.checkedAt,summary?.complianceAvailability,summary?.currentRecordSources]);
-
-  // Transform shifts data to dashboard format
-  const transformedShifts = shifts.length > 0 ? shifts.map(bucket => {
-    const date = new Date(bucket.date);
-    const dayNames = ["SUN", "MON", "TUE", "WED", "THUR", "FRI", "SAT"];
-    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sept", "Oct", "Nov", "Dec"];
-    return {
-      day: dayNames[date.getDay()],
-      scheduled: bucket.scheduled,
-      completed: bucket.completed,
-      ongoing: bucket.ongoing || 0,
-      date: `${date.getDate()} ${monthNames[date.getMonth()]}`
+    const scopeKey = JSON.stringify([useAssignmentReviewScope(), agencyId, user?.agency?.status, mode]);
+    const {
+        currentData: analytics, isLoading: loadingAnalytics, isFetching: fetchingAnalytics, isError: analyticsError, refetch,
+    } = useGetAnalyticsSummaryQuery(
+        { startDate: dateRange.startDate || undefined, endDate: dateRange.endDate || undefined, mode: mode ?? undefined, scopeKey },
+        { refetchOnMountOrArgChange: true },
+    );
+    const summary = !analyticsError && analytics?.success && matchesReportScope(analytics.data.reportScope, {
+        mode: mode ?? undefined, startDate: dateRange.startDate || undefined, endDate: dateRange.endDate || undefined,
+    }) ? analytics.data : undefined;
+    const analyticsLoading = loadingAnalytics || fetchingAnalytics;
+    const reportQuery = printParams(summary?.reportScope);
+    const reportDisabled = analyticsLoading || !summary || !reportQuery;
+    // Panels re-mount on a new scope so their AI insights popovers never show another period's answer.
+    const panelKey = JSON.stringify([scopeKey, dateRange, summary?.reportScope.checkedAt]);
+    const insightsScope = {
+        startDate: summary?.reportScope.startDate, endDate: summary?.reportScope.endDate, mode: mode ?? undefined, scopeKey,
     };
-  }) : shiftsData;
 
-  // Transform to dashboard format and limit to first 10
-  const complianceAlerts = expiredDocuments.slice(0, 10).map(doc => ({
-    id: doc.id,
-    title: doc.employee.fullName,
-    subtitle: doc.employee.role,
-    document: doc.documentType,
-    status: `Expired (${doc.daysExpired} day${doc.daysExpired !== 1 ? "s" : ""} ago)`,
-  }));
+    // Workforce note: staff with documents coming up for expiry (one page; "25+" beyond that).
+    const watchesExpiry = getComplianceSources(user, mode).includes("document_expiry");
+    const { currentData: expiring, isError: expiringError } = useGetDocumentComplianceQuery(
+        { scopeKey, viewerId: user?.uid || "", agencyId, mode: mode ?? undefined, condition: "expiring", limit: EXPIRING_PAGE },
+        { skip: !agencyId || !user?.uid || !watchesExpiry },
+    );
+    const expiringStaff = expiring && !expiringError && expiring.monitoringState === "active"
+        ? new Set(expiring.items.map((item) => item.employeeId)).size : undefined;
+    const expiringMore = !!expiring?.nextCursor;
+    const workforceNote = expiringStaff === undefined
+        ? `${labels.nounPlural} employed by the agency in this program.`
+        : expiringStaff === 0
+            ? "No staff documents are expiring soon."
+            : `${expiringStaff}${expiringMore ? "+" : ""} ${expiringStaff === 1 && !expiringMore ? nounSingular : nounPlural} ${expiringStaff === 1 && !expiringMore ? "has" : "have"} documents expiring soon.`;
 
-  const maxShiftValue = Math.max(...transformedShifts.map((d) => Math.max(d.scheduled, d.completed, d.ongoing || 0)));
+    const clients = clientStats?.stats;
+    const clientsNote = clients
+        ? clients.total === 0 ? "No clients registered for this program yet." : `${clients.active} of ${clients.total} client${clients.total === 1 ? " is" : "s are"} active in this program.`
+        : undefined;
 
-  const copyToClipboard = async () => {
-    const domain = window.location.origin;
-    const url = `${domain}${Routes.auth.signup}?agencyId=${encodeURIComponent(user?.agencyId || "")}${effectiveMode === "sc" ? "&applicantType=support_coordinator" : ""}`;
-    await navigator.clipboard.writeText(url);
-    toast.success("Copied to clipboard!");
-  };
+    const period = formatPeriod(summary?.reportScope.startDate ?? dateRange.startDate, summary?.reportScope.endDate ?? dateRange.endDate);
+    const agencyName = user?.agency?.name || user?.profile?.name;
+    const description = [agencyName, agencyProgramName(mode), "what needs attention today."].filter(Boolean).join(" · ");
 
-  const copyMobileAppUrl = async () => {
-    const domain = window.location.origin;
-    const url = `${domain}/app/${user?.agencyId}`;
-    await navigator.clipboard.writeText(url);
-    toast.success("Mobile app URL copied to clipboard!");
-  };
+    const copy = async (url: string, message: string) => {
+        try {
+            await navigator.clipboard.writeText(url);
+            toast.success(message);
+        } catch {
+            toast.error("Could not copy the link. Copy it from the address bar instead.");
+        }
+    };
+    const copySignupLink = () => copy(
+        `${window.location.origin}${Routes.auth.signup}?agencyId=${encodeURIComponent(agencyId)}${mode === "sc" ? "&applicantType=support_coordinator" : ""}`,
+        "Sign-up link copied",
+    );
+    const copyMobileAppLink = () => copy(`${window.location.origin}/app/${encodeURIComponent(agencyId)}`, "Mobile app link copied");
+    const downloadReport = () => {
+        if (!reportDisabled && reportQuery) window.open(`${Routes.agency.analyticsPrint}?${reportQuery}`, "_blank", "noopener,noreferrer");
+    };
 
-  const downloadPDF = () => {
-    if (!reportDisabled && reportQuery) window.open(`${Routes.agency.analyticsPrint}?${reportQuery}`, "_blank", "noopener,noreferrer");
-  };
-
-  const isAnalyticsLoading = isLoadingAnalytics || isFetchingAnalytics;
-
-  return (
-    <div className="min-h-[calc(100vh-200px)]">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-[40px] font-bold leading-[1.4] text-[#10141a]">
-          Dashboard
-        </h1>
-        <div className="flex gap-3">
-          <Button
-            onClick={copyToClipboard}
-            className="bg-[#00b4b8] text-white px-4 py-2 rounded-full"
-          >Copy {labels.noun} Agency URL</Button>
-          <Button
-            onClick={copyMobileAppUrl}
-            className="bg-[#00b4b8] text-white px-4 py-2 rounded-full"
-          >Copy Mobile App URL</Button>
-        </div>
-      </div>
-
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 gap-6">
-        {/* Top Row - DSP and Clients */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {/* DSP Card */}
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => navigate(Routes.agency.dspManagement)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                navigate(Routes.agency.dspManagement);
-              }
-            }}
-            className="flex justify-between items-center rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white cursor-pointer transition-all hover:border-[#00b4b8] hover:bg-white/70 focus:outline-none focus:ring-2 focus:ring-[#00b4b8]/30">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-semibold text-[#10141a]">{labels.noun}</h2>
-                <p className="text-[16px] font-medium text-[#808081] mt-1">
-                  Overview of Staff employed by the agency.
-                </p>
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              {isLoadingDsp ? (
-                <>
-                  {[["#0EAF52", "Active"], ["#2B82FF", "Inactive"], ["#808081", "Total"]].map(([color, label]) => (
-                    <div key={label} className="text-center">
-                      <Skeleton className="w-12 mx-auto mb-2 h-9" />
-                      <div className="flex items-center justify-center gap-1.5">
-                        <div className="w-2 h-2 rounded-full" style={{ background: color }} />
-                        <div className="text-[12px] font-medium text-[#808081]">{label}</div>
-                      </div>
-                    </div>
-                  ))}
-                </>
-              ) : (
-                <>
-                  <div className="text-center">
-                    <div className="text-[32px] font-bold text-[#10141a]">{dspStats.active}</div>
-                    <div className="flex items-center justify-center gap-1.5 mt-1">
-                      <div className={"flex"}>
-                        <div className="w-2 h-2 rounded-full bg-[#0EAF52]"></div>
-                      </div>
-                      <div className="text-[12px] font-medium text-[#808081]">Active</div>
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-[32px] font-bold text-[#10141a]">{dspStats.inactive}</div>
-                    <div className="flex items-center justify-center gap-1.5 mt-1">
-                      <div className={"flex"}>
-                        <div className="w-2 h-2 rounded-full bg-[#2B82FF]"></div>
-                      </div>
-                      <div className="text-[12px] font-medium text-[#808081]">Inactive</div>
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-[32px] font-bold text-[#10141a]">{dspStats.total}</div>
-                    <div className="flex items-center justify-center gap-1.5 mt-1">
-                      <div className={"flex"}>
-                        <div className="w-2 h-2 rounded-full bg-[#808081]"></div>
-                      </div>
-                      <div className="text-[12px] font-medium text-[#808081]">Total</div>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Clients Card */}
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => navigate(Routes.agency.clients)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                navigate(Routes.agency.clients);
-              }
-            }}
-            className="flex justify-between items-center rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white cursor-pointer transition-all hover:border-[#00b4b8] hover:bg-white/70 focus:outline-none focus:ring-2 focus:ring-[#00b4b8]/30">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-semibold text-[#10141a]">CLIENTS</h2>
-                <p className="text-[16px] font-medium text-[#808081] mt-1">
-                  Breakdown of Clients registered to this agency.
-                </p>
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              {isLoadingClients ? (
-                <>
-                  {[["#0EAF52", "Active"], ["#2B82FF", "Inactive"], ["#808081", "Total"]].map(([color, label]) => (
-                    <div key={label} className="text-center">
-                      <Skeleton className="w-12 mx-auto mb-2 h-9" />
-                      <div className="flex items-center justify-center gap-1.5">
-                        <div className="w-2 h-2 rounded-full" style={{ background: color }} />
-                        <div className="text-[12px] font-medium text-[#808081]">{label}</div>
-                      </div>
-                    </div>
-                  ))}
-                </>
-              ) : (
-                <>
-                  <div className="text-center">
-                    <div className="text-[32px] font-bold text-[#10141a]">{clients.active}</div>
-                    <div className="flex items-center justify-center gap-1.5 mt-1">
-                      <div className={"flex"}>
-                        <div className="w-2 h-2 rounded-full bg-[#0EAF52]"></div>
-                      </div>
-                      <div className="text-[12px] font-medium text-[#808081]">Active</div>
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-[32px] font-bold text-[#10141a]">{clients.inactive}</div>
-                    <div className="flex items-center justify-center gap-1.5 mt-1">
-                      <div className={"flex"}>
-                        <div className="w-2 h-2 rounded-full bg-[#2B82FF]"></div>
-                      </div>
-                      <div className="text-[12px] font-medium text-[#808081]">Inactive</div>
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-[32px] font-bold text-[#10141a]">{clients.total}</div>
-                    <div className="flex items-center justify-center gap-1.5 mt-1">
-                      <div className={"flex"}>
-                        <div className="w-2 h-2 rounded-full bg-[#808081]"></div>
-                      </div>
-                      <div className="text-[12px] font-medium text-[#808081]">Total</div>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom Row - Shifts and Billing */}
-        <div>
-          {/* <div className={"space-y-6"}> */}
-            {/* Shifts Chart */}
-            {/* <div className="rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-[16px] font-semibold text-[#10141a]">SHIFTS</h2>
-                  <p className="text-[12px] font-medium text-[#808081] mt-1">
-                    Total number of shifts happening last 7 days
-                  </p>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div className="flex flex-col items-center gap-1">
-                    <div className="flex items-center justify-end w-full">
-                      <span className="text-[11px] font-medium text-[#808081] text-right">Scheduled</span>
-                      <div className="w-3 h-3 rounded-sm bg-[#2B82FF] ml-2"></div>
-                    </div>
-                    <div className="flex items-center justify-end w-full">
-                      <span className="text-[11px] font-medium text-[#808081]">Visit Completed</span>
-                      <div className="w-3 h-3 rounded-sm bg-[#84B7FF] ml-2"></div>
-                    </div>
-                    <div className="flex items-center justify-end w-full">
-                      <span className="text-[11px] font-medium text-[#808081]">Ongoing</span>
-                      <div className="w-3 h-3 rounded-sm bg-[#808081] ml-2"></div>
-                    </div>
-                  </div>
-                  <div>
-                    <button
-                      onClick={() => navigate(Routes.agency.shifts)}
-                      className="cursor-pointer bg-white p-2 rounded-full text-[#00b4b8] hover:text-[#0090a8] transition-colors"
-                    >
-                      <ArrowUpRight color={"#000000"} className="w-5 h-5" />
+    return (
+        <div className="pb-4">
+            <AgencyPageHeader
+                icon={House}
+                title="Dashboard"
+                description={description}
+                actions={<>
+                    <button type="button" onClick={() => setShowDateModal(true)} className={outlineButton} aria-label={period ? `Reporting period ${period}. Change period` : "Choose reporting period"}>
+                        <span className="text-[#4b535b] dark:text-[#9aa4a8]">Period:</span>
+                        <span>{period ?? "Last 30 days"}</span>
+                        <ChevronDown aria-hidden="true" className="h-4 w-4 text-[#4b535b] dark:text-[#9aa4a8]" />
                     </button>
-                  </div>
+                    <button type="button" onClick={copySignupLink} className={outlineButton}>
+                        <Link2 aria-hidden="true" className="h-4 w-4" />
+                        Copy {nounSingular} sign-up link
+                    </button>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <button type="button" className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-[10px] bg-[#003839] px-4 text-[14px] font-semibold text-white transition-colors hover:bg-[#0b4c4d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] dark:bg-[#0f7e7d] dark:hover:bg-[#13908f]">
+                                Take action
+                            </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" sideOffset={8} className="z-[70] w-[240px] rounded-[12px] border-[#e4e7ea] bg-white p-1.5 dark:border-white/10 dark:bg-[#1b232b]">
+                            <DropdownMenuItem className={menuItem} disabled={reportDisabled} onSelect={downloadReport}>
+                                <Download aria-hidden="true" className="h-4 w-4 text-[#007679] dark:text-[#7fd3d3]" />Download report
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className={menuItem} disabled={reportDisabled} onSelect={() => setShowShareModal(true)}>
+                                <Share2 aria-hidden="true" className="h-4 w-4 text-[#007679] dark:text-[#7fd3d3]" />Share report
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator className="my-1 bg-[#eceef0] dark:bg-white/10" />
+                            <DropdownMenuItem className={menuItem} onSelect={copyMobileAppLink}>
+                                <Smartphone aria-hidden="true" className="h-4 w-4 text-[#007679] dark:text-[#7fd3d3]" />Copy mobile app link
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className={menuItem} onSelect={() => void refetch()}>
+                                <RefreshCw aria-hidden="true" className="h-4 w-4 text-[#007679] dark:text-[#7fd3d3]" />Refresh figures
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </>}
+            />
+
+            {analyticsError && (
+                <div role="alert" className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-[#f5c2c0] bg-[#fdf2f1] px-4 py-3 text-[14px] text-[#8a1c14] dark:border-[#ff6b5e]/30 dark:bg-[#ff6b5e]/10 dark:text-[#ffb4ad]">
+                    <span>This period's report could not be loaded. Your dates have been kept.</span>
+                    <button type="button" onClick={() => void refetch()} className="inline-flex cursor-pointer items-center gap-1.5 font-semibold underline underline-offset-4">
+                        <RefreshCw aria-hidden="true" className="h-4 w-4" />Try again
+                    </button>
                 </div>
-              </div>
+            )}
 
-              <div className="flex items-end justify-between gap-3 h-[200px] relative">
-                {isLoadingShifts ? (
-                  [55, 80, 40, 90, 65, 45, 70].map((h, i) => (
-                    <div key={i} className="flex flex-col items-center justify-end flex-1 h-full gap-2">
-                      <Skeleton className="w-full rounded-t-md" style={{ height: `${h}%` }} />
-                      <Skeleton className="w-8 h-3" />
-                      <Skeleton className="h-2.5 w-10" />
-                    </div>
-                  ))
-                ) : transformedShifts.map((shift, index) => (
-                  <div
-                    key={`${shift.day}-${index}`}
-                    className="relative flex flex-col items-center justify-end flex-1 h-full"
-                    onMouseEnter={() => setHoveredShift(index)}
-                    onMouseLeave={() => setHoveredShift(null)}
-                  >
-                    {/* Tooltip */}
-                    {/* {hoveredShift === index && (
-                      <div
-                        className="absolute z-10 px-4 py-3 mb-2 text-black bg-white rounded shadow-lg bottom-full whitespace-nowrap">
-                        <div className="mb-1 text-sm font-semibold">Report
-                          for {shift.date}</div>
-                        <div className={"flex justify-between items-center gap-4"}>
-                          <div className="text-[#808081] text-xs">Scheduled</div>
-                          <div className="text-xs font-semibold text-black">{shift.scheduled}</div>
-                        </div>
-                        <div className={"flex justify-between items-center gap-4"}>
-                          <div className="text-[#808081] text-xs">Visit Completed</div>
-                          <div className="text-xs font-semibold text-black">{shift.completed}</div>
-                        </div>
-                        {shift.ongoing > 0 && (
-                          <div className={"flex justify-between items-center gap-4"}>
-                            <div className="text-[#808081] text-xs">Ongoing</div>
-                            <div className="text-xs font-semibold text-black">{shift.ongoing}</div>
-                          </div>
-                        )}
-                      </div>
-                    )} */}
+            <div className="mt-6 space-y-5">
+                <DashboardKpis summary={summary} isLoading={analyticsLoading} />
 
-                    {/* <div className="relative flex items-end justify-center w-full h-full gap-1"> */}
-                      {/* Scheduled Bar
-                      {shift.scheduled > 0 && <div
-                        className="flex-1 text-center text-white text-sm rounded-t-md rounded-b-md bg-[#2B82FF] transition-all duration-300"
-                        style={{
-                          height: `${(shift.scheduled / maxShiftValue) * 100}%`,
-                          minHeight: shift.scheduled ? "30px" : "0px",
-                        }}
-                      >{shift.scheduled}
-                      </div>} */}
-                      {/* Completed Bar */}
-                      {/* {shift.completed > 0 && <div
-                        className="flex-1 text-center text-white text-sm rounded-t-md rounded-b-md bg-[#84B7FF] transition-all duration-300"
-                        style={{
-                          height: `${(shift.completed / maxShiftValue) * 100}%`,
-                          minHeight: shift.completed ? "30px" : "0px",
-                        }}
-                      >{shift.completed}
-                      </div>} */}
-                      {/* Ongoing Bar */}
-                      {/* {shift.ongoing > 0 && <div
-                        className="flex-1 text-center text-white text-sm rounded-t-md rounded-b-md bg-[#808081] transition-all duration-300"
-                        style={{
-                          height: `${(shift.ongoing / maxShiftValue) * 100}%`,
-                          minHeight: shift.ongoing ? "30px" : "0px",
-                        }}
-                      >{shift.ongoing}
-                      </div>}
-                    </div> */}
-                    {/* Day Label */}
-                    {/* <div className="text-[11px] font-medium text-[#808081] mt-2">{shift.day}</div>
-                    <div className="text-[10px] font-medium text-[#b2b2b3]">{shift.date}</div>
-                  </div>
-                ))}
-              </div>
-            // </div> */
-            // } 
-            }
-
-            {/* Compliance Alerts */}
-            {/* <div className="rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white"> */}
-              {/* <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-[16px] font-semibold text-[#10141a]">Compliance Alerts</h2>
-                  <p className="text-[12px] font-medium text-[#808081] mt-1">
-                    Number of Expiring Or Missing Documents
-                  </p>
+                <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
+                    <PeopleSummaryCard
+                        icon={WorkforceIcon}
+                        title="Workforce"
+                        link={can("DSP Management") ? { label: `Open ${labels.title} management`, to: Routes.agency.dspManagement } : undefined}
+                        labels={[`Active ${nounPlural}`, "Inactive", "Total"]}
+                        stats={dspStats?.stats}
+                        isLoading={loadingDsp}
+                        note={!loadingDsp && workforceNote}
+                    />
+                    <PeopleSummaryCard
+                        icon={ClientsIcon}
+                        title="Clients"
+                        link={can("Client Management") ? { label: "Open client management", to: Routes.agency.clients } : undefined}
+                        labels={["Active clients", "Inactive", "Total"]}
+                        stats={clients}
+                        isLoading={loadingClients}
+                        note={clientsNote}
+                    />
+                    <NeedsAttentionCard summary={summary} mode={mode} agencyId={agencyId} scopeKey={scopeKey} isLoading={analyticsLoading} />
                 </div>
-                <div>
-                  <button
-                    onClick={() => navigate(Routes.agency.complianceAlerts)}
-                    className="cursor-pointer bg-white p-2 rounded-full text-[#00b4b8] hover:text-[#0090a8] transition-colors"
-                  >
-                    <ArrowUpRight color={"#000000"} className="w-5 h-5" />
-                  </button>
-                </div>
-              </div> */}
 
-              {/* Table */}
-              {/* <div className="space-y-3">
-                {isLoadingAlerts ? (
-                  <div className="space-y-3">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <div key={i} className="flex items-center justify-between py-4 px-4 border-b border-[#e5e5e6] last:border-0">
-                        <div className="flex-1 space-y-2">
-                          <Skeleton className="w-32 h-4" />
-                          <Skeleton className="w-20 h-3" />
-                        </div>
-                        <div className="flex-1 px-4 space-y-2">
-                          <Skeleton className="w-16 h-3" />
-                          <Skeleton className="w-24 h-4" />
-                        </div>
-                        <div className="flex-1 px-4 space-y-2">
-                          <Skeleton className="w-12 h-3" />
-                          <Skeleton className="h-4 w-28" />
-                        </div>
-                        <Skeleton className="w-24 h-8 rounded-full shrink-0" />
-                      </div>
-                    ))}
-                  </div>
-                ) : complianceAlerts.length === 0 ? (
-                  <div className="flex items-center justify-center py-8">
-                    <p className="text-[14px] text-[#808081]">No expired documents found.</p>
-                  </div>
-                ) : (
-                  complianceAlerts.map((alert) => (
-                    <div key={alert.id}
-                         className="flex items-center justify-between py-4 px-4 rounded-lg hover:bg-[#f9fafb] transition-colors border-b border-[#e5e5e6] last:border-0">
-                      <div className="flex-1">
-                        <div
-                          className="text-[14px] font-semibold text-[#10141a]">{alert.title}</div>
-                        <div
-                          className="text-[12px] font-medium text-[#808081]">{alert.subtitle}</div>
-                      </div>
-                      <div className="flex-1 px-4">
-                        <div className="text-[14px] text-[#808081]">Document</div>
-                        <div
-                          className="text-[14px] font-medium text-[#10141a]">{alert.document}</div>
-                      </div>
-                      <div className="flex-1 px-4">
-                        <div className="text-[14px] text-[#808081]">Status</div>
-                        <div
-                          className="text-[14px] font-medium text-[#d53411]">{alert.status}</div>
-                      </div>
-                      <div className="shrink-0">
-                        <button
-                          className="cursor-pointer px-4 py-2 text-[13px] rounded-full bg-[#B2B2B31A] border border-[#B2B2B3] font-semibold text-[#565656] transition-colors">
-                          Send Alert
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div> */}
-
-              {/* Pagination */}
-              {/* Pagination */}
-              {/* {complianceAlerts.length > itemsPerPage && (
-                <div className="flex items-center justify-center gap-2 mt-6">
-              <span className={"text-[18px]"}>
-                {currentPage}/<span className={"text-[#808081]"}>
-                  {Math.ceil(complianceAlerts.length / itemsPerPage)}
-                </span>
-              </span>
-                  <div
-                    className={`rounded-full p-2 cursor-pointer ${currentPage === 1 ? "opacity-50 cursor-not-allowed" : "bg-white"}`}
-                    onClick={() => currentPage > 1 && setCurrentPage(prev => prev - 1)}
-                  >
-                    <ChevronLeft size={14} className={currentPage === 1 ? "text-gray-400" : ""} />
-                  </div>
-                  <div
-                    className={`rounded-full p-2 cursor-pointer ${currentPage * itemsPerPage >= complianceAlerts.length ? "opacity-50 cursor-not-allowed" : "bg-white"}`}
-                    onClick={() => currentPage * itemsPerPage < complianceAlerts.length && setCurrentPage(prev => prev + 1)}
-                  >
-                    <ChevronRight size={14}
-                                  className={currentPage * itemsPerPage >= complianceAlerts.length ? "text-gray-400" : ""} />
-                  </div>
+                <div className="grid gap-5 xl:grid-cols-2">
+                    <RiskIndicatorsCard key={`${panelKey}:indicators`} summary={summary} isLoading={analyticsLoading} scope={insightsScope} mode={mode ?? undefined} />
+                    <RiskTrendsCard key={`${panelKey}:trends`} data={summary?.riskTrends} isLoading={analyticsLoading} scope={insightsScope} mode={mode ?? undefined} />
                 </div>
-              )}
+
+                <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
+                    {mode !== "sc" && (
+                        <OperationalEfficiencyCard key={`${panelKey}:efficiency`} data={summary?.operationalEfficiency} isLoading={analyticsLoading} scope={insightsScope} />
+                    )}
+                    <BillingSummaryCard key={`${panelKey}:billing`} data={summary?.billingSummary} isLoading={analyticsLoading} scope={insightsScope} />
+                    <DocumentationPatternsCard agencyId={agencyId} mode={mode} staffNoun={nounSingular} />
+                </div>
             </div>
-          </div>
-        </div> */}
-      </div>
 
-      <div className="space-y-6 ">
-        {/* Analytics header */}
-        <div className="no-print">
-          <OperationReportHeader reportDisabled={reportDisabled}
-            title="Agency Operation Overview"
-            dateRange={summary?.reportScope ?? dateRange}
-            onOpenDateModal={() => setShowDateModal(true)}
-            onActionSelect={(action) => {
-              switch (action) {
-                case "Download report":
-                  downloadPDF();
-                  break;
-                case "Share report":
-                  setShowShareModal(true);
-                  break;
-                default:
-                  break;
-              }
-            }}
-          />
+            <AnalyticsDateRangeModal
+                open={showDateModal}
+                onClose={() => setShowDateModal(false)}
+                values={dateRange}
+                onChange={setDateRange}
+                onApply={setDateRange}
+            />
+            <ShareReportModal open={showShareModal} onClose={() => setShowShareModal(false)} />
         </div>
-
-        {/* Analytics report */}
-        {analyticsError && <div role="alert" className="mb-4">Could not load this report. Your reporting dates have been kept. <button onClick={()=>refreshAnalytics()}>Retry</button></div>}
-        <div id="analytics-report" className="space-y-6 print-container">
-        {summary && !reportDisabled && <CurrentRecordsLinks summary={summary} mode={effectiveMode} />}
-          <div className="print-card">
-            <OverviewCards availability={summary?.complianceAvailability} populationTotal={summary?.populationTotal} data={summary?.overview} isLoading={isAnalyticsLoading} />
-          </div>
-
-          <DocumentationPatternsCard agencyId={user?.agencyId || ""} mode={effectiveMode}/>
-
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-            <div className="print-card">
-              <ComplianceInsights key={widgetScope+"compliance"} scopeKey={scopeKey} availability={summary?.complianceAvailability.indicators}
-                total={summary?.complianceInsights?.total}
-                data={summary?.complianceInsights?.breakdown}
-                isLoading={isAnalyticsLoading}
-                startDate={summary?.reportScope.startDate}
-                endDate={summary?.reportScope.endDate}
-                mode={effectiveMode ?? undefined}
-              />
-            </div>
-
-            <div className="print-card">
-              <RiskTrends key={widgetScope+"risk"} scopeKey={scopeKey}
-                data={summary?.riskTrends}
-                isLoading={isAnalyticsLoading}
-                startDate={summary?.reportScope.startDate}
-                endDate={summary?.reportScope.endDate}
-                mode={effectiveMode ?? undefined}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-            {effectiveMode !== "sc" && <div className="print-card">
-              <OperationalEfficiency key={widgetScope+"efficiency"} scopeKey={scopeKey} mode={effectiveMode ?? undefined}
-                metrics={summary ? buildOperationalMetrics(summary.operationalEfficiency) : undefined}
-                isLoading={isAnalyticsLoading}
-                startDate={summary?.reportScope.startDate}
-                endDate={summary?.reportScope.endDate}
-              />
-            </div>}
-
-            <div className="print-card">
-              <BillingSummary key={widgetScope+"billing"} scopeKey={scopeKey} mode={effectiveMode ?? undefined}
-                total={summary?.billingSummary.total}
-                data={summary?.billingSummary.breakdown}
-                isLoading={isAnalyticsLoading}
-                startDate={summary?.reportScope.startDate}
-                endDate={summary?.reportScope.endDate}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Date modal */}
-      <AnalyticsDateRangeModal
-        open={showDateModal}
-        onClose={() => setShowDateModal(false)}
-        values={dateRange}
-        onChange={setDateRange}
-        onApply={(values) => {
-          setDateRange(values);
-        }}
-      />
-
-      {/* Share modal */}
-      <ShareReportModal
-        open={showShareModal}
-        onClose={() => setShowShareModal(false)}
-      />
-    </div>
-    </div>
-  );
+    );
 }
