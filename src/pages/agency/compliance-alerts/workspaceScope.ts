@@ -9,7 +9,7 @@ export type Source =
   | "shift_notes"
   | "documentation_patterns"
   | "community_inclusion";
-export type Section = "staff" | "clients" | "shifts";
+export type Section = "staff" | "clients" | "shifts" | "patterns";
 export interface ComplianceView {
   initialRunId?: string;
   section?: Section;
@@ -57,7 +57,7 @@ export const sourceSection: Record<Source, Section> = {
   manual_audits: "clients",
   unsigned_form485: "clients",
   shift_notes: "shifts",
-  documentation_patterns: "shifts",
+  documentation_patterns: "patterns",
   community_inclusion: "shifts",
 };
 export const sourceLabels: Record<Source, string> = {
@@ -67,7 +67,7 @@ export const sourceLabels: Record<Source, string> = {
   manual_audits: "Manual audits",
   unsigned_form485: "Unsigned Form 485",
   shift_notes: "Shift notes",
-  documentation_patterns: "Compliance patterns",
+  documentation_patterns: "Patterns",
   community_inclusion: "Community inclusion",
 };
 const validPrograms = (value: unknown): value is string[] =>
@@ -180,7 +180,7 @@ export function parseComplianceView(params: URLSearchParams): ViewParseResult {
           : source === "unsigned_form485"
             ? ["clientId"]
             : source === "documentation_patterns"
-              ? ["findingStatus", "severity", "ruleId"]
+              ? ["findingStatus", "severity", "ruleId", "employeeId"]
             : source === "community_inclusion"
               ? ["startDate"]
               : ["employeeId", "shiftId", "stateGroup", "startDate", "endDate"]),

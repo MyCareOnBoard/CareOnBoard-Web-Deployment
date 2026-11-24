@@ -24,6 +24,8 @@ export enum AgencyAccessScope {
     EXPENSES_MANAGEMENT = "Expenses Management",
     TIMESHEETS_VIEW = "Timesheets View",
     TIMESHEETS_APPROVAL = "Timesheets Approval",
+    EVV_VIEW = "EVV View",
+    EVV_MANAGEMENT = "EVV Management",
     AI_AUTOMATION = "AI Automation",
     SUPPORT = "Support",
     ANALYTICS = "Analytics",

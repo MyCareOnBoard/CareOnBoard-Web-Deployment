@@ -19,6 +19,8 @@ export interface SourceProps {
   onSelect: (selection: Partial<ComplianceView>) => void;
   onPage: (cursor?: string, staff?: boolean) => void;
   onPrevious: (staff?: boolean) => void;
+  /** Opens the Patterns tab on one staff member. Absent when the viewer cannot see patterns. */
+  onOpenPatterns?: (employeeId: string) => void;
 }
 export function sourceError(
   error: unknown,

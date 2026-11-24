@@ -11,6 +11,8 @@ export const AGENCY_BILLING_SCOPES = Object.freeze([
   "Expenses Management",
   "Timesheets View",
   "Timesheets Approval",
+  "EVV View",
+  "EVV Management",
 ] as const);
 
 export type PayrollApprovalScope = "Payroll Approval";
@@ -24,6 +26,7 @@ export const AGENCY_BILLING_SCOPE_IMPLICATIONS: Readonly<
   "Payroll Approval": "Payroll View",
   "Expenses Management": "Expenses View",
   "Timesheets Approval": "Timesheets View",
+  "EVV Management": "EVV View",
 });
 
 export function canAccessBillingChild(

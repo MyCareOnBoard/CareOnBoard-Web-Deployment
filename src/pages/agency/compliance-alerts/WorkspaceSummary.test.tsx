@@ -3,7 +3,7 @@ import {beforeEach,expect,it,vi} from 'vitest';
 const mocks=vi.hoisted(()=>({staff:vi.fn(),summary:vi.fn()}));
 vi.mock('./api',()=>({complianceAlertsApi:{injectEndpoints:()=>({useWorkspaceStaffQuery:mocks.staff,useWorkspaceSummaryQuery:mocks.summary})}}));
 vi.mock('react-router',()=>({Link:({children,to}:any)=><a href={to}>{children}</a>}));
-vi.mock('./StaffFindings',()=>({StaffFindings:({employeeId}:any)=><div data-testid="findings">{employeeId}</div>}));
+vi.mock('./StaffFindings',()=>({StaffPatternsLink:({employeeId}:any)=><div data-testid="findings">{employeeId}</div>}));
 import {StaffWorkspace,WorkspaceSummary,WorkspaceReviewList} from './WorkspaceSummary';
 const props={scopeKey:'scope',agencyId:'agency',viewerId:'owner',mode:'ddd',view:{source:'document_expiry' as const},onApply:vi.fn(),onSelect:vi.fn(),onPage:vi.fn(),onPrevious:vi.fn()};
 beforeEach(()=>{vi.clearAllMocks();mocks.staff.mockReturnValue({currentData:{items:[{id:'one',name:'First',status:'active'},{id:'two',name:'Second',status:'active'}],nextCursor:'next-staff'},refetch:vi.fn()});mocks.summary.mockImplementation(({id}:any)=>({currentData:{alerts:{count:id==='one'?7:0,complete:id==='two'},name:id,evaluatedAt:'2026-09-22T00:00:00Z',sections:[{label:'Documents',state:'ready',items:[{id:'required',label:'Required documents',state:'missing'}]},{label:'Training',state:'restricted',items:[]}]},refetch:vi.fn()}));});

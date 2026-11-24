@@ -6,7 +6,7 @@ import SettingsTabSkeleton from "./components/SettingsTabSkeleton";
 import { TabPanel } from "@/pages/shared/settings";
 import { useAuth } from "@/utils/auth";
 import { UserType } from "@/utils/auth/types";
-import { canManageEmployeePayroll } from "@/lib/agency/agency-billing-permissions";
+import { canAccessBillingChild, canManageEmployeePayroll } from "@/lib/agency/agency-billing-permissions";
 import { Routes } from "@/routes/constants";
 
 const AgencyInfoTab = lazy(() => import("./components/AgencyInfoTab"));
@@ -14,6 +14,7 @@ const NotificationsTab = lazy(() => import("./components/NotificationTab"));
 const AgencyPayrollSetupTab = lazy(() => import("./components/AgencyPayrollSetupTab"));
 const MyPayrollTab = lazy(() => import("@/features/payroll/components/MyPayrollTab"));
 const CommunityInclusionSettingsTab = lazy(() => import("./components/CommunityInclusionSettingsTab"));
+const EvvSettingsTab = lazy(() => import("./components/EvvSettingsTab"));
 
 
 
@@ -32,6 +33,10 @@ export default function AgencySettingsPage() {
   const supportedTypes: readonly string[] = user?.agency?.supportedClientTypes ?? [];
   const canManageCommunityInclusion = supportedTypes.includes("ddd")
     && (user?.userType === UserType.AGENCY || (isAgencyStaff && accessList.includes("Notes")));
+  // HHAeXchange EVV: HHA and DDD agencies; EVV View can look, EVV Management can change.
+  const evvPrograms = (["hha", "ddd"] as const).filter((type) => supportedTypes.includes(type));
+  const canViewEvv = evvPrograms.length > 0 && canAccessBillingChild(user?.userType, accessList, "EVV View");
+  const canManageEvv = canViewEvv && canAccessBillingChild(user?.userType, accessList, "EVV Management");
 
   const tabs = useMemo(() => {
 
@@ -48,10 +53,11 @@ export default function AgencySettingsPage() {
     if (isAgencyStaff) items.push({ id: "myPayroll", label: "Payroll Setup" });
     if (canOpenPayrollSetup) items.push({ id: "payrollSetup", label: "Agency Payroll Setup" });
     if (canManageCommunityInclusion) items.push({ id: "communityInclusion", label: "Community Inclusion" });
+    if (canViewEvv) items.push({ id: "evv", label: "HHAeXchange EVV" });
 
     return items;
 
-  }, [isAgencyStaff, canOpenPayrollSetup, canManageCommunityInclusion]);
+  }, [isAgencyStaff, canOpenPayrollSetup, canManageCommunityInclusion, canViewEvv]);
 
 
 
@@ -169,6 +175,14 @@ export default function AgencySettingsPage() {
           <TabPanel tabId="communityInclusion" activeTab={activeTab}>
             <Suspense fallback={<SettingsTabSkeleton variant="form" cardCount={3} />}>
               <CommunityInclusionSettingsTab />
+            </Suspense>
+          </TabPanel>
+        )}
+
+        {canViewEvv && visitedTabs.has("evv") && (
+          <TabPanel tabId="evv" activeTab={activeTab}>
+            <Suspense fallback={<SettingsTabSkeleton variant="form" cardCount={3} />}>
+              <EvvSettingsTab canManage={canManageEvv} supportedPrograms={[...evvPrograms]} />
             </Suspense>
           </TabPanel>
         )}
