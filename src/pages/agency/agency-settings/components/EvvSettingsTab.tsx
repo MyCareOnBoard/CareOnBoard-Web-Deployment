@@ -10,14 +10,17 @@ const BUTTON = "cursor-pointer rounded-full bg-[#00b4b8] px-5 py-2 text-sm font-
 const GHOST = "cursor-pointer rounded-full border border-[#d5dadf] bg-white px-4 py-2 text-sm font-medium text-[#10141a] hover:border-[#00b4b8] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-transparent dark:text-[#f4f6f7]";
 const LABEL = "flex flex-col gap-1.5 text-sm font-medium text-[#10141a] dark:text-[#f4f6f7]";
 
-type CodeListKey = "payers" | "reasonCodes" | "actionCodes" | "missedReasonCodes" | "taskCodes";
+type CodeListKey = "payers" | "reasonCodes" | "actionCodes" | "missedReasonCodes" | "missedActionCodes" | "taskCodes";
 const CODE_LISTS: { key: CodeListKey; title: string; hint: string }[] = [
-  { key: "payers", title: "Payers", hint: "The payer ids HHAeXchange uses, e.g. NJ Medicaid and each MCO." },
-  { key: "reasonCodes", title: "Visit reason codes", hint: "Used for manual entries, corrections and voids." },
-  { key: "actionCodes", title: "Action taken codes", hint: "Paired with missed-visit reasons." },
-  { key: "missedReasonCodes", title: "Missed visit reasons", hint: "Why a scheduled visit did not happen." },
-  { key: "taskCodes", title: "Task codes", hint: "Optional duty codes sent with a visit." },
+  { key: "payers", title: "Payers", hint: "HHAeXchange payer ids, e.g. HRNJ for Horizon or FFNJ for Fee for Service." },
+  { key: "reasonCodes", title: "Visit edit reasons", hint: "For manual entries and corrections (200 to 228). 222 needs a note." },
+  { key: "actionCodes", title: "Visit edit actions taken", hint: "Sent with every visit edit reason (11 to 25)." },
+  { key: "missedReasonCodes", title: "Missed visit reasons", hint: "Why a scheduled visit did not happen (600 to 609)." },
+  { key: "missedActionCodes", title: "Missed visit actions taken", hint: "Sent with every missed visit reason (51 to 56)." },
+  { key: "taskCodes", title: "Duties", hint: "Task codes sent as performed at clock-out (115 to 203)." },
 ];
+
+const OFFICE_NPI = /^\d{10}$/;
 
 /** One "CODE, Label" per line, so the agency can paste HHAeXchange's lists straight in. */
 export function parseCodeLines(text: string): { codes: EvvCode[]; errors: string[] } {
@@ -43,7 +46,7 @@ const toLines = (codes: EvvCode[]) => codes.map((c) => (c.label && c.label !== c
 /** Agency settings › HHAeXchange EVV: switch, go-live date, programs, offices and code lists. */
 export default function EvvSettingsTab({ canManage, supportedPrograms }: { canManage: boolean; supportedPrograms: EvvProgram[] }) {
   const [settings, setSettings] = useState<EvvSettings | null>(null);
-  const [lists, setLists] = useState<Record<CodeListKey, string>>({ payers: "", reasonCodes: "", actionCodes: "", missedReasonCodes: "", taskCodes: "" });
+  const [lists, setLists] = useState<Record<CodeListKey, string>>({ payers: "", reasonCodes: "", actionCodes: "", missedReasonCodes: "", missedActionCodes: "", taskCodes: "" });
   const [officesText, setOfficesText] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -56,6 +59,7 @@ export default function EvvSettingsTab({ canManage, supportedPrograms }: { canMa
       reasonCodes: toLines(next.reasonCodes),
       actionCodes: toLines(next.actionCodes),
       missedReasonCodes: toLines(next.missedReasonCodes),
+      missedActionCodes: toLines(next.missedActionCodes),
       taskCodes: toLines(next.taskCodes),
     });
     setOfficesText(toLines(next.offices.map((o) => ({ code: o.hhaxOfficeId, label: o.name }))));
@@ -66,7 +70,11 @@ export default function EvvSettingsTab({ canManage, supportedPrograms }: { canMa
   }, []);
 
   const parsed = Object.fromEntries(CODE_LISTS.map(({ key }) => [key, parseCodeLines(lists[key])])) as Record<CodeListKey, ReturnType<typeof parseCodeLines>>;
-  const offices = parseCodeLines(officesText);
+  const parsedOffices = parseCodeLines(officesText);
+  const offices = {
+    codes: parsedOffices.codes,
+    errors: [...parsedOffices.errors, ...parsedOffices.codes.filter((o) => !OFFICE_NPI.test(o.code)).map((o) => `Office NPI ${o.code} must be 10 digits.`)],
+  };
   const listErrors = [...Object.values(parsed).flatMap((p) => p.errors), ...offices.errors];
   const goLiveMissing = Boolean(settings?.enabled && !settings.goLiveDate);
 
@@ -88,6 +96,7 @@ export default function EvvSettingsTab({ canManage, supportedPrograms }: { canMa
         reasonCodes: parsed.reasonCodes.codes,
         actionCodes: parsed.actionCodes.codes,
         missedReasonCodes: parsed.missedReasonCodes.codes,
+        missedActionCodes: parsed.missedActionCodes.codes,
         taskCodes: parsed.taskCodes.codes,
       }));
       toast.success("EVV settings saved");
@@ -171,9 +180,9 @@ export default function EvvSettingsTab({ canManage, supportedPrograms }: { canMa
         </div>
       </SettingsSectionCard>
 
-      <SettingsSectionCard title="Offices and code lists" subtitle="Paste these from the agency's HHAeXchange portal, one per line as CODE, Label.">
+      <SettingsSectionCard title="Offices and code lists" subtitle="These start with New Jersey's lists from the HHAeXchange specification. Change them only if HHAeXchange gives the agency different ones. One per line as CODE, Label.">
         <div className="grid gap-4 lg:grid-cols-2">
-          <CodeArea title="Offices" hint="HHAeXchange office id, then the office name. The first one is the default." value={officesText} disabled={disabled} onChange={setOfficesText} errors={offices.errors} />
+          <CodeArea title="Offices" hint="Only for agencies with more than one HHAeXchange office: the office-level NPI, then the office name. The first one is the default. Leave empty to send the agency tax id." value={officesText} disabled={disabled} onChange={setOfficesText} errors={offices.errors} />
           {CODE_LISTS.map(({ key, title, hint }) => (
             <CodeArea key={key} title={title} hint={hint} value={lists[key]} disabled={disabled} errors={parsed[key].errors} onChange={(value) => setLists((prev) => ({ ...prev, [key]: value }))} />
           ))}

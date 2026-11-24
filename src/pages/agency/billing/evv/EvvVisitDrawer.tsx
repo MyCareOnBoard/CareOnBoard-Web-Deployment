@@ -12,6 +12,8 @@ import {
   type EvvIssue,
   type EvvSettings,
   type EvvVisitDetail,
+  EVV_NOTE_MAX,
+  EVV_NOTE_REQUIRED_REASONS,
 } from "@/lib/api/evv";
 import { EvvStateBadge, EVV_BUTTON, EVV_DANGER_BUTTON, EVV_GHOST_BUTTON, EVV_INPUT, isAbort } from "./evvUi";
 
@@ -114,7 +116,7 @@ export default function EvvVisitDrawer({
               key={kind}
               kind={kind}
               codes={kind === "missed" ? settings?.missedReasonCodes ?? [] : settings?.reasonCodes ?? []}
-              actionCodes={settings?.actionCodes ?? []}
+              actionCodes={kind === "missed" ? settings?.missedActionCodes ?? [] : settings?.actionCodes ?? []}
               busy={busy}
               onSave={(input) => act(() => evvApi.setReason(shiftId, { kind, ...input }), "Reason saved.", "The reason could not be saved.")}
             />
@@ -222,7 +224,7 @@ function CodeSelect({ id, label, codes, value, onChange, optional = false }: { i
           {codes.map((c) => <option key={c.code} value={c.code}>{c.code} · {c.label}</option>)}
         </select>
       ) : (
-        <input id={id} className={EVV_INPUT} value={value} maxLength={40} placeholder="HHAeXchange code" onChange={(e) => onChange(e.target.value)} />
+        <input id={id} className={EVV_INPUT} value={value} maxLength={4} placeholder="HHAeXchange code" onChange={(e) => onChange(e.target.value)} />
       )}
     </label>
   );
@@ -233,25 +235,26 @@ function ReasonForm({ kind, codes, actionCodes, busy, onSave }: {
   codes: EvvCode[];
   actionCodes: EvvCode[];
   busy: boolean;
-  onSave: (input: { reasonCode: string; actionCode: string | null; note: string | null }) => Promise<unknown>;
+  onSave: (input: { reasonCode: string; actionCode: string; note: string | null }) => Promise<unknown>;
 }) {
   const [reasonCode, setReasonCode] = useState("");
   const [actionCode, setActionCode] = useState("");
   const [note, setNote] = useState("");
-  const needsAction = kind === "missed";
-  const ready = reasonCode.trim() && (!needsAction || actionCode.trim());
+  // HHAeXchange needs the action taken with every reason, and a note with "Other" (222).
+  const noteRequired = EVV_NOTE_REQUIRED_REASONS.includes(reasonCode.trim());
+  const ready = reasonCode.trim() && actionCode.trim() && (!noteRequired || note.trim());
   return (
     <Section title={REASON_TITLES[kind]}>
       <div className="flex flex-col gap-3 rounded-xl border border-[#e4e7ea] p-4 dark:border-white/10">
         <CodeSelect id={`evv-${kind}-reason`} label="Reason code" codes={codes} value={reasonCode} onChange={setReasonCode} />
-        {needsAction && <CodeSelect id={`evv-${kind}-action`} label="Action taken" codes={actionCodes} value={actionCode} onChange={setActionCode} />}
+        <CodeSelect id={`evv-${kind}-action`} label="Action taken" codes={actionCodes} value={actionCode} onChange={setActionCode} />
         <label htmlFor={`evv-${kind}-note`} className="flex flex-col gap-1.5 text-sm font-medium text-[#10141a] dark:text-[#f4f6f7]">
-          Note (optional)
-          <textarea id={`evv-${kind}-note`} className={`${EVV_INPUT} h-20 py-2`} maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} />
+          {noteRequired ? "Note (required for this reason)" : "Note (optional)"}
+          <textarea id={`evv-${kind}-note`} className={`${EVV_INPUT} h-20 py-2`} maxLength={EVV_NOTE_MAX} required={noteRequired} value={note} onChange={(e) => setNote(e.target.value)} />
         </label>
         {codes.length === 0 && <p className="text-xs text-[#5b636b]">Add the agency's HHAeXchange code lists in EVV settings to pick from a list.</p>}
         <div>
-          <button type="button" className={EVV_BUTTON} disabled={busy || !ready} onClick={() => void onSave({ reasonCode: reasonCode.trim(), actionCode: actionCode.trim() || null, note: note.trim() || null })}>Save reason</button>
+          <button type="button" className={EVV_BUTTON} disabled={busy || !ready} onClick={() => void onSave({ reasonCode: reasonCode.trim(), actionCode: actionCode.trim(), note: note.trim() || null })}>Save reason</button>
         </div>
       </div>
     </Section>

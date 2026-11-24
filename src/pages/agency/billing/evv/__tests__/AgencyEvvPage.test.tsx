@@ -22,7 +22,6 @@ const api = vi.hoisted(() => ({
   listCaregivers: vi.fn(),
   listTransactions: vi.fn(),
   linkMember: vi.fn(),
-  lookupMember: vi.fn(),
   syncCaregiver: vi.fn(),
 }));
 vi.unmock("react-router");
@@ -35,7 +34,8 @@ vi.mock("@/lib/api/evv", async (importOriginal) => ({ ...(await importOriginal<o
 const settings: EvvSettings = {
   agencyId: "a", provider: "hhax", enabled: true, environment: "sandbox", effectiveEnvironment: "sandbox", goLiveDate: "2026-11-01",
   programs: { hha: true, ddd: false }, offices: [], defaultOfficeId: null,
-  payers: [{ code: "NJMCD", label: "NJ Medicaid" }], reasonCodes: [{ code: "R1", label: "Phone issue" }], actionCodes: [], missedReasonCodes: [], taskCodes: [],
+  payers: [{ code: "HRNJ", label: "Horizon" }], reasonCodes: [{ code: "217", label: "Attendant unable to use mobile device" }, { code: "222", label: "Other" }],
+  actionCodes: [{ code: "18", label: "Changed verification collection method" }], missedReasonCodes: [], missedActionCodes: [], taskCodes: [],
   credentialsConfigured: true, sendsEnabled: true, connection: { status: "connected", message: null, checkedAt: null },
   provider_identity: { taxIdLast4: "6789", npi: "123", medicaidProviderId: null }, updatedAt: null,
 };
@@ -70,15 +70,21 @@ describe("HHAeXchange EVV page", () => {
     expect(screen.getByText(/Connected to HHAeXchange sandbox/)).toBeInTheDocument();
   });
 
-  it("opens the visit and saves a manual-entry reason from the agency's code list", async () => {
+  it("saves a manual-entry reason only with the action taken, and a note for 222", async () => {
     const interaction = userEvent.setup();
     renderPage();
     await interaction.click(await screen.findByRole("button", { name: "Nov 20, 2026" }));
     const dialog = await screen.findByRole("dialog");
     await within(dialog).findByText("Manual entry reason");
-    await interaction.selectOptions(within(dialog).getByLabelText("Reason code"), "R1");
-    await interaction.click(within(dialog).getByRole("button", { name: "Save reason" }));
-    await waitFor(() => expect(api.setReason).toHaveBeenCalledWith("shift1", { kind: "exception", reasonCode: "R1", actionCode: null, note: null }));
+    const save = within(dialog).getByRole("button", { name: "Save reason" });
+    await interaction.selectOptions(within(dialog).getByLabelText("Reason code"), "222");
+    await interaction.selectOptions(within(dialog).getByLabelText("Action taken"), "18");
+    expect(save).toBeDisabled();
+    expect(within(dialog).getByLabelText("Note (required for this reason)")).toBeRequired();
+    await interaction.selectOptions(within(dialog).getByLabelText("Reason code"), "217");
+    expect(save).toBeEnabled();
+    await interaction.click(save);
+    await waitFor(() => expect(api.setReason).toHaveBeenCalledWith("shift1", { kind: "exception", reasonCode: "217", actionCode: "18", note: null }));
   });
 
   it("opens a visit linked from another page and keeps view-only staff read-only", async () => {
@@ -98,7 +104,7 @@ describe("HHAeXchange EVV page", () => {
 });
 
 describe("member link dialog", () => {
-  it("validates the member id and saves the link", async () => {
+  it("validates the Medicaid id and saves the link", async () => {
     const interaction = userEvent.setup();
     const onLinked = vi.fn();
     api.linkMember.mockResolvedValue({ linkState: "linked", visitsRechecked: 2 });
@@ -111,12 +117,13 @@ describe("member link dialog", () => {
       />,
     );
     const save = screen.getByRole("button", { name: "Save link" });
-    await interaction.type(screen.getByLabelText("Member id"), "12");
-    expect(screen.getByText(/4 to 30 letters/)).toBeInTheDocument();
+    await interaction.type(screen.getByLabelText("Medicaid id"), "12");
+    expect(screen.getByText(/4 to 50 letters/)).toBeInTheDocument();
     expect(save).toBeDisabled();
-    await interaction.type(screen.getByLabelText("Member id"), "345678901");
+    await interaction.type(screen.getByLabelText("Medicaid id"), "345678901");
+    await interaction.type(screen.getByLabelText(/Admission id/), "A-7");
     await interaction.click(save);
-    await waitFor(() => expect(api.linkMember).toHaveBeenCalledWith("c1", { memberQualifier: "medicaid_id", memberId: "12345678901", payerId: "NJMCD", officeId: null, hhaxPatientId: null }));
+    await waitFor(() => expect(api.linkMember).toHaveBeenCalledWith("c1", { memberQualifier: "medicaid_id", memberId: "12345678901", payerId: "HRNJ", officeId: null, admissionId: "A-7" }));
     expect(onLinked).toHaveBeenCalled();
   });
 });
