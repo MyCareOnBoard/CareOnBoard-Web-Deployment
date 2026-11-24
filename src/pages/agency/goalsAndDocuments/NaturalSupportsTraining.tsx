@@ -18,6 +18,8 @@ import {
     useSubmitGoalDocumentMutation
 } from "./api";
 import {DocumentType, NaturalSupportsTrainingDocument} from "@/lib/api/goals-and-documents";
+import {clientDisplayName, goalsBackRoute, rememberDocumentId, useClientGoalDraft} from "./components/useClientGoalDraft";
+import {goalFormForDocumentType, ispOutcomesForForm, planYearDatesForDocument} from "./goal-forms";
 import VoiceEnabledTextarea from "@/components/VoiceEnabledTextarea";
 import VoiceInputButton from "@/components/VoiceInputButton";
 import {VoiceRecordingProvider} from "@/contexts/VoiceRecordingContext";
@@ -31,13 +33,19 @@ export default function NaturalSupportsTraining() {
     const firebaseId = new URLSearchParams(location.search).get("firebaseId");
     const fromList = new URLSearchParams(location.search).get("fromList") === "true";
     const isUserPanel = location.pathname.startsWith("/user-panel/");
-    const backRoute = isUserPanel ? Routes.userPanel.planOfCare : Routes.agency.goalsAndDocuments.index;
     const backLabel = isUserPanel ? "Back to Plan of Care" : "Back to Goals & Documents";
     const documentType = DocumentType.NATURAL_SUPPORTS_TRAINING;
     
-    const {data: document, isLoading} = useGetSingleGoalDocumentQuery(documentType, {
-        skip: !documentType || !!firebaseId,
+    const forClient = useClientGoalDraft(documentType);
+    const backRoute = goalsBackRoute(isUserPanel, forClient.clientId || new URLSearchParams(location.search).get("clientId"));
+
+    const {data: agencyDraft, isLoading} = useGetSingleGoalDocumentQuery(documentType, {
+        skip: !documentType || !!firebaseId || !!forClient.clientId,
     });
+    // Opened for a client: work on that client's draft, never another client's.
+    const document = forClient.clientId ? forClient.draft ?? undefined : agencyDraft;
+    const [savedId, setSavedId] = useState<string | null>(null);
+    const currentId = savedId ?? document?.id ?? documentId;
 
     const {data: firebaseDocument, isLoading: isLoadingFirebaseDoc} = useGetGoalDocumentByFirebaseIdQuery(firebaseId!, {
         skip: !firebaseId,
@@ -80,7 +88,7 @@ export default function NaturalSupportsTraining() {
             const metadata = sourceDoc.metadata as NaturalSupportsTrainingDocument;
             setFormData({
                 name: metadata.name || "",
-                clientId: (metadata as any).clientId || "",
+                clientId: (metadata as any).clientId || sourceDoc.clientId || "",
                 birthDate: metadata.birthDate || "",
                 ispOutcome: metadata.ispOutcome || "",
                 nameOfTrainer: metadata.nameOfTrainer || "",
@@ -100,6 +108,20 @@ export default function NaturalSupportsTraining() {
             });
         }
     }, [document, firebaseDocument]);
+
+    // Opened for a client: fill in the client's name, ISP date and ISP outcome where the form is blank.
+    useEffect(() => {
+        if (!forClient.clientId || !forClient.ready || firebaseId) return;
+        const form = goalFormForDocumentType(documentType);
+        const outcome = form ? ispOutcomesForForm(forClient.client, form)[0] ?? "" : "";
+        setFormData((prev) => ({
+            ...prev,
+            clientId: forClient.clientId,
+            name: prev.name || clientDisplayName(forClient.client),
+            birthDate: prev.birthDate || planYearDatesForDocument(forClient.client, documentType).start,
+            ispOutcome: prev.ispOutcome || outcome,
+        }));
+    }, [forClient.clientId, forClient.ready, forClient.client, forClient.draft, documentType, firebaseId]);
 
     useEffect(() => {
         return () => {
@@ -128,13 +150,13 @@ export default function NaturalSupportsTraining() {
                         data: { 
                             metadata: data, 
                             agencyId: user?.agencyId,
-                            clientId: data.clientId || undefined
+                            clientId: data.clientId || forClient.clientId || undefined
                         }
                     }).unwrap();
                     
-                    if (result.id && !documentId && !firebaseId) {
-                        const newUrl = `${location.pathname}?id=${result.id}`;
-                        window.history.replaceState({}, '', newUrl);
+                    if (result.id) {
+                        setSavedId(result.id);
+                        if (!documentId && !firebaseId) rememberDocumentId(result.id);
                     }
                 }
             } catch (error) {
@@ -220,7 +242,7 @@ export default function NaturalSupportsTraining() {
             return;
         }
 
-        if (!document?.id) {
+        if (!currentId) {
             toast.error('Please save the document first before submitting');
             return;
         }
@@ -231,7 +253,7 @@ export default function NaturalSupportsTraining() {
         }
         
         try {
-            await submitDocument(document?.id ?? "").unwrap();
+            await submitDocument(currentId).unwrap();
             toast.success('Document submitted successfully!');
             navigate(backRoute);
         } catch (error: any) {
@@ -543,12 +565,12 @@ export default function NaturalSupportsTraining() {
                         <div className={"flex justify-between items-center"}>
                             <div className="text-sm text-gray-500">
                                 {isSaving && "Saving draft..."}
-                                {!isSaving && document?.id && "Draft saved"}
+                                {!isSaving && currentId && "Draft saved"}
                             </div>
                             <Button
                                 type={"button"}
                                 onClick={handleSubmit}
-                                disabled={isSubmitting || !documentId}
+                                disabled={isSubmitting || !currentId}
                                 className="flex items-center gap-2 bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full px-6 py-3 h-auto font-semibold shadow-sm disabled:opacity-50"
                             >
                                 {isSubmitting ? "Submitting..." : "Submit"}

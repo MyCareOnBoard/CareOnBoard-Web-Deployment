@@ -2241,9 +2241,10 @@ export default function AddScheduleModal({
         // existing document, or start a single draft and link every shift.
         let goalResults: ({ id?: string } | null)[];
         if (PROGRAM_GOALS_TYPES.has(formData.goalsType) && successfulShifts.length > 0) {
-          const existing = await findProgramGoalsDocument(formData.clientId, formData.goalsType).catch(() => null);
+          // undefined = the lookup failed: skip rather than risk a duplicate draft.
+          const existing = await findProgramGoalsDocument(formData.clientId, formData.goalsType).catch(() => undefined);
           if (!isCurrentMutation(operation.generation, operation.controller)) return;
-          const shared = existing ?? (await createGoalDoc(successfulShifts[0]));
+          const shared = existing === undefined ? null : existing ?? (await createGoalDoc(successfulShifts[0]));
           goalResults = successfulShifts.map(() => shared);
         } else {
           // Create goal documents with shiftId at top level

@@ -344,7 +344,15 @@ export function CiProgramPage({ program }: { program: CiProgram }) {
                     </td>
                     <td className="px-3 py-2.5">
                       {e.goalsApproved === false ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-[#8a5a00] dark:text-[#ffd27a]"><AlertTriangle aria-hidden="true" className="h-3.5 w-3.5" />No approved goals</span>
+                        canEditSettings ? (
+                          <Link
+                            to={`${Routes.agency.goalsAndDocuments.index}?clientId=${encodeURIComponent(e.clientId)}`}
+                            title="Open this client's forms on Goals & documents"
+                            className="inline-flex items-center gap-1 text-xs font-medium text-[#8a5a00] underline underline-offset-2 dark:text-[#ffd27a]"
+                          >
+                            <AlertTriangle aria-hidden="true" className="h-3.5 w-3.5" />No approved goals
+                          </Link>
+                        ) : <span className="inline-flex items-center gap-1 text-xs font-medium text-[#8a5a00] dark:text-[#ffd27a]"><AlertTriangle aria-hidden="true" className="h-3.5 w-3.5" />No approved goals</span>
                       ) : <span className="text-xs text-[#2a3138] dark:text-[#c9d1d4]">Approved</span>}
                     </td>
                     <td className="px-3 py-2.5 text-right">
