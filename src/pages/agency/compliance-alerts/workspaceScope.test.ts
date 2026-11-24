@@ -4,8 +4,10 @@ const staff = (accessList: string[], agencyModes: unknown = ['ddd', 'hha', 'sc']
 describe('compliance patterns URL', () => {
   it('accepts only its own filters', () => {
     expect(parseComplianceView(new URLSearchParams('source=documentation_patterns&ruleId=document.expiry_lapse')).ok).toBe(true);
-    expect(parseComplianceView(new URLSearchParams('source=documentation_patterns&findingStatus=resolved&severity=high&ruleId=shift.clock_out'))).toEqual({ok: true, view: {section: 'shifts', source: 'documentation_patterns', findingStatus: 'resolved', severity: 'high', ruleId: 'shift.clock_out'}});
-    for (const query of ['source=documentation_patterns&severity=urgent', 'source=documentation_patterns&ruleId=nope', 'source=documentation_patterns&ruleId=toString', 'source=documentation_patterns&findingStatus=bad', 'source=documentation_patterns&employeeId=e1', 'source=shift_notes&severity=high'])
+    expect(parseComplianceView(new URLSearchParams('source=documentation_patterns&section=patterns&employeeId=e1&mode=hha'))).toEqual({ok: true, view: {section: 'patterns', source: 'documentation_patterns', employeeId: 'e1', mode: 'hha'}});
+    expect(parseComplianceView(new URLSearchParams('source=documentation_patterns&section=shifts')).ok).toBe(false);
+    expect(parseComplianceView(new URLSearchParams('source=documentation_patterns&findingStatus=resolved&severity=high&ruleId=shift.clock_out'))).toEqual({ok: true, view: {section: 'patterns', source: 'documentation_patterns', findingStatus: 'resolved', severity: 'high', ruleId: 'shift.clock_out'}});
+    for (const query of ['source=documentation_patterns&severity=urgent', 'source=documentation_patterns&ruleId=nope', 'source=documentation_patterns&ruleId=toString', 'source=documentation_patterns&findingStatus=bad', 'source=shift_notes&severity=high'])
       expect(parseComplianceView(new URLSearchParams(query)).ok).toBe(false);
   });
 });

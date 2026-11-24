@@ -13,7 +13,7 @@ it('lists patterns, opens the staff view and pages', () => {
   render(<AgencyFindings {...props} onOpenStaff={open}/>);
   expect(mocks.findings).toHaveBeenCalledWith(expect.objectContaining({status: 'active', agencyId: 'a1'}), expect.anything());
   expect(screen.getByText('Ada Lee')).toBeInTheDocument();
-  expect(screen.getByText(/4 of the last 8 records incomplete; most often missing activities/)).toBeInTheDocument();
+  expect(screen.getByText(/4 of the last 8 records incomplete; most often Activities/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', {name: 'Review Ada Lee'}));
   expect(open).toHaveBeenCalledWith('e1');
   fireEvent.click(screen.getByRole('button', {name: 'Next page'}));
@@ -29,7 +29,7 @@ it('applies filters, warns on truncation, hides review without staff access, and
   mocks.findings.mockReturnValue({error: {status: 500}, refetch: vi.fn()});
   rerender(<AgencyFindings {...props}/>);
   expect(screen.getByRole('alert')).toHaveTextContent('could not be loaded');
-  expect(screen.queryByText(/No compliance patterns match/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/No patterns match/)).not.toBeInTheDocument();
 });
 it('labels each pattern by type, words shift patterns as shifts, and filters by type', () => {
   mocks.findings.mockReturnValue({currentData: {items: [{...item, id: 'f2', ruleId: 'shift.punctuality', topFields: [{key: 'late_start', count: 4}]}], total: 1, truncated: false, nextCursor: null}, refetch: vi.fn()});
@@ -45,4 +45,21 @@ it('words document patterns as documents and offers the Document renewals type',
   expect(screen.getByText('Document renewals', {selector: 'span'})).toBeInTheDocument();
   expect(screen.getByText(/3 of the last 5 documents lapsed/)).toBeInTheDocument();
   expect(screen.getByRole('option', {name: 'Document renewals'})).toBeInTheDocument();
+});
+it('shows the finding wording, the trend and the next step, and keeps records closed until asked', () => {
+  mocks.findings.mockReturnValue({currentData: {items: [{...item, explanation: 'Documentation was incomplete in 4 of the last 8 records.', trend: 'worsening', priorWindow: {numerator: 1, denominator: 8}, recommendationKey: 'refresher.documentation'}], total: 1, truncated: false, nextCursor: null}, refetch: vi.fn()});
+  render(<AgencyFindings {...props}/>);
+  expect(screen.getByText('High severity')).toBeInTheDocument();
+  expect(screen.getByText('Documentation was incomplete in 4 of the last 8 records.')).toBeInTheDocument();
+  expect(screen.getByText('Before: 1 of 8 · getting worse')).toBeInTheDocument();
+  expect(screen.getByText(/documentation refresher training/)).toBeInTheDocument();
+  expect(screen.getByText('Records behind this')).toBeInTheDocument();
+});
+it('puts a linked staff member first and can clear the link', () => {
+  mocks.findings.mockReturnValue({currentData: {items: [{...item, id: 'f9', employeeId: 'e9', employeeName: 'Zed Park'}, item], total: 2, truncated: false, nextCursor: null}, refetch: vi.fn()});
+  render(<AgencyFindings {...props} view={{source: 'documentation_patterns', employeeId: 'e1'}}/>);
+  const names = screen.getAllByText(/Ada Lee|Zed Park/).map(node => node.textContent);
+  expect(names[0]).toBe('Ada Lee');
+  fireEvent.click(screen.getByRole('button', {name: 'Show everyone'}));
+  expect(props.onApply).toHaveBeenCalledWith({employeeId: undefined});
 });

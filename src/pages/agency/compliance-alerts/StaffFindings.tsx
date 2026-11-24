@@ -1,13 +1,13 @@
 import {complianceAlertsApi} from './api';
-import {FindingActions} from './FindingActions';
-import {fieldLabel, ruleLabel} from './findingLabels';
-import {ComplianceBadge, ComplianceSkeleton} from './CompliancePresentation';
+import {Button} from '@/components/ui/button';
+import {fieldLabel} from './findingLabels';
+import {ComplianceSkeleton} from './CompliancePresentation';
 
 export type FindingEvidence = {id: string; occurredAt: string | null; outcome: string; source: string; noteType: string | null; label?: string | null; fields: string[]; noteId: string | null; shiftId: string | null; activityLogId: string | null};
 export type StaffFinding = {
   id: string; ruleId?: string; status: 'open' | 'recurred' | 'resolved' | 'dismissed'; severity: 'low' | 'medium' | 'high' | null; program: string | null;
   metrics: {numerator: number; denominator: number} | null; topFields: Array<{key: string; count: number}>;
-  trend: string | null; explanation: string | null; recurrenceCount: number; lastSeenAt: string | null; resolvedAt: string | null;
+  trend: string | null; priorWindow?: {numerator: number; denominator: number} | null; recommendationKey?: string | null; explanation: string | null; recurrenceCount: number; lastSeenAt: string | null; resolvedAt: string | null;
   reviewCount?: number; lastReviewedAt?: string | null; dismissedAt?: string | null; dismissReason?: string | null;
   evidence: FindingEvidence[];
 };
@@ -21,38 +21,31 @@ const findingsApi = complianceAlertsApi.injectEndpoints({endpoints: builder => (
 })});
 export const {useStaffFindingsQuery} = findingsApi;
 
-const severityTone = {high: 'danger', medium: 'warning', low: 'neutral'} as const;
-const statusLabel: Record<string, string> = {open: 'Open', recurred: 'Came back', resolved: 'Resolved', dismissed: 'Dismissed'};
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString() : 'unknown date');
 
-export function StaffFindings(args: Args) {
+/** The records behind one pattern, newest first. Shared by the Patterns tab. */
+export function EvidenceList({ruleId, evidence}: {ruleId?: string; evidence: FindingEvidence[]}) {
+  return <ul className="divide-y divide-[#dce7e8] text-sm">{evidence.map(item => <li key={item.id} className="py-2">
+    <span className="font-medium">{fmt(item.occurredAt)}</span>
+    {(item.label || item.noteType) && <span className="text-[#5e7378]"> · {item.label || item.noteType}</span>}
+    {item.fields.length > 0 && <span> · {!ruleId || ruleId === 'note.required_fields' ? 'Missing: ' : ''}{item.fields.map(fieldLabel).join(', ')}</span>}
+  </li>)}</ul>;
+}
+
+/**
+ * One line on a staff member's compliance page. The patterns themselves live in one place, the
+ * Patterns tab; this only says how many are active and links there.
+ */
+export function StaffPatternsLink({onOpenPatterns, ...args}: Args & {onOpenPatterns?: (employeeId: string) => void}) {
   const query = useStaffFindingsQuery(args, {refetchOnMountOrArgChange: true});
   const findings = query.currentData?.findings;
-  return <section aria-label="Compliance patterns" className="space-y-3 border-t border-[#dce7e8] pt-4">
-    <h3 className="font-bold">Compliance patterns</h3>
-    <p className="text-xs text-[#5e7378]">Based on submitted service notes and completed shifts. These are advisory and need a person to review them.</p>
-    {query.isFetching && !findings && <ComplianceSkeleton label="Checking compliance patterns…" detail={false}/>}
-    {!!query.error && !findings && <p role="alert" className="text-sm">Compliance patterns could not be loaded. <button type="button" className="underline" onClick={() => void query.refetch()}>Try again</button></p>}
-    {findings && !findings.length && <p className="text-sm">No compliance patterns found.</p>}
-    {findings?.map(finding => <article key={finding.id} className="space-y-2 rounded-lg border border-[#dce7e8] p-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <ComplianceBadge tone="neutral">{ruleLabel(finding.ruleId)}</ComplianceBadge>
-        {finding.severity && <ComplianceBadge tone={severityTone[finding.severity]}>{finding.severity[0].toUpperCase() + finding.severity.slice(1)} severity</ComplianceBadge>}
-        <ComplianceBadge tone={finding.status === 'resolved' || finding.status === 'dismissed' ? 'success' : 'warning'}>{statusLabel[finding.status]}</ComplianceBadge>
-        {(finding.reviewCount ?? 0) > 0 && <span className="text-xs text-[#5e7378]">Reviewed {finding.reviewCount}× · last {fmt(finding.lastReviewedAt ?? null)}</span>}
-        {finding.recurrenceCount > 0 && <span className="text-xs text-[#5e7378]">Returned {finding.recurrenceCount} time{finding.recurrenceCount === 1 ? '' : 's'}</span>}
-      </div>
-      {finding.explanation && <p className="text-sm">{finding.explanation}</p>}
-      {finding.status === 'dismissed' && finding.dismissReason && <p className="text-sm">Dismissed: {finding.dismissReason}</p>}
-      {finding.evidence.length > 0 && <details>
-        <summary className="cursor-pointer text-sm font-semibold">Evidence ({finding.evidence.length} records)</summary>
-        <ul className="mt-2 divide-y divide-[#dce7e8] text-sm">{finding.evidence.map(item => <li key={item.id} className="py-2">
-          <span className="font-medium">{fmt(item.occurredAt)}</span>
-          {(item.label || item.noteType) && <span className="text-[#5e7378]"> · {item.label || item.noteType}</span>}
-          {item.fields.length > 0 && <span> · {!finding.ruleId || finding.ruleId === 'note.required_fields' ? 'Missing: ' : ''}{item.fields.map(fieldLabel).join(', ')}</span>}
-        </li>)}</ul>
-      </details>}
-      <FindingActions findingId={finding.id} status={finding.status} onDone={() => void query.refetch()}/>
-    </article>)}
+  const active = (findings || []).filter(item => item.status === 'open' || item.status === 'recurred');
+  const high = active.filter(item => item.severity === 'high').length;
+  return <section aria-label="Compliance patterns" className="flex flex-wrap items-center gap-3 border-t border-[#dce7e8] pt-4">
+    <h3 className="font-bold">Patterns</h3>
+    {query.isFetching && !findings && <ComplianceSkeleton label="Checking patterns…" detail={false}/>}
+    {!!query.error && !findings && <p role="alert" className="text-sm">Patterns could not be loaded. <button type="button" className="underline" onClick={() => void query.refetch()}>Try again</button></p>}
+    {findings && <p className="text-sm">{active.length ? `${active.length} active${high ? ` · ${high} high severity` : ''}` : 'No active patterns.'}</p>}
+    {findings && active.length > 0 && onOpenPatterns && <Button type="button" variant="outline" size="sm" onClick={() => onOpenPatterns(args.employeeId)}>View patterns</Button>}
   </section>;
 }
