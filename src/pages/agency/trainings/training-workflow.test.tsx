@@ -91,7 +91,7 @@ describe('agency training pagination', () => {
     render(<AgencyTrainings />);
     expect(screen.getByText('0 assigned')).toBeInTheDocument();
     expect(screen.getByText('14 automatic requirements')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button',{name:'Review Trainings'}));
+    fireEvent.click(screen.getByRole('button',{name:'Review trainings'}));
     expect(await screen.findByText('14 automatic training assignments are pending.')).toBeInTheDocument();
     expect(screen.queryByText('No trainings available')).not.toBeInTheDocument();
   });
@@ -100,7 +100,7 @@ describe('agency training pagination', () => {
     state.staff = {items: [{id: 'employee-1', fullName: 'Ada Lovelace', profilePictureUrl: '', status: 'Assigned', assignedCount: 2}], nextCursor: null};
     render(<AgencyTrainings />);
     expect(state.courseArgs).toHaveLength(0);
-    fireEvent.click(screen.getByRole('button', {name: 'Review Trainings'}));
+    fireEvent.click(screen.getByRole('button', {name: 'Review trainings'}));
     await waitFor(() => expect(state.courseArgs[0]).toMatchObject({employeeId: 'employee-1', agencyId: 'agency-1', limit: 25, mode: 'ddd'}));
   });
 
