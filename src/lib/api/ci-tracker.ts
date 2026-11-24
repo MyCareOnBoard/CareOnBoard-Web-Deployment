@@ -436,9 +436,6 @@ export async function listProgramStaff(agencyId: string | undefined, signal?: Ab
   return staff;
 }
 
-/** The Individualized Goals document types the programs read approved goals from. */
-export const PROGRAM_GOALS_TYPES: ReadonlySet<string> = new Set(Object.values(CI_PROGRAMS).map((p) => p.goalsType));
-
 /** A client's goals document of this type (approved first, then submitted, then a draft), or null. */
 export async function findProgramGoalsDocument(clientId: string, goalsType: string): Promise<GoalDocument | null> {
   const { documents = [] } = await getDocumentsByClient(clientId, goalsType as DocumentType);

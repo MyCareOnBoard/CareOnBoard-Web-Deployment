@@ -20,7 +20,7 @@ import type { CreateActivityLogRequest } from "@/lib/api/employees";
 import ScheduleSuccessModal from "./ScheduleSuccessModal";
 import ScheduleSavedModal from "./ScheduleSavedModal";
 import { DocumentType } from "@/lib/api/goals-and-documents";
-import { PROGRAM_GOALS_TYPES, findProgramGoalsDocument } from "@/lib/api/ci-tracker";
+import { findProgramGoalsDocument } from "@/lib/api/ci-tracker";
 import { noteTypesForClientType, getNoteTitle, HHA_PERSONAL_CARE, HHA_SERVICE_LOG } from "@/lib/notes/noteTypes";
 import { resolveHhaNoteType } from "@/pages/agency/scheduling/utils/resolveHhaNoteType";
 import { getClientBasicInfo } from "@/lib/notes/clientBasicInfo";
@@ -261,15 +261,16 @@ const WEEKDAY_LABEL_BY_INDEX = Object.fromEntries(
   WEEKDAY_OPTIONS.map((option) => [option.dayIndex, option.label]),
 ) as Record<number, string>;
 
+// Plan-year goal documents a shift works toward. Annual updates are yearly reviews filled in on
+// Goals & documents, not something a shift produces, so they aren't offered here.
 const DDD_GOALS_TYPES: { id: string; title: string }[] = [
-  { id: DocumentType.COMMUNITY_INCLUSION_SERVICES, title: "Community Inclusion Services" },
   { id: DocumentType.COMMUNITY_INCLUSION_INDIVIDUALIZED_GOALS, title: "Community Inclusion – Individualized Goals" },
-  { id: DocumentType.DAY_HABILITATION_SERVICES, title: "Day Habilitation Services" },
   { id: DocumentType.DAY_HABILITATION_INDIVIDUALIZED_GOALS, title: "Day Habilitation – Individualized Goals" },
-  { id: DocumentType.PREVOCATIONAL_TRAINING_SERVICES, title: "Prevocational Training Services" },
   { id: DocumentType.PREVOCATIONAL_TRAINING_INDIVIDUALIZED_GOALS, title: "Prevocational Training – Individualized Goals" },
   { id: DocumentType.NATURAL_SUPPORTS_TRAINING, title: "Natural Supports Training" },
 ];
+/** Each of these is one document per client, shared by all of the client's shifts. */
+const PER_CLIENT_GOALS_TYPES: ReadonlySet<string> = new Set(DDD_GOALS_TYPES.map((t) => t.id));
 
 
 const initialFormData: ScheduleFormData = {
@@ -2236,11 +2237,11 @@ export default function AddScheduleModal({
             return null;
           });
 
-        // Community inclusion and day program goals are written once per
-        // client (from the ISP), not once per shift: reuse the client's
-        // existing document, or start a single draft and link every shift.
+        // Goals are written once per client (from the ISP), not once per
+        // shift: reuse the client's existing document, or start a single
+        // draft and link every shift.
         let goalResults: ({ id?: string } | null)[];
-        if (PROGRAM_GOALS_TYPES.has(formData.goalsType) && successfulShifts.length > 0) {
+        if (PER_CLIENT_GOALS_TYPES.has(formData.goalsType) && successfulShifts.length > 0) {
           // undefined = the lookup failed: skip rather than risk a duplicate draft.
           const existing = await findProgramGoalsDocument(formData.clientId, formData.goalsType).catch(() => undefined);
           if (!isCurrentMutation(operation.generation, operation.controller)) return;
@@ -2782,7 +2783,7 @@ export default function AddScheduleModal({
                   >
                     <span className="flex-1 text-left text-[14px] font-normal text-black">
                       {formData.goalsType
-                        ? goalsTypes.find((elt) => elt.id === formData.goalsType)?.title
+                        ? goalsTypes.find((elt) => elt.id === formData.goalsType)?.title ?? "Select goals type"
                         : "Select goals type"
                       }
                     </span>
