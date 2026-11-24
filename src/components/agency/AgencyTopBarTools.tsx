@@ -15,10 +15,12 @@ interface Announcement {
   type: "info" | "warning" | "urgent";
 }
 
+// The design shows announcements in amber; urgent ones stay red so they still stand out.
+const AMBER_TONE = "bg-[#fcf5dc] text-[#7a5800] hover:bg-[#f9efc8] dark:bg-[#e0b400]/15 dark:text-[#f0cf6b] dark:hover:bg-[#e0b400]/20";
 const PILL_TONE: Record<Announcement["type"], string> = {
-  info: "bg-[#eaf2ff] text-[#1f63c7] dark:bg-[#2b82ff]/15 dark:text-[#9cc0e6]",
-  warning: "bg-[#fff1e6] text-[#b44d00] dark:bg-[#ff6c10]/15 dark:text-[#ffa36b]",
-  urgent: "bg-[#fde8e6] text-[#b42318] dark:bg-[#ef4444]/15 dark:text-[#f8a1a1]",
+  info: AMBER_TONE,
+  warning: AMBER_TONE,
+  urgent: "bg-[#fde8e6] text-[#b42318] hover:bg-[#fbdcd9] dark:bg-[#ef4444]/15 dark:text-[#f8a1a1] dark:hover:bg-[#ef4444]/20",
 };
 const PRIORITY: Record<string, number> = { urgent: 0, warning: 1, info: 2 };
 
@@ -41,10 +43,10 @@ export function AgencyAnnouncementPill({ endpoint, viewAllPath }: { endpoint: st
   return (
     <Link to={viewAllPath} title={top.item.title}
       aria-label={`Announcement: ${top.item.title}${top.count > 1 ? `, and ${top.count - 1} more` : ""}`}
-      className={cn("inline-flex min-w-0 max-w-[320px] shrink items-center gap-2 rounded-full px-3 py-1.5 text-[12px] font-medium", PILL_TONE[top.item.type] ?? PILL_TONE.info)}>
-      <Megaphone aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
-      <span className="hidden truncate md:inline">{top.item.title}</span>
-      {top.count > 1 && <span className="shrink-0 opacity-80">+{top.count - 1}</span>}
+      className={cn("inline-flex h-9 min-w-0 max-w-[340px] shrink items-center gap-2 rounded-full px-3.5 text-[13px] font-medium transition-colors", PILL_TONE[top.item.type] ?? PILL_TONE.info)}>
+      <Megaphone aria-hidden="true" className="h-4 w-4 shrink-0" />
+      <span className="hidden truncate lg:inline">{top.item.title}</span>
+      {top.count > 1 && <span className="shrink-0 opacity-75"><span className="lg:hidden">+{top.count - 1}</span><span className="hidden lg:inline">+{top.count - 1} more</span></span>}
     </Link>
   );
 }
@@ -117,11 +119,9 @@ export function AgencyGlobalSearch({ navItems, agencyId }: { navItems: NavItem[]
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} aria-label="Search (Ctrl+K)"
-        className="flex h-9 min-w-0 cursor-pointer items-center gap-2 rounded-full border border-[#e3e8ea] bg-white px-3 text-[13px] text-[#5d6b73] hover:bg-[#f7f9f9] sm:w-[220px] dark:border-white/10 dark:bg-[#1b232b] dark:text-[#9aa4a8]">
-        <Search aria-hidden="true" className="h-4 w-4 shrink-0" />
-        <span className="hidden flex-1 truncate text-left sm:inline">Search</span>
-        <kbd className="hidden rounded border border-[#e3e8ea] px-1.5 text-[11px] lg:inline dark:border-white/10">Ctrl K</kbd>
+      <button type="button" onClick={() => setOpen(true)} aria-label="Search (Ctrl+K)" title="Search (Ctrl+K)"
+        className="grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-full border border-[rgba(22,22,22,0.1)] bg-white text-[#10141a] transition-colors hover:bg-[#f3f5f6] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] dark:border-white/10 dark:bg-[#1b232b] dark:text-[#f4f6f7] dark:hover:bg-white/5">
+        <Search aria-hidden="true" className="h-5 w-5" strokeWidth={1.6} />
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent showCloseButton={false} className="top-[15vh] max-w-[560px] translate-y-0 gap-0 overflow-hidden rounded-[16px] p-0 dark:bg-[#1b232b]">

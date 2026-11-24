@@ -34,7 +34,7 @@ function segmentKey(item: ComplianceBreakdownItem) {
   );
 }
 
-function allocateRoundedPercentages(exactPercentages: number[]) {
+export function allocateRoundedPercentages(exactPercentages: number[]) {
   if (exactPercentages.every((percentage) => percentage === 0)) {
     return exactPercentages.map(() => 0);
   }

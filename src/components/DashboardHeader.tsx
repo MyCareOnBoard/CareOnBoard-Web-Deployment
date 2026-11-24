@@ -40,7 +40,7 @@ export function HeaderActionButton({ icon: Icon, ariaLabel, onClick }: { icon: C
 }
 
 
-export function UserAvatar({ userName, userImage }: { userName?: string; userImage?: string }) {
+export function UserAvatar({ userName, userImage, solid = false }: { userName?: string; userImage?: string; /** Flat dark-teal initials disc (agency design) instead of the gradient. */ solid?: boolean }) {
   const [imageError, setImageError] = useState(false);
 
   const getInitials = (name?: string) => {
@@ -55,7 +55,7 @@ export function UserAvatar({ userName, userImage }: { userName?: string; userIma
   // Show initials if no image or image failed to load
   if (!userImage || imageError) {
     return (
-      <div className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-xs font-semibold">
+      <div className={cn("flex h-[34px] w-[34px] items-center justify-center rounded-full text-white text-xs font-semibold", solid ? "bg-[#0b6566]" : "bg-gradient-to-br from-[#00b4b8] to-[#0090a8]")}>
         {getInitials(userName)}
       </div>
     );
@@ -111,7 +111,7 @@ export function DashboardHeaderFrame({ centerContent, children, sidebarInset = f
         "fixed left-0 right-0 top-0 z-50 bg-[#003839] px-4 pt-4 dark:bg-[#002c2d] md:pl-0 md:transition-[left] md:duration-200",
         collapsed ? "md:left-[96px]" : "md:left-[256px]"
       )}>
-        <div className="flex h-[76px] items-center justify-between gap-2 rounded-t-[20px] bg-white px-4 sm:px-8 dark:bg-[#151c22]">
+        <div className="flex h-[76px] items-center justify-between gap-2 rounded-t-[24px] bg-white px-4 sm:px-8 dark:bg-[#151c22]">
           <div className="flex min-w-0 items-center gap-3">
             <button
               type="button"
@@ -157,7 +157,9 @@ export function DashboardHeaderFrame({ centerContent, children, sidebarInset = f
 }
 
 export default function DashboardHeader(
-  { actions, centerContent, userName, userImage, userRole, onLogout, userType, sidebarInset, showSettings = true, accountMenu, variant = "classic", surface, leading }: {
+  { actions, extraActions, centerContent, userName, userImage, userRole, onLogout, userType, sidebarInset, showSettings = true, accountMenu, variant = "classic", surface, leading }: {
+    /** Shown before the notification bell in the default actions (the agency's announcement pill and search). */
+    extraActions?: ReactNode;
     sidebarInset?: boolean;
     surface?: "page" | "card";
     leading?: ReactNode;
@@ -254,11 +256,13 @@ export default function DashboardHeader(
 
   const getCareConnectDashboardUrl = () => careConnectDashboardUrl(userType as UserType);
   const panel = variant === "panel";
+  const onCard = surface === "card";
 
   return (
     <DashboardHeaderFrame centerContent={centerContent} sidebarInset={sidebarInset} surface={surface} leading={leading}>
         {actions ?? (
-          <div className="flex items-center gap-[10px]">
+          <div className="flex min-w-0 items-center gap-[10px]">
+            {extraActions}
             {!panel && getCareConnectDashboardUrl() && (
               <a
                 href={getCareConnectDashboardUrl()!}
@@ -390,9 +394,14 @@ export default function DashboardHeader(
                 <div
                   role="button"
                   aria-label={`Account menu for ${userName || 'User'}`}
-                  className="flex items-center gap-3 rounded-[60px] border border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.5)] px-[5px] py-[5px] backdrop-blur-[22px] hover:bg-[rgba(255,255,255,0.6)] transition-colors cursor-pointer dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
+                  className={cn(
+                    "flex shrink-0 items-center gap-3 rounded-[60px] px-[5px] py-[5px] transition-colors cursor-pointer",
+                    onCard
+                      ? "border border-[rgba(22,22,22,0.1)] bg-white hover:bg-[#f6f8f8] dark:border-white/10 dark:bg-[#1b232b] dark:hover:bg-white/5"
+                      : "border border-[rgba(255,255,255,0.3)] bg-[rgba(255,255,255,0.5)] backdrop-blur-[22px] hover:bg-[rgba(255,255,255,0.6)] dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
+                  )}
                 >
-                  <UserAvatar userName={userName} userImage={userImage} />
+                  <UserAvatar userName={userName} userImage={userImage} solid={onCard} />
                   <div className="hidden min-w-0 pr-2 sm:block">
                     <p className="max-w-40 truncate text-sm font-medium leading-tight text-[#10141a] dark:text-[#f4f6f7]">
                       {userName || 'User'}
