@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, ChangeEvent, KeyboardEvent } from "react";
 import { useForm, useFormState, useWatch } from "react-hook-form";
-import { AlertCircle, Info, Upload } from "lucide-react";
+import { AlertCircle, ImageUp, Info, Upload } from "lucide-react";
 import {
   Accordion,
   AccordionContent,
@@ -34,7 +34,6 @@ import { cn } from "@/lib/utils";
 import {
   settingsAlertErrorClass,
   settingsAlertInfoClass,
-  settingsCardShellClass,
   settingsCardSubtitleClass,
 } from "./settingsCardStyles";
 import {
@@ -153,6 +152,8 @@ export default function AgencyInfoTab() {
   const addressInputRef = useRef<HTMLDivElement>(null);
   const timezoneInputRef = useRef<HTMLDivElement>(null);
   const timezoneOptionRefs = useRef(new Map<string, HTMLButtonElement>());
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const [createdAt, setCreatedAt] = useState("");
   const {
     suggestions,
     isSearching,
@@ -170,6 +171,7 @@ export default function AgencyInfoTab() {
   const { isDirty } = useFormState({ control: form.control });
   const primaryColor = useWatch({ control: form.control, name: "primaryColor" });
   const timezone = useWatch({ control: form.control, name: "timezone" });
+  const watchedSummary = useWatch({ control: form.control, name: ["name", "medicaidProviderId", "npi"] as const });
   const watchedOperational = useWatch({
     control: form.control,
     name: OPERATIONAL_FIELD_KEYS,
@@ -203,6 +205,7 @@ export default function AgencyInfoTab() {
     try {
       const agency = await getAgencyById(agencyId);
       setSupportedClientTypes(agency.supportedClientTypes ?? null);
+      setCreatedAt(agency.createdAt ?? "");
       const values = agencyToFormValues(agency);
       setEinStatus(agency.checkPayrollProfile?.einStatus ?? null);
       setInitialValues(values);
@@ -464,10 +467,52 @@ export default function AgencyInfoTab() {
     return <SettingsTabSkeleton variant="accordion" cardCount={5} />;
   }
 
-  const accordionItemClass = cn(settingsCardShellClass, "border-b-0 px-0");
+  const accordionItemClass = "rounded-[16px] border-0 bg-[#f4f5f6] px-0 dark:bg-white/5";
+
+  // Summary card: name, programs and IDs as they stand in the form, so edits show before saving.
+  const summaryName = (watchedSummary[0] || "").trim() || "Your agency";
+  const summaryInitials = summaryName.split(/\s+/).map((word) => word[0]).join("").slice(0, 2).toUpperCase();
+  const summaryCreated = createdAt && !Number.isNaN(Date.parse(createdAt))
+    ? new Date(createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+    : "";
+  const summaryPrograms = (supportedClientTypes?.length ? supportedClientTypes : []).map((type) => type.toUpperCase()).join(" and ");
+  const summaryLine = [
+    summaryPrograms && `${summaryPrograms} program${supportedClientTypes && supportedClientTypes.length > 1 ? "s" : ""}`,
+    watchedSummary[1]?.trim() && `Medicaid provider ${watchedSummary[1].trim()}`,
+    watchedSummary[2]?.trim() && `NPI ${watchedSummary[2].trim()}`,
+    summaryCreated && `created ${summaryCreated}`,
+  ].filter(Boolean).join(" · ");
+  const summaryLogo = resolveBrandingPreviewSrc(logoPreview);
 
   return (
     <div className="flex flex-col gap-4">
+      <section aria-label="Agency summary" className="flex flex-wrap items-center gap-4 rounded-[16px] border border-[#007679]/45 bg-[#e8f6f6] px-5 py-4 dark:border-[#7fd3d3]/30 dark:bg-[#0f7e7d]/15">
+        {summaryLogo ? (
+          <span className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-full bg-white">
+            <img src={summaryLogo} alt="" className="max-h-12 max-w-12 object-contain" />
+          </span>
+        ) : (
+          <span aria-hidden="true" className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-[#003839] text-[20px] font-medium text-white">
+            {summaryInitials}
+          </span>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[22px] font-medium leading-tight text-[#10141a] dark:text-[#f4f6f7]">{summaryName}</p>
+          {summaryLine && <p className="mt-1 text-[13px] text-[#4b535b] dark:text-[#9aa4a8]">{summaryLine}</p>}
+        </div>
+        {!readOnly && (
+          <button
+            type="button"
+            onClick={() => logoInputRef.current?.click()}
+            disabled={disabled}
+            className="inline-flex h-10 shrink-0 cursor-pointer items-center gap-2 rounded-[10px] border border-[#dcdfe2] bg-white px-4 text-[14px] font-medium text-[#10141a] transition-colors hover:bg-[#f4f6f7] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/15 dark:bg-[#1b232b] dark:text-[#f4f6f7]"
+          >
+            <ImageUp aria-hidden="true" className="h-4 w-4" />
+            {summaryLogo ? "Change logo" : "Upload logo"}
+          </button>
+        )}
+      </section>
+
       {readOnly && (
         <div className={settingsAlertInfoClass}>
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#00b4b8]" />
@@ -490,13 +535,13 @@ export default function AgencyInfoTab() {
             <AccordionItem value="identity" className={accordionItemClass}>
               <AccordionTrigger className="px-5 py-4 sm:px-6 hover:no-underline">
                 <div className="text-left">
-                  <span className="text-[17px] font-semibold text-[#10141a]">Identity &amp; Registration</span>
+                  <span className="text-[20px] font-medium text-[#10141a] dark:text-[#f4f6f7]">Identity &amp; Registration</span>
                   <p className={cn(settingsCardSubtitleClass, "font-normal normal-case")}>
                     Legal identity, provider IDs, and registration details.
                   </p>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="px-5 pb-5 sm:px-6">
+              <AccordionContent className="mx-3 mb-3 rounded-[12px] bg-white px-4 py-1 sm:mx-4 sm:mb-4 sm:px-5 dark:bg-[#1b232b]">
                 <SettingsFormFieldRow
                   title={
                     <>
@@ -668,13 +713,13 @@ export default function AgencyInfoTab() {
             <AccordionItem value="contact" className={accordionItemClass}>
               <AccordionTrigger className="px-5 py-4 sm:px-6 hover:no-underline">
                 <div className="text-left">
-                  <span className="text-[17px] font-semibold text-[#10141a]">Contact &amp; Location</span>
+                  <span className="text-[20px] font-medium text-[#10141a] dark:text-[#f4f6f7]">Contact &amp; Location</span>
                   <p className={cn(settingsCardSubtitleClass, "font-normal normal-case")}>
                     Email, phone, and primary business address.
                   </p>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="px-5 pb-5 sm:px-6">
+              <AccordionContent className="mx-3 mb-3 rounded-[12px] bg-white px-4 py-1 sm:mx-4 sm:mb-4 sm:px-5 dark:bg-[#1b232b]">
                 <SettingsFormFieldRow title="Email" description="Primary contact email for your agency.">
                   <FormField
                     control={form.control}
@@ -960,13 +1005,13 @@ export default function AgencyInfoTab() {
             <AccordionItem value="branding" className={accordionItemClass}>
               <AccordionTrigger className="px-5 py-4 sm:px-6 hover:no-underline">
                 <div className="text-left">
-                  <span className="text-[17px] font-semibold text-[#10141a]">Branding</span>
+                  <span className="text-[20px] font-medium text-[#10141a] dark:text-[#f4f6f7]">Branding</span>
                   <p className={cn(settingsCardSubtitleClass, "font-normal normal-case")}>
                     Logo, colors, and letterhead for reports.
                   </p>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="px-5 pb-5 sm:px-6">
+              <AccordionContent className="mx-3 mb-3 rounded-[12px] bg-white px-4 py-1 sm:mx-4 sm:mb-4 sm:px-5 dark:bg-[#1b232b]">
                 <SettingsFormFieldRow title="Logo" description="Upload your agency logo. JPG/PNG, max 5MB.">
                   <div className="space-y-3">
                     <label className="flex items-center justify-center gap-2 w-full min-h-11 px-4 py-3 bg-[#00b3ad] hover:bg-[#00a39f] text-white font-medium rounded-full transition cursor-pointer sm:w-auto sm:inline-flex">
@@ -974,6 +1019,7 @@ export default function AgencyInfoTab() {
                       {logoPreview ? "Change logo" : "Upload logo"}
                       <input
                         type="file"
+                        ref={logoInputRef}
                         accept={AGENCY_LOGO_ACCEPT}
                         className="hidden"
                         disabled={disabled}
@@ -1069,13 +1115,13 @@ export default function AgencyInfoTab() {
             <AccordionItem value="operational" className={accordionItemClass}>
               <AccordionTrigger className="px-5 py-4 sm:px-6 hover:no-underline">
                 <div className="text-left">
-                  <span className="text-[17px] font-semibold text-[#10141a]">Operational Settings</span>
+                  <span className="text-[20px] font-medium text-[#10141a] dark:text-[#f4f6f7]">Operational Settings</span>
                   <p className={cn(settingsCardSubtitleClass, "font-normal normal-case")}>
                     Scheduling, mileage, notifications, and file upload rules.
                   </p>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="px-5 pb-5 sm:px-6">
+              <AccordionContent className="mx-3 mb-3 rounded-[12px] bg-white px-4 py-1 sm:mx-4 sm:mb-4 sm:px-5 dark:bg-[#1b232b]">
                 <SettingsFormFieldRow
                   title="Operational preferences"
                   description="Mileage rate applies to mileage reimbursement and payroll mileage pay. Other options control scheduling and uploads."
@@ -1095,13 +1141,13 @@ export default function AgencyInfoTab() {
             <AccordionItem value="billing" className={accordionItemClass}>
               <AccordionTrigger className="px-5 py-4 sm:px-6 hover:no-underline">
                 <div className="text-left">
-                  <span className="text-[17px] font-semibold text-[#10141a]">Billing Configuration</span>
+                  <span className="text-[20px] font-medium text-[#10141a] dark:text-[#f4f6f7]">Billing Configuration</span>
                   <p className={cn(settingsCardSubtitleClass, "font-normal normal-case")}>
                     Billing format and invoice contact details.
                   </p>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="px-5 pb-5 sm:px-6">
+              <AccordionContent className="mx-3 mb-3 rounded-[12px] bg-white px-4 py-1 sm:mx-4 sm:mb-4 sm:px-5 dark:bg-[#1b232b]">
                 <SettingsFormFieldRow
                   title="Preferred Billing Agency"
                   description="Your preferred billing agency or format."
