@@ -337,7 +337,7 @@ export default function DocumentImportDialog<T extends ImportExtractionResult = 
         type="button"
         variant="outline"
         aria-label={triggerAriaLabel ?? triggerLabel}
-        className={triggerClassName ?? "h-11 min-h-[44px] shrink-0 rounded-[12px] border-[#00b4b8] px-3 text-[#00b4b8] hover:bg-[#e6fafa] sm:px-4"}
+        className={triggerClassName ?? "shrink-0"}
         disabled={disabled}
         onClick={openImportModal}
       >
@@ -523,7 +523,7 @@ export default function DocumentImportDialog<T extends ImportExtractionResult = 
                 {!isSingleAutoExtract ? (
                   <Button
                     type="button"
-                    className="h-11 min-h-[44px] w-full shrink-0 bg-[#00b4b8] hover:bg-[#009ea1] sm:w-auto"
+                    className="w-full shrink-0 sm:w-auto"
                     onClick={() => void runExtract(selectedFiles)}
                     disabled={busy || selectedCount === 0}
                     aria-label={
@@ -557,7 +557,7 @@ export default function DocumentImportDialog<T extends ImportExtractionResult = 
                 </button>
                 <Button
                   type="button"
-                  className="h-11 min-h-[44px] shrink-0 bg-[#00b4b8] hover:bg-[#009ea1]"
+                  className="shrink-0"
                   onClick={applyImport}
                   disabled={disabled || !extraction || selectedCount === 0 || Boolean(canApply && !canApply(extraction, { overwrite, files: selectedFiles }))}
                 >
@@ -592,8 +592,8 @@ function SingleDropzone({
       className={cn(
         "group relative overflow-hidden rounded-2xl border transition-all duration-200",
         dragActive && !busy
-          ? "border-[#00b4b8] bg-gradient-to-b from-[#e6fafa] to-white shadow-md ring-2 ring-[#00b4b8]/25"
-          : "border-[#e2e4e6] bg-gradient-to-b from-[#f8fafb] to-white shadow-sm hover:border-[#00b4b8]/40 hover:shadow-md",
+          ? "border-[#007679] bg-gradient-to-b from-[#e0f3f3] to-white shadow-md ring-2 ring-[#007679]/25"
+          : "border-[#e2e4e6] bg-gradient-to-b from-[#f8fafb] to-white shadow-sm hover:border-[#007679]/40 hover:shadow-md",
       )}
       onDragEnter={(e) => {
         e.preventDefault();
@@ -625,17 +625,17 @@ function SingleDropzone({
       {dragActive && !busy ? (
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 rounded-[14px] bg-[#00b4b8]/10 px-6 text-center backdrop-blur-[1px]"
+          className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 rounded-[14px] bg-[#007679]/10 px-6 text-center backdrop-blur-[1px]"
         >
-          <FileUp className="h-8 w-8 text-[#00b4b8]" aria-hidden />
-          <p className="text-[15px] font-semibold text-[#00b4b8]">Release to upload</p>
+          <FileUp className="h-8 w-8 text-[#007679]" aria-hidden />
+          <p className="text-[15px] font-semibold text-[#007679]">Release to upload</p>
           <p className="text-[12px] text-[#5c6368]">PDF, JPG, PNG, or WebP</p>
         </div>
       ) : null}
       <label
         htmlFor="client-import-file-modal"
         className={cn(
-          "relative flex w-full flex-col items-center gap-4 px-5 py-10 text-center transition-colors outline-none focus-within:ring-2 focus-within:ring-[#00b4b8]/35 focus-within:ring-offset-2",
+          "relative flex w-full flex-col items-center gap-4 px-5 py-10 text-center transition-colors outline-none focus-within:ring-2 focus-within:ring-[#007679]/35 focus-within:ring-offset-2",
           !busy ? "cursor-pointer" : "cursor-not-allowed opacity-75",
         )}
       >
@@ -652,7 +652,7 @@ function SingleDropzone({
             if (files.length) onPick(multiple ? files : files.slice(0, 1));
           }}
         />
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#00b4b8]/12 text-[#00b4b8] ring-1 ring-[#00b4b8]/15">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#007679]/12 text-[#007679] ring-1 ring-[#007679]/15">
           {busy ? (
             <Loader2 className="h-7 w-7 animate-spin" aria-hidden />
           ) : (
@@ -679,7 +679,7 @@ function SingleDropzone({
           </span>
         </div>
         {!busy ? (
-          <span className="inline-flex items-center rounded-[60px] border border-[#00b4b8] bg-white px-5 py-2.5 text-sm font-semibold text-[#00b4b8] shadow-sm ring-offset-background transition-colors group-hover:bg-[#e6fafa]">
+          <span className="inline-flex items-center rounded-[10px] border border-[#dcdfe2] bg-white px-4 py-2.5 text-sm font-semibold text-[#10141a] ring-offset-background transition-colors group-hover:bg-[#f4f6f7]">
             {multiple ? "Choose files" : "Choose file"}
           </span>
         ) : null}
@@ -711,8 +711,8 @@ function SlotPicker({
       className={cn(
         "relative rounded-2xl border p-3 transition-all duration-200",
         dragActive && !busy
-          ? "border-[#00b4b8] bg-[#e6fafa] ring-2 ring-[#00b4b8]/25"
-          : "border-[#e2e4e6] bg-gradient-to-b from-[#f8fafb] to-white hover:border-[#00b4b8]/40",
+          ? "border-[#007679] bg-[#e0f3f3] ring-2 ring-[#007679]/25"
+          : "border-[#e2e4e6] bg-gradient-to-b from-[#f8fafb] to-white hover:border-[#007679]/40",
       )}
       onDragEnter={(e) => {
         e.preventDefault();
@@ -744,15 +744,15 @@ function SlotPicker({
       {dragActive && !busy ? (
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 rounded-[14px] bg-[#00b4b8]/10 text-center backdrop-blur-[1px]"
+          className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 rounded-[14px] bg-[#007679]/10 text-center backdrop-blur-[1px]"
         >
-          <FileUp className="h-6 w-6 text-[#00b4b8]" aria-hidden />
-          <p className="text-[13px] font-semibold text-[#00b4b8]">Release to upload</p>
+          <FileUp className="h-6 w-6 text-[#007679]" aria-hidden />
+          <p className="text-[13px] font-semibold text-[#007679]">Release to upload</p>
         </div>
       ) : null}
       <p className="mb-2 text-[13px] font-semibold text-[#10141a]">{slot.label}</p>
       {file ? (
-        <div className="flex items-center justify-between gap-2 rounded-[10px] border border-[#00b4b8]/30 bg-white px-3 py-2">
+        <div className="flex items-center justify-between gap-2 rounded-[10px] border border-[#007679]/30 bg-white px-3 py-2">
           <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-[#10141a]">
             {file.name}
           </span>
@@ -770,8 +770,8 @@ function SlotPicker({
         <label
           htmlFor={inputId}
           className={cn(
-            "flex w-full items-center justify-center gap-2 rounded-[10px] border border-dashed border-[#00b4b8]/50 bg-white px-3 py-4 text-[12px] font-medium text-[#00b4b8] transition-colors",
-            !busy ? "cursor-pointer hover:bg-[#e6fafa]" : "cursor-not-allowed opacity-75",
+            "flex w-full items-center justify-center gap-2 rounded-[10px] border border-dashed border-[#007679]/50 bg-white px-3 py-4 text-[12px] font-medium text-[#007679] transition-colors",
+            !busy ? "cursor-pointer hover:bg-[#e0f3f3]" : "cursor-not-allowed opacity-75",
           )}
         >
           <input

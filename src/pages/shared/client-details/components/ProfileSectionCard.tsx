@@ -85,7 +85,7 @@ const StringListBlock = memo(function StringListBlock({ items }: { items: string
           className="flex gap-3 text-[14px] leading-relaxed text-[#10141a] sm:text-[15px]"
         >
           <span
-            className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#00b4b8]"
+            className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#12b5b0]"
             aria-hidden
           />
           <span className="min-w-0 flex-1 break-words">{text}</span>
@@ -176,7 +176,7 @@ const OutcomesBlock = memo(function OutcomesBlock({
                 className="flex gap-3 text-[14px] leading-relaxed text-[#10141a] sm:text-[15px]"
               >
                 <span
-                  className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#00b4b8]/12 text-[12px] font-semibold text-[#008f92]"
+                  className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#e0f3f3] text-[12px] font-semibold text-[#005c5e]"
                   aria-hidden
                 >
                   {i + 1}
@@ -224,13 +224,13 @@ export const ProfileSectionCard = memo(function ProfileSectionCard({
   return (
     <section
       className={cn(
-        "flex flex-col overflow-hidden rounded-2xl border border-[#e8eaed]/80 bg-white shadow-[0_1px_3px_rgba(16,20,26,0.06),0_8px_24px_rgba(16,20,26,0.04)]",
+        "flex flex-col overflow-hidden rounded-[16px] border border-[#e4e7ea] bg-white dark:border-white/10 dark:bg-[#1b232b]",
         "[content-visibility:auto] [contain-intrinsic-size:auto_320px]",
         layoutClass,
       )}
     >
       <header className="border-b border-[#eef0f2] px-5 py-4 sm:px-6">
-        <h2 className="text-[17px] font-semibold tracking-tight text-[#10141a] sm:text-lg">
+        <h2 className="text-base font-semibold text-[#10141a] dark:text-[#f4f6f7]">
           {section.title}
         </h2>
         {section.subtitle ? (

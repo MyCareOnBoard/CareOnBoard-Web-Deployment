@@ -240,7 +240,7 @@ export default function FolderImportDialog({ mode, allowedModes = ["ddd", "hha"]
   const reviewLink = `${Routes.agency.clients}?${IMPORT_REVIEW_PARAM}=1`;
 
   return <>
-    <Button type="button" variant="outline" size="lg" className={triggerClassName ?? "h-[52px] gap-2 border-[#00b4b8] px-4 text-[#00a3a7] hover:bg-[#e6fafa]"} onClick={() => setOpen(true)}>
+    <Button type="button" variant="outline" size="lg" className={triggerClassName ?? "gap-2"} onClick={() => setOpen(true)}>
       <FolderUp className="h-5 w-5" aria-hidden="true" />Import from folder
     </Button>
     <Dialog open={open} onOpenChange={setOpen}>
@@ -257,7 +257,7 @@ export default function FolderImportDialog({ mode, allowedModes = ["ddd", "hha"]
             {!mode && allowedModes.length > 1 && <fieldset className="space-y-2">
               <legend className="text-[13px] font-semibold text-[#10141a]">Client type</legend>
               <div className="flex flex-wrap gap-2">
-                {allowedModes.map(option => <label key={option} className={cn("flex min-h-[44px] cursor-pointer items-center gap-2 rounded-xl border px-4 text-[13px] font-medium", chosenMode === option ? "border-[#00b4b8] bg-[#e6fafa] text-[#087b80]" : "border-[#dce6e7] text-[#4b6266]")}>
+                {allowedModes.map(option => <label key={option} className={cn("flex min-h-[44px] cursor-pointer items-center gap-2 rounded-xl border px-4 text-[13px] font-medium", chosenMode === option ? "border-[#007679] bg-[#e0f3f3] text-[#005c5e]" : "border-[#dce6e7] text-[#4b6266]")}>
                   <input type="radio" name="folder-import-mode" value={option} checked={chosenMode === option} onChange={() => setChosenMode(option)} />
                   {modeLabels[option]}
                 </label>)}
@@ -265,7 +265,7 @@ export default function FolderImportDialog({ mode, allowedModes = ["ddd", "hha"]
             </fieldset>}
             <div
               role="presentation"
-              className={cn("rounded-2xl border-2 border-dashed px-6 py-10 text-center transition-colors", dragActive ? "border-[#00b4b8] bg-[#e6fafa]" : "border-[#dce6e7] bg-[#f8fafb]")}
+              className={cn("rounded-2xl border-2 border-dashed px-6 py-10 text-center transition-colors", dragActive ? "border-[#007679] bg-[#e0f3f3]" : "border-[#dce6e7] bg-[#f8fafb]")}
               onDragEnter={event => { event.preventDefault(); setDragActive(true); }}
               onDragOver={event => { event.preventDefault(); setDragActive(true); }}
               onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDragActive(false); }}
@@ -279,7 +279,7 @@ export default function FolderImportDialog({ mode, allowedModes = ["ddd", "hha"]
                   .finally(() => setReading(false));
               }}
             >
-              <FolderOpen className="mx-auto mb-3 h-10 w-10 text-[#00b4b8]" aria-hidden="true" />
+              <FolderOpen className="mx-auto mb-3 h-10 w-10 text-[#007679]" aria-hidden="true" />
               <p className="text-[14px] font-semibold text-[#10141a]">{reading ? "Reading folder…" : "Drop a folder here"}</p>
               <p className="mb-4 text-[12px] text-[#5c6368]">PDF, JPEG, PNG, or WebP files up to 10 MB each</p>
               <input ref={setFolderInput} type="file" multiple tabIndex={-1} className="sr-only" id="folder-import-input" aria-label="Choose folder"
@@ -324,7 +324,7 @@ export default function FolderImportDialog({ mode, allowedModes = ["ddd", "hha"]
                       {duplicate && !savedId && <p className="mt-1 flex items-center gap-1 text-[12px] font-medium text-amber-800"><AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />A client with this name already exists, so it is left out of Create. Check before creating another.</p>}
                     </div>
                     {savedId
-                      ? <div className="flex items-center gap-3"><span className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#087b80]"><CheckCircle2 className="h-4 w-4" aria-hidden="true" />Created</span><Link className="text-[13px] font-semibold text-[#00a3a7] underline-offset-2 hover:underline" to={Routes.agency.clientDetails.replace(":clientId", savedId)}>Open client</Link></div>
+                      ? <div className="flex items-center gap-3"><span className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#087b80]"><CheckCircle2 className="h-4 w-4" aria-hidden="true" />Created</span><Link className="text-[13px] font-semibold text-[#007679] underline-offset-2 hover:underline" to={Routes.agency.clientDetails.replace(":clientId", savedId)}>Open client</Link></div>
                       : state
                         ? <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[#335d61]" role="status">{state.phase === "working" && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}{state.phase === "waiting" ? "Waiting" : state.message || "Working"}</span>
                         : <div className="flex flex-wrap gap-2">

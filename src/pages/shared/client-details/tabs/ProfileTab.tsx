@@ -32,7 +32,7 @@ const CLIENT_CONFIRM_CONFIG: Record<
 };
 
 const profileActionBtn =
-  "h-9 min-h-9 rounded-lg px-3.5 text-[13px] font-medium shadow-none transition-colors focus-visible:ring-offset-0";
+  "h-9 min-h-9 rounded-[10px] px-3.5 text-[13px] font-semibold shadow-none transition-colors";
 
 const ProfileTabSections = memo(function ProfileTabSections({
   sections,
@@ -79,7 +79,7 @@ const ProfileTabToolbar = memo(function ProfileTabToolbar({
           variant="ghost"
           className={cn(
             profileActionBtn,
-            "gap-1.5 border border-[#00b4b8]/35 bg-[#00b4b8]/8 text-[#008f92] hover:bg-[#00b4b8]/14 hover:text-[#007a7d]",
+            "gap-1.5 bg-[#003839] text-white hover:bg-[#0b4c4d] hover:text-white dark:bg-[#0f7e7d] dark:hover:bg-[#13908f]",
           )}
           onClick={onActivate}
           disabled={isActivating}
@@ -102,7 +102,7 @@ const ProfileTabToolbar = memo(function ProfileTabToolbar({
           variant="ghost"
           className={cn(
             profileActionBtn,
-            "border border-[#e8eaed] bg-white/90 text-[#525253] hover:border-[#d8dadd] hover:bg-white hover:text-[#10141a]",
+            "border border-[#dcdfe2] bg-white text-[#10141a] hover:bg-[#f4f6f7] dark:border-white/15 dark:bg-transparent dark:text-[#f4f6f7] dark:hover:bg-white/5",
           )}
           onClick={onOpenDeactivate}
           disabled={isDeactivating}
@@ -123,7 +123,7 @@ const ProfileTabToolbar = memo(function ProfileTabToolbar({
         variant="ghost"
         className={cn(
           profileActionBtn,
-          "gap-1.5 border border-red-200/90 bg-white/90 text-red-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700",
+          "gap-1.5 border border-[#f0c8c4] bg-white text-[#b42318] hover:bg-[#fdf2f1] hover:text-[#b42318] dark:border-[#ff6b5e]/30 dark:bg-transparent dark:text-[#f8a1a1] dark:hover:bg-[#ff6b5e]/10",
         )}
         onClick={isArchived ? onOpenDelete : onOpenArchive}
         disabled={isArchiving}

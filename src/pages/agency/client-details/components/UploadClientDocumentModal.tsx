@@ -493,7 +493,7 @@ export function UploadClientDocumentModal({
                 !formData.documentType ||
                 (formData.documentType === "other" && (!formData.customName || !formData.customTitle))
               }
-              className="w-full px-6 text-white font-medium bg-[#00b4b8] hover:bg-[#00a0a4] rounded-[60px] transition-colors h-11 flex items-center justify-center gap-2"
+              className="w-full"
             >
               {isUploading ? (
                 <>

@@ -213,7 +213,7 @@ const GeneratePocPanel = React.forwardRef<GeneratePocPanelHandle, GeneratePocPan
             <Button
               type="button"
               variant="outline"
-              className="h-10 rounded-[12px] border-[#00b4b8] text-[#00b4b8] hover:bg-[#e6fafa]"
+              className="shrink-0"
               onClick={openModal}
               disabled={busy}
             >
@@ -235,7 +235,7 @@ const GeneratePocPanel = React.forwardRef<GeneratePocPanelHandle, GeneratePocPan
             <DialogHeader className="shrink-0 items-start gap-2 space-y-0 border-b border-[#e6e7e8] px-5 pb-2.5 pt-5 text-left">
               <div className="flex w-full items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2.5">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#e6fafa] text-[#00b4b8]">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#e0f3f3] text-[#007679]">
                     <Sparkles className="h-4 w-4" aria-hidden />
                   </span>
                   <DialogTitle className="text-left text-lg font-semibold text-[#10141a]">
@@ -269,7 +269,7 @@ const GeneratePocPanel = React.forwardRef<GeneratePocPanelHandle, GeneratePocPan
               {step === "confirm" ? (
                 <div className="space-y-4">
                   <div className="rounded-[12px] border border-[#cceeee] bg-[#f0fbfb] px-4 py-3">
-                    <p className="text-[12px] font-medium uppercase tracking-wide text-[#00b4b8]">
+                    <p className="text-[12px] font-medium uppercase tracking-wide text-[#007679]">
                       Source documents
                     </p>
                     <p className="mt-1 text-[14px] font-medium text-[#10141a]">
@@ -294,7 +294,7 @@ const GeneratePocPanel = React.forwardRef<GeneratePocPanelHandle, GeneratePocPan
 
               {step === "generating" ? (
                 <div className="flex flex-col items-center justify-center gap-4 py-8">
-                  <Loader2 className="h-10 w-10 animate-spin text-[#00b4b8]" />
+                  <Loader2 className="h-10 w-10 animate-spin text-[#007679]" />
                   <p className="max-w-[320px] text-center text-[14px] font-medium leading-relaxed text-[#10141a]">
                     Generating the plan of care from the ISP/PCPT&hellip;
                   </p>

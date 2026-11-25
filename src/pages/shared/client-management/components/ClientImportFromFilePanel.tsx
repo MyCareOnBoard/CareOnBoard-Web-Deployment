@@ -86,7 +86,7 @@ export default function ClientImportFromFilePanel({
           <button
             type="button"
             aria-label="How auto-fill works"
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#5c6368] transition-colors hover:bg-[#e6e7e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8]/40"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#5c6368] transition-colors hover:bg-[#e6e7e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#007679]/40"
           >
             <Info className="h-4 w-4" aria-hidden />
           </button>

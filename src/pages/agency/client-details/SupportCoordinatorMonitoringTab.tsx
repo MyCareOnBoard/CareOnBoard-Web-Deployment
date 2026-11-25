@@ -78,7 +78,7 @@ export default function SupportCoordinatorMonitoringTab({ sample }: { sample: bo
       <div className="flex items-center gap-2">
         <h3 className="text-xl font-medium">{format(selectedDate, "EEE, MMMM d")}</h3>
         <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-          <PopoverTrigger asChild><button type="button" aria-label="Choose monitoring date" className="grid size-9 place-items-center rounded-full border border-[#e5e7eb] transition-colors hover:border-[#00a4a8] hover:text-[#008f93]"><CalendarDays className="size-4" /></button></PopoverTrigger>
+          <PopoverTrigger asChild><button type="button" aria-label="Choose monitoring date" className="grid size-9 place-items-center rounded-full border border-[#e5e7eb] transition-colors hover:border-[#00a4a8] hover:text-[#007679]"><CalendarDays className="size-4" /></button></PopoverTrigger>
           <PopoverContent align="start" className="w-auto border border-[#e5e7eb] p-1 shadow-lg"><Calendar mode="single" selected={selectedDate} onSelect={(day) => { if (day) { setSelectedDate(day); setCalendarOpen(false); } }} /></PopoverContent>
         </Popover>
       </div>
@@ -100,7 +100,7 @@ export default function SupportCoordinatorMonitoringTab({ sample }: { sample: bo
         <div className="flex flex-wrap items-center gap-3 border-b border-[#f0f1f2] px-4 py-3">
           <h4 className="font-medium">Individual Supports</h4><span className="rounded bg-[#e8fbf4] px-2 py-0.5 text-[13px] font-semibold text-[#16815e]">Active</span>
           <span className="ml-auto text-[13px] text-[#9199a6]">Morning Star Supportive Services Corp</span>
-          <Button type="button" onClick={() => setDialog("monitoring")} className="bg-[#008f93] text-[13px] hover:bg-[#00777b]">{monitoringSaved ? "Update monitoring" : "Start monitoring"}</Button>
+          <Button type="button" onClick={() => setDialog("monitoring")} className="bg-[#007679] text-[13px] hover:bg-[#00777b]">{monitoringSaved ? "Update monitoring" : "Start monitoring"}</Button>
         </div>
         <div className="grid gap-3 px-4 py-3 text-[13px] sm:grid-cols-2 lg:grid-cols-4">
           <div><p className="text-[#9199a6]">Authorization</p><p className="mt-1">03/24/2026 → 03/23/2027<br />90 hrs/week</p></div>
@@ -137,7 +137,7 @@ export default function SupportCoordinatorMonitoringTab({ sample }: { sample: bo
             <div><label htmlFor="sc-follow-up-method" className="mb-1 block font-semibold">Follow-Up Method</label><Select value={method} onValueChange={setMethod} required><SelectTrigger id="sc-follow-up-method" className="w-full"><SelectValue placeholder="-- Select method --" /></SelectTrigger><SelectContent className="[&_[role=option]]:text-[15px]"><SelectItem value="Phone call">Phone call</SelectItem><SelectItem value="Email">Email</SelectItem><SelectItem value="In person">In person</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select></div>
             <div><label htmlFor="sc-follow-up-notes" className="mb-1 block font-semibold">Notes</label><Textarea id="sc-follow-up-notes" value={followUpNotes} onChange={(event) => setFollowUpNotes(event.target.value)} placeholder="e.g. Community Inclusion Services" className="min-h-20 resize-y" /></div>
           </div>
-          <div className="flex justify-end gap-2 px-5 pb-5"><Button type="button" variant="outline" onClick={() => setDialog(null)}>Cancel</Button><Button type="submit" disabled={!method} className="bg-[#008f93] hover:bg-[#00777b]">Create follow-up task</Button></div>
+          <div className="flex justify-end gap-2 px-5 pb-5"><Button type="button" variant="outline" onClick={() => setDialog(null)}>Cancel</Button><Button type="submit" disabled={!method} className="bg-[#007679] hover:bg-[#00777b]">Create follow-up task</Button></div>
         </form>
       </DialogContent>
     </Dialog>
@@ -152,7 +152,7 @@ export default function SupportCoordinatorMonitoringTab({ sample }: { sample: bo
             <fieldset className="border-t border-[#e5e7eb] pt-3"><legend className="pt-2 font-semibold">Client monitoring</legend><div className="mt-2 grid grid-cols-2 gap-3 rounded-lg border border-[#e5e7eb] p-2 sm:grid-cols-3">{monitoringAreas.map((area) => <Checkbox key={area} label={area} checked={areas.includes(area)} onChange={() => setAreas((current) => current.includes(area) ? current.filter((item) => item !== area) : [...current, area])} className="size-4 rounded border-[#00a4a8]" labelClassName="text-[13px] font-normal" />)}</div></fieldset>
             <div><label htmlFor="sc-monitoring-notes" className="mb-1 block font-semibold">Notes</label><Textarea id="sc-monitoring-notes" value={monitoringNotes} onChange={(event) => setMonitoringNotes(event.target.value)} placeholder="e.g. Community Inclusion Services" className="min-h-20 resize-y" /></div>
           </div>
-          <div className="flex justify-end gap-2 px-5 pb-5"><Button type="button" variant="outline" onClick={() => setDialog(null)}>Cancel</Button><Button type="submit" className="bg-[#008f93] hover:bg-[#00777b]">Save monitoring record</Button></div>
+          <div className="flex justify-end gap-2 px-5 pb-5"><Button type="button" variant="outline" onClick={() => setDialog(null)}>Cancel</Button><Button type="submit" className="bg-[#007679] hover:bg-[#00777b]">Save monitoring record</Button></div>
         </form>
       </DialogContent>
     </Dialog>

@@ -33,7 +33,7 @@ export function PocSaveGuardModal({
         <DialogHeader className="shrink-0 items-start gap-2 space-y-0 border-b border-[#e6e7e8] px-5 pb-2.5 pt-5 text-left">
           <div className="flex w-full items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2.5">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#e6fafa] text-[#00b4b8]">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#e0f3f3] text-[#007679]">
                 <FileText className="h-4 w-4" aria-hidden />
               </span>
               <DialogTitle className="text-left text-lg font-semibold text-[#10141a]">
@@ -59,7 +59,7 @@ export function PocSaveGuardModal({
 
         <div className="px-5 py-4">
           <div className="rounded-[12px] border border-[#cceeee] bg-[#f0fbfb] px-4 py-3">
-            <p className="text-[12px] font-medium uppercase tracking-wide text-[#00b4b8]">
+            <p className="text-[12px] font-medium uppercase tracking-wide text-[#007679]">
               Missing document
             </p>
             <p className="mt-1 text-[14px] font-medium text-[#10141a]">
@@ -93,7 +93,7 @@ export function PocSaveGuardModal({
             {showGenerateOption ? (
               <Button
                 type="button"
-                className="h-10 min-w-0 w-full rounded-[12px] bg-[#00b4b8] px-3 text-white hover:bg-[#009da1]"
+                className="min-w-0 w-full px-3"
                 onClick={() => onAction("generate")}
               >
                 <Sparkles className="h-4 w-4 shrink-0" />

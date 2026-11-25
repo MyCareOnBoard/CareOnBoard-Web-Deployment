@@ -100,7 +100,7 @@ export function AddressAutocompleteInput({
         >
           {places.isSearching && (
             <li className="flex items-center gap-2 px-4 py-3 text-sm text-[#808081]">
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-[#00b4b8] border-r-transparent" />
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-[#007679] border-r-transparent" />
               Searching...
             </li>
           )}

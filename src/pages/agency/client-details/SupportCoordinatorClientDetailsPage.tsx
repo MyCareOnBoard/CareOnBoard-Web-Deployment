@@ -208,7 +208,7 @@ function SupportCoordinatorClientDetailsWorkspace() {
 
   return (
     <div className="min-h-[calc(100vh-200px)] px-4 pb-8 sm:px-6 lg:px-0">
-      <Link to={Routes.agency.clients} className="mb-5 inline-flex items-center gap-2 text-sm font-medium text-[#008f93] hover:underline">
+      <Link to={Routes.agency.clients} className="mb-5 inline-flex items-center gap-2 text-sm font-medium text-[#007679] hover:underline">
         <ArrowLeft className="h-4 w-4" /> Back to clients
       </Link>
       <ClientImportReviewNotice client={savedClient} />
@@ -237,7 +237,7 @@ function SupportCoordinatorClientDetailsWorkspace() {
         {!pcptOpen && !ispOpen && <nav aria-label="Client details tabs" className="mt-5 flex gap-2 overflow-x-auto border-b border-[#e5e7eb] pb-3">
           {tabs.map((tab) => (
             <Link key={tab.id} to={tabLink(tab.id)} aria-current={activeTab === tab.id ? "page" : undefined}
-              className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00b4b8] ${activeTab === tab.id ? "border-[#00b4b8] bg-[#00b4b8] text-white" : "border-[#e5e7eb] text-[#4b5563] hover:border-[#00b4b8] hover:text-[#008f93]"}`}>
+              className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] ${activeTab === tab.id ? "border-[#003839] bg-[#003839] text-white" : "border-[#e5e7eb] text-[#4b5563] hover:border-[#007679] hover:text-[#007679]"}`}>
               {tab.label}
             </Link>
           ))}
@@ -260,19 +260,19 @@ function SupportCoordinatorClientDetailsWorkspace() {
                 <InfoCard label="Program" value={program || "Not set"} source={sample ? "LUCR" : undefined} />
               </div>
               <section aria-labelledby="sc-isp-outcomes-heading" className="mt-6 rounded-xl border border-[#e5e7eb] p-4 sm:p-5">
-                <h3 id="sc-isp-outcomes-heading" className="text-lg font-semibold text-[#008f93]">ISP Outcomes</h3>
+                <h3 id="sc-isp-outcomes-heading" className="text-lg font-semibold text-[#007679]">ISP Outcomes</h3>
                 {outcomes.length ? <div className="mt-5 divide-y divide-[#e5e7eb]">{outcomes.map((outcome, index) => (
                   <div key={index} className="grid gap-1 py-4 first:pt-0 last:pb-0 sm:grid-cols-[90px_1fr]">
-                    <span className="text-sm font-semibold text-[#008f93]">Outcome {index + 1}</span>
+                    <span className="text-sm font-semibold text-[#007679]">Outcome {index + 1}</span>
                     <div><p className="text-sm font-semibold text-[#10141a]">{sample ? `${firstName} ${outcome.goal}` : outcome.goal}</p>{outcome.support && <p className="mt-0.5 text-sm text-[#6b7280]">{outcome.support}</p>}</div>
                   </div>
                 ))}</div> : <p className="mt-4 text-sm text-[#6b7280]">No ISP outcomes recorded yet.</p>}
               </section>
               <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                {documentShortcuts.map((item) => <button key={item.title} type="button" onClick={() => item.title === "PCPT" || item.title === "ISP" ? navigate(`${tabLink("planning")}&view=${item.title.toLowerCase()}`) : setSelectedShortcut(item.title)} className="h-full w-full cursor-pointer rounded-xl border border-[#e5e7eb] p-4 text-left transition-[transform,border-color,box-shadow] duration-150 hover:-translate-y-0.5 hover:border-[#00b4b8] hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00b4b8]">
+                {documentShortcuts.map((item) => <button key={item.title} type="button" onClick={() => item.title === "PCPT" || item.title === "ISP" ? navigate(`${tabLink("planning")}&view=${item.title.toLowerCase()}`) : setSelectedShortcut(item.title)} className="h-full w-full cursor-pointer rounded-xl border border-[#e5e7eb] p-4 text-left transition-[transform,border-color,box-shadow] duration-150 hover:-translate-y-0.5 hover:border-[#007679] hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679]">
                   <p className="text-sm font-semibold text-[#10141a]">{item.title}</p>
                   <p className="mt-1 text-sm text-[#4b5563]">{item.description}</p>
-                  <p className="mt-2 text-xs font-semibold text-[#008f93]">{(item.title === "ISP Quality Review" && reviewSaved) || (item.title === "Participant Rights" && rightsSaved) ? "Saved in this preview" : item.action}</p>
+                  <p className="mt-2 text-xs font-semibold text-[#007679]">{(item.title === "ISP Quality Review" && reviewSaved) || (item.title === "Participant Rights" && rightsSaved) ? "Saved in this preview" : item.action}</p>
                 </button>)}
               </div>
             </section>
@@ -289,7 +289,7 @@ function SupportCoordinatorClientDetailsWorkspace() {
             </>
           ) : (
             <section aria-label={`${tabs.find((tab) => tab.id === activeTab)?.label} tab`} className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-[#d1d5db] px-6 text-center">
-              <FileText className="mb-3 h-8 w-8 text-[#008f93]" />
+              <FileText className="mb-3 h-8 w-8 text-[#007679]" />
               <h2 className="text-xl font-semibold text-[#10141a]">{tabs.find((tab) => tab.id === activeTab)?.label}</h2>
               <p className="mt-2 text-sm text-[#6b7280]">This section is ready for client records.</p>
             </section>
@@ -445,7 +445,7 @@ function ServiceAuthorizationTab({ sample, client, onSaved }: { sample: boolean;
           <span className={"rounded px-2 py-0.5 text-xs font-semibold " + (service.status === "Active" ? "bg-[#e8fff2] text-[#047857]" : "bg-[#fff8e9] text-[#a16207]")}>{service.status}</span>
           <span className="text-xs text-[#8a929e]">{service.code}</span>
           <DropdownMenu>
-            <DropdownMenuTrigger asChild><button type="button" className="ml-auto cursor-pointer text-sm font-semibold text-[#008f93] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00b4b8]">Actions</button></DropdownMenuTrigger>
+            <DropdownMenuTrigger asChild><button type="button" className="ml-auto cursor-pointer text-sm font-semibold text-[#007679] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679]">Actions</button></DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-40">
               <DropdownMenuItem className="cursor-pointer hover:bg-[#f0fbfb]" onSelect={() => { setDocumentWeek(null); setPreview(service); }}>View details</DropdownMenuItem>
               <DropdownMenuItem className="cursor-pointer hover:bg-[#f0fbfb]" onSelect={() => { setEditing({ service, index }); setStartDate(service.record?.startAuthDate ? parseISO(service.record.startAuthDate) : editDate(service.authorization.split(" → ")[0])); setEndDate(service.record?.endAuthDate ? parseISO(service.record.endAuthDate) : editDate(service.authorization.split(" → ")[1])); setUnit(service.record?.unitType || (service.units.includes("days") ? "Daily" : "Hourly")); setFrequency(service.frequency); setOutcomeId(service.outcomeId || "new"); setNewOutcome(""); setFormError(""); setPreview("Edit service"); }}>Edit service</DropdownMenuItem>
@@ -485,7 +485,7 @@ function ServiceAuthorizationTab({ sample, client, onSaved }: { sample: boolean;
         <DialogTitle className={formOpen ? "shrink-0 border-b border-[#eef0f2] pb-4 text-2xl font-semibold leading-8" : "text-xl font-medium leading-7"}>{selectedService?.name ?? (typeof preview === "string" ? preview : "")}</DialogTitle>
         {formOpen ? <>
           <DialogDescription className="sr-only">Enter a service authorization for this client.</DialogDescription>
-          <button type="button" aria-label={"Close " + preview.toLowerCase()} onClick={() => setPreview(null)} className="absolute right-5 top-5 flex size-9 cursor-pointer items-center justify-center rounded-full bg-[#f0f3f5] text-[#303741] hover:bg-[#e4ebed] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00b4b8] sm:right-7 sm:top-7"><X className="size-4" /></button>
+          <button type="button" aria-label={"Close " + preview.toLowerCase()} onClick={() => setPreview(null)} className="absolute right-5 top-5 flex size-9 cursor-pointer items-center justify-center rounded-full bg-[#f0f3f5] text-[#303741] hover:bg-[#e4ebed] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] sm:right-7 sm:top-7"><X className="size-4" /></button>
           <form key={editing?.service.record?.id ?? editing?.index ?? "new"} className="flex min-h-0 flex-1 flex-col" onSubmit={async (event) => {
             event.preventDefault();
             const data = new FormData(event.currentTarget);
@@ -584,7 +584,7 @@ function ServiceAuthorizationTab({ sample, client, onSaved }: { sample: boolean;
                 <tbody>{sampleAuthorizationWeeks.map((week) => <tr key={week} className="border-t border-[#f0f1f3]">
                   <td className="px-2.5 py-1.5 text-[#303741]">{week}</td>
                   <td className="px-2.5 py-1.5 text-[#303741]"><span aria-hidden="true" className="mr-1.5 inline-block size-1.5 rounded-full bg-[#00a878]" />✓ Received</td>
-                  <td className="px-2.5 py-1.5"><button type="button" className="cursor-pointer font-medium text-[#008f93] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00b4b8]" aria-label={"View PA document for " + week} onClick={() => setDocumentWeek(week)}>View</button></td>
+                  <td className="px-2.5 py-1.5"><button type="button" className="cursor-pointer font-medium text-[#007679] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679]" aria-label={"View PA document for " + week} onClick={() => setDocumentWeek(week)}>View</button></td>
                 </tr>)}</tbody>
               </table>
             </div> : <p className="rounded border border-[#e5e7eb] px-3 py-2 text-xs text-[#6b7280]">{selectedService.pa === "Received" ? "Received · SDR document on file. No prior authorization history recorded." : selectedService.pa === "Missing" ? "No prior authorization history recorded." : "Prior authorization is pending."}</p>}
@@ -785,7 +785,7 @@ function AssessmentTab({ tier, lastName, sample, client, onSaved }: { tier: stri
             <p className="text-xs text-[#8a929e]">{label}</p><p className="break-words text-sm font-medium text-[#10141a]">{value}</p>
           </div>)}
         </div>
-        <button type="button" disabled={!selectedClientDocument} aria-label={`Preview ${documentFilename}`} title={selectedClientDocument ? undefined : "Sample document unavailable"} onClick={() => { if (selectedClientDocument) { setSelectedDocument(null); setPreviewDocument(selectedClientDocument); } }} className="mt-3 flex min-h-16 w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-[#d8dce2] px-3 py-2 text-sm text-[#8a929e] transition-colors enabled:hover:border-[#00b4b8] enabled:hover:bg-[#f0fcfc] enabled:focus-visible:outline-2 enabled:focus-visible:outline-offset-2 enabled:focus-visible:outline-[#00b4b8] disabled:cursor-default">
+        <button type="button" disabled={!selectedClientDocument} aria-label={`Preview ${documentFilename}`} title={selectedClientDocument ? undefined : "Sample document unavailable"} onClick={() => { if (selectedClientDocument) { setSelectedDocument(null); setPreviewDocument(selectedClientDocument); } }} className="mt-3 flex min-h-16 w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-[#d8dce2] px-3 py-2 text-sm text-[#8a929e] transition-colors enabled:hover:border-[#007679] enabled:hover:bg-[#f0fcfc] enabled:focus-visible:outline-2 enabled:focus-visible:outline-offset-2 enabled:focus-visible:outline-[#007679] disabled:cursor-default">
           <FileText className="h-4 w-4" aria-hidden="true" /><span className="break-all text-center">{documentFilename}</span>
         </button>
         <div className="mt-5 flex items-center justify-between gap-2">

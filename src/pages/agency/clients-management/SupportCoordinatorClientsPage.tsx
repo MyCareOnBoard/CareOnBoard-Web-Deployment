@@ -67,7 +67,7 @@ export default function SupportCoordinatorClientsPage() {
           {summary.map(({ label, value, detail, icon: Icon }) => (
             <div key={label} className="rounded-2xl border border-[#e5e7eb] bg-white p-4">
               <div className="flex items-center gap-3">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#e6f8f8] text-[#008f93]"><Icon className="h-4 w-4" /></span>
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#e6f8f8] text-[#007679]"><Icon className="h-4 w-4" /></span>
                 <span className="text-[13px] font-semibold text-[#6b7280]">{label}</span>
               </div>
               {isLoading ? <Skeleton className="mt-2 h-8 w-14" /> : <p className="mt-1 text-[28px] font-bold leading-tight text-[#10141a]">{value}</p>}
@@ -93,7 +93,7 @@ export default function SupportCoordinatorClientsPage() {
         <div className="flex flex-wrap items-center gap-2 border-b border-[#e5e7eb] px-4 py-3 sm:px-6">
           {filters.map((item) => (
             <button key={item} type="button" aria-pressed={filter === item} onClick={() => { setFilter(item); setPage(1); }}
-              className={`rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00b4b8] ${filter === item ? "border-[#00b4b8] bg-[#00b4b8] text-white" : "border-[#e5e7eb] text-[#6b7280] hover:border-[#cccccd]"}`}>
+              className={`rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] ${filter === item ? "border-[#003839] bg-[#003839] text-white" : "border-[#e5e7eb] text-[#6b7280] hover:border-[#cccccd]"}`}>
               {item}
             </button>
           ))}
@@ -115,7 +115,7 @@ export default function SupportCoordinatorClientsPage() {
               const createdAt = client.createdAt;
               const createdDate = createdAt instanceof Date ? createdAt : typeof createdAt === "string" ? new Date(createdAt) : createdAt?._seconds ? new Date(createdAt._seconds * 1000) : null;
               const openDetails = () => navigate(Routes.agency.clientDetails.replace(":clientId", client.id));
-              return <div role="row" aria-label={`Open details for ${name}`} tabIndex={0} onClick={openDetails} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openDetails(); } }} key={client.id} className="sc-client-grid grid cursor-pointer grid-cols-1 gap-3 border-b border-[#e5e5e6] px-4 py-4 last:border-b-0 hover:bg-[#f9fafb] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#00b4b8] lg:items-center">
+              return <div role="row" aria-label={`Open details for ${name}`} tabIndex={0} onClick={openDetails} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openDetails(); } }} key={client.id} className="sc-client-grid grid cursor-pointer grid-cols-1 gap-3 border-b border-[#e5e5e6] px-4 py-4 last:border-b-0 hover:bg-[#f9fafb] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#007679] lg:items-center">
                 <div role="cell" className="flex min-w-0 items-center gap-3">
                   <Avatar className="h-10 w-10">{client.profileImage && <AvatarImage src={client.profileImage} alt="" className="object-cover" />}<AvatarFallback className="bg-[#e6f8f8] text-[12px] font-bold text-[#007f84]">{[client.firstName, client.lastName].filter(Boolean).map(part => part?.[0]?.toUpperCase()).join("")}</AvatarFallback></Avatar>
                   <div className="min-w-0"><p className="truncate text-[14px] font-semibold text-[#10141a]">{name}</p><p className="truncate text-[12px] text-[#6b7280]">ID: {client.id} · SC: {client.supportCoordinatorName || "Unassigned"}</p></div>

@@ -95,7 +95,7 @@ export function AgencyClientFormWrapper({ isEditMode = false }: AgencyClientForm
     return (
       <div className="min-h-[calc(100vh-200px)] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 animate-spin text-[#00b4b8]" />
+          <Loader2 className="w-8 h-8 animate-spin text-[#007679]" />
           <p className="text-[14px] font-medium text-[#808081]">
             Loading client details...
           </p>

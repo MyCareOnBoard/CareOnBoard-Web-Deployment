@@ -181,7 +181,7 @@ export const HhaAuthorizationFields = React.memo(function HhaAuthorizationFields
               value={row.goal ?? ""}
               onChange={(e) => onChange({ goal: e.target.value })}
               rows={3}
-              className="rounded-[12px] border border-[#cccccd] bg-white p-3 text-[14px] text-[#10141a] focus:outline-none focus:ring-2 focus:ring-[#00b4b8]"
+              className="rounded-[12px] border border-[#cccccd] bg-white p-3 text-[14px] text-[#10141a] focus:outline-none focus:ring-2 focus:ring-[#007679]"
               placeholder="Goal for this service (shown on the HHA Service Activity Log)"
             />
           </div>

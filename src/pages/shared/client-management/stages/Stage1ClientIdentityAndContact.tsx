@@ -29,7 +29,7 @@ const SELECT_TRIGGER_CN =
   "w-full h-[44px] rounded-[12px] border-[#cccccd] bg-white";
 
 const SECTION_HEADER_ACTION_BTN =
-  "h-11 shrink-0 rounded-[60px] border border-[#b2b2b3] bg-white/40 px-5 text-[14px] font-semibold text-[#10141a] hover:bg-white/60";
+  "inline-flex h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-[#dcdfe2] bg-white px-4 text-[14px] font-semibold text-[#10141a] transition-colors hover:bg-[#f4f6f7] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/15 dark:bg-transparent dark:text-[#f4f6f7] dark:hover:bg-white/5";
 
 export function Stage1ClientIdentityAndContact({
   showAgencySelection = false,

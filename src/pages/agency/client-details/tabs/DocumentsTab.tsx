@@ -64,26 +64,29 @@ export function DocumentsTab({
 
   return (
     <>
-      {requestedSlot&&<div ref={focusRef} tabIndex={-1} className="mt-4 rounded-xl border border-primary/30 bg-background p-4"><p className="font-semibold">Selected document: {requestedSlot.toUpperCase()}</p><p className="my-2 text-sm text-muted-foreground">Review the current file and dates below.</p>{safeDocuments.some(({document})=>document.key===requestedSlot&&clientDocumentUrl(document.url))?<Button variant="outline" onClick={()=>{const doc=safeDocuments.find(({document})=>document.key===requestedSlot&&clientDocumentUrl(document.url))?.document;if(doc)setPreview(doc);}}>View selected document</Button>:onUploadChecklist?<Button onClick={()=>onUploadChecklist(requestedSlot as ChecklistRow['key'])}>Upload required document</Button>:<p className="text-sm">No file recorded. Ask your agency administrator to upload it.</p>}</div>}
-      <div className="mt-4 backdrop-blur bg-[rgba(255,255,255,0.3)] border border-[rgba(255,255,255,0.3)] rounded-[30px] p-[20px] flex flex-col gap-[24px] overflow-hidden">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex flex-col gap-[4px]">
-            <p className="text-[24px] font-medium leading-[normal] text-[#10141a]">
-              Documents
-            </p>
-            <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-              Here are your uploaded documents
-            </p>
+      {requestedSlot&&<div ref={focusRef} tabIndex={-1} className="mt-5 rounded-[12px] border border-[#bfe3e3] bg-[#f3fafa] p-4 dark:border-[#0f7e7d]/40 dark:bg-[#0f7e7d]/10"><p className="text-[14px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">Selected document: {requestedSlot.toUpperCase()}</p><p className="my-2 text-[13px] text-[#4b535b] dark:text-[#9aa4a8]">Review the current file and dates below.</p>{safeDocuments.some(({document})=>document.key===requestedSlot&&clientDocumentUrl(document.url))?<Button variant="outline" onClick={()=>{const doc=safeDocuments.find(({document})=>document.key===requestedSlot&&clientDocumentUrl(document.url))?.document;if(doc)setPreview(doc);}}>View selected document</Button>:onUploadChecklist?<Button onClick={()=>onUploadChecklist(requestedSlot as ChecklistRow['key'])}>Upload required document</Button>:<p className="text-sm">No file recorded. Ask your agency administrator to upload it.</p>}</div>}
+      <div className="mt-5 flex flex-col gap-5 overflow-hidden rounded-[16px] border border-[#e4e7ea] bg-white p-5 dark:border-white/10 dark:bg-[#1b232b]">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#eceef0] pb-4 dark:border-white/10">
+          <div className="flex items-center gap-2.5">
+            <FileText aria-hidden="true" className="h-5 w-5 shrink-0 text-[#007679] dark:text-[#7fd3d3]" />
+            <div>
+              <h2 className="text-base font-semibold text-[#10141a] dark:text-[#f4f6f7]">
+                Documents
+              </h2>
+              <p className="text-[13px] text-[#4b535b] dark:text-[#9aa4a8]">
+                Here are your uploaded documents
+              </p>
+            </div>
           </div>
           {onOpenUploadModal && <Button
-            className="h-11 rounded-[60px] bg-[#00b4b8] text-white hover:bg-[#00a0a4] px-6 shrink-0"
+            className="shrink-0"
             onClick={() => {
               if (onOpenUploadModal) {
                 onOpenUploadModal();
               }
             }}
           >
-            <Plus className="w-5 h-5 mr-2" />
+            <Plus aria-hidden="true" className="h-4 w-4" />
             Add Document
           </Button>}
         </div>
@@ -125,7 +128,7 @@ export function DocumentsTab({
               A signed Form 485 is on file. This client can be activated.
             </p>
             <Button
-              className="h-9 shrink-0 rounded-[60px] bg-[#12b76a] px-5 text-white hover:bg-[#039855]"
+              size="sm" className="shrink-0"
               onClick={() => onActivateClient?.()}
             >
               Activate client
@@ -136,8 +139,8 @@ export function DocumentsTab({
         {showChecklist && <ClientDocumentChecklist client={client} canUpload={Boolean(onUploadChecklist)} refreshing={refreshing} refreshError={refreshError} onRefresh={onRefresh} onUpload={key => onUploadChecklist?.(key)} onViewFiles={viewFiles} />}
         <div ref={listRef} className="flex flex-col gap-3">
           {documents.length === 0 ? (
-            <div className="py-12 text-center">
-              <p className="text-[14px] font-medium text-[#808081]">
+            <div className="rounded-[12px] border border-dashed border-[#dcdfe2] py-12 text-center dark:border-white/15">
+              <p className="text-[14px] text-[#4b535b] dark:text-[#9aa4a8]">
                 No documents uploaded yet.
               </p>
             </div>
@@ -148,20 +151,20 @@ export function DocumentsTab({
                 tabIndex={-1}
                 data-document-key={doc.document.key}
                 aria-label={`${doc.title} file ${doc.id + 1}`}
-                className="backdrop-blur-[20px] rounded-[20px] flex flex-wrap items-center gap-[16px] focus-visible:outline focus-visible:outline-[#00b4b8]"
+                className="flex flex-wrap items-center gap-3 rounded-[12px] border border-[#eceef0] px-4 py-3 transition-colors hover:bg-[#f8f9fa] focus-visible:outline focus-visible:outline-[#007679] dark:border-white/10 dark:hover:bg-white/5"
               >
-                <div className="w-[52.5px] h-[60px] rounded-[8px] bg-white flex items-center justify-center shrink-0">
-                  <FileText className="w-6 h-6 text-[#00b4b8]" />
+                <div aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#e0f3f3] text-[#005c5e] dark:bg-[#0f7e7d]/20 dark:text-[#7fd3d3]">
+                  <FileText className="h-4 w-4" />
                 </div>
 
                 <div className="flex flex-1 flex-wrap items-center justify-between gap-3 min-w-0">
                   <div className="flex flex-col gap-1 min-w-0">
-                    <p className="text-[14px] font-semibold leading-[1.4] text-[#10141a] truncate">
+                    <p className="truncate text-[14px] font-medium leading-[1.4] text-[#10141a] dark:text-[#f4f6f7]">
                       {doc.title}
                     </p>
-                    {typeof doc.document.issuedOnDate === 'string' && doc.document.issuedOnDate && <p className="text-xs text-[#808081] break-all">Recorded issued date: {doc.document.issuedOnDate}</p>}
-                    {typeof doc.document.expiryDate === 'string' && doc.document.expiryDate && <p className="text-xs text-[#808081] break-all">Recorded expiry date: {doc.document.expiryDate}</p>}
-                    {doc.fileName && <p title={doc.fileName} className="text-[12px] font-medium text-[#808081] truncate">{doc.fileName}</p>}
+                    {typeof doc.document.issuedOnDate === 'string' && doc.document.issuedOnDate && <p className="text-xs text-[#4b535b] break-all dark:text-[#9aa4a8]">Recorded issued date: {doc.document.issuedOnDate}</p>}
+                    {typeof doc.document.expiryDate === 'string' && doc.document.expiryDate && <p className="text-xs text-[#4b535b] break-all dark:text-[#9aa4a8]">Recorded expiry date: {doc.document.expiryDate}</p>}
+                    {doc.fileName && <p title={doc.fileName} className="truncate text-[12px] text-[#4b535b] dark:text-[#9aa4a8]">{doc.fileName}</p>}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
