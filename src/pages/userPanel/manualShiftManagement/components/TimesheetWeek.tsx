@@ -85,13 +85,14 @@ export default function TimesheetWeek({
   };
 
   return (
-    <div className="overflow-hidden rounded-xl bg-[#0EAF520D]">
+    <div className="overflow-x-auto">
+      <div className="min-w-[560px]">
       {/* Table Header */}
-      <div className="grid grid-cols-4 gap-4 p-4 pt-4">
-        <div className="font-semibold text-sm text-[#10141a]">Day</div>
-        <div className="font-semibold text-sm text-[#10141a]">Date</div>
-        <div className="font-semibold text-sm text-[#10141a]">Check In</div>
-        <div className="font-semibold text-sm text-[#10141a]">Check Out</div>
+      <div className="grid grid-cols-4 gap-4 border-y border-[#eceef0] bg-[#f8f9fa] px-4 py-2.5 dark:border-white/10 dark:bg-white/5">
+        <div className="text-[13px] text-[#4b535b] dark:text-[#9aa4a8]">Day</div>
+        <div className="text-[13px] text-[#4b535b] dark:text-[#9aa4a8]">Date</div>
+        <div className="text-[13px] text-[#4b535b] dark:text-[#9aa4a8]">Check in</div>
+        <div className="text-[13px] text-[#4b535b] dark:text-[#9aa4a8]">Check out</div>
       </div>
 
       {/* Table Rows */}
@@ -99,11 +100,11 @@ export default function TimesheetWeek({
         {days.map((day, index) => (
           <div
             key={day}
-            className={`grid grid-cols-4 gap-4 p-4 ${
-              index !== days.length - 1 ? "border-b border-[#e5e5e6]" : ""
-            } hover:bg-[#f8f9fa] transition-colors`}
+            className={`grid grid-cols-4 gap-4 px-4 py-2.5 ${
+              index !== days.length - 1 ? "border-b border-[#eceef0] dark:border-white/10" : ""
+            } hover:bg-[#f8f9fa] transition-colors dark:hover:bg-white/5`}
           >
-            <div className="flex items-center text-sm font-medium text-[#10141a]">{day}</div>
+            <div className="flex items-center text-[14px] font-medium text-[#10141a] dark:text-[#f4f6f7]">{day}</div>
             
             {/* Date Picker */}
             <div className="flex items-center">
@@ -117,11 +118,11 @@ export default function TimesheetWeek({
                   <Button
                     variant="outline"
                     onClick={() => setDatePickerState({ day, open: true })}
-                    className={`w-full justify-start text-left font-normal border-[#e5e5e6] rounded-md bg-white hover:bg-[#f8f9fa] ${
-                      !weekData[day].date && "text-[#a0a0a1]"
+                    className={`w-full h-9 justify-start rounded-[8px] border-[#dcdfe2] bg-white px-3 text-left text-[13px] font-normal text-[#10141a] tabular-nums shadow-none hover:bg-[#f4f6f7] dark:border-white/15 dark:bg-transparent dark:text-[#f4f6f7] dark:hover:bg-white/5 ${
+                      !weekData[day].date && "text-[#9aa1a7]"
                     }`}
                   >
-                    <CalendarIcon className="w-4 h-4 mr-2" />
+                    <CalendarIcon aria-hidden="true" className="w-4 h-4 mr-1 text-[#6b737a]" />
                     {weekData[day].date || "---"}
                   </Button>
                 </PopoverTrigger>
@@ -155,11 +156,11 @@ export default function TimesheetWeek({
               >
                 <Button
                   variant="outline"
-                  className={`w-full justify-start text-left font-normal border-[#e5e5e6] rounded-md bg-white hover:bg-[#f8f9fa] ${
-                    !weekData[day].checkIn && "text-[#a0a0a1]"
+                  className={`w-full h-9 justify-start rounded-[8px] border-[#dcdfe2] bg-white px-3 text-left text-[13px] font-normal text-[#10141a] tabular-nums shadow-none hover:bg-[#f4f6f7] dark:border-white/15 dark:bg-transparent dark:text-[#f4f6f7] dark:hover:bg-white/5 ${
+                    !weekData[day].checkIn && "text-[#9aa1a7]"
                   }`}
                 >
-                  <Clock className="w-4 h-4 mr-2" />
+                  <Clock aria-hidden="true" className="w-4 h-4 mr-1 text-[#6b737a]" />
                   {weekData[day].checkIn || "---"}
                 </Button>
               </TimePicker>
@@ -173,11 +174,11 @@ export default function TimesheetWeek({
               >
                 <Button
                   variant="outline"
-                  className={`w-full justify-start text-left font-normal border-[#e5e5e6] rounded-md bg-white hover:bg-[#f8f9fa] ${
-                    !weekData[day].checkOut && "text-[#a0a0a1]"
+                  className={`w-full h-9 justify-start rounded-[8px] border-[#dcdfe2] bg-white px-3 text-left text-[13px] font-normal text-[#10141a] tabular-nums shadow-none hover:bg-[#f4f6f7] dark:border-white/15 dark:bg-transparent dark:text-[#f4f6f7] dark:hover:bg-white/5 ${
+                    !weekData[day].checkOut && "text-[#9aa1a7]"
                   }`}
                 >
-                  <Clock className="w-4 h-4 mr-2" />
+                  <Clock aria-hidden="true" className="w-4 h-4 mr-1 text-[#6b737a]" />
                   {weekData[day].checkOut || "---"}
                 </Button>
               </TimePicker>
@@ -187,10 +188,11 @@ export default function TimesheetWeek({
       </div>
 
       {/* Total Hours */}
-      <div className="p-4 bg-[#f8f9fa] text-right">
-        <span className="text-sm font-semibold text-[#10141a]">
-          Total Hours : {totalHours} hours
+      <div className="border-t border-[#eceef0] px-4 py-3 text-right dark:border-white/10">
+        <span className="text-[13px] text-[#4b535b] dark:text-[#9aa4a8]">
+          Total Hours : <span className="font-medium text-[#10141a] dark:text-[#f4f6f7]">{totalHours} hours</span>
         </span>
+      </div>
       </div>
     </div>
   );

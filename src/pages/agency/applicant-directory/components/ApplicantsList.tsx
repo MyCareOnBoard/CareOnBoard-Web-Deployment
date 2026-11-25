@@ -1,8 +1,12 @@
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Search, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
+import type { ReactNode } from "react";
+import { ChevronRight, Circle, CircleCheck } from "lucide-react";
 import type { Applicant, PeriodFilter } from "@/lib/api/applicants";
+import { cn } from "@/lib/utils";
+import { AgencyProgressBar } from "@/components/agency/AgencyShell";
+import {
+  AgencyListCard, AgencyPagination, AgencyPerson, AgencySearchField, AgencySegmented, agencyRowLink,
+  agencyTd, agencyTh, agencyTheadRow, agencyTr,
+} from "@/components/agency/AgencyListKit";
 
 interface ApplicantsListProps {
   applicants: Applicant[];
@@ -17,116 +21,37 @@ interface ApplicantsListProps {
   isLoading?: boolean;
   title?: string;
   description?: string;
+  /** Shown at the start of the toolbar (the Pending / All switch). */
+  nav?: ReactNode;
 }
 
-function getInitials(name: string) {
-  if (!name) return "?";
-  const parts = name.trim().split(" ");
-  if (parts.length === 1) return parts[0][0]?.toUpperCase() ?? "?";
-  return `${parts[0][0] ?? ""}${parts[parts.length - 1][0] ?? ""}`.toUpperCase();
-}
+const STAGES: { key: keyof Pick<Applicant, "profileScreening" | "documents" | "conditionalHire" | "finalAgencyReview" | "officialHire">; label: string }[] = [
+  { key: "profileScreening", label: "Profile & Pre-Screening" },
+  { key: "documents", label: "Documents" },
+  { key: "conditionalHire", label: "Conditional Hire" },
+  { key: "finalAgencyReview", label: "Final Agency Review" },
+  { key: "officialHire", label: "Official Hire" },
+];
 
-interface ApplicantRowProps {
-  applicant: Applicant;
-  onClick: (applicant: Applicant) => void;
-}
+const PERIODS: { value: PeriodFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "today", label: "Today" },
+  { value: "week", label: "This week" },
+  { value: "month", label: "This month" },
+];
 
-function ApplicantRow({ applicant, onClick }: ApplicantRowProps) {
+function StageChip({ done, label }: { done: boolean; label: string }) {
   return (
-    <div
-      key={applicant.id}
-      onClick={() => onClick(applicant)}
-      className="flex flex-wrap gap-4 md:flex-row md:items-center md:justify-between px-4 py-3 hover:bg-[#f8f9fa] cursor-pointer transition-colors rounded-[20px] w-full"
-    >
-      <div className="flex flex-wrap items-center gap-4 md:flex-1">
-        {/* Avatar */}
-        <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
-          {(applicant as any).profilePictureUrl && (
-            <AvatarImage
-              src={(applicant as any).profilePictureUrl}
-              alt={applicant.name}
-              className="w-full h-full object-cover aspect-auto rounded-[8px]"
-            />
-          )}
-          <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
-            {getInitials(applicant.name)}
-          </AvatarFallback>
-        </Avatar>
-
-        {/* Info */}
-        <div className="flex-1 min-w-[160px]">
-          <h3 className="text-[16px] font-semibold text-[#10141a] leading-[1.6] mb-0.5">
-            {applicant.name}
-          </h3>
-          <p className="text-[14px] font-medium text-[#808081] leading-[1.4]">
-            {applicant.role}
-          </p>
-        </div>
-
-        {/* Stage Pills */}
-        <div className="flex flex-wrap gap-2">
-          <div
-            className={`flex items-center gap-[4px] px-[10px] py-2 rounded-[60px] text-[14px] font-semibold whitespace-nowrap border-[0.5px] ${applicant.profileScreening
-              ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
-              : "bg-[rgba(128,128,129,0.05)] text-[#525253] border-[#525253]"
-              }`}
-          >
-            <CheckCircle2 className="w-5 h-5" strokeWidth={2.2} />
-            Profile & Pre-Screening
-          </div>
-
-          <div
-            className={`flex items-center gap-[4px] px-[10px] py-2 rounded-[60px] text-[14px] font-semibold whitespace-nowrap border-[0.5px] ${applicant.documents
-              ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
-              : "bg-[rgba(128,128,129,0.05)] text-[#525253] border-[#525253]"
-              }`}
-          >
-            <CheckCircle2 className="w-5 h-5" strokeWidth={2.2} />
-            Documents
-          </div>
-
-          <div
-            className={`flex items-center gap-[4px] px-[10px] py-2 rounded-[60px] text-[14px] font-semibold whitespace-nowrap border-[0.5px] ${applicant.conditionalHire
-              ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
-              : "bg-[rgba(128,128,129,0.05)] text-[#525253] border-[#525253]"
-              }`}
-          >
-            <CheckCircle2 className="w-5 h-5" strokeWidth={2.2} />
-            Conditional Hire
-          </div>
-
-          <div
-            className={`flex items-center gap-[4px] px-[10px] py-2 rounded-[60px] text-[14px] font-semibold whitespace-nowrap border-[0.5px] ${applicant.finalAgencyReview
-              ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
-              : "bg-[rgba(128,128,129,0.05)] text-[#525253] border-[#525253]"
-              }`}
-          >
-            <CheckCircle2 className="w-5 h-5" strokeWidth={2.2} />
-            Final Agency Review
-          </div>
-
-          <div
-            className={`flex items-center gap-[4px] px-[10px] py-2 rounded-[60px] text-[14px] font-semibold whitespace-nowrap border-[0.5px] ${applicant.officialHire
-              ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
-              : "bg-[rgba(128,128,129,0.05)] text-[#525253] border-[#525253]"
-              }`}
-          >
-            <CheckCircle2 className="w-5 h-5" strokeWidth={2.2} />
-            Official Hire
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center gap-2 shrink-0 md:self-auto self-start" onClick={(e) => e.stopPropagation()}>
-          <Button
-            onClick={() => onClick(applicant)}
-            className="bg-[#b2b2b3] border border-[#b2b2b3] hover:bg-[#9ca3af] text-white rounded-[60px] px-6 h-9 text-[14px] font-semibold shadow-none"
-          >
-            Details
-          </Button>
-        </div>
-      </div>
-    </div>
+    <span className={cn(
+      "inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-[6px] px-2 text-[12px] font-medium",
+      done
+        ? "bg-[#e6f6ec] text-[#1a7f37] dark:bg-[#30a46c]/15 dark:text-[#7ee2a8]"
+        : "border border-[#e4e7ea] text-[#6b737a] dark:border-white/15 dark:text-[#9aa4a8]",
+    )}>
+      {done ? <CircleCheck aria-hidden="true" className="h-3.5 w-3.5" /> : <Circle aria-hidden="true" className="h-3.5 w-3.5" />}
+      {label}
+      <span className="sr-only">{done ? "(complete)" : "(not complete)"}</span>
+    </span>
   );
 }
 
@@ -143,127 +68,98 @@ export function ApplicantsList({
   isLoading,
   title = "All Applicants",
   description = "Browse and review applicants assigned to your agency.",
+  nav,
 }: ApplicantsListProps) {
   return (
-    <div className="bg-white rounded-[30px] border border-[#e5e5e6] p-4 md:p-6 w-full">
-      {/* Filters Section */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
-        <div className="flex-1 min-w-[180px]">
-          <h2 className="text-base font-semibold text-[#10141a] mb-1">
-            {title}
-          </h2>
-          <p className="text-sm text-[#808081]">
-            {description}
-          </p>
+    <div className="mt-5">
+      {/* Toolbar */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-3">
+          {nav}
+          <AgencySegmented label="Applied" value={filterPeriod} onChange={onFilterChange} options={PERIODS} />
         </div>
-
-        <div className="flex flex-wrap gap-3 md:flex-row md:items-center md:justify-end md:gap-4 w-full md:w-auto">
-          <div className="relative w-full md:w-auto">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[#808081] pointer-events-none" />
-            <Input
-              type="text"
-              placeholder="Search"
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="pl-10 pr-4 h-10 w-full md:w-[280px] border-[#e5e5e6] rounded-lg focus-visible:ring-1 focus-visible:ring-[#2563eb]"
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {(["all", "today", "week", "month"] as const).map((period) => (
-              <Button
-                key={period}
-                onClick={() => onFilterChange(period)}
-                className={`h-10 rounded-full px-5 text-sm font-medium shadow-none ${filterPeriod === period
-                  ? "bg-[#2563eb] text-white hover:bg-[#1d4ed8]"
-                  : "bg-transparent text-[#808081] border border-[#e5e5e6] hover:bg-[#f8f9fa]"
-                  }`}
-              >
-                {period === "all" && "All"}
-                {period === "today" && "Today"}
-                {period === "week" && "This Week"}
-                {period === "month" && "This month"}
-              </Button>
-            ))}
-          </div>
-        </div>
+        <AgencySearchField
+          label="Search applicants"
+          placeholder="Search applicants"
+          value={searchQuery}
+          onChange={onSearchChange}
+          className="w-full lg:w-[280px]"
+        />
       </div>
 
-      {/* Applicants List */}
-      <div className="space-y-3 mb-6">
+      <AgencyListCard label={title} className="mt-4">
+        <div className="p-4">
+          <h2 className="text-base font-semibold text-[#10141a] dark:text-[#f4f6f7]">{title}</h2>
+          <p className="text-[13px] text-[#4b535b] dark:text-[#9aa4a8]">{description}</p>
+        </div>
+
         {isLoading && (
-          <div className="py-8 space-y-4">
-            {[1, 2, 3].map((key) => (
-              <div
-                key={key}
-                className="flex items-center justify-between p-4 border-b border-[#e5e5e6] last:border-0"
-              >
-                <div className="flex items-center gap-4 flex-1">
-                  <div className="w-14 h-14 rounded-full bg-[#e5e7eb] animate-pulse" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 w-32 bg-[#e5e7eb] rounded-full animate-pulse" />
-                    <div className="h-3 w-24 bg-[#e5e7eb] rounded-full animate-pulse" />
-                  </div>
-                  <div className="flex-1 flex gap-2">
-                    {[1, 2, 3, 4, 5].map((pill) => (
-                      <div
-                        key={pill}
-                        className="h-8 flex-1 bg-[#f3f4f6] rounded-full animate-pulse"
-                      />
-                    ))}
-                  </div>
-                </div>
-                <div className="w-20 h-9 bg-[#e5e7eb] rounded-full animate-pulse" />
-              </div>
-            ))}
+          <div role="status" aria-label="Loading applicants" className="space-y-px border-t border-[#eceef0] dark:border-white/10">
+            {[1, 2, 3].map((key) => <div key={key} aria-hidden="true" className="h-[62px] animate-pulse bg-[#f8f9fa] dark:bg-white/5" />)}
           </div>
         )}
 
         {!isLoading && applicants.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-12 text-center text-[#808081]">
-            <div className="mb-3 text-3xl">🔍</div>
-            <p className="text-sm font-medium mb-1">No applicants found</p>
-            <p className="text-xs max-w-xs">
+          <div className="border-t border-[#eceef0] px-6 py-14 text-center dark:border-white/10">
+            <p className="text-[16px] font-medium text-[#10141a] dark:text-[#f4f6f7]">No applicants found</p>
+            <p className="mx-auto mt-1 max-w-xs text-[14px] text-[#4b535b] dark:text-[#9aa4a8]">
               Try adjusting your search or date filters to see more results.
             </p>
           </div>
         )}
 
-        {!isLoading &&
-          applicants.length > 0 &&
-          applicants.map((applicant) => (
-            <ApplicantRow
-              key={applicant.id}
-              applicant={applicant}
-              onClick={onApplicantSelect}
-            />
-          ))}
-      </div>
-
-      {/* Pagination */}
-      {applicants.length > 0 && (
-        <div className="flex items-center justify-center gap-4 py-5 border-t border-[#e5e5e6]">
-          <span className="text-sm text-[#808081]">
-            {currentPage}/{Math.max(totalPages, 1)}
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
-              className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#e5e5e6] hover:bg-[#f8f9fa] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => onPageChange(Math.min(totalPages || 1, currentPage + 1))}
-              disabled={totalPages !== 0 && currentPage === totalPages}
-              className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#e5e5e6] hover:bg-[#f8f9fa] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
+        {!isLoading && applicants.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[980px]">
+              <thead>
+                <tr className={agencyTheadRow}>
+                  <th scope="col" className={agencyTh}>Applicant</th>
+                  <th scope="col" className={agencyTh}>Progress</th>
+                  <th scope="col" className={agencyTh}>Stages</th>
+                  <th scope="col" className={agencyTh}><span className="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {applicants.map((applicant) => {
+                  const done = STAGES.filter((stage) => applicant[stage.key]).length;
+                  return (
+                    <tr key={applicant.id} onClick={() => onApplicantSelect(applicant)} className={cn(agencyTr, "cursor-pointer")}>
+                      <td className={cn(agencyTd, "w-[260px]")}>
+                        <AgencyPerson name={applicant.name} detail={applicant.role} imageUrl={applicant.profilePictureUrl} />
+                      </td>
+                      <td className={cn(agencyTd, "w-[130px]")}>
+                        <span className="block text-[13px] font-medium tabular-nums">{done} of {STAGES.length}</span>
+                        <AgencyProgressBar value={(done / STAGES.length) * 100} label={`${applicant.name} completed ${done} of ${STAGES.length} stages`} className="mt-1.5 w-[90px]" />
+                      </td>
+                      <td className={agencyTd}>
+                        <div className="flex flex-wrap gap-1.5">
+                          {STAGES.map((stage) => <StageChip key={stage.key} done={!!applicant[stage.key]} label={stage.label} />)}
+                        </div>
+                      </td>
+                      <td className={cn(agencyTd, "text-right")} onClick={(e) => e.stopPropagation()}>
+                        <button type="button" onClick={() => onApplicantSelect(applicant)} className={agencyRowLink}
+                          aria-label={`Details for ${applicant.name}`}>
+                          Details<ChevronRight aria-hidden="true" className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* Pagination */}
+        {applicants.length > 0 && (
+          <AgencyPagination
+            summary={`Page ${currentPage} of ${Math.max(totalPages, 1)}`}
+            page={currentPage}
+            pages={Math.max(totalPages, 1)}
+            onPage={onPageChange}
+          />
+        )}
+      </AgencyListCard>
     </div>
   );
 }

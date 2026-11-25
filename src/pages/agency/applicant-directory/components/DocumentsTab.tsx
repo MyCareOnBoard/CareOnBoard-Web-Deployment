@@ -32,11 +32,11 @@ function getReferenceConfirmationPresentation(status?: string) {
     case "pending":
     case "sent":
     case "sending":
-      return { label: "Confirmation pending", className: "bg-[rgba(37,99,235,0.08)] text-[#2563eb]" };
+      return { label: "Confirmation pending", className: "bg-[#e0f3f3] text-[#005c5e]" };
     case "expired":
       return { label: "Link expired", className: "bg-[rgba(245,158,11,0.12)] text-[#b45309]" };
     case "failed":
-      return { label: "Delivery failed", className: "bg-[rgba(213,52,17,0.08)] text-[#d53411]" };
+      return { label: "Delivery failed", className: "bg-[#fde8e6] text-[#b42318]" };
     default:
       return { label: "Not sent", className: "bg-[rgba(95,99,104,0.08)] text-[#5f6368]" };
   }
@@ -81,13 +81,13 @@ export function DocumentsTab({
   const getStatusClasses = (status: ApplicantDocumentItem["status"]) => {
     switch (status) {
       case "verified":
-        return "bg-[rgba(14,175,82,0.1)] text-[#0eaf52]";
+        return "bg-[#e6f6ec] text-[#1a7f37] dark:bg-[#30a46c]/15 dark:text-[#7ee2a8]";
       case "rejected":
-        return "bg-[rgba(213,52,17,0.08)] text-[#d53411]";
+        return "bg-[#fde8e6] text-[#b42318] dark:bg-[#ef4444]/15 dark:text-[#f8a1a1]";
       case "uploaded":
-        return "bg-[rgba(37,99,235,0.08)] text-[#2563eb]";
+        return "bg-[#e0f3f3] text-[#005c5e] dark:bg-[#0f7e7d]/20 dark:text-[#7fd3d3]";
       default:
-        return "bg-[rgba(128,128,129,0.08)] text-[#808081]";
+        return "bg-[#eef0f2] text-[#2a3138] dark:bg-white/10 dark:text-[#c9d1d4]";
     }
   };
 
@@ -118,7 +118,7 @@ export function DocumentsTab({
   return (
     <div className="space-y-4">
       {/* Documents list */}
-      <div className="backdrop-blur-[8px] bg-[rgba(255,255,255,0.3)] border border-[rgba(255,255,255,0.3)] rounded-[30px] px-4 py-4 md:px-6 md:py-5 space-y-3">
+      <div className="rounded-[16px] border border-[#e4e7ea] bg-white p-4 md:p-5 dark:border-white/10 dark:bg-[#1b232b] space-y-3">
         {documentDefinitions.map((definition) => {
           const document = documentByType.get(definition.type);
           const url = getDocumentUrlByType(definition.type);
@@ -130,13 +130,13 @@ export function DocumentsTab({
           return (
             <div
               key={definition.type}
-              className="rounded-[20px] bg-[rgba(255,255,255,0.8)] px-4 py-3"
+              className="rounded-[12px] bg-[#f4f5f6] dark:bg-white/5 px-4 py-3"
             >
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-[60px] w-[52.5px] items-center justify-center rounded-[8px] bg-white shadow-sm">
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white dark:bg-white/10">
                     <svg
-                      className="h-6 w-6 text-[#808081]"
+                      className="h-5 w-5 text-[#007679] dark:text-[#7fd3d3]"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -150,27 +150,27 @@ export function DocumentsTab({
                     </svg>
                   </div>
                   <div className="space-y-2">
-                    <span className="block text-[15px] font-medium text-[#10141a]">
+                    <span className="block text-[15px] font-medium text-[#10141a] dark:text-[#f4f6f7]">
                       {definition.label}
                     </span>
                     <div className="flex flex-wrap items-center gap-2">
                       <span
-                        className={`rounded-full px-3 py-1 text-[11px] font-semibold capitalize ${getStatusClasses(status)}`}
+                        className={`rounded-[6px] px-2 py-0.5 text-[12px] font-medium capitalize ${getStatusClasses(status)}`}
                       >
                         {getStatusLabel(status)}
                       </span>
                       {!hasDocument && (
-                        <span className="text-[12px] text-[#808081]">
+                        <span className="text-[12px] text-[#6b737a] dark:text-[#9aa4a8]">
                           Awaiting upload from applicant
                         </span>
                       )}
                       {document?.note && status === "rejected" && (
-                        <span className="text-[12px] text-[#d53411]">
+                        <span className="text-[12px] text-[#b42318] dark:text-[#f8a1a1]">
                           {document.note}
                         </span>
                       )}
                       {hasDocument && document?.expiryDate && (
-                        <span className="text-[12px] text-[#808081]">
+                        <span className="text-[12px] text-[#6b737a] dark:text-[#9aa4a8]">
                           Expiry: {formatExpiryDate(document.expiryDate)}
                         </span>
                       )}
@@ -185,7 +185,7 @@ export function DocumentsTab({
                         type="button"
                         variant="outline"
                         onClick={() => { if (url) setPreview({ title: definition.label, url, fileName: document?.fileName }); }}
-                        className="rounded-[60px] border-[#0eaf52] bg-[rgba(14,175,82,0.1)] px-4 py-[6px] text-[11px] font-semibold text-[#0eaf52] hover:bg-[rgba(14,175,82,0.15)]"
+                        className="h-8 rounded-[8px] px-3 text-[13px] font-medium shadow-none disabled:opacity-60 border-[#dcdfe2] bg-white text-[#10141a] hover:bg-[#f4f6f7] dark:border-white/15 dark:bg-transparent dark:text-[#f4f6f7] dark:hover:bg-white/5"
                       >
                         View Document
                       </Button>
@@ -193,7 +193,7 @@ export function DocumentsTab({
                         variant="outline"
                         onClick={() => onVerifyDocument(definition.type)}
                         disabled={isBusy || status === "verified"}
-                        className="rounded-[60px] border-[#0eaf52] px-4 py-[6px] text-[11px] font-semibold text-[#0eaf52] hover:bg-[rgba(14,175,82,0.08)] disabled:opacity-60"
+                        className="h-8 rounded-[8px] px-3 text-[13px] font-medium shadow-none disabled:opacity-60 border-[#003839] bg-[#003839] text-white hover:bg-[#0b4c4d] hover:text-white dark:border-[#0f7e7d] dark:bg-[#0f7e7d]"
                       >
                         {isBusy && actionLoading === definition.type ? "Working..." : status === "verified" ? "Accepted" : "Accept"}
                       </Button>
@@ -201,7 +201,7 @@ export function DocumentsTab({
                         variant="outline"
                         onClick={() => onRejectDocument(definition.type)}
                         disabled={isBusy || status === "rejected" || status === "verified"}
-                        className="rounded-[60px] border-[#d53411] px-4 py-[6px] text-[11px] font-semibold text-[#d53411] hover:bg-[rgba(213,52,17,0.06)] disabled:opacity-60"
+                        className="h-8 rounded-[8px] px-3 text-[13px] font-medium shadow-none disabled:opacity-60 border-[#f1c4bf] bg-white text-[#b42318] hover:bg-[#fdf2f1] hover:text-[#b42318] dark:border-[#f8a1a1]/30 dark:bg-transparent dark:text-[#f8a1a1]"
                       >
                         {isBusy && actionLoading === definition.type ? "Working..." : status === "rejected" ? "Rejected" : "Reject"}
                       </Button>
@@ -211,7 +211,7 @@ export function DocumentsTab({
                       variant="outline"
                       onClick={() => onRequestDocument(definition.type)}
                       disabled={isRequesting}
-                      className="rounded-[60px] border-[#2563eb] bg-[rgba(37,99,235,0.08)] px-4 py-[6px] text-[11px] font-semibold text-[#2563eb] hover:bg-[rgba(37,99,235,0.14)] disabled:opacity-60"
+                      className="h-8 rounded-[8px] px-3 text-[13px] font-medium shadow-none disabled:opacity-60 border-[#007679] bg-white text-[#007679] hover:bg-[#e0f3f3] hover:text-[#007679] dark:border-[#7fd3d3]/40 dark:bg-transparent dark:text-[#7fd3d3]"
                     >
                       {isRequesting ? "Requesting..." : "Request Document"}
                     </Button>
@@ -224,8 +224,8 @@ export function DocumentsTab({
       </div>
 
       {/* References card */}
-      <div className="backdrop-blur-[8px] bg-[rgba(255,255,255,0.3)] border border-[rgba(255,255,255,0.3)] rounded-[30px] px-4 py-4 md:px-6 md:py-6 space-y-4">
-        <h3 className="text-[18px] font-semibold text-[#10141a]">
+      <div className="rounded-[16px] border border-[#e4e7ea] bg-white p-4 md:p-5 dark:border-white/10 dark:bg-[#1b232b] space-y-4">
+        <h3 className="text-[18px] font-medium leading-tight text-[#10141a] dark:text-[#f4f6f7]">
           References
         </h3>
         {references.length > 0 ? (
@@ -243,19 +243,19 @@ export function DocumentsTab({
               return (
                 <div
                   key={emailKey || `${ref.name}-${index}`}
-                  className="rounded-[20px] bg-[rgba(255,255,255,0.8)] px-4 py-4 space-y-1"
+                  className="rounded-[12px] bg-[#f4f5f6] dark:bg-white/5 px-4 py-4 space-y-1"
                 >
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-[15px] font-semibold text-[#10141a]">
+                        <p className="text-[15px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">
                           {ref.name}
                         </p>
-                        <span className={`rounded-full px-3 py-1 text-[11px] font-semibold ${presentation.className}`}>
+                        <span className={`rounded-[6px] px-2 py-0.5 text-[12px] font-medium ${presentation.className}`}>
                           {presentation.label}
                         </span>
                       </div>
-                      <p className="text-[13px] text-[#808081]">{ref.relation}</p>
+                      <p className="text-[13px] text-[#4b535b] dark:text-[#9aa4a8]">{ref.relation}</p>
                     </div>
 
                     {!isConfirmed && (
@@ -265,7 +265,7 @@ export function DocumentsTab({
                             variant="outline"
                             onClick={() => onSendReferenceConfirmation(ref.email)}
                             disabled={isQueued || Boolean(referenceActionLoading)}
-                            className="h-8 rounded-[60px] border-[#2563eb] px-3 text-[11px] font-semibold text-[#2563eb] hover:bg-[rgba(37,99,235,0.08)] disabled:opacity-60"
+                            className="h-8 rounded-[8px] px-3 text-[13px] font-medium shadow-none disabled:opacity-60 border-[#007679] bg-white text-[#007679] hover:bg-[#e0f3f3] hover:text-[#007679] dark:border-[#7fd3d3]/40 dark:bg-transparent dark:text-[#7fd3d3]"
                           >
                             {isQueued || sendLoading ? "Sending..." : "Send Email"}
                           </Button>
@@ -274,7 +274,7 @@ export function DocumentsTab({
                           variant="outline"
                           onClick={() => onConfirmReferenceManually(ref)}
                           disabled={Boolean(referenceActionLoading)}
-                          className="h-8 rounded-[60px] border-[#0eaf52] px-3 text-[11px] font-semibold text-[#087f3e] hover:bg-[rgba(14,175,82,0.08)] disabled:opacity-60"
+                          className="h-8 rounded-[8px] px-3 text-[13px] font-medium shadow-none disabled:opacity-60 border-[#dcdfe2] bg-white text-[#10141a] hover:bg-[#f4f6f7] dark:border-white/15 dark:bg-transparent dark:text-[#f4f6f7] dark:hover:bg-white/5"
                         >
                           {confirmLoading ? "Confirming..." : "Manually Confirm"}
                         </Button>
@@ -283,12 +283,12 @@ export function DocumentsTab({
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2 text-[13px]">
                     <div className="space-y-1">
-                      <p className="text-[#808081]">Mobile</p>
-                      <p className="font-medium text-[#10141a]">{ref.mobile || "-"}</p>
+                      <p className="text-[#6b737a] dark:text-[#9aa4a8]">Mobile</p>
+                      <p className="font-medium text-[#10141a] dark:text-[#f4f6f7]">{ref.mobile || "-"}</p>
                     </div>
                     <div className="min-w-0 space-y-1">
-                      <p className="text-[#808081]">Email</p>
-                      <p className="break-words font-medium text-[#10141a]">{ref.email || "-"}</p>
+                      <p className="text-[#6b737a] dark:text-[#9aa4a8]">Email</p>
+                      <p className="break-words font-medium text-[#10141a] dark:text-[#f4f6f7]">{ref.email || "-"}</p>
                     </div>
                   </div>
                 </div>
@@ -296,7 +296,7 @@ export function DocumentsTab({
             })}
           </div>
         ) : (
-          <div className="rounded-[20px] bg-[rgba(255,255,255,0.8)] px-4 py-5 text-[14px] text-[#808081]">
+          <div className="rounded-[12px] bg-[#f4f5f6] dark:bg-white/5 px-4 py-5 text-[14px] text-[#4b535b] dark:text-[#9aa4a8]">
             No references have been submitted yet.
           </div>
         )}
@@ -306,7 +306,7 @@ export function DocumentsTab({
           <Button
             onClick={onAdvanceDocumentsStage}
             disabled={!canAdvanceDocumentsStage || isAdvancingStage}
-            className="rounded-[60px] bg-[#00B4B8] text-white hover:bg-[#009ca0] disabled:opacity-60"
+            className="h-10 rounded-[10px] bg-[#003839] px-4 text-[14px] font-semibold text-white hover:bg-[#0b4c4d] disabled:opacity-60 dark:bg-[#0f7e7d]"
           >
             {isAdvancingStage ? "Sending..." : "Send Conditional Hire Letter"}
           </Button>

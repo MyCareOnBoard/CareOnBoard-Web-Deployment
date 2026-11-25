@@ -1,5 +1,7 @@
-import { Button } from "@/components/ui/button";
+import { FileText } from "lucide-react";
 import type { Applicant } from "@/lib/api/applicants";
+import { agencyOutlineButton } from "@/components/agency/AgencyListKit";
+import { cn } from "@/lib/utils";
 
 interface ProfileTabProps {
   applicant: {
@@ -16,120 +18,54 @@ interface ProfileTabProps {
   } & Pick<Applicant, "name">;
 }
 
-export function ProfileTab({ applicant }: ProfileTabProps) {
+function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="backdrop-blur-[8px] bg-[rgba(255,255,255,0.3)] border border-[rgba(255,255,255,0.3)] rounded-[30px] p-4 md:p-6 space-y-3">
-      {/* Gender */}
-      <div className="flex items-center justify-between rounded-[20px] bg-[rgba(255,255,255,0.7)] px-4 py-3">
-        <span className="text-[16px] font-medium leading-[1.6] text-[#808081]">
-          Gender
-        </span>
-        <span className="text-[16px] font-semibold leading-[1.6] text-[#10141a]">
-          {applicant.gender || "-"}
-        </span>
-      </div>
-
-      {/* Email */}
-      <div className="flex items-center justify-between rounded-[20px] bg-[rgba(255,255,255,0.7)] px-4 py-3">
-        <span className="text-[16px] font-medium leading-[1.6] text-[#808081]">
-          Email
-        </span>
-        <span className="text-[16px] font-semibold leading-[1.6] text-[#10141a]">
-          {applicant.email || "-"}
-        </span>
-      </div>
-
-      {/* Questions */}
-      <div className="flex items-center justify-between rounded-[20px] bg-[rgba(255,255,255,0.7)] px-4 py-3">
-        <span className="text-[16px] font-medium leading-[1.6] text-[#808081]">
-          Are you at least 18 years old?
-        </span>
-        <span className="text-[16px] font-semibold leading-[1.6] text-[#10141a]">
-          {applicant.questionnaire?.isAtLeast18 ?? "-"}
-        </span>
-      </div>
-
-      <div className="flex items-center justify-between rounded-[20px] bg-[rgba(255,255,255,0.7)] px-4 py-3">
-        <span className="text-[16px] font-medium leading-[1.6] text-[#808081]">
-          Do you have a High School Diploma or GED?
-        </span>
-        <span className="text-[16px] font-semibold leading-[1.6] text-[#10141a]">
-          {applicant.questionnaire?.highSchoolDiploma ?? "-"}
-        </span>
-      </div>
-
-      <div className="flex items-center justify-between rounded-[20px] bg-[rgba(255,255,255,0.7)] px-4 py-3">
-        <span className="text-[16px] font-medium leading-[1.6] text-[#808081]">
-          Are you legally eligible to work in the U.S.?
-        </span>
-        <span className="text-[16px] font-semibold leading-[1.6] text-[#10141a]">
-          {applicant.questionnaire?.legallyEligible ?? "-"}
-        </span>
-      </div>
-
-      <div className="flex items-center justify-between rounded-[20px] bg-[rgba(255,255,255,0.7)] px-4 py-3">
-        <span className="text-[16px] font-medium leading-[1.6] text-[#808081]">
-          Have you ever been convicted of a disqualifying offense under NJ law?
-        </span>
-        <span className="text-[16px] font-semibold leading-[1.6] text-[#10141a]">
-          {applicant.questionnaire?.convicted ?? "-"}
-        </span>
-      </div>
-
-      <div className="flex items-center justify-between rounded-[20px] bg-[rgba(255,255,255,0.7)] px-4 py-3">
-        <span className="text-[16px] font-medium leading-[1.6] text-[#808081]">
-          Do you have reliable transportation? (Optional)
-        </span>
-        <span className="text-[16px] font-semibold leading-[1.6] text-[#10141a]">
-          {applicant.questionnaire?.reliableTransportation ?? "-"}
-        </span>
-      </div>
-
-      {/* Resume */}
-      <div className="rounded-[20px] bg-[rgba(255,255,255,0.7)] px-4 py-3">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-[60px] w-[52.5px] items-center justify-center rounded-[8px] bg-white shadow-sm">
-              <svg
-                className="h-6 w-6 text-[#808081]"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-            </div>
-            <span className="text-[16px] font-semibold leading-[1.6] text-[#10141a]">
-              Resume
-            </span>
-          </div>
-          {applicant.resumeUrl ? (
-            <Button
-              asChild
-              variant="outline"
-              className="rounded-[60px] border-[#0eaf52] bg-[rgba(14,175,82,0.1)] px-4 py-[6px] text-[11px] font-semibold text-[#0eaf52] hover:bg-[rgba(14,175,82,0.15)]"
-            >
-              <a href={applicant.resumeUrl} target="_blank" rel="noreferrer">
-                View Resume
-              </a>
-            </Button>
-          ) : (
-            <Button
-              variant="outline"
-              disabled
-              className="rounded-[60px] border-[#b2b2b3] bg-[rgba(178,178,179,0.08)] px-4 py-[6px] text-[11px] font-semibold text-[#b2b2b3] cursor-not-allowed"
-            >
-              View Resume
-            </Button>
-          )}
-        </div>
-      </div>
+    <div className="flex items-center justify-between gap-4 px-4 py-3">
+      <dt className="text-[14px] text-[#4b535b] dark:text-[#9aa4a8]">{label}</dt>
+      <dd className="shrink-0 text-right text-[14px] font-medium text-[#10141a] dark:text-[#f4f6f7]">{value}</dd>
     </div>
   );
 }
 
+const sectionLabel = "rounded-[8px] bg-[#f4f5f6] px-3 py-1.5 text-[12px] font-medium uppercase tracking-[0.08em] text-[#4b535b] dark:bg-white/5 dark:text-[#9aa4a8]";
+const listPanel = "divide-y divide-[#e4e7ea] rounded-[12px] bg-[#f4f5f6] dark:divide-white/10 dark:bg-white/5";
+
+export function ProfileTab({ applicant }: ProfileTabProps) {
+  return (
+    <div className="space-y-4 rounded-[16px] border border-[#e4e7ea] bg-white p-4 md:p-5 dark:border-white/10 dark:bg-[#1b232b]">
+      <h3 className={sectionLabel}>Details</h3>
+      <dl className={listPanel}>
+        <DetailRow label="Gender" value={applicant.gender || "-"} />
+        <DetailRow label="Email" value={applicant.email || "-"} />
+      </dl>
+
+      <h3 className={sectionLabel}>Pre-screening</h3>
+      <dl className={listPanel}>
+        <DetailRow label="Are you at least 18 years old?" value={applicant.questionnaire?.isAtLeast18 ?? "-"} />
+        <DetailRow label="Do you have a High School Diploma or GED?" value={applicant.questionnaire?.highSchoolDiploma ?? "-"} />
+        <DetailRow label="Are you legally eligible to work in the U.S.?" value={applicant.questionnaire?.legallyEligible ?? "-"} />
+        <DetailRow label="Have you ever been convicted of a disqualifying offense under NJ law?" value={applicant.questionnaire?.convicted ?? "-"} />
+        <DetailRow label="Do you have reliable transportation? (Optional)" value={applicant.questionnaire?.reliableTransportation ?? "-"} />
+      </dl>
+
+      {/* Resume */}
+      <div className="flex items-center justify-between gap-4 rounded-[12px] bg-[#f4f5f6] px-4 py-3 dark:bg-white/5">
+        <div className="flex items-center gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white dark:bg-white/10">
+            <FileText aria-hidden="true" className="h-5 w-5 text-[#007679] dark:text-[#7fd3d3]" />
+          </span>
+          <span className="text-[15px] font-medium text-[#10141a] dark:text-[#f4f6f7]">Resume</span>
+        </div>
+        {applicant.resumeUrl ? (
+          <a href={applicant.resumeUrl} target="_blank" rel="noreferrer" className={cn(agencyOutlineButton, "h-8 rounded-[8px] px-3 text-[13px] font-medium")}>
+            View Resume
+          </a>
+        ) : (
+          <button type="button" disabled className={cn(agencyOutlineButton, "h-8 rounded-[8px] px-3 text-[13px] font-medium")}>
+            View Resume
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
