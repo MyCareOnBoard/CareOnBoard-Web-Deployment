@@ -1,6 +1,9 @@
 import { useLocation, useNavigate } from "react-router";
+import { UserRoundSearch } from "lucide-react";
 import { Routes } from "@/routes/constants";
+import { AgencyPageHeader } from "@/components/agency/AgencyShell";
 import { ApplicantsList } from "./components/ApplicantsList";
+import { CopySignupLinkButton } from "./components/CopySignupLinkButton";
 import { DirectoryViewNav } from "./components/DirectoryViewNav";
 import { useApplicantDirectoryData } from "./useApplicantDirectoryData";
 
@@ -24,36 +27,29 @@ export default function AllApplicants() {
   };
 
   return (
-    <div className="min-h-screen">
-      {/* Main Content */}
-      <div className="mx-auto max-w-7xl">
-        {/* Header */}
-        <div className="flex mb-4">
-          <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
-            Applicants directory
-          </h1>
-        </div>
+    <div className="min-w-0 pb-6">
+      <AgencyPageHeader
+        icon={UserRoundSearch}
+        title="Applicants"
+        description="People who applied through your sign-up link. Review, then onboard or decline."
+        actions={<CopySignupLinkButton />}
+      />
 
-        <DirectoryViewNav currentPath={location.pathname} />
-
-        {/* Applicant Directory List Section */}
-        <div className="backdrop-blur-[8px] bg-[rgba(255,255,255,0.3)] border border-[rgba(255,255,255,0.3)] border-solid overflow-hidden relative rounded-[30px]">
-          <ApplicantsList
-            applicants={applicants}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            filterPeriod={activeTab}
-            onFilterChange={setActiveTab}
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={goToPage}
-            onApplicantSelect={(applicant) => handleViewDetails(applicant.id)}
-            isLoading={isLoading}
-            title="All Applicants"
-            description="All applicants in your agency"
-          />
-        </div>
-      </div>
+      <ApplicantsList
+        nav={<DirectoryViewNav currentPath={location.pathname} />}
+        applicants={applicants}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        filterPeriod={activeTab}
+        onFilterChange={setActiveTab}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={goToPage}
+        onApplicantSelect={(applicant) => handleViewDetails(applicant.id)}
+        isLoading={isLoading}
+        title="All applicants"
+        description="All applicants in your agency"
+      />
     </div>
   );
 }

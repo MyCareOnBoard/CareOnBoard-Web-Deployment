@@ -1,7 +1,5 @@
-import { useMemo, useRef, useState, useEffect } from "react";
+import { useMemo, useRef, useState, useEffect, type ReactNode } from "react";
 import { format, parseISO } from "date-fns";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ChevronDown,
@@ -10,11 +8,13 @@ import {
   Send,
   Loader2,
   Clock,
-  CalendarRange,
+  ClipboardList,
   PenLine,
   Check,
-  Layers,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { AgencyPageHeader, AgencyPanel } from "@/components/agency/AgencyShell";
+import { AgencyPill, agencyOutlineButton, agencyPrimaryButton } from "@/components/agency/AgencyListKit";
 import TimesheetWeek from "@/pages/userPanel/manualShiftManagement/components/TimesheetWeek";
 import ConfirmShiftModal from "@/pages/userPanel/manualShiftManagement/components/ConfirmShiftModal";
 import SuccessModal from "@/pages/userPanel/manualShiftManagement/components/SuccessModal";
@@ -39,81 +39,54 @@ import {
 
 type Signature = StaffTimesheetSignature;
 
+const card = "overflow-hidden rounded-[16px] border border-[#e4e7ea] bg-white dark:border-white/10 dark:bg-[#1b232b]";
+
 function TimesheetSkeleton() {
   return (
-    <div role="status" aria-label="Loading timesheet" aria-busy="true" className="min-h-[calc(100vh-200px)] px-4 sm:px-6 lg:px-0">
+    <div role="status" aria-label="Loading timesheet" aria-busy="true" className="pb-6">
       <div aria-hidden="true">
-        <div className="mb-4 flex flex-wrap items-end justify-between gap-3 sm:mb-6">
-          <div className="space-y-2">
-            <Skeleton className="h-10 w-44" />
-            <Skeleton className="h-4 w-48" />
+        <div className="flex flex-col gap-4 border-b border-[#eceef0] pb-6 sm:flex-row sm:items-center sm:justify-between dark:border-white/10">
+          <div className="flex items-center gap-4">
+            <Skeleton className="w-12 h-12 rounded-full" />
+            <div className="space-y-2">
+              <Skeleton className="w-40 h-8" />
+              <Skeleton className="w-64 h-4" />
+            </div>
           </div>
-          <Skeleton className="h-7 w-32 rounded-full" />
+          <div className="flex gap-2.5">
+            <Skeleton className="h-10 w-28 rounded-[10px]" />
+            <Skeleton className="h-10 w-40 rounded-[10px]" />
+          </div>
         </div>
 
-        <div className="space-y-6">
-          <div className="rounded-2xl bg-white p-5 shadow-sm sm:p-6">
-            <Skeleton className="mb-4 h-5 w-32" />
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {Array.from({ length: 2 }, (_, index) => (
-                <div key={index} className="space-y-1.5">
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-10 w-full rounded-lg" />
+        <div className="mt-5 grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="space-y-5">
+            {Array.from({ length: 2 }, (_, week) => (
+              <div key={week} className={card}>
+                <div className="flex items-center justify-between px-4 py-3.5">
+                  <Skeleton className="w-20 h-5" />
+                  <Skeleton className="h-8 w-24 rounded-[8px]" />
                 </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="overflow-hidden rounded-2xl bg-white p-5 shadow-sm sm:p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Skeleton className="h-5 w-14" />
-                <Skeleton className="h-5 w-9 rounded-full" />
+                <div className="h-10 border-y border-[#eceef0] bg-[#f8f9fa] dark:border-white/10 dark:bg-white/5" />
+                {Array.from({ length: week === 0 ? 7 : 0 }, (_, index) => (
+                  <div key={index} className="grid grid-cols-4 gap-4 border-b border-[#eceef0] px-4 py-2.5 last:border-b-0 dark:border-white/10">
+                    <Skeleton className="w-20 h-4 max-w-full my-auto" />
+                    {Array.from({ length: 3 }, (_, field) => <Skeleton key={field} className="h-9 w-full rounded-[8px]" />)}
+                  </div>
+                ))}
               </div>
-              <Skeleton className="h-7 w-24 rounded-full" />
-            </div>
-            <div className="overflow-hidden rounded-xl bg-[#0EAF520D]">
-              <div className="grid grid-cols-4 gap-4 p-4">
-                {Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-4 w-16 max-w-full" />)}
-              </div>
-              {Array.from({ length: 7 }, (_, index) => (
-                <div key={index} className="grid grid-cols-4 gap-4 border-b border-[#e5e5e6] p-4 last:border-b-0">
-                  <Skeleton className="my-auto h-4 w-20 max-w-full" />
-                  {Array.from({ length: 3 }, (_, field) => <Skeleton key={field} className="h-10 w-full rounded-md" />)}
-                </div>
-              ))}
-              <div className="flex justify-end bg-[#f8f9fa] p-4"><Skeleton className="h-4 w-32" /></div>
-            </div>
+            ))}
           </div>
-
-          <div className="rounded-2xl bg-white p-5 shadow-sm sm:p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3"><Skeleton className="h-5 w-14" /><Skeleton className="h-5 w-9 rounded-full" /></div>
-              <Skeleton className="h-7 w-24 rounded-full" />
+          <div className="space-y-5">
+            <div className={cn(card, "p-4")}>
+              <Skeleton className="w-24 h-5 mb-4" />
+              <Skeleton className="h-44 w-full rounded-[12px]" />
+              <Skeleton className="w-32 h-8 mt-4" />
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <div className="rounded-2xl bg-white p-5 shadow-sm sm:p-6">
-              <Skeleton className="mb-4 h-5 w-24" />
-              <div className="flex h-[84px] flex-col items-center justify-center gap-2 rounded-xl bg-[#00b4b80a]">
-                <Skeleton className="h-3 w-20" /><Skeleton className="h-8 w-12" />
-              </div>
-              <div className="mt-4 space-y-3">
-                <div className="flex justify-between"><Skeleton className="h-4 w-20" /><Skeleton className="h-5 w-12 rounded-full" /></div>
-                <div className="flex justify-between"><Skeleton className="h-4 w-24" /><Skeleton className="h-4 w-28" /></div>
-              </div>
+            <div className={cn(card, "p-4")}>
+              <Skeleton className="w-24 h-5 mb-4" />
+              <Skeleton className="h-[130px] w-full rounded-[12px]" />
             </div>
-            <div className="rounded-2xl bg-white p-5 shadow-sm sm:p-6">
-              <Skeleton className="mb-3 h-5 w-24" />
-              <div className="flex min-h-[130px] items-center justify-center rounded-xl border-2 border-dashed border-[#e5e5e6] p-4"><Skeleton className="h-5 w-28" /></div>
-              <Skeleton className="mt-2 h-3 w-40" />
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2.5 sm:flex-row sm:justify-end">
-            <Skeleton className="h-11 w-full rounded-full sm:w-[180px]" />
-            <Skeleton className="h-11 w-full rounded-full sm:w-[180px]" />
           </div>
         </div>
       </div>
@@ -126,7 +99,7 @@ function SignaturePreview({ signature }: { signature: Signature }) {
   if (signature.signatureType === "type") {
     return (
       <p
-        className="max-w-full break-words text-center text-3xl leading-tight text-[#10141a]"
+        className="max-w-full break-words text-center text-3xl leading-tight text-[#003839] dark:text-[#f4f6f7]"
         style={{ fontFamily: "Brush Script MT, cursive" }}
       >
         {signature.signatureData}
@@ -316,183 +289,149 @@ export default function StaffTimesheetPage() {
       ? `${format(parseISO(periodStart), "MMM d")} – ${format(parseISO(periodEnd), "MMM d, yyyy")}`
       : "—";
 
+  const summaryRows: { label: string; value: ReactNode }[] = [
+    { label: "Employee", value: employeeName || "—" },
+    { label: "Role", value: role || "—" },
+    {
+      label: "Program",
+      value: mode
+        ? <span className="uppercase">{mode}</span>
+        : <span className="font-medium text-[#b54708] dark:text-[#f0cf6b]">Not selected</span>,
+    },
+    { label: "Pay period", value: periodLabel },
+    { label: "Week 1", value: `${calculateWeekHours(week1Data)} h` },
+    { label: "Week 2", value: `${calculateWeekHours(week2Data)} h` },
+  ];
+
   return (
     <>
-      <div className="min-h-[calc(100vh-200px)] px-4 sm:px-6 lg:px-0">
-        {/* Header */}
-        <div className="mb-4 flex flex-wrap items-end justify-between gap-3 sm:mb-6">
-          <div>
-            <h1 className="text-[28px] font-bold leading-[1.4] text-[#10141a] sm:text-[32px] lg:text-[40px]">
-              Timesheet
-            </h1>
-            <p className="mt-1 text-[13px] text-[#808081] sm:text-sm">Bi-weekly staff work record</p>
-          </div>
-          {draftId && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[#b2b2b3] px-3 py-1 text-[12px] font-medium text-[#808081]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#b2b2b3]" />
-              Draft in progress
-            </span>
-          )}
-        </div>
+      <div className="pb-6">
+        <AgencyPageHeader
+          icon={Clock}
+          title="Timesheet"
+          description="Bi-weekly staff work record. Save a draft any time, then sign and submit for approval."
+          actions={<>
+            {draftId && <AgencyPill tone="grey">Draft in progress</AgencyPill>}
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving || submitting}
+              className={agencyOutlineButton}
+            >
+              {saving ? <Loader2 aria-hidden="true" className="w-4 h-4 animate-spin" /> : <Save aria-hidden="true" className="w-4 h-4" />}
+              {saving ? "Saving..." : "Save draft"}
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmitClick}
+              disabled={saving || submitting}
+              className={agencyPrimaryButton}
+            >
+              {submitting ? <Loader2 aria-hidden="true" className="w-4 h-4 animate-spin" /> : <Send aria-hidden="true" className="w-4 h-4" />}
+              {submitting ? "Submitting..." : "Submit for approval"}
+            </button>
+          </>}
+        />
 
-        <div className="space-y-6">
-          {/* Employee details */}
-          <div className="rounded-2xl bg-white p-5 shadow-sm sm:p-6">
-            <h3 className="mb-4 text-[15px] font-bold text-[#10141a]">Employee details</h3>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="mb-1.5 block text-[13px] font-medium text-[#6b7280]">Employee</label>
-                <Input
-                  value={employeeName}
-                  disabled
-                  className="rounded-lg border-[#e5e5e6] bg-[#f8f9fa] text-[#10141a] disabled:opacity-100"
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-[13px] font-medium text-[#6b7280]">Role</label>
-                <Input
-                  value={role || "—"}
-                  disabled
-                  className="rounded-lg border-[#e5e5e6] bg-[#f8f9fa] text-[#10141a] disabled:opacity-100"
-                />
-              </div>
-            </div>
-          </div>
-
+        <div className="mt-5 grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
           {/* Weeks */}
-          {[
-            { label: "Week 1", data: week1Data, setData: setWeek1Data, expanded: week1Expanded, setExpanded: setWeek1Expanded },
-            { label: "Week 2", data: week2Data, setData: setWeek2Data, expanded: week2Expanded, setExpanded: setWeek2Expanded },
-          ].map((week) => (
-            <div key={week.label} className="overflow-hidden rounded-2xl bg-white p-5 shadow-sm sm:p-6">
-              <div className="mb-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <h3 className="text-[15px] font-bold text-[#10141a]">{week.label}</h3>
-                  <span className="rounded-full bg-[#00b4b814] px-2.5 py-0.5 text-[12px] font-semibold text-[#008f93]">
-                    {calculateWeekHours(week.data)}h
-                  </span>
-                </div>
-                <Button
-                  onClick={() => week.setExpanded(!week.expanded)}
-                  variant="ghost"
-                  className="h-auto rounded-full bg-[#f3f4f6] px-3 py-1.5 text-xs font-medium text-[#6b7280] hover:bg-[#e5e7eb]"
-                >
-                  {week.expanded ? (
-                    <>
-                      <ChevronUp className="mr-1.5 h-4 w-4" /> Collapse
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown className="mr-1.5 h-4 w-4" /> Expand
-                    </>
-                  )}
-                </Button>
-              </div>
-              {week.expanded && (
-                <TimesheetWeek
-                  weekData={week.data}
-                  onWeekDataChange={week.setData}
-                  totalHours={calculateWeekHours(week.data)}
-                />
-              )}
-            </div>
-          ))}
-
-          {/* Summary + Signature side by side */}
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            {/* Summary */}
-            <div className="rounded-2xl bg-white p-5 shadow-sm sm:p-6">
-              <div className="mb-4 flex items-center gap-2">
-                <Clock className="h-4 w-4 text-[#00b4b8]" />
-                <h3 className="text-[15px] font-bold text-[#10141a]">Summary</h3>
-              </div>
-              <div className="rounded-xl bg-[#00b4b80a] p-4 text-center">
-                <p className="text-[12px] font-medium uppercase tracking-wide text-[#008f93]">Total hours</p>
-                <p className="mt-1 text-[32px] font-bold leading-none text-[#10141a]">
-                  {totalHours}
-                  <span className="ml-1 text-[16px] font-semibold text-[#6b7280]">h</span>
-                </p>
-              </div>
-              <div className="mt-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-2 text-[13px] text-[#6b7280]">
-                    <Layers className="h-3.5 w-3.5" /> Program
-                  </span>
-                  {mode ? (
-                    <span className="rounded-full bg-[#00b4b814] px-2.5 py-0.5 text-[12px] font-semibold uppercase text-[#008f93]">
-                      {mode}
+          <div className="min-w-0 space-y-5">
+            {[
+              { label: "Week 1", data: week1Data, setData: setWeek1Data, expanded: week1Expanded, setExpanded: setWeek1Expanded },
+              { label: "Week 2", data: week2Data, setData: setWeek2Data, expanded: week2Expanded, setExpanded: setWeek2Expanded },
+            ].map((week) => (
+              <section key={week.label} aria-label={week.label} className={card}>
+                <div className="flex items-center justify-between gap-3 px-4 py-3">
+                  <h2 className="text-[16px] font-medium text-[#10141a] dark:text-[#f4f6f7]">{week.label}</h2>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[14px] font-medium tabular-nums text-[#007679] dark:text-[#7fd3d3]">
+                      {calculateWeekHours(week.data)} h
                     </span>
-                  ) : (
-                    <span className="text-[13px] font-medium text-[#f97316]">Not selected</span>
-                  )}
+                    <button
+                      type="button"
+                      onClick={() => week.setExpanded(!week.expanded)}
+                      aria-expanded={week.expanded}
+                      className={cn(agencyOutlineButton, "h-8 rounded-[8px] px-2.5 text-[13px] font-medium")}
+                    >
+                      {week.expanded ? (
+                        <>
+                          <ChevronUp aria-hidden="true" className="w-4 h-4" /> Collapse
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown aria-hidden="true" className="w-4 h-4" /> Expand
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-2 text-[13px] text-[#6b7280]">
-                    <CalendarRange className="h-3.5 w-3.5" /> Pay period
-                  </span>
-                  <span className="text-[13px] font-medium text-[#10141a]">{periodLabel}</span>
-                </div>
+                {week.expanded && (
+                  <TimesheetWeek
+                    weekData={week.data}
+                    onWeekDataChange={week.setData}
+                    totalHours={calculateWeekHours(week.data)}
+                  />
+                )}
+              </section>
+            ))}
+          </div>
+
+          <div className="min-w-0 space-y-5">
+            {/* Summary */}
+            <AgencyPanel icon={ClipboardList} title="Summary">
+              <dl className="space-y-0 rounded-[12px] bg-[#f4f5f6] px-3.5 py-1 dark:bg-white/5">
+                {summaryRows.map((row) => (
+                  <div key={row.label} className="flex items-center justify-between gap-4 py-2.5">
+                    <dt className="text-[14px] text-[#4b535b] dark:text-[#9aa4a8]">{row.label}</dt>
+                    <dd className="text-right text-[14px] text-[#10141a] dark:text-[#f4f6f7]">{row.value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <div className="flex items-end justify-between gap-4 mt-4">
+                <span className="text-[14px] font-bold text-[#10141a] dark:text-[#9aa4a8]">Total hours</span>
+                <span className="text-[32px] font-bold leading-none tabular-nums text-[#10141a] dark:text-[#f4f6f7]">
+                  {totalHours} h
+                </span>
               </div>
-            </div>
+            </AgencyPanel>
 
             {/* Signature */}
-            <div className="rounded-2xl bg-white p-5 shadow-sm sm:p-6">
-              <div className="mb-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <PenLine className="h-4 w-4 text-[#00b4b8]" />
-                  <h3 className="text-[15px] font-bold text-[#10141a]">Signature</h3>
-                </div>
-                {signature && (
-                  <button
-                    onClick={() => setSignatureModalOpen(true)}
-                    className="text-[12px] font-semibold text-[#00b4b8] hover:underline"
-                  >
-                    Re-sign
-                  </button>
-                )}
-              </div>
-              <div
+            <AgencyPanel
+              icon={PenLine}
+              title="Signature"
+              action={signature && (
+                <button
+                  type="button"
+                  onClick={() => setSignatureModalOpen(true)}
+                  className="cursor-pointer rounded text-[14px] font-medium text-[#007679] underline underline-offset-4 hover:text-[#005c5e] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] dark:text-[#7fd3d3]"
+                >
+                  Re-sign
+                </button>
+              )}
+            >
+              <button
+                type="button"
                 onClick={() => setSignatureModalOpen(true)}
-                className="flex min-h-[130px] cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[#e5e5e6] p-4 text-center transition-colors hover:border-[#00b4b8] hover:bg-[#f8fbfb]"
+                aria-label={signature ? "Signature added. Sign again" : "Add your signature"}
+                className="flex min-h-[130px] w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-[12px] border border-[#dcdfe2] bg-[#f4f5f6] p-4 text-center transition-colors hover:border-[#007679] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] dark:border-white/15 dark:bg-white/5"
               >
                 {signature ? (
                   <SignaturePreview signature={signature} />
                 ) : (
                   <>
-                    <PenLine className="h-6 w-6 text-[#b2b2b3]" />
-                    <span className="text-[13px] text-[#808081]">Tap to sign</span>
+                    <PenLine aria-hidden="true" className="h-6 w-6 text-[#9aa1a7]" />
+                    <span className="text-[13px] text-[#4b535b] dark:text-[#9aa4a8]">Tap to sign</span>
                   </>
                 )}
-              </div>
+              </button>
               {signature ? (
-                <p className="mt-2 flex items-center gap-1.5 text-[12px] font-medium text-[#0eaf52]">
-                  <Check className="h-3.5 w-3.5" /> Signed
+                <p className="mt-2 flex items-center gap-1.5 text-[12px] font-medium text-[#1a7f37] dark:text-[#7ee2a8]">
+                  <Check aria-hidden="true" className="h-3.5 w-3.5" /> Signed
                 </p>
               ) : (
-                <p className="mt-2 text-[12px] text-[#808081]">Required before you can submit.</p>
+                <p className="mt-2 text-[12px] text-[#4b535b] dark:text-[#9aa4a8]">Required before you can submit.</p>
               )}
-            </div>
-          </div>
-
-          {/* Actions — Save draft, then Submit */}
-          <div className="flex flex-col gap-2.5 sm:flex-row sm:justify-end">
-            <Button
-              onClick={handleSave}
-              variant="outline"
-              disabled={saving || submitting}
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-full border-[#e5e7eb] font-semibold text-[#4b5563] hover:bg-[#f3f4f6] sm:w-auto sm:min-w-[180px] sm:px-8"
-            >
-              {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-              {saving ? "Saving..." : "Save draft"}
-            </Button>
-            <Button
-              onClick={handleSubmitClick}
-              disabled={saving || submitting}
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[#00b4b8] font-semibold text-white hover:bg-[#009da1] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:min-w-[180px] sm:px-8"
-            >
-              {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-              {submitting ? "Submitting..." : "Submit for approval"}
-            </Button>
+            </AgencyPanel>
           </div>
         </div>
       </div>

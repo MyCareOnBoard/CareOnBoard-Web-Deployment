@@ -18,24 +18,24 @@ export default function SuccessModal({
 }: SuccessModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="p-8 bg-white shadow-xl sm:max-w-md rounded-3xl">
+      <DialogContent className="rounded-[20px] border border-[#e4e7ea] bg-white p-6 shadow-xl sm:max-w-md dark:border-white/10 dark:bg-[#1b232b]">
         <div className="text-center">
           <div className="flex items-center justify-center mb-4">
-            <div className="w-16 h-16 rounded-full bg-[#22c55e] flex items-center justify-center">
-              <CheckCircle2 className="w-10 h-10 text-white" />
+            <div className="w-14 h-14 rounded-full bg-[#e6f6ec] flex items-center justify-center dark:bg-[#30a46c]/15">
+              <CheckCircle2 aria-hidden="true" className="w-8 h-8 text-[#1a7f37] dark:text-[#7ee2a8]" />
             </div>
           </div>
           
-          <DialogTitle className="text-2xl font-bold text-[#10141a] mb-3">
+          <DialogTitle className="text-[22px] font-medium leading-tight text-[#10141a] mb-2 dark:text-[#f4f6f7]">
             Timesheet Submitted Successfully
           </DialogTitle>
-          <DialogDescription className="text-sm text-[#808081] mb-6">
+          <DialogDescription className="text-sm text-[#4b535b] mb-6 dark:text-[#9aa4a8]">
             Your bi-weekly timesheet has been submitted with signatures. You can now review your submitted timesheets or create a new one.
           </DialogDescription>
 
           <Button
             onClick={() => onOpenChange(false)}
-            className="w-full bg-[#00b4b8] hover:bg-[#009da1] text-white rounded-full py-3 h-auto font-medium text-base"
+            className="w-full h-10 rounded-[10px] bg-[#003839] text-[14px] font-semibold text-white hover:bg-[#0b4c4d] dark:bg-[#0f7e7d] dark:hover:bg-[#13908f]"
           >
             Close
           </Button>

@@ -44,26 +44,26 @@ export default function EditableNoteActions({ submissionId, onEdit, canEdit = tr
       {canEdit && <button
         disabled={isMutating||Boolean(unknownAction)}
         onClick={onEdit}
-        className="cursor-pointer rounded-full bg-[#B2B2B3] px-4 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-[#9a9a9b]"
+        className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-[8px] px-3 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] disabled:cursor-not-allowed disabled:opacity-50 border border-[#dcdfe2] bg-white text-[#10141a] hover:bg-[#f4f6f7] dark:border-white/15 dark:bg-transparent dark:text-[#f4f6f7] dark:hover:bg-white/5"
       >
         Edit
       </button>}
       <button
         onClick={() => void approve()}
         disabled={isMutating||unknownAction==='return'}
-        className={`rounded-full bg-[#0EAF52] px-4 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-[#0c9644] ${isMutating ? "cursor-not-allowed opacity-50" : ""}`}
+        className={`inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-[8px] px-3 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] disabled:cursor-not-allowed disabled:opacity-50 bg-[#003839] text-white hover:bg-[#0b4c4d] dark:bg-[#0f7e7d] dark:hover:bg-[#13908f] ${isMutating ? "cursor-not-allowed opacity-50" : ""}`}
       >
         {isApproving ? "Approving..." : unknownAction==='approve' ? "Check approval" : "Approve"}
       </button>
       <button
         onClick={() => void reject()}
         disabled={isMutating||unknownAction==='approve'}
-        className={`flex items-center gap-1 rounded-full bg-[#FF6900] px-4 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-[#e55f00] ${isMutating ? "cursor-not-allowed opacity-50" : ""}`}
+        className={`inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-[8px] px-3 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] disabled:cursor-not-allowed disabled:opacity-50 border border-[#f1c4bf] bg-white text-[#b42318] hover:bg-[#fdf2f1] dark:border-[#f8a1a1]/30 dark:bg-transparent dark:text-[#f8a1a1] ${isMutating ? "cursor-not-allowed opacity-50" : ""}`}
       >
-        <CornerDownLeft size={14} />
+        <CornerDownLeft aria-hidden="true" size={14} />
         {isRejecting ? "Returning..." : unknownAction==='return' ? "Check return" : canEdit ? "Return" : "Return for correction"}
       </button>
-      {errorMessage&&<p role="alert" className="text-sm">{errorMessage}</p>}
+      {errorMessage&&<p role="alert" className="text-sm text-[#b42318] dark:text-[#f8a1a1]">{errorMessage}</p>}
     </>
   );
 }

@@ -41,12 +41,12 @@ export function FinalReviewTab({
   actionLoading,
 }: FinalReviewTabProps) {
   return (
-    <div className="backdrop-blur-[8px] bg-[rgba(255,255,255,0.3)] border border-[rgba(255,255,255,0.3)] rounded-[30px] px-4 py-4 md:px-6 md:py-5 space-y-4">
+    <div className="rounded-[16px] border border-[#e4e7ea] bg-white p-4 md:p-5 dark:border-white/10 dark:bg-[#1b232b] space-y-4">
       <div>
-        <h3 className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
+        <h3 className="text-[18px] font-medium leading-tight text-[#10141a] dark:text-[#f4f6f7]">
           Final Agency Review
         </h3>
-        <p className="mt-1 text-[14px] text-[#808081]">
+        <p className="mt-1 text-[14px] text-[#4b535b] dark:text-[#9aa4a8]">
           Internal HR and compliance officer review before official hire.
         </p>
       </div>
@@ -61,20 +61,20 @@ export function FinalReviewTab({
           return (
             <div
               key={step.key}
-              className="flex items-center justify-between rounded-[16px] bg-[rgba(255,255,255,0.85)] px-4 py-3"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-[12px] bg-[#f4f5f6] dark:bg-white/5 px-4 py-3"
             >
               <div className="flex items-center gap-3 flex-1">
                 {isConfirmed ? (
-                  <CheckCircle2 className="h-5 w-5 text-[#0eaf52] shrink-0" />
+                  <CheckCircle2 aria-hidden="true" className="h-5 w-5 shrink-0 text-[#1a7f37] dark:text-[#7ee2a8]" />
                 ) : (
-                  <Circle className="h-5 w-5 text-[#b2b2b3] shrink-0" />
+                  <Circle aria-hidden="true" className="h-5 w-5 shrink-0 text-[#9aa1a7]" />
                 )}
                 <div className="flex-1">
-                  <p className="text-[14px] font-medium text-[#10141a]">
+                  <p className="text-[14px] font-medium text-[#10141a] dark:text-[#f4f6f7]">
                     {step.title}
                   </p>
                   {isConfirmed && confirmation.timestamp && (
-                    <p className="mt-0.5 text-[12px] text-[#808081]">
+                    <p className="mt-0.5 text-[12px] text-[#6b737a] dark:text-[#9aa4a8]">
                       {new Date(confirmation.timestamp).toLocaleDateString("en-US", {
                         month: "short",
                         day: "numeric",
@@ -91,7 +91,7 @@ export function FinalReviewTab({
               </div>
 
               {isConfirmed ? (
-                <span className="rounded-[999px] bg-[rgba(14,175,82,0.1)] px-4 py-[4px] text-[12px] font-semibold text-[#0eaf52]">
+                <span className="rounded-[6px] bg-[#e6f6ec] px-2 py-0.5 text-[12px] font-medium text-[#1a7f37] dark:bg-[#30a46c]/15 dark:text-[#7ee2a8]">
                   Confirmed
                 </span>
               ) : (
@@ -99,7 +99,7 @@ export function FinalReviewTab({
                   <Button
                     onClick={() => onConfirm(step.key)}
                     disabled={isLoading}
-                    className="rounded-[60px] bg-[#00b4b8] px-5 py-[8px] text-[13px] font-semibold text-white hover:bg-[#0090a8]"
+                    className="h-8 rounded-[8px] px-3 text-[13px] font-medium shadow-none disabled:opacity-60 border-[#003839] bg-[#003839] text-white hover:bg-[#0b4c4d] hover:text-white dark:border-[#0f7e7d] dark:bg-[#0f7e7d]"
                   >
                     {isLoading ? "Confirming..." : "Confirm"}
                   </Button>
@@ -107,7 +107,7 @@ export function FinalReviewTab({
                     variant="outline"
                     onClick={() => onReject(step.key)}
                     disabled={isLoading || isRejected}
-                    className="rounded-[60px] border-[#d53411] px-5 py-[8px] text-[13px] font-semibold text-[#d53411] hover:bg-[rgba(213,52,17,0.06)]"
+                    className="h-8 rounded-[8px] px-3 text-[13px] font-medium shadow-none disabled:opacity-60 border-[#f1c4bf] bg-white text-[#b42318] hover:bg-[#fdf2f1] hover:text-[#b42318] dark:border-[#f8a1a1]/30 dark:bg-transparent dark:text-[#f8a1a1]"
                   >
                     {isRejected ? "Rejected" : isLoading ? "Processing..." : "Reject"}
                   </Button>

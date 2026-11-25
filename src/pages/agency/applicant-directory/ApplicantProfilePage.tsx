@@ -8,7 +8,8 @@ import {
   CheckCircle2,
   CircleAlert,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { AgencyPill, agencyOutlineButton } from "@/components/agency/AgencyListKit";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog, ConfirmDialogContent } from "@/components/ui/confirm-dialog";
 import { Routes } from "@/routes/constants";
@@ -813,218 +814,154 @@ function ApplicantProfilePageContent() {
   return (
     <VoiceRecordingProvider pageTitle="Applicant profile">
       <VoiceInputButton className="z-[60]" />
-    <div className="min-h-screen">
-      <div className="p-2">
-        <div className="mx-auto max-w-7xl">
-          {/* Header */}
-          <div className="flex items-center gap-4 mb-8">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate(Routes.agency.applicantDirectory)}
-              className="text-gray-600 hover:text-gray-900"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
-              Applicant&apos;s directory
-            </h1>
-          </div>
-
-          {/* Profile Header Card */}
-          <div className="relative mb-6 rounded-[24px] bg-[rgba(255,255,255,0.8)] shadow-sm p-6 md:p-8">
-            {isLoading ? (
-              <div className="space-y-6">
-                <div className="flex flex-col gap-6 md:flex-row md:items-start">
-                  <Skeleton className="h-[145px] w-[127px] rounded-[12px]" />
-                  <div className="flex-1 space-y-4">
-                    <Skeleton className="h-6 w-24 rounded-full" />
-                    <div className="space-y-2">
-                      <Skeleton className="h-8 w-64" />
-                      <Skeleton className="h-4 w-48" />
-                    </div>
-                    <div className="flex gap-3">
-                      <Skeleton className="h-10 w-24 rounded-full" />
-                      <Skeleton className="h-10 w-24 rounded-full" />
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <Skeleton key={i} className="h-9 w-40 rounded-full" />
-                  ))}
-                </div>
-              </div>
-            ) : (
+    <div className="space-y-6 pb-6">
+      <div className="border-b border-[#eceef0] pb-6 dark:border-white/10">
+        {/* Breadcrumb */}
+        <nav aria-label="Breadcrumb" className="flex items-center gap-3 text-[14px]">
+          <button
+            type="button"
+            onClick={() => navigate(Routes.agency.applicantDirectory)}
+            aria-label="Back to Applicants"
+            className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-full border border-[#dcdfe2] text-[#2a3138] transition-colors hover:bg-[#f4f6f7] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] dark:border-white/15 dark:text-[#c9d1d4] dark:hover:bg-white/5"
+          >
+            <ArrowLeft aria-hidden="true" className="h-4 w-4" />
+          </button>
+          <ol className="flex min-w-0 items-center gap-2">
+            <li>
+              <button type="button" onClick={() => navigate(Routes.agency.applicantDirectory)} className="cursor-pointer text-[#4b535b] hover:text-[#10141a] hover:underline dark:text-[#9aa4a8] dark:hover:text-[#f4f6f7]">
+                Applicants
+              </button>
+            </li>
+            {!isLoading && applicant.name && (
               <>
-                <div className="flex flex-col gap-6 md:flex-row md:items-start">
-                  {/* Avatar */}
-                  <div className="h-[145px] w-[127px] rounded-[12px] bg-[#e0e0e0] overflow-hidden shrink-0">
-                    {applicant.avatar ? (
-                      <img
-                        src={applicant.avatar}
-                        alt={applicant.name}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-xl font-semibold text-[#808081]">
-                        {applicant.name
-                          .split(" ")
-                          .filter(Boolean)
-                          .slice(0, 2)
-                          .map((w) => w[0]?.toUpperCase())
-                          .join("") || "AP"}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Name / meta / actions */}
-                  <div className="flex-1 space-y-3">
-                    <div className="inline-flex rounded-[60px] border border-[#0eaf52] bg-[#f0faf4] px-4 py-[6px]">
-                      <span className="text-[10px] font-semibold leading-[1.4] text-[#0eaf52]">
-                        {applicant.userType === 'applicant'
-                          ? 'Applicant'
-                          : applicant.userType === 'agency_staff'
-                            ? 'Agency staff'
-                          : roleLabel({ applicantType: applicant.applicantType, role: applicant.role })}
-                      </span>
-                    </div>
-                    <div>
-                      <h2 className="text-[24px] font-semibold leading-[1.3] text-[#10141a]">
-                        {applicant.name}
-                      </h2>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] font-medium leading-[1.6] text-[#808081]">
-                        {applicant.address && <span>{applicant.address}</span>}
-                        {applicant.address && applicant.dob && (
-                          <span className="h-[6px] w-[6px] rounded-full bg-[#b2b2b3]" />
-                        )}
-                        {applicant.dob && <span>{applicant.dob}</span>}
-                      </div>
-                    </div>
-
-                    <div className="mt-2 flex flex-wrap items-center gap-3">
-                      <Button
-                        disabled
-                        className="flex items-center gap-2 rounded-[60px] bg-[#2b82ff] px-5 py-[10px] text-[14px] font-semibold text-white shadow-none hover:bg-[#2563eb] disabled:opacity-70"
-                      >
-                        <Phone className="h-4 w-4" />
-                        Call
-                      </Button>
-                      {applicant.userType === 'employee' && (
-                        <Button
-                          variant="outline"
-                          disabled={isOpeningChat}
-                          className="flex items-center gap-2 rounded-[60px] border-[rgba(255,255,255,0.3)] bg-white/70 px-5 py-[10px] text-[14px] font-semibold text-[#10141a] shadow-none hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
-                          onClick={handleOpenChat}
-                        >
-                          <MessageSquare className="h-4 w-4" />
-                          {isOpeningChat ? "Opening..." : "Chat"}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Stage Pills */}
-                <div className="relative z-10 mt-6 flex flex-wrap gap-3">
-                  {/* Profile */}
-                  <button
-                    type="button"
-                    onClick={() => handleNavigateToSection("profile")}
-                    className={`pointer-events-auto flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "profile"
-                      ? "bg-[#00b4b8] text-white border-[#00b4b8]"
-                      : !!(stepStatuses.profile)
-                        ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
-                        : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
-                      }`}
-                  >
-                    {!!(stepStatuses.profile) ? (
-                      <CheckCircle2 className="h-4 w-4" />
-                    ) : (
-                      <CircleAlert className="h-4 w-4" />
-                    )}
-                    Profile &amp; Pre-Screening
-                  </button>
-
-                  {/* Documents */}
-                  <button
-                    type="button"
-                    onClick={() => handleNavigateToSection("documents")}
-                    className={`pointer-events-auto flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "documents"
-                      ? "bg-[#00b4b8] text-white border-[#00b4b8]"
-                      : documentsPillCompleted
-                        ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
-                        : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
-                      }`}
-                  >
-                    {documentsPillCompleted ? (
-                      <CheckCircle2 className="h-4 w-4" />
-                    ) : (
-                      <CircleAlert className="h-4 w-4" />
-                    )}
-                    Document Upload &amp; Eligibility Verification
-                  </button>
-
-                  {/* Conditional Hire */}
-                  <button
-                    type="button"
-                    onClick={() => handleNavigateToSection("conditional")}
-                    className={`pointer-events-auto flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "conditional"
-                      ? "bg-[#00b4b8] text-white border-[#00b4b8]"
-                      : conditionalPillCompleted
-                        ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
-                        : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
-                      }`}
-                  >
-                    {conditionalPillCompleted ? (
-                      <CheckCircle2 className="h-4 w-4" />
-                    ) : (
-                      <CircleAlert className="h-4 w-4" />
-                    )}
-                    Conditional Hire &amp; Compliance
-                  </button>
-
-                  {/* Final Review */}
-                  <button
-                    type="button"
-                    onClick={() => handleNavigateToSection("final")}
-                    className={`pointer-events-auto flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "final"
-                      ? "bg-[#00b4b8] text-white border-[#00b4b8]"
-                      : isStepComplete(stepStatuses.final)
-                        ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
-                        : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
-                      }`}
-                  >
-                    {isStepComplete(stepStatuses.final) ? (
-                      <CheckCircle2 className="h-4 w-4" />
-                    ) : (
-                      <CircleAlert className="h-4 w-4" />
-                    )}
-                    Final Agency Review
-                  </button>
-
-                  {/* Official Hire */}
-                  <button
-                    type="button"
-                    onClick={() => handleNavigateToSection("official")}
-                    className={`pointer-events-auto flex items-center gap-2 rounded-[60px] px-4 py-2 text-[12px] font-medium border transition-colors cursor-pointer ${activeSection === "official"
-                      ? "bg-[#00b4b8] text-white border-[#00b4b8]"
-                      : isStepComplete(stepStatuses.official)
-                        ? "bg-[rgba(14,175,82,0.05)] text-[#0eaf52] border-[#0eaf52]"
-                        : "bg-[rgba(213,52,17,0.05)] text-[#d53411] border-[#d53411]"
-                      }`}
-                  >
-                    {isStepComplete(stepStatuses.official) ? (
-                      <CheckCircle2 className="h-4 w-4" />
-                    ) : (
-                      <CircleAlert className="h-4 w-4" />
-                    )}
-                    Official Hire
-                  </button>
-                </div>
+                <li aria-hidden="true" className="text-[#9aa1a7]">/</li>
+                <li aria-current="page" className="truncate font-medium text-[#10141a] dark:text-[#f4f6f7]">{applicant.name}</li>
               </>
             )}
+          </ol>
+        </nav>
+
+        {/* Profile header */}
+        {isLoading ? (
+          <div className="mt-5 flex items-center gap-4">
+            <Skeleton className="h-14 w-14 rounded-full" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-7 w-56" />
+              <Skeleton className="h-4 w-40" />
+            </div>
           </div>
+        ) : (
+          <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-4">
+              {/* Avatar */}
+              <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full bg-[#e0f3f3] dark:bg-[#0f7e7d]/20">
+                {applicant.avatar ? (
+                  <img
+                    src={applicant.avatar}
+                    alt={applicant.name}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-[20px] font-medium text-[#005c5e] dark:text-[#7fd3d3]">
+                    {applicant.name
+                      .split(" ")
+                      .filter(Boolean)
+                      .slice(0, 2)
+                      .map((w) => w[0]?.toUpperCase())
+                      .join("") || "AP"}
+                  </div>
+                )}
+              </div>
+
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <h1 className="text-[28px] font-medium leading-tight text-[#10141a] dark:text-[#f4f6f7]">
+                    {applicant.name}
+                  </h1>
+                  <AgencyPill tone="teal">
+                    {applicant.userType === 'applicant'
+                      ? 'Applicant'
+                      : applicant.userType === 'agency_staff'
+                        ? 'Agency staff'
+                      : roleLabel({ applicantType: applicant.applicantType, role: applicant.role })}
+                  </AgencyPill>
+                </div>
+                <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[14px] text-[#4b535b] dark:text-[#9aa4a8]">
+                  {applicant.address && <span>{applicant.address}</span>}
+                  {applicant.address && applicant.dob && (
+                    <span aria-hidden="true">·</span>
+                  )}
+                  {applicant.dob && <span>{applicant.dob}</span>}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button type="button" disabled className={agencyOutlineButton}>
+                <Phone aria-hidden="true" className="h-4 w-4" />
+                Call
+              </button>
+              {applicant.userType === 'employee' && (
+                <button
+                  type="button"
+                  disabled={isOpeningChat}
+                  className={agencyOutlineButton}
+                  onClick={handleOpenChat}
+                >
+                  <MessageSquare aria-hidden="true" className="h-4 w-4" />
+                  {isOpeningChat ? "Opening..." : "Chat"}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Stage tabs */}
+      {isLoading ? (
+        <div className="flex flex-wrap gap-2">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-9 w-40 rounded-[9px]" />
+          ))}
+        </div>
+      ) : (
+        <div role="tablist" aria-label="Onboarding stages" className="flex max-w-full gap-1 overflow-x-auto rounded-[12px] bg-[#f4f5f6] p-1 sm:inline-flex dark:bg-white/5">
+          {([
+            { key: "profile", label: "Profile & Pre-Screening", done: !!(stepStatuses.profile) },
+            { key: "documents", label: "Document Upload & Eligibility Verification", done: documentsPillCompleted },
+            { key: "conditional", label: "Conditional Hire & Compliance", done: conditionalPillCompleted },
+            { key: "final", label: "Final Agency Review", done: isStepComplete(stepStatuses.final) },
+            { key: "official", label: "Official Hire", done: isStepComplete(stepStatuses.official) },
+          ] as { key: TabSection; label: string; done: boolean }[]).map((stage) => {
+            const active = activeSection === stage.key;
+            return (
+              <button
+                key={stage.key}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => handleNavigateToSection(stage.key)}
+                className={cn(
+                  "inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-[9px] px-3.5 text-[14px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#007679]",
+                  active
+                    ? "bg-[#003839] font-medium text-white shadow-[0_1px_2px_rgba(16,20,26,0.12)] dark:bg-[#0f7e7d] dark:text-white"
+                    : stage.done
+                      ? "bg-[#e6f6ec] font-medium text-[#1a7f37] hover:bg-[#d6efdf] dark:bg-[#30a46c]/15 dark:text-[#7ee2a8] dark:hover:bg-[#30a46c]/25"
+                      : "bg-[#fde8e6] font-medium text-[#b42318] hover:bg-[#fbd9d5] dark:bg-[#ef4444]/15 dark:text-[#f8a1a1] dark:hover:bg-[#ef4444]/25",
+                )}
+              >
+                {stage.done ? (
+                  <CheckCircle2 aria-hidden="true" className="h-4 w-4" />
+                ) : (
+                  <CircleAlert aria-hidden="true" className="h-4 w-4" />
+                )}
+                {stage.label}
+                <span className="sr-only">{stage.done ? "(complete)" : "(not complete)"}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
           {/* Tab Panels */}
           {activeSection === "profile" && <ProfileTab applicant={applicant} />}
@@ -1061,7 +998,7 @@ function ApplicantProfilePageContent() {
 
           {activeSection === "final" && (
             applicant.userType === "agency_staff" ? (
-              <div className="rounded-[20px] border border-[#0eaf52] bg-[#f0faf4] p-6 text-[#10141a]">
+              <div className="rounded-[16px] border border-[#cbe9d5] bg-[#e6f6ec] p-6 text-[#10141a] dark:border-[#30a46c]/30 dark:bg-[#30a46c]/10 dark:text-[#f4f6f7]">
                 <h3 className="text-lg font-semibold">Agency staff account created</h3>
                 <p className="mt-2 text-sm">The applicant signed the official hire letter and can use their existing account to access the agency dashboard.</p>
               </div>
@@ -1214,8 +1151,6 @@ function ApplicantProfilePageContent() {
               />
             </ConfirmDialogContent>
           </ConfirmDialog>
-        </div>
-      </div>
     </div>
     </VoiceRecordingProvider>
   );
