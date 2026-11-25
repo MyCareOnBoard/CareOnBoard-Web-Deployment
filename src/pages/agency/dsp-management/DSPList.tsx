@@ -1,16 +1,20 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { useSelector } from "react-redux";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { isValid, parseISO } from "date-fns";
+import { ChevronRight, GraduationCap, Search, UserCheck, UserX } from "lucide-react";
 import { DSP } from "./types";
 import { Routes } from "@/routes/constants";
 import { useAuth } from "@/utils/auth";
 import { roleLabel, staffLabels } from "@/lib/roleLabel";
 import type { RootState } from "@/store/redux/store";
+import { cn } from "@/lib/utils";
+import { AgencyProgressBar, AgencyStatCard } from "@/components/agency/AgencyShell";
+import { WorkforceIcon } from "@/components/agency/AgencyIcons";
+import {
+  AgencyListCard, AgencyPagination, AgencyPerson, AgencyPill, AgencySegmented, agencyField, agencyRowLink,
+  agencyTd, agencyTh, agencyTheadRow, agencyTr, type AgencyTone,
+} from "@/components/agency/AgencyListKit";
 
 interface DSPStats {
   active: number;
@@ -22,6 +26,20 @@ interface DSPListProps {
   dsps: DSP[];
   stats: DSPStats;
   isLoading?: boolean;
+}
+
+const STATUS_TONE: Record<string, AgencyTone> = {
+  active: "green",
+  pending: "amber",
+  suspended: "red",
+  inactive: "grey",
+};
+
+const statusLabel = (status?: string) => status ? status.charAt(0).toUpperCase() + status.slice(1) : "Unknown";
+
+function hireDateLabel(hireDate?: string) {
+  const date = parseISO(hireDate?.slice(0, 10) || "");
+  return isValid(date) ? date.toLocaleDateString() : "—";
 }
 
 export function DSPList({ dsps, stats, isLoading }: DSPListProps) {
@@ -42,32 +60,25 @@ export function DSPList({ dsps, stats, isLoading }: DSPListProps) {
   const pageSize = 8;
 
   const { active: activeCount, inactive: inactiveCount, total: totalCount } = stats;
+  const trainedCount = dsps.filter((dsp) => (dsp.totalTrainings ?? 0) > 0 && (dsp.completedTrainings ?? 0) >= (dsp.totalTrainings ?? 0)).length;
+  const trainedPercent = totalCount ? Math.round((trainedCount / totalCount) * 100) : 0;
 
   const filteredDsps = dsps.filter(dsp => {
     const matchesSearch = dsp.fullName.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === "All" || 
+    const matchesStatus = statusFilter === "All" ||
       (statusFilter === "active" && dsp.status === "active") ||
       (statusFilter === "inactive" && (dsp.status === "inactive" || dsp.status === "suspended" || dsp.status === "pending"));
     return matchesSearch && matchesStatus;
   });
 
-  const searchSuggestions = searchQuery.trim() 
-    ? dsps.filter(dsp => 
+  const searchSuggestions = searchQuery.trim()
+    ? dsps.filter(dsp =>
         dsp.fullName.toLowerCase().includes(searchQuery.toLowerCase())
       ).slice(0, 5)
     : [];
 
   const totalPages = Math.ceil(filteredDsps.length / pageSize);
   const paginatedDsps = filteredDsps.slice((page - 1) * pageSize, page * pageSize);
-
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
-  };
 
   // Reset page when filter or search changes
   useEffect(() => {
@@ -96,236 +107,132 @@ export function DSPList({ dsps, stats, isLoading }: DSPListProps) {
     setShowSearchSuggestions(false);
   };
 
+  const count = (value: number) => (isLoading ? "—" : value);
+
   return (
     <>
-      {/* DSP Overview Stats */}
-      <div className="bg-gray-100 flex justify-between rounded-2xl shadow-sm p-6">
-        <div className="mb-4">
-          <h3 className="text-lg font-bold text-gray-900">{labels.noun}</h3>
-          <p className="text-sm text-gray-600">{labels.noun} overview who are managing shifts for clients</p>
-        </div>
-        <div className="flex items-center gap-12">
-          {isLoading ? (
-            <>
-              {[["bg-green-500", "Active"], ["bg-blue-500", "Inactive"], ["bg-gray-500", "Total"]].map(([color, label]) => (
-                <div key={label} className="text-center">
-                  <Skeleton className="h-10 w-14 mx-auto mb-2" />
-                  <div className="flex items-center gap-2 mt-1">
-                    <div className={`w-2 h-2 rounded-full ${color}`} />
-                    <span className="text-sm text-gray-600">{label}</span>
-                  </div>
-                </div>
-              ))}
-            </>
-          ) : (
-            <>
-              <div className="text-center">
-                <p className="text-4xl font-bold text-gray-900">{activeCount}</p>
-                <div className="flex items-center gap-2 mt-2">
-                  <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                  <span className="text-sm text-gray-600">Active</span>
-                </div>
-              </div>
-              <div className="text-center">
-                <p className="text-4xl font-bold text-gray-900">{inactiveCount}</p>
-                <div className="flex items-center gap-2 mt-2">
-                  <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                  <span className="text-sm text-gray-600">Inactive</span>
-                </div>
-              </div>
-              <div className="text-center">
-                <p className="text-4xl font-bold text-gray-900">{totalCount}</p>
-                <div className="flex items-center gap-2 mt-2">
-                  <div className="w-2 h-2 rounded-full bg-gray-500"></div>
-                  <span className="text-sm text-gray-600">Total</span>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+      {/* Overview */}
+      <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <AgencyStatCard icon={UserCheck} label="Active" value={count(activeCount)} footnote={`${labels.nounPlural} with an active account.`} />
+        <AgencyStatCard icon={UserX} label="Inactive" value={count(inactiveCount)} footnote="Inactive, suspended or pending accounts." />
+        <AgencyStatCard icon={WorkforceIcon} label="Total" value={count(totalCount)} footnote={`Every ${labels.noun} in this program.`} />
+        <AgencyStatCard icon={GraduationCap} label="Training complete" value={count(trainedCount)}
+          footnote={isLoading ? undefined : `Of ${totalCount} ${labels.nounPlural} (${trainedPercent}%).`}>
+          <AgencyProgressBar value={isLoading ? 0 : trainedPercent} label="Share with all training complete" />
+        </AgencyStatCard>
       </div>
 
-      {/* DSP Directory */}
-      <div className="bg-gray-100 rounded-2xl shadow-sm p-6 space-y-6">
-        {/* Directory Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-bold text-gray-900">{labels.noun} Directory</h3>
-            <p className="text-sm text-gray-600">Browse, search, and manage your {labels.plural}</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="relative" ref={searchRef}>
-              <Input
-                placeholder="Search"
+      {/* Directory */}
+      <AgencyListCard label={`${labels.noun} directory`} className="mt-5">
+        <div className="flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between">
+          <AgencySegmented
+            label="Status"
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={[
+              { value: "active", label: "Active", count: isLoading ? undefined : activeCount },
+              { value: "inactive", label: "Inactive", count: isLoading ? undefined : inactiveCount },
+            ]}
+          />
+          <div className="relative w-full lg:w-[300px]" ref={searchRef}>
+            <label className="relative block">
+              <span className="sr-only">Search {labels.nounPlural}</span>
+              <Search aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6b737a]" />
+              <input
+                type="search"
+                placeholder="Search name"
                 value={searchQuery}
                 onChange={handleSearchChange}
                 onFocus={() => searchQuery && setShowSearchSuggestions(true)}
-                className="w-64 h-10 pl-10"
+                className={cn(agencyField, "h-10 pl-10")}
               />
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              
-              {/* Search Suggestions Dropdown */}
-              {showSearchSuggestions && searchSuggestions.length > 0 && (
-                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                  {searchSuggestions.map((dsp) => (
-                    <button
-                      key={dsp.id}
-                      onClick={() => handleSuggestionClick(dsp)}
-                      className="w-full flex items-center gap-3 p-3 hover:bg-teal-50 hover:text-teal-700 transition-colors text-left cursor-pointer"
-                    >
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={dsp.profilePicture} alt={dsp.fullName} />
-                        <AvatarFallback className="bg-gray-200 text-gray-700 text-xs font-medium">
-                          {getInitials(dsp.fullName)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{dsp.fullName}</p>
-                        <p className="text-xs text-gray-500">{roleLabel({ role: dsp.role })} · {dsp.status}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setStatusFilter("active")}
-                className={`px-6 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer ${
-                  statusFilter === "active"
-                    ? "bg-teal-500 text-white border border-teal-500"
-                    : "bg-white text-gray-600 border border-gray-300 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-700"
-                }`}
-              >
-                Active
-              </button>
-              <button
-                onClick={() => setStatusFilter("inactive")}
-                className={`px-6 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer ${
-                  statusFilter === "inactive"
-                    ? "bg-teal-500 text-white border border-teal-500"
-                    : "bg-white text-gray-600 border border-gray-300 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-700"
-                }`}
-              >
-                Inactive
-              </button>
-            </div>
+            </label>
+
+            {/* Search suggestions */}
+            {showSearchSuggestions && searchSuggestions.length > 0 && (
+              <div className="absolute z-10 mt-1 max-h-60 w-full overflow-y-auto rounded-[12px] border border-[#e4e7ea] bg-white p-1.5 shadow-[0_8px_24px_rgba(16,20,26,0.08)] dark:border-white/10 dark:bg-[#1b232b]">
+                {searchSuggestions.map((dsp) => (
+                  <button
+                    key={dsp.id}
+                    type="button"
+                    onClick={() => handleSuggestionClick(dsp)}
+                    className="flex w-full cursor-pointer items-center gap-3 rounded-[8px] px-2.5 py-2 text-left text-[14px] transition-colors hover:bg-[#f4f6f7] dark:hover:bg-white/5"
+                  >
+                    <AgencyPerson name={dsp.fullName} imageUrl={dsp.profilePicture} detail={`${roleLabel({ role: dsp.role })} · ${dsp.status}`} />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* DSP List */}
         {isLoading ? (
-          <div className="space-y-2">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="flex items-center justify-between py-4 px-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-4">
-                  <Skeleton className="h-12 w-12 rounded-full" />
-                  <div className="space-y-1.5">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-3 w-8" />
-                  </div>
-                </div>
-                <div className="flex items-center w-[50%] justify-between">
-                  <Skeleton className="h-7 w-20 rounded-full" />
-                  <div className="text-center space-y-1">
-                    <Skeleton className="h-3 w-10 mx-auto" />
-                    <Skeleton className="h-5 w-8 mx-auto" />
-                  </div>
-                  <div className="text-center space-y-1">
-                    <Skeleton className="h-3 w-14 mx-auto" />
-                    <Skeleton className="h-5 w-12 mx-auto" />
-                  </div>
-                </div>
-                <Skeleton className="h-8 w-20 rounded-full" />
-              </div>
-            ))}
+          <div aria-hidden="true" className="space-y-px border-t border-[#eceef0] dark:border-white/10">
+            {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-[62px] animate-pulse bg-[#f8f9fa] dark:bg-white/5" />)}
+          </div>
+        ) : filteredDsps.length === 0 ? (
+          <div className="border-t border-[#eceef0] px-6 py-14 text-center dark:border-white/10">
+            <p className="text-[16px] font-medium text-[#10141a] dark:text-[#f4f6f7]">
+              {searchQuery.trim() ? `No ${labels.nounPlural} match your search` : `No ${statusFilter === "inactive" ? "inactive" : "active"} ${labels.nounPlural}`}
+            </p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {paginatedDsps.map((dsp) => {
-              return (
-                <div
-                  key={dsp.id}
-                  className="flex items-center justify-between py-4 px-4 bg-gray-50 rounded-lg hover:bg-teal-50 cursor-pointer transition-colors"
-                >
-                  <div className="flex items-center gap-4 w-[350px]">
-                    <button
-                      onClick={() => navigateToProfile(dsp)}
-                      className="flex items-center gap-4 cursor-pointer"
-                    >
-                      <Avatar className="h-12 w-12 cursor-pointer">
-                        <AvatarImage src={dsp.profilePicture} alt={dsp.fullName} />
-                        <AvatarFallback className="bg-gray-200 text-gray-700 text-sm font-medium">
-                          {getInitials(dsp.fullName)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div onClick={() => navigateToProfile(dsp)} className="text-left cursor-pointer">
-                        <p className="font-semibold text-gray-900 text-sm">{dsp.fullName}</p>
-                        <p className="mt-1 text-xs text-gray-500">{dsp.email}</p>
-                      </div>
-                    </button>
-                  </div>
-
-                  <div className="flex items-center w-[50%] justify-between">
-                    <span className={`px-4 py-1.5 rounded-full text-sm font-medium capitalize ${
-                      dsp.status === "active"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-red-100 text-red-700"
-                    }`}>
-                      {dsp.status}
-                    </span>
-                    <div className="text-center">
-                      <p className="text-xs text-gray-500">Clients</p>
-                      <p className="text-lg font-semibold text-gray-900">{dsp.clients || 0}</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-xs text-gray-500">Training</p>
-                      <p className="text-lg font-semibold text-gray-900">{dsp.completedTrainings || 0}/{dsp.totalTrainings || 0}</p>
-                    </div>
-                  </div>
-                    {/* {dsp.status !== "active" && (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="rounded-full"
-                      >
-                        Send Alert
-                      </Button>
-                    )} */}
-                    <Button
-                      size="sm"
-                      className="rounded-full"
-                      onClick={() => navigateToProfile(dsp)}
-                    >
-                      Details
-                    </Button>
-                </div>
-              );
-            })}
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px]">
+              <thead>
+                <tr className={agencyTheadRow}>
+                  <th scope="col" className={agencyTh}>{labels.noun}</th>
+                  <th scope="col" className={agencyTh}>Clients</th>
+                  <th scope="col" className={agencyTh}>Training</th>
+                  <th scope="col" className={agencyTh}>Status</th>
+                  <th scope="col" className={agencyTh}>Hire date</th>
+                  <th scope="col" className={agencyTh}><span className="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedDsps.map((dsp) => {
+                  const done = dsp.completedTrainings || 0;
+                  const total = dsp.totalTrainings || 0;
+                  return (
+                    <tr key={dsp.id} className={agencyTr}>
+                      <td className={agencyTd}>
+                        <button type="button" onClick={() => navigateToProfile(dsp)}
+                          className="cursor-pointer rounded-[8px] text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679]">
+                          <AgencyPerson name={dsp.fullName} detail={dsp.email} imageUrl={dsp.profilePicture} />
+                        </button>
+                      </td>
+                      <td className={cn(agencyTd, "tabular-nums")}>{dsp.clients || 0}</td>
+                      <td className={agencyTd}>
+                        <span className="block text-[13px] font-medium tabular-nums">{done}/{total}</span>
+                        <AgencyProgressBar value={total ? (done / total) * 100 : 0} label={`${dsp.fullName} training ${done} of ${total}`} className="mt-1.5 w-[90px]" />
+                      </td>
+                      <td className={agencyTd}>
+                        <AgencyPill tone={STATUS_TONE[dsp.status ?? ""] ?? "grey"}>{statusLabel(dsp.status)}</AgencyPill>
+                      </td>
+                      <td className={cn(agencyTd, "whitespace-nowrap")}>{hireDateLabel(dsp.hireDate)}</td>
+                      <td className={cn(agencyTd, "text-right")}>
+                        <button type="button" onClick={() => navigateToProfile(dsp)} className={agencyRowLink}
+                          aria-label={`Details for ${dsp.fullName}`}>
+                          Details<ChevronRight aria-hidden="true" className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
 
-        {/* Pagination */}
-        <div className="flex items-center justify-center gap-2 pt-4">
-          <button
-            onClick={() => setPage(Math.max(1, page - 1))}
-            disabled={page === 1}
-            className="h-8 w-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <span className="text-sm text-gray-600 px-1">{page} / {totalPages}</span>
-          <button
-            onClick={() => setPage(Math.min(totalPages, page + 1))}
-            disabled={page === totalPages}
-            className="h-8 w-8 flex items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
+        {!isLoading && filteredDsps.length > 0 && (
+          <AgencyPagination
+            summary={`Showing ${paginatedDsps.length} of ${filteredDsps.length} ${filteredDsps.length === 1 ? labels.noun : labels.nounPlural}`}
+            page={page}
+            pages={totalPages}
+            onPage={setPage}
+          />
+        )}
+      </AgencyListCard>
     </>
   );
 }

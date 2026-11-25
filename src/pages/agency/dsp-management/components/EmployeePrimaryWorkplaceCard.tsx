@@ -42,11 +42,11 @@ export default function EmployeePrimaryWorkplaceCard({ scope }: { scope: Managed
   if (!scope.employmentId) return null;
 
   if (!projection && (queryState.isLoading || queryState.isFetching)) {
-    return <section aria-label="Loading primary work location" aria-busy="true" role="status" className="mt-6 h-32 animate-pulse rounded-lg bg-[#edf1f2]" />;
+    return <section aria-label="Loading primary work location" aria-busy="true" role="status" className="h-32 animate-pulse rounded-[16px] bg-[#f4f5f6] dark:bg-white/5" />;
   }
 
   if (!projection && queryState.isError) {
-    return <section className="mt-6 rounded-lg border border-[#e7c3c3] bg-[#fffafa] p-5 text-sm text-[#7a2929]" role="alert">Primary work location could not be loaded. <button type="button" className="font-semibold underline" onClick={() => void subscription.refetch()}>Try again</button></section>;
+    return <section className="rounded-[16px] border border-[#f0c8c4] bg-[#fdf3f2] p-5 text-sm text-[#b42318] dark:border-[#ff6b5e]/30 dark:bg-[#ff6b5e]/10 dark:text-[#f8a1a1]" role="alert">Primary work location could not be loaded. <button type="button" className="font-semibold underline" onClick={() => void subscription.refetch()}>Try again</button></section>;
   }
 
   if (!projection) return null;
@@ -57,7 +57,7 @@ export default function EmployeePrimaryWorkplaceCard({ scope }: { scope: Managed
     : undefined;
 
   if (selectedPrimary) {
-    return <section aria-label="Primary work location" className="mt-6 rounded-lg bg-[#edf1f2] p-5"><p className="text-sm font-semibold text-[#10141a]">Primary work location: {selectedPrimary.clientLabel}</p></section>;
+    return <section aria-label="Primary work location" className="rounded-[16px] border border-[#e4e7ea] bg-white p-5 dark:border-white/10 dark:bg-[#1b232b]"><p className="text-sm font-semibold text-[#10141a] dark:text-[#f4f6f7]">Primary work location: {selectedPrimary.clientLabel}</p></section>;
   }
 
   if (primaryWorkplace.options.length <= 1) return null;
@@ -103,13 +103,13 @@ export default function EmployeePrimaryWorkplaceCard({ scope }: { scope: Managed
     }
   };
 
-  return <section aria-labelledby="primary-work-location-heading" className="mt-6 rounded-lg bg-[#edf1f2] p-5">
-    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#006f73]">Payroll</p>
-    <h2 id="primary-work-location-heading" className="mt-1 text-lg font-semibold text-[#10141a]">Primary work location</h2>
-    <p className="mt-2 text-sm text-[#5d626b]">Select the employee&apos;s ordinary primary work location for payroll setup.</p>
+  return <section aria-labelledby="primary-work-location-heading" className="rounded-[16px] border border-[#e4e7ea] bg-white p-5 dark:border-white/10 dark:bg-[#1b232b]">
+    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#007679] dark:text-[#7fd3d3]">Payroll</p>
+    <h2 id="primary-work-location-heading" className="mt-1 text-base font-semibold text-[#10141a] dark:text-[#f4f6f7]">Primary work location</h2>
+    <p className="mt-1 text-sm text-[#4b535b] dark:text-[#9aa4a8]">Select the employee&apos;s ordinary primary work location for payroll setup.</p>
     <fieldset role="radiogroup" aria-label="Choose a primary work location" className="mt-4 space-y-3">
-      <legend className="text-sm font-semibold text-[#10141a]">Choose a primary work location</legend>
-      {primaryWorkplace.options.map((option) => <label key={option.clientAssignmentId} className="flex cursor-pointer items-center gap-3 rounded-md bg-[#f8fbfb] px-3 py-3 text-sm text-[#10141a] focus-within:ring-2 focus-within:ring-[#006f73]">
+      <legend className="text-sm font-semibold text-[#10141a] dark:text-[#f4f6f7]">Choose a primary work location</legend>
+      {primaryWorkplace.options.map((option) => <label key={option.clientAssignmentId} className="flex cursor-pointer items-center gap-3 rounded-[10px] border border-[#e4e7ea] px-3 py-3 text-sm text-[#10141a] transition-colors hover:bg-[#f8f9fa] focus-within:ring-2 focus-within:ring-[#007679] dark:border-white/10 dark:text-[#f4f6f7] dark:hover:bg-white/5">
         <input
           type="radio"
           name={`primary-workplace-${scope.employmentId}`}
@@ -117,16 +117,16 @@ export default function EmployeePrimaryWorkplaceCard({ scope }: { scope: Managed
           checked={selectedClientAssignmentId === option.clientAssignmentId}
           onChange={() => setSelectedClientAssignmentId(option.clientAssignmentId)}
           disabled={submitting}
-          className="h-4 w-4 accent-[#006f73]"
+          className="h-4 w-4 accent-[#007679]"
         />
         {option.clientLabel}
       </label>)}
     </fieldset>
-    <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm text-[#10141a]">
-      <input type="checkbox" checked={ordinaryPrimaryWorkLocation} onChange={(event) => setOrdinaryPrimaryWorkLocation(event.target.checked)} disabled={submitting} className="mt-0.5 h-4 w-4 accent-[#006f73]" />
+    <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm text-[#10141a] dark:text-[#f4f6f7]">
+      <input type="checkbox" checked={ordinaryPrimaryWorkLocation} onChange={(event) => setOrdinaryPrimaryWorkLocation(event.target.checked)} disabled={submitting} className="mt-0.5 h-4 w-4 accent-[#007679]" />
       <span>I confirm this is the employee&apos;s ordinary primary work location.</span>
     </label>
-    {requestError && <p role="alert" className="mt-3 text-sm text-[#8b2d2d]">{requestError}</p>}
-    <button type="button" disabled={!canSubmit} onClick={() => void savePrimaryWorkplace()} className="mt-5 rounded-md bg-[#006f73] px-4 py-2 text-sm font-medium text-white hover:bg-[#00595c] disabled:cursor-not-allowed disabled:opacity-60">{submitting ? "Saving primary work location..." : "Save primary work location"}</button>
+    {requestError && <p role="alert" className="mt-3 text-sm text-[#b42318] dark:text-[#f8a1a1]">{requestError}</p>}
+    <button type="button" disabled={!canSubmit} onClick={() => void savePrimaryWorkplace()} className="mt-5 inline-flex h-10 cursor-pointer items-center justify-center rounded-[10px] bg-[#003839] px-4 text-[14px] font-semibold text-white transition-colors hover:bg-[#0b4c4d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] disabled:cursor-not-allowed disabled:opacity-60 dark:bg-[#0f7e7d] dark:hover:bg-[#13908f]">{submitting ? "Saving primary work location..." : "Save primary work location"}</button>
   </section>;
 }

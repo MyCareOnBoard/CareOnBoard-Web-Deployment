@@ -80,7 +80,7 @@ const SuccessDialogContent = React.forwardRef<
         {/* Button */}
         {buttonText && (
           <Button 
-            className="w-full rounded-[60px] bg-[#00b4b8] px-4 py-4 text-[14px] font-semibold leading-[1.4] text-white backdrop-blur-[22px] hover:bg-[#00a3a7]" 
+            className="w-full" 
             onClick={onButtonClick}
           >
             {buttonText}

@@ -47,9 +47,9 @@ export function ActivityTab({
 }: ActivityTabProps) {
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Grid Layout: Shifts Chart (Left) and Training (Right) */}
-      {!focusDocumentId && !focusDocumentKey && <div className="grid grid-cols-2 gap-6">
+      {!focusDocumentId && !focusDocumentKey && <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         {/* Left Column: Shifts Chart */}
         <ShiftsChart
           shifts={shifts}
@@ -57,16 +57,13 @@ export function ActivityTab({
         />
 
         {/* Right Column*/}
-        <div className="flex flex-col gap-4">
-          <TrainingSection
-            totalCount={totalCount}
-            completedCount={completedCount}
-            automaticAccepted={automaticAccepted}
-            policyAssessmentComplete={policyAssessmentComplete}
-            isLoading={trainingsLoading}
-          />
-          <div className=" bg-[#edf1f2] p-6 rounded-lg aspect"></div>
-        </div>
+        <TrainingSection
+          totalCount={totalCount}
+          completedCount={completedCount}
+          automaticAccepted={automaticAccepted}
+          policyAssessmentComplete={policyAssessmentComplete}
+          isLoading={trainingsLoading}
+        />
       </div>}
 
       {/* Documents Section - Full Width */}

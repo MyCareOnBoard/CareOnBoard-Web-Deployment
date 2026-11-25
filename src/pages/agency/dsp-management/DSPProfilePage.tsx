@@ -5,6 +5,7 @@ import { DSPProfile } from "./DSPProfile";
 import { DSP } from "./types";
 import { Routes } from "@/routes/constants";
 import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
+import { agencyOutlineButton } from "@/components/agency/AgencyListKit";
 
 function normalizeAddress(address: any): string {
   if (!address) return "";
@@ -85,23 +86,36 @@ export default function DSPProfilePage() {
       .finally(() => setIsLoading(false));
   }, [dspId, navigate]);
 
+  const sectionLabel = mode === "hha" ? "Caregiver management" : "DSP management";
+
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00B4B8]" />
+      <div role="status" aria-label="Loading profile" className="space-y-6 pb-6">
+        <div aria-hidden="true" className="space-y-5 border-b border-[#eceef0] pb-6 dark:border-white/10">
+          <div className="h-9 w-64 animate-pulse rounded-full bg-[#f4f5f6] dark:bg-white/5" />
+          <div className="flex items-center gap-4">
+            <div className="h-14 w-14 animate-pulse rounded-full bg-[#f4f5f6] dark:bg-white/5" />
+            <div className="space-y-2">
+              <div className="h-7 w-56 animate-pulse rounded-[8px] bg-[#f4f5f6] dark:bg-white/5" />
+              <div className="h-4 w-80 max-w-full animate-pulse rounded-[6px] bg-[#f4f5f6] dark:bg-white/5" />
+            </div>
+          </div>
+        </div>
+        <div aria-hidden="true" className="h-64 animate-pulse rounded-[16px] bg-[#f4f5f6] dark:bg-white/5" />
       </div>
     );
   }
 
   if (error || !dsp) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">Failed to load DSP profile</p>
-          <p className="text-gray-600">{error}</p>
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div role="alert" className="max-w-md rounded-[16px] border border-[#e4e7ea] bg-white px-8 py-10 text-center dark:border-white/10 dark:bg-[#1b232b]">
+          <p className="text-[16px] font-medium text-[#b42318] dark:text-[#f8a1a1]">Failed to load DSP profile</p>
+          <p className="mt-1 text-[14px] text-[#4b535b] dark:text-[#9aa4a8]">{error}</p>
           <button
+            type="button"
             onClick={() => navigate(Routes.agency.dspManagement)}
-            className="mt-4 px-4 py-2 bg-gray-900 text-white text-sm rounded-full"
+            className={`${agencyOutlineButton} mt-5`}
           >
             Back to Directory
           </button>
@@ -111,14 +125,10 @@ export default function DSPProfilePage() {
   }
 
   return (
-    <div className="min-h-screen">
-      <div className="mx-auto p-6 space-y-6">
-        <h1 className="text-3xl font-bold text-gray-900">{mode === "hha" ? "Caregiver Management" : "DSP Management"}</h1>
-        <DSPProfile
-          dsp={dsp}
-          onBack={() => navigate(Routes.agency.dspManagement)}
-        />
-      </div>
-    </div>
+    <DSPProfile
+      dsp={dsp}
+      sectionLabel={sectionLabel}
+      onBack={() => navigate(Routes.agency.dspManagement)}
+    />
   );
 }

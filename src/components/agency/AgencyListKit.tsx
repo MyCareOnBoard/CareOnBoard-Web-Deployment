@@ -41,14 +41,14 @@ export function AgencySegmented<T extends string>({ label, value, onChange, opti
           <button key={option.value} type="button" aria-pressed={on} onClick={() => onChange(option.value)}
             className={cn(
               "inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-[9px] px-3 text-[14px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#007679]",
-              on ? "bg-white font-medium text-[#10141a] shadow-[0_1px_2px_rgba(16,20,26,0.08)] dark:bg-[#1b232b] dark:text-[#f4f6f7]"
+              on ? "bg-[#003839] font-medium text-white shadow-[0_1px_2px_rgba(16,20,26,0.12)] dark:bg-[#0f7e7d] dark:text-white"
                 : "text-[#4b535b] hover:text-[#10141a] dark:text-[#9aa4a8] dark:hover:text-[#f4f6f7]",
             )}>
             {option.label}
             {option.count !== undefined && (
               <span className={cn(
                 "grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[12px] font-medium tabular-nums",
-                on ? "bg-[#0f7e7d] text-white" : "bg-[#e4e7ea] text-[#4b535b] dark:bg-white/10 dark:text-[#c9d1d4]",
+                on ? "bg-white/20 text-white" : "bg-[#e4e7ea] text-[#4b535b] dark:bg-white/10 dark:text-[#c9d1d4]",
               )}>
                 {option.count}
               </span>

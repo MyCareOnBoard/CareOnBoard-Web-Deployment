@@ -15,6 +15,8 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { FileText, X } from "lucide-react";
+import { agencyPrimaryButton } from "@/components/agency/AgencyListKit";
 import { requestEmployeeDocument, type EmployeeDocument, isExpiringSoon } from "@/lib/api/employee-documents";
 import { canonicalDocumentType, DOCUMENT_TYPE_LABELS } from "@/lib/documentTypes";
 import { useToast } from "@/hooks/use-toast";
@@ -115,21 +117,21 @@ export function RequestDocumentModal({
 
 	return (
 		<Dialog open={open} onOpenChange={(next) => !next && resetAndClose()}>
-			<DialogContent className="w-[480px] max-w-[calc(100vw-32px)] p-0 gap-0 overflow-hidden rounded-2xl shadow-xl">
-				<DialogHeader className="px-6 pt-6 pb-4 text-left items-start">
-					<DialogTitle className="text-lg font-semibold text-[#10141a]">
+			<DialogContent showCloseButton={false} className="w-[calc(100vw-32px)] max-w-[480px] gap-0 overflow-hidden rounded-[20px] p-0">
+				<DialogHeader className="flex-row items-start gap-3.5 border-b border-[#eceef0] px-5 py-4 text-left dark:border-white/10"><span aria-hidden="true" className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-[#dcdfe2] text-[#007679] dark:border-white/15 dark:text-[#7fd3d3]"><FileText className="h-5 w-5" /></span><div className="min-w-0 flex-1">
+					<DialogTitle className="text-[22px] font-medium leading-tight text-[#10141a] dark:text-[#f4f6f7]">
 						Request Document
 					</DialogTitle>
-				</DialogHeader>
+				</div><button type="button" onClick={resetAndClose} aria-label="Close" disabled={sending} className="grid h-8 w-8 shrink-0 cursor-pointer place-items-center rounded-full border border-[#dcdfe2] text-[#4b535b] transition-colors hover:bg-[#f4f6f7] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] disabled:opacity-50 dark:border-white/15 dark:text-[#c9d1d4]"><X aria-hidden="true" className="h-4 w-4" /></button></DialogHeader>
 
-				<div className="px-6 pb-6 space-y-4">
+				<div className="space-y-4 px-5 py-5">
 					{/* Document Type */}
 					<div className="space-y-1.5">
-						<Label className="text-sm font-medium text-[#10141a]">
-							Document Type <span className="text-red-500">*</span>
+						<Label className="text-[13px] font-medium text-[#2a3138] dark:text-[#c9d1d4]">
+							Document Type <span className="text-[#b42318] dark:text-[#f8a1a1]">*</span>
 						</Label>
 						<Select value={documentType || undefined} onValueChange={setDocumentType}>
-							<SelectTrigger className="w-full h-10 rounded-lg border-[var(--input-border)] bg-[var(--input-bg)]">
+							<SelectTrigger className="h-10 w-full rounded-[10px] border-[#dcdfe2] bg-white dark:border-white/15 dark:bg-[#151c22]">
 								<SelectValue placeholder="Select document type" />
 							</SelectTrigger>
 							<SelectContent>
@@ -144,9 +146,9 @@ export function RequestDocumentModal({
 
 					{/* Expiry Date (kept per user request) */}
 					<div className="space-y-1.5">
-						<Label className="text-sm font-medium text-[#10141a]">
+						<Label className="text-[13px] font-medium text-[#2a3138] dark:text-[#c9d1d4]">
 							Requested Expiry Date{" "}
-							<span className="text-[var(--grey-200)] font-normal">(optional)</span>
+							<span className="font-normal text-[#4b535b] dark:text-[#9aa4a8]">(optional)</span>
 						</Label>
 						<CustomDatePicker
 							date={expiryDate}
@@ -160,10 +162,10 @@ export function RequestDocumentModal({
 					{/* Expiry status banner */}
 					{existingDoc && (isExpired || expiringSoon) && (
 						<div
-							className={`rounded-lg px-4 py-2 text-sm font-medium ${
+							className={`rounded-[10px] border px-3.5 py-2.5 text-[13px] font-medium ${
 								isExpired
-									? "bg-red-50 text-red-700 border border-red-200"
-									: "bg-amber-50 text-amber-700 border border-amber-200"
+									? "border-[#f0c8c4] bg-[#fdf3f2] text-[#b42318] dark:border-[#ff6b5e]/30 dark:bg-[#ff6b5e]/10 dark:text-[#f8a1a1]"
+									: "border-[#f0dfa0] bg-[#fcf5dc] text-[#7a5800] dark:border-[#e0b400]/30 dark:bg-[#e0b400]/15 dark:text-[#f0cf6b]"
 							}`}
 						>
 							{isExpired
@@ -172,7 +174,7 @@ export function RequestDocumentModal({
 						</div>
 					)}
 
-					<p className="text-sm text-[var(--grey-200)]">
+					<p className="text-[13px] text-[#4b535b] dark:text-[#9aa4a8]">
 						This will send a notification to the user.
 					</p>
 
@@ -181,7 +183,7 @@ export function RequestDocumentModal({
 						<Button
 							onClick={handleSend}
 							disabled={sending || !documentType}
-							className="w-full px-6 py-2.5 rounded-full bg-teal-500 hover:bg-teal-600 text-white font-medium"
+							className={`${agencyPrimaryButton} w-full active:bg-[#003839]`}
 						>
 							{sending ? "Sending..." : "Send Request"}
 						</Button>
