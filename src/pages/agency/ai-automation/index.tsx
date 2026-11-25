@@ -233,23 +233,20 @@ function AIAutomationContent() {
     return (
       <>
         <VoiceInputButton textareaRef={textareaRef} />
-      <div className="flex flex-col min-h-screen gap-4 px-4 sm:gap-6 sm:px-6 sm:py-6">
+      <div className="flex min-h-[calc(100vh-140px)] flex-col gap-5 pb-4">
         <AIAutomationHeader
           onOpenConversations={() => setShowConversations(true)}
-          // onNewConversation={startNewConversation}
-          userName={user?.fullName || user?.email || undefined}
+          onNewConversation={startNewConversation}
           conversationMode={activeConversationId ? conversationMode : null}
-          // selectedArea={selectedArea}
-          // onSelectArea={setSelectedArea}
         />
-        <div className="flex-1 flex min-h-0 flex-col overflow-hidden rounded-[28px] border-2 border-white shadow-sm sm:rounded-[32px]">
-          <div className="flex-1 p-4 overflow-y-auto sm:p-6 md:p-8">
+        <div className="flex min-h-[560px] flex-1 flex-col overflow-hidden rounded-[16px] border border-[#e4e7ea] bg-white dark:border-white/10 dark:bg-[#1b232b]">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6">
             {isLoadingConversation ? (
-              <div className="flex flex-col gap-4 animate-pulse">
+              <div aria-hidden="true" className="flex animate-pulse flex-col gap-4">
                 {[80, 60, 90, 50].map((w, i) => (
                   <div key={i} className={`flex ${i % 2 === 0 ? "justify-start" : "justify-end"}`}>
                     <div
-                      className="h-10 rounded-2xl bg-[#e5e7eb]"
+                      className="h-10 rounded-[12px] bg-[#f4f5f6] dark:bg-white/5"
                       style={{ width: `${w}%` }}
                     />
                   </div>
@@ -257,13 +254,14 @@ function AIAutomationContent() {
               </div>
             ) : messages.length === 0 ? (
               <EmptyState
+                userName={user?.fullName || user?.email || undefined}
                 onQuickAction={(text) => handleSend(text)}
                 onOpenConversations={() => setShowConversations(true)}
                 onNewConversation={startNewConversation}
                 onAction={(text) => handleSend(text)}
               />
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-5">
                 {messages.map((msg) => (
                   <MessageBubble key={msg.id} msg={msg} onAssignDSP={handleAssignDSP} onSendMessage={handleSend} />
                 ))}

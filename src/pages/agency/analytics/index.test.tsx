@@ -35,8 +35,15 @@ vi.mock("./components/AnalyticsDateRangeModal", () => ({
   ),
 }));
 vi.mock("./components/ShareReportModal", () => ({ default: () => null }));
-vi.mock("./components/ComplianceInsights", () => ({ default: () => null }));
-vi.mock("./components/RiskTrends", () => ({ default: () => null }));
+vi.mock("../dashboard/components/RiskIndicatorsCard", () => ({
+  default: () => null,
+}));
+vi.mock("../dashboard/components/RiskTrendsCard", () => ({
+  default: () => null,
+}));
+vi.mock("../dashboard/components/NeedsAttentionCard", () => ({
+  default: () => null,
+}));
 vi.mock("recharts", () => ({
   ResponsiveContainer: () => null,
   AreaChart: () => null,
@@ -96,7 +103,6 @@ it("opens print using resolved returned dates and mode", () => {
       <AnalyticsPage />
     </MemoryRouter>,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Take action" }));
   fireEvent.click(screen.getByRole("button", { name: "Download report" }));
   expect(window.open).toHaveBeenCalledWith(
     "/agency/analytics/print?startDate=2026-09-01&endDate=2026-09-16&mode=hha",
@@ -120,7 +126,6 @@ it.each(["pending", "failure"])(
       </MemoryRouter>,
     );
     expect(screen.queryByText("91%")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Take action" }));
     expect(
       screen.getByRole("button", { name: "Download report" }),
     ).toBeDisabled();
@@ -140,11 +145,11 @@ it("blocks billing and operational AI after the selected report fails, then resu
       <AnalyticsPage />
     </MemoryRouter>,
   );
-  const controls = screen.getAllByRole("button", { name: "AI insights" });
-  expect(controls).toHaveLength(2);
-  controls.forEach((button) => fireEvent.click(button));
+  // Without a report for the selected period the cards offer no AI insights.
+  expect(
+    screen.queryAllByRole("button", { name: "AI insights" }),
+  ).toHaveLength(0);
   expect(fetchInsights).not.toHaveBeenCalled();
-  controls.forEach((button) => expect(button).toBeDisabled());
   expect(
     screen.queryByText("Default-period narrative"),
   ).not.toBeInTheDocument();
@@ -158,7 +163,9 @@ it("blocks billing and operational AI after the selected report fails, then resu
       <AnalyticsPage />
     </MemoryRouter>,
   );
-  screen.getAllByRole("button", { name: "AI insights" }).forEach((button) => {
+  const controls = screen.getAllByRole("button", { name: "AI insights" });
+  expect(controls).toHaveLength(2);
+  controls.forEach((button) => {
     expect(button).toBeEnabled();
     fireEvent.click(button);
   });

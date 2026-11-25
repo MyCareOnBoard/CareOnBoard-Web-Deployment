@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Button } from "@/components/ui/button";
 import {
   ChevronUp,
   Mic,
@@ -21,6 +20,9 @@ const QUICK_ACTIONS = [
   { label: "Review billing issues" },
   { label: "Generate smart report" },
 ];
+
+const composerButton =
+  "inline-flex h-10 cursor-pointer items-center gap-2 rounded-[10px] border border-[#dcdfe2] bg-white px-3.5 text-[14px] font-medium text-[#10141a] transition-colors hover:bg-[#f4f6f7] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] dark:border-white/15 dark:bg-transparent dark:text-[#f4f6f7] dark:hover:bg-white/5";
 
 interface ChatComposerProps {
   value: string;
@@ -81,47 +83,38 @@ export default function ChatComposer({
   }, []);
 
   return (
-    <div className="border-t border-[#e5e7eb] bg-[#FFFFFF42] px-4 py-5 sm:px-6 sm:py-6 flex-shrink-0">
-      <div className="rounded-[28px] bg-white p-4 sm:p-5">
+    <div className="flex-shrink-0 px-4 pb-4 sm:px-6 sm:pb-6">
+      <div className="rounded-[14px] border border-[#12b5b0] bg-white p-3 transition-shadow focus-within:ring-2 focus-within:ring-[#12b5b0]/20 sm:p-4 dark:border-[#12b5b0]/60 dark:bg-[#151c22]">
         <textarea
           ref={textareaRef}
           value={value}
           onChange={(e) => onChange(e.target.value.slice(0, maxLength))}
           placeholder="Talk to me, how can I help you today?"
-          rows={4}
-          className="
-            w-full resize-none rounded-[20px]
-            border border-[#E7E7E7]
-            bg-[#F4F7F8]
-            px-4 py-4
-            text-[15px] text-[#111827]
-            outline-none
-            placeholder:text-[#8B8B8B]
-            focus:border-[#00B4B8]
-            transition
-          "
+          aria-label="Message"
+          rows={3}
+          className="w-full resize-none bg-transparent px-1 text-[14px] leading-6 text-[#10141a] outline-none placeholder:text-[#6b737a] dark:text-[#f4f6f7] dark:placeholder:text-[#9aa4a8]"
         />
 
         {attachments.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-2 flex flex-wrap gap-2">
             {attachments.map((att, idx) => (
-              <div key={idx} className="relative group">
+              <div key={idx} className="group relative">
                 {att.type === "image" ? (
                   <img
                     src={att.url}
                     alt={att.name}
-                    className="h-14 w-14 rounded-xl object-cover border border-[#E7E7E7]"
+                    className="h-14 w-14 rounded-[10px] border border-[#e4e7ea] object-cover dark:border-white/10"
                   />
                 ) : (
-                  <div className="flex items-center gap-1.5 rounded-xl border border-[#E7E7E7] bg-[#F4F7F8] px-3 py-2 text-[13px] text-[#111827]">
-                    <FileText className="h-4 w-4 text-[#6B7280]" />
-                    <span className="max-w-[100px] truncate">{att.name}</span>
+                  <div className="flex items-center gap-1.5 rounded-[10px] border border-[#e4e7ea] bg-[#f4f5f6] px-3 py-2 text-[13px] text-[#10141a] dark:border-white/10 dark:bg-white/5 dark:text-[#f4f6f7]">
+                    <FileText aria-hidden="true" className="h-4 w-4 text-[#4b535b]" />
+                    <span className="max-w-[140px] truncate">{att.name}</span>
                   </div>
                 )}
                 <button
                   type="button"
                   onClick={() => onRemoveAttachment?.(idx)}
-                  className="absolute -top-1.5 -right-1.5 hidden group-hover:flex h-5 w-5 items-center justify-center rounded-full bg-[#6B7280] text-white"
+                  className="absolute -right-1.5 -top-1.5 hidden h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-[#4b535b] text-white group-hover:flex group-focus-within:flex focus-visible:flex"
                   aria-label="Remove attachment"
                 >
                   <X className="h-3 w-3" />
@@ -131,93 +124,55 @@ export default function ChatComposer({
           </div>
         )}
 
-        <div className="mt-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={onAddAttachment ? onAddAttachment : undefined}
-              className="
-                inline-flex items-center gap-2
-                rounded-xl border border-[#E7E7E7]
-                bg-white px-4 py-3
-                text-[15px] font-medium text-[#111827]
-                transition hover:bg-[#F8F8F8] cursor-pointer
-              "
+              className={composerButton}
             >
-              <Paperclip className="h-5 w-5" />
+              <Paperclip aria-hidden="true" className="h-4 w-4" />
               Add attachment
             </button>
 
             <div className="relative" ref={actionRef}>
               <button
                 type="button"
+                aria-expanded={showActions}
                 onClick={() => setShowActions((v) => !v)}
-                className="
-                  inline-flex items-center gap-2
-                  rounded-xl border border-[#E7E7E7]
-                  bg-white px-4 py-3
-                  text-[15px] font-medium text-[#111827]
-                  transition hover:bg-[#F8F8F8] cursor-pointer
-                "
+                className={composerButton}
               >
-                <File className="h-5 w-5" />
-
+                <File aria-hidden="true" className="h-4 w-4" />
                 <span>Take action</span>
-
                 <ChevronUp
-                  className={`h-4 w-4 transition-transform ${
-                    showActions ? "" : "rotate-180"
-                  }`}
+                  aria-hidden="true"
+                  className={`h-4 w-4 transition-transform ${showActions ? "" : "rotate-180"}`}
                 />
               </button>
 
               {showActions && (
-                <div
-                  className="
-                    absolute bottom-[calc(100%+12px)] left-0 z-50
-                    w-[248px]
-                    rounded-[20px]
-                    border border-[#E7E7E7]
-                    bg-white p-3
-                    shadow-[0_10px_40px_rgba(0,0,0,0.08)]
-                  "
-                >
-                  <div className="space-y-1">
-                    {QUICK_ACTIONS.map((action, index) => (
-                      <button
-                        key={action.label}
-                        type="button"
-                        onClick={() => {
-                          onQuickAction(action.label);
-                          setShowActions(false);
-                        }}
-                        className={`
-                          flex w-full items-center justify-between
-                          rounded-[14px]
-                          px-4 py-3
-                          text-left text-[15px]
-                          text-[#111827]
-                          transition hover:bg-[#F7F7F7]
-                          ${
-                            index === 0
-                              ? "border border-[#E5E7EB] bg-[#F8F8F8] font-semibold"
-                              : ""
-                          }
-                        `}
-                      >
-                        <span>{action.label}</span>
-
-                        <ChevronRight className="h-4 w-4 text-[#6B7280]" />
-                      </button>
-                    ))}
-                  </div>
+                <div className="absolute bottom-[calc(100%+8px)] left-0 z-50 w-[240px] rounded-[12px] border border-[#e4e7ea] bg-white p-1.5 shadow-[0_10px_40px_rgba(0,0,0,0.08)] dark:border-white/10 dark:bg-[#1b232b]">
+                  {QUICK_ACTIONS.map((action) => (
+                    <button
+                      key={action.label}
+                      type="button"
+                      onClick={() => {
+                        onQuickAction(action.label);
+                        setShowActions(false);
+                      }}
+                      className="flex w-full cursor-pointer items-center justify-between rounded-[8px] px-2.5 py-2 text-left text-[14px] text-[#10141a] transition-colors hover:bg-[#f2f7f7] dark:text-[#f4f6f7] dark:hover:bg-white/5"
+                    >
+                      <span>{action.label}</span>
+                      <ChevronRight aria-hidden="true" className="h-4 w-4 text-[#4b535b] dark:text-[#9aa4a8]" />
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className="text-[13px] font-medium text-[#6B7280]">
+          <div className="flex items-center gap-2.5">
+            <span className="text-[13px] text-[#4b535b] tabular-nums dark:text-[#9aa4a8]">
               {value.length}/{maxLength}
             </span>
 
@@ -234,28 +189,22 @@ export default function ChatComposer({
               <button
                 type="button"
                 onClick={onMicClick}
-                className="
-                  inline-flex h-11 w-11 items-center justify-center
-                  rounded-xl border border-[#E7E7E7]
-                  bg-white text-[#111827] transition hover:bg-[#F8F8F8] cursor-pointer
-                "
+                aria-label="Dictate a message"
+                className="grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-[#dcdfe2] bg-white text-[#10141a] transition-colors hover:bg-[#f4f6f7] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] dark:border-white/15 dark:bg-transparent dark:text-[#f4f6f7] dark:hover:bg-white/5"
               >
-                <Mic className="h-5 w-5" />
+                <Mic className="h-4 w-4" />
               </button>
             )}
 
-            <Button
+            <button
+              type="button"
               onClick={onSend}
               disabled={disabled}
-              className="
-                h-11 w-11 rounded-xl
-                bg-[#00B4B8]
-                hover:bg-[#009CA0]
-                disabled:bg-[#E5E7EB]
-              "
+              aria-label="Send message"
+              className="grid h-10 w-10 cursor-pointer place-items-center rounded-full bg-[#003839] text-white transition-colors hover:bg-[#0b4c4d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] disabled:cursor-not-allowed disabled:bg-[#e2e5e8] disabled:text-[#8a949b] dark:bg-[#0f7e7d] dark:disabled:bg-white/10"
             >
-              <Send className="h-8 w-8" />
-            </Button>
+              <Send aria-hidden="true" className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </div>

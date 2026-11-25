@@ -1,114 +1,97 @@
-import { ArrowRight, CalendarDays, CreditCard, ShieldCheck, ChevronRight, FileSpreadsheet } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import type { ReactNode } from "react";
+import { CalendarDays, ChevronRight, CreditCard, FileSpreadsheet, ShieldCheck } from "lucide-react";
+import type { ComponentType } from "react";
+import { AiInsightsIcon } from "@/components/agency/AgencyIcons";
+import { agencyRowLink } from "@/components/agency/AgencyListKit";
 
-const QUICK_ACTIONS = [
+const QUICK_ACTIONS: Array<{
+  title: string;
+  description: string;
+  actionLabel: string;
+  icon: ComponentType<{ className?: string }>;
+  payload: string;
+}> = [
   {
     title: "Find shift coverage",
     description: "Quickly fill open shifts with the best available staff.",
     actionLabel: "Find now",
-    icon: <CalendarDays className="w-5 h-5" />,
+    icon: CalendarDays,
     payload: "Find shift coverage",
   },
   {
     title: "Check compliance risks",
     description: "See expiring items, missing documents, and potential issues.",
     actionLabel: "View risks",
-    icon: <ShieldCheck className="w-5 h-5" />,
+    icon: ShieldCheck,
     payload: "Check compliance risks",
   },
   {
     title: "Agency Compliance Report",
     description: "Generate the MSRT monitoring workbook for a period.",
     actionLabel: "Generate",
-    icon: <FileSpreadsheet className="w-5 h-5" />,
+    icon: FileSpreadsheet,
     payload: "Generate the Agency Compliance Report for this quarter",
   },
   {
     title: "Review billing issues",
     description: "Identify overdue invoices, anomalies, and errors.",
     actionLabel: "Review now",
-    icon: <CreditCard className="w-5 h-5" />,
+    icon: CreditCard,
     payload: "Review billing issues",
   },
 ];
 
 interface EmptyStateProps {
+  userName?: string;
   onOpenConversations: () => void;
   onNewConversation: () => void;
   onAction: (text: string) => void;
   onQuickAction: (text: string) => void;
 }
 
-function QuickAction({
-  title,
-  description,
-  actionLabel,
-  icon,
-  payload,
-  onQuickAction
-}: {
-  title: string;
-  description: string;
-  actionLabel: string;
-  icon: ReactNode;
-  payload: string;
-  onQuickAction: (text: string) => void;
-}) {
+export default function EmptyState({ userName, onQuickAction }: EmptyStateProps) {
   return (
-    <div className="bg-white rounded-2xl p-4 sm:p-5 md:p-6 flex flex-col justify-between min-h-[180px] sm:min-h-[200px] shadow-[0_10px_30px_rgba(15,23,42,0.04)] hover:shadow-[0_12px_36px_rgba(15,23,42,0.08)] transition">
-      <div className="flex items-center justify-between gap-3">
-        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-[16px] sm:rounded-2xl bg-[#e0f7f7] grid place-items-center flex-shrink-0">
-          {icon}
-        </div>
-      </div>
-      <div className="mt-4 sm:mt-6">
-        <h3 className="text-[14px] sm:text-[15px] font-semibold text-[#10141a] mb-2">
-          {title}
-        </h3>
-        <p className="text-[12px] sm:text-[13px] leading-[1.5] sm:leading-6 text-[#6b7280]">
-          {description}
-        </p>
-      </div>
-      <button
-        type="button"
-        onClick={() => onQuickAction(payload)}
-        className="mt-4 sm:mt-6 inline-flex items-center justify-between w-full text-[12px] sm:text-[13px] font-semibold cursor-pointer text-[#00b4b8] hover:text-[#009199] transition"
-      >
-        {actionLabel}
-        <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-      </button>
-    </div>
-  );
-}
+    <div className="mx-auto flex max-w-[860px] flex-col items-center py-4 text-center sm:py-8">
+      <span aria-hidden="true" className="grid h-14 w-14 place-items-center rounded-full bg-[#007679] text-white dark:bg-[#0f7e7d]">
+        <AiInsightsIcon className="h-7 w-7" />
+      </span>
+      <h2 className="mt-4 text-[26px] font-medium leading-tight text-[#10141a] sm:text-[30px] dark:text-[#f4f6f7]">
+        Good to see you{userName ? `, ${userName}` : ""}
+      </h2>
+      <p className="mt-1.5 text-[14px] text-[#4b535b] dark:text-[#9aa4a8]">
+        What would you like to do today?
+      </p>
 
-export default function EmptyState({
-  onOpenConversations, onQuickAction }: EmptyStateProps)
-    {
-  return (
-    <div className="rounded-[20px] sm:rounded-[28px] md:rounded-[32px] bg-[#f2f7f8]">
-            <div className="flex flex-col gap-4 sm:gap-6">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div className="text-center">
-                  <p className="text-[12px] sm:text-[14px] md:text-[20px] font-semibold text-[#10141a] leading-tight">
-                   Quick Actions
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onQuickAction("Show me all quick actions")}
-                  className="self-start mt-2 sm:mt-0 inline-flex items-center gap-2 rounded-full border border-[#e5e7eb] bg-white px-3 sm:px-4 py-2 text-[12px] sm:text-[13px] font-semibold text-[#10141a] hover:border-[#00b4b8] hover:text-[#00b4b8] cursor-pointer transition"
-                >
-                  View all <ChevronRight className="w-5 h-5" />
-                </button>
-              </div>
-              {/* Quick Action Cards */}
-              <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 md:grid-cols-3">
-                {QUICK_ACTIONS.map((action) => (
-                  <QuickAction key={action.title} {...action} onQuickAction={onQuickAction} />
-                ))}
-              </div>
-            </div>
-          </div>
+      <div className="mt-7 w-full">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h3 className="text-[14px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">Quick actions</h3>
+          <button type="button" onClick={() => onQuickAction("Show me all quick actions")} className={agencyRowLink}>
+            View all
+            <ChevronRight aria-hidden="true" className="h-4 w-4" />
+          </button>
+        </div>
+        <ul className="grid grid-cols-1 gap-3 text-left sm:grid-cols-2 xl:grid-cols-4">
+          {QUICK_ACTIONS.map(({ title, description, actionLabel, icon: Icon, payload }) => (
+            <li key={title}>
+              <button
+                type="button"
+                onClick={() => onQuickAction(payload)}
+                aria-label={`${title}: ${actionLabel}`}
+                className="group flex h-full w-full cursor-pointer flex-col rounded-[12px] bg-[#f4f5f6] p-3.5 text-left transition-colors hover:bg-[#eaf4f4] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] dark:bg-white/5 dark:hover:bg-white/10"
+              >
+                <span className="grid h-8 w-8 place-items-center rounded-full bg-white text-[#007679] dark:bg-white/10 dark:text-[#7fd3d3]">
+                  <Icon aria-hidden="true" className="h-4 w-4" />
+                </span>
+                <span className="mt-3 text-[14px] font-medium text-[#10141a] dark:text-[#f4f6f7]">{title}</span>
+                <span className="mt-1 flex-1 text-[12px] leading-[18px] text-[#4b535b] dark:text-[#9aa4a8]">{description}</span>
+                <span className="mt-3 inline-flex items-center gap-1 text-[13px] font-medium text-[#007679] group-hover:underline dark:text-[#7fd3d3]">
+                  {actionLabel}
+                  <ChevronRight aria-hidden="true" className="h-3.5 w-3.5" />
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
   );
 }
