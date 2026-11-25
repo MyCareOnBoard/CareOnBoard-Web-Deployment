@@ -3,7 +3,9 @@ import { useEffectiveAgencyMode } from '@/hooks/useEffectiveAgencyMode';
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { ChevronLeft, MessageSquare } from "lucide-react";
+import { ArrowLeft, MessageSquare, Pencil } from "lucide-react";
+import { AgencyPill, agencyOutlineButton, agencyPrimaryButton, type AgencyTone } from "@/components/agency/AgencyListKit";
+import { cn } from "@/lib/utils";
 import { DSP } from "./types";
 import { useDSPDetails,  useUpdateDSPStatus } from "./useDSPManagement";
 import { Routes } from "@/routes/constants";
@@ -25,9 +27,17 @@ import { withMessagingProvider } from "@/contexts/withMessagingProvider";
 interface DSPProfileProps {
   dsp: DSP;
   onBack: () => void;
+  /** Breadcrumb label for the directory ("DSP management"). */
+  sectionLabel?: string;
 }
 
-function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
+const PROFILE_TABS = ["Activity", "Shifts", "Profile", "Training"] as const;
+
+const STATUS_TONE: Record<string, AgencyTone> = { active: "green", pending: "amber", suspended: "red", inactive: "grey" };
+
+const smallButton = "inline-flex h-8 cursor-pointer items-center justify-center rounded-[8px] px-3 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] disabled:cursor-not-allowed disabled:opacity-50";
+
+function DSPProfileContent({ dsp, onBack, sectionLabel = "DSP management" }: DSPProfileProps) {
   const [activeTab, setActiveTab] = useState<"Activity" | "Shifts" | "Profile" | "Training">("Activity");
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showRequestDocument, setShowRequestDocument] = useState(false);
@@ -116,15 +126,15 @@ function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
   const getDocumentStatusColor = (status: string) => {
     switch (status) {
       case 'available':
-        return 'bg-green-100 text-green-700';
+        return 'bg-[#e6f6ec] text-[#1a7f37] dark:bg-[#30a46c]/15 dark:text-[#7ee2a8]';
       case 'expired':
-        return 'bg-red-100 text-red-700';
+        return 'bg-[#fde8e6] text-[#b42318] dark:bg-[#ef4444]/15 dark:text-[#f8a1a1]';
       case 'expiring-soon':
-        return 'bg-orange-100 text-orange-700';
+        return 'bg-[#fcf5dc] text-[#7a5800] dark:bg-[#e0b400]/15 dark:text-[#f0cf6b]';
       case 'unavailable':
-        return 'bg-gray-200 text-gray-600';
+        return 'bg-[#eef0f2] text-[#4b535b] dark:bg-white/10 dark:text-[#c9d1d4]';
       default:
-        return 'bg-gray-100 text-gray-700';
+        return 'bg-[#eef0f2] text-[#2a3138] dark:bg-white/10 dark:text-[#c9d1d4]';
     }
   };
 
@@ -172,7 +182,7 @@ function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
         type="button"
         onClick={() => setRemovingDoc(doc)}
         aria-label={`Remove ${documentTypeLabel(doc.documentName)}`}
-        className="px-3 py-1 text-xs text-red-600 rounded-full border border-red-200 hover:bg-red-50 transition-colors cursor-pointer"
+        className={cn(smallButton, "border border-[#f0c8c4] bg-white text-[#b42318] hover:bg-[#fdf2f1] dark:border-[#ff6b5e]/30 dark:bg-transparent dark:text-[#f8a1a1] dark:hover:bg-[#ff6b5e]/10")}
       >
         Remove
       </button>
@@ -183,7 +193,7 @@ function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
         <button
           onClick={() => handleSendDocumentAlert(doc)}
           disabled={isLoading}
-          className="px-4 py-1 bg-red-500 text-white text-xs rounded-full hover:bg-red-600 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          className={cn(smallButton, "bg-[#b42318] text-white hover:bg-[#9a1d14] dark:bg-[#d93a2f] dark:hover:bg-[#c2322a]")}
         >
           {isLoading ? 'Sending...' : 'Send Alert'}
         </button>
@@ -258,107 +268,101 @@ function DSPProfileContent({ dsp, onBack }: DSPProfileProps) {
     }
   };
 
-  return (
-    <div className="  p-6 space-y-6">
-      {/* Back Button */}
-      <button
-        onClick={onBack}
-        className="flex items-center gap-2 text-gray-600 hover:text-teal-600 transition-colors mb-4"
-      >
-        <ChevronLeft className="w-5 h-5" />
-        <span className="text-sm font-medium">Back to Directory</span>
-      </button>
+  const metaLine = [
+    `${currentDsp.role} · ${currentDsp.age} yrs old`,
+    currentDsp.email,
+  ].filter(Boolean);
 
-      {/* Profile Section */}
-      <div className="flex items-start justify-between">
-        <div className="flex items-start gap-4">
-          <Avatar className="h-[110px] w-24 shrink-0 overflow-hidden rounded-[8px]">
-            <AvatarImage
-              src={currentDsp.profilePicture}
-              alt={currentDsp.fullName}
-              className="h-full w-full object-cover aspect-auto"
-            />
-            <AvatarFallback className="rounded-[8px] bg-linear-to-br from-[#00b4b8] to-[#0090a8] text-white text-lg font-medium">
-              {getInitials(currentDsp.fullName)}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <h2 className="text-xl font-bold text-gray-900">{currentDsp.fullName}</h2>
-              <span className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${
-                currentDsp.status === "active" 
-                  ? "bg-green-100 text-green-700" 
-                  : "bg-gray-200 text-gray-700"
-              }`}>
-                {currentDsp.status}
-              </span>
-            </div>
-            <p className="text-sm text-gray-600">{currentDsp.role} · {currentDsp.age} yrs old</p>
-            <div className="flex items-center gap-2 mt-3">
-              <button
-                onClick={handleOpenChat}
-                disabled={isOpeningChat}
-                className="flex items-center gap-2 px-4 py-2 bg-teal-500 text-white text-sm rounded-full hover:bg-teal-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <MessageSquare className="w-4 h-4" />
-                {isOpeningChat ? "Opening..." : "Chat"}
+  return (
+    <div className="space-y-6 pb-6">
+      <div className="border-b border-[#eceef0] pb-6 dark:border-white/10">
+        {/* Breadcrumb */}
+        <nav aria-label="Breadcrumb" className="flex items-center gap-3 text-[14px]">
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Back to Directory"
+            className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-full border border-[#dcdfe2] text-[#2a3138] transition-colors hover:bg-[#f4f6f7] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] dark:border-white/15 dark:text-[#c9d1d4] dark:hover:bg-white/5"
+          >
+            <ArrowLeft aria-hidden="true" className="h-4 w-4" />
+          </button>
+          <ol className="flex min-w-0 items-center gap-2">
+            <li>
+              <button type="button" onClick={onBack} className="cursor-pointer text-[#4b535b] hover:text-[#10141a] hover:underline dark:text-[#9aa4a8] dark:hover:text-[#f4f6f7]">
+                {sectionLabel}
               </button>
-              <button
-                onClick={() => setShowEditProfile(true)}
-                className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded-full hover:bg-teal-50 hover:border-teal-300 hover:text-teal-600 transition-colors cursor-pointer"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                </svg>
-                Edit Profile
-              </button>
+            </li>
+            <li aria-hidden="true" className="text-[#9aa1a7]">/</li>
+            <li aria-current="page" className="truncate font-medium text-[#10141a] dark:text-[#f4f6f7]">{currentDsp.fullName}</li>
+          </ol>
+        </nav>
+
+        {/* Profile header */}
+        <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-4">
+            <Avatar className="h-14 w-14 shrink-0">
+              <AvatarImage
+                src={currentDsp.profilePicture}
+                alt={currentDsp.fullName}
+                className="h-full w-full object-cover"
+              />
+              <AvatarFallback className="bg-[#e0f3f3] text-[20px] font-medium text-[#005c5e] dark:bg-[#0f7e7d]/20 dark:text-[#7fd3d3]">
+                {getInitials(currentDsp.fullName)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <h1 className="text-[28px] font-medium leading-tight text-[#10141a] dark:text-[#f4f6f7]">{currentDsp.fullName}</h1>
+                <AgencyPill tone={STATUS_TONE[currentDsp.status ?? ""] ?? "grey"} className="capitalize">{currentDsp.status}</AgencyPill>
+              </div>
+              <p className="mt-1 flex flex-wrap gap-x-2 text-[14px] text-[#4b535b] dark:text-[#9aa4a8]">
+                {metaLine.map((item, index) => (
+                  <span key={index}>{index > 0 && <span aria-hidden="true" className="mr-2">·</span>}{item}</span>
+                ))}
+              </p>
             </div>
           </div>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              type="button"
+              onClick={handleOpenChat}
+              disabled={isOpeningChat}
+              className={agencyOutlineButton}
+            >
+              <MessageSquare aria-hidden="true" className="h-4 w-4" />
+              {isOpeningChat ? "Opening..." : "Chat"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowEditProfile(true)}
+              className={agencyPrimaryButton}
+            >
+              <Pencil aria-hidden="true" className="h-4 w-4" />
+              Edit Profile
+            </button>
+          </div>
         </div>
+      </div>
 
-        {/* Tabs */}
-        <div className="flex items-center gap-2">
+      {/* Tabs */}
+      <div role="tablist" aria-label="Profile sections" className="flex max-w-full gap-0.5 overflow-x-auto rounded-[12px] bg-[#f4f5f6] p-1 sm:inline-flex dark:bg-white/5">
+        {PROFILE_TABS.map((tab) => (
           <button
-            onClick={() => setActiveTab("Activity")}
-            className={`px-6 py-2 rounded-full text-sm font-medium border transition-colors cursor-pointer ${
-              activeTab === "Activity"
-                ? "bg-teal-500 text-white border-teal-500"
-                : "text-gray-600 border-gray-200 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-700"
-            }`}
+            key={tab}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab}
+            onClick={() => setActiveTab(tab)}
+            className={cn(
+              "inline-flex h-9 shrink-0 cursor-pointer items-center rounded-[9px] px-4 text-[14px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#007679]",
+              activeTab === tab
+                ? "bg-[#003839] font-medium text-white shadow-[0_1px_2px_rgba(16,20,26,0.12)] dark:bg-[#0f7e7d] dark:text-white"
+                : "text-[#4b535b] hover:bg-white/70 hover:text-[#10141a] dark:text-[#9aa4a8] dark:hover:bg-white/5 dark:hover:text-[#f4f6f7]",
+            )}
           >
-            Activity
+            {tab}
           </button>
-          <button
-            onClick={() => setActiveTab("Shifts")}
-            className={`px-6 py-2 rounded-full border text-sm font-medium transition-colors cursor-pointer ${
-              activeTab === "Shifts"
-                ? "bg-teal-500 text-white border-teal-500"
-                : "text-gray-600 border-gray-200 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-700"
-            }`}
-          >
-            Shifts
-          </button>
-          <button
-            onClick={() => setActiveTab("Profile")}
-            className={`px-6 py-2 rounded-full text-sm border font-medium transition-colors cursor-pointer ${
-              activeTab === "Profile"
-                ? "bg-teal-500 text-white border-teal-500"
-                : "text-gray-600 border-gray-200 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-700"
-            }`}
-          >
-            Profile
-          </button>
-          <button
-            onClick={() => setActiveTab("Training")}
-            className={`px-6 py-2 rounded-full text-sm border font-medium transition-colors cursor-pointer ${
-              activeTab === "Training"
-                ? "bg-teal-500 text-white border-teal-500"
-                : "text-gray-600 border-gray-200 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-700"
-            }`}
-          >
-            Training
-          </button>
-        </div>
+        ))}
       </div>
 
       {/* Tab Content */}

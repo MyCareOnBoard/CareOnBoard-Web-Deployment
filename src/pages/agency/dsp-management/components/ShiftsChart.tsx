@@ -21,7 +21,9 @@ import {
   format,
   isWithinInterval,
 } from "date-fns";
+import { CalendarDays } from "lucide-react";
 import { type Shift, ShiftStatus } from "@/lib/api/shifts";
+import { cn } from "@/lib/utils";
 
 type FilterType = "week" | "month" | "year" | "lifetime";
 
@@ -156,9 +158,9 @@ const FILTER_OPTIONS: { key: FilterType; label: string }[] = [
 ];
 
 const BAR_COLORS = {
-  Scheduled: "#1A4D8F",
-  "Visit Completed": "#2B82FF",
-  Incomplete: "#B0BEC5",
+  Scheduled: "#0f7e7d",
+  "Visit Completed": "#12b5b0",
+  Incomplete: "#c9d1d4",
 };
 
 interface ShiftsChartProps {
@@ -174,30 +176,34 @@ export function ShiftsChart({ shifts, isLoading }: ShiftsChartProps) {
   const total = shifts.length;
 
   return (
-    <div className="bg-[#edf1f2] p-6 rounded-lg flex flex-col gap-4">
+    <section aria-label="Shifts" aria-busy={isLoading || undefined} className="flex min-w-0 flex-col rounded-[16px] border border-[#e4e7ea] bg-white dark:border-white/10 dark:bg-[#1b232b]">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-bold text-gray-900">SHIFTS</h3>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#eceef0] px-5 py-3 dark:border-white/10">
+        <div className="flex items-center gap-2.5">
+          <CalendarDays aria-hidden="true" className="h-5 w-5 text-[#007679] dark:text-[#7fd3d3]" />
+          <h3 className="text-base font-semibold text-[#10141a] dark:text-[#f4f6f7]">Shifts</h3>
           {!isLoading && (
-            <p className="text-sm text-gray-500 mt-0.5">
+            <span className="text-[13px] text-[#4b535b] dark:text-[#9aa4a8]">
               Total:{" "}
-              <span className="font-semibold text-gray-900">{total}</span>
-            </p>
+              <span className="font-semibold text-[#10141a] dark:text-[#f4f6f7]">{total}</span>
+            </span>
           )}
         </div>
 
         {/* Filter Buttons */}
-        <div className="flex items-center gap-1 bg-white rounded-lg p-1 border border-gray-200">
+        <div role="group" aria-label="Shift period" className="flex items-center gap-0.5 rounded-[10px] bg-[#f4f5f6] p-1 dark:bg-white/5">
           {FILTER_OPTIONS.map((opt) => (
             <button
               key={opt.key}
+              type="button"
+              aria-pressed={filter === opt.key}
               onClick={() => setFilter(opt.key)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+              className={cn(
+                "h-7 cursor-pointer rounded-[7px] px-2.5 text-[12px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#007679]",
                 filter === opt.key
-                  ? "bg-teal-500 text-white"
-                  : "text-gray-500 hover:text-teal-600 hover:bg-teal-50"
-              }`}
+                  ? "bg-[#003839] font-medium text-white shadow-[0_1px_2px_rgba(16,20,26,0.12)] dark:bg-[#0f7e7d] dark:text-white"
+                  : "text-[#4b535b] hover:text-[#10141a] dark:text-[#9aa4a8] dark:hover:text-[#f4f6f7]",
+              )}
             >
               {opt.label}
             </button>
@@ -205,15 +211,16 @@ export function ShiftsChart({ shifts, isLoading }: ShiftsChartProps) {
         </div>
       </div>
 
+      <div className="flex flex-1 flex-col gap-4 px-5 py-4">
       {/* Legend */}
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4">
         {Object.entries(BAR_COLORS).map(([label, color]) => (
           <div key={label} className="flex items-center gap-1.5">
             <div
-              className="w-2.5 h-2.5 rounded-sm shrink-0"
+              className="h-2.5 w-2.5 shrink-0 rounded-full"
               style={{ backgroundColor: color }}
             />
-            <span className="text-xs text-gray-600">{label}</span>
+            <span className="text-[12px] text-[#4b535b] dark:text-[#9aa4a8]">{label}</span>
           </div>
         ))}
       </div>
@@ -221,9 +228,7 @@ export function ShiftsChart({ shifts, isLoading }: ShiftsChartProps) {
       {/* Chart */}
       <div className="min-h-48">
         {isLoading ? (
-          <div className="flex items-center justify-center h-48">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-teal-500" />
-          </div>
+          <div aria-hidden="true" className="h-[220px] animate-pulse rounded-[12px] bg-[#f4f5f6] dark:bg-white/5" />
         ) : (
           <ResponsiveContainer width="100%" height={220}>
             <BarChart
@@ -232,24 +237,25 @@ export function ShiftsChart({ shifts, isLoading }: ShiftsChartProps) {
               barCategoryGap="30%"
               barGap={2}
             >
-              <CartesianGrid vertical={false} stroke="#D1D5DB" strokeDasharray="3 3" />
+              <CartesianGrid vertical={false} stroke="#eceef0" strokeDasharray="3 3" />
               <XAxis
                 dataKey="label"
-                tick={{ fontSize: 11, fill: "#6B7280" }}
+                tick={{ fontSize: 11, fill: "#6b737a" }}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
                 allowDecimals={false}
-                tick={{ fontSize: 11, fill: "#6B7280" }}
+                tick={{ fontSize: 11, fill: "#6b737a" }}
                 axisLine={false}
                 tickLine={false}
               />
               <Tooltip
+                cursor={{ fill: "rgba(15,126,125,0.06)" }}
                 contentStyle={{
-                  borderRadius: "8px",
-                  border: "none",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+                  borderRadius: "10px",
+                  border: "1px solid #e4e7ea",
+                  boxShadow: "0 8px 24px rgba(16,20,26,0.08)",
                   fontSize: 12,
                 }}
               />
@@ -260,6 +266,7 @@ export function ShiftsChart({ shifts, isLoading }: ShiftsChartProps) {
           </ResponsiveContainer>
         )}
       </div>
-    </div>
+      </div>
+    </section>
   );
 }

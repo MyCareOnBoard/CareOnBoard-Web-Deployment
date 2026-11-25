@@ -1,10 +1,10 @@
 import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import { useNavigate, generatePath } from "react-router";
-import { Button } from "@/components/ui/button";
 import { ShiftsMonthCalendar } from "@/components/shifts/ShiftsMonthCalendar";
 import { cn } from "@/lib/utils";
-import { CalendarDays, ChevronLeft, ChevronRight, List, Loader2 } from "lucide-react";
+import { CalendarDays, List } from "lucide-react";
+import { AgencyPagination } from "@/components/agency/AgencyListKit";
 import {
   type Shift,
   categorizeShifts,
@@ -250,44 +250,45 @@ export function ShiftsTab({
     }
   }, [agencyId, shiftToApprove, toast, onShiftsUpdated]);
 
-  const tabClass = (tab: "previous" | "ongoing" | "upcoming") =>
-    `px-5 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer border ${
-      shiftsTab === tab
-        ? "bg-teal-500 text-white border-teal-500"
-        : "text-gray-600 border-gray-200 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-700"
-    }`;
+  const tabClass = (tab: "previous" | "ongoing" | "upcoming") => cn(
+    "inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-[9px] px-3 text-[14px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#007679]",
+    shiftsTab === tab
+      ? "bg-[#003839] font-medium text-white shadow-[0_1px_2px_rgba(16,20,26,0.12)] dark:bg-[#0f7e7d] dark:text-white"
+      : "text-[#4b535b] hover:text-[#10141a] dark:text-[#9aa4a8] dark:hover:text-[#f4f6f7]",
+  );
+
+  const viewButton = (on: boolean) => cn(
+    "grid h-8 w-8 cursor-pointer place-items-center rounded-[7px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#007679]",
+    on ? "bg-[#003839] font-medium text-white shadow-[0_1px_2px_rgba(16,20,26,0.12)] dark:bg-[#0f7e7d] dark:text-white" : "text-[#4b535b] hover:text-[#10141a] dark:text-[#9aa4a8] dark:hover:text-[#f4f6f7]",
+  );
 
   const shiftsViewToggle = (opts?: { dividerAfterYear?: boolean }) => (
     <div
       className={cn(
-        "flex items-center gap-1",
-        opts?.dividerAfterYear && "border-l border-gray-200/80 pl-2 ml-0.5",
+        "flex items-center gap-0.5 rounded-[10px] bg-[#f4f5f6] p-1 dark:bg-white/5",
+        opts?.dividerAfterYear && "ml-0.5",
       )}
       role="tablist"
       aria-label="Shifts view"
     >
-      <Button
+      <button
         type="button"
-        variant={shiftsView === "calendar" ? "default" : "outline"}
-        size="icon-sm"
-        className="rounded-[5px] px-0"
+        className={viewButton(shiftsView === "calendar")}
         aria-pressed={shiftsView === "calendar"}
         aria-label="Calendar view"
         onClick={() => setShiftsView("calendar")}
       >
-        <CalendarDays className="size-5 shrink-0" />
-      </Button>
-      <Button
+        <CalendarDays aria-hidden="true" className="size-4 shrink-0" />
+      </button>
+      <button
         type="button"
-        variant={shiftsView === "list" ? "default" : "outline"}
-        size="icon-sm"
-        className="rounded-[5px] px-0"
+        className={viewButton(shiftsView === "list")}
         aria-pressed={shiftsView === "list"}
         aria-label="List view"
         onClick={() => setShiftsView("list")}
       >
-        <List className="size-5 shrink-0" />
-      </Button>
+        <List aria-hidden="true" className="size-4 shrink-0" />
+      </button>
     </div>
   );
 
@@ -352,74 +353,63 @@ export function ShiftsTab({
   return (
     <div className="space-y-4">
       {shiftsView === "calendar" && (
-        <ShiftsMonthCalendar
-          variant="dsp"
-          agencyId={agencyId}
-          employeeId={dspId}
-          headerActions={shiftsViewToggle({ dividerAfterYear: true })}
-        />
+        <div className="rounded-[16px] border border-[#e4e7ea] bg-white dark:border-white/10 dark:bg-[#1b232b] p-5">
+          <ShiftsMonthCalendar
+            variant="dsp"
+            agencyId={agencyId}
+            employeeId={dspId}
+            headerActions={shiftsViewToggle({ dividerAfterYear: true })}
+          />
+        </div>
       )}
 
       {shiftsView === "list" && (
         <>
           <div className="flex justify-end">{shiftsViewToggle()}</div>
-          <div className="rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white">
-            <div className="flex flex-wrap items-center gap-2 mb-6">
+          <div className="overflow-hidden rounded-[16px] border border-[#e4e7ea] bg-white dark:border-white/10 dark:bg-[#1b232b]">
+            <div className="p-4">
+            <div role="group" aria-label="Shift period" className="flex max-w-full flex-wrap items-center gap-0.5 rounded-[12px] bg-[#f4f5f6] p-1 sm:inline-flex dark:bg-white/5">
               <button type="button" onClick={() => handleTabChange("previous")} className={tabClass("previous")}>
                 Previous Shifts
                 {categorized.previous.length > 0 && (
-                  <span className="ml-1.5 text-xs opacity-80">({categorized.previous.length})</span>
+                  <span className="text-[12px] opacity-80">({categorized.previous.length})</span>
                 )}
               </button>
               <button type="button" onClick={() => handleTabChange("ongoing")} className={tabClass("ongoing")}>
                 Ongoing Shifts
-                {categorized.current && <span className="ml-1.5 text-xs opacity-80">(1)</span>}
+                {categorized.current && <span className="text-[12px] opacity-80">(1)</span>}
               </button>
               <button type="button" onClick={() => handleTabChange("upcoming")} className={tabClass("upcoming")}>
                 Upcoming Shifts
                 {categorized.upcoming.length > 0 && (
-                  <span className="ml-1.5 text-xs opacity-80">({categorized.upcoming.length})</span>
+                  <span className="text-[12px] opacity-80">({categorized.upcoming.length})</span>
                 )}
               </button>
             </div>
 
+            </div>
+
+            <div className="border-t border-[#eceef0] px-4 py-4 dark:border-white/10">
             {isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-[#00b4b8]" aria-hidden />
+              <div role="status" aria-label="Loading shifts" className="space-y-3">
+                {[0, 1, 2].map((i) => <div key={i} aria-hidden="true" className="h-[88px] animate-pulse rounded-[12px] bg-[#f4f5f6] dark:bg-white/5" />)}
               </div>
             ) : filteredShifts.length === 0 ? (
-              <div className="flex items-center justify-center py-8 px-4 text-center">
-                <p className="text-[14px] text-[#808081]">No {shiftsTab} shifts available</p>
+              <div className="flex items-center justify-center px-4 py-10 text-center">
+                <p className="text-[14px] text-[#4b535b] dark:text-[#9aa4a8]">No {shiftsTab} shifts available</p>
               </div>
             ) : (
               <div className="space-y-3">{paginatedShifts.map(renderShiftRow)}</div>
             )}
+            </div>
 
             {!isLoading && filteredShifts.length > pageSize && (
-              <div className="flex items-center justify-center gap-2 mt-6">
-                <span className="text-[16px] font-medium leading-[1.6] text-[#10141a]">
-                  {page}
-                  <span className="text-[14px] text-[#808081]">/{totalPages}</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setPage(Math.max(1, page - 1))}
-                  disabled={page === 1}
-                  className="backdrop-blur-[2.909px] bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] rounded-full p-1.5 disabled:opacity-50 hover:bg-white/70 transition-colors cursor-pointer"
-                  aria-label="Previous page"
-                >
-                  <ChevronLeft className="w-5 h-5 text-[#10141a]" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPage(Math.min(totalPages, page + 1))}
-                  disabled={page === totalPages}
-                  className="backdrop-blur-[2.909px] bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] rounded-full p-1.5 disabled:opacity-50 hover:bg-white/70 transition-colors cursor-pointer"
-                  aria-label="Next page"
-                >
-                  <ChevronRight className="w-5 h-5 text-[#10141a]" />
-                </button>
-              </div>
+              <AgencyPagination
+                summary={`Showing ${paginatedShifts.length} of ${filteredShifts.length} shifts`}
+                page={page}
+                pages={totalPages}
+                onPage={(next) => setPage(Math.min(totalPages, Math.max(1, next)))}
+              />
             )}
           </div>
         </>

@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, UserPen, X } from "lucide-react";
+import { agencyOutlineButton, agencyPrimaryButton } from "@/components/agency/AgencyListKit";
 import { format, parseISO } from "date-fns";
 import { updateEmployee, type UpdateEmployeeRequest } from "@/lib/api/employees";
 import { useToast } from "@/hooks/use-toast";
@@ -138,20 +139,20 @@ export function EditProfileModal({
 
 	return (
 		<Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-			<DialogContent className="w-[520px] max-w-[calc(100vw-32px)] p-0 gap-0 overflow-hidden rounded-2xl shadow-xl">
-				<DialogHeader className="px-6 pt-6 pb-4 text-left items-start">
-					<DialogTitle className="text-lg font-semibold text-[#10141a]">
+			<DialogContent showCloseButton={false} className="w-[calc(100vw-32px)] max-w-[560px] gap-0 overflow-hidden rounded-[20px] p-0">
+				<DialogHeader className="flex-row items-start gap-3.5 border-b border-[#eceef0] px-5 py-4 text-left dark:border-white/10"><span aria-hidden="true" className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-[#dcdfe2] text-[#007679] dark:border-white/15 dark:text-[#7fd3d3]"><UserPen className="h-5 w-5" /></span><div className="min-w-0 flex-1">
+					<DialogTitle className="text-[22px] font-medium leading-tight text-[#10141a] dark:text-[#f4f6f7]">
 						Edit Profile
 					</DialogTitle>
-					<p className="text-sm text-[var(--grey-200)] mt-0.5">
+					<p className="mt-0.5 text-[14px] text-[#4b535b] dark:text-[#9aa4a8]">
 						Update {dsp.fullName}&apos;s information
 					</p>
-				</DialogHeader>
+				</div><button type="button" onClick={onClose} aria-label="Close" disabled={saving} className="grid h-8 w-8 shrink-0 cursor-pointer place-items-center rounded-full border border-[#dcdfe2] text-[#4b535b] transition-colors hover:bg-[#f4f6f7] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] disabled:opacity-50 dark:border-white/15 dark:text-[#c9d1d4]"><X aria-hidden="true" className="h-4 w-4" /></button></DialogHeader>
 
-				<div className="px-6 py-5 space-y-4 max-h-[60vh] overflow-y-auto">
+				<div className="max-h-[60vh] space-y-4 overflow-y-auto px-5 py-5">
 					{/* Full Name */}
 					<div className="space-y-1.5">
-						<Label className="text-sm font-medium text-[#10141a]">
+						<Label className="text-[13px] font-medium text-[#2a3138] dark:text-[#c9d1d4]">
 							Full Name
 						</Label>
 						<Input
@@ -163,7 +164,7 @@ export function EditProfileModal({
 
 					{/* Phone */}
 					<div className="space-y-1.5">
-						<Label className="text-sm font-medium text-[#10141a]">
+						<Label className="text-[13px] font-medium text-[#2a3138] dark:text-[#c9d1d4]">
 							Phone Number
 						</Label>
 						<Input
@@ -176,7 +177,7 @@ export function EditProfileModal({
 
 					{/* Address */}
 					<div className="space-y-1.5">
-						<Label className="text-sm font-medium text-[#10141a]">
+						<Label className="text-[13px] font-medium text-[#2a3138] dark:text-[#c9d1d4]">
 							Address
 						</Label>
 						<Input
@@ -188,7 +189,7 @@ export function EditProfileModal({
 
 					{/* Date of Birth */}
 					<div className="space-y-1.5">
-						<Label className="text-sm font-medium text-[#10141a]">
+						<Label className="text-[13px] font-medium text-[#2a3138] dark:text-[#c9d1d4]">
 							Date of Birth
 						</Label>
 						<Input
@@ -198,11 +199,11 @@ export function EditProfileModal({
 						/>
 					</div>
 					<div className="space-y-1.5">
-						<Label htmlFor="edit-hire-date" className="text-sm font-medium text-[#10141a]">Hire Date</Label>
+						<Label htmlFor="edit-hire-date" className="text-[13px] font-medium text-[#2a3138] dark:text-[#c9d1d4]">Hire Date</Label>
 						<Popover open={hireDateOpen} onOpenChange={setHireDateOpen}>
 							<PopoverTrigger asChild>
-								<Button id="edit-hire-date" type="button" variant="outline" disabled={saving} className="w-full justify-between rounded-xl border-[var(--input-border)] bg-[var(--input-bg)] text-[#10141a]">
-									{form.hireDate || "Select hire date"}<CalendarDays className="h-4 w-4 text-[#808081]" />
+								<Button id="edit-hire-date" type="button" variant="outline" disabled={saving} className="h-10 w-full justify-between rounded-[10px] border-[#dcdfe2] bg-white px-3.5 text-[14px] font-normal text-[#10141a] dark:border-white/15 dark:bg-[#151c22] dark:text-[#f4f6f7]">
+									{form.hireDate || "Select hire date"}<CalendarDays className="h-4 w-4 text-[#007679]" />
 								</Button>
 							</PopoverTrigger>
 							<PopoverContent align="start" className="w-auto p-0">
@@ -219,15 +220,15 @@ export function EditProfileModal({
 					</div>
 
 					{/* Agency Compliance (MSRT) report fields */}
-					<div className="pt-2 border-t border-gray-100">
-						<p className="text-sm font-semibold text-[#10141a]">Compliance reporting</p>
-						<p className="text-xs text-[var(--grey-200)] mt-0.5">
+					<div className="border-t border-[#eceef0] pt-3 dark:border-white/10">
+						<p className="text-sm font-semibold text-[#10141a] dark:text-[#f4f6f7]">Compliance reporting</p>
+						<p className="text-xs text-[#4b535b] dark:text-[#9aa4a8] mt-0.5">
 							Columns on the Agency Compliance report.
 						</p>
 					</div>
 
 					<div className="space-y-1.5">
-						<Label className="text-sm font-medium text-[#10141a]">
+						<Label className="text-[13px] font-medium text-[#2a3138] dark:text-[#c9d1d4]">
 							Alternate last name
 						</Label>
 						<Input
@@ -238,7 +239,7 @@ export function EditProfileModal({
 					</div>
 
 					<div className="space-y-1.5">
-						<Label className="text-sm font-medium text-[#10141a]">
+						<Label className="text-[13px] font-medium text-[#2a3138] dark:text-[#c9d1d4]">
 							Last 4 digits of SSN
 						</Label>
 						<Input
@@ -250,13 +251,13 @@ export function EditProfileModal({
 								handleChange("ssnLast4", e.target.value.replace(/\D/g, "").slice(0, 4))
 							}
 						/>
-						<p className="text-xs text-[var(--grey-200)]">
+						<p className="text-xs text-[#4b535b] dark:text-[#9aa4a8]">
 							Last four digits only. The full number is never stored.
 						</p>
 					</div>
 
 					<div className="space-y-1.5">
-						<Label className="text-sm font-medium text-[#10141a]">
+						<Label className="text-[13px] font-medium text-[#2a3138] dark:text-[#c9d1d4]">
 							Start date (if different from hire date)
 						</Label>
 						<Input
@@ -269,38 +270,38 @@ export function EditProfileModal({
 					<label className="flex items-center gap-2.5 cursor-pointer">
 						<input
 							type="checkbox"
-							className="h-4 w-4 accent-teal-500"
+							className="h-4 w-4 accent-[#007679]"
 							checked={form.drivesIndividuals}
 							onChange={(e) => handleChange("drivesIndividuals", e.target.checked)}
 						/>
-						<span className="text-sm text-[#10141a]">Drives individuals</span>
+						<span className="text-sm text-[#10141a] dark:text-[#f4f6f7]">Drives individuals</span>
 					</label>
 
 					<label className="flex items-center gap-2.5 cursor-pointer">
 						<input
 							type="checkbox"
-							className="h-4 w-4 accent-teal-500"
+							className="h-4 w-4 accent-[#007679]"
 							checked={form.administersMedications}
 							onChange={(e) => handleChange("administersMedications", e.target.checked)}
 						/>
-						<span className="text-sm text-[#10141a]">Administers medications</span>
+						<span className="text-sm text-[#10141a] dark:text-[#f4f6f7]">Administers medications</span>
 					</label>
 				</div>
 
 				{/* Actions */}
-				<div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
+				<div className="flex items-center justify-end gap-2.5 border-t border-[#eceef0] px-5 py-4 dark:border-white/10">
 					<Button
 						variant="outline"
 						onClick={onClose}
 						disabled={saving}
-						className="px-5 py-2 rounded-full border-gray-300 text-gray-700 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-600 transition-colors"
+						className={agencyOutlineButton}
 					>
 						Cancel
 					</Button>
 					<Button
 						onClick={handleSave}
 						disabled={saving}
-						className="px-5 py-2 rounded-full bg-teal-500 hover:bg-teal-600 text-white font-medium disabled:opacity-50"
+						className={`${agencyPrimaryButton} active:bg-[#003839]`}
 					>
 						{saving ? "Saving..." : "Save Changes"}
 					</Button>

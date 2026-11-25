@@ -101,7 +101,7 @@ const ConfirmDialogContent = React.forwardRef<
         <div className="flex w-full gap-3">
           <Button 
             variant="outline"
-            className="flex-1 rounded-[60px] border-[#e0e0e0] px-4 py-4 text-[14px] font-semibold leading-[1.4] text-[#808081] hover:bg-[#f5f5f5] cursor-pointer disabled:cursor-not-allowed dark:border-white/15 dark:text-[#9aa4a8] dark:hover:bg-white/5" 
+            className="flex-1 disabled:cursor-not-allowed" 
             onClick={onCancel}
             disabled={isLoading}
           >
@@ -109,7 +109,7 @@ const ConfirmDialogContent = React.forwardRef<
           </Button>
           <Button 
             variant={confirmVariant}
-            className={cn("flex-1 rounded-[60px] px-4 py-4 text-[14px] font-semibold leading-[1.4] text-white cursor-pointer disabled:cursor-not-allowed", confirmVariant === "destructive" && "bg-[#ef4444] hover:bg-[#dc2626]")}
+            className="flex-1 disabled:cursor-not-allowed"
             onClick={onConfirm}
             disabled={isLoading || confirmDisabled}
           >

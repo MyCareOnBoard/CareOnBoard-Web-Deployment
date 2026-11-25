@@ -44,31 +44,29 @@ export const StageFooter = memo(function StageFooter({
         />
       )}
 
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-2.5">
         {!isFirst && (
           <Button
             type="button"
-            variant="secondary"
-            className="h-[44px] rounded-[60px] px-6 text-[14px] font-semibold"
+            variant="outline"
             onClick={onPrev}
             disabled={primaryLoading}
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft aria-hidden="true" className="h-4 w-4" />
             Previous
           </Button>
         )}
 
         <Button
           type="button"
-          variant="outline"
-          className="h-[44px] rounded-[60px] px-6 text-[14px] font-semibold border-[#00b4b8] text-[#00b4b8] hover:bg-[#00b4b8]/10"
+          variant={isLast ? "default" : "outline"}
           onClick={onSave}
           disabled={nextDisabled || primaryLoading || saveDisabled}
         >
           {primaryLoading ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
+            <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
           ) : (
-            <Save className="w-5 h-5" />
+            <Save aria-hidden="true" className="h-4 w-4" />
           )}
           {saveButtonText}
         </Button>
@@ -76,12 +74,11 @@ export const StageFooter = memo(function StageFooter({
         {!isLast && (
           <Button
             type="button"
-            className="h-[44px] rounded-[60px] px-6 text-[14px] font-semibold"
             onClick={onNext}
             disabled={nextDisabled || primaryLoading || nextBlocked}
           >
             Next
-            <ArrowRight className="w-5 h-5 text-white" />
+            <ArrowRight aria-hidden="true" className="h-4 w-4" />
           </Button>
         )}
       </div>

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { format, isValid, parseISO } from "date-fns";
 import { AlertTriangle, BookOpen, CheckCircle2, Clock, FileText, GraduationCap, RefreshCw, ShieldCheck } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AgencyStatCard } from "@/components/agency/AgencyShell";
+import { cn } from "@/lib/utils";
 import { useGetEmployeeTrainingsQuery, useLazyGetEmployeeTrainingsQuery, type TrainingData } from "@/pages/agency/trainings/trainingApi";
 import { trainingPolicyLabel } from "@/pages/agency/trainings/TrainingPolicyFields";
 
@@ -17,10 +19,10 @@ type Filter = "all" | "attention" | "done";
 const PAGE_SIZE = 25;
 
 const toneStyles: Record<Tone, { badge: string; icon: string; accent: string }> = {
-  done: { badge: "bg-[#e5f7f7] text-[#008c90]", icon: "bg-[#e5f7f7] text-[#008c90]", accent: "bg-[#00b4b8]" },
-  urgent: { badge: "bg-[#fff1eb] text-[#b14d35]", icon: "bg-[#fff1eb] text-[#b14d35]", accent: "bg-[#e07a5f]" },
-  warn: { badge: "bg-[#faf3e4] text-[#88601d]", icon: "bg-[#faf3e4] text-[#88601d]", accent: "bg-[#e0b04a]" },
-  neutral: { badge: "bg-[#f2f6f7] text-[#627476]", icon: "bg-[#f2f6f7] text-[#627476]", accent: "bg-[#cfd8da]" },
+  done: { badge: "bg-[#e6f6ec] text-[#1a7f37] dark:bg-[#30a46c]/15 dark:text-[#7ee2a8]", icon: "bg-[#e0f3f3] text-[#005c5e] dark:bg-[#0f7e7d]/20 dark:text-[#7fd3d3]", accent: "bg-[#30a46c]" },
+  urgent: { badge: "bg-[#fde8e6] text-[#b42318] dark:bg-[#ef4444]/15 dark:text-[#f8a1a1]", icon: "bg-[#fde8e6] text-[#b42318] dark:bg-[#ef4444]/15 dark:text-[#f8a1a1]", accent: "bg-[#e5484d]" },
+  warn: { badge: "bg-[#fcf5dc] text-[#7a5800] dark:bg-[#e0b400]/15 dark:text-[#f0cf6b]", icon: "bg-[#fcf5dc] text-[#7a5800] dark:bg-[#e0b400]/15 dark:text-[#f0cf6b]", accent: "bg-[#e0b400]" },
+  neutral: { badge: "bg-[#eef0f2] text-[#2a3138] dark:bg-white/10 dark:text-[#c9d1d4]", icon: "bg-[#f4f5f6] text-[#4b535b] dark:bg-white/5 dark:text-[#c9d1d4]", accent: "bg-[#c9d1d4]" },
 };
 
 function trainingState(training: TrainingData): { tone: Tone; label: string } {
@@ -77,52 +79,36 @@ function trainingDetails(training: TrainingData): string[] {
   return details;
 }
 
-function StatTile({ label, value, icon: Icon, tone }: { label: string; value: number; icon: typeof BookOpen; tone: Tone }) {
-  return (
-    <div className="flex items-center gap-4 rounded-lg bg-[#edf1f2] p-5">
-      <div className={`flex size-11 shrink-0 items-center justify-center rounded-full ${toneStyles[tone].icon}`}>
-        <Icon className="size-5" aria-hidden="true" />
-      </div>
-      <div className="min-w-0">
-        <p className="text-2xl font-bold leading-none text-gray-900">{value}</p>
-        <p className="mt-1.5 truncate text-xs text-gray-600">{label}</p>
-      </div>
-    </div>
-  );
+function StatTile({ label, value, icon }: { label: string; value: number; icon: typeof BookOpen }) {
+  return <AgencyStatCard icon={icon} label={label} value={value} />;
 }
 
 function TrainingRowSkeleton() {
   return (
-    <div aria-hidden="true" className="flex items-center gap-4 rounded-lg bg-[#f2f6f7] px-5 py-4">
-      <Skeleton className="size-10 shrink-0 rounded-full bg-[#dde5e6]" />
+    <div aria-hidden="true" className="flex items-center gap-4 rounded-[12px] border border-[#eceef0] px-4 py-3.5 dark:border-white/10">
+      <Skeleton className="size-9 shrink-0 rounded-full bg-[#f4f5f6] dark:bg-white/5" />
       <div className="min-w-0 flex-1 space-y-2.5">
-        <Skeleton className="h-4 w-56 max-w-[70%] bg-[#dde5e6]" />
-        <Skeleton className="h-3 w-40 max-w-[50%] bg-[#dde5e6]" />
+        <Skeleton className="h-4 w-56 max-w-[70%] bg-[#f4f5f6] dark:bg-white/5" />
+        <Skeleton className="h-3 w-40 max-w-[50%] bg-[#f4f5f6] dark:bg-white/5" />
       </div>
-      <Skeleton className="hidden h-6 w-24 rounded-full bg-[#dde5e6] sm:block" />
+      <Skeleton className="hidden h-6 w-24 rounded-[6px] bg-[#f4f5f6] sm:block dark:bg-white/5" />
     </div>
   );
 }
 
 function TrainingTabSkeleton() {
   return (
-    <div role="status" aria-label="Loading trainings" className="space-y-6">
+    <div role="status" aria-label="Loading trainings" className="space-y-5">
       <span className="sr-only">Loading trainings...</span>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {Array.from({ length: 4 }, (_, index) => (
-          <div key={index} aria-hidden="true" className="flex items-center gap-4 rounded-lg bg-[#edf1f2] p-5">
-            <Skeleton className="size-11 shrink-0 rounded-full bg-[#dde5e6]" />
-            <div className="flex-1 space-y-2">
-              <Skeleton className="h-6 w-10 bg-[#dde5e6]" />
-              <Skeleton className="h-3 w-24 bg-[#dde5e6]" />
-            </div>
-          </div>
+          <div key={index} aria-hidden="true" className="h-[118px] animate-pulse rounded-[16px] bg-[#f4f5f6] dark:bg-white/5" />
         ))}
       </div>
-      <div className="space-y-4 rounded-lg bg-[#edf1f2] p-6">
+      <div className="space-y-4 rounded-[16px] border border-[#e4e7ea] bg-white dark:border-white/10 dark:bg-[#1b232b] p-5">
         <div className="flex items-center justify-between">
-          <Skeleton className="h-5 w-40 bg-[#dde5e6]" />
-          <Skeleton className="h-8 w-56 rounded-full bg-[#dde5e6]" />
+          <Skeleton className="h-5 w-40 bg-[#f4f5f6] dark:bg-white/5" />
+          <Skeleton className="h-9 w-56 rounded-[10px] bg-[#f4f5f6] dark:bg-white/5" />
         </div>
         <div className="space-y-3">
           {Array.from({ length: 5 }, (_, index) => <TrainingRowSkeleton key={index} />)}
@@ -178,15 +164,15 @@ export function TrainingTab({ dspId, agencyId, mode }: TrainingTabProps) {
 
   if (isError && !data) {
     return (
-      <div className="flex flex-col items-center justify-center gap-3 rounded-lg bg-[#edf1f2] px-6 py-16 text-center">
-        <div className="flex size-12 items-center justify-center rounded-full bg-[#fff1eb] text-[#b14d35]">
+      <div className="flex flex-col items-center justify-center gap-3 rounded-[16px] border border-[#e4e7ea] bg-white dark:border-white/10 dark:bg-[#1b232b] px-6 py-16 text-center">
+        <div className="flex size-12 items-center justify-center rounded-full bg-[#fde8e6] text-[#b42318] dark:bg-[#ef4444]/15 dark:text-[#f8a1a1]">
           <AlertTriangle className="size-5" aria-hidden="true" />
         </div>
-        <p className="text-sm font-medium text-gray-900">Unable to load trainings</p>
+        <p className="text-sm font-medium text-[#10141a] dark:text-[#f4f6f7]">Unable to load trainings</p>
         <button
           type="button"
           onClick={() => void refetch()}
-          className="flex items-center gap-2 rounded-full border border-gray-300 px-4 py-2 text-sm text-gray-700 transition-colors hover:border-teal-300 hover:bg-teal-50 hover:text-teal-600 cursor-pointer"
+          className="inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-[#dcdfe2] bg-white px-4 text-[14px] font-medium text-[#10141a] transition-colors hover:bg-[#f4f6f7] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:bg-transparent dark:text-[#f4f6f7] dark:hover:bg-white/5"
         >
           <RefreshCw className="size-4" aria-hidden="true" />
           Try again
@@ -202,21 +188,22 @@ export function TrainingTab({ dspId, agencyId, mode }: TrainingTabProps) {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatTile label="Assigned" value={summary?.assigned ?? items.length} icon={BookOpen} tone="neutral" />
-        <StatTile label="Manually completed" value={summary?.manualCompleted ?? 0} icon={CheckCircle2} tone="done" />
-        <StatTile label="Automatic evidence accepted" value={summary?.policyAccepted ?? 0} icon={ShieldCheck} tone="done" />
-        <StatTile label="Awaiting review" value={summary?.policyAwaitingReview ?? 0} icon={Clock} tone="warn" />
+        <StatTile label="Assigned" value={summary?.assigned ?? items.length} icon={BookOpen} />
+        <StatTile label="Manually completed" value={summary?.manualCompleted ?? 0} icon={CheckCircle2} />
+        <StatTile label="Automatic evidence accepted" value={summary?.policyAccepted ?? 0} icon={ShieldCheck} />
+        <StatTile label="Awaiting review" value={summary?.policyAwaitingReview ?? 0} icon={Clock} />
       </div>
 
-      <div className="rounded-lg bg-[#edf1f2] p-6">
-        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2">
-            <h3 className="text-lg font-bold text-gray-900">Assigned trainings</h3>
-            {isFetching && !loadingMore && <RefreshCw className="size-4 animate-spin text-teal-500" aria-label="Refreshing" />}
+      <div className="rounded-[16px] border border-[#e4e7ea] bg-white dark:border-white/10 dark:bg-[#1b232b]">
+        <div className="flex flex-col gap-3 border-b border-[#eceef0] px-5 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-white/10">
+          <div className="flex items-center gap-2.5">
+            <GraduationCap className="size-5 text-[#007679] dark:text-[#7fd3d3]" aria-hidden="true" />
+            <h3 className="text-base font-semibold text-[#10141a] dark:text-[#f4f6f7]">Assigned trainings</h3>
+            {isFetching && !loadingMore && <RefreshCw className="size-4 animate-spin text-[#007679]" aria-label="Refreshing" />}
           </div>
-          <div role="tablist" aria-label="Filter trainings" className="flex items-center gap-1 rounded-full bg-white p-1">
+          <div role="tablist" aria-label="Filter trainings" className="flex max-w-full items-center gap-0.5 overflow-x-auto rounded-[12px] bg-[#f4f5f6] p-1 dark:bg-white/5">
             {filters.map((item) => (
               <button
                 key={item.key}
@@ -224,60 +211,64 @@ export function TrainingTab({ dspId, agencyId, mode }: TrainingTabProps) {
                 role="tab"
                 aria-selected={filter === item.key}
                 onClick={() => setFilter(item.key)}
-                className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
-                  filter === item.key ? "bg-teal-500 text-white" : "text-gray-600 hover:bg-teal-50 hover:text-teal-700"
-                }`}
+                className={cn(
+                  "inline-flex h-8 shrink-0 cursor-pointer items-center gap-2 rounded-[9px] px-3 text-[13px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#007679]",
+                  filter === item.key
+                    ? "bg-[#003839] font-medium text-white shadow-[0_1px_2px_rgba(16,20,26,0.12)] dark:bg-[#0f7e7d] dark:text-white"
+                    : "text-[#4b535b] hover:text-[#10141a] dark:text-[#9aa4a8] dark:hover:text-[#f4f6f7]",
+                )}
               >
                 {item.label}
-                <span className={`rounded-full px-1.5 text-[10px] ${filter === item.key ? "bg-white/25" : "bg-[#edf1f2]"}`}>{item.count}</span>
+                <span className={cn("grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[11px] font-medium tabular-nums", filter === item.key ? "bg-white/20 text-white" : "bg-[#e4e7ea] text-[#4b535b] dark:bg-white/10 dark:text-[#c9d1d4]")}>{item.count}</span>
               </button>
             ))}
           </div>
         </div>
 
+        <div className="px-5 py-4">
         {pendingAssignments > 0 && (
-          <p className="mb-4 flex items-center gap-2 rounded-lg bg-[#faf3e4] px-4 py-3 text-xs text-[#88601d]">
+          <p className="mb-4 flex items-center gap-2 rounded-[10px] bg-[#fcf5dc] px-4 py-3 text-[13px] text-[#7a5800] dark:bg-[#e0b400]/15 dark:text-[#f0cf6b]">
             <Clock className="size-4 shrink-0" aria-hidden="true" />
             {pendingAssignments} automatic training {pendingAssignments === 1 ? "assignment is" : "assignments are"} still being prepared.
           </p>
         )}
 
         {visibleRows.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 rounded-lg bg-[#f2f6f7] px-6 py-14 text-center">
-            <div className="flex size-12 items-center justify-center rounded-full bg-white text-[#00b4b8]">
+          <div className="flex flex-col items-center justify-center gap-3 rounded-[12px] border border-dashed border-[#dcdfe2] px-6 py-14 text-center dark:border-white/15">
+            <div className="flex size-12 items-center justify-center rounded-full bg-[#e0f3f3] text-[#007679] dark:bg-[#0f7e7d]/20 dark:text-[#7fd3d3]">
               <GraduationCap className="size-6" aria-hidden="true" />
             </div>
-            <p className="text-sm font-medium text-gray-900">
+            <p className="text-sm font-medium text-[#10141a] dark:text-[#f4f6f7]">
               {rows.length === 0 ? "No trainings assigned yet" : filter === "done" ? "No completed trainings yet" : "Nothing needs attention"}
             </p>
-            {rows.length === 0 && <p className="max-w-sm text-xs text-gray-600">Trainings assigned on the Trainings page or required by policy will show up here.</p>}
+            {rows.length === 0 && <p className="max-w-sm text-[13px] text-[#4b535b] dark:text-[#9aa4a8]">Trainings assigned on the Trainings page or required by policy will show up here.</p>}
           </div>
         ) : (
-          <ul className="space-y-3">
+          <ul className="space-y-2">
             {visibleRows.map(({ training, tone, label }, index) => {
               const details = trainingDetails(training);
               const certificate = training.acceptedCertificate?.fileName || training.latestCertificate?.fileName || training.certificateName;
               return (
                 <li
                   key={training.id ?? `${training.name}-${index}`}
-                  className="group relative flex items-center gap-4 overflow-hidden rounded-lg bg-[#f2f6f7] px-5 py-4 transition-colors hover:bg-white"
+                  className="group relative flex items-center gap-4 overflow-hidden rounded-[12px] border border-[#eceef0] px-4 py-3.5 transition-colors hover:bg-[#f8f9fa] dark:border-white/10 dark:hover:bg-white/5"
                 >
                   <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-1 ${toneStyles[tone].accent}`} />
-                  <div className={`flex size-10 shrink-0 items-center justify-center rounded-full ${toneStyles[tone].icon}`}>
-                    {tone === "done" ? <CheckCircle2 className="size-5" aria-hidden="true" />
-                      : tone === "urgent" ? <AlertTriangle className="size-5" aria-hidden="true" />
-                      : tone === "warn" ? <Clock className="size-5" aria-hidden="true" />
-                      : <GraduationCap className="size-5" aria-hidden="true" />}
+                  <div className={`flex size-9 shrink-0 items-center justify-center rounded-full ${toneStyles[tone].icon}`}>
+                    {tone === "done" ? <CheckCircle2 className="size-4" aria-hidden="true" />
+                      : tone === "urgent" ? <AlertTriangle className="size-4" aria-hidden="true" />
+                      : tone === "warn" ? <Clock className="size-4" aria-hidden="true" />
+                      : <GraduationCap className="size-4" aria-hidden="true" />}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="break-words text-sm font-semibold text-gray-900">{training.name}</p>
-                      <span className="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500">
+                      <p className="break-words text-[14px] font-medium text-[#10141a] dark:text-[#f4f6f7]">{training.name}</p>
+                      <span className="rounded-[6px] border border-[#e4e7ea] px-1.5 py-0.5 text-[11px] text-[#4b535b] dark:border-white/15 dark:text-[#9aa4a8]">
                         {training.source === "policy" ? "Automatic" : "Manual"}
                       </span>
                     </div>
                     {(details.length > 0 || certificate) && (
-                      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600">
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[#4b535b] dark:text-[#9aa4a8]">
                         {details.map((detail) => <span key={detail}>{detail}</span>)}
                         {certificate && (
                           <span className="flex min-w-0 items-center gap-1">
@@ -288,7 +279,7 @@ export function TrainingTab({ dspId, agencyId, mode }: TrainingTabProps) {
                       </div>
                     )}
                   </div>
-                  <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${toneStyles[tone].badge}`}>{label}</span>
+                  <span className={`inline-flex h-6 shrink-0 items-center rounded-[6px] px-2 text-[12px] font-medium ${toneStyles[tone].badge}`}>{label}</span>
                 </li>
               );
             })}
@@ -296,19 +287,20 @@ export function TrainingTab({ dspId, agencyId, mode }: TrainingTabProps) {
           </ul>
         )}
 
-        {loadMoreError && <p className="mt-4 text-center text-xs text-[#b14d35]">Couldn't load more trainings. Please try again.</p>}
+        {loadMoreError && <p className="mt-4 text-center text-[13px] text-[#b42318] dark:text-[#f8a1a1]">Couldn't load more trainings. Please try again.</p>}
         {nextCursor && (
           <div className="mt-5 flex justify-center">
             <button
               type="button"
               onClick={handleLoadMore}
               disabled={loadingMore}
-              className="rounded-full border border-gray-300 px-5 py-2 text-sm text-gray-700 transition-colors hover:border-teal-300 hover:bg-teal-50 hover:text-teal-600 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+              className="inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-[#dcdfe2] bg-white px-4 text-[14px] font-medium text-[#10141a] transition-colors hover:bg-[#f4f6f7] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:bg-transparent dark:text-[#f4f6f7] dark:hover:bg-white/5"
             >
               {loadingMore ? "Loading..." : "Load more trainings"}
             </button>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

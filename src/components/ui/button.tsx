@@ -5,31 +5,33 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[60px] text-sm font-semibold leading-[1.4] transition-all duration-200 cursor-pointer disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-5 shrink-0 px-4 h-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background cursor-pointer",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[10px] text-[14px] font-semibold leading-[1.4] transition-colors duration-200 cursor-pointer disabled:pointer-events-none disabled:opacity-60 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 px-4 h-10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679]",
   {
     variants: {
       variant: {
+        /** Dark green primary action. */
         default:
-          "bg-[#00b4b8] text-white hover:bg-[#00a0a4] active:bg-[#008f93]",
-                   default_full:
-          "bg-[#00B4B8] text-white hover:bg-[#029a9c] active:bg-[#029a9c] w-full",
+          "bg-[#003839] text-white hover:bg-[#0b4c4d] active:bg-[#002a2b] dark:bg-[#0f7e7d] dark:hover:bg-[#13908f]",
+        default_full:
+          "bg-[#003839] text-white hover:bg-[#0b4c4d] active:bg-[#002a2b] dark:bg-[#0f7e7d] dark:hover:bg-[#13908f] w-full",
         destructive:
-          "bg-[#ff4d4d] text-white hover:bg-[#ff6161] active:bg-[#ff7575] [&>svg]:text-white",
+          "bg-[#b42318] text-white hover:bg-[#9a1d14] active:bg-[#851910] dark:bg-[#d93a2f] dark:hover:bg-[#c2322a] [&>svg]:text-white",
+        /** White with a grey border; secondary action. */
         outline:
-          'border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50',
+          "border border-[#dcdfe2] bg-white text-[#10141a] hover:bg-[#f4f6f7] dark:border-white/15 dark:bg-transparent dark:text-[#f4f6f7] dark:hover:bg-white/5",
         secondary:
-          "bg-[#b2b2b3] text-white hover:bg-[#9a9a9b] active:bg-[#888889]",
+          "bg-[#eef0f2] text-[#10141a] hover:bg-[#e4e7ea] active:bg-[#dcdfe2] dark:bg-white/10 dark:text-[#f4f6f7] dark:hover:bg-white/15",
         ghost:
-          "bg-transparent text-foreground hover:bg-accent/20 hover:text-accent-foreground backdrop-blur-0",
-        link: "text-primary underline-offset-4 hover:underline backdrop-blur-0",
+          "bg-transparent text-[#10141a] hover:bg-[#f4f6f7] dark:text-[#f4f6f7] dark:hover:bg-white/5",
+        link: "text-[#007679] underline-offset-4 hover:underline dark:text-[#7fd3d3]",
       },
       size: {
-        default: "h-11 px-4 py-3",
-        sm: "h-10 px-5",
-        lg: "h-[52px] px-[16px] py-[12px]",
-        icon: "size-11 justify-center",
-        "icon-sm": "size-10 justify-center",
-        "icon-lg": "size-12 justify-center",
+        default: "h-10 px-4",
+        sm: "h-9 px-3.5 text-[13px]",
+        lg: "h-12 px-5",
+        icon: "size-10 justify-center rounded-full px-0",
+        "icon-sm": "size-9 justify-center rounded-full px-0",
+        "icon-lg": "size-12 justify-center rounded-full px-0",
       },
     },
     defaultVariants: {

@@ -4,6 +4,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { FileCheck2, X } from "lucide-react";
+import { agencyOutlineButton, agencyPrimaryButton } from "@/components/agency/AgencyListKit";
 import CustomDatePicker from "@/components/ui/datePicker";
 import { useToast } from "@/hooks/use-toast";
 import { documentTypeLabel } from "@/lib/documentTypes";
@@ -87,28 +89,28 @@ export function DocumentReviewDialog({ employeeId, employeeName, document, mode,
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open && !saving) onClose(); }}>
-      <DialogContent className="w-[480px] max-w-[calc(100vw-32px)] p-0 gap-0 overflow-hidden rounded-2xl shadow-xl">
-        <DialogHeader className="px-6 pt-6 pb-4 text-left items-start">
-          <DialogTitle className="text-lg font-semibold text-[#10141a]">
+      <DialogContent showCloseButton={false} className="w-[calc(100vw-32px)] max-w-[480px] gap-0 overflow-hidden rounded-[20px] p-0">
+        <DialogHeader className="flex-row items-start gap-3.5 border-b border-[#eceef0] px-5 py-4 text-left dark:border-white/10"><span aria-hidden="true" className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-[#dcdfe2] text-[#007679] dark:border-white/15 dark:text-[#7fd3d3]"><FileCheck2 className="h-5 w-5" /></span><div className="min-w-0 flex-1">
+          <DialogTitle className="text-[22px] font-medium leading-tight text-[#10141a] dark:text-[#f4f6f7]">
             {mode === "expiry" ? "Set expiry date" : "Review document"}
           </DialogTitle>
-          <DialogDescription className="text-sm text-[var(--grey-200)]">
+          <DialogDescription className="mt-0.5 text-[14px] text-[#4b535b] dark:text-[#9aa4a8]">
             {label} from {employeeName}{uploaded ? `, uploaded ${uploaded}` : ""}.
           </DialogDescription>
-        </DialogHeader>
+        </div><button type="button" onClick={onClose} aria-label="Close" disabled={saving !== null} className="grid h-8 w-8 shrink-0 cursor-pointer place-items-center rounded-full border border-[#dcdfe2] text-[#4b535b] transition-colors hover:bg-[#f4f6f7] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] disabled:opacity-50 dark:border-white/15 dark:text-[#c9d1d4]"><X aria-hidden="true" className="h-4 w-4" /></button></DialogHeader>
 
-        <div className="px-6 pb-6 space-y-4">
+        <div className="space-y-4 px-5 py-5">
           {mode === "review" && document.fileUrl && onView && (
-            <Button type="button" variant="outline" size="sm" onClick={() => onView(document)}>
+            <Button type="button" variant="outline" onClick={() => onView(document)} className={agencyOutlineButton}>
               View file
             </Button>
           )}
 
           {!rejecting && (
             <div className="space-y-1.5">
-              <Label className="text-sm font-medium text-[#10141a]">
+              <Label className="text-[13px] font-medium text-[#2a3138] dark:text-[#c9d1d4]">
                 Expiry date{" "}
-                {needsDate ? <span className="text-red-500">*</span> : <span className="text-[var(--grey-200)] font-normal">(optional, this document doesn't usually expire)</span>}
+                {needsDate ? <span className="text-[#b42318] dark:text-[#f8a1a1]">*</span> : <span className="font-normal text-[#4b535b] dark:text-[#9aa4a8]">(optional, this document doesn't usually expire)</span>}
               </Label>
               <CustomDatePicker
                 date={expiry}
@@ -123,8 +125,8 @@ export function DocumentReviewDialog({ employeeId, employeeName, document, mode,
 
           {rejecting && (
             <div className="space-y-1.5">
-              <Label htmlFor="document-reject-reason" className="text-sm font-medium text-[#10141a]">
-                Reason <span className="text-red-500">*</span>
+              <Label htmlFor="document-reject-reason" className="text-[13px] font-medium text-[#2a3138] dark:text-[#c9d1d4]">
+                Reason <span className="text-[#b42318] dark:text-[#f8a1a1]">*</span>
               </Label>
               <Textarea
                 id="document-reject-reason"
@@ -134,32 +136,32 @@ export function DocumentReviewDialog({ employeeId, employeeName, document, mode,
                 placeholder="For example: the scan is blurry, or the card has expired."
                 rows={3}
               />
-              <p className="text-xs text-[var(--grey-200)]">{employeeName} will see this and be asked to upload a new copy.</p>
+              <p className="text-xs text-[#4b535b] dark:text-[#9aa4a8]">{employeeName} will see this and be asked to upload a new copy.</p>
             </div>
           )}
 
-          {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+          {error && <p role="alert" className="rounded-[10px] border border-[#f0c8c4] bg-[#fdf3f2] px-3.5 py-2.5 text-[13px] text-[#b42318] dark:border-[#ff6b5e]/30 dark:bg-[#ff6b5e]/10 dark:text-[#f8a1a1]">{error}</p>}
 
-          <div className="flex flex-wrap justify-end gap-2 pt-2">
+          <div className="flex flex-wrap justify-end gap-2.5 border-t border-[#eceef0] pt-4 dark:border-white/10">
             {mode === "expiry" ? (
-              <Button type="button" onClick={() => run("expiry")} disabled={saving !== null} className="rounded-full bg-teal-500 hover:bg-teal-600 text-white">
+              <Button type="button" onClick={() => run("expiry")} disabled={saving !== null} className={`${agencyPrimaryButton} active:bg-[#003839]`}>
                 {saving ? "Saving..." : "Save expiry date"}
               </Button>
             ) : rejecting ? (
               <>
-                <Button type="button" variant="outline" onClick={() => { setRejecting(false); setError(null); }} disabled={saving !== null} className="rounded-full">
+                <Button type="button" variant="outline" onClick={() => { setRejecting(false); setError(null); }} disabled={saving !== null} className={agencyOutlineButton}>
                   Back
                 </Button>
-                <Button type="button" onClick={() => run("reject")} disabled={saving !== null} className="rounded-full bg-red-600 hover:bg-red-700 text-white">
+                <Button type="button" onClick={() => run("reject")} disabled={saving !== null} className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-[10px] bg-[#b42318] px-4 text-[14px] font-semibold text-white transition-colors hover:bg-[#9a1d14] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b42318] disabled:cursor-not-allowed disabled:opacity-60 dark:bg-[#d93a2f] dark:hover:bg-[#c2322a] active:bg-[#9a1d14]">
                   {saving === "reject" ? "Rejecting..." : "Reject document"}
                 </Button>
               </>
             ) : (
               <>
-                <Button type="button" variant="outline" onClick={() => { setRejecting(true); setError(null); }} disabled={saving !== null} className="rounded-full text-red-600 border-red-200 hover:bg-red-50">
+                <Button type="button" variant="outline" onClick={() => { setRejecting(true); setError(null); }} disabled={saving !== null} className={`${agencyOutlineButton} border-[#f0c8c4] text-[#b42318] hover:bg-[#fdf2f1] dark:border-[#ff6b5e]/30 dark:text-[#f8a1a1] dark:hover:bg-[#ff6b5e]/10`}>
                   Reject
                 </Button>
-                <Button type="button" onClick={() => run("accept")} disabled={saving !== null} className="rounded-full bg-teal-500 hover:bg-teal-600 text-white">
+                <Button type="button" onClick={() => run("accept")} disabled={saving !== null} className={`${agencyPrimaryButton} active:bg-[#003839]`}>
                   {saving === "accept" ? "Accepting..." : "Accept"}
                 </Button>
               </>

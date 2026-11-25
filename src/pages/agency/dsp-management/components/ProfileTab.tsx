@@ -1,13 +1,38 @@
 import { lazy, Suspense, useState } from "react";
 import { isValid, parseISO } from "date-fns";
 import { DSP } from "../types";
-import { Button } from "@/components/ui/button";
+import { CalendarCheck, CalendarDays, FileText, Mail, MapPin, Phone, type LucideIcon } from "lucide-react";
+import { agencyOutlineButton, agencyPrimaryButton } from "@/components/agency/AgencyListKit";
+import { cn } from "@/lib/utils";
 import { ConfirmDialog, ConfirmDialogContent } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { canManageEmployeePayroll } from "@/lib/agency/agency-billing-permissions";
 import { useAuth } from "@/utils/auth";
 
 const EmployeePrimaryWorkplaceCard = lazy(() => import("./EmployeePrimaryWorkplaceCard"));
+
+function DetailRow({ icon: Icon, label, children, stacked = false }: { icon: LucideIcon; label: string; children: React.ReactNode; stacked?: boolean }) {
+  return (
+    <div className={cn("flex gap-3 border-b border-[#eceef0] px-5 py-4 last:border-b-0 dark:border-white/10", stacked ? "items-start" : "flex-col sm:flex-row sm:items-center sm:justify-between")}>
+      <div className={cn("flex gap-3", stacked ? "items-start" : "items-center")}>
+        <span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#f4f5f6] text-[#007679] dark:bg-white/5 dark:text-[#7fd3d3]">
+          <Icon className="h-4 w-4" />
+        </span>
+        {stacked ? (
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] text-[#4b535b] dark:text-[#9aa4a8]">{label}</p>
+            {children}
+          </div>
+        ) : (
+          <p className="text-[14px] text-[#4b535b] dark:text-[#9aa4a8]">{label}</p>
+        )}
+      </div>
+      {!stacked && children}
+    </div>
+  );
+}
+
+const valueClass = "text-[14px] text-[#10141a] sm:text-right dark:text-[#f4f6f7]";
 
 interface ProfileTabProps {
   dsp: DSP;
@@ -73,122 +98,61 @@ export function ProfileTab({ dsp, onDeactivate, onActivate }: ProfileTabProps) {
     && Boolean(user?.uid && user.agencyId && dsp.id);
 
   return (<>
-    <div className="bg-[#edf1f2] p-6 rounded-lg space-y-6">
-      <div className="space-y-4">
-        {/* Date of Birth */}
-        <div className="flex bg-[#f2f6f7] rounded-lg items-center justify-between py-5 px-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
-              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <p className="text-sm text-gray-600">Date of Birth</p>
-          </div>
-          <p className="text-sm text-gray-900 font-normal">{dsp.dateOfBirth ? new Date(dsp.dateOfBirth).toLocaleDateString() : 'N/A'}</p>
-        </div>
-
-        {/* Email */}
-        <div className="flex bg-[#f2f6f7] rounded-lg items-center justify-between py-5 px-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
-              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <p className="text-sm text-gray-600">Email</p>
-          </div>
-          <p className="text-sm text-gray-900 font-normal">{dsp.email}</p>
-        </div>
-
-        {/* Phone Number */}
-        <div className="flex bg-[#f2f6f7] rounded-lg items-center justify-between py-5 px-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
-              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-              </svg>
-            </div>
-            <p className="text-sm text-gray-600">Phone number</p>
-          </div>
-          <p className="text-sm text-gray-900 font-normal">{dsp.phoneNumber || 'N/A'}</p>
-        </div>
-
-        {/* Address */}
-        <div className="flex bg-[#f2f6f7] rounded-lg items-center justify-between py-5 px-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
-              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </div>
-            <p className="text-sm text-gray-600">Address</p>
-          </div>
-          <p className="text-sm text-gray-900 font-normal">
+    <div className="space-y-5">
+      <section aria-label="Personal details" className="min-w-0 rounded-[16px] border border-[#e4e7ea] bg-white dark:border-white/10 dark:bg-[#1b232b]">
+        <DetailRow icon={CalendarDays} label="Date of Birth">
+          <p className={valueClass}>{dsp.dateOfBirth ? new Date(dsp.dateOfBirth).toLocaleDateString() : 'N/A'}</p>
+        </DetailRow>
+        <DetailRow icon={Mail} label="Email">
+          <p className={cn(valueClass, "break-all")}>{dsp.email}</p>
+        </DetailRow>
+        <DetailRow icon={Phone} label="Phone number">
+          <p className={valueClass}>{dsp.phoneNumber || 'N/A'}</p>
+        </DetailRow>
+        <DetailRow icon={MapPin} label="Address">
+          <p className={valueClass}>
             {typeof dsp.address === "object" && dsp.address !== null
               ? [(dsp.address as any).address, (dsp.address as any).city, (dsp.address as any).zipCode].filter(Boolean).join(", ") || "N/A"
               : dsp.address || "N/A"}
           </p>
-        </div>
-
-        {/* Joining Date */}
-        <div className="flex bg-[#f2f6f7] rounded-lg items-center justify-between py-5 px-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
-              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <p className="text-sm text-gray-600">Hire date</p>
-          </div>
-          <p className="text-sm text-gray-900 font-normal">
+        </DetailRow>
+        <DetailRow icon={CalendarCheck} label="Hire date">
+          <p className={valueClass}>
             {isValid(hireDate) ? hireDate.toLocaleDateString() : 'Not set'}
           </p>
-        </div>
+        </DetailRow>
+        <DetailRow icon={FileText} label="Professional summary" stacked>
+          <p className="mt-1 text-[14px] leading-relaxed text-[#10141a] dark:text-[#f4f6f7]">
+           {dsp.bio || "No professional summary provided."}
+          </p>
+        </DetailRow>
+      </section>
 
-        {/* Professional Summary */}
-        <div className="flex bg-[#f2f6f7] rounded-lg items-start justify-between py-5 px-6">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
-              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </div>
-            <div className="flex-1">
-              <p className="text-sm text-gray-600 mb-1">Professional summary</p>
-              <p className="text-sm text-gray-900 font-semibold leading-relaxed">
-               {dsp.bio || "No professional summary provided."}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+      {canManagePrimaryWorkplace && <Suspense fallback={<section aria-label="Loading primary work location" aria-busy="true" role="status" className="h-32 animate-pulse rounded-[16px] bg-[#f4f5f6] dark:bg-white/5" />}><EmployeePrimaryWorkplaceCard scope={{ audience: "agency", actorUid: user!.uid, agencyId: user!.agencyId!, employmentId: dsp.id }} /></Suspense>}
 
-      {canManagePrimaryWorkplace && <Suspense fallback={<section aria-label="Loading primary work location" aria-busy="true" role="status" className="h-32 animate-pulse rounded-lg bg-[#edf1f2]" />}><EmployeePrimaryWorkplaceCard scope={{ audience: "agency", actorUid: user!.uid, agencyId: user!.agencyId!, employmentId: dsp.id }} /></Suspense>}
-
-    </div>
-      <div className="flex items-center gap-4 ">
-        <Button variant="outline" size="sm">
+      <div className="flex flex-wrap items-center gap-2.5">
+        <button type="button" className={agencyOutlineButton}>
           Report
-        </Button>
+        </button>
         {dsp.status === "active" ? (
-          <Button
-            variant="destructive"
-            size="sm"
+          <button
+            type="button"
             onClick={handleDeactivateClick}
+            className={cn(agencyOutlineButton, "border-[#f0c8c4] text-[#b42318] hover:bg-[#fdf2f1] dark:border-[#ff6b5e]/30 dark:text-[#f8a1a1] dark:hover:bg-[#ff6b5e]/10")}
           >
             Deactivate User
-          </Button>
+          </button>
         ) : (
-          <Button
-            size="sm"
+          <button
+            type="button"
             onClick={handleActivateClick}
+            className={agencyPrimaryButton}
           >
             Activate User
-          </Button>
+          </button>
         )}
       </div>
+    </div>
 
       <ConfirmDialog open={showStatusDialog} onOpenChange={(open) => !open && !isStatusLoading && handleCancelStatusChange()}>
         <ConfirmDialogContent

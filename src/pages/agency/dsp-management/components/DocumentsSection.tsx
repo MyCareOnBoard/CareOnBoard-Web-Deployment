@@ -3,13 +3,17 @@ import {getApplicantDocs} from "@/pages/applicant/application/documentConfig";
 import { useState, useEffect, useRef } from "react";
 import { FileText, Plus } from "lucide-react";
 import { DocumentPreviewModal } from "@/components/documents/DocumentPreviewModal";
-import { Button } from "@/components/ui/button";
+import { agencyOutlineButton, agencyPrimaryButton } from "@/components/agency/AgencyListKit";
+import { cn } from "@/lib/utils";
 import type { EmployeeDocument } from "@/lib/api/employee-documents";
 import { documentTypeLabel } from "@/lib/documentTypes";
 import { DocumentReviewDialog, type DocumentReviewMode } from "./DocumentReviewDialog";
 
 /** Expiry problems the agency fixes by entering the date. */
 const EXPIRY_FIXABLE = new Set(["missing_expiry_date", "invalid_expiry_date"]);
+
+const rowButton = "inline-flex h-8 cursor-pointer items-center justify-center rounded-[8px] px-3 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] disabled:cursor-not-allowed disabled:opacity-50";
+const rowOutlineButton = cn(rowButton, "border border-[#dcdfe2] bg-white text-[#10141a] hover:bg-[#f4f6f7] dark:border-white/15 dark:bg-transparent dark:text-[#f4f6f7] dark:hover:bg-white/5");
 
 interface DocumentsSectionProps {
   compliance?: DocumentComplianceResponse;
@@ -50,35 +54,40 @@ export function DocumentsSection({
     row?.focus(); row?.scrollIntoView?.({block: 'nearest'});
   }, [focusDocumentId, documents, isLoading]);
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="text-lg font-bold text-gray-900">Documents</h3>
-          <p className="text-sm text-gray-600">Here are your uploaded documents</p>
+    <section aria-label="Documents" className="min-w-0 rounded-[16px] border border-[#e4e7ea] bg-white dark:border-white/10 dark:bg-[#1b232b]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#eceef0] px-5 py-3 dark:border-white/10">
+        <div className="flex items-center gap-2.5">
+          <FileText aria-hidden="true" className="h-5 w-5 shrink-0 text-[#007679] dark:text-[#7fd3d3]" />
+          <div>
+            <h3 className="text-base font-semibold text-[#10141a] dark:text-[#f4f6f7]">Documents</h3>
+            <p className="text-[13px] text-[#4b535b] dark:text-[#9aa4a8]">Here are your uploaded documents</p>
+          </div>
         </div>
-        <button 
+        <button
+          type="button"
           onClick={onRequestDocument}
-          className="flex items-center gap-2 px-4 py-2 bg-teal-500 text-white text-sm rounded-full hover:bg-teal-600 transition-colors cursor-pointer"
+          className={agencyPrimaryButton}
         >
-          <Plus className="w-4 h-4" />
+          <Plus aria-hidden="true" className="h-4 w-4" />
           Request new document
         </button>
       </div>
+      <div className="px-5 py-4">
 
-      {slot&&!isLoading&&<div ref={slotRef} tabIndex={-1} className="mb-4 rounded-xl border border-primary/30 bg-background p-4"><p className="font-semibold">Selected requirement: {slot.label}</p><p className="my-2 text-sm text-muted-foreground">Review the matching files below. If the required file is missing, request it from this staff member.</p><Button variant="outline" onClick={onRequestDocument}>Request document</Button></div>}
-      {(complianceError || compliance?.syncStatus === 'error') && <p role="alert" className="text-sm text-red-700">We couldn't load document expiry status. Try again. Last checked: {compliance?.evaluatedAt ? new Date(compliance.evaluatedAt).toLocaleString() : 'Not yet checked'}. <button type="button" onClick={refreshCompliance}>Retry</button></p>}
-      {focusDocumentId && !isLoading && !documents.some(doc => doc.id === focusDocumentId) && <p role="status">This document is unavailable or you no longer have access. <a href="?">Back to documents</a></p>}
+      {slot&&!isLoading&&<div ref={slotRef} tabIndex={-1} className="mb-4 rounded-[12px] border border-[#bfe3e3] bg-[#f3fafa] p-4 dark:border-[#0f7e7d]/40 dark:bg-[#0f7e7d]/10"><p className="text-[14px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">Selected requirement: {slot.label}</p><p className="my-2 text-[13px] text-[#4b535b] dark:text-[#9aa4a8]">Review the matching files below. If the required file is missing, request it from this staff member.</p><button type="button" className={agencyOutlineButton} onClick={onRequestDocument}>Request document</button></div>}
+      {(complianceError || compliance?.syncStatus === 'error') && <p role="alert" className="mb-3 rounded-[10px] border border-[#f0c8c4] bg-[#fdf3f2] px-3.5 py-2.5 text-[13px] text-[#b42318] dark:border-[#ff6b5e]/30 dark:bg-[#ff6b5e]/10 dark:text-[#f8a1a1]">We couldn't load document expiry status. Try again. Last checked: {compliance?.evaluatedAt ? new Date(compliance.evaluatedAt).toLocaleString() : 'Not yet checked'}. <button type="button" onClick={refreshCompliance} className="cursor-pointer font-medium underline underline-offset-4">Retry</button></p>}
+      {focusDocumentId && !isLoading && !documents.some(doc => doc.id === focusDocumentId) && <p role="status" className="mb-3 text-[13px] text-[#4b535b] dark:text-[#9aa4a8]">This document is unavailable or you no longer have access. <a href="?" className="font-medium text-[#007679] underline underline-offset-4 dark:text-[#7fd3d3]">Back to documents</a></p>}
       <div className="space-y-2">
         {isLoading ? (
-          <div className="flex items-center justify-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-teal-500"></div>
+          <div aria-hidden="true" className="space-y-2">
+            {[0, 1, 2].map((i) => <div key={i} className="h-[60px] animate-pulse rounded-[12px] bg-[#f4f5f6] dark:bg-white/5" />)}
           </div>
         ) : documents.length === 0 ? (
-          <div className="py-12 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
-            <div className="text-center">
-              <FileText className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-              <p className="text-sm text-gray-500">No documents uploaded yet</p>
-            </div>
+          <div className="rounded-[12px] border border-dashed border-[#dcdfe2] px-6 py-12 text-center dark:border-white/15">
+            <span aria-hidden="true" className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-full bg-[#f4f5f6] text-[#6b737a] dark:bg-white/5 dark:text-[#9aa4a8]">
+              <FileText className="h-5 w-5" />
+            </span>
+            <p className="text-[14px] text-[#4b535b] dark:text-[#9aa4a8]">No documents uploaded yet</p>
           </div>
         ) : (
           documents.map((doc) => {
@@ -89,52 +98,52 @@ export function DocumentsSection({
             const review = doc.review?.status;
             const fixExpiry = canReview && pilot && review !== 'pending' && EXPIRY_FIXABLE.has(issue?.reasonCode ?? '');
             return (
-            <div key={doc.id} id={`document-${doc.id}`} tabIndex={-1} className="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-lg hover:bg-teal-50 transition-colors">
-              <div className="flex items-center gap-3 flex-1">
-                <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shrink-0">
-                  <FileText className="w-5 h-5 text-gray-600" />
+            <div key={doc.id} id={`document-${doc.id}`} tabIndex={-1} className="flex flex-col gap-3 rounded-[12px] border border-[#eceef0] px-4 py-3 transition-colors hover:bg-[#f8f9fa] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:hover:bg-white/5">
+              <div className="flex min-w-0 flex-1 items-center gap-3">
+                <div aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#e0f3f3] text-[#005c5e] dark:bg-[#0f7e7d]/20 dark:text-[#7fd3d3]">
+                  <FileText className="h-4 w-4" />
                 </div>
-                <span className="text-sm text-gray-900">{documentTypeLabel(doc.documentName)}</span>
+                <span className="truncate text-[14px] font-medium text-[#10141a] dark:text-[#f4f6f7]">{documentTypeLabel(doc.documentName)}</span>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2">
                 {review === 'pending' || review === 'rejected' ? (
                   <span
                     title={review === 'rejected' && doc.review?.reason ? `Reason: ${doc.review.reason}` : undefined}
-                    className={`px-3 py-1 rounded-full text-xs font-medium ${review === 'pending' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-700'}`}
+                    className={`inline-flex h-6 items-center rounded-[6px] px-2 text-[12px] font-medium ${review === 'pending' ? 'bg-[#fcf5dc] text-[#7a5800] dark:bg-[#e0b400]/15 dark:text-[#f0cf6b]' : 'bg-[#fde8e6] text-[#b42318] dark:bg-[#ef4444]/15 dark:text-[#f8a1a1]'}`}
                   >
                     {review === 'pending' ? 'Awaiting review' : 'Rejected · new copy requested'}
                     {review === 'rejected' && doc.review?.reason ? <span className="sr-only">. Reason: {doc.review.reason}</span> : null}
                   </span>
                 ) : (
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getDocumentStatusColor(pilot ? issue?.condition ?? 'pending' : doc.status)}`}>
+                  <span className={`inline-flex min-h-6 items-center rounded-[6px] px-2 py-0.5 text-[12px] font-medium capitalize ${getDocumentStatusColor(pilot ? issue?.condition ?? 'pending' : doc.status)}`}>
                     {status === 'expiring-soon' ? 'Expiring Soon' : status === 'unavailable' ? 'Unavailable' : status}{reason ? ` · ${reason}` : ''}{pilot && issue?.expiryDateKey ? ` · ${civilDateLabel(issue.expiryDateKey)}` : ''}
                   </span>
                 )}
                 {canReview && review === 'pending' && (
-                  <Button type="button" size="sm" onClick={() => setReviewing({document: doc, mode: 'review'})} className="rounded-full bg-teal-500 hover:bg-teal-600 text-white">
+                  <button type="button" onClick={() => setReviewing({document: doc, mode: 'review'})} className={cn(rowButton, "bg-[#003839] text-white hover:bg-[#0b4c4d] dark:bg-[#0f7e7d] dark:hover:bg-[#13908f]")}>
                     Review
-                  </Button>
+                  </button>
                 )}
                 {fixExpiry && (
-                  <Button type="button" variant="outline" size="sm" onClick={() => setReviewing({document: doc, mode: 'expiry'})}>
+                  <button type="button" onClick={() => setReviewing({document: doc, mode: 'expiry'})} className={rowOutlineButton}>
                     Set expiry
-                  </Button>
+                  </button>
                 )}
                 {getDocumentActionButton(doc.status, doc)}
                 {doc.fileUrl ? (
-                  <Button
+                  <button
                     type="button"
-                    variant="outline"
-                    size="sm"
                     onClick={() => setPreview(doc)}
+                    className={rowOutlineButton}
                   >
                     View
-                  </Button>
+                  </button>
                 ) : null}
               </div>
             </div>
           );})
         )}
+      </div>
       </div>
       {canReview && reviewing && (
         <DocumentReviewDialog
@@ -155,6 +164,6 @@ export function DocumentsSection({
         url={preview?.fileUrl}
         fileName={preview?.fileName}
       />
-    </div>
+    </section>
   );
 }

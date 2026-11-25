@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { StageFooter } from "@/pages/shared/client-management/components/StageFooter";
 import { useToast } from "@/hooks/use-toast";
 import { Routes } from "@/routes/constants";
-import { AlertCircle, CalendarDays, CheckCircle2, Eye, EyeOff, Loader2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, CalendarDays, CheckCircle2, Eye, EyeOff, Loader2 } from "lucide-react";
 import { SuccessDialog, SuccessDialogContent } from "@/components/ui/success-dialog";
 import { differenceInYears, format, isValid, parseISO, subYears } from "date-fns";
 import { checkEmailExists, uploadTempDocument, completeManualOnboarding } from "@/lib/api/manual-onboarding";
@@ -911,10 +911,9 @@ export default function ManualStaffOnboarding() {
           </div>
 
           <div className="flex justify-end">
-            <button type="button" onClick={handleGeneratePassword}
-              className="flex items-center justify-center px-3 py-2 rounded-lg border border-[#808081] text-sm font-medium text-[#10141a] hover:bg-[#f5f5f5]">
+            <Button type="button" variant="outline" onClick={handleGeneratePassword}>
               Generate New Password
-            </button>
+            </Button>
           </div>
 
           <div className="rounded-2xl border border-[#d9d9d9] bg-white p-4">
@@ -951,7 +950,8 @@ export default function ManualStaffOnboarding() {
       <div className="mb-[24px] flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-[40px] font-bold leading-[1.4] text-[#10141a]">Manual Staff Onboarding</h1>
         <div className="flex items-center gap-3">
-          <Button type="button" onClick={() => navigate(Routes.agency.dspManagement)}>
+          <Button type="button" variant="outline" onClick={() => navigate(Routes.agency.dspManagement)}>
+            <ArrowLeft aria-hidden="true" className="h-4 w-4" />
             Back to {managementPageLabel}
           </Button>
         </div>
@@ -969,7 +969,7 @@ export default function ManualStaffOnboarding() {
           <div className="mb-[24px] pb-0 overflow-x-auto">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Button type="button" onClick={handlePrev} disabled={activeStep === 0 || isSubmitting}>
+                <Button type="button" variant="outline" onClick={handlePrev} disabled={activeStep === 0 || isSubmitting}>
                   Previous
                 </Button>
                 <Button type="button" onClick={handleNext}
@@ -984,7 +984,7 @@ export default function ManualStaffOnboarding() {
                     <div key={title}
                       className={cn(
                         "h-2 rounded-full transition-all",
-                        i === activeStep ? "w-8 bg-[#00b4b8]" : i < activeStep ? "w-4 bg-[#00b4b8]/50" : "w-4 bg-[#d9d9d9]"
+                        i === activeStep ? "w-8 bg-[#003839] dark:bg-[#0f7e7d]" : i < activeStep ? "w-4 bg-[#12b5b0]" : "w-4 bg-[#dcdfe2] dark:bg-white/15"
                       )} />
                   ))}
                 </div>
@@ -997,7 +997,7 @@ export default function ManualStaffOnboarding() {
               {STEP_TITLES.map((title, i) => (
                 <div key={title} className={cn(
                   "text-xs px-3 py-1 rounded-full whitespace-nowrap",
-                  i === activeStep ? "bg-[#00b4b8]/10 text-[#00b4b8] font-semibold" :
+                  i === activeStep ? "bg-[#003839] text-white font-semibold dark:bg-[#0f7e7d]" :
                   i < activeStep ? "bg-[#f0faf4] text-[#0eaf52]" : "bg-[#f5f5f5] text-[#808081]"
                 )}>
                   {i < activeStep ? "✓ " : ""}{title}
