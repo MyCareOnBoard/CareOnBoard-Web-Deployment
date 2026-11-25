@@ -320,12 +320,12 @@ export default function AddNewUserModal({
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen && !isSaving) onClose(); }}>
       <DialogContent
-        className="w-[min(490px,95vw)] h-[min(993px,95vh)] p-[20px] backdrop-blur bg-white border border-[rgba(255,255,255,0.3)] rounded-[30px] flex flex-col gap-[18px] !left-1/2 !-translate-x-1/2 md:!left-auto md:!right-[26px] md:!translate-x-0"
+        className="w-[min(490px,95vw)] h-[min(993px,95vh)] p-[20px] bg-white border border-[#e4e7ea] rounded-[20px] flex flex-col gap-[18px] dark:border-white/10 dark:bg-[#1b232b] !left-1/2 !-translate-x-1/2 md:!left-auto md:!right-[26px] md:!translate-x-0"
         showCloseButton={false}
       >
         {/* Header */}
         <div className="flex items-center justify-between w-full h-[44px] shrink-0">
-          <DialogTitle className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
+          <DialogTitle className="text-[22px] font-medium leading-tight text-[#10141a] dark:text-[#f4f6f7]">
             {reviewApplicant ? "Create applicant account" : mode === "create" ? "Add staff member" : "Edit staff member"}
           </DialogTitle>
           <DialogDescription className="sr-only">
@@ -335,9 +335,9 @@ export default function AddNewUserModal({
             onClick={handleClose}
             disabled={isSaving}
             aria-label="Close dialog"
-            className="flex items-center justify-center p-[8px] rounded-[200px] bg-[#eff2f3] backdrop-blur-sm border border-[rgba(255,255,255,0.3)] hover:bg-[#e0e3e4] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="grid h-8 w-8 shrink-0 cursor-pointer place-items-center rounded-full border border-[#dcdfe2] text-[#4b535b] transition-colors hover:bg-[#f4f6f7] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] disabled:opacity-50 disabled:cursor-not-allowed dark:border-white/15"
           >
-            <X className="w-4 h-4 text-[#10141a]" />
+            <X aria-hidden="true" className="w-4 h-4 text-current" />
           </button>
         </div>
 
@@ -368,7 +368,7 @@ export default function AddNewUserModal({
               onChange={(e) => setName(e.target.value)}
               placeholder="Enter name"
               disabled={isSaving}
-              className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white px-[16px] text-[14px] font-normal text-black placeholder:text-[#525253] focus-visible:ring-1 focus-visible:ring-[#00b4b8] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white px-[16px] text-[14px] font-normal text-black placeholder:text-[#525253] focus-visible:ring-1 focus-visible:ring-[#007679] disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -383,7 +383,7 @@ export default function AddNewUserModal({
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Enter email"
               disabled={mode === "edit" || isSaving}
-              className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white px-[16px] text-[14px] font-normal text-black placeholder:text-[#525253] focus-visible:ring-1 focus-visible:ring-[#00b4b8] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white px-[16px] text-[14px] font-normal text-black placeholder:text-[#525253] focus-visible:ring-1 focus-visible:ring-[#007679] disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -403,7 +403,7 @@ export default function AddNewUserModal({
                     : "Enter password"
                 }
                 disabled={isSaving}
-                className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white pl-[16px] pr-[44px] text-[14px] font-normal text-black placeholder:text-[#525253] focus-visible:ring-1 focus-visible:ring-[#00b4b8] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white pl-[16px] pr-[44px] text-[14px] font-normal text-black placeholder:text-[#525253] focus-visible:ring-1 focus-visible:ring-[#007679] disabled:opacity-50 disabled:cursor-not-allowed"
               />
               <button
                 type="button"
@@ -442,7 +442,7 @@ export default function AddNewUserModal({
               <button
                 onClick={handleSendResetLink}
                 disabled={isSaving}
-                className="text-[12px] text-[#00B4B8] hover:underline text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                className="text-[12px] text-[#007679] hover:underline text-left disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Send a reset password link
               </button>
@@ -487,10 +487,10 @@ export default function AddNewUserModal({
                         onClick={() => selectRole(option)}
                         className={`flex items-center justify-between px-[20px] py-[12px] hover:bg-[#f5f5f5] transition-colors ${isSelected ? "bg-[#e5effa]" : ""}`}
                       >
-                        <span className={`text-[14px] leading-[1.4] ${isSelected ? "font-semibold text-[#00b4b8]" : "font-normal text-[#808081]"}`}>
+                        <span className={`text-[14px] leading-[1.4] ${isSelected ? "font-semibold text-[#007679]" : "font-normal text-[#808081]"}`}>
                           {option}
                         </span>
-                        {isSelected && <Check className="w-5 h-5 text-[#00b4b8]" />}
+                        {isSelected && <Check className="w-5 h-5 text-[#007679]" />}
                       </button>
                     );
                   })}
@@ -498,10 +498,10 @@ export default function AddNewUserModal({
                     onClick={selectCustomRole}
                     className={`flex items-center justify-between px-[20px] py-[12px] hover:bg-[#f5f5f5] transition-colors ${roleIsCustom ? "bg-[#e5effa]" : ""}`}
                   >
-                    <span className={`text-[14px] leading-[1.4] ${roleIsCustom ? "font-semibold text-[#00b4b8]" : "font-normal text-[#808081]"}`}>
+                    <span className={`text-[14px] leading-[1.4] ${roleIsCustom ? "font-semibold text-[#007679]" : "font-normal text-[#808081]"}`}>
                       Other (custom)
                     </span>
-                    {roleIsCustom && <Check className="w-5 h-5 text-[#00b4b8]" />}
+                    {roleIsCustom && <Check className="w-5 h-5 text-[#007679]" />}
                   </button>
                 </div>
               </PopoverContent>
@@ -513,7 +513,7 @@ export default function AddNewUserModal({
                 placeholder="Enter role"
                 disabled={isSaving}
                 aria-invalid={!role.trim()}
-                className="mt-[4px] h-[44px] rounded-[12px] border border-[#cccccd] bg-white px-[16px] text-[14px] font-normal text-black placeholder:text-[#525253] focus-visible:ring-1 focus-visible:ring-[#00b4b8] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="mt-[4px] h-[44px] rounded-[12px] border border-[#cccccd] bg-white px-[16px] text-[14px] font-normal text-black placeholder:text-[#525253] focus-visible:ring-1 focus-visible:ring-[#007679] disabled:opacity-50 disabled:cursor-not-allowed"
               />
             )}
             {mode === "create" && !role.trim() && (
@@ -535,7 +535,7 @@ export default function AddNewUserModal({
                     type="button"
                     onClick={() => setEmploymentType(option.value)}
                     disabled={isSaving}
-                    className={`flex-1 h-[44px] rounded-[12px] border text-[14px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isSelected ? "border-[#00b4b8] bg-[#00b4b8] text-white" : "border-[#cccccd] bg-white text-[#525253] hover:bg-[#fafafa]"}`}
+                    className={`flex-1 h-[44px] rounded-[12px] border text-[14px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isSelected ? "border-[#003839] bg-[#003839] text-white dark:border-[#0f7e7d] dark:bg-[#0f7e7d]" : "border-[#cccccd] bg-white text-[#525253] hover:bg-[#fafafa]"}`}
                   >
                     {option.label}
                   </button>
@@ -560,7 +560,7 @@ export default function AddNewUserModal({
                 disabled={isSaving}
                 aria-invalid={mode === "create" && !employmentStartDate}
                 aria-describedby={mode === "create" && !employmentStartDate ? "employment-start-date-error" : undefined}
-                className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white px-[16px] text-[14px] font-normal text-black focus-visible:ring-1 focus-visible:ring-[#00b4b8] disabled:cursor-not-allowed disabled:opacity-50"
+                className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white px-[16px] text-[14px] font-normal text-black focus-visible:ring-1 focus-visible:ring-[#007679] disabled:cursor-not-allowed disabled:opacity-50"
               />
               {mode === "create" && !employmentStartDate && (
                 <p id="employment-start-date-error" className="text-[11px] text-[#ef4444]">Enter an employment start date.</p>
@@ -577,7 +577,7 @@ export default function AddNewUserModal({
                 disabled={isSaving}
                 aria-invalid={employmentRangeInvalid}
                 aria-describedby={employmentRangeInvalid ? "employment-end-date-error" : undefined}
-                className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white px-[16px] text-[14px] font-normal text-black focus-visible:ring-1 focus-visible:ring-[#00b4b8] disabled:cursor-not-allowed disabled:opacity-50"
+                className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white px-[16px] text-[14px] font-normal text-black focus-visible:ring-1 focus-visible:ring-[#007679] disabled:cursor-not-allowed disabled:opacity-50"
               />
               {employmentRangeInvalid && (
                 <p id="employment-end-date-error" role="alert" className="text-[11px] text-[#ef4444]">
@@ -601,7 +601,7 @@ export default function AddNewUserModal({
                     type="button"
                     onClick={() => setBillingType(option.value)}
                     disabled={isSaving}
-                    className={`flex-1 h-[44px] rounded-[12px] border text-[14px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isSelected ? "border-[#00b4b8] bg-[#00b4b8] text-white" : "border-[#cccccd] bg-white text-[#525253] hover:bg-[#fafafa]"}`}
+                    className={`flex-1 h-[44px] rounded-[12px] border text-[14px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isSelected ? "border-[#003839] bg-[#003839] text-white dark:border-[#0f7e7d] dark:bg-[#0f7e7d]" : "border-[#cccccd] bg-white text-[#525253] hover:bg-[#fafafa]"}`}
                   >
                     {option.label}
                   </button>
@@ -623,7 +623,7 @@ export default function AddNewUserModal({
                 placeholder="0.00"
                 disabled={isSaving}
                 aria-invalid={billingRate.trim() !== "" && !billingRateValid}
-                className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white pl-[28px] pr-[60px] text-[14px] font-normal text-black placeholder:text-[#525253] focus-visible:ring-1 focus-visible:ring-[#00b4b8] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white pl-[28px] pr-[60px] text-[14px] font-normal text-black placeholder:text-[#525253] focus-visible:ring-1 focus-visible:ring-[#007679] disabled:opacity-50 disabled:cursor-not-allowed"
               />
               <span className="absolute right-[16px] top-1/2 -translate-y-1/2 text-[14px] text-[#525253] pointer-events-none">
                 {billingType === "monthly" ? "/mo" : billingType === "hourly" ? "/hr" : ""}
@@ -649,7 +649,7 @@ export default function AddNewUserModal({
               disabled={isSaving}
               aria-invalid={(mode === "create" && !compensationEffectiveDate) || editCompensationTermsIncomplete}
               aria-describedby={(mode === "create" && !compensationEffectiveDate) || editCompensationTermsIncomplete ? "compensation-effective-date-error" : undefined}
-              className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white px-[16px] text-[14px] font-normal text-black focus-visible:ring-1 focus-visible:ring-[#00b4b8] disabled:cursor-not-allowed disabled:opacity-50"
+              className="h-[44px] rounded-[12px] border border-[#cccccd] bg-white px-[16px] text-[14px] font-normal text-black focus-visible:ring-1 focus-visible:ring-[#007679] disabled:cursor-not-allowed disabled:opacity-50"
             />
             {mode === "create" && !compensationEffectiveDate && (
               <p id="compensation-effective-date-error" className="text-[11px] text-[#ef4444]">Enter the date these compensation terms take effect.</p>
@@ -700,10 +700,10 @@ export default function AddNewUserModal({
                             onClick={() => toggleMode(option.value)}
                             className={`flex items-center justify-between px-[20px] py-[12px] hover:bg-[#f5f5f5] transition-colors ${isSelected ? "bg-[#e5effa]" : ""}`}
                           >
-                            <span className={`text-[14px] leading-[1.4] ${isSelected ? "font-semibold text-[#00b4b8]" : "font-normal text-[#808081]"}`}>
+                            <span className={`text-[14px] leading-[1.4] ${isSelected ? "font-semibold text-[#007679]" : "font-normal text-[#808081]"}`}>
                               {option.label}
                             </span>
-                            {isSelected && <Check className="w-5 h-5 text-[#00b4b8]" />}
+                            {isSelected && <Check className="w-5 h-5 text-[#007679]" />}
                           </button>
                         );
                       })}
@@ -718,7 +718,7 @@ export default function AddNewUserModal({
                   {MODE_OPTIONS.filter((o) => agencyModes.includes(o.value)).map((option) => (
                     <div
                       key={option.value}
-                      className="group flex items-center gap-[6px] px-[10px] py-[6px] rounded-[6px] bg-[#00b4b8] border-[0.5px] border-[#808081] hover:bg-[#00a0a3] transition-colors"
+                      className="group flex items-center gap-[6px] px-[10px] py-[6px] rounded-[6px] bg-[#003839] hover:bg-[#0b4c4d] transition-colors dark:bg-[#0f7e7d]"
                     >
                       <span className="text-[14px] font-medium leading-[1.4] text-white">{option.label}</span>
                       <button
@@ -782,14 +782,14 @@ export default function AddNewUserModal({
                         >
                           <span
                             className={`text-[14px] leading-[1.4] ${isSelected
-                              ? "font-semibold text-[#00b4b8]"
+                              ? "font-semibold text-[#007679]"
                               : "font-normal text-[#808081]"
                               }`}
                           >
                             {accessLabel(option)}
                           </span>
                           {isSelected && (
-                            <Check className="w-5 h-5 text-[#00b4b8]" />
+                            <Check className="w-5 h-5 text-[#007679]" />
                           )}
                         </button>
                       );
@@ -806,7 +806,7 @@ export default function AddNewUserModal({
               {accessList.map((access) => (
                 <div
                   key={access}
-                  className="group flex items-center gap-[6px] px-[10px] py-[6px] rounded-[6px] bg-[#00b4b8] border-[0.5px] border-[#808081] hover:bg-[#00a0a3] transition-colors"
+                  className="group flex items-center gap-[6px] px-[10px] py-[6px] rounded-[6px] bg-[#003839] hover:bg-[#0b4c4d] transition-colors dark:bg-[#0f7e7d]"
                 >
                   <span className="text-[14px] font-medium leading-[1.4] text-white">
                     {accessLabel(access)}
@@ -826,20 +826,20 @@ export default function AddNewUserModal({
         </div>
 
         {/* Footer Buttons */}
-        <DialogFooter className="flex flex-row gap-[12px] items-center justify-center pt-[40px] pb-0 w-full shrink-0 mt-auto">
+        <DialogFooter className="flex flex-row gap-[12px] items-center justify-center border-t border-[#eceef0] pt-4 pb-0 w-full shrink-0 mt-auto dark:border-white/10">
           <button
             onClick={handleClose}
             disabled={isSaving}
-            className="flex-1 flex items-center justify-center px-[16px] py-[12px] rounded-[60px] backdrop-blur-[22px] border border-[#525253] hover:bg-[#f5f5f5] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-[#dcdfe2] bg-white px-4 transition-colors hover:bg-[#f4f6f7] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/15 dark:bg-transparent dark:hover:bg-white/5"
           >
-            <span className="text-[14px] font-semibold leading-[1.4] text-[#525253]">
+            <span className="text-[14px] font-semibold leading-[1.4] text-[#10141a] dark:text-[#f4f6f7]">
               Cancel
             </span>
           </button>
           <button
             onClick={handleSave}
             disabled={isSaving || (reviewApplicant && !reviewAccountType) || (reviewAccountType !== "employee" && ((showModePicker && agencyModes.length === 0) || !canSave))}
-            className="flex-1 flex items-center justify-center gap-2 px-[16px] py-[12px] rounded-[60px] bg-[#2b82ff] backdrop-blur-[22px] hover:bg-[#2775e5] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-[10px] bg-[#003839] px-4 transition-colors hover:bg-[#0b4c4d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] disabled:cursor-not-allowed disabled:opacity-60 dark:bg-[#0f7e7d] dark:hover:bg-[#13908f]"
           >
             {isSaving && (
               <div className="h-5 w-5 animate-spin rounded-full border-2 border-solid border-white border-r-transparent"></div>
