@@ -52,7 +52,7 @@ export function SaveClientErrorModal({
           </AlertDialogDescription>
           <AlertDialogAction
             onClick={() => onOpenChange(false)}
-            className="mt-2 h-11 rounded-[60px] bg-[#00b4b8] text-white hover:bg-[#00a0a4] px-6"
+            className="mt-2"
           >
             Close
           </AlertDialogAction>

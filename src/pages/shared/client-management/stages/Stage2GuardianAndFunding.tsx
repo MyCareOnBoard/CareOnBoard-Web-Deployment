@@ -51,9 +51,9 @@ import { COVERAGE, SPLIT_MODE, type Coverage, type SplitMode } from "@/lib/cover
 const RATE_INPUT_CLASS = "h-[44px] rounded-[12px] border-[#cccccd] bg-white";
 const SELECT_TRIGGER_CLASS = "w-[180px] h-[44px] rounded-[12px] border-[#cccccd] bg-white";
 const SECTION_HEADER_ACTION_BTN =
-  "h-11 shrink-0 rounded-[60px] border border-[#b2b2b3] bg-white/40 px-5 text-[14px] font-semibold text-[#10141a] hover:bg-white/60";
+  "inline-flex h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-[#dcdfe2] bg-white px-4 text-[14px] font-semibold text-[#10141a] transition-colors hover:bg-[#f4f6f7] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/15 dark:bg-transparent dark:text-[#f4f6f7] dark:hover:bg-white/5";
 const SECTION_DANGER_ACTION_BTN =
-  "h-9 shrink-0 rounded-[60px] border border-red-200/90 bg-red-50 px-3 text-[14px] font-semibold text-red-700 hover:border-red-300 hover:bg-red-100 hover:text-red-800";
+  "inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-[10px] border border-[#f0c8c4] bg-white px-3 text-[13px] font-semibold text-[#b42318] transition-colors hover:bg-[#fdf2f1] disabled:cursor-not-allowed disabled:opacity-60";
 /** Visible on touch; on hover-capable devices show when section is hovered or focused. */
 const SECTION_REMOVE_BTN_CLASS = [
   SECTION_DANGER_ACTION_BTN,
@@ -1458,7 +1458,7 @@ export function Stage2GuardianAndFunding({
             type="button"
             variant="outline"
             aria-label="Import service delivery report"
-            className="h-11 min-h-[44px] shrink-0 rounded-[12px] border-[#00b4b8] px-3 text-[#00b4b8] hover:bg-[#e6fafa] sm:px-4"
+            className="shrink-0"
             onClick={() => setSdrImportOpen(true)}
           >
             <FileUp className="mr-2 h-4 w-4 shrink-0" aria-hidden="true" />

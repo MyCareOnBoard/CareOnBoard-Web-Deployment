@@ -67,7 +67,7 @@ export default function HhaBlankFormsCard({
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <Button
           type="button"
-          className="h-11 min-h-[44px] w-full rounded-[10px] bg-[#00b4b8] hover:bg-[#009ea1] sm:w-auto"
+          className="w-full sm:w-auto"
           onClick={() => setPocOpen(true)}
         >
           <FilePlus2 className="mr-2 h-4 w-4 shrink-0" aria-hidden />
@@ -75,7 +75,7 @@ export default function HhaBlankFormsCard({
         </Button>
         <Button
           type="button"
-          className="h-11 min-h-[44px] w-full rounded-[10px] bg-[#00b4b8] hover:bg-[#009ea1] sm:w-auto"
+          className="w-full sm:w-auto"
           onClick={() => setCaOpen(true)}
         >
           <FilePlus2 className="mr-2 h-4 w-4 shrink-0" aria-hidden />
@@ -91,7 +91,7 @@ export default function HhaBlankFormsCard({
               href={doc.href}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex w-fit items-center gap-1.5 text-[12px] font-medium text-[#00b4b8] hover:underline"
+              className="inline-flex w-fit items-center gap-1.5 text-[12px] font-medium text-[#007679] hover:underline"
             >
               <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden />
               View {doc.label}

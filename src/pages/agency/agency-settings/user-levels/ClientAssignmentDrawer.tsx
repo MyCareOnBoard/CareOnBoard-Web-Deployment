@@ -69,7 +69,7 @@ export default function ClientAssignmentDrawer({ staffName, agencyId, modes, asP
     <DialogContent showCloseButton={false} className="!top-0 !right-0 !left-auto !h-dvh !w-full !max-w-[480px] !translate-x-0 !translate-y-0 !rounded-none p-0 flex flex-col">
       <div className="flex items-start justify-between gap-4 border-b border-[#e5e7eb] px-6 py-5">
         <div><DialogTitle className="text-xl">Manage clients</DialogTitle><DialogDescription className="mt-1 text-sm">Choose the clients {staffName} can see and manage. Clients not selected stay hidden from them.</DialogDescription></div>
-        <button type="button" aria-label="Close client assignment" disabled={saving} onClick={onClose} className="rounded-lg p-1 text-[#6b7280] hover:bg-[#f3f4f6] focus-visible:outline-2 focus-visible:outline-[#008f93]"><X className="h-5 w-5" /></button>
+        <button type="button" aria-label="Close client assignment" disabled={saving} onClick={onClose} className="rounded-lg p-1 text-[#6b7280] hover:bg-[#f3f4f6] focus-visible:outline-2 focus-visible:outline-[#007679]"><X className="h-5 w-5" /></button>
       </div>
       <div className="flex min-h-0 flex-1 flex-col px-6 pt-5">
         {!canAssign && <p className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Give this staff member Client Management access before assigning clients. Save to clear any existing assignments.</p>}
@@ -77,7 +77,7 @@ export default function ClientAssignmentDrawer({ staffName, agencyId, modes, asP
         <Input id="client-assignment-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by name" className="mb-4" />
         <div className="mb-3 flex items-center justify-between gap-3">
           <p className="text-sm text-[#6b7280]" aria-live="polite">{selectedIds.length} selected</p>
-          {canAssign && !loading && visible.length > 0 && <button type="button" disabled={saving} onClick={toggleVisible} className="rounded-md text-sm font-medium text-[#007a7d] hover:underline focus-visible:outline-2 focus-visible:outline-[#008f93]">
+          {canAssign && !loading && visible.length > 0 && <button type="button" disabled={saving} onClick={toggleVisible} className="rounded-md text-sm font-medium text-[#007679] hover:underline focus-visible:outline-2 focus-visible:outline-[#007679]">
             {allVisibleSelected ? "Clear shown" : "Select shown"}
           </button>}
         </div>
@@ -85,10 +85,10 @@ export default function ClientAssignmentDrawer({ staffName, agencyId, modes, asP
         {loading ? <p role="status" className="text-sm text-[#6b7280]">Loading clients…</p> :
           <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pb-5">
             {visible.length === 0 ? <p className="rounded-lg border border-[#e5e7eb] p-4 text-sm text-[#6b7280]">{search ? "No clients match your search." : "No clients are available."}</p> : visible.map((client) =>
-              <label key={client.id} className="flex cursor-pointer items-center gap-3 rounded-xl border border-[#e5e7eb] p-3 hover:border-[#00b4b8]">
-                <input type="checkbox" disabled={!canAssign || saving} checked={selectedIds.includes(client.id)} onChange={(event) => setSelectedIds((ids) => event.target.checked ? [...ids, client.id] : ids.filter((id) => id !== client.id))} className="h-4 w-4 accent-[#008f93]" />
+              <label key={client.id} className="flex cursor-pointer items-center gap-3 rounded-xl border border-[#e5e7eb] p-3 hover:border-[#007679]">
+                <input type="checkbox" disabled={!canAssign || saving} checked={selectedIds.includes(client.id)} onChange={(event) => setSelectedIds((ids) => event.target.checked ? [...ids, client.id] : ids.filter((id) => id !== client.id))} className="h-4 w-4 accent-[#007679]" />
                 <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-[#10141a]">{client.name}</span>{client.status && <span className="block truncate text-xs capitalize text-[#808081]">{client.status}</span>}</span>
-                {showMode && <span className="rounded-full bg-[#e6f7f7] px-2 py-0.5 text-[10px] font-semibold uppercase text-[#008f93]">{client.mode}</span>}
+                {showMode && <span className="rounded-full bg-[#e0f3f3] px-2 py-0.5 text-[10px] font-semibold uppercase text-[#007679]">{client.mode}</span>}
               </label>)}
           </div>}
       </div>

@@ -33,15 +33,15 @@ export function CheckTile({
       className={cn(
         "inline-flex min-h-[44px] items-center gap-2 rounded-[10px] border px-3 py-2 text-left text-[13px] font-medium leading-[1.25] transition-colors",
         checked
-          ? "border-[#00b4b8] bg-[#e6fafa] text-[#0c5d5f]"
-          : "border-[#cccccd] bg-white text-[#10141a] hover:border-[#00b4b8]/60 active:bg-[#f1f5f5]",
+          ? "border-[#007679] bg-[#e0f3f3] text-[#0c5d5f]"
+          : "border-[#cccccd] bg-white text-[#10141a] hover:border-[#007679]/60 active:bg-[#f1f5f5]",
         className,
       )}
     >
       <span
         className={cn(
           "flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] border",
-          checked ? "border-[#00b4b8] bg-[#00b4b8] text-white" : "border-[#9aa0a6] bg-white",
+          checked ? "border-[#003839] bg-[#003839] text-white" : "border-[#9aa0a6] bg-white",
         )}
       >
         {checked ? <Check className="h-3.5 w-3.5" aria-hidden /> : null}
@@ -75,7 +75,7 @@ export function OptionTiles<T extends string>({
     <div
       id={id}
       tabIndex={id ? -1 : undefined}
-      className="flex flex-wrap gap-2 rounded-[10px] outline-none focus:ring-2 focus:ring-[#00b4b8]/30"
+      className="flex flex-wrap gap-2 rounded-[10px] outline-none focus:ring-2 focus:ring-[#007679]/30"
       role="radiogroup"
       aria-label={ariaLabel}
       aria-required={required || undefined}
@@ -93,14 +93,14 @@ export function OptionTiles<T extends string>({
             className={cn(
               "inline-flex min-h-[44px] items-center gap-2 rounded-[10px] border px-3 py-2 text-left text-[13px] font-medium leading-[1.25] transition-colors",
               active
-                ? "border-[#00b4b8] bg-[#e6fafa] text-[#0c5d5f]"
-                : "border-[#cccccd] bg-white text-[#10141a] hover:border-[#00b4b8]/60 active:bg-[#f1f5f5]",
+                ? "border-[#007679] bg-[#e0f3f3] text-[#0c5d5f]"
+                : "border-[#cccccd] bg-white text-[#10141a] hover:border-[#007679]/60 active:bg-[#f1f5f5]",
             )}
           >
             <span
               className={cn(
                 "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border",
-                active ? "border-[#00b4b8] bg-[#00b4b8] text-white" : "border-[#9aa0a6] bg-white",
+                active ? "border-[#003839] bg-[#003839] text-white" : "border-[#9aa0a6] bg-white",
               )}
             >
               {active ? <span className="h-2 w-2 rounded-full bg-white" /> : null}
@@ -137,7 +137,7 @@ export function SegmentedToggle<T extends string>({
             onClick={() => onChange(o.value)}
             className={cn(
               "min-h-[44px] min-w-[64px] rounded-[8px] px-4 text-[13px] font-semibold transition-colors",
-              active ? "bg-[#00b4b8] text-white" : "bg-transparent text-[#10141a] active:bg-[#f1f5f5]",
+              active ? "bg-[#003839] text-white" : "bg-transparent text-[#10141a] active:bg-[#f1f5f5]",
             )}
           >
             {o.label}
@@ -175,7 +175,7 @@ export function LineInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
     <input
       {...rest}
       className={cn(
-        "h-11 w-full rounded-[10px] border border-[#cccccd] bg-white px-3 text-[14px] text-[#10141a] placeholder:text-[#b2b2b3] outline-none focus:border-[#00b4b8] focus:ring-2 focus:ring-[#00b4b8]/20",
+        "h-11 w-full rounded-[10px] border border-[#cccccd] bg-white px-3 text-[14px] text-[#10141a] placeholder:text-[#b2b2b3] outline-none focus:border-[#007679] focus:ring-2 focus:ring-[#007679]/20",
         className,
       )}
     />
@@ -188,7 +188,7 @@ export function LineTextArea(props: React.TextareaHTMLAttributes<HTMLTextAreaEle
     <textarea
       {...rest}
       className={cn(
-        "min-h-[44px] w-full rounded-[10px] border border-[#cccccd] bg-white px-3 py-2 text-[14px] text-[#10141a] placeholder:text-[#b2b2b3] outline-none focus:border-[#00b4b8] focus:ring-2 focus:ring-[#00b4b8]/20",
+        "min-h-[44px] w-full rounded-[10px] border border-[#cccccd] bg-white px-3 py-2 text-[14px] text-[#10141a] placeholder:text-[#b2b2b3] outline-none focus:border-[#007679] focus:ring-2 focus:ring-[#007679]/20",
         className,
       )}
     />
@@ -302,7 +302,7 @@ export function SignatureField({
         onClick={onOpen}
         aria-label={ariaLabel ?? (hasValue ? "Edit signature" : "Add signature")}
         aria-required={required || undefined}
-        className="flex h-16 w-full items-center justify-center rounded-[10px] border border-[#cccccd] bg-white px-3 transition-colors hover:border-[#00b4b8]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8]/30"
+        className="flex h-16 w-full items-center justify-center rounded-[10px] border border-[#cccccd] bg-white px-3 transition-colors hover:border-[#007679]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#007679]/30"
       >
         {hasValue ? (
           <img src={value} alt={ariaLabel ?? "Signature"} className="max-h-12 object-contain" />
@@ -320,7 +320,7 @@ export function SignatureField({
             // so keyboard users don't get dropped to <body>.
             triggerRef.current?.focus();
           }}
-          className="absolute right-1 top-1 inline-flex h-11 w-11 items-center justify-center rounded-full text-[#5c6368] transition-colors hover:bg-[#e6e7e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8]/30"
+          className="absolute right-1 top-1 inline-flex h-11 w-11 items-center justify-center rounded-full text-[#5c6368] transition-colors hover:bg-[#e6e7e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#007679]/30"
         >
           <X className="h-4 w-4" aria-hidden />
         </button>

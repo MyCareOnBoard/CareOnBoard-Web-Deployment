@@ -221,7 +221,7 @@ function MedicationRows({
       <button
         type="button"
         onClick={add}
-        className="inline-flex w-fit items-center gap-1.5 rounded-[10px] border border-[#00b4b8] px-3 py-2 text-[13px] font-medium text-[#00b4b8] transition-colors hover:bg-[#e6fafa]"
+        className="inline-flex w-fit items-center gap-1.5 rounded-[10px] border border-[#dcdfe2] bg-white px-3 py-2 text-[13px] font-semibold text-[#10141a] transition-colors hover:bg-[#f4f6f7]"
       >
         <Plus className="h-4 w-4" aria-hidden />
         Add medication

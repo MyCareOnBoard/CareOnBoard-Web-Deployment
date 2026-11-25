@@ -510,7 +510,7 @@ export function ClientFormWizard({
           className="w-[min(90vw,426px)] gap-6 p-5"
         >
           <div className="flex flex-col items-center justify-center gap-4">
-            <Loader2 className="w-12 h-12 text-[#00b4b8] animate-spin" />
+            <Loader2 className="w-12 h-12 text-[#007679] animate-spin" />
             <p className="text-center text-[16px] font-semibold text-[#10141a]">
               {saveStage === 1 ? "Saving client information..." : "Uploading documents..."}
             </p>

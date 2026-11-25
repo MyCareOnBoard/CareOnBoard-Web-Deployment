@@ -67,16 +67,16 @@ export function ClientTypePicker({ pageTitle, onSelect, onBack, allowed }: Clien
               key={option.type}
               type="button"
               onClick={() => onSelect(option.type)}
-              className="flex min-h-[220px] cursor-pointer flex-col items-start rounded-[24px] border border-[#e5e5e6] bg-white/70 p-6 text-left shadow-sm transition hover:border-[#00b4b8] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2 active:border-[#00b4b8] active:bg-white"
+              className="flex min-h-[220px] cursor-pointer flex-col items-start rounded-[24px] border border-[#e5e5e6] bg-white/70 p-6 text-left shadow-sm transition hover:border-[#007679] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#007679] focus-visible:ring-offset-2 active:border-[#007679] active:bg-white"
             >
-              <span className="mb-6 flex h-12 w-12 items-center justify-center rounded-[16px] bg-[#e6fafa] text-[#00b4b8]">
+              <span className="mb-6 flex h-12 w-12 items-center justify-center rounded-[16px] bg-[#e0f3f3] text-[#007679]">
                 <Icon className="h-6 w-6" />
               </span>
               <span className="text-[22px] font-semibold text-[#10141a]">{option.title}</span>
               <span className="mt-3 text-[14px] font-medium leading-[1.5] text-[#808081]">
                 {option.description}
               </span>
-              <span className="mt-auto inline-flex h-11 cursor-pointer items-center justify-center rounded-[60px] bg-[#00b4b8] px-6 text-[14px] font-semibold text-white">
+              <span className="mt-auto inline-flex h-10 cursor-pointer items-center justify-center rounded-[10px] bg-[#003839] px-4 text-[14px] font-semibold text-white">
                 Start {option.title}
               </span>
             </button>

@@ -226,7 +226,7 @@ export function Stage5StaffAssignmentAndRestrictions({
                     }
                     className={[
                       "cursor-pointer rounded-[6px] border border-[#808081] px-[10px] py-[6px] text-[14px] font-medium leading-[1.4] transition-colors",
-                      active ? "bg-[#00b4b8] text-white border-[#00b4b8]" : "bg-transparent text-[#10141a]",
+                      active ? "bg-[#003839] text-white border-[#003839]" : "bg-transparent text-[#10141a]",
                     ].join(" ")}
                   >
                     {opt.label}

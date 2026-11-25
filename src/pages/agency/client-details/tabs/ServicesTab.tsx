@@ -392,7 +392,7 @@ function ServiceRow({
   };
 
   return (
-    <div className="backdrop-blur-[20px] rounded-[20px] border border-[rgba(255,255,255,0.4)] bg-white/70 px-4 py-3 flex flex-col gap-3">
+    <div className="rounded-[12px] border border-[#eceef0] bg-white px-4 py-3 flex flex-col gap-3 dark:border-white/10 dark:bg-transparent">
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1 flex-1 min-w-0">
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-3">
@@ -1534,13 +1534,13 @@ export function ServicesTab({ client, clientId, onServicesUpdated, readOnly = fa
   if (client.type === "hha") {
     const authorizations = client.hhaAuthorizations ?? [];
     return (
-      <div className="mt-4 backdrop-blur bg-[rgba(255,255,255,0.3)] border border-[rgba(255,255,255,0.3)] rounded-[30px] p-5 flex flex-col gap-4">
+      <div className="mt-5 rounded-[16px] border border-[#e4e7ea] bg-white dark:border-white/10 dark:bg-[#1b232b] p-5 flex flex-col gap-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex flex-col gap-1">
-            <p className="text-[24px] font-medium leading-[normal] text-[#10141a]">
+            <h2 className="text-base font-semibold text-[#10141a] dark:text-[#f4f6f7]">
               Service authorizations
-            </p>
-            <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+            </h2>
+            <p className="text-[13px] text-[#4b535b] dark:text-[#9aa4a8]">
               Approved HHA services, payer details, and assigned caregivers.
             </p>
           </div>
@@ -1548,7 +1548,7 @@ export function ServicesTab({ client, clientId, onServicesUpdated, readOnly = fa
           <Button
             type="button"
             variant="outline"
-            className="h-11 shrink-0 rounded-[60px] border-[#b2b2b3] bg-white/60 px-5 text-[#10141a] hover:bg-white"
+            className="shrink-0"
             onClick={() => navigate(editClientPath)}
           >
             Edit service authorizations
@@ -1579,7 +1579,7 @@ export function ServicesTab({ client, clientId, onServicesUpdated, readOnly = fa
                       {auth.serviceCode || "No service code"}
                     </p>
                   </div>
-                  <span className="rounded-full bg-[#e6fafa] px-3 py-1 text-[12px] font-semibold text-[#007f83]">
+                  <span className="rounded-full bg-[#e0f3f3] px-3 py-1 text-[12px] font-semibold text-[#007f83]">
                     HHA
                   </span>
                 </div>
@@ -1638,15 +1638,15 @@ export function ServicesTab({ client, clientId, onServicesUpdated, readOnly = fa
 
   return (
     <AssignmentReviewRosterProvider medication={{value: medicationSupportSettings ?? {underMedication: false, trainingRequired: false}, onChange: setMedicationSupportSettings}} enabled={reviewMode !== "sc"} clientId={clientId} agencyId={client.agencyId} program="ddd" savedRows={mapClientOutcomesToEditable(client.outcomes).flatMap(group => group.services)} decisionState={decisionState} onDecisionState={setDecisionState} decisionCaptureRef={decisionCaptureRef}>
-    <div className="mt-4 backdrop-blur bg-[rgba(255,255,255,0.3)] border border-[rgba(255,255,255,0.3)] rounded-[30px] p-5 flex flex-col gap-4">
+    <div className="mt-5 rounded-[16px] border border-[#e4e7ea] bg-white dark:border-white/10 dark:bg-[#1b232b] p-5 flex flex-col gap-4">
       {careerAccess && (!readOnly||careerReadOnly) && reviewMode !== 'sc' && client.type==='ddd' && careerRows.map(row=><Button key={row.id} variant="outline" onClick={()=>navigate(`${careerReadOnly?Routes.superAdmin.careerPlanning:Routes.agency.goalsAndDocuments.careerPlanning}?agencyId=${encodeURIComponent(client.agencyId??'')}&clientId=${encodeURIComponent(clientId)}&serviceAuthorizationId=${encodeURIComponent(row.id)}`)}>Open Career Planning plan · {row.startAuthDate?.slice(0,10)??'Authorization'} – {row.endAuthDate?.slice(0,10)??''}</Button>)}
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <p className="text-[24px] font-medium leading-[normal] text-[#10141a]">
+          <h2 className="text-base font-semibold text-[#10141a] dark:text-[#f4f6f7]">
             Outcomes &amp; services
-          </p>
-          <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
+          </h2>
+          <p className="text-[13px] text-[#4b535b] dark:text-[#9aa4a8]">
             Edit ISP outcome statements and nested service authorizations (saved as <code className="text-xs">outcomes</code> only).
           </p>
         </div>
@@ -1656,7 +1656,6 @@ export function ServicesTab({ client, clientId, onServicesUpdated, readOnly = fa
             <Button
               type="button"
               variant="outline"
-              className="h-11 rounded-[60px] border-[#b2b2b3] text-[#10141a] bg-white/60 hover:bg-white"
               onClick={() => setIsEditing((prev) => !prev)}
               disabled={isSaving}
             >
@@ -1666,7 +1665,6 @@ export function ServicesTab({ client, clientId, onServicesUpdated, readOnly = fa
           <Button
             type="button"
             variant="outline"
-            className="h-11 rounded-[60px] border-[#b2b2b3] text-[#10141a] bg-white/60 hover:bg-white"
             onClick={handleAddOutcome}
             disabled={isSaving}
           >
@@ -1675,7 +1673,7 @@ export function ServicesTab({ client, clientId, onServicesUpdated, readOnly = fa
           </Button>
           <Button
             type="button"
-            className="h-11 rounded-[60px] bg-[#00b4b8] text-white hover:bg-[#00a0a4] px-5 shrink-0"
+            className="shrink-0"
             onClick={handleAddService}
             disabled={isSaving}
           >
@@ -1699,7 +1697,6 @@ export function ServicesTab({ client, clientId, onServicesUpdated, readOnly = fa
             <div className="mt-2 flex justify-center">
               <Button
                 type="button"
-                className="h-10 rounded-[60px] px-5 bg-[#00b4b8] text-white hover:bg-[#00a0a4]"
                 onClick={() => setShowErrorModal(false)}
               >
                 Close
@@ -1787,7 +1784,7 @@ export function ServicesTab({ client, clientId, onServicesUpdated, readOnly = fa
                 <Button
                   type="button"
                   variant="outline"
-                  className="self-start rounded-[60px]"
+                  className="self-start"
                   onClick={() => handleAddServiceToOutcome(oi)}
                 >
                   <Plus className="w-4 h-4 mr-2" />
@@ -1803,7 +1800,6 @@ export function ServicesTab({ client, clientId, onServicesUpdated, readOnly = fa
           <Button
             type="button"
             variant="outline"
-            className="h-10 rounded-[60px] px-5 text-[#10141a] border-[#b2b2b3] bg-white"
             onClick={handleCancel}
             disabled={isSaving}
           >
@@ -1811,7 +1807,7 @@ export function ServicesTab({ client, clientId, onServicesUpdated, readOnly = fa
           </Button>
           <Button
             type="button"
-            className="h-10 rounded-[60px] px-6 bg-[#00b4b8] text-white hover:bg-[#00a0a4] flex items-center gap-2"
+            className="flex items-center gap-2"
             onClick={handleSave}
             disabled={isSaving || (!!decisionState.loading && rosterAssignmentsChanged(mapClientOutcomesToEditable(client.outcomes).flatMap(group => group.services), outcomeGroups.flatMap(group => group.services)))}
           >
@@ -1825,7 +1821,7 @@ export function ServicesTab({ client, clientId, onServicesUpdated, readOnly = fa
         <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/30">
           <div className="w-full max-w-sm rounded-[20px] bg-white shadow-lg p-6 flex flex-col items-center gap-3 text-center">
             <div className="flex items-center justify-center w-12 h-12 rounded-full bg-[#e6f7f7]">
-              <Loader2 className="w-7 h-7 animate-spin text-[#00b4b8]" />
+              <Loader2 className="w-7 h-7 animate-spin text-[#007679]" />
             </div>
             <p className="text-[16px] font-medium text-[#10141a]">Saving…</p>
             <p className="text-[13px] text-[#808081]">

@@ -248,7 +248,7 @@ export default function PlanOfCareFormModal({
           </div>
           <DialogClose
             aria-label="Close"
-            className="-mr-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#5c6368] transition-colors hover:bg-[#e6e7e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8]/40"
+            className="-mr-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#5c6368] transition-colors hover:bg-[#e6e7e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#007679]/40"
           >
             <X className="h-5 w-5" aria-hidden />
           </DialogClose>
@@ -553,7 +553,7 @@ export default function PlanOfCareFormModal({
             <Button
               type="button"
               variant="outline"
-              className="h-11 min-h-[44px] w-full border-[#00b4b8] text-[#00b4b8] hover:bg-[#e6fafa] sm:w-auto"
+              className="w-full sm:w-auto"
               onClick={() => void generate("download")}
               disabled={!!busy}
             >
@@ -566,7 +566,7 @@ export default function PlanOfCareFormModal({
             </Button>
             <Button
               type="button"
-              className="h-11 min-h-[44px] w-full shrink-0 bg-[#00b4b8] hover:bg-[#009ea1] sm:w-auto"
+              className="w-full shrink-0 sm:w-auto"
               onClick={() => void generate("apply")}
               disabled={!!busy}
             >

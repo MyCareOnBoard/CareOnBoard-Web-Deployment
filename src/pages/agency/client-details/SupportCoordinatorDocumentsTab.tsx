@@ -108,7 +108,7 @@ export default function SupportCoordinatorDocumentsTab({ sample, client, onSaved
       <DialogContent showCloseButton={false} className="flex max-h-[calc(100vh-32px)] w-[calc(100vw-32px)] max-w-[455px] flex-col overflow-hidden rounded-[22px] p-5">
         <div className="flex shrink-0 items-center justify-between gap-3">
           <DialogTitle className="text-lg font-semibold text-[#10141a]">Upload document</DialogTitle>
-          <button type="button" aria-label="Close upload document" onClick={close} className="flex size-8 cursor-pointer items-center justify-center rounded-full bg-[#f0f3f5] text-[#303741] hover:bg-[#e4ebed] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00b4b8]"><X className="size-4" /></button>
+          <button type="button" aria-label="Close upload document" onClick={close} className="flex size-8 cursor-pointer items-center justify-center rounded-full bg-[#f0f3f5] text-[#303741] hover:bg-[#e4ebed] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679]"><X className="size-4" /></button>
         </div>
         <DialogDescription className="sr-only">Upload a document to this client record.</DialogDescription>
         <form className="flex min-h-0 flex-1 flex-col" onSubmit={async (event) => {

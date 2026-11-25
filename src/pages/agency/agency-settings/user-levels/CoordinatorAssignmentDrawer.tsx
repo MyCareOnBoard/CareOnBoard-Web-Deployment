@@ -74,7 +74,7 @@ export default function CoordinatorAssignmentDrawer({ staffName, agencyId, assig
     <DialogContent showCloseButton={false} className="!top-0 !right-0 !left-auto !h-dvh !w-full !max-w-[480px] !translate-x-0 !translate-y-0 !rounded-none p-0 flex flex-col">
       <div className="flex items-start justify-between gap-4 border-b border-[#e5e7eb] px-6 py-5">
         <div><DialogTitle className="text-xl">Manage coordinators</DialogTitle><DialogDescription className="mt-1 text-sm">Choose the support coordinators {staffName} can manage.</DialogDescription></div>
-        <button type="button" aria-label="Close assignment drawer" disabled={saving} onClick={onClose} className="rounded-lg p-1 text-[#6b7280] hover:bg-[#f3f4f6] focus-visible:outline-2 focus-visible:outline-[#008f93]"><X className="h-5 w-5" /></button>
+        <button type="button" aria-label="Close assignment drawer" disabled={saving} onClick={onClose} className="rounded-lg p-1 text-[#6b7280] hover:bg-[#f3f4f6] focus-visible:outline-2 focus-visible:outline-[#007679]"><X className="h-5 w-5" /></button>
       </div>
       <div className="flex min-h-0 flex-1 flex-col px-6 pt-5">
         {!canAssign && <p className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Give this staff member Support Coordination access before assigning coordinators. Save to clear any existing assignments.</p>}
@@ -85,8 +85,8 @@ export default function CoordinatorAssignmentDrawer({ staffName, agencyId, assig
         {loading ? <p role="status" className="text-sm text-[#6b7280]">Loading coordinators…</p> :
           <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pb-5">
             {visible.length === 0 ? <p className="rounded-lg border border-[#e5e7eb] p-4 text-sm text-[#6b7280]">{search ? "No coordinators match your search." : "No support coordinators are available."}</p> : visible.map((coordinator) =>
-              <label key={coordinator.id} className="flex cursor-pointer items-center gap-3 rounded-xl border border-[#e5e7eb] p-3 hover:border-[#00b4b8]">
-                <input type="checkbox" disabled={!canAssign || saving} checked={selectedIds.includes(coordinator.id)} onChange={(event) => setSelectedIds((ids) => event.target.checked ? [...ids, coordinator.id] : ids.filter((id) => id !== coordinator.id))} className="h-4 w-4 accent-[#008f93]" />
+              <label key={coordinator.id} className="flex cursor-pointer items-center gap-3 rounded-xl border border-[#e5e7eb] p-3 hover:border-[#007679]">
+                <input type="checkbox" disabled={!canAssign || saving} checked={selectedIds.includes(coordinator.id)} onChange={(event) => setSelectedIds((ids) => event.target.checked ? [...ids, coordinator.id] : ids.filter((id) => id !== coordinator.id))} className="h-4 w-4 accent-[#007679]" />
                 <span className="min-w-0"><span className="block truncate text-sm font-medium text-[#10141a]">{coordinator.fullName}</span><span className="block truncate text-xs text-[#808081]">{coordinator.email}</span></span>
               </label>)}
           </div>}

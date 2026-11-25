@@ -99,16 +99,16 @@ export function FamilyPortalTab({ client, clientId, onClientUpdated }: FamilyPor
   }
 
   return (
-    <div className="mt-6 flex flex-col gap-6">
+    <div className="mt-5 flex flex-col gap-5">
       {/* Existing contacts */}
-      <div className="rounded-2xl border border-[#e8eaed] bg-white p-6 shadow-sm">
+      <div className="rounded-[16px] border border-[#e4e7ea] bg-white dark:border-white/10 dark:bg-[#1b232b] p-5">
         <div className="mb-4 flex items-center gap-2">
-          <Users className="h-5 w-5 text-[#00b4b8]" />
-          <h3 className="text-[15px] font-semibold text-[#10141a]">Family Portal Access</h3>
+          <Users className="h-5 w-5 text-[#007679]" />
+          <h3 className="text-base font-semibold text-[#10141a] dark:text-[#f4f6f7]">Family Portal Access</h3>
         </div>
 
         {contacts.length === 0 ? (
-          <p className="text-sm text-[#808081]">
+          <p className="text-sm text-[#4b535b]">
             No family portal contacts yet. Add a phone number or an email address below to
             grant portal access.
           </p>
@@ -117,22 +117,22 @@ export function FamilyPortalTab({ client, clientId, onClientUpdated }: FamilyPor
             {contacts.map((contact, i) => (
               <li
                 key={i}
-                className="flex items-center justify-between rounded-xl border border-[#e8eaed] bg-[#f8fafb] px-4 py-3"
+                className="flex items-center justify-between rounded-[12px] border border-[#eceef0] px-4 py-3 dark:border-white/10"
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#00b4b8]/10">
-                    <User className="h-4 w-4 text-[#00b4b8]" />
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e0f3f3]">
+                    <User className="h-4 w-4 text-[#005c5e]" />
                   </div>
                   <div>
                     <p className="text-[14px] font-medium text-[#10141a]">
                       {contact.name}
                       {contact.relationship && (
-                        <span className="ml-2 text-[12px] font-normal text-[#808081]">
+                        <span className="ml-2 text-[12px] font-normal text-[#4b535b]">
                           ({contact.relationship})
                         </span>
                       )}
                     </p>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[#808081]">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[#4b535b]">
                       {contact.primaryPhone && (
                         <span className="flex items-center gap-1">
                           <Phone className="h-3 w-3" />
@@ -169,10 +169,10 @@ export function FamilyPortalTab({ client, clientId, onClientUpdated }: FamilyPor
       </div>
 
       {/* Add contact form */}
-      <div className="rounded-2xl border border-[#e8eaed] bg-white p-6 shadow-sm">
+      <div className="rounded-[16px] border border-[#e4e7ea] bg-white dark:border-white/10 dark:bg-[#1b232b] p-5">
         <div className="mb-4 flex items-center gap-2">
-          <Plus className="h-5 w-5 text-[#00b4b8]" />
-          <h3 className="text-[15px] font-semibold text-[#10141a]">Add Family Portal Contact</h3>
+          <Plus className="h-5 w-5 text-[#007679]" />
+          <h3 className="text-base font-semibold text-[#10141a] dark:text-[#f4f6f7]">Add Family Portal Contact</h3>
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -248,7 +248,7 @@ export function FamilyPortalTab({ client, clientId, onClientUpdated }: FamilyPor
           type="button"
           disabled={saving}
           onClick={() => void handleAdd()}
-          className="mt-4 h-10 rounded-xl bg-[#00b4b8] px-5 text-[14px] font-medium text-white hover:bg-[#00a0a4]"
+          className="mt-4"
         >
           {saving ? (
             <span className="flex items-center gap-2">
@@ -263,7 +263,7 @@ export function FamilyPortalTab({ client, clientId, onClientUpdated }: FamilyPor
           )}
         </Button>
 
-        <p className="mt-3 text-[12px] text-[#808081]">
+        <p className="mt-3 text-[12px] text-[#4b535b]">
           A phone number signs in by SMS code; an email address signs in by a link sent to that
           inbox. Give both and the contact can use either.
         </p>
@@ -281,8 +281,8 @@ export function FamilyPortalTab({ client, clientId, onClientUpdated }: FamilyPor
           gap: 0.5rem;
         }
         .phone-input-family:focus-within {
-          border-color: #00b4b8;
-          box-shadow: 0 0 0 2px rgba(0, 180, 184, 0.15);
+          border-color: #007679;
+          box-shadow: 0 0 0 2px rgba(0, 118, 121, 0.15);
         }
         .phone-input-family .PhoneInputCountrySelect {
           background: transparent;

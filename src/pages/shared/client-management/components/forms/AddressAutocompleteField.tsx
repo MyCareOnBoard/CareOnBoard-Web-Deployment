@@ -215,7 +215,7 @@ export function AddressAutocompleteField({
               disabled={disabled || locating}
               title="Use my current location"
               aria-label="Use my current location"
-              className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-[8px] text-[#5c6368] transition-colors hover:bg-[#00b4b8]/10 hover:text-[#00b4b8] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8]/30 disabled:cursor-not-allowed disabled:opacity-60"
+              className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-[8px] text-[#5c6368] transition-colors hover:bg-[#007679]/10 hover:text-[#007679] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#007679]/30 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {locating ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -242,7 +242,7 @@ export function AddressAutocompleteField({
             <div role="listbox" id={listboxId} aria-label={label}>
               {isSearching && (
                 <div className="flex items-center gap-2 px-3 py-2.5 text-[13px] text-[#808081]">
-                  <Loader2 className="h-4 w-4 animate-spin text-[#00b4b8]" />
+                  <Loader2 className="h-4 w-4 animate-spin text-[#007679]" />
                   Searching…
                 </div>
               )}
@@ -265,7 +265,7 @@ export function AddressAutocompleteField({
                       index === activeIndex ? "bg-[#eafafa]" : "hover:bg-[#f5fbfb]",
                     )}
                   >
-                    <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#00b4b8]" />
+                    <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#007679]" />
                     <span className="flex min-w-0 flex-col">
                       <span className="truncate text-[13px] font-medium text-[#10141a]">
                         {suggestion.mainText}

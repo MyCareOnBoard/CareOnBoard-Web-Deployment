@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Plus, Trash2, Pencil, ChevronDown, UsersRound, KeyRound, UserRoundX, UserRoundCheck } from "lucide-react";
+import { Plus, Trash2, Pencil, Ellipsis, UsersRound, KeyRound, UserRoundX, UserRoundCheck, UserCheck, UserX, ShieldUser } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -9,9 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Skeleton } from "@/components/ui/skeleton";
 import AddNewUserModal from "../user-levels/AddNewUserModal";
 import ClientAssignmentDrawer from "../user-levels/ClientAssignmentDrawer";
 import CoordinatorAssignmentDrawer from "../user-levels/CoordinatorAssignmentDrawer";
@@ -34,7 +32,13 @@ import { useStaffLabels } from "@/hooks/useStaffLabels";
 import { ConfirmDialog, ConfirmDialogContent } from "@/components/ui/confirm-dialog";
 import { getInitials } from "@/lib/utils/string-utils";
 import { validateImageUrl } from "@/lib/utils/string-utils";
-import SettingsSectionCard from "./SettingsSectionCard";
+import { AgencyPageHeader, AgencyStatCard } from "@/components/agency/AgencyShell";
+import { WorkforceIcon } from "@/components/agency/AgencyIcons";
+import {
+  AgencyListCard, AgencyPagination, AgencyPill, AgencySearchField, agencyMenuContent, agencyMenuItem, agencyPrimaryButton,
+  agencyRowMenuButton, agencyTd, agencyTh, agencyTheadRow, agencyTr,
+} from "@/components/agency/AgencyListKit";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/utils/auth";
 import { UserType } from "@/utils/auth/types/user.types";
 import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
@@ -236,212 +240,193 @@ export default function InternalUsersPage() {
   const hasUsers = !isLoading && filteredUsers.length > 0;
   const isEmpty = !isLoading && filteredUsers.length === 0;
 
-  return (
-    <div className="min-w-0">
-      <SettingsSectionCard
-        title="Staff members"
-        subtitle="Add and manage staff who can access the agency dashboard. Assign access levels to control what each person can see and do."
-        bodyClassName="pt-0 sm:pt-0"
-      >
-        <div className="flex min-w-0 flex-col gap-4 border-b border-[#eef0f2] pb-5 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-x-6">
-          <div className="flex min-w-0 flex-shrink-0 flex-col gap-3 sm:ml-auto sm:flex-row sm:items-center sm:gap-3 sm:w-full sm:justify-end">
-            <div className="relative w-full min-w-0 sm:w-[200px] sm:min-w-[160px] md:w-[240px] lg:w-[280px]">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#a0a0a1]" />
-              <Input
-                type="text"
-                placeholder="Search by name or email"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-10 min-w-0 rounded-full border border-[#e0e0e0] bg-white pl-10 text-[14px] placeholder:text-[#a0a0a1] focus-visible:ring-1 focus-visible:ring-[#00b4b8]"
-              />
-            </div>
+  const totalStaff = data?.pagination?.total ?? filteredUsers.length;
+  const activeStaff = filteredUsers.filter((user) => user.isActive).length;
+  const inactiveStaff = filteredUsers.length - activeStaff;
+  const statValue = (value: number) => (isLoading ? "—" : value);
+  const chip = "inline-flex h-6 items-center whitespace-nowrap rounded-[6px] border border-[#e4e7ea] px-2 text-[12px] text-[#2a3138] dark:border-white/15 dark:text-[#c9d1d4]";
 
-            <Button
-              onClick={() => {
-                setEditingStaff(null);
-                setShowAddUserModal(true);
-              }}
-              disabled={isCreating || isUpdating}
-              className="h-10 shrink-0 rounded-full px-5 text-[14px] font-medium whitespace-nowrap"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Add staff member
-            </Button>
-          </div>
+  return (
+    <div className="min-w-0 pb-6">
+      <AgencyPageHeader
+        icon={ShieldUser}
+        title="Staff management"
+        description="Add staff and manage their access to the agency dashboard."
+        actions={<>
+          <AgencySearchField
+            label="Search staff"
+            placeholder="Search by name or email"
+            value={searchQuery}
+            onChange={setSearchQuery}
+            className="w-full sm:w-[280px]"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              setEditingStaff(null);
+              setShowAddUserModal(true);
+            }}
+            disabled={isCreating || isUpdating}
+            className={agencyPrimaryButton}
+          >
+            <Plus aria-hidden="true" className="h-4 w-4" />
+            Add staff member
+          </button>
+        </>}
+      />
+
+      {/* Summary */}
+      <div className="mt-5 grid gap-4 sm:grid-cols-3">
+        <AgencyStatCard icon={WorkforceIcon} label="Staff members" value={statValue(totalStaff)} footnote="Staff who can access the agency dashboard." />
+        <AgencyStatCard icon={UserCheck} label="Active" value={statValue(activeStaff)} footnote="Can sign in and use the dashboard." />
+        <AgencyStatCard icon={UserX} label="Inactive" value={statValue(inactiveStaff)} footnote="Deactivated; they cannot sign in." />
+      </div>
+
+      <AgencyListCard label="Staff members" className="mt-5">
+        <div className="p-4">
+          <h2 className="text-base font-semibold text-[#10141a] dark:text-[#f4f6f7]">Staff members</h2>
+          <p className="text-[13px] text-[#4b535b] dark:text-[#9aa4a8]">Assign access levels to control what each person can see and do.</p>
         </div>
 
         {/* Error State */}
         {!!error && (
-          <div className="mt-6 rounded-[16px] border border-red-200 bg-red-50 p-4 text-center">
-            <p className="text-[14px] text-red-600">
-              Could not load staff members. Please try again.
-            </p>
+          <div role="alert" className="border-t border-[#eceef0] px-6 py-10 text-center text-[14px] text-[#b42318] dark:border-white/10 dark:text-[#f8a1a1]">
+            Could not load staff members. Please try again.
           </div>
         )}
 
-        {/* Users List */}
-        <div className="mt-6 space-y-3">
-          {/* Loading state with skeletons */}
-          {isLoading && (
-            <>
-              {Array.from({ length: 3 }).map((_, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between gap-6 rounded-[16px] border border-[#f0f0f0] bg-white p-5"
-                >
-                  <div className="flex min-w-0 flex-shrink-0 items-center gap-4">
-                    <Skeleton className="h-[50px] w-[50px] rounded-full" />
-                    <div className="space-y-2">
-                      <Skeleton className="h-3 w-32 rounded-full" />
-                      <Skeleton className="h-3 w-40 rounded-full" />
-                    </div>
-                  </div>
-                  <div className="min-w-0 flex-1 space-y-2">
-                    <Skeleton className="h-2 w-20 rounded-full" />
-                    <div className="flex flex-wrap gap-2">
-                      <Skeleton className="h-6 w-16 rounded-full" />
-                      <Skeleton className="h-6 w-14 rounded-full" />
-                      <Skeleton className="h-6 w-20 rounded-full" />
-                    </div>
-                  </div>
-                  <div className="flex flex-shrink-0 items-center">
-                    <Skeleton className="h-9 w-24 rounded-full" />
-                  </div>
-                </div>
-              ))}
-            </>
-          )}
+        {/* Loading state */}
+        {isLoading && (
+          <div role="status" aria-label="Loading staff members" className="space-y-px border-t border-[#eceef0] dark:border-white/10">
+            {Array.from({ length: 4 }).map((_, index) => <div key={index} aria-hidden="true" className="h-[66px] animate-pulse bg-[#f8f9fa] dark:bg-white/5" />)}
+          </div>
+        )}
 
-          {/* Empty state */}
-          {isEmpty && (
-            <div className="flex flex-col items-center justify-center rounded-[16px] border border-dashed border-[#e0e0e0] bg-white px-6 py-10 text-center">
-              <h3 className="mb-2 text-[16px] font-semibold text-[#10141a]">
-                No staff members yet
-              </h3>
-              <p className="mb-4 max-w-md text-[13px] text-[#808081]">
-                Add your first staff member to get started. Assign access levels to control what each person can see and do.
-              </p>
-              <Button
-                onClick={() => setShowAddUserModal(true)}
-                className="rounded-full px-5 text-[14px] font-medium"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add first staff member
-              </Button>
-            </div>
-          )}
+        {/* Empty state */}
+        {isEmpty && !error && (
+          <div className="flex flex-col items-center justify-center border-t border-[#eceef0] px-6 py-14 text-center dark:border-white/10">
+            <h3 className="mb-2 text-[16px] font-medium text-[#10141a] dark:text-[#f4f6f7]">
+              No staff members yet
+            </h3>
+            <p className="mb-4 max-w-md text-[14px] text-[#4b535b] dark:text-[#9aa4a8]">
+              Add your first staff member to get started. Assign access levels to control what each person can see and do.
+            </p>
+            <button type="button" onClick={() => setShowAddUserModal(true)} className={agencyPrimaryButton}>
+              <Plus aria-hidden="true" className="h-4 w-4" />
+              Add first staff member
+            </button>
+          </div>
+        )}
 
-          {/* Populated list */}
-          {hasUsers &&
-            filteredUsers.map((user) => (
-              <div
-                key={user.id}
-                className="flex flex-col gap-4 rounded-[16px] border border-[#f0f0f0] bg-white p-5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-6"
-              >
-                {/* First: Avatar and Name */}
-                <div className="flex min-w-0 flex-shrink-0 items-center gap-4 sm:min-w-[200px]">
-                  <Avatar className="h-12 w-12 shrink-0 rounded-[8px]">
-                    <AvatarImage
-                      src={validateImageUrl(user?.avatar) || undefined}
-                      alt={user.name}
-                      className="rounded-[8px]"
-                    />
-                    <AvatarFallback className="bg-gradient-to-br from-[#e5e7eb] to-[#d1d5db] text-[#10141a] text-[16px] font-semibold rounded-[8px]">
-                      {getInitials(user.name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="truncate text-[16px] font-semibold text-[#10141a]">
-                      {user.name}
-                    </h3>
-                    <p className="truncate text-[12px] text-[#808081]">{user.email}</p>
-                  </div>
-                </div>
-
-                {/* Second: Role */}
-                <div className="flex min-w-0 flex-col gap-1.5 sm:min-w-[120px]">
-                  <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#4b5563]">
-                    Role
-                  </p>
-                  <p className="truncate text-[13px] font-medium text-[#10141a]">
-                    {user.role || "—"}
-                  </p>
-                </div>
-
-                {/* Third: Access pills */}
-                <div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:min-w-[180px]">
-                  <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#4b5563]">
-                    Access
-                  </p>
-                  {!!user.agencyModes?.length && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {user.agencyModes.map((m) => (
-                        <span
-                          key={m}
-                          className="rounded-full bg-[#e6f7f7] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#008f93]"
-                        >
-                          {m}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex flex-wrap gap-1.5">
-                    {user.accessList.map((level) => (
-                      <span
-                        key={level}
-                        className="rounded-full bg-[#f5f5f5] px-3 py-1 text-[11px] font-medium text-[#525253]"
-                      >
-                        {accessLabel(level)}
-                      </span>
-                    ))}
-                  </div>
-                  {activeMode === "sc" || activeMode === null
-                    ? user.agencyModes?.includes("sc") && <p className="text-[11px] text-[#6b7280]">{user.managedCoordinatorIds?.length || 0} coordinators assigned</p>
-                    : null}
-                  {activeMode !== "sc" && clientModesFor(user).length > 0 && <p className="text-[11px] text-[#6b7280]">{user.managedClientIds?.length || 0} client{user.managedClientIds?.length === 1 ? "" : "s"} assigned</p>}
-                </div>
-
-                {/* Fourth: Actions */}
-                <div className="flex w-full flex-shrink-0 items-center sm:ml-auto sm:w-auto">
+        {/* Populated list */}
+        {hasUsers && (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px]">
+              <thead>
+                <tr className={agencyTheadRow}>
+                  <th scope="col" className={agencyTh}>Staff member</th>
+                  <th scope="col" className={agencyTh}>Role</th>
+                  <th scope="col" className={agencyTh}>Access</th>
+                  <th scope="col" className={agencyTh}>Assigned</th>
+                  <th scope="col" className={agencyTh}>Status</th>
+                  <th scope="col" className={agencyTh}><span className="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredUsers.map((user) => {
+                  const showCoordinators = (activeMode === "sc" || activeMode === null) && user.agencyModes?.includes("sc");
+                  const showClients = activeMode !== "sc" && clientModesFor(user).length > 0;
+                  return (
+                  <tr key={user.id} className={agencyTr}>
+                    <td className={agencyTd}>
+                      <div className="flex min-w-0 items-center gap-3">
+                        <Avatar className="h-9 w-9 shrink-0">
+                          <AvatarImage
+                            src={validateImageUrl(user?.avatar) || undefined}
+                            alt={user.name}
+                            className="object-cover"
+                          />
+                          <AvatarFallback className="bg-[#e0f3f3] text-[13px] font-medium text-[#005c5e] dark:bg-[#0f7e7d]/20 dark:text-[#7fd3d3]">
+                            {getInitials(user.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-[#10141a] dark:text-[#f4f6f7]">{user.name}</p>
+                          <p className="truncate text-[12px] text-[#6b737a] dark:text-[#9aa4a8]">{user.email}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className={agencyTd}>{user.role || "—"}</td>
+                    <td className={cn(agencyTd, "max-w-[340px]")}>
+                      <div className="flex flex-wrap gap-1.5">
+                        {user.agencyModes?.map((m) => (
+                          <AgencyPill key={m} tone="teal" className="uppercase">{m}</AgencyPill>
+                        ))}
+                        {user.accessList.map((level) => (
+                          <span key={level} className={chip}>{accessLabel(level)}</span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className={cn(agencyTd, "whitespace-nowrap text-[13px]")}>
+                      {showCoordinators && <p>{user.managedCoordinatorIds?.length || 0} coordinators assigned</p>}
+                      {showClients && <p>{user.managedClientIds?.length || 0} client{user.managedClientIds?.length === 1 ? "" : "s"} assigned</p>}
+                      {!showCoordinators && !showClients && <span className="text-[#6b737a]">—</span>}
+                    </td>
+                    <td className={agencyTd}>
+                      <AgencyPill tone={user.isActive ? "green" : "grey"}>{user.isActive ? "Active" : "Inactive"}</AgencyPill>
+                    </td>
+                    <td className={cn(agencyTd, "text-right")}>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button type="button" variant="outline" aria-label={`Actions for ${user.name}`} className="group h-9 rounded-full px-4 text-[13px] font-medium text-[#4b5563] hover:border-[#00b4b8] hover:bg-[#e6f7f7] hover:text-[#007a7d] data-[state=open]:border-[#00b4b8] data-[state=open]:bg-[#e6f7f7] data-[state=open]:text-[#007a7d]">
-                        Actions
-                        <ChevronDown aria-hidden="true" className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180 motion-reduce:transition-none" />
-                      </Button>
+                      <button type="button" aria-label={`Actions for ${user.name}`} className={cn(agencyRowMenuButton, "ml-auto")}>
+                        <Ellipsis aria-hidden="true" className="h-4 w-4" />
+                      </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" sideOffset={8} className="w-60 max-w-[calc(100vw-2rem)] rounded-2xl border-[#e5e7eb] bg-white p-1.5 text-[#10141a] shadow-lg [&_[role=menuitem]]:min-h-10 [&_[role=menuitem]]:cursor-pointer [&_[role=menuitem]]:gap-3 [&_[role=menuitem]]:rounded-lg [&_[role=menuitem]]:px-3 [&_[role=menuitem]]:text-[13px] [&_[role=menuitem]]:font-medium [&_[role=menuitem]]:transition-colors [&_[role=menuitem]]:focus:bg-[#e6f7f7] [&_[role=menuitem]]:focus:text-[#007a7d] [&_svg]:text-current">
-                      <DropdownMenuLabel className="px-3 pb-2 pt-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#6b7280]">Staff actions</DropdownMenuLabel>
-                      <DropdownMenuItem disabled={isUpdating} onSelect={() => handleEditClick(user)}>
-                        <Pencil aria-hidden="true" className="h-4 w-4" /> Edit staff member
+                    <DropdownMenuContent align="end" sideOffset={8} className={cn(agencyMenuContent, "w-60 max-w-[calc(100vw-2rem)]")}>
+                      <DropdownMenuLabel className="px-2.5 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-wider text-[#6b737a]">Staff actions</DropdownMenuLabel>
+                      <DropdownMenuItem className={agencyMenuItem} disabled={isUpdating} onSelect={() => handleEditClick(user)}>
+                        <Pencil aria-hidden="true" className="h-4 w-4 text-[#007679] dark:text-[#7fd3d3]" /> Edit staff member
                       </DropdownMenuItem>
                       {/* DDD/HHA: pick the clients staff with Client Management manage. SC: pick coordinators. */}
-                      {isAgencyOwner && activeMode !== "sc" && clientModesFor(user).length > 0 && <DropdownMenuItem onSelect={() => setClientAssignmentStaff(user)}>
-                        <UsersRound aria-hidden="true" className="h-4 w-4" />
+                      {isAgencyOwner && activeMode !== "sc" && clientModesFor(user).length > 0 && <DropdownMenuItem className={agencyMenuItem} onSelect={() => setClientAssignmentStaff(user)}>
+                        <UsersRound aria-hidden="true" className="h-4 w-4 text-[#007679] dark:text-[#7fd3d3]" />
                         Manage clients
                       </DropdownMenuItem>}
-                      {isAgencyOwner && (activeMode === "sc" || (activeMode === null && user.agencyModes?.includes("sc"))) && <DropdownMenuItem onSelect={() => setAssignmentStaff(user)}>
-                        <UsersRound aria-hidden="true" className="h-4 w-4" />
+                      {isAgencyOwner && (activeMode === "sc" || (activeMode === null && user.agencyModes?.includes("sc"))) && <DropdownMenuItem className={agencyMenuItem} onSelect={() => setAssignmentStaff(user)}>
+                        <UsersRound aria-hidden="true" className="h-4 w-4 text-[#007679] dark:text-[#7fd3d3]" />
                         Manage coordinators
                       </DropdownMenuItem>}
-                      <DropdownMenuItem onSelect={() => handleResetPasswordClick(user.id, user.name)}>
-                        <KeyRound aria-hidden="true" className="h-4 w-4" /> Reset password
+                      <DropdownMenuItem className={agencyMenuItem} onSelect={() => handleResetPasswordClick(user.id, user.name)}>
+                        <KeyRound aria-hidden="true" className="h-4 w-4 text-[#007679] dark:text-[#7fd3d3]" /> Reset password
                       </DropdownMenuItem>
-                      <DropdownMenuSeparator className="mx-2 my-1.5 bg-[#eef0f2]" />
-                      <DropdownMenuItem className={user.isActive ? "text-amber-700 focus:!bg-amber-50 focus:!text-amber-800" : "text-[#007a7d]"} onSelect={() => handleDeactivateClick(user.id, user.name)}>
+                      <DropdownMenuSeparator className="my-1 bg-[#eceef0] dark:bg-white/10" />
+                      <DropdownMenuItem className={cn(agencyMenuItem, user.isActive ? "text-[#7a5800] focus:!bg-[#fcf5dc] focus:!text-[#7a5800]" : "text-[#007679]")} onSelect={() => handleDeactivateClick(user.id, user.name)}>
                         {user.isActive ? <UserRoundX aria-hidden="true" className="h-4 w-4" /> : <UserRoundCheck aria-hidden="true" className="h-4 w-4" />}
                         {user.isActive ? "Deactivate" : "Activate"}
                       </DropdownMenuItem>
-                      <DropdownMenuItem variant="destructive" className="text-red-600 focus:!bg-red-50 focus:!text-red-700 [&_svg]:!text-current" disabled={isDeleting} onSelect={() => handleDeleteClick(user.id, user.name)}>
+                      <DropdownMenuItem variant="destructive" className={cn(agencyMenuItem, "text-[#b42318] focus:!bg-[#fdf2f1] focus:!text-[#b42318] [&_svg]:!text-current")} disabled={isDeleting} onSelect={() => handleDeleteClick(user.id, user.name)}>
                         <Trash2 aria-hidden="true" className="h-4 w-4" /> Delete staff member
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                </div>
-              </div>
-            ))}
-        </div>
-      </SettingsSectionCard>
+                    </td>
+                  </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {hasUsers && (
+          <AgencyPagination
+            summary={`Showing ${filteredUsers.length} of ${totalStaff} staff member${totalStaff === 1 ? "" : "s"}`}
+            page={1}
+            pages={1}
+            onPage={() => {}}
+          />
+        )}
+      </AgencyListCard>
 
       {assignmentStaff && <CoordinatorAssignmentDrawer
         key={assignmentStaff.id}

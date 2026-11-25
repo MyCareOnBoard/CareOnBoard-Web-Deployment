@@ -114,7 +114,7 @@ export function Stage7SystemAiAndAudit({
               className={[
                 "cursor-pointer rounded-[6px] border px-[10px] py-[6px] text-[14px] font-medium leading-[1.4] capitalize transition-colors",
                 stage7.auditCycle === "monthly"
-                  ? "bg-[#00b4b8] border-[#00b4b8] text-white"
+                  ? "bg-[#003839] border-[#003839] text-white"
                   : "border-[#808081] bg-transparent text-[#10141a]",
               ].join(" ")}
             >
@@ -126,7 +126,7 @@ export function Stage7SystemAiAndAudit({
               className={[
                 "cursor-pointer rounded-[6px] border px-[10px] py-[6px] text-[14px] font-medium leading-[1.4] capitalize transition-colors",
                 stage7.auditCycle === "quarterly"
-                  ? "bg-[#00b4b8] border-[#00b4b8] text-white"
+                  ? "bg-[#003839] border-[#003839] text-white"
                   : "border-[#808081] bg-transparent text-[#10141a]",
               ].join(" ")}
             >

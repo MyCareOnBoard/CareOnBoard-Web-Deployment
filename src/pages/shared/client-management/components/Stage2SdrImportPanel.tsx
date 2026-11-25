@@ -356,7 +356,7 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
                   <button
                     type="button"
                     aria-label="How SDR import works"
-                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#5c6368] transition-colors hover:bg-[#e6e7e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8]/40"
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#5c6368] transition-colors hover:bg-[#e6e7e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#007679]/40"
                   >
                     <Info className="h-4 w-4" aria-hidden />
                   </button>
@@ -393,8 +393,8 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
                 className={cn(
                   "group relative overflow-hidden rounded-2xl border transition-all duration-200",
                   isDragActive && !loading
-                    ? "border-[#00b4b8] bg-gradient-to-b from-[#e6fafa] to-white shadow-md ring-2 ring-[#00b4b8]/25"
-                    : "border-[#e2e4e6] bg-gradient-to-b from-[#f8fafb] to-white shadow-sm hover:border-[#00b4b8]/40 hover:shadow-md",
+                    ? "border-[#007679] bg-gradient-to-b from-[#e0f3f3] to-white shadow-md ring-2 ring-[#007679]/25"
+                    : "border-[#e2e4e6] bg-gradient-to-b from-[#f8fafb] to-white shadow-sm hover:border-[#007679]/40 hover:shadow-md",
                 )}
                 onDragEnter={handleDragEnter}
                 onDragOver={handleDragOver}
@@ -405,17 +405,17 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
                 {isDragActive && !loading ? (
                   <div
                     aria-hidden="true"
-                    className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 rounded-[14px] bg-[#00b4b8]/10 px-6 text-center backdrop-blur-[1px]"
+                    className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 rounded-[14px] bg-[#007679]/10 px-6 text-center backdrop-blur-[1px]"
                   >
-                    <FileUp className="h-8 w-8 text-[#00b4b8]" aria-hidden />
-                    <p className="text-[15px] font-semibold text-[#00b4b8]">Release to upload</p>
+                    <FileUp className="h-8 w-8 text-[#007679]" aria-hidden />
+                    <p className="text-[15px] font-semibold text-[#007679]">Release to upload</p>
                     <p className="text-[12px] text-[#5c6368]">PDF, JPG, PNG, or WebP</p>
                   </div>
                 ) : null}
                 <label
                   htmlFor="stage2-sdr-import-file"
                   className={cn(
-                    "relative flex w-full flex-col items-center gap-4 px-5 py-10 text-center transition-colors outline-none focus-within:ring-2 focus-within:ring-[#00b4b8]/35 focus-within:ring-offset-2",
+                    "relative flex w-full flex-col items-center gap-4 px-5 py-10 text-center transition-colors outline-none focus-within:ring-2 focus-within:ring-[#007679]/35 focus-within:ring-offset-2",
                     !loading ? "cursor-pointer" : "cursor-not-allowed opacity-75",
                   )}
                 >
@@ -428,7 +428,7 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
                     disabled={loading}
                     onChange={onPickFile}
                   />
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#00b4b8]/12 text-[#00b4b8] ring-1 ring-[#00b4b8]/15">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#007679]/12 text-[#007679] ring-1 ring-[#007679]/15">
                     {loading ? (
                       <Loader2 className="h-7 w-7 animate-spin" aria-hidden />
                     ) : (
@@ -456,7 +456,7 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
                     </span>
                   </div>
                   {!loading ? (
-                    <span className="inline-flex items-center rounded-[60px] border border-[#00b4b8] bg-white px-5 py-2.5 text-sm font-semibold text-[#00b4b8] shadow-sm ring-offset-background transition-colors group-hover:bg-[#e6fafa]">
+                    <span className="inline-flex items-center rounded-[10px] border border-[#dcdfe2] bg-white px-4 py-2.5 text-sm font-semibold text-[#10141a] ring-offset-background transition-colors group-hover:bg-[#f4f6f7]">
                       Choose SDR file
                     </span>
                   ) : null}
@@ -734,7 +734,7 @@ export function Stage2SdrImportPanel({ open, onOpenChange, formData, setFormData
               </button>
               <Button
                 type="button"
-                className="h-11 min-h-[44px] shrink-0 bg-[#00b4b8] hover:bg-[#009ea1]"
+                className="shrink-0"
                 disabled={!canApply}
                 onClick={handleApply}
               >

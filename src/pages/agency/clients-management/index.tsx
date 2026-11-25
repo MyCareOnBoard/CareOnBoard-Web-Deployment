@@ -1,12 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Loader2, Plus, Search, ArrowRight } from "lucide-react";
+import { ChevronRight, Loader2, Plus, Search, UserCheck, UserX } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 import { format } from "date-fns";
 import { staffLabels } from "@/lib/roleLabel";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { cn } from "@/lib/utils";
+import { AgencyPageHeader, AgencyStatCard } from "@/components/agency/AgencyShell";
+import { ClientsIcon } from "@/components/agency/AgencyIcons";
+import {
+  AgencyListCard, AgencyPagination, AgencyPerson, AgencyPill, agencyField, agencyOutlineButton, agencyPrimaryButton, agencyRowLink,
+  agencyTd, agencyTh, agencyTheadRow, agencyTr, type AgencyTone,
+} from "@/components/agency/AgencyListKit";
 import { Routes } from "@/routes/constants";
 import { useAuth } from "@/utils/auth";
 import { useListAgencyClientsQuery, useGetClientStatsQuery, type Client } from "@/lib/api/clients";
@@ -15,6 +19,13 @@ import { isForm485Required } from "@/pages/shared/client-management/utils/form48
 import SupportCoordinatorClientsPage from "./SupportCoordinatorClientsPage";
 import FolderImportDialog from "@/pages/shared/client-management/components/FolderImportDialog";
 import { ClientImportReviewBanner } from "@/pages/shared/client-management/components/ClientImportReview";
+
+const STATUS_TONE: Record<DisplayClient["status"], AgencyTone> = {
+  Active: "green",
+  Pending: "amber",
+  Inactive: "red",
+  Archived: "grey",
+};
 
 interface DisplayClient {
   id: string;
@@ -67,6 +78,8 @@ function AgencyClientsPage() {
 
   const clients = clientsData?.clients || [];
   const totalClients = statsData?.stats?.total ?? 0;
+  const activeClients = statsData?.stats?.active ?? 0;
+  const inactiveClients = statsData?.stats?.inactive ?? 0;
   const isLoading = isLoadingClients && clients.length === 0;
   const error = null;
 
@@ -223,88 +236,55 @@ function AgencyClientsPage() {
     setIsSearchOpen(shouldShowSearchDropdown);
   }, [shouldShowSearchDropdown]);
 
+  const statValue = (value: number) => (isLoading ? "—" : value);
+
   return (
-    <div className="min-h-[calc(100vh-200px)]">
-      {/* Page Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h1 className="text-[40px] font-semibold leading-[1.6] text-[#10141a]">
-            Client Management
-          </h1>
-          {/* <button
-            onClick={() => navigate(Routes.agency.communityInclusions)}
-            className="flex items-center gap-[13px] px-[16px] py-[12px] rounded-[60px] border border-[#525253] bg-transparent backdrop-blur-[22px] hover:bg-[rgba(82,82,83,0.05)] transition-colors cursor-pointer"
-          >
-            <span className="font-['Urbanist'] text-[14px] font-semibold leading-[1.4] text-[#525253]">
-              Community Inclusions
-            </span>
-            <ArrowRight className="w-5 h-5 text-[#525253]" />
-          </button> */}
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
+    <div className="pb-6">
+      <AgencyPageHeader
+        icon={ClientsIcon}
+        title="Client management"
+        description="Clients registered with the agency."
+        actions={<>
           <FolderImportDialog
             mode={selectedMode === "ddd" || selectedMode === "hha" ? selectedMode : null}
             allowedModes={folderImportModes}
             existingClientNames={existingClientNames}
+            triggerClassName={agencyOutlineButton}
             onClientsCreated={() => { for (const refetch of [refetchClients, refetchStats]) { try { void refetch?.(); } catch { /* query not started (skipped) */ } } }}
           />
-          <Button
-            size="lg"
-            className="h-[52px] px-[16px] py-[12px]"
+          <button
+            type="button"
+            className={agencyPrimaryButton}
             onClick={() => navigate(Routes.agency.addClient)}
           >
-            <Plus className="w-5 h-5 text-white" />
+            <Plus aria-hidden="true" className="h-4 w-4" />
             Add Client
-          </Button>
-        </div>
+          </button>
+        </>}
+      />
+
+      <div className="mt-5 empty:hidden">
+        <ClientImportReviewBanner program={selectedMode === "ddd" || selectedMode === "hha" ? selectedMode : null} />
       </div>
 
-      <ClientImportReviewBanner program={selectedMode === "ddd" || selectedMode === "hha" ? selectedMode : null} />
-
-      {/* Summary Card */}
-      <div className="rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white">
-        <div className="flex items-center justify-between">
-          <div className="flex flex-col gap-[4px]">
-            <p className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
-              Clients
-            </p>
-            <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-              Count of clients registered with the agency
-            </p>
-          </div>
-
-          <div className="flex flex-col items-start px-[24px]">
-            <p className="text-[40px] font-semibold leading-[normal] text-[#10141a]">
-              {isLoading ? "..." : totalClients}
-            </p>
-            <div className="flex items-center gap-[6px]">
-              <span className="inline-block h-[12px] w-[12px] rounded-full bg-[#2B82FF]" />
-              <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-                Total
-              </p>
-            </div>
-          </div>
-        </div>
+      {/* Summary */}
+      <div className="mt-5 grid gap-4 sm:grid-cols-3">
+        <AgencyStatCard icon={ClientsIcon} label="Clients" value={statValue(totalClients)} footnote="Count of clients registered with the agency." />
+        <AgencyStatCard icon={UserCheck} label="Active" value={statValue(activeClients)} footnote="Clients with an active status." />
+        <AgencyStatCard icon={UserX} label="Inactive" value={statValue(inactiveClients)} footnote="Clients who are not active." />
       </div>
 
       {/* Directory */}
-      <div className="mt-4 rounded-[20px] bg-[#FFFFFF4D] p-6 shadow-sm border border-white">
-        {/* Directory Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex flex-col gap-[4px]">
-            <p className="text-[20px] font-medium leading-[1.6] text-[#10141a]">
-              Client Directory
-            </p>
-            <p className="text-[14px] font-medium leading-[1.4] text-[#808081]">
-              List of clients registered with the agency
-            </p>
+      <AgencyListCard label="Client Directory" className="mt-5">
+        <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-[#10141a] dark:text-[#f4f6f7]">Client Directory</h2>
+            <p className="text-[13px] text-[#4b535b] dark:text-[#9aa4a8]">List of clients registered with the agency</p>
           </div>
-          <div
-            ref={searchAnchorRef}
-            className="relative flex items-center gap-2 bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] rounded-full px-3 py-2 h-[36px] w-[320px]"
-          >
-            <Search className="w-4 h-4 text-[#808081] shrink-0" />
-            <Input
+          <div ref={searchAnchorRef} className="relative w-full sm:w-[300px]">
+            <Search aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6b737a]" />
+            <input
+              type="search"
               value={searchQuery}
               onFocus={handleSearchFocus}
               onChange={(e) => handleSearchChange(e.target.value)}
@@ -344,155 +324,93 @@ function AgencyClientsPage() {
                 }
               }}
               placeholder="Search"
-              className="h-[20px] border-0 bg-transparent px-0 py-0 text-[12px] font-medium leading-[1.4] text-[#10141a] placeholder:text-[#808081] shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+              aria-label="Search clients"
+              className={cn(agencyField, "h-10 pl-10 pr-9")}
               role="combobox"
               aria-expanded={isSearchOpen}
               aria-controls="client-search-dropdown"
               aria-autocomplete="list"
             />
             {isSearching && (
-              <Loader2 className="w-4 h-4 text-[#808081] animate-spin shrink-0" />
+              <Loader2 aria-hidden="true" className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-[#6b737a]" />
             )}
           </div>
         </div>
 
-        {/* Rows */}
-        <div className="mt-6 space-y-3">
-          {isLoading ? (
-            <div className="py-12 flex flex-col items-center justify-center gap-2 text-center">
-              <Loader2 className="w-6 h-6 animate-spin" />
-              <p className="text-[14px] font-medium text-[#808081]">
-                Loading clients...
-              </p>
-            </div>
-          ) : error ? (
-            <div className="py-12 text-center">
-              <p className="text-[14px] font-medium text-red-600">
-                {error}
-              </p>
-            </div>
-          ) : paginatedClients.length === 0 ? (
-            <div className="py-12 text-center">
-              <p className="text-[14px] font-medium text-[#808081]">
-                No clients found.
-              </p>
-            </div>
-          ) : (
-            paginatedClients.map((client) => (
-              <div
-                key={client.id}
-                className="flex flex-col gap-4 rounded-[20px] bg-[#FFFFFF4D] p-5 shadow-sm border border-white sm:p-6 md:flex-row md:items-center md:gap-6 lg:gap-8"
-              >
-                {/* Avatar + name / type · status */}
-                <div className="flex items-center gap-4 min-w-0 md:w-[220px] md:shrink-0 lg:w-[240px]">
-                  <Avatar className="w-[52.5px] h-[60px] rounded-[8px] shrink-0">
-                    {client.avatarUrl && (
-                      <AvatarImage
-                        src={client.avatarUrl}
-                        alt={client.name}
-                        className="w-full h-full object-cover aspect-auto rounded-[8px]"
-                      />
-                    )}
-                    <AvatarFallback className="w-full h-full rounded-[8px] bg-gradient-to-br from-[#00b4b8] to-[#0090a8] text-white text-sm font-medium">
-                      {client.name
-                        .split(" ")
-                        .filter(Boolean)
-                        .slice(0, 2)
-                        .map((w) => w[0]?.toUpperCase())
-                        .join("")}
-                    </AvatarFallback>
-                  </Avatar>
-
-                  <div className="min-w-0">
-                    <p className="text-[16px] font-semibold leading-[1.6] text-black truncate">
-                      {client.name}
-                    </p>
-                    <div className="mt-1 flex items-center gap-2">
-                      <span
-                        className={
-                          "text-[13px] font-bold uppercase leading-[1.4] " +
-                          (client.type === "hha"
-                            ? "text-[#2B82FF]"
-                            : "text-[#7c3aed]")
+        {isLoading ? (
+          <div role="status" aria-label="Loading clients..." className="space-y-px border-t border-[#eceef0] dark:border-white/10">
+            {Array.from({ length: 5 }).map((_, i) => <div key={i} aria-hidden="true" className="h-[62px] animate-pulse bg-[#f8f9fa] dark:bg-white/5" />)}
+          </div>
+        ) : error ? (
+          <div role="alert" className="border-t border-[#eceef0] px-6 py-12 text-center text-[14px] text-[#b42318] dark:border-white/10 dark:text-[#f8a1a1]">
+            {error}
+          </div>
+        ) : paginatedClients.length === 0 ? (
+          <div className="border-t border-[#eceef0] px-6 py-14 text-center dark:border-white/10">
+            <p className="text-[16px] font-medium text-[#10141a] dark:text-[#f4f6f7]">No clients found.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px]">
+              <thead>
+                <tr className={agencyTheadRow}>
+                  <th scope="col" className={agencyTh}>Client</th>
+                  <th scope="col" className={agencyTh}>Program</th>
+                  <th scope="col" className={agencyTh}>Status</th>
+                  <th scope="col" className={agencyTh}>{labels.noun}</th>
+                  <th scope="col" className={agencyTh}>Account Created</th>
+                  <th scope="col" className={agencyTh}><span className="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedClients.map((client) => (
+                  <tr key={client.id} className={agencyTr}>
+                    <td className={agencyTd}>
+                      <button
+                        type="button"
+                        onClick={() => navigate(Routes.agency.clientDetails.replace(":clientId", client.id))}
+                        className="cursor-pointer rounded-[8px] text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679]"
+                      >
+                        <AgencyPerson name={client.name} imageUrl={client.avatarUrl} />
+                      </button>
+                    </td>
+                    <td className={agencyTd}>
+                      <AgencyPill tone={client.type === "hha" ? "slate" : "teal"} className="uppercase">{client.type}</AgencyPill>
+                    </td>
+                    <td className={agencyTd}>
+                      <AgencyPill tone={STATUS_TONE[client.status] ?? "grey"}>{client.statusLabel}</AgencyPill>
+                    </td>
+                    <td className={cn(agencyTd, "tabular-nums")}>{client.roleValue}</td>
+                    <td className={cn(agencyTd, "whitespace-nowrap")}>{client.accountCreated}</td>
+                    <td className={cn(agencyTd, "text-right")}>
+                      <button
+                        type="button"
+                        className={agencyRowLink}
+                        onClick={() =>
+                          navigate(
+                            Routes.agency.clientDetails.replace(":clientId", client.id)
+                          )
                         }
                       >
-                        {client.type}
-                      </span>
+                        Client Details<ChevronRight aria-hidden="true" className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-                      <span className="text-[15px] leading-none text-[#808081]">
-                        •
-                      </span>
-
-                      <span
-                        className={
-                          "text-[13px] font-bold leading-[1.4] " +
-                          (client.status === "Active"
-                            ? "text-[#0eaf52]"
-                            : client.status === "Pending"
-                              ? "text-amber-700"
-                              : client.status === "Inactive"
-                                ? "text-[#d92d20]"
-                                : "text-[#808081]")
-                        }
-                      >
-                        {client.statusLabel}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Meta: role + account created */}
-                <div className="flex flex-wrap items-center gap-x-8 gap-y-2 md:flex-1 md:flex-nowrap lg:gap-x-12">
-                  <div className="w-[75px] text-[14px] font-medium leading-[1.4]">
-                    <p className="mb-0 text-[#808081]">{client.roleLabel}</p>
-                    <p className="text-[#10141a]">{client.roleValue}</p>
-                  </div>
-
-                  <div className="w-[160px] text-[14px] font-medium leading-[1.4]">
-                    <p className="mb-0 text-[#808081]">Account Created</p>
-                    <p className="text-[#10141a]">{client.accountCreated}</p>
-                  </div>
-                </div>
-
-                <Button
-                  className="h-9 w-full shrink-0 px-4 py-2 text-[14px] font-semibold md:w-[140px]"
-                  onClick={() =>
-                    navigate(
-                      Routes.agency.clientDetails.replace(":clientId", client.id)
-                    )
-                  }
-                >
-                  Client Details
-                </Button>
-              </div>
-            ))
-          )}
-        </div>
-
-        {/* Pagination */}
-        <div className="mt-6 flex items-center justify-center gap-2">
-          <span className="text-[16px] font-medium leading-[1.6] text-[#10141a]">
-            {Math.min(currentPage, totalPages)}
-            <span className="text-[14px] text-[#808081]">/{totalPages}</span>
-          </span>
-          <button
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            disabled={currentPage <= 1}
-            className="backdrop-blur-[2.909px] bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] rounded-full p-1.5 disabled:opacity-50 hover:bg-white/70 transition-colors cursor-pointer"
-            aria-label="Previous page"
-          >
-            <ChevronLeft className="w-5 h-5 text-[#10141a]" />
-          </button>
-          <button
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            disabled={currentPage >= totalPages}
-            className="backdrop-blur-[2.909px] bg-[rgba(255,255,255,0.5)] border border-[rgba(255,255,255,0.3)] rounded-full p-1.5 disabled:opacity-50 hover:bg-white/70 transition-colors cursor-pointer"
-            aria-label="Next page"
-          >
-            <ChevronRight className="w-5 h-5 text-[#10141a]" />
-          </button>
-        </div>
-      </div>
+        {!isLoading && filteredClients.length > 0 && (
+          <AgencyPagination
+            summary={`Showing ${paginatedClients.length} of ${filteredClients.length} client${filteredClients.length === 1 ? "" : "s"}`}
+            page={Math.min(currentPage, totalPages)}
+            pages={totalPages}
+            onPage={(next) => setCurrentPage(Math.min(totalPages, Math.max(1, next)))}
+          />
+        )}
+      </AgencyListCard>
     </div>
   );
 }
