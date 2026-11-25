@@ -32,18 +32,20 @@ type Row = { key: string; label: string; to: string; icon: ComponentType<{ class
  * overtime. Counts are shown only where they are known exactly (or as "50+" for a full page), so an
  * area without a count is a link, never a misleading zero.
  */
-export default function NeedsAttentionCard({ summary, mode, agencyId, scopeKey, isLoading }: {
+export default function NeedsAttentionCard({ summary, mode, agencyId, scopeKey, isLoading, showPatterns = false }: {
     summary?: AnalyticsSummaryData;
     mode: "ddd" | "hha" | "sc" | null;
     agencyId: string;
     scopeKey: string;
     isLoading?: boolean;
+    /** List the documentation patterns link too (Analytics, which has no patterns panel). */
+    showPatterns?: boolean;
 }) {
     const { user } = useAuth();
     const viewerId = user?.uid || "";
     // Compliance patterns have their own panel on the dashboard.
     const sources = summary
-        ? getComplianceSources(user, mode).filter((source) => source !== "documentation_patterns" && summary.currentRecordSources?.includes(source))
+        ? getComplianceSources(user, mode).filter((source) => (showPatterns || source !== "documentation_patterns") && summary.currentRecordSources?.includes(source))
         : [];
     const programMode = mode === "ddd" || mode === "hha" ? mode : undefined;
 
@@ -95,6 +97,8 @@ export default function NeedsAttentionCard({ summary, mode, agencyId, scopeKey, 
             icon={FlagIcon}
             title="Needs attention"
             busy={isLoading}
+            // Red border so the card stands out on both the dashboard and Analytics.
+            className="border-[#f0a19c] dark:border-[#ff6b5e]/50"
             bodyClassName="px-2 py-2"
             action={open > 0 && (
                 <span className="inline-flex h-6 items-center gap-1.5 rounded-[6px] bg-[#fcf5dc] px-2 text-[12px] font-medium text-[#7a5800] dark:bg-[#e0b400]/15 dark:text-[#f0cf6b]">

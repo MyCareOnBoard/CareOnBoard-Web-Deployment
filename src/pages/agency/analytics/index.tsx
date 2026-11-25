@@ -1,63 +1,25 @@
 import { useAssignmentReviewScope } from "@/hooks/useAssignmentReview";
 import { matchesReportScope, printParams } from "./analyticsScope";
-import CurrentRecordsLinks from "./components/CurrentRecordsLinks";
 import { useAuth } from "@/utils/auth";
 import React from "react";
 
-import { Clock3, WandSparkles, UserRoundCog } from "lucide-react";
+import { BarChart3, CalendarDays, ChevronDown, Download, RefreshCw, Share2 } from "lucide-react";
 import { Routes } from "@/routes/constants";
 
-import OperationReportHeader from "./components/AnalyticsReportHeader";
+import { AgencyPageHeader } from "@/components/agency/AgencyShell";
+import { agencyOutlineButton, agencyPrimaryButton } from "@/components/agency/AgencyListKit";
 import AnalyticsDateRangeModal from "./components/AnalyticsDateRangeModal";
 import ShareReportModal from "./components/ShareReportModal";
-import OverviewCards from "./components/OverviewCards";
-import ComplianceInsights from "./components/ComplianceInsights";
-import RiskTrends from "./components/RiskTrends";
-import OperationalEfficiency, {
-  type OperationalMetric,
-} from "./components/OperationalEfficiency";
-import BillingSummary from "./components/BillingSummary";
+// The report shows the same sections as the agency dashboard, so it uses the dashboard's cards.
+import DashboardKpis from "../dashboard/components/DashboardKpis";
+import RiskIndicatorsCard from "../dashboard/components/RiskIndicatorsCard";
+import RiskTrendsCard from "../dashboard/components/RiskTrendsCard";
+import NeedsAttentionCard from "../dashboard/components/NeedsAttentionCard";
+import OperationalEfficiencyCard from "../dashboard/components/OperationalEfficiencyCard";
+import BillingSummaryCard from "../dashboard/components/BillingSummaryCard";
 
 import { useGetAnalyticsSummaryQuery } from "@/lib/api/reports";
-import type { AnalyticsSummaryData } from "@/lib/api/reports";
 import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
-
-function buildOperationalMetrics(
-  data: AnalyticsSummaryData["operationalEfficiency"],
-): OperationalMetric[] {
-  return [
-    {
-      id: "completion",
-      title: "Shift completion rate",
-      value: data.completionRate.value,
-      path: Routes.agency.shifts,
-      trend: data.completionRate.trend,
-      icon: Clock3,
-      chartColor: "#12B5B0",
-      data: data.completionRate.sparkline,
-    },
-    {
-      id: "ontime",
-      title: "On-time start rate",
-      value: data.onTimeRate.value,
-      path: Routes.agency.shifts,
-      trend: data.onTimeRate.trend,
-      icon: WandSparkles,
-      chartColor: "#12B5B0",
-      data: data.onTimeRate.sparkline,
-    },
-    {
-      id: "manual",
-      title: "Manual interventions",
-      value: data.manualRate.value,
-      path: Routes.agency.shifts,
-      trend: data.manualRate.trend,
-      icon: UserRoundCog,
-      chartColor: "#E5484D",
-      data: data.manualRate.sparkline,
-    },
-  ];
-}
 
 export default function AnalyticsPage() {
   const [dateRange, setDateRange] = React.useState({
@@ -69,6 +31,7 @@ export default function AnalyticsPage() {
   const mode = useEffectiveAgencyMode();
 
   const { user } = useAuth();
+  const agencyId = user?.agencyId || user?.agency?.id || "";
   const scopeKey = JSON.stringify([
     useAssignmentReviewScope(),
     user?.agencyId || user?.agency?.id,
@@ -110,6 +73,14 @@ export default function AnalyticsPage() {
     summary?.complianceAvailability,
     summary?.currentRecordSources,
   ]);
+  const insightsScope = {
+    startDate: summary?.reportScope.startDate,
+    endDate: summary?.reportScope.endDate,
+    mode: mode ?? undefined,
+    scopeKey,
+  };
+  const shownRange = summary?.reportScope ?? dateRange;
+  const checkedAt = summary ? new Date(summary.reportScope.checkedAt) : undefined;
 
   const downloadPDF = () => {
     if (!reportDisabled && reportQuery)
@@ -121,107 +92,126 @@ export default function AnalyticsPage() {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen pb-4">
       {/* Header */}
       <div className="no-print">
-        <OperationReportHeader
-          reportDisabled={reportDisabled}
-          title="AI Analytics & Operation report"
-          dateRange={summary?.reportScope ?? dateRange}
-          onOpenDateModal={() => setShowDateModal(true)}
-          onActionSelect={(action) => {
-            switch (action) {
-              case "Download report":
-                downloadPDF();
-                break;
-              case "Share report":
-                setShowShareModal(true);
-                break;
-              default:
-                break;
-            }
-          }}
+        <AgencyPageHeader
+          icon={BarChart3}
+          title="Analytics"
+          description="AI-assisted operations report. Indicators use the period you pick; current records can differ."
+          actions={
+            <>
+              <button
+                type="button"
+                onClick={() => setShowShareModal(true)}
+                className={agencyOutlineButton}
+              >
+                <Share2 aria-hidden="true" className="h-4 w-4" />
+                Share report
+              </button>
+              <button
+                type="button"
+                disabled={reportDisabled}
+                onClick={downloadPDF}
+                className={agencyPrimaryButton}
+              >
+                <Download aria-hidden="true" className="h-4 w-4" />
+                Download report
+              </button>
+            </>
+          }
         />
+
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setShowDateModal(true)}
+            className={agencyOutlineButton}
+          >
+            <CalendarDays aria-hidden="true" className="h-4 w-4 text-[#4b535b] dark:text-[#9aa4a8]" />
+            <span className="text-[#4b535b] dark:text-[#9aa4a8]">Period:</span>
+            <span>
+              {shownRange.startDate && shownRange.endDate
+                ? `${shownRange.startDate} - ${shownRange.endDate}`
+                : "Select date range"}
+            </span>
+            <ChevronDown aria-hidden="true" className="h-4 w-4 text-[#4b535b] dark:text-[#9aa4a8]" />
+          </button>
+          {checkedAt && Number.isFinite(checkedAt.getTime()) && (
+            <p className="text-[13px] text-[#4b535b] dark:text-[#9aa4a8]">
+              Last updated{" "}
+              {checkedAt.toLocaleString(undefined, {
+                dateStyle: "medium",
+                timeStyle: "short",
+              })}
+            </p>
+          )}
+        </div>
       </div>
 
       {analyticsError && (
-        <div role="alert" className="mb-4">
-          Could not load this report. Your reporting dates have been kept.{" "}
-          <button onClick={() => refreshAnalytics()}>Retry</button>
+        <div
+          role="alert"
+          className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-[#f5c2c0] bg-[#fdf2f1] px-4 py-3 text-[14px] text-[#8a1c14] dark:border-[#ff6b5e]/30 dark:bg-[#ff6b5e]/10 dark:text-[#ffb4ad]"
+        >
+          <span>Could not load this report. Your reporting dates have been kept.</span>
+          <button
+            type="button"
+            onClick={() => refreshAnalytics()}
+            className="inline-flex cursor-pointer items-center gap-1.5 font-semibold underline underline-offset-4"
+          >
+            <RefreshCw aria-hidden="true" className="h-4 w-4" />
+            Retry
+          </button>
         </div>
       )}
+
       {/* Report */}
-      <div id="analytics-report" className="space-y-6 print-container">
-        {summary && !reportDisabled && (
-          <CurrentRecordsLinks summary={summary} mode={mode} />
-        )}
-        {/* Overview KPI cards */}
+      <div id="analytics-report" className="print-container mt-5 space-y-5">
         <div className="print-card">
-          <OverviewCards
-            availability={summary?.complianceAvailability}
-            populationTotal={summary?.populationTotal}
-            data={summary?.overview}
+          <DashboardKpis summary={summary} isLoading={isLoading || isFetching} />
+        </div>
+
+        {/* Links to the current records behind the indicators (was "Review current records"). */}
+        <NeedsAttentionCard
+          summary={summary}
+          mode={mode}
+          agencyId={agencyId}
+          scopeKey={scopeKey}
+          isLoading={isLoading || isFetching}
+          showPatterns
+        />
+
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+          <RiskIndicatorsCard
+            key={widgetScope + "compliance"}
+            summary={summary}
             isLoading={isLoading || isFetching}
+            scope={insightsScope}
+            mode={mode ?? undefined}
+          />
+          <RiskTrendsCard
+            key={widgetScope + "risk"}
+            data={summary?.riskTrends}
+            isLoading={isLoading || isFetching}
+            scope={insightsScope}
+            mode={mode ?? undefined}
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-          <div className="print-card">
-            <ComplianceInsights
-              key={widgetScope + "compliance"}
-              scopeKey={scopeKey}
-              availability={summary?.complianceAvailability.indicators}
-              total={summary?.complianceInsights?.total}
-              data={summary?.complianceInsights?.breakdown}
-              isLoading={isLoading || isFetching}
-              startDate={summary?.reportScope.startDate}
-              endDate={summary?.reportScope.endDate}
-              mode={mode ?? undefined}
-            />
-          </div>
-
-          <div className="print-card">
-            <RiskTrends
-              key={widgetScope + "risk"}
-              scopeKey={scopeKey}
-              data={summary?.riskTrends}
-              isLoading={isLoading || isFetching}
-              startDate={summary?.reportScope.startDate}
-              endDate={summary?.reportScope.endDate}
-              mode={mode ?? undefined}
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-          <div className="print-card">
-            <OperationalEfficiency
-              key={widgetScope + "efficiency"}
-              scopeKey={scopeKey}
-              mode={mode ?? undefined}
-              metrics={
-                summary
-                  ? buildOperationalMetrics(summary.operationalEfficiency)
-                  : undefined
-              }
-              isLoading={isLoading || isFetching}
-              startDate={summary?.reportScope.startDate}
-              endDate={summary?.reportScope.endDate}
-            />
-          </div>
-
-          <div className="print-card">
-            <BillingSummary
-              key={widgetScope + "billing"}
-              scopeKey={scopeKey}
-              mode={mode ?? undefined}
-              total={summary?.billingSummary.total}
-              data={summary?.billingSummary.breakdown}
-              isLoading={isLoading || isFetching}
-              startDate={summary?.reportScope.startDate}
-              endDate={summary?.reportScope.endDate}
-            />
-          </div>
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+          <OperationalEfficiencyCard
+            key={widgetScope + "efficiency"}
+            data={summary?.operationalEfficiency}
+            isLoading={isLoading || isFetching}
+            scope={insightsScope}
+          />
+          <BillingSummaryCard
+            key={widgetScope + "billing"}
+            data={summary?.billingSummary}
+            isLoading={isLoading || isFetching}
+            scope={insightsScope}
+          />
         </div>
       </div>
 

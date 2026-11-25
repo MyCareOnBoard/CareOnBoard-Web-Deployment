@@ -1,5 +1,6 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { CheckCircle, FileText, Sparkles } from "lucide-react";
+import { CheckCircle, FileText } from "lucide-react";
+import { AiInsightsIcon } from "@/components/agency/AgencyIcons";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { type DSPSuggestion } from "../api";
@@ -16,37 +17,37 @@ function getInitials(name: string) {
 }
 
 function reliabilityColor(reliability: string) {
-  if (reliability === "High") return "text-emerald-600";
-  if (reliability === "Medium") return "text-amber-500";
-  return "text-red-500";
+  if (reliability === "High") return "text-[#0a6b38] dark:text-[#7fe0a8]";
+  if (reliability === "Medium") return "text-[#7a5800] dark:text-[#f0cf6b]";
+  return "text-[#b4232b] dark:text-[#ff9d94]";
 }
 
 function DSPCard({ suggestion, onAssign }: { suggestion: DSPSuggestion; onAssign?: (suggestion: DSPSuggestion) => void }) {
   return (
     <button
       type="button"
-      className="flex flex-col gap-1.5 sm:gap-2 rounded-[16px] sm:rounded-2xl border border-[#e5e7eb] bg-white p-2.5 sm:p-3 text-left hover:border-[#00b4b8] hover:shadow-sm transition"
+      className="flex cursor-pointer flex-col gap-1.5 rounded-[12px] border border-[#e4e7ea] bg-white p-3 text-left transition-colors hover:border-[#12b5b0] hover:bg-[#f8fbfb] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
       onClick={() => onAssign?.(suggestion)}
     >
       <div className="flex items-center gap-2">
-        <Avatar className="h-7 w-7 sm:h-8 sm:w-8 text-[10px] sm:text-xs">
+        <Avatar className="h-8 w-8 text-xs">
           <AvatarImage src="" />
-          <AvatarFallback className="bg-[#e0f7f7] text-[#00b4b8] font-semibold text-[10px] sm:text-[11px]">
+          <AvatarFallback className="bg-[#e6f4f4] text-[12px] font-semibold text-[#007679] dark:bg-[#12b5b0]/15 dark:text-[#7fd3d3]">
             {getInitials(suggestion.fullName)}
           </AvatarFallback>
         </Avatar>
-        <p className="text-[12px] sm:text-[13px] font-semibold text-[#10141a] truncate">
+        <p className="truncate text-[14px] font-medium text-[#10141a] dark:text-[#f4f6f7]">
           {suggestion.fullName}
         </p>
       </div>
-      <p className="text-[11px] sm:text-[12px] text-[#6b7280]">
-        <span className="font-medium text-[#10141a]">Reliability:</span>{" "}
+      <p className="text-[12px] text-[#4b535b] dark:text-[#9aa4a8]">
+        <span className="font-medium text-[#10141a] dark:text-[#f4f6f7]">Reliability:</span>{" "}
         <span className={reliabilityColor(suggestion.reliability)}>
           {suggestion.reliability}
         </span>
       </p>
-      <p className="text-[11px] sm:text-[12px] text-[#6b7280]">
-        <span className="font-medium text-[#10141a]">Last shift:</span> {suggestion.lastShift}
+      <p className="text-[12px] text-[#4b535b] dark:text-[#9aa4a8]">
+        <span className="font-medium text-[#10141a] dark:text-[#f4f6f7]">Last shift:</span> {suggestion.lastShift}
       </p>
     </button>
   );
@@ -73,7 +74,7 @@ export function MessageBubble({
                     <img
                       src={att.url}
                       alt={att.name}
-                      className="max-w-[200px] sm:max-w-[280px] rounded-[14px] object-cover border border-[#e5e7eb]"
+                      className="max-w-[200px] rounded-[12px] border border-[#e4e7ea] object-cover sm:max-w-[280px] dark:border-white/10"
                     />
                   </a>
                 ) : (
@@ -82,9 +83,9 @@ export function MessageBubble({
                     href={att.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-full border border-[#e5e7eb] bg-white px-3 py-1.5 text-[12px] text-[#111827] hover:border-[#00b4b8] transition"
+                    className="inline-flex items-center gap-1.5 rounded-[8px] border border-[#e4e7ea] bg-white px-3 py-1.5 text-[12px] text-[#10141a] transition-colors hover:border-[#12b5b0] dark:border-white/10 dark:bg-white/5 dark:text-[#f4f6f7]"
                   >
-                    <FileText className="h-3.5 w-3.5 text-[#6b7280]" />
+                    <FileText aria-hidden="true" className="h-3.5 w-3.5 text-[#4b535b]" />
                     <span className="max-w-[140px] truncate">{att.name}</span>
                   </a>
                 )
@@ -92,7 +93,7 @@ export function MessageBubble({
             </div>
           )}
           {msg.content && (
-            <div className="rounded-[18px] sm:rounded-[24px] rounded-tr-[4px] sm:rounded-tr-[6px] bg-white px-4 sm:px-5 py-3 sm:py-4 text-[13px] sm:text-[14px] leading-relaxed text-black break-words">
+            <div className="break-words rounded-[12px] bg-[#003839] px-4 py-2.5 text-[14px] leading-relaxed text-white dark:bg-[#0f7e7d]">
               {msg.content}
             </div>
           )}
@@ -102,42 +103,42 @@ export function MessageBubble({
   }
 
   return (
-    <div className="flex gap-2.5 sm:gap-3 items-start">
-      <div className="mt-1 flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-[14px] sm:rounded-2xl bg-[#e0f7f7] flex-shrink-0">
-        <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-[#00b4b8]" />
+    <div className="flex items-start gap-3">
+      <div aria-hidden="true" className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#007679] text-white dark:bg-[#0f7e7d]">
+        <AiInsightsIcon className="h-4 w-4" />
       </div>
       <div className="flex-1 min-w-0">
         {/* Loading state */}
         {msg.isLoading && (
-          <div className="rounded-[18px] border border-[#e5e7eb] bg-white px-4 sm:px-5 py-3 sm:py-4">
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <span className="h-2 w-2 sm:h-2.5 sm:w-2.5 animate-bounce rounded-full bg-[#00b4b8]" />
-              <span className="h-2 w-2 sm:h-2.5 sm:w-2.5 animate-bounce rounded-full bg-[#00b4b8] delay-150" />
-              <span className="h-2 w-2 sm:h-2.5 sm:w-2.5 animate-bounce rounded-full bg-[#00b4b8] delay-300" />
+          <div role="status" aria-label="Thinking" className="py-2.5">
+            <div className="flex items-center gap-1.5">
+              <span className="h-2 w-2 animate-bounce rounded-full bg-[#12b5b0]" />
+              <span className="h-2 w-2 animate-bounce rounded-full bg-[#12b5b0] delay-150" />
+              <span className="h-2 w-2 animate-bounce rounded-full bg-[#12b5b0] delay-300" />
             </div>
           </div>
         )}
 
         {/* Text content card */}
         {!msg.isLoading && msg.content && (
-          <div className="rounded-[18px] border border-[#e5e7eb] bg-white overflow-hidden">
-            <div className="px-4 sm:px-5 py-3 sm:py-4 text-[13px] sm:text-[14px] leading-relaxed text-[#10141a]">
+          <div>
+            <div className="pt-1 text-[14px] leading-relaxed text-[#10141a] dark:text-[#e6eaec]">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
                   table: ({ children }) => (
-                    <div className="mt-2 overflow-x-auto">
-                      <table className="w-full text-[12px] border-collapse">{children}</table>
+                    <div className="mt-2 overflow-x-auto rounded-[12px] border border-[#e4e7ea] dark:border-white/10">
+                      <table className="w-full border-collapse text-[13px]">{children}</table>
                     </div>
                   ),
                   thead: ({ children }) => <thead>{children}</thead>,
                   th: ({ children }) => (
-                    <th className="border border-[#e5e7eb] bg-[#f9fafb] px-3 py-1.5 text-left font-semibold text-[#374151]">
+                    <th className="border-b border-[#eceef0] bg-[#f8f9fa] px-3 py-2 text-left font-normal text-[#4b535b] dark:border-white/10 dark:bg-white/5 dark:text-[#9aa4a8]">
                       {children}
                     </th>
                   ),
                   td: ({ children }) => (
-                    <td className="border border-[#e5e7eb] px-3 py-1.5 text-[#374151]">{children}</td>
+                    <td className="border-b border-[#eceef0] px-3 py-2 text-[#10141a] dark:border-white/10 dark:text-[#e6eaec]">{children}</td>
                   ),
                   p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
                   ul: ({ children }) => (
@@ -147,16 +148,16 @@ export function MessageBubble({
                     <ol className="list-decimal pl-4 mb-2 space-y-0.5">{children}</ol>
                   ),
                   strong: ({ children }) => (
-                    <strong className="font-semibold text-[#10141a]">{children}</strong>
+                    <strong className="font-semibold text-[#10141a] dark:text-[#f4f6f7]">{children}</strong>
                   ),
-                  em: ({ children }) => <em className="italic text-[#6b7280]">{children}</em>,
+                  em: ({ children }) => <em className="italic text-[#4b535b] dark:text-[#9aa4a8]">{children}</em>,
                   code: ({ children }) => (
-                    <code className="rounded bg-[#f3f4f6] px-1.5 py-0.5 text-[11px] font-mono text-[#d97706]">
+                    <code className="rounded bg-[#f4f5f6] px-1.5 py-0.5 font-mono text-[12px] text-[#7a5800] dark:bg-white/10 dark:text-[#f0cf6b]">
                       {children}
                     </code>
                   ),
                   blockquote: ({ children }) => (
-                    <blockquote className="border-l-4 border-[#00b4b8] pl-3 py-2 text-[#6b7280] italic my-2">
+                    <blockquote className="my-2 border-l-4 border-[#12b5b0] py-2 pl-3 italic text-[#4b535b] dark:text-[#9aa4a8]">
                       {children}
                     </blockquote>
                   ),
@@ -181,9 +182,9 @@ export function MessageBubble({
             {msg.actions.map((action, index) => (
               <span
                 key={index}
-                className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 sm:px-3 py-1 text-[11px] sm:text-[12px] text-emerald-700"
+                className="inline-flex h-6 items-center gap-1.5 rounded-[6px] bg-[#e5f6ec] px-2 text-[12px] font-medium text-[#0a6b38] dark:bg-[#3ecb7a]/15 dark:text-[#7fe0a8]"
               >
-                <CheckCircle className="w-3 h-3" />
+                <CheckCircle aria-hidden="true" className="h-3 w-3" />
                 {action.outcome}
               </span>
             ))}
