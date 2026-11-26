@@ -78,8 +78,6 @@ export interface GoalFormCard {
     state: GoalCardState;
     /** Footer line under the card, e.g. "Due 30 Nov 2026". */
     detail: string;
-    /** Whether the client's services call for the form. */
-    applies: boolean;
     /** Where "Fill now" / "View" goes. */
     href: string;
     action: "fill" | "view";
@@ -146,7 +144,10 @@ function dueState(due: Date | null, now: Date, windowDays: number): { state: Goa
     return { state: "not_started", detail: `Due ${formatDay(due)}` };
 }
 
-/** One card per form for the picked client. `documents` are the client's goal documents (drafts and submitted). */
+/**
+ * One card per form the picked client's services call for (no Community Inclusion service, no CI cards).
+ * `documents` are the client's goal documents (drafts and submitted).
+ */
 export function buildGoalFormCards({ client, clientId, documents, careerPlans, now = new Date() }: {
     client: Pick<Client, "services" | "outcomes" | "ispPeriod"> | null;
     clientId: string;
@@ -154,10 +155,7 @@ export function buildGoalFormCards({ client, clientId, documents, careerPlans, n
     careerPlans?: CareerPlanSummary[];
     now?: Date;
 }): GoalFormCard[] {
-    const services = clientServices(client);
-    return GOAL_FORMS.map((form): GoalFormCard => {
-        const matching = services.filter(form.matches);
-        const applies = matching.length > 0;
+    function buildCard(form: GoalFormDef, matching: ClientService[]): GoalFormCard {
         const plan = planYearFor(client, matching);
         const fillHref = withQuery(form.route, { clientId });
 
@@ -165,11 +163,10 @@ export function buildGoalFormCards({ client, clientId, documents, careerPlans, n
             const plans = (careerPlans ?? []).filter((p) => p.clientId === clientId);
             const published = plans.filter((p) => p.publishedSummary).sort((a, b) => (b.publishedSummary!.publishedAt).localeCompare(a.publishedSummary!.publishedAt))[0];
             if (published?.publishedSummary && !plans.some((p) => p.hasDraft && !p.publishedSummary)) {
-                return { form, applies, state: "completed", detail: `Completed ${formatDay(parseDay(published.publishedSummary.publishedAt) ?? now)}`, href: fillHref, action: "view" };
+                return { form, state: "completed", detail: `Completed ${formatDay(parseDay(published.publishedSummary.publishedAt) ?? now)}`, href: fillHref, action: "view" };
             }
-            if (!applies && !plans.length) return { form, applies, state: "not_started", detail: "Not started", href: fillHref, action: "fill" };
             const due = plan.start ? addDays(plan.start, GOALS_DUE_DAYS) : null;
-            return { form, applies, ...dueState(due, now, Number.POSITIVE_INFINITY), href: fillHref, action: "fill" };
+            return { form, ...dueState(due, now, Number.POSITIVE_INFINITY), href: fillHref, action: "fill" };
         }
 
         const ofType = documents.filter((d) => d.documentType === form.documentType);
@@ -182,12 +179,11 @@ export function buildGoalFormCards({ client, clientId, documents, careerPlans, n
             // Done for this plan year once an update was submitted after the plan year started.
             const due = plan.end;
             const yearStart = plan.start ?? (due ? subDays(due, 365) : null);
-            if (latest && latestAt && !draft && (applies ? !yearStart || latestAt >= yearStart : true)) {
-                return { form, applies, state: "completed", detail: `Completed ${formatDay(latestAt)}`, href: withQuery(form.route, { firebaseId: latest.id, clientId }), action: "view" };
+            if (latest && latestAt && !draft && (!yearStart || latestAt >= yearStart)) {
+                return { form, state: "completed", detail: `Completed ${formatDay(latestAt)}`, href: withQuery(form.route, { firebaseId: latest.id, clientId }), action: "view" };
             }
-            if (!applies && !draft) return { form, applies, state: "not_started", detail: "Not started", href: fillHref, action: "fill" };
             const status = dueState(due, now, ANNUAL_DUE_WINDOW_DAYS);
-            return { form, applies, ...(draft ? { state: status.state === "not_started" ? "due" as const : status.state, detail: `Draft · ${status.detail}` } : status), href: fillHref, action: "fill" };
+            return { form, ...(draft ? { state: status.state === "not_started" ? "due" as const : status.state, detail: `Draft · ${status.detail}` } : status), href: fillHref, action: "fill" };
         }
 
         // Goals and training plans: one per plan year. A submission from before the plan year is last year's.
@@ -195,18 +191,19 @@ export function buildGoalFormCards({ client, clientId, documents, careerPlans, n
         if (current && latestAt && !draft) {
             const href = withQuery(form.route, { firebaseId: current.id, clientId });
             if (isCiGoals(form) && current.approval?.status !== "approved") {
-                return { form, applies, state: "review", detail: `Submitted ${formatDay(latestAt)}`, href, action: "view" };
+                return { form, state: "review", detail: `Submitted ${formatDay(latestAt)}`, href, action: "view" };
             }
-            return { form, applies, state: "completed", detail: `Completed ${formatDay(latestAt)}`, href, action: "view" };
-        }
-        if (!applies && !draft) {
-            return latest && latestAt
-                ? { form, applies, state: "completed", detail: `Completed ${formatDay(latestAt)}`, href: withQuery(form.route, { firebaseId: latest.id, clientId }), action: "view" }
-                : { form, applies, state: "not_started", detail: "Not started", href: fillHref, action: "fill" };
+            return { form, state: "completed", detail: `Completed ${formatDay(latestAt)}`, href, action: "view" };
         }
         const due = plan.start ? addDays(plan.start, GOALS_DUE_DAYS) : null;
         const status = dueState(due, now, Number.POSITIVE_INFINITY);
-        return { form, applies, state: status.state, detail: draft ? `Draft · ${status.detail}` : status.detail, href: fillHref, action: "fill" };
+        return { form, state: status.state, detail: draft ? `Draft · ${status.detail}` : status.detail, href: fillHref, action: "fill" };
+    }
+
+    const services = clientServices(client);
+    return GOAL_FORMS.flatMap((form) => {
+        const matching = services.filter(form.matches);
+        return matching.length ? [buildCard(form, matching)] : [];
     });
 }
 
