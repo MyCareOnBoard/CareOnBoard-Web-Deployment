@@ -28,6 +28,7 @@ import {
   mapDashboardToStatusChart,
   STATUS_LABEL_TO_FILTER,
 } from "./utils/expensesDashboardUtils";
+import ExpenseDetailsDrawer from "./components/ExpenseDetailsDrawer";
 
 const RejectExpenseModal = lazy(() => import("./components/RejectExpenseModal"));
 
@@ -45,6 +46,7 @@ export function ExpensesDashboardContent() {
   const [declineTarget, setDeclineTarget] = useState<AgencyExpenseListItem | null>(null);
   const [approveTarget, setApproveTarget] = useState<AgencyExpenseListItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AgencyExpenseListItem | null>(null);
+  const [viewTarget, setViewTarget] = useState<AgencyExpenseListItem | null>(null);
   const lastDashboardErrorRef = useRef<string | null>(null);
   const lastListErrorRef = useRef<string | null>(null);
   const activeAgencyRef = useRef(agencyId);
@@ -102,33 +104,35 @@ export function ExpensesDashboardContent() {
   const statusChart = useMemo(() => mapDashboardToStatusChart(dashboardData), [dashboardData]);
 
   const handleApprove = useCallback(
-    async (expense: AgencyExpenseListItem) => {
+    async (expense: AgencyExpenseListItem): Promise<boolean> => {
       if (!hasAgency) {
         toast({
           title: "Sign in required",
           description: "Your account isn't linked to an agency.",
           variant: "destructive",
         });
-        return;
+        return false;
       }
 
       const request = approveExpense({ agencyId, expenseId: expense.id });
       mutationRequestsRef.current.add(request);
       try {
         await request.unwrap();
-        if (activeAgencyRef.current !== agencyId) return;
+        if (activeAgencyRef.current !== agencyId) return false;
         setApproveTarget(null);
         toast({
           title: "Expense approved",
           description: `Included in this ${staffNoun}'s next payroll for the expense date.`,
         });
+        return true;
       } catch (error) {
-        if (activeAgencyRef.current !== agencyId) return;
+        if (activeAgencyRef.current !== agencyId) return false;
         toast({
           title: "Couldn't update expense",
           description: mapExpenseMutationError(error),
           variant: "destructive",
         });
+        return false;
       } finally {
         mutationRequestsRef.current.delete(request);
       }
@@ -193,45 +197,66 @@ export function ExpensesDashboardContent() {
     void handleDelete(deleteTarget);
   }, [deleteTarget, handleDelete]);
 
-  const handleConfirmDecline = useCallback(
-    async (reviewerNotes: string) => {
-      if (!declineTarget) return;
-
+  const handleDecline = useCallback(
+    async (expense: AgencyExpenseListItem, reviewerNotes: string): Promise<boolean> => {
       if (!hasAgency) {
         toast({
           title: "Sign in required",
           description: "Your account isn't linked to an agency.",
           variant: "destructive",
         });
-        return;
+        return false;
       }
 
       const request = rejectExpense({
         agencyId,
-        expenseId: declineTarget.id,
+        expenseId: expense.id,
         reviewerNotes,
       });
       mutationRequestsRef.current.add(request);
       try {
         await request.unwrap();
-        if (activeAgencyRef.current !== agencyId) return;
+        if (activeAgencyRef.current !== agencyId) return false;
         setDeclineTarget(null);
         toast({
           title: "Expense declined",
           description: `The ${staffNoun} will see your reason in their app.`,
         });
+        return true;
       } catch (error) {
-        if (activeAgencyRef.current !== agencyId) return;
+        if (activeAgencyRef.current !== agencyId) return false;
         toast({
           title: "Couldn't update expense",
           description: mapExpenseMutationError(error),
           variant: "destructive",
         });
+        return false;
       } finally {
         mutationRequestsRef.current.delete(request);
       }
     },
-    [agencyId, declineTarget, hasAgency, rejectExpense, toast, staffNoun],
+    [agencyId, hasAgency, rejectExpense, toast, staffNoun],
+  );
+
+  const handleConfirmDecline = useCallback(
+    (reviewerNotes: string) => {
+      if (declineTarget) void handleDecline(declineTarget, reviewerNotes);
+    },
+    [declineTarget, handleDecline],
+  );
+
+  const handleDrawerApprove = useCallback(
+    async (expense: AgencyExpenseListItem) => {
+      if (await handleApprove(expense)) setViewTarget(null);
+    },
+    [handleApprove],
+  );
+
+  const handleDrawerDecline = useCallback(
+    async (expense: AgencyExpenseListItem, reviewerNotes: string) => {
+      if (await handleDecline(expense, reviewerNotes)) setViewTarget(null);
+    },
+    [handleDecline],
   );
 
   const handleStatusSegmentClick = useCallback((segmentLabel: string) => {
@@ -328,6 +353,7 @@ export function ExpensesDashboardContent() {
         <PendingExpensesTable
           expenses={pendingQuery.data?.expenses ?? []}
           loading={pendingQuery.isLoading || pendingQuery.isFetching}
+          onView={setViewTarget}
           onApprove={handleRequestApprove}
           onDecline={setDeclineTarget}
           onDelete={handleRequestDelete}
@@ -348,6 +374,7 @@ export function ExpensesDashboardContent() {
           }}
           onLoadMore={() => setListPage((page) => page + 1)}
           noun={staffNoun}
+          onView={setViewTarget}
         />
       )}
 
@@ -398,6 +425,16 @@ export function ExpensesDashboardContent() {
         cancelText="Cancel"
       />
 
+      <ExpenseDetailsDrawer
+        expense={viewTarget}
+        onClose={() => setViewTarget(null)}
+        onApprove={(expense) => void handleDrawerApprove(expense)}
+        onDecline={(expense, notes) => void handleDrawerDecline(expense, notes)}
+        approving={isApproving}
+        declining={isDeclining}
+        noun={staffNoun}
+      />
+
       {declineTarget ? (
         <Suspense fallback={null}>
           <RejectExpenseModal
@@ -405,7 +442,7 @@ export function ExpensesDashboardContent() {
             expense={declineTarget}
             saving={isDeclining}
             onClose={() => !isDeclining && setDeclineTarget(null)}
-            onConfirm={(notes) => void handleConfirmDecline(notes)}
+            onConfirm={handleConfirmDecline}
             noun={staffNoun}
           />
         </Suspense>

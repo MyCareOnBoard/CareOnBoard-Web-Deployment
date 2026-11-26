@@ -65,7 +65,8 @@ export default function ExpenseRow(props: ExpenseRowProps) {
   const agencyName = showAgency
     ? (expense as NetworkAgencyExpense).agencyName
     : undefined;
-  const hasMobileMenu = showActions || Boolean(expense.receiptUrl);
+  const hasMobileMenu = showActions || Boolean(expense.receiptUrl) || Boolean(props.onView);
+  const viewDetails = props.onView as ((expense: AgencyExpenseListItem) => void) | undefined;
   const renderActionsMenu = (menuVariant: "desktop" | "mobile") => {
     if (props.showAgency) {
       return (
@@ -79,6 +80,7 @@ export default function ExpenseRow(props: ExpenseRowProps) {
               ? (props.onViewReceipt ?? openReceipt)
               : undefined
           }
+          onView={props.onView}
           onApprove={showActions ? props.onApprove : undefined}
           onDecline={showActions ? props.onDecline : undefined}
           onDelete={showActions ? props.onDelete : undefined}
@@ -96,6 +98,7 @@ export default function ExpenseRow(props: ExpenseRowProps) {
             ? (props.onViewReceipt ?? openReceipt)
             : undefined
         }
+        onView={props.onView}
         onApprove={showActions ? props.onApprove : undefined}
         onDecline={showActions ? props.onDecline : undefined}
         onDelete={showActions ? props.onDelete : undefined}
@@ -153,8 +156,19 @@ export default function ExpenseRow(props: ExpenseRowProps) {
           {agencyName}
         </span>
       ) : null}
-      <div className="text-[14px]">
-        <AgencyPerson name={expense.employeeName} />
+      <div className="min-w-0 text-[14px]">
+        {viewDetails ? (
+          <button
+            type="button"
+            onClick={() => viewDetails(expense)}
+            aria-label={`View expense details for ${expense.employeeName}`}
+            className="-mx-1 max-w-full cursor-pointer rounded-[8px] px-1 text-left transition-colors hover:bg-[#f4f5f6] focus-visible:outline-2 focus-visible:outline-[#007679] dark:hover:bg-white/5"
+          >
+            <AgencyPerson name={expense.employeeName} />
+          </button>
+        ) : (
+          <AgencyPerson name={expense.employeeName} />
+        )}
       </div>
       <span className="text-[14px] tabular-nums text-[#10141a] dark:text-[#e6eaec]">
         {formatCurrency(expense.amount)}

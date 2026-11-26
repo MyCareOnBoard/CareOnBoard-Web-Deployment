@@ -44,6 +44,7 @@ function ExpenseActionsMenuContent<T extends AgencyExpenseListItem>({
   expense,
   variant = "desktop",
   disabled = false,
+  onView,
   onViewReceipt,
   onApprove,
   onDecline,
@@ -53,6 +54,7 @@ function ExpenseActionsMenuContent<T extends AgencyExpenseListItem>({
   const isPending = expense.status === "pending";
   const hasReceipt = Boolean(expense.receiptUrl);
   const hasAnyAction =
+    onView ||
     (hasReceipt && onViewReceipt) ||
     (isPending && onApprove) ||
     (isPending && onDecline) ||
@@ -84,6 +86,15 @@ function ExpenseActionsMenuContent<T extends AgencyExpenseListItem>({
         collisionPadding={16}
         className="z-[100] w-[220px] rounded-xl border border-[#e5e5e6] bg-white p-0 shadow-lg"
       >
+        {onView ? (
+          <DropdownMenuItem
+            className={neutralMenuItemClassName}
+            onSelect={() => onView(expense)}
+          >
+            View details
+            <ChevronRight className="ml-auto h-4 w-4 text-[#808081]" />
+          </DropdownMenuItem>
+        ) : null}
         {hasReceipt && onViewReceipt ? (
           <DropdownMenuItem
             className={neutralMenuItemClassName}

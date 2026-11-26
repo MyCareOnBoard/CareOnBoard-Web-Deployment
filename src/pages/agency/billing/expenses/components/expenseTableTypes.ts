@@ -6,6 +6,8 @@ export type NetworkAgencyExpense = AgencyExpenseListItem & {
 };
 
 export type ExpenseActionCallbacks<T extends AgencyExpenseListItem> = {
+  /** Opens the expense details drawer. */
+  onView?: (expense: T) => void;
   onViewReceipt?: (expense: T) => void;
   onApprove?: (expense: T) => void;
   onDecline?: (expense: T) => void;

@@ -34,6 +34,8 @@ type SharedExpensesHistoryTableProps<T extends AgencyExpenseListItem> = {
   isRefetching?: boolean;
   nextCursor?: string | null;
   incomplete?: boolean;
+  /** Opens the expense details drawer. */
+  onView?: (expense: T) => void;
 };
 
 type ExpensesHistoryTableProps =
@@ -113,12 +115,14 @@ export default function ExpensesHistoryTable(props: ExpensesHistoryTableProps) {
         expense={expense as NetworkAgencyExpense}
         showAgency
         variant={variant}
+        onView={props.onView}
       />
     ) : (
       <ExpenseRow
         key={expenseKey(expense)}
         expense={expense}
         variant={variant}
+        onView={props.onView}
       />
     );
 

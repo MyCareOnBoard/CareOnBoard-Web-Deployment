@@ -99,6 +99,7 @@ export default function PendingExpensesTable(props: PendingExpensesTableProps) {
         variant={variant}
         showActions
         actionsDisabled={actionsDisabled}
+        onView={props.onView}
         onApprove={props.onApprove}
         onDecline={props.onDecline}
         onDelete={props.onDelete}
@@ -110,6 +111,7 @@ export default function PendingExpensesTable(props: PendingExpensesTableProps) {
         variant={variant}
         showActions
         actionsDisabled={actionsDisabled}
+        onView={props.onView}
         onApprove={props.onApprove}
         onDecline={props.onDecline}
         onDelete={props.onDelete}

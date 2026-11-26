@@ -10,6 +10,7 @@ import ExpensesByStatusChart from "@/pages/agency/billing/expenses/components/Ex
 import ExpensesHistoryTable from "@/pages/agency/billing/expenses/components/ExpensesHistoryTable";
 import ExpensesOverviewCards from "@/pages/agency/billing/expenses/components/ExpensesOverviewCards";
 import PendingExpensesTable from "@/pages/agency/billing/expenses/components/PendingExpensesTable";
+import ExpenseDetailsDrawer from "@/pages/agency/billing/expenses/components/ExpenseDetailsDrawer";
 import ExpensesWorkspaceTabs, { type ExpensesWorkspaceTab } from "@/pages/agency/billing/expenses/components/ExpensesWorkspaceTabs";
 import type { NetworkAgencyExpense } from "@/pages/agency/billing/expenses/components/expenseTableTypes";
 import { formatCurrency } from "@/pages/agency/billing-and-approvals/billingUtils";
@@ -83,6 +84,7 @@ export default function NetworkExpenses() {
   const [approveTarget, setApproveTarget] = useState<NetworkAgencyExpense | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<NetworkAgencyExpense | null>(null);
   const [declineTarget, setDeclineTarget] = useState<NetworkAgencyExpense | null>(null);
+  const [viewTarget, setViewTarget] = useState<NetworkAgencyExpense | null>(null);
   const [busy, setBusy] = useState<{ id: string; action: BusyAction } | null>(null);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
 
@@ -267,10 +269,11 @@ export default function NetworkExpenses() {
       <ExpensesWorkspaceTabs activeTab={tab} onTabChange={setTab} />
       <label className="flex min-h-11 flex-col gap-1 text-[13px] text-[#687173]"><span>Category in loaded rows</span><select aria-label="Expense category" value={category} onChange={(event) => setCategory(event.target.value)} className="min-h-11 rounded-md border border-[#e5e5e6] bg-white px-3 text-sm text-[#10141a]"><option value="all">All categories</option>{categories.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
     </div>
-    {tab === "pending" ? <PendingExpensesTable expenses={visibleExpenses.filter((expense) => expense.status === "pending")} loading={bootstrapLoading && !hasBootstrapData} onApprove={setApproveTarget} onDecline={setDeclineTarget} onDelete={setDeleteTarget} actionsDisabled={actionsDisabled} showAgency noun="Staff" /> : <ExpensesHistoryTable expenses={visibleExpenses.filter((expense) => status === "all" || expense.status === status)} totalCount={totalCount} hasMore={historyHasMore} incomplete={Boolean(historyPartialData)} page={1} loading={bootstrapLoading && !hasBootstrapData} isRefetching={bootstrapFetching || page.isFetching} statusFilter={status} statusFilterOptions={NETWORK_HISTORY_STATUS_OPTIONS} onStatusFilterChange={(next) => { if (next === "all" || next === "approved" || next === "rejected") setStatus(next); }} onLoadMore={historyPartialData ? retryBootstrap : () => void loadMore()} nextCursor={historyNextCursor} showAgency noun="Staff" />}
+    {tab === "pending" ? <PendingExpensesTable expenses={visibleExpenses.filter((expense) => expense.status === "pending")} loading={bootstrapLoading && !hasBootstrapData} onView={setViewTarget} onApprove={setApproveTarget} onDecline={setDeclineTarget} onDelete={setDeleteTarget} actionsDisabled={actionsDisabled} showAgency noun="Staff" /> : <ExpensesHistoryTable expenses={visibleExpenses.filter((expense) => status === "all" || expense.status === status)} totalCount={totalCount} hasMore={historyHasMore} incomplete={Boolean(historyPartialData)} page={1} loading={bootstrapLoading && !hasBootstrapData} isRefetching={bootstrapFetching || page.isFetching} statusFilter={status} statusFilterOptions={NETWORK_HISTORY_STATUS_OPTIONS} onStatusFilterChange={(next) => { if (next === "all" || next === "approved" || next === "rejected") setStatus(next); }} onLoadMore={historyPartialData ? retryBootstrap : () => void loadMore()} nextCursor={historyNextCursor} onView={setViewTarget} showAgency noun="Staff" />}
     {loadMoreError ? <p role="alert" className="text-sm text-[#b42318]">{loadMoreError}</p> : null}
     <DeleteConfirmationModal isOpen={Boolean(approveTarget)} onClose={() => !busy && setApproveTarget(null)} onConfirm={() => void approve()} isDeleting={busy?.action === "approve"} title={approveTarget ? `Approve expense for ${approveTarget.employeeName}?` : "Approve expense?"} message={approveTarget ? `${formatCurrency(approveTarget.amount)} will be included in the next payroll for ${approveTarget.agencyName}.` : ""} confirmText="Approve expense" cancelText="Cancel" confirmButtonClassName="flex-1 bg-[#0EAF52] hover:bg-[#0c9644] text-white" />
     <DeleteConfirmationModal isOpen={Boolean(deleteTarget)} onClose={() => !busy && setDeleteTarget(null)} onConfirm={() => void remove()} isDeleting={busy?.action === "delete"} title={deleteTarget ? `Delete expense for ${deleteTarget.employeeName}?` : "Delete expense?"} message={deleteTarget ? `This permanently removes ${formatCurrency(deleteTarget.amount)} from ${deleteTarget.agencyName}.` : ""} confirmText="Delete expense" cancelText="Cancel" />
+    <ExpenseDetailsDrawer expense={viewTarget} agencyName={viewTarget?.agencyName} onClose={() => setViewTarget(null)} noun="Staff" />
     {declineTarget ? <Suspense fallback={null}><RejectExpenseModal open expense={declineTarget} saving={busy?.action === "reject"} onClose={() => !busy && setDeclineTarget(null)} onConfirm={(notes) => void reject(notes)} noun="staff member" /></Suspense> : null}
   </section>;
 }
