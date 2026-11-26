@@ -218,7 +218,7 @@ export default function IncidentPage() {
                             className="block w-full truncate rounded text-left font-medium text-[#10141a] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] dark:text-[#f4f6f7]">
                             {summaryLine}
                           </button>
-                          <span className="mt-0.5 block truncate text-[12px] text-[#6b737a] dark:text-[#9aa4a8]">Reported by {reporterOf(incident)}</span>
+                          <span className="mt-0.5 block truncate text-[12px] text-[#6b737a] dark:text-[#9aa4a8]">{incident.source === "compliance_pattern" ? "Detected for" : "Reported by"} {reporterOf(incident)}</span>
                         </td>
                         <td className="px-4 py-3 text-[#10141a] dark:text-[#e6eaec]">{clientNameOf(incident)}</td>
                         <td className="whitespace-nowrap px-4 py-3">

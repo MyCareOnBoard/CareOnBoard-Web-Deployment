@@ -57,7 +57,7 @@ export default function IncidentReviewPanel({ incident, staffNoun, onDecided }: 
     || "Unknown";
   const rows: { icon: ComponentType<{ className?: string }>; label: string; value: string }[] = [
     { icon: User, label: "Client", value: clientNameOf(incident) },
-    { icon: Users, label: "Reported by", value: `${reporter}, ${staffNoun}` },
+    { icon: Users, label: incident.source === "compliance_pattern" ? "Detected for" : "Reported by", value: `${reporter}, ${staffNoun}` },
     { icon: Clock, label: "When", value: formatWhen(incident) },
     { icon: Eye, label: "Witness", value: witnessText(incident.witness) },
   ];

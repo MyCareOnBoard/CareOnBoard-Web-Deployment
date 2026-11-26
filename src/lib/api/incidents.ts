@@ -50,6 +50,8 @@ export interface IncidentReport {
     createdAt: string;
     updatedAt: string;
     reportedDate?: string;
+    /** 'compliance_pattern' when the system opened it from a compliance pattern. */
+    source?: string;
     employee?: {
         id: string;
         fullName?: string;
