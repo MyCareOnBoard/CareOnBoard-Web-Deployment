@@ -4,18 +4,22 @@
  */
 
 import React, { useMemo } from "react";
-import { MoreHorizontal, Trash2 } from "lucide-react";
+import { Link } from "react-router";
+import { MoreHorizontal, Trash2, UserRound } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Conversation } from "@/lib/hooks/useMessaging";
 import { OnlineStatusIndicator } from "./OnlineStatusIndicator";
 import { formatRoleLabel, getInitials, validateImageUrl } from "@/lib/utils/string-utils";
+import { isProgramScopedRole, roleLabel } from "@/lib/roleLabel";
 
 interface ConversationHeaderProps {
   conversation: Conversation | null;
   currentUserId?: string;
   onDelete?: () => void;
-  variant?: "classic" | "panel";
+  variant?: "classic" | "panel" | "agency";
+  /** Agency variant: where "View profile" goes for this person, or null to hide it. */
+  getProfileHref?: (participant: { uid: string; role: string }) => string | null;
 }
 
 export const ConversationHeader = React.memo(function ConversationHeader({
@@ -23,6 +27,7 @@ export const ConversationHeader = React.memo(function ConversationHeader({
   currentUserId,
   onDelete,
   variant = "classic",
+  getProfileHref,
 }: ConversationHeaderProps) {
   // Get participant info (not the current user) - memoized
   const participant = useMemo(() => {
@@ -37,6 +42,44 @@ export const ConversationHeader = React.memo(function ConversationHeader({
   }, [participant?.avatar]);
 
   if (!conversation || !participant) return null;
+
+  if (variant === "agency") {
+    const profileHref = getProfileHref?.(participant) ?? null;
+    return (
+      <div className="flex items-center justify-between gap-3 px-4 py-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="relative shrink-0">
+            <Avatar className="h-10 w-10 rounded-full">
+              <AvatarImage src={validatedAvatar || undefined} alt="" className="rounded-full object-cover" />
+              <AvatarFallback className="rounded-full bg-[#e6f4f4] text-[13px] font-semibold text-[#007679] dark:bg-[#00a3a7]/20 dark:text-[#7fe0e2]">{getInitials(participant.name)}</AvatarFallback>
+            </Avatar>
+            <div className="absolute -bottom-0.5 -right-0.5"><OnlineStatusIndicator userId={participant.uid} /></div>
+          </div>
+          <div className="min-w-0">
+            <h3 className="truncate text-[15px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">{participant.name}</h3>
+            <p className="truncate text-[12px] text-[#5d6b73] dark:text-[#9aa4a8]">{isProgramScopedRole(participant.role) ? roleLabel({ role: participant.role }) : formatRoleLabel(participant.role)}</p>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {profileHref && <Link to={profileHref}
+            className="inline-flex h-9 items-center gap-2 rounded-full border border-[#dcdfe2] px-3.5 text-[13px] font-medium text-[#10141a] transition-colors hover:bg-[#f3f5f6] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] dark:border-white/15 dark:text-[#f4f6f7] dark:hover:bg-white/5">
+            <UserRound className="h-4 w-4" aria-hidden="true" /><span className="sr-only sm:not-sr-only">View profile</span>
+          </Link>}
+          {onDelete && <DropdownMenu>
+            <DropdownMenuTrigger aria-label="Conversation options"
+              className="grid h-9 w-9 cursor-pointer place-items-center rounded-full border border-[#dcdfe2] text-[#10141a] hover:bg-[#f3f5f6] focus-visible:outline-2 focus-visible:outline-[#007679] dark:border-white/15 dark:text-[#f4f6f7] dark:hover:bg-white/5">
+              <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={onDelete} className="cursor-pointer text-[#b3371c] focus:text-[#b3371c] dark:text-[#f3a08c]">
+                <Trash2 className="h-4 w-4" aria-hidden="true" />Delete conversation
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>}
+        </div>
+      </div>
+    );
+  }
 
   if (variant === "panel") {
     return (

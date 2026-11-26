@@ -18,7 +18,7 @@ export function ViewSwitch<T extends string>({ value, options, label, className 
             to={option.to}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "inline-flex h-8 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679]",
+              "inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679]",
               active ? "bg-white text-[#10141a] shadow-[0_1px_2px_rgba(16,40,44,0.12)] dark:bg-[#2a3138] dark:text-[#f4f6f7]" : "text-[#5d6b73] hover:text-[#10141a] dark:text-[#9aa4a8] dark:hover:text-[#f4f6f7]",
             )}
           >

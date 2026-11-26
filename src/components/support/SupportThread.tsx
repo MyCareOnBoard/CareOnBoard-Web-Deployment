@@ -43,9 +43,11 @@ export function PriorityChip({ priority }: { priority: string }) {
  * The messages of a support case. `viewer` decides which side a message sits on:
  * the requester sees their own messages on the right; agents see the team's there.
  */
-export function SupportThread({ messages, viewer, renderAfter, className }: {
+export function SupportThread({ messages, viewer, renderAfter, className, look = "default" }: {
   messages: SupportMessage[];
   viewer: "requester" | "agent";
+  /** "agency" is the agency Support look: white bubbles, dark own bubbles, time inside. */
+  look?: "default" | "agency";
   /** Extra content under a message, such as the "Did this answer it?" buttons. */
   renderAfter?: (message: SupportMessage, index: number) => ReactNode;
   className?: string;
@@ -67,6 +69,38 @@ export function SupportThread({ messages, viewer, renderAfter, className }: {
         }
         const mine = viewer === "requester" ? message.senderType === "user" : message.senderType === "agent";
         const ai = message.senderType === "ai";
+        if (look === "agency") {
+          return (
+            <li key={message.id} className={cn("flex flex-col gap-1", mine ? "items-end" : "items-start")}>
+              <div className={cn(
+                "max-w-[min(560px,88%)] whitespace-pre-wrap break-words rounded-[12px] px-3.5 py-2.5 text-[13.5px] leading-relaxed",
+                mine ? "bg-[#003839] text-white dark:bg-[#00686b]" : ai ? "border border-[#cfeaea] bg-[#eef7f7] text-[#10141a] dark:border-[#00686b]/50 dark:bg-[#00686b]/15 dark:text-[#f4f6f7]" : "border border-[#e6eaeb] bg-white text-[#10141a] dark:border-white/10 dark:bg-[#1b232b] dark:text-[#f4f6f7]",
+              )}>
+                {!mine && <span className="mb-0.5 flex items-center gap-1.5 text-[11.5px] font-semibold text-[#34434c] dark:text-[#c9d3d6]">
+                  {ai && <Bot aria-hidden="true" className="h-3.5 w-3.5 text-[#007679] dark:text-[#7fd3d3]" />}{message.senderName}
+                </span>}
+                {message.content}
+                {ai && !!message.aiMeta?.sources?.length && (
+                  <div className="mt-2 border-t border-[#cfeaea] pt-2 dark:border-[#00686b]/50">
+                    <p className="text-[11.5px] font-medium text-[#5d6b73] dark:text-[#9aa4a8]">From the help articles</p>
+                    <ul className="mt-1 flex flex-wrap gap-1.5">
+                      {message.aiMeta.sources.map((source) => (
+                        <li key={source.id} className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[12px] text-[#00686b] dark:bg-white/10 dark:text-[#7fd3d3]">
+                          <BookOpen aria-hidden="true" className="h-3 w-3" />{source.title}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <span className={cn("mt-1 block text-[11px]", mine ? "text-white/70" : "text-[#8a979d] dark:text-[#9aa4a8]")}>
+                  {mine && viewer === "requester" ? "You · " : mine && message.senderName ? `${message.senderName} · ` : ""}
+                  <time dateTime={message.createdAt ?? undefined}>{formatTime(message.createdAt)}</time>
+                </span>
+              </div>
+              {renderAfter?.(message, index)}
+            </li>
+          );
+        }
         return (
           <li key={message.id} className={cn("flex flex-col gap-1", mine ? "items-end" : "items-start")}>
             <span className="flex items-center gap-1.5 px-1 text-[11.5px] text-[#5d6b73] dark:text-[#9aa4a8]">
@@ -103,7 +137,7 @@ export function SupportThread({ messages, viewer, renderAfter, className }: {
 }
 
 /** A message box: Enter sends, Shift+Enter adds a line. */
-export function SupportComposer({ onSend, placeholder, disabled, busy, label = "Message", initialValue, accessory, tone = "default" }: {
+export function SupportComposer({ onSend, placeholder, disabled, busy, label = "Message", initialValue, accessory, tone = "default", look = "default" }: {
   onSend: (text: string) => Promise<boolean | void> | boolean | void;
   placeholder?: string;
   disabled?: boolean;
@@ -112,6 +146,8 @@ export function SupportComposer({ onSend, placeholder, disabled, busy, label = "
   initialValue?: string;
   accessory?: ReactNode;
   tone?: "default" | "note";
+  /** "agency" uses the agency Support's dark send button. */
+  look?: "default" | "agency";
 }) {
   const [text, setText] = useState(initialValue ?? "");
   const inputId = useId();
@@ -134,7 +170,7 @@ export function SupportComposer({ onSend, placeholder, disabled, busy, label = "
   };
 
   return (
-    <form onSubmit={submit} className={cn("rounded-[14px] border p-2", tone === "note" ? "border-[#f1d58a] bg-[#fffaeb] dark:border-[#8a5300]/60 dark:bg-[#8a5300]/10" : "border-[#e3e8ea] bg-white dark:border-white/15 dark:bg-[#1b232b]")}>
+    <form onSubmit={submit} className={cn("border p-2", look === "agency" ? "rounded-[10px]" : "rounded-[14px]", tone === "note" ? "border-[#f1d58a] bg-[#fffaeb] dark:border-[#8a5300]/60 dark:bg-[#8a5300]/10" : "border-[#e3e8ea] bg-white dark:border-white/15 dark:bg-[#1b232b]")}>
       <label className="sr-only" htmlFor={inputId}>{label}</label>
       <textarea
         id={inputId}
@@ -152,7 +188,8 @@ export function SupportComposer({ onSend, placeholder, disabled, busy, label = "
         <button
           type="submit"
           disabled={disabled || busy || !text.trim()}
-          className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-[#007679] px-4 text-[13px] font-semibold text-white transition-colors hover:bg-[#00686b] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] disabled:cursor-not-allowed disabled:opacity-50"
+          className={cn("inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-4 text-[13px] font-semibold text-white transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] disabled:cursor-not-allowed disabled:opacity-50",
+            look === "agency" ? "bg-[#003839] hover:bg-[#00494a] dark:bg-[#00a3a7] dark:text-[#06292a]" : "bg-[#007679] hover:bg-[#00686b]")}
         >
           {busy ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : <Send aria-hidden="true" className="h-4 w-4" />}
           {tone === "note" ? "Add note" : "Send"}

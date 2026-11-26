@@ -27,7 +27,7 @@ const POLL_LIST_MS = 30000;
  * The requester's side of the support desk: their cases, a box to ask something new,
  * and the open case with the assistant's answers and the team's replies.
  */
-export function AskSupportPanel({ deskName, intro, placeholder, contextPage, className, showUrgentOption = true }: {
+export function AskSupportPanel({ deskName, intro, placeholder, contextPage, className, showUrgentOption = true, variant = "default" }: {
   /** Who answers, as the person sees it: "your agency" or "CareOnboard". */
   deskName: string;
   intro?: string;
@@ -36,7 +36,10 @@ export function AskSupportPanel({ deskName, intro, placeholder, contextPage, cla
   contextPage?: string;
   className?: string;
   showUrgentOption?: boolean;
+  /** "agency" is the agency Support look: one card split into the cases and the open case. */
+  variant?: "default" | "agency";
 }) {
+  const agency = variant === "agency";
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedId = searchParams.get("case");
   const [cases, setCases] = useState<SupportCase[] | null>(null);
@@ -129,25 +132,27 @@ export function AskSupportPanel({ deskName, intro, placeholder, contextPage, cla
   const open = detail && detail.case.id === selectedId ? detail : null;
 
   return (
-    <div className={cn("grid min-h-0 flex-1 gap-4 lg:grid-cols-[300px_minmax(0,1fr)]", className)}>
-      <section aria-label="Your support cases" className={cn("min-h-0 flex-col", showList ? "flex" : "hidden lg:flex")}>
+    <div className={cn("grid min-h-0 flex-1", agency ? "overflow-hidden rounded-[16px] border border-[#e4e7ea] bg-white lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[340px_minmax(0,1fr)] dark:border-white/10 dark:bg-[#1b232b]" : "gap-4 lg:grid-cols-[300px_minmax(0,1fr)]", className)}>
+      <section aria-label="Your support cases" className={cn("min-h-0 flex-col", agency && "p-3 lg:border-r lg:border-[#eceef0] dark:lg:border-white/10", showList ? "flex" : "hidden lg:flex")}>
         <button
           type="button"
           onClick={() => { selectCase(null); setComposing(true); }}
-          className="mb-3 inline-flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-[10px] bg-[#007679] text-[14px] font-semibold text-white transition-colors hover:bg-[#00686b] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679]"
+          className={cn("mb-3 inline-flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-[10px] text-[14px] font-semibold text-white transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679]",
+            agency ? "bg-[#003839] hover:bg-[#00494a] dark:bg-[#00a3a7] dark:text-[#06292a]" : "bg-[#007679] hover:bg-[#00686b]")}
         >
           <MessageSquarePlus aria-hidden="true" className="h-4 w-4" />Ask a new question
         </button>
-        <CaseList cases={cases} selectedId={selectedId} onSelect={(id) => { setComposing(false); selectCase(id); }} />
+        <CaseList cases={cases} selectedId={selectedId} agency={agency} onSelect={(id) => { setComposing(false); selectCase(id); }} />
       </section>
 
-      <section aria-label={open ? `Case ${open.case.caseNumber}` : "Ask a question"} className={cn("min-h-0 flex-col rounded-[16px] border border-[#e3e8ea] dark:border-white/10", showList ? "hidden lg:flex" : "flex")}>
+      <section aria-label={open ? `Case ${open.case.caseNumber}` : "Ask a question"} className={cn("min-h-0 flex-col", agency ? "bg-[#f5f7f7] dark:bg-[#141b21]" : "rounded-[16px] border border-[#e3e8ea] dark:border-white/10", showList ? "hidden lg:flex" : "flex")}>
         {selectedId ? (
           open ? (
             <CaseView
               detail={open}
               busy={busy}
               deskName={deskName}
+              agency={agency}
               onBack={() => selectCase(null)}
               onSend={(text) => run(() => sendCaseMessage(open.case.id, text), "Your message was not sent.")}
               onFeedback={(message, helpful) => run(() => sendCaseFeedback(open.case.id, message.id, helpful), "That did not save.")}
@@ -164,6 +169,7 @@ export function AskSupportPanel({ deskName, intro, placeholder, contextPage, cla
             intro={intro}
             placeholder={placeholder}
             showUrgentOption={showUrgentOption}
+            agency={agency}
             onBack={cases?.length ? () => setComposing(false) : undefined}
             onCreate={async (input) => {
               setBusy(true);
@@ -188,7 +194,7 @@ export function AskSupportPanel({ deskName, intro, placeholder, contextPage, cla
   );
 }
 
-function CaseList({ cases, selectedId, onSelect }: { cases: SupportCase[] | null; selectedId: string | null; onSelect: (id: string) => void }) {
+function CaseList({ cases, selectedId, onSelect, agency }: { cases: SupportCase[] | null; selectedId: string | null; onSelect: (id: string) => void; agency?: boolean }) {
   if (cases === null) {
     return <div className="grid place-items-center py-10"><Loader2 aria-label="Loading your cases" className="h-5 w-5 animate-spin text-[#5d6b73]" /></div>;
   }
@@ -196,7 +202,7 @@ function CaseList({ cases, selectedId, onSelect }: { cases: SupportCase[] | null
     return <p className="rounded-[12px] bg-[#f4f6f7] p-4 text-[13px] leading-relaxed text-[#5d6b73] dark:bg-white/5 dark:text-[#9aa4a8]">Your questions will show up here. The assistant answers most of them right away.</p>;
   }
   return (
-    <ul className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
+    <ul className={cn("min-h-0 flex-1 overflow-y-auto", agency ? "-mx-3 -mb-3 divide-y divide-[#eceef0] border-t border-[#eceef0] dark:divide-white/10 dark:border-white/10" : "-mx-1 px-1")}>
       {cases.map((item) => (
         <li key={item.id}>
           <button
@@ -204,8 +210,10 @@ function CaseList({ cases, selectedId, onSelect }: { cases: SupportCase[] | null
             onClick={() => onSelect(item.id)}
             aria-current={item.id === selectedId ? "true" : undefined}
             className={cn(
-              "mb-1.5 w-full cursor-pointer rounded-[12px] border px-3 py-2.5 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679]",
-              item.id === selectedId ? "border-[#007679] bg-[#f2fbfb] dark:bg-[#00686b]/15" : "border-[#e3e8ea] hover:bg-[#f7f9f9] dark:border-white/10 dark:hover:bg-white/5",
+              "w-full cursor-pointer px-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-[#007679]",
+              agency
+                ? cn("border-l-2 py-3 focus-visible:-outline-offset-2", item.id === selectedId ? "border-[#007679] bg-[#eef7f7] dark:bg-[#00a3a7]/15" : "border-transparent hover:bg-[#f6f8f8] dark:hover:bg-white/5")
+                : cn("mb-1.5 rounded-[12px] border py-2.5 focus-visible:outline-offset-2", item.id === selectedId ? "border-[#007679] bg-[#f2fbfb] dark:bg-[#00686b]/15" : "border-[#e3e8ea] hover:bg-[#f7f9f9] dark:border-white/10 dark:hover:bg-white/5"),
             )}
           >
             <span className="flex items-center justify-between gap-2">
@@ -225,8 +233,9 @@ function CaseList({ cases, selectedId, onSelect }: { cases: SupportCase[] | null
   );
 }
 
-function NewQuestion({ deskName, intro, placeholder, showUrgentOption, onCreate, onBack, busy }: {
+function NewQuestion({ deskName, intro, placeholder, showUrgentOption, onCreate, onBack, busy, agency }: {
   deskName: string;
+  agency?: boolean;
   intro?: string;
   placeholder?: string;
   showUrgentOption: boolean;
@@ -281,7 +290,8 @@ function NewQuestion({ deskName, intro, placeholder, showUrgentOption, onCreate,
         <button
           type="submit"
           disabled={busy || !content.trim()}
-          className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-full bg-[#007679] px-5 text-[14px] font-semibold text-white transition-colors hover:bg-[#00686b] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] disabled:cursor-not-allowed disabled:opacity-50"
+          className={cn("inline-flex h-10 cursor-pointer items-center gap-2 px-5 text-[14px] font-semibold text-white transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] disabled:cursor-not-allowed disabled:opacity-50",
+            agency ? "rounded-[10px] bg-[#003839] hover:bg-[#00494a] dark:bg-[#00a3a7] dark:text-[#06292a]" : "rounded-full bg-[#007679] hover:bg-[#00686b]")}
         >
           {busy && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />}
           {busy ? "Finding an answer…" : "Ask"}
@@ -291,8 +301,9 @@ function NewQuestion({ deskName, intro, placeholder, showUrgentOption, onCreate,
   );
 }
 
-function CaseView({ detail, busy, deskName, onBack, onSend, onFeedback, onAskPerson, onClose, onRate }: {
+function CaseView({ detail, busy, deskName, agency, onBack, onSend, onFeedback, onAskPerson, onClose, onRate }: {
   detail: SupportCaseDetail;
+  agency?: boolean;
   busy: boolean;
   deskName: string;
   onBack: () => void;
@@ -308,7 +319,7 @@ function CaseView({ detail, busy, deskName, onBack, onSend, onFeedback, onAskPer
 
   return (
     <>
-      <header className="flex flex-wrap items-center gap-2 border-b border-[#e3e8ea] px-4 py-3 dark:border-white/10">
+      <header className={cn("flex flex-wrap items-center gap-2 border-b px-4 py-3 dark:border-white/10", agency ? "border-[#eceef0] bg-white dark:bg-[#1b232b]" : "border-[#e3e8ea]")}>
         <button type="button" onClick={onBack} aria-label="Back to your cases" className="grid h-8 w-8 cursor-pointer place-items-center rounded-full text-[#10141a] hover:bg-[#f1f3f4] lg:hidden dark:text-[#f4f6f7] dark:hover:bg-white/10">
           <ArrowLeft aria-hidden="true" className="h-4 w-4" />
         </button>
@@ -341,6 +352,7 @@ function CaseView({ detail, busy, deskName, onBack, onSend, onFeedback, onAskPer
         <SupportThread
           messages={messages}
           viewer="requester"
+          look={agency ? "agency" : "default"}
           renderAfter={(message, index) =>
             awaitingFeedback && index === lastAiIndex ? (
               <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -356,7 +368,7 @@ function CaseView({ detail, busy, deskName, onBack, onSend, onFeedback, onAskPer
         {busy && <p className="mt-3 flex items-center gap-2 text-[12.5px] text-[#5d6b73]"><Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin" />Working on it…</p>}
       </div>
 
-      <div className="border-t border-[#e3e8ea] p-3 dark:border-white/10">
+      <div className={cn("border-t p-3 dark:border-white/10", agency ? "border-[#eceef0] bg-white dark:bg-[#1b232b]" : "border-[#e3e8ea]")}>
         {item.status === "resolved" && item.rating === null && item.resolvedAt && !item.aiActive && <RateCase onRate={onRate} busy={busy} />}
         {item.status === "ai" && !awaitingFeedback && (
           <button type="button" onClick={() => void onAskPerson()} disabled={busy} className="mb-2 inline-flex cursor-pointer items-center gap-1 text-[12.5px] font-medium text-[#007679] hover:underline disabled:opacity-50 dark:text-[#7fd3d3]">
@@ -368,6 +380,7 @@ function CaseView({ detail, busy, deskName, onBack, onSend, onFeedback, onAskPer
           busy={busy}
           label={`Reply on ${item.caseNumber}`}
           placeholder={item.status === "resolved" ? "Write here to reopen this case" : "Write a message"}
+          look={agency ? "agency" : "default"}
         />
       </div>
     </>

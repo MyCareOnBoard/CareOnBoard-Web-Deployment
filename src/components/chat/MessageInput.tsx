@@ -22,7 +22,7 @@ interface MessageInputProps {
   ) => void | Promise<void>;
   disabled?: boolean;
   placeholder?: string;
-  variant?: "classic" | "panel";
+  variant?: "classic" | "panel" | "agency";
 }
 
 export const MessageInput = React.memo(function MessageInput({
@@ -222,6 +222,39 @@ export const MessageInput = React.memo(function MessageInput({
 
   const canSend = (message.trim().length > 0 || hasReadyAttachments) && !disabled && !sending && !hasUploadingAttachments;
   const fileInput = <input ref={fileInputRef} type="file" className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.txt,.csv,.tsv" onChange={validateAndUploadFiles} />;
+
+  if (variant === "agency") {
+    return (
+      <div className="px-3 py-3 sm:px-4">
+        {attachments.length > 0 && <ul className="mb-2 flex flex-wrap gap-2" aria-label="Attachments">
+          {attachments.map((att) => <li key={att.id} className="flex items-center gap-2 rounded-full bg-[#e6f4f4] py-1 pl-3 pr-1 text-[12px] text-[#10141a] dark:bg-white/10 dark:text-[#f4f6f7]">
+            <span className="max-w-[160px] truncate">{att.name}{att.uploading && " (uploading...)"}{att.error && " (failed)"}</span>
+            <button type="button" onClick={() => handleRemoveAttachment(att.id)} disabled={att.uploading} aria-label={`Remove ${att.name}`}
+              className="grid h-5 w-5 cursor-pointer place-items-center rounded-full text-[#5d6b73] hover:bg-black/5 disabled:cursor-not-allowed dark:text-[#9aa4a8]">
+              <X className="h-3 w-3" aria-hidden="true" />
+            </button>
+          </li>)}
+        </ul>}
+        <div className="flex items-center gap-2.5">
+          <button type="button" onClick={handleOpenFilePicker} aria-label="Attach file" disabled={disabled || sending || attachments.length >= MAX_ATTACHMENTS_PER_MESSAGE}
+            className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-full border border-[#dcdfe2] text-[#5d6b73] transition-colors hover:bg-[#f3f5f6] hover:text-[#10141a] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:text-[#9aa4a8] dark:hover:bg-white/5">
+            <Paperclip className="h-4 w-4" aria-hidden="true" />
+          </button>
+          <label className="sr-only" htmlFor={`message-${conversationId}`}>Message</label>
+          <input id={`message-${conversationId}`} type="text" placeholder={placeholder} value={message} maxLength={MAX_MESSAGE_LENGTH}
+            onChange={(e) => { if (e.target.value.length <= MAX_MESSAGE_LENGTH) setMessage(e.target.value); }}
+            onKeyDown={handleKeyPress} disabled={disabled || sending}
+            className="h-10 min-w-0 flex-1 rounded-[10px] border border-[#dcdfe2] bg-white px-3.5 text-[13.5px] text-[#10141a] outline-none placeholder:text-[#8a979d] focus-visible:border-[#007679] focus-visible:ring-2 focus-visible:ring-[#007679]/20 disabled:cursor-not-allowed dark:border-white/15 dark:bg-[#141b21] dark:text-[#f4f6f7]" />
+          <button type="button" onClick={() => void handleSend()} disabled={!canSend} aria-label="Send message"
+            className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-full bg-[#003839] text-white transition-colors hover:bg-[#00494a] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#00a3a7] dark:text-[#06292a]">
+            <Send className="h-4 w-4" aria-hidden="true" />
+          </button>
+          {fileInput}
+        </div>
+        {message.length > MAX_MESSAGE_LENGTH * 0.9 && <p className="mt-1 text-right text-[12px] text-[#5d6b73]">{message.length.toLocaleString()} / {MAX_MESSAGE_LENGTH.toLocaleString()} characters</p>}
+      </div>
+    );
+  }
 
   if (variant === "panel") {
     return (

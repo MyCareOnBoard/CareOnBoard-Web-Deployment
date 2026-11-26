@@ -15,7 +15,7 @@ interface MessageListProps {
   messages: Message[];
   currentUserId?: string;
   loading?: boolean;
-  variant?: "classic" | "panel";
+  variant?: "classic" | "panel" | "agency";
 }
 
 /** "Today", "Yesterday" or "Monday, Nov 3" above each day's messages. */
@@ -32,7 +32,7 @@ function PanelAttachments({ attachments, own }: { attachments: Attachment[]; own
     {attachments.map((att, index) => <a key={`${att.url}-${index}`} href={att.url} target="_blank" rel="noopener noreferrer" className="block max-w-full">
       {att.type === "image"
         ? <img src={att.url} alt={att.name || "Image attachment"} className="max-h-40 rounded-[10px] object-cover" />
-        : <span className={cn("inline-flex max-w-[220px] items-center rounded-[8px] px-3 py-1.5 text-[12px] underline-offset-2 hover:underline", own ? "bg-white/15 text-white" : "bg-white text-[#10141a] dark:bg-white/10 dark:text-[#f4f6f7]")}>
+        : <span className={cn("inline-flex max-w-[220px] items-center rounded-[8px] px-3 py-1.5 text-[12px] underline-offset-2 hover:underline", own ? "bg-white/15 text-white" : "bg-white text-[#10141a] ring-1 ring-[#e6eaeb] dark:bg-white/10 dark:text-[#f4f6f7] dark:ring-white/10")}>
           <span className="truncate">{att.name || "File attachment"}</span>
         </span>}
     </a>)}
@@ -45,7 +45,8 @@ export const MessageList = React.memo(function MessageList({
   loading,
   variant = "classic",
 }: MessageListProps) {
-  const panel = variant === "panel";
+  const agency = variant === "agency";
+  const panel = variant === "panel" || agency;
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
 
@@ -114,6 +115,22 @@ export const MessageList = React.memo(function MessageList({
             const date = new Date(msg.createdAt);
             const previous = formattedMessages[index - 1];
             const newDay = !previous || new Date(previous.createdAt).toDateString() !== date.toDateString();
+            if (agency) {
+              const time = format(date, "HH:mm");
+              return <li key={msg.id}>
+                {newDay && <p className="my-3 flex justify-center"><span className="rounded-full border border-[#e6eaeb] bg-white px-3 py-0.5 text-[11.5px] font-medium text-[#5d6b73] dark:border-white/10 dark:bg-white/5 dark:text-[#c9d3d6]">{dayLabel(date)}</span></p>}
+                <div className={cn("flex", own ? "justify-end" : "justify-start")}>
+                  <div className={cn("max-w-[85%] space-y-2 rounded-[12px] px-3.5 py-2.5 sm:max-w-[60%]", own ? "bg-[#003839] text-white dark:bg-[#00686b]" : "border border-[#e6eaeb] bg-white text-[#10141a] dark:border-white/10 dark:bg-[#1b232b] dark:text-[#f4f6f7]")}>
+                    {!own && msg.senderName && <p className="sr-only">{msg.senderName}</p>}
+                    {msg.sanitizedContent && <p className="whitespace-pre-wrap break-words text-[13.5px] leading-relaxed" dangerouslySetInnerHTML={{ __html: msg.sanitizedContent }} />}
+                    {msg.attachments && msg.attachments.length > 0 && <PanelAttachments attachments={msg.attachments} own={own} />}
+                    <p className={cn("text-[11px]", own ? "text-white/70" : "text-[#8a979d] dark:text-[#9aa4a8]")}>
+                      <time dateTime={date.toISOString()}>{time}</time>{own && msg.status === "read" && " · Read"}
+                    </p>
+                  </div>
+                </div>
+              </li>;
+            }
             return <li key={msg.id}>
               {newDay && <p className="my-3 flex justify-center"><span className="rounded-[6px] bg-[#f3f5f6] px-3 py-1 text-[12px] font-medium text-[#34434c] dark:bg-white/10 dark:text-[#c9d3d6]">{dayLabel(date)}</span></p>}
               <div className={cn("flex flex-col", own ? "items-end" : "items-start")}>
