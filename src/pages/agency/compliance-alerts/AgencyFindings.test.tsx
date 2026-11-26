@@ -63,3 +63,8 @@ it('puts a linked staff member first and can clear the link', () => {
   fireEvent.click(screen.getByRole('button', {name: 'Show everyone'}));
   expect(props.onApply).toHaveBeenCalledWith({employeeId: undefined});
 });
+it('shows where a pattern concentrates, and says nothing when it does not', () => {
+  mocks.findings.mockReturnValue({currentData: {items: [{...item, concentration: {dimension: 'weekday', count: 3, of: 4, weekday: 1}}, {...item, id: 'f8', employeeId: 'e8', employeeName: 'Bo Kim'}], total: 2, truncated: false, nextCursor: null}, refetch: vi.fn()});
+  render(<AgencyFindings {...props}/>);
+  expect(screen.getAllByText('Mostly Mondays (3 of 4)')).toHaveLength(1);
+});
