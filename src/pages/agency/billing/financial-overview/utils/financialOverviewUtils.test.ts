@@ -5,9 +5,11 @@ import {
   assertValidDateRange,
   buildRecentActivity,
   computeTrend,
+  financialSummaryCsv,
   getPreviousPeriodRange,
   mapPayrollRunsToFinancialPayrollChart,
   mapDashboardToOverviewStats,
+  mapFinancialKpis,
   shouldLoadNextPayrollRunPage,
 } from "./financialOverviewUtils";
 
@@ -228,6 +230,36 @@ describe("financialOverviewUtils", () => {
       expect(activity[0].amount).toBe(250);
       expect(activity[1].module).toBe("Claim");
       expect(activity[1].status).toBe("pending");
+    });
+  });
+
+  describe("mapFinancialKpis", () => {
+    it("sums payroll due, keeps the largest headcount and derives gross margin", () => {
+      const kpis = mapFinancialKpis(sampleClaimsDashboard, null, [
+        payrollRun("run-1", "paid", { employeeCount: 3 }),
+        payrollRun("run-2", "pending", { employeeCount: 5 }),
+      ]);
+      expect(kpis.billedAmount).toBe(5000);
+      expect(kpis.payrollAmount).toBe(500);
+      expect(kpis.payrollRunCount).toBe(2);
+      expect(kpis.payrollEmployeeCount).toBe(5);
+      expect(kpis.grossMarginPercent).toBeCloseTo(90);
+      expect(kpis.billedTrend).toBeUndefined();
+    });
+
+    it("leaves gross margin empty when nothing was billed", () => {
+      expect(mapFinancialKpis(null, null, []).grossMarginPercent).toBeNull();
+    });
+  });
+
+  describe("financialSummaryCsv", () => {
+    it("keeps negative figures numeric and neutralises formula-like text", () => {
+      const kpis = mapFinancialKpis(null, null, [payrollRun("run-1", "paid")]);
+      const csv = financialSummaryCsv({ startDate: "2026-05-01", endDate: "2026-05-07" }, { ...kpis, grossMarginPercent: -12.5 }, [
+        { id: "a", description: "=HYPERLINK(\"x\")", module: "Claim", amount: 10, date: "May 2, 2026", status: "paid" },
+      ]);
+      expect(csv).toContain('"Gross margin (%)","-12.5",""');
+      expect(csv).toContain('"\'=HYPERLINK(""x"")"');
     });
   });
 });

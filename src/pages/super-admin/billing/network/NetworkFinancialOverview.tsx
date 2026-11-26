@@ -19,7 +19,7 @@ import {
 } from "@/lib/api/network-billing";
 import { formatCurrency } from "@/pages/agency/billing-and-approvals/billingUtils";
 import ClaimsByStatusChart from "@/pages/agency/billing/claims/components/ClaimsByStatusChart";
-import FinancialOverviewCards from "@/pages/agency/billing/financial-overview/components/FinancialOverviewCards";
+import { FinancialStatCards } from "@/pages/agency/billing/financial-overview/components/FinancialOverviewCards";
 import RecentActivityTable from "@/pages/agency/billing/financial-overview/components/RecentActivityTable";
 import PayrollSummaryChart from "@/pages/agency/billing/payroll/components/PayrollSummaryChart";
 import type { ClaimsStatusChartData } from "@/pages/agency/billing/claims/utils/claimsDashboardUtils";
@@ -313,7 +313,7 @@ export default function NetworkFinancialOverview() {
     >
       <span className="sr-only">Financial overview for all authorized agencies</span>
       <div>
-        <FinancialOverviewCards stats={buildStats(data)} loading={initialLoading} trendsLoading={query.isFetching} />
+        <FinancialStatCards stats={buildStats(data)} loading={initialLoading} trendsLoading={query.isFetching} />
         <PartialFailure
           label="Claims"
           messages={partialMessages(partialErrors, "current.claims", "previous.claims")}

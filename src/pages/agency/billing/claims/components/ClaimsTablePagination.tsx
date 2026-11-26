@@ -19,7 +19,7 @@ export default function ClaimsTablePagination({
 
   if (nextCursor === null) {
     return (
-      <p role="status" className="pt-4 text-center text-[13px] text-[#808081]">
+      <p role="status" className="pt-4 text-center text-[13px] text-[#6b737a] dark:text-[#9aa4a8]">
         {terminalLabel}
       </p>
     );
@@ -35,7 +35,7 @@ export default function ClaimsTablePagination({
         disabled={!onLoadMore || isRefetching}
         aria-label={loadMoreError ? loadMoreLabel.replace("Load more", "Retry loading more") : loadMoreLabel}
         aria-busy={isRefetching}
-        className="inline-flex h-11 min-w-11 items-center justify-center rounded-md border border-[#cccccd] bg-white px-4 text-[13px] font-medium text-[#10141a] transition-colors hover:bg-[#eef4f5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex h-10 min-w-10 cursor-pointer items-center justify-center rounded-[10px] border border-[#dcdfe2] bg-white px-4 text-[14px] font-semibold text-[#10141a] transition-colors hover:bg-[#f4f6f7] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:bg-transparent dark:text-[#f4f6f7] dark:hover:bg-white/5"
       >
         {isRefetching ? "Loading more…" : "Load more"}
       </button>

@@ -1,38 +1,28 @@
-import { cn } from "@/lib/utils";
+import { AgencySegmented } from "@/components/agency/AgencyListKit";
 
 export type ClaimsWorkspaceTab = "shifts" | "saved";
 
 type ClaimsWorkspaceTabsProps = {
   activeTab: ClaimsWorkspaceTab;
   onTabChange: (tab: ClaimsWorkspaceTab) => void;
+  counts?: Partial<Record<ClaimsWorkspaceTab, number>>;
 };
-
-const tabs: Array<{ id: ClaimsWorkspaceTab; label: string }> = [
-  { id: "shifts", label: "Ready to bill" },
-  { id: "saved", label: "Claims & invoices" },
-];
 
 export default function ClaimsWorkspaceTabs({
   activeTab,
   onTabChange,
+  counts = {},
 }: ClaimsWorkspaceTabsProps) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {tabs.map((tab) => (
-        <button
-          key={tab.id}
-          type="button"
-          onClick={() => onTabChange(tab.id)}
-          className={cn(
-            "rounded-full border px-5 py-2 text-sm font-medium transition-colors cursor-pointer",
-            activeTab === tab.id
-              ? "border-[#00b4b8] bg-[#00b4b8] text-white"
-              : "border-[#e5e5e6] text-[#10141a] hover:border-[#00b4b8]/40 hover:bg-[#eef4f5]",
-          )}
-        >
-          {tab.label}
-        </button>
-      ))}
-    </div>
+    <AgencySegmented
+      label="Claims views"
+      value={activeTab}
+      onChange={onTabChange}
+      options={[
+        { value: "shifts", label: "Ready to bill", count: counts.shifts },
+        { value: "saved", label: "Claims & invoices", count: counts.saved },
+      ]}
+      className="w-fit"
+    />
   );
 }

@@ -91,7 +91,7 @@ export default function RecentClaimsClientGroupHeader({
   }
 
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-[#e5e5e6] bg-[#eef4f5] px-4 py-3 pr-8">
+    <div className="flex items-center justify-between gap-4 border-b border-[#eceef0] bg-[#f4f9f9] px-4 py-3 pr-8 dark:bg-white/5">
       <div className="flex min-w-0 items-center gap-3">
         {providerFree ? <ProviderFreeClientName name={group.clientName} className="text-[14px] font-semibold text-[#10141a]" /> : <ClientNameLink name={group.clientName} clientId={group.clientId} className="text-[14px] font-semibold text-[#10141a]" />}
         <span className="shrink-0 text-[13px] text-[#808081]">{itemLabel}</span>

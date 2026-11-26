@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Check, CornerDownLeft, Loader2 } from "lucide-react";
+import { Check, ClipboardCheck, CornerDownLeft, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { resolveEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
 import {
@@ -30,11 +30,13 @@ import { createAgencyOperationalDataAdapter } from "@/lib/operational-agency/dat
 import { agencyDirectoryRoutes } from "@/lib/operational-agency/routes";
 import type { RootState } from "@/store/redux/store";
 import { UserType } from "@/utils/auth/types/user.types";
-import StaffTimesheetsTable, { StaffTimesheetStatusPill } from "./StaffTimesheetsTable";
+import { agencyOutlineButton, agencyPrimaryButton } from "@/components/agency/AgencyListKit";
+import BillingDashboardHeader from "../components/BillingDashboardHeader";
+import { StaffTimesheetStatusPill } from "./StaffTimesheetsTable";
+import SubmittedTimesheetsBoard from "./SubmittedTimesheetsBoard";
 import ApprovalsPage from "@/pages/agency/scheduling/approvals";
 
 
-// Shared column template (header/rows/skeleton) — full literal class string so Tailwind JIT
 function fmtPeriod(start: string, end: string) {
   try {
     return `${format(parseISO(start), "MMM d")} – ${format(parseISO(end), "MMM d, yyyy")}`;
@@ -73,6 +75,8 @@ export function StaffTimesheetsApprovalContent() {
   const [viewing, setViewing] = useState<StaffTimesheet | null>(null);
   const [rejectTarget, setRejectTarget] = useState<StaffTimesheet | null>(null);
   const [rejectNotes, setRejectNotes] = useState("");
+  const [confirmApproveAll, setConfirmApproveAll] = useState(false);
+  const [approvingAll, setApprovingAll] = useState(false);
   const loadControllerRef = useRef<AbortController | null>(null);
   const loadRequestIdRef = useRef(0);
   const mutationControllerRef = useRef<AbortController | null>(null);
@@ -184,15 +188,61 @@ export function StaffTimesheetsApprovalContent() {
     }
   }
 
-  return (
-    <div className="min-h-[calc(100vh-200px)] px-4 sm:px-6 lg:px-0">
-      <div className="mb-4 sm:mb-6">
-        <h1 className="text-[28px] font-bold leading-[1.4] text-[#10141a] sm:text-[32px] lg:text-[40px]">
-          Staff Timesheets
-        </h1>
-      </div>
+  const pendingTimesheets = useMemo(() => timesheets.filter((timesheet) => timesheet.status === "pending"), [timesheets]);
 
-      <StaffTimesheetsTable
+  async function handleApproveAll() {
+    const targets = pendingTimesheets;
+    if (!targets.length) return;
+    const controller = beginMutation();
+    setApprovingAll(true);
+    let approved = 0;
+    try {
+      // One at a time, so a failure stops the run and the toast can say how far it got.
+      for (const timesheet of targets) {
+        setBusyId(timesheet.id);
+        await reviewStaffTimesheet({
+          context: { agencyId },
+          timesheetId: timesheet.id,
+          status: "approved",
+          signal: controller.signal,
+        });
+        if (controller.signal.aborted) return;
+        approved += 1;
+      }
+      toast({ title: `${approved} ${approved === 1 ? "timesheet" : "timesheets"} approved`, variant: "success" });
+    } catch (error) {
+      if (controller.signal.aborted || isAbort(error)) return;
+      toast({
+        title: approved ? `Approved ${approved} of ${targets.length} timesheets` : "Approval failed",
+        description: getStaffTimesheetErrorMessage(error),
+        variant: "destructive",
+      });
+    } finally {
+      if (!controller.signal.aborted && mutationControllerRef.current === controller) {
+        setBusyId(null);
+        setApprovingAll(false);
+        setConfirmApproveAll(false);
+        mutationControllerRef.current = null;
+        await load();
+      }
+    }
+  }
+
+  return (
+    <div className="min-h-[calc(100vh-200px)] space-y-6 pb-8">
+      <BillingDashboardHeader
+        icon={ClipboardCheck}
+        title="Submitted timesheets"
+        subtitle="Staff timesheets waiting for approval before payroll."
+        primaryAction={{
+          label: pendingTimesheets.length ? `Approve all (${pendingTimesheets.length})` : "Approve all",
+          onClick: () => setConfirmApproveAll(true),
+          disabled: loading || pendingTimesheets.length === 0 || busyId !== null,
+          loading: approvingAll,
+        }}
+      />
+
+      <SubmittedTimesheetsBoard
         timesheets={timesheets}
         loading={loading}
         busyId={busyId}
@@ -203,6 +253,28 @@ export function StaffTimesheetsApprovalContent() {
           setRejectNotes("");
         }}
       />
+
+      <Dialog open={confirmApproveAll} onOpenChange={(open) => !approvingAll && setConfirmApproveAll(open)}>
+        <DialogContent className="max-w-[440px] rounded-[20px] bg-white p-6 dark:bg-[#1b232b]">
+          <DialogHeader>
+            <DialogTitle className="text-[20px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">
+              Approve {pendingTimesheets.length} {pendingTimesheets.length === 1 ? "timesheet" : "timesheets"}?
+            </DialogTitle>
+            <DialogDescription className="text-sm text-[#5b636b] dark:text-[#9aa4a8]">
+              Every pending timesheet is approved and sent to payroll. Open any you are unsure about first.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 pt-2">
+            <button type="button" className={agencyOutlineButton} disabled={approvingAll} onClick={() => setConfirmApproveAll(false)}>
+              Cancel
+            </button>
+            <button type="button" className={agencyPrimaryButton} disabled={approvingAll} onClick={() => void handleApproveAll()}>
+              {approvingAll ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : <Check aria-hidden="true" className="h-4 w-4" />}
+              {approvingAll ? "Approving…" : "Approve all"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Detail modal */}
       <Dialog open={!!viewing} onOpenChange={(open) => !open && setViewing(null)}>

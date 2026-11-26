@@ -313,7 +313,7 @@ export function ExpensesDashboardContent() {
   const actionsDisabled = isApproving || isDeclining || isDeleting;
 
   return (
-    <div className="min-h-[calc(100vh-200px)] space-y-8 pb-8">
+    <div className="min-h-[calc(100vh-200px)] space-y-6 pb-8">
       <ExpensesDashboardHeader dateRange={dateRange} onDateRangeChange={handleDateRangeChange} noun={staffNoun} />
       <ExpensesOverviewCards stats={overviewStats} loading={dashboardLoading} />
       <ExpensesByStatusChart

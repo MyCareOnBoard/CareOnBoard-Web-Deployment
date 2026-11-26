@@ -51,7 +51,7 @@ describe("claimsDashboardUtils", () => {
     expect(chart.total).toBe(4);
     expect(chart.centerLabel).toBe("Total claims");
     expect(chart.data).toHaveLength(3);
-    expect(chart.data[0].color).toBe("#f97316");
+    expect(chart.data[0].color).toBe("#003839");
   });
 
   it("mapDashboardToRejectionChart returns empty state when no rejections", () => {

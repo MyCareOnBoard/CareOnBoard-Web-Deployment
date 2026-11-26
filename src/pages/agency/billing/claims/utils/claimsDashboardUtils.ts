@@ -10,6 +10,13 @@ export const CLAIMS_STATUS_COLORS: Record<BillingClaimStatus, string> = {
   rejected: "#ef4444",
 };
 
+/** Status colours of the claims breakdown (agency design): paid teal, pending dark teal, rejected red. */
+export const CLAIMS_CHART_COLORS: Record<BillingClaimStatus, string> = {
+  pending: "#003839",
+  paid: "#12b5b0",
+  rejected: "#e5484d",
+};
+
 const REJECTION_CHART_COLORS = ["#ef4444", "#f97316", "#3b82f6", "#22c55e", "#a855f7"];
 
 const OVERVIEW_STAT_CONFIG: Array<{
@@ -69,7 +76,7 @@ export function mapDashboardToStatusChart(
   const chartSegments: DonutSegment[] = segments.map((segment) => ({
     label: STATUS_LABELS[segment.status],
     value: segment.count,
-    color: CLAIMS_STATUS_COLORS[segment.status],
+    color: CLAIMS_CHART_COLORS[segment.status],
   }));
 
   return {

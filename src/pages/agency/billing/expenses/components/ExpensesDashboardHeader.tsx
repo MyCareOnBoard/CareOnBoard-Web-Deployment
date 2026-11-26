@@ -1,3 +1,4 @@
+import { Wallet } from "lucide-react";
 import BillingDashboardHeader from "../../components/BillingDashboardHeader";
 import type { BillingDateRangeValues } from "../../components/types";
 import { MAX_EXPENSE_RANGE_DAYS } from "../utils/expensesDashboardUtils";
@@ -15,8 +16,9 @@ export default function ExpensesDashboardHeader({
 }: ExpensesDashboardHeaderProps) {
   return (
     <BillingDashboardHeader
+      icon={Wallet}
       title={`${noun} expenses`}
-      subtitle="Review receipts and approve reimbursements for payroll."
+      subtitle="Costs staff pay during visits, such as groceries for meal prep. Approved amounts join the next pay run."
       dateRange={dateRange}
       onDateRangeChange={onDateRangeChange}
       dateRangeModalTitle="Select date range"

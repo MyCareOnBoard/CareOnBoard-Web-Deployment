@@ -8,6 +8,7 @@ import SavedInvoiceRow from "./SavedInvoiceRow";
 import SavedClaimsClientGroupHeader from "./SavedClaimsClientGroupHeader";
 import {
   GROUPED_SAVED_CLAIMS_TABLE_HEADER_CLASS,
+  GROUPED_SAVED_CLAIMS_TABLE_ROW_CLASS,
   NETWORK_GROUPED_SAVED_CLAIMS_TABLE_ROW_CLASS,
   NETWORK_GROUPED_SAVED_CLAIMS_TABLE_HEADER_CLASS,
   SAVED_CLAIMS_TABLE_MIN_WIDTH,
@@ -60,11 +61,11 @@ function SavedClaimSkeletonRow({
     <div
       className={`${(showAgency
         ? NETWORK_GROUPED_SAVED_CLAIMS_TABLE_ROW_CLASS
-        : GROUPED_SAVED_CLAIMS_TABLE_HEADER_CLASS.replace("font-semibold", ""))} animate-pulse`}
+        : GROUPED_SAVED_CLAIMS_TABLE_ROW_CLASS)} animate-pulse`}
       aria-hidden="true"
     >
       {Array.from({ length: grouped ? showAgency ? 8 : 7 : 8 }).map((_, index) => (
-        <span key={index} className="h-4 rounded bg-[#eef4f5]" />
+        <span key={index} className="h-4 rounded bg-[#f4f5f6] dark:bg-white/5" />
       ))}
     </div>
   );
@@ -73,7 +74,7 @@ function SavedClaimSkeletonRow({
 function SavedClaimMobileSkeletonCard() {
   return (
     <div
-      className="animate-pulse rounded-[16px] border border-[#e5e5e6] bg-white px-4 py-4"
+      className="animate-pulse rounded-[16px] border border-[#e4e7ea] bg-white dark:border-white/10 dark:bg-[#1b232b] px-4 py-4"
       aria-hidden="true"
     >
       <div className="h-5 w-32 rounded bg-[#eef4f5]" />
@@ -130,17 +131,17 @@ export default function SavedClaimsTable({
   return (
     <section>
       <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <h2 className="text-[18px] font-semibold text-[#10141a]">Claims &amp; invoices</h2>
+        <h2 className="text-base font-semibold text-[#10141a] dark:text-[#f4f6f7]">Claims &amp; invoices</h2>
         {showStatusFilter || showClientSearch ? <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           {showStatusFilter ? (
-          <label className="flex items-center gap-2 text-[13px] text-[#10141a]">
-            <span className="whitespace-nowrap text-[#808081]">Status</span>
+          <label className="flex items-center gap-2 text-[14px] text-[#10141a] dark:text-[#f4f6f7]">
+            <span className="whitespace-nowrap text-[#4b535b] dark:text-[#9aa4a8]">Status</span>
             <select
               value={statusFilter}
               onChange={(event) =>
                 onStatusFilterChange(event.target.value as BillingClaimStatus | "all")
               }
-              className="rounded-md border border-[#e5e5e6] bg-white px-3 py-2 text-[13px] text-[#10141a]"
+              className="h-10 cursor-pointer rounded-[10px] border border-[#dcdfe2] bg-white px-3 text-[14px] text-[#10141a] outline-none focus:border-[#007679] focus:ring-2 focus:ring-[#007679]/15 dark:border-white/15 dark:bg-[#151c22] dark:text-[#f4f6f7]"
             >
               {STATUS_FILTER_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -154,7 +155,7 @@ export default function SavedClaimsTable({
         </div> : null}
       </div>
 
-      <div className="hidden overflow-hidden rounded-[16px] border border-[#e5e5e6] bg-white lg:block">
+      <div className="hidden overflow-hidden rounded-[16px] border border-[#e4e7ea] bg-white dark:border-white/10 dark:bg-[#1b232b] lg:block">
         <div className="overflow-x-auto">
           <div className={SAVED_CLAIMS_TABLE_MIN_WIDTH}>
             <div className={showAgency ? NETWORK_GROUPED_SAVED_CLAIMS_TABLE_HEADER_CLASS : GROUPED_SAVED_CLAIMS_TABLE_HEADER_CLASS}>
@@ -229,7 +230,7 @@ export default function SavedClaimsTable({
               </>
             ) : (
               <div className="px-4 py-10 text-center">
-                <p className="text-[14px] font-medium text-[#808081]">{emptyMessage}</p>
+                <p className="text-[14px] text-[#6b737a] dark:text-[#9aa4a8]">{emptyMessage}</p>
               </div>
             )}
           </div>
@@ -293,8 +294,8 @@ export default function SavedClaimsTable({
             ))}
           </>
         ) : (
-          <div className="rounded-[16px] border border-[#e5e5e6] bg-white px-4 py-10 text-center">
-            <p className="text-[14px] font-medium text-[#808081]">{emptyMessage}</p>
+          <div className="rounded-[16px] border border-[#e4e7ea] bg-white dark:border-white/10 dark:bg-[#1b232b] px-4 py-10 text-center">
+            <p className="text-[14px] text-[#6b737a] dark:text-[#9aa4a8]">{emptyMessage}</p>
           </div>
         )}
       </div>

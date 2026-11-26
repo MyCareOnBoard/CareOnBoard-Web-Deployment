@@ -604,6 +604,29 @@ export function ClaimsDashboardContent() {
     toast,
   ]);
 
+  // Support coordination claims don't go out as 837P files yet.
+  const canExport837 = canManageClaims && mode !== "sc";
+  const ediPanelRef = useRef<HTMLDivElement>(null);
+  const scrollToEdiPanel = useRef(false);
+  const openEdiExport = useCallback(() => {
+    // Already on the saved tab: the tab change below would not re-render, so scroll now.
+    if (activeTab === "saved" && ediPanelRef.current) {
+      ediPanelRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    scrollToEdiPanel.current = true;
+    setActiveTab("saved");
+  }, [activeTab]);
+  useEffect(() => {
+    if (activeTab !== "saved" || !scrollToEdiPanel.current || !ediPanelRef.current) return;
+    scrollToEdiPanel.current = false;
+    ediPanelRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [activeTab]);
+  const readyClientCount = useMemo(
+    () => new Set(readyClaims.map((claim) => claim.clientId || claim.client)).size,
+    [readyClaims],
+  );
+
   const handleStatusSegmentClick = useCallback((segmentLabel: string) => {
     const nextFilter = STATUS_LABEL_TO_FILTER[segmentLabel];
     if (!nextFilter) {
@@ -626,7 +649,7 @@ export function ClaimsDashboardContent() {
       : null;
 
   return (
-    <div className="min-h-[calc(100vh-200px)] space-y-8 pb-8">
+    <div className="min-h-[calc(100vh-200px)] space-y-6 pb-8">
       {reportSelectionError&&<p role="alert">{reportSelectionError}</p>}
       <ClaimsDashboardHeader
         dateRange={dateRange}
@@ -636,14 +659,30 @@ export function ClaimsDashboardContent() {
           setGenerateOpen(true);
         }}
         generateClaimLoading={savingClaim && generateOpen}
+        readyCount={readyClaims.length}
+        onExportClick={canExport837 ? openEdiExport : undefined}
       />
-      <ClaimsOverviewCards stats={dashboard.overviewStats} loading={dashboard.loading} />
+      <ClaimsOverviewCards
+        stats={dashboard.overviewStats}
+        loading={dashboard.loading}
+        ready={{
+          count: readyClaims.length,
+          clients: readyClientCount,
+          truncated: readyToClaim.truncated,
+          loading: readyToClaim.loading,
+        }}
+        onFixRejected={() => {
+          setActiveTab("saved");
+          setStatusFilter("rejected");
+        }}
+      />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <ClaimsByStatusChart
           chart={dashboard.statusChart}
           loading={dashboard.loading}
           onStatusSegmentClick={handleStatusSegmentClick}
+          variant="bar"
         />
         <TopRejectionReasonsChart chart={dashboard.rejectionChart} loading={dashboard.loading} />
       </div>
@@ -661,17 +700,18 @@ export function ClaimsDashboardContent() {
         />
       ) : (
         <>
-        {/* Support coordination claims don't go out as 837P files yet. */}
-        {canManageClaims && mode !== "sc" ? (
-          <Suspense fallback={null}>
-            <StediEnrollmentBanner />
-            <X12ExportPanel
-              claims={generatedClaims.claims}
-              refreshKey={x12RefreshKey}
-              onExported={() => void generatedClaims.refetch({ force: true })}
-              onOpenReport={(claim) => void handleViewReport(claim)}
-            />
-          </Suspense>
+        {canExport837 ? (
+          <div ref={ediPanelRef} className="scroll-mt-6 space-y-6">
+            <Suspense fallback={null}>
+              <StediEnrollmentBanner />
+              <X12ExportPanel
+                claims={generatedClaims.claims}
+                refreshKey={x12RefreshKey}
+                onExported={() => void generatedClaims.refetch({ force: true })}
+                onOpenReport={(claim) => void handleViewReport(claim)}
+              />
+            </Suspense>
+          </div>
         ) : null}
         <SavedClaimsTable
           claims={generatedClaims.claims}

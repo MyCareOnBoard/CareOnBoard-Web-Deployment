@@ -23,6 +23,7 @@ import {
   getPreviousPeriodRange,
   mapPayrollRunsToFinancialPayrollChart,
   mapDashboardToOverviewStats,
+  mapFinancialKpis,
   MAX_PAYROLL_RUN_PAGES,
   shouldLoadNextPayrollRunPage,
 } from "../utils/financialOverviewUtils";
@@ -364,6 +365,10 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
     return merged.filter((run) => run.periodEnd >= dateRange.startDate && run.periodStart <= dateRange.endDate) as PayrollRun[];
   }, [currentPayroll.currentData, dateRange.endDate, dateRange.startDate, payrollHistory.currentData, payrollRange, payrollRangeKey]);
   const payrollChart = useMemo(() => mapPayrollRunsToFinancialPayrollChart(payrollRuns), [payrollRuns]);
+  const kpis = useMemo(
+    () => mapFinancialKpis(claimsDashboard, previousClaimsDashboard, payrollRuns),
+    [claimsDashboard, payrollRuns, previousClaimsDashboard],
+  );
   const recentActivity = useMemo(
     () => buildRecentActivity(claims, payrollRuns, { limit: ACTIVITY_LIMIT }),
     [claims, payrollRuns],
@@ -385,6 +390,7 @@ export function useFinancialOverview(dateRange: DateRangeValues) {
 
   return {
     overviewStats,
+    kpis,
     claimsChart,
     payrollChart,
     recentActivity,

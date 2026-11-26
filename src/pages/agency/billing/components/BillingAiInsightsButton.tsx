@@ -1,12 +1,12 @@
-import { Sparkles } from "lucide-react";
+import { AiInsightsIcon } from "@/components/agency/AgencyIcons";
 
 export default function BillingAiInsightsButton() {
   return (
     <button
       type="button"
-      className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 self-start rounded-full border border-[#e5e5e6] bg-white px-4 py-2.5 text-[14px] font-medium text-[#10141a] transition-colors hover:bg-[#eef4f5]"
+      className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-[8px] border border-[#cfe9e8] bg-white px-2.5 text-[13px] font-medium text-[#005c5e] transition-colors hover:bg-[#eef8f8] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] dark:border-white/15 dark:bg-transparent dark:text-[#7fd3d3] dark:hover:bg-white/5"
     >
-      <Sparkles className="h-4 w-4 text-[#00b4b8]" />
+      <AiInsightsIcon aria-hidden="true" className="h-[18px] w-[18px]" />
       AI insights
     </button>
   );

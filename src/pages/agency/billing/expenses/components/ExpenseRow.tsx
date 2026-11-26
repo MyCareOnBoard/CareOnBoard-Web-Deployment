@@ -5,6 +5,7 @@ import {
   NETWORK_EXPENSES_TABLE_ROW_CLASS,
 } from "./tableColumns";
 import ExpenseActionsMenu from "./ExpenseActionsMenu";
+import { AgencyPerson, AgencyPill, type AgencyTone } from "@/components/agency/AgencyListKit";
 import {
   assertNetworkExpenseRows,
   type ExpenseActionCallbacks,
@@ -36,6 +37,12 @@ function statusLabel(status: AgencyExpenseListItem["status"]) {
   if (status === "approved") return "Approved";
   return "Declined";
 }
+
+const STATUS_TONE: Record<AgencyExpenseListItem["status"], AgencyTone> = {
+  pending: "amber",
+  approved: "green",
+  rejected: "red",
+};
 
 function openReceipt(expense: AgencyExpenseListItem) {
   if (expense.receiptUrl)
@@ -98,7 +105,7 @@ export default function ExpenseRow(props: ExpenseRowProps) {
 
   if (variant === "mobile") {
     return (
-      <article className="relative rounded-[16px] border border-[#e5e5e6] bg-white px-4 py-4">
+      <article className="relative rounded-[16px] border border-[#e4e7ea] bg-white px-4 py-4 dark:border-white/10 dark:bg-[#1b232b]">
         {hasMobileMenu ? (
           <div className="absolute right-2 top-2">
             {renderActionsMenu("mobile")}
@@ -126,9 +133,7 @@ export default function ExpenseRow(props: ExpenseRowProps) {
           <p className="text-[14px] font-semibold tabular-nums text-[#10141a]">
             {formatCurrency(expense.amount)}
           </p>
-          <p className="text-[13px] text-[#808081]">
-            {statusLabel(expense.status)}
-          </p>
+          <AgencyPill tone={STATUS_TONE[expense.status]}>{statusLabel(expense.status)}</AgencyPill>
         </div>
       </article>
     );
@@ -142,33 +147,33 @@ export default function ExpenseRow(props: ExpenseRowProps) {
     >
       {showAgency ? (
         <span
-          className="truncate text-[13px] font-medium text-[#10141a]"
+          className="truncate text-[14px] font-medium text-[#10141a] dark:text-[#f4f6f7]"
           title={agencyName}
         >
           {agencyName}
         </span>
       ) : null}
-      <span className="text-[13px] font-medium text-[#10141a]">
-        {expense.employeeName}
-      </span>
-      <span className="text-[13px] tabular-nums text-[#10141a]">
+      <div className="text-[14px]">
+        <AgencyPerson name={expense.employeeName} />
+      </div>
+      <span className="text-[14px] tabular-nums text-[#10141a] dark:text-[#e6eaec]">
         {formatCurrency(expense.amount)}
       </span>
-      <span className="text-[13px] text-[#808081]">
+      <span className="text-[14px] text-[#2a3138] dark:text-[#c9d1d4]">
         {expense.category || "—"}
       </span>
       <span
-        className="truncate text-[13px] text-[#808081]"
+        className="truncate text-[14px] text-[#4b535b] dark:text-[#9aa4a8]"
         title={expense.message}
       >
         {expense.message || "—"}
       </span>
-      <span className="text-[13px] text-[#808081]">
+      <span className="text-[14px] text-[#2a3138] dark:text-[#c9d1d4]">
         {formatExpenseDate(expense.date)}
       </span>
-      <span className="text-[13px] text-[#808081]">
-        {statusLabel(expense.status)}
-      </span>
+      <div>
+        <AgencyPill tone={STATUS_TONE[expense.status]}>{statusLabel(expense.status)}</AgencyPill>
+      </div>
       <div className="flex justify-end">{renderActionsMenu("desktop")}</div>
     </div>
   );

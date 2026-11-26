@@ -1,5 +1,3 @@
-import BillingOverviewCards from "../../components/BillingOverviewCards";
-import type { BillingOverviewStat } from "../../components/types";
 import type { PayrollRun } from "@/features/payroll/runs/model/types";
 
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
@@ -9,64 +7,57 @@ const date = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
   timeZone: "UTC",
 });
+const shortDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
-export function mapPayrollRunToOverviewStats(run: PayrollRun): BillingOverviewStat[] {
+const utc = (value: string) => new Date(`${value}T00:00:00.000Z`);
+
+type SummaryItem = { id: string; label: string; value: string };
+
+export function mapPayrollRunToSummary(run: PayrollRun | null): SummaryItem[] {
+  if (!run) {
+    return [
+      { id: "period", label: "Pay period", value: "—" },
+      { id: "payday", label: "Pay date", value: "—" },
+      { id: "employees", label: "Employees", value: "—" },
+      { id: "gross-earnings", label: "Gross pay", value: "—" },
+      { id: "total-due", label: "Total due", value: "—" },
+    ];
+  }
   return [
-    {
-      id: "total-due",
-      label: "Total payroll due",
-      value: currency.format(run.totals.totalDueCents / 100),
-    },
-    {
-      id: "gross-earnings",
-      label: "Gross earnings",
-      value: currency.format(run.totals.grossEarningsCents / 100),
-    },
-    {
-      id: "reimbursements",
-      label: "Reimbursements",
-      value: currency.format(run.totals.reimbursementCents / 100),
-    },
-    {
-      id: "adjustments",
-      label: "Adjustments",
-      value: currency.format(run.totals.adjustmentCents / 100),
-    },
-    {
-      id: "payday",
-      label: "Payday",
-      value: date.format(new Date(`${run.payday}T00:00:00.000Z`)),
-    },
+    { id: "period", label: "Pay period", value: `${shortDate.format(utc(run.periodStart))} – ${date.format(utc(run.periodEnd))}` },
+    { id: "payday", label: "Pay date", value: date.format(utc(run.payday)) },
+    { id: "employees", label: "Employees", value: run.employeeCount.toLocaleString() },
+    { id: "gross-earnings", label: "Gross pay", value: currency.format(run.totals.grossEarningsCents / 100) },
+    { id: "total-due", label: "Total due", value: currency.format(run.totals.totalDueCents / 100) },
   ];
 }
 
 type PayrollOverviewCardsProps = {
-  stats: BillingOverviewStat[];
+  run: PayrollRun | null;
   loading?: boolean;
 };
 
-function OverviewCardSkeleton() {
+/** Teal summary band of the current pay run: period, pay date, employees, gross pay and total due. */
+export default function PayrollOverviewCards({ run, loading = false }: PayrollOverviewCardsProps) {
+  const items = mapPayrollRunToSummary(run);
+  const extras = run && (run.totals.reimbursementCents || run.totals.adjustmentCents)
+    ? `Includes ${currency.format(run.totals.reimbursementCents / 100)} reimbursements and ${currency.format(run.totals.adjustmentCents / 100)} adjustments.`
+    : null;
   return (
-    <div className="flex h-[77px] min-w-[199px] flex-[1_1_199px] animate-pulse flex-col justify-center rounded-[8px] border border-[#e5e5e6] bg-white px-4 py-[11px]">
-      <div className="h-5 w-24 rounded bg-[#eef4f5]" />
-      <div className="mt-2 h-4 w-32 rounded bg-[#eef4f5]" />
-    </div>
+    <section aria-labelledby="payroll-overview-heading" aria-busy={loading || undefined}
+      className="rounded-[16px] border border-[#9fdedb] bg-[#e6f7f6] px-5 py-4 dark:border-[#0f7e7d]/50 dark:bg-[#0f7e7d]/15">
+      <h2 id="payroll-overview-heading" className="sr-only">Current payroll overview</h2>
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-5">
+        {items.map((item) => (
+          <div key={item.id} className="min-w-0">
+            <dt className="text-[12px] text-[#3d5c5c] dark:text-[#9fd3d1]">{item.label}</dt>
+            <dd className="mt-1 truncate text-[20px] font-medium tabular-nums leading-tight text-[#10141a] dark:text-[#f4f6f7]">
+              {loading ? <span aria-hidden="true" className="inline-block h-6 w-24 animate-pulse rounded bg-white/70 dark:bg-white/10" /> : item.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      {extras && !loading ? <p className="mt-3 text-[12px] text-[#3d5c5c] dark:text-[#9fd3d1]">{extras}</p> : null}
+    </section>
   );
-}
-
-export default function PayrollOverviewCards({ stats, loading = false }: PayrollOverviewCardsProps) {
-  if (loading) {
-    return (
-      <section>
-        <h2 className="mb-4 text-[16px] font-semibold text-[#10141a]">Current payroll overview</h2>
-        <div className="flex flex-wrap gap-6">
-          {Array.from({ length: 5 }).map((_, index) => (
-            <OverviewCardSkeleton key={index} />
-          ))}
-        </div>
-      </section>
-    );
-  }
-
-  return <BillingOverviewCards stats={stats} showCountBadge heading="Current payroll overview" />;
 }
