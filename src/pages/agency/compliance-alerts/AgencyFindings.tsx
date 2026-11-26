@@ -6,6 +6,7 @@ import {EvidenceList, useStaffFindingsQuery} from './StaffFindings';
 import {useState} from 'react';
 import {ComplianceBadge, ComplianceSkeleton} from './CompliancePresentation';
 import {SourcePage, type SourceProps} from './SourceControls';
+import WhatWeCheck from './WhatWeCheck';
 
 export type AgencyFinding = {
   id: string; ruleId?: string; employeeId: string; employeeName: string | null; status: 'open' | 'recurred' | 'resolved' | 'dismissed';
@@ -78,6 +79,7 @@ export default function AgencyFindings({view, scopeKey, agencyId, mode, onApply,
   return <section aria-label="Patterns" className="p-4 sm:p-6">
     <h2 className="text-xl font-bold">Patterns</h2>
     <p className="mt-2 text-sm text-[#5e7378]">Staff who keep missing the same requirement: service notes, shift attendance, documents or training. Most serious first. These are advisory: nothing is sent to the staff member until you act.</p>
+    <WhatWeCheck {...scope}/>
     {view.employeeId && <div className="mt-3 flex flex-wrap items-center gap-2 text-sm"><span>Showing the selected staff member first.</span><Button type="button" variant="outline" size="sm" onClick={() => onApply({employeeId: undefined})}>Show everyone</Button></div>}
     <div className="my-4 flex flex-wrap gap-3">
       <label className="text-sm">Status <select aria-label="Pattern status" className="ml-2 rounded border border-[#dce7e8] p-1" value={status} onChange={event => onApply({findingStatus: event.target.value as 'active'})}>
