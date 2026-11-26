@@ -20,6 +20,18 @@ export type CareDashboardClient = {
   pendingDocuments: number;
   pendingUpdates: number;
   publicationActionCount: number | null;
+  /** Date of the newest activity the caller can see. */
+  lastActivityAt?: string | null;
+  /** Family contacts on the client record; null for organizations that do not own the client. */
+  familyContacts?: { name: string; relationship?: string }[] | null;
+  /** Care team invitations not yet accepted; null without permission to manage the team. */
+  pendingInvitations?: number | null;
+};
+/** An active support coordination client that has no care workspace yet. */
+export type CareUnconnectedClient = {
+  clientId: string;
+  clientName: string;
+  familyContactCount: number;
 };
 export type CareRequestOptions = {
   signal?: AbortSignal;
@@ -42,6 +54,8 @@ export type CareOrganization = {
   name: string;
   kind: "internal" | "external";
   role: string;
+  /** True for the support coordination agency's owner and its coordinators, who create care workspaces. */
+  canConnectClients?: boolean;
 };
 export type CareMe = {
   uid?: string;
@@ -964,6 +978,8 @@ export const agencyCareApi = {
     ),
   dashboard: (options?: CareRequestOptions) =>
     request<CarePage<CareDashboardClient>>("get", "/dashboard", undefined, options),
+  unconnectedClients: (options?: CareRequestOptions) =>
+    request<CarePage<CareUnconnectedClient>>("get", "/unconnected-clients", undefined, options),
   reports: (options?: CareRequestOptions) =>
     request<
       CarePage<{

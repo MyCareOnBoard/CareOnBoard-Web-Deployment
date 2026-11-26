@@ -241,7 +241,9 @@ export default function AgencyDashboardLayout({ children }: { children?: ReactNo
     // Staff-management label reflects the selected mode (or agency's types when mode is null).
     const dspManagementLabel = useMemo(() => {
         const typesForLabel = effectiveMode ? [effectiveMode] : supportedTypes;
-        return `${staffLabels(typesForLabel).title} management`;
+        const { title } = staffLabels(typesForLabel);
+        // The full "Support Coordinator management" is too long for the sidebar.
+        return title === "Support Coordinator" ? "SC Management" : `${title} management`;
     }, [effectiveMode, supportedTypes]);
 
     // Build filtered nav items.

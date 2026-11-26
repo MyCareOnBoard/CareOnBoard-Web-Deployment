@@ -103,7 +103,7 @@ export function PayrollRunActions({
     "request_preview", "approve_payroll", "reopen_payroll", "refresh_reconciliation",
   ];
   return (
-    <section aria-label="Payroll actions" className="border-y border-[#dfe7e8] py-4">
+    <section aria-label="Payroll actions" className="rounded-[16px] border border-[#e4e7ea] bg-white px-4 py-4 dark:border-white/10 dark:bg-[#1b232b]">
       <div className="flex flex-wrap gap-2">
         {commands.map((command) => {
           const availability = getPayrollActionAvailability(projection, command, { freshness, now });
@@ -117,8 +117,8 @@ export function PayrollRunActions({
                 aria-describedby={reasonId ?? (activeIntent ? progressId : undefined)}
                 onClick={() => onAction(command)}
                 className={primary
-                  ? "min-h-11 rounded-lg bg-[#006f73] px-4 text-sm font-semibold text-white hover:bg-[#005b5e] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  : "min-h-11 rounded-lg border border-[#b8dfe0] px-4 text-sm font-semibold text-[#006f73] hover:bg-[#edf8f8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"}
+                  ? "h-10 cursor-pointer rounded-[10px] bg-[#003839] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#0b4c4d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#0f7e7d] dark:hover:bg-[#13908f]"
+                  : "h-10 cursor-pointer rounded-[10px] border border-[#dcdfe2] bg-white px-4 text-sm font-semibold text-[#10141a] transition-colors hover:bg-[#f4f6f7] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:bg-transparent dark:text-[#f4f6f7] dark:hover:bg-white/5"}
               >
                 {labels[command]}
               </button>
@@ -130,7 +130,7 @@ export function PayrollRunActions({
         })}
       </div>
       {activeIntent ? (
-        <p id={progressId} role="status" className="mt-3 text-sm font-medium text-[#006f73]">
+        <p id={progressId} role="status" className="mt-3 text-sm font-medium text-[#007679] dark:text-[#7fd3d3]">
           {activeIntent === "request_preview" ? "Starting payroll preview…" : "Starting payroll action…"}
         </p>
       ) : null}

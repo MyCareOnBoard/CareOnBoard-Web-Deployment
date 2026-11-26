@@ -37,9 +37,15 @@ export interface ConversationListProps {
    * field staff are hidden and the field-staff tab is relabelled. Omit to disable.
    */
   programMode?: AgencyMode | null;
-  /** "panel" is the caregiver/DSP look: round avatars, last message preview, teal selection. */
-  variant?: "classic" | "panel";
+  /**
+   * "panel" is the caregiver/DSP look: round avatars, last message preview, teal selection.
+   * "agency" is the agency Support look: a flat pane inside the page's card, with a
+   * segmented All/DSP/Staff/Admin filter that counts unread conversations.
+   */
+  variant?: "classic" | "panel" | "agency";
 }
+
+type FilterTabValue = NonNullable<ConversationListProps["filterTab"]>;
 
 /** "2:20 PM" today, "Yesterday", else "Nov 3". */
 export function conversationTime(dateString: string | null | undefined): string {
@@ -72,6 +78,20 @@ const isStaffRole = (role: string): boolean => {
 const isAdministrationRole = (role: string): boolean => {
   const r = (role || "").toLowerCase();
   return r.includes("super");
+};
+
+/**
+ * Whether a direct chat with someone in this role belongs under the filter tab.
+ * Under a program mode the field-staff tab matches that program's field staff
+ * (DSPs in DDD, caregivers in HHA).
+ */
+const matchesFilterTab = (role: string | undefined, tab: FilterTabValue, programMode: AgencyMode | null): boolean => {
+  if (tab === "all") return true;
+  if (role === undefined) return false;
+  if (tab === "dsp") return programMode ? isProgramScopedRole(role) : isDspRole(role);
+  if (tab === "staff" || tab === "agency") return isStaffRole(role);
+  if (tab === "administration") return isAdministrationRole(role);
+  return true;
 };
 
 /**
@@ -263,25 +283,7 @@ export const ConversationList = React.memo(function ConversationList({
       }
 
       // Apply tab filter (only for non-group chats for simplicity)
-      if (filterTab !== "all" && !isGroup) {
-        const primaryParticipant = otherParticipants[0];
-        if (!primaryParticipant) return false;
-
-        const role = primaryParticipant.role || "";
-
-        if (filterTab === "dsp") {
-          // Under a program mode the gate above already restricts to the current
-          // program, so the field-staff tab matches that program's field staff
-          // (DSPs in DDD, caregivers in HHA).
-          return programMode ? isProgramScopedRole(role) : isDspRole(role);
-        }
-        if (filterTab === "staff" || filterTab === "agency") {
-          return isStaffRole(role);
-        }
-        if (filterTab === "administration") {
-          return isAdministrationRole(role);
-        }
-      }
+      if (!isGroup) return matchesFilterTab(otherParticipants[0]?.role, filterTab, programMode);
 
       return true;
     });
@@ -297,6 +299,133 @@ export const ConversationList = React.memo(function ConversationList({
     }
     return 0;
   };
+
+  // Agency filter badges: unread conversations per tab, within the program scope.
+  const unreadByTab = useMemo(() => {
+    const counts: Record<FilterTabValue, number> = { all: 0, dsp: 0, staff: 0, administration: 0, agency: 0 };
+    if (variant !== "agency") return counts;
+    for (const { otherParticipants, isGroup, primaryParticipant, ...conversation } of conversationsWithParticipants) {
+      const unread = typeof conversation.unreadCount === "number"
+        ? conversation.unreadCount
+        : (currentUserId && conversation.unreadCount?.[currentUserId]) || 0;
+      if (otherParticipants.length === 0 || unread === 0) continue;
+      if (programMode && !isGroup && !matchesAgencyMode(primaryParticipant?.role, programMode)) continue;
+      counts.all += 1;
+      if (isGroup) continue;
+      for (const tab of ["dsp", "staff", "administration"] as const) {
+        if (matchesFilterTab(primaryParticipant?.role, tab, programMode)) counts[tab] += 1;
+      }
+    }
+    return counts;
+  }, [conversationsWithParticipants, currentUserId, programMode, variant]);
+
+  if (variant === "agency") {
+    const tabs: { value: FilterTabValue; label: string }[] = [
+      { value: "all", label: "All" },
+      { value: "dsp", label: roleLabel({ role: programMode === "hha" ? "hha" : "dsp" }) },
+      { value: "staff", label: "Staff" },
+      { value: "administration", label: "Admin" },
+    ];
+    return (
+      <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
+        <h2 className="sr-only">Conversations</h2>
+        <div className="shrink-0 space-y-3 p-3">
+          {onSearchChange && (
+            <label className="relative block">
+              <span className="sr-only">Search messages</span>
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a979d]" aria-hidden="true" />
+              <input type="search" value={searchQuery} onChange={(e) => onSearchChange(e.target.value)} placeholder="Search messages"
+                className="h-10 w-full rounded-[10px] border border-[#dcdfe2] bg-white pl-9 pr-3 text-[13px] text-[#10141a] outline-none placeholder:text-[#8a979d] focus-visible:border-[#007679] focus-visible:ring-2 focus-visible:ring-[#007679]/20 dark:border-white/15 dark:bg-[#141b21] dark:text-[#f4f6f7]" />
+            </label>
+          )}
+          {onFilterChange && (
+            <div role="group" aria-label="Filter conversations" className="flex w-full rounded-[10px] bg-[#f1f3f4] p-1 dark:bg-white/5">
+              {tabs.map((tab) => {
+                const active = filterTab === tab.value;
+                const count = unreadByTab[tab.value];
+                return (
+                  <button key={tab.value} type="button" aria-pressed={active} onClick={() => onFilterChange(tab.value)}
+                    className={cn("inline-flex h-8 min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[8px] px-2 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#007679]",
+                      active ? "bg-white text-[#10141a] shadow-[0_1px_2px_rgba(16,40,44,0.12)] dark:bg-[#2a3138] dark:text-[#f4f6f7]" : "text-[#5d6b73] hover:text-[#10141a] dark:text-[#9aa4a8] dark:hover:text-[#f4f6f7]")}>
+                    <span className="truncate">{tab.label}</span>
+                    {count > 0 && <span className={cn("grid h-[18px] min-w-[18px] shrink-0 place-items-center rounded-full px-1 text-[11px] font-semibold tabular-nums",
+                      active ? "bg-[#007679] text-white" : "bg-[#e3e6e8] text-[#34434c] dark:bg-white/10 dark:text-[#c9d3d6]")}>
+                      {count > 99 ? "99+" : count}<span className="sr-only"> unread</span>
+                    </span>}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {loading ? (
+            <div role="status" aria-label="Loading conversations" className="flex flex-col gap-1 px-3">
+              {[0, 1, 2, 3].map((row) => <div key={row} className="flex items-center gap-3 py-2.5">
+                <div className="h-10 w-10 shrink-0 animate-pulse rounded-full bg-[#edf1f2] motion-reduce:animate-none dark:bg-white/10" />
+                <div className="flex-1 space-y-2"><div className="h-3 w-2/3 animate-pulse rounded bg-[#edf1f2] motion-reduce:animate-none dark:bg-white/10" /><div className="h-3 w-full animate-pulse rounded bg-[#edf1f2] motion-reduce:animate-none dark:bg-white/10" /></div>
+              </div>)}
+            </div>
+          ) : filteredConversations.length === 0 ? (
+            <p className="px-4 py-12 text-center text-[13px] text-[#5d6b73] dark:text-[#9aa4a8]">
+              {debouncedSearchQuery ? "No conversations match your search." : filterTab !== "all" ? "No conversations here yet." : "No conversations yet. Start one with New message."}
+            </p>
+          ) : (
+            <ul className="divide-y divide-[#eceef0] border-t border-[#eceef0] dark:divide-white/10 dark:border-white/10">
+              {filteredConversations.map((item) => {
+                const { otherParticipants, isGroup, primaryParticipant, ...conversation } = item;
+                const unreadCount = getUnreadCount(conversation as Conversation);
+                const isSelected = selectedConversationId === conversation.id;
+                const isOnline = !isGroup && primaryParticipant ? presenceMap[primaryParticipant.uid]?.status === "online" : false;
+                const displayName = isGroup ? getGroupDisplayName(otherParticipants, conversation.name) : primaryParticipant?.name || "Unknown";
+                const preview = conversation.lastMessagePreview || conversation.lastMessage
+                  || (isGroup ? `${otherParticipants.length + 1} members` : getParticipantRoleTag(primaryParticipant?.role || ""));
+                const time = conversationTime(conversation.lastMessageAt);
+                return (
+                  <li key={conversation.id}>
+                    <button type="button" onClick={() => onSelectConversation(conversation.id)} aria-current={isSelected ? "true" : undefined}
+                      className={cn("flex w-full cursor-pointer items-center gap-3 px-3 py-3 text-left transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#007679]",
+                        isSelected ? "bg-[#eef7f7] dark:bg-[#00a3a7]/15" : "hover:bg-[#f6f8f8] dark:hover:bg-white/5")}>
+                      <span className="relative shrink-0">
+                        {isGroup ? <span className="grid h-10 w-10 place-items-center rounded-full bg-[#e6f4f4] text-[#007679] dark:bg-[#00a3a7]/20 dark:text-[#7fe0e2]"><Users className="h-5 w-5" aria-hidden="true" /></span>
+                          : <Avatar className="h-10 w-10 rounded-full">
+                            <AvatarImage src={validateImageUrl(primaryParticipant?.avatar) || undefined} alt="" className="rounded-full object-cover" />
+                            <AvatarFallback className={cn("rounded-full text-[13px] font-semibold", isAdministrationRole(primaryParticipant?.role || "") ? "bg-[#003839] text-white" : "bg-[#e6f4f4] text-[#007679] dark:bg-[#00a3a7]/20 dark:text-[#7fe0e2]")}>{getInitials(displayName)}</AvatarFallback>
+                          </Avatar>}
+                        {isOnline && <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#20a35c] dark:border-[#1b232b]"><span className="sr-only">Online</span></span>}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="truncate text-[13.5px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">{displayName}</span>
+                          {time && <span className="shrink-0 text-[11.5px] text-[#8a979d] dark:text-[#9aa4a8]">{time}</span>}
+                        </span>
+                        <span className="mt-0.5 flex items-center justify-between gap-2">
+                          <span className={cn("truncate text-[12.5px]", unreadCount > 0 ? "font-medium text-[#10141a] dark:text-[#f4f6f7]" : "text-[#5d6b73] dark:text-[#9aa4a8]")}>
+                            {!isGroup && showAgencyName && primaryParticipant?.agencyName ? `${primaryParticipant.agencyName} · ${preview}` : preview}
+                          </span>
+                          {unreadCount > 0 && <span className="grid h-[18px] min-w-[18px] shrink-0 place-items-center rounded-full bg-[#007679] px-1 text-[11px] font-semibold text-white dark:bg-[#7fe0e2] dark:text-[#06292a]">
+                            {unreadCount > 9 ? "9+" : unreadCount}<span className="sr-only"> unread</span>
+                          </span>}
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {hasMore && onLoadMore && !loading && (
+            <div className="flex justify-center px-4 py-3">
+              <button type="button" onClick={() => void onLoadMore()} disabled={loadingMore}
+                className="cursor-pointer text-[13px] font-semibold text-[#007679] hover:underline disabled:cursor-not-allowed disabled:opacity-50 dark:text-[#7fe0e2]">
+                {loadingMore ? "Loading more..." : "Load more conversations"}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   if (variant === "panel") {
     return (

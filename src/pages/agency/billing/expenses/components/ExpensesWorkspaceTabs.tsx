@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { AgencySegmented } from "@/components/agency/AgencyListKit";
 
 export type ExpensesWorkspaceTab = "pending" | "all";
 
@@ -7,32 +7,20 @@ type ExpensesWorkspaceTabsProps = {
   onTabChange: (tab: ExpensesWorkspaceTab) => void;
 };
 
-const tabs: Array<{ id: ExpensesWorkspaceTab; label: string }> = [
-  { id: "pending", label: "Awaiting review" },
-  { id: "all", label: "All submissions" },
-];
-
 export default function ExpensesWorkspaceTabs({
   activeTab,
   onTabChange,
 }: ExpensesWorkspaceTabsProps) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {tabs.map((tab) => (
-        <button
-          key={tab.id}
-          type="button"
-          onClick={() => onTabChange(tab.id)}
-          className={cn(
-            "rounded-full border px-5 py-2 text-sm font-medium transition-colors cursor-pointer",
-            activeTab === tab.id
-              ? "border-[#00b4b8] bg-[#00b4b8] text-white"
-              : "border-[#e5e5e6] text-[#10141a] hover:border-[#00b4b8]/40 hover:bg-[#eef4f5]",
-          )}
-        >
-          {tab.label}
-        </button>
-      ))}
-    </div>
+    <AgencySegmented
+      label="Expense views"
+      value={activeTab}
+      onChange={onTabChange}
+      options={[
+        { value: "pending", label: "Awaiting review" },
+        { value: "all", label: "All submissions" },
+      ]}
+      className="w-fit"
+    />
   );
 }

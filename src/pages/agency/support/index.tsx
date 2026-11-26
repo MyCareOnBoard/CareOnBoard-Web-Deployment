@@ -6,29 +6,40 @@ import { AskSupportPanel } from "@/components/support/AskSupportPanel";
 import { SupportDesk } from "@/components/support/SupportDesk";
 import { ViewSwitch } from "@/components/support/ViewSwitch";
 import { useEffectiveAgencyMode } from "@/hooks/useEffectiveAgencyMode";
+import { isProgramScopedRole } from "@/lib/roleLabel";
 import { Routes } from "@/routes/constants";
 
 const BASE = Routes.agency.support;
-type View = "cases" | "messages" | "careonboard";
+type View = "messages" | "cases" | "careonboard";
+
+/** Field staff open on their DSP profile; other people have no agency profile page. */
+function profileHref(participant: { uid: string; role: string }) {
+  return isProgramScopedRole(participant.role) ? Routes.agency.dspProfile.replace(":dspId", encodeURIComponent(participant.uid)) : null;
+}
 
 /**
- * Agency Support: the support desk your staff's questions land on (the assistant
- * answers first), direct messages, and a way to ask CareOnboard for help.
+ * Agency Support: messages with DSPs, office staff and CareOnboard (the default
+ * view), the support desk your staff's questions land on (the assistant answers
+ * first), and a way to ask CareOnboard for help.
  */
 export default function AgencySupportPage() {
   const programMode = useEffectiveAgencyMode();
   const { conversationId } = useParams<{ conversationId?: string }>();
   const [searchParams] = useSearchParams();
   const requested = searchParams.get("view");
-  const view: View = conversationId || requested === "messages" ? "messages" : requested === "careonboard" ? "careonboard" : "cases";
+  // A ?case= link (from a notification) opens that case on the desk.
+  const view: View = conversationId ? "messages"
+    : requested === "cases" || (!requested && searchParams.has("case")) ? "cases"
+    : requested === "careonboard" ? "careonboard"
+    : "messages";
 
   const switcher = (
     <ViewSwitch
       label="Support views"
       value={view}
       options={[
-        { value: "cases", label: "Staff cases", to: BASE },
-        { value: "messages", label: "Messages", to: `${BASE}?view=messages` },
+        { value: "messages", label: "Messages", to: BASE },
+        { value: "cases", label: "Staff cases", to: `${BASE}?view=cases` },
         { value: "careonboard", label: "Ask CareOnboard", to: `${BASE}?view=careonboard` },
       ]}
     />
@@ -37,12 +48,15 @@ export default function AgencySupportPage() {
   if (view === "messages") {
     return (
       <MessagingPage
+        variant="agency"
         pageTitle="Support"
+        pageIcon={LifeBuoy}
+        pageDescription="Messages with DSPs, office staff and CareOnboard administration."
         basePath={BASE}
-        buttonColor="#2563eb"
         showFilterTabs={true}
         programMode={programMode}
         headerSlot={switcher}
+        getProfileHref={profileHref}
       />
     );
   }
@@ -54,12 +68,13 @@ export default function AgencySupportPage() {
         title="Support"
         description={view === "careonboard"
           ? "Questions for the CareOnboard team about the platform, billing or your account."
-          : "Your staff's questions. The assistant answers from your help articles first and hands the rest to your support team."}
+          : "Your staff's questions. The assistant answers first and hands the rest to your team."}
         actions={switcher}
       />
       {view === "careonboard" ? (
         <div className="flex min-h-[600px] flex-1 flex-col">
           <AskSupportPanel
+            variant="agency"
             deskName="CareOnboard"
             contextPage={BASE}
             showUrgentOption={false}
@@ -67,7 +82,7 @@ export default function AgencySupportPage() {
           />
         </div>
       ) : (
-        <SupportDesk desk="agency" />
+        <SupportDesk desk="agency" variant="agency" />
       )}
     </div>
   );

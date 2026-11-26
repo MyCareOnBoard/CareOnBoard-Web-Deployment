@@ -1,33 +1,35 @@
+import { CircleCheck, CircleX, FileText, Hourglass } from "lucide-react";
 import BillingOverviewCards from "../../components/BillingOverviewCards";
 import type { BillingOverviewStat } from "../../components/types";
 
 type ExpensesOverviewCardsProps = {
+  /** Dashboard stats by id: submitted, awaiting-review, approved, declined (amount as value, count). */
   stats: BillingOverviewStat[];
   loading?: boolean;
 };
 
-function OverviewCardSkeleton() {
-  return (
-    <div className="flex h-[77px] min-w-[199px] flex-[1_1_199px] animate-pulse flex-col justify-center rounded-[8px] border border-[#e5e5e6] bg-white px-4 py-[11px]">
-      <div className="h-5 w-24 rounded bg-[#eef4f5]" />
-      <div className="mt-2 h-4 w-32 rounded bg-[#eef4f5]" />
-    </div>
-  );
+const ICONS: Record<string, BillingOverviewStat["icon"]> = {
+  submitted: FileText,
+  "awaiting-review": Hourglass,
+  approved: CircleCheck,
+  declined: CircleX,
+};
+
+function footnote(stat: BillingOverviewStat) {
+  const count = stat.count ?? 0;
+  if (stat.id === "declined" && count === 0) return "Nothing declined.";
+  if (stat.id === "submitted") return `${stat.value} this period.`;
+  if (stat.id === "approved") return `${stat.value}, joins the next pay run.`;
+  return `${stat.value}.`;
 }
 
 export default function ExpensesOverviewCards({ stats, loading = false }: ExpensesOverviewCardsProps) {
-  if (loading) {
-    return (
-      <section>
-        <h2 className="mb-4 text-[16px] font-semibold text-[#10141a]">Overview</h2>
-        <div className="flex flex-wrap gap-6">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <OverviewCardSkeleton key={index} />
-          ))}
-        </div>
-      </section>
-    );
-  }
-
-  return <BillingOverviewCards stats={stats} showCountBadge />;
+  const tiles = stats.map<BillingOverviewStat>((stat) => ({
+    id: stat.id,
+    label: stat.label,
+    icon: ICONS[stat.id],
+    value: (stat.count ?? 0).toLocaleString(),
+    footnote: footnote(stat),
+  }));
+  return <BillingOverviewCards stats={tiles} loading={loading} skeletonCount={4} />;
 }

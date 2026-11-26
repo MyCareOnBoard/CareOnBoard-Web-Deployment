@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -56,6 +56,9 @@ vi.mock("@/lib/api/billing-expenses", () => ({
   useApproveExpenseMutation: () => [expenseApi.approve, { isLoading: false }],
   useRejectExpenseMutation: () => [expenseApi.reject, { isLoading: false }],
   useDeleteExpenseMutation: () => [expenseApi.remove, { isLoading: false }],
+  useGetExpenseReviewQuery: () => ({ currentData: undefined, isFetching: false, isError: false }),
+  useGetExpenseSettingsQuery: () => ({ currentData: undefined, isError: false }),
+  useUpdateExpenseSettingsMutation: () => [vi.fn(), { isLoading: false }],
 }));
 vi.mock("@/lib/api/staff-timesheets", () => ({
   listStaffTimesheets: timesheetApi.list,
@@ -375,6 +378,8 @@ describe("super-admin expense and submitted-timesheet parity", () => {
 
     view.rerender(<Scope actor="super_admin" agency={beacon}><StaffTimesheetsApprovalPage /></Scope>);
     expect(atlasSignal?.aborted).toBe(true);
+    // The board opens on pending timesheets; Bea's approved one sits under "Approved".
+    fireEvent.click(await screen.findByRole("button", { name: /^Approved/, pressed: false }));
     expect(await screen.findByText("Bea Beacon")).toBeVisible();
     ui.toast.mockClear();
     await act(async () => atlasLoad.resolve({ timesheets: [pendingTimesheet], total: 1 }));

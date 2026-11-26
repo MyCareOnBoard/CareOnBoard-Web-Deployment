@@ -605,7 +605,7 @@ describe("SuperAdminBillingWorkspace", () => {
       <FinancialOverviewPage />,
     );
 
-    const financialDateControl = await screen.findByRole("button", { name: "July 1 - July 31, 2026" });
+    const financialDateControl = await screen.findByRole("button", { name: "Period: 1 Jul – 31 Jul 2026" });
     expect(financialDateControl).toBeVisible();
     expect(billingApi.listBillingClaims).toHaveBeenCalledWith(expect.objectContaining({
       query: expect.objectContaining({ startDate: "2026-07-01", endDate: "2026-07-31" }),
@@ -622,7 +622,7 @@ describe("SuperAdminBillingWorkspace", () => {
     await user.click(screen.getByRole("button", { name: "Last 7 days" }));
     await user.click(screen.getByRole("button", { name: "Use this date range" }));
 
-    expect(await screen.findByRole("button", { name: "July 27 - August 3, 2026" })).toBeVisible();
+    expect(await screen.findByRole("button", { name: "Period: 27 Jul – 3 Aug 2026" })).toBeVisible();
     await waitFor(() => expect(billingApi.listBillingClaims).toHaveBeenCalledWith(expect.objectContaining({
       query: expect.objectContaining(expectedRange),
     })));

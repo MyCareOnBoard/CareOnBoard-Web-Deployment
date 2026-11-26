@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
@@ -107,7 +107,7 @@ describe("NetworkFinancialOverview", () => {
       tab: "overview",
     }, expect.any(Object));
     expect(agencyOverview).not.toHaveBeenCalled();
-    expect(screen.getByText("$1,200.00")).toBeVisible();
+    expect(within(screen.getByRole("region", { name: "Overview" })).getByText("$1,200.00")).toBeVisible();
   });
 
   it("uses the shared overview structure for an initial skeleton", () => {
@@ -115,7 +115,7 @@ describe("NetworkFinancialOverview", () => {
     renderWithWorkspace(<NetworkFinancialOverview />);
 
     expect(screen.getByRole("region", { name: "Network financial overview" })).toHaveAttribute("aria-busy", "true");
-    expect(screen.getByText("Overview")).toBeVisible();
+    expect(screen.getByRole("region", { name: "Overview" })).toHaveAttribute("aria-busy", "true");
     expect(screen.getByText("Claims by status")).toBeVisible();
     expect(screen.getByText("Payroll summary")).toBeVisible();
     expect(screen.getByText("Recent activity")).toBeVisible();
@@ -225,7 +225,7 @@ describe("NetworkFinancialOverview", () => {
     api.overview.mockReturnValue(queryResult({ isFetching: true }));
     renderWithWorkspace(<NetworkFinancialOverview />);
 
-    expect(screen.getByText("$1,200.00")).toBeVisible();
+    expect(within(screen.getByRole("region", { name: "Overview" })).getByText("$1,200.00")).toBeVisible();
     expect(screen.getAllByText("Atlas Care").length).toBeGreaterThan(0);
     expect(screen.getByRole("region", { name: "Network financial overview" })).toHaveAttribute("aria-busy", "true");
   });

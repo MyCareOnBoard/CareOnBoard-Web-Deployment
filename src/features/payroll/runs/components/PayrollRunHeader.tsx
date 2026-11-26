@@ -37,24 +37,21 @@ export function PayrollRunHeader({ run, activeOperation, headingRef }: {
   headingRef?: Ref<HTMLHeadingElement>;
 }) {
   return (
-    <header className="flex flex-col gap-4 border-b border-[#e5e5e6] pb-5 sm:flex-row sm:items-end sm:justify-between">
+    <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#007f83]">
-          Payroll management
-        </p>
-        <h2 ref={headingRef} tabIndex={-1} className="mt-1 rounded text-2xl font-semibold tracking-[-0.02em] text-[#10141a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2">
+        <h2 ref={headingRef} tabIndex={-1} className="rounded text-base font-semibold text-[#10141a] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] dark:text-[#f4f6f7]">
           Current payroll
         </h2>
-        <p className="mt-2 text-sm text-[#62686f]">
+        <p className="mt-1 text-sm text-[#5b636b] dark:text-[#9aa4a8]">
           {dateLabel(run.periodStart)} – {dateLabel(run.periodEnd)} · Payday {dateLabel(run.payday)}
         </p>
         {activeOperation ? (
-          <p className="mt-2 text-sm font-medium text-[#007f83]" aria-live="polite">
+          <p className="mt-1 text-sm font-medium text-[#007679] dark:text-[#7fd3d3]" aria-live="polite">
             {operationLabel(activeOperation)}
           </p>
         ) : null}
       </div>
-      <span className="self-start rounded-full bg-[#e9f6f6] px-3 py-1.5 text-xs font-semibold text-[#006f73] sm:self-auto">
+      <span className="inline-flex h-6 items-center self-start rounded-[6px] bg-[#e0f3f3] px-2 text-[12px] font-medium text-[#005c5e] sm:self-auto dark:bg-[#0f7e7d]/20 dark:text-[#7fd3d3]">
         {workflowLabel(run.workflowState)}
       </span>
     </header>

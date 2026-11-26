@@ -25,13 +25,34 @@ const doc = (over: Partial<GoalDocument>): GoalDocument => ({
 const cardFor = (cards: ReturnType<typeof buildGoalFormCards>, key: string) => cards.find((c) => c.form.key === key)!;
 
 describe("goal form cards", () => {
-    it("marks forms the client's services call for as due, and the rest as not started", () => {
+    it("shows only the forms the client's services call for", () => {
         const cards = buildGoalFormCards({ client, clientId: "c1", documents: [], now });
+        expect(cards.map((c) => c.form.key)).toEqual(["ci_goals", "day_goals", "ci_annual", "day_annual"]);
         expect(cardFor(cards, "ci_goals")).toMatchObject({ state: "due", detail: "Due 1 Dec 2026", action: "fill", href: expect.stringContaining("clientId=c1") });
-        expect(cardFor(cards, "prevoc_goals")).toMatchObject({ state: "not_started", applies: false });
         // Plan year ends 10 Jan, inside the 60-day window.
         expect(cardFor(cards, "ci_annual")).toMatchObject({ state: "due", detail: "Due 10 Jan 2027" });
-        expect(cards).toHaveLength(GOAL_FORMS.length);
+    });
+
+    it("hides CI forms, even with saved documents, when the client has no Community Inclusion service", () => {
+        const dayOnly = { ...client, services: [client.services![1]], outcomes: [client.outcomes![1]] } as Client;
+        const saved = doc({ status: SubmissionStatus.SUBMITTED, submittedAt: "2026-11-10T00:00:00Z" });
+        const cards = buildGoalFormCards({ client: dayOnly, clientId: "c1", documents: [saved], now });
+        expect(cards.map((c) => c.form.key)).toEqual(["day_goals", "day_annual"]);
+    });
+
+    it("matches prevocational, career planning and natural supports services by name", () => {
+        const other = { ispPeriod: client.ispPeriod, services: [
+            { id: "p", name: "Prevocational Training" },
+            { id: "cp", name: "Career Planning" },
+            { id: "ns", name: "Natural Supports Training" },
+        ] } as unknown as Client;
+        const keys = buildGoalFormCards({ client: other, clientId: "c1", documents: [], now }).map((c) => c.form.key);
+        expect(keys).toEqual(["career_planning", "natural_supports", "prevoc_goals", "prevoc_annual"]);
+    });
+
+    it("shows no forms for a client without matching services", () => {
+        expect(buildGoalFormCards({ client: { services: [], outcomes: [] } as unknown as Client, clientId: "c1", documents: [], now })).toEqual([]);
+        expect(buildGoalFormCards({ client: null, clientId: "c1", documents: [], now })).toEqual([]);
     });
 
     it("shows submitted CI goals as needing approval until approved, then completed", () => {

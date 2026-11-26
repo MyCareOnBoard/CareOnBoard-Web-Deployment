@@ -39,7 +39,7 @@ export default function SavedClaimsClientGroupHeader({
   }
 
   return (
-    <div className="flex items-center gap-3 border-b border-[#e5e5e6] bg-[#eef4f5] px-4 py-3 pr-8">
+    <div className="flex items-center gap-3 border-b border-[#eceef0] bg-[#f4f9f9] px-4 py-3 pr-8 dark:bg-white/5">
       {providerFree ? <ProviderFreeClientName name={clientName} className="text-[14px] font-semibold text-[#10141a]" /> : <ClientNameLink name={clientName} clientId={clientId} className="text-[14px] font-semibold text-[#10141a]" />}
       {outOfPocket ? <OutOfPocketBadge /> : <PayerInsuranceBadge />}
       <span className="shrink-0 text-[13px] text-[#808081]">{label}</span>

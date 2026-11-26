@@ -165,6 +165,45 @@ export function mapDashboardToOverviewStats(
   });
 }
 
+export type FinancialKpis = {
+  billedAmount: number;
+  billedCount: number;
+  billedTrend?: TrendBadge;
+  pendingAmount: number;
+  pendingCount: number;
+  atRiskAmount: number;
+  payrollAmount: number;
+  payrollRunCount: number;
+  payrollEmployeeCount: number;
+  /** Share of billed revenue left after payroll, in percent. Null when nothing was billed. */
+  grossMarginPercent: number | null;
+};
+
+/** Headline figures of the financial overview: billed revenue, pending claims, payroll and gross margin. */
+export function mapFinancialKpis(
+  current: ClaimsDashboardSummary | null,
+  previous: ClaimsDashboardSummary | null,
+  payrollRuns: readonly PayrollRun[],
+): FinancialKpis {
+  const billedAmount = current?.overview.submitted.amount ?? 0;
+  const payrollAmount = payrollRuns.reduce((sum, run) => sum + run.totals.totalDueCents, 0) / 100;
+  const billedTrend = previous
+    ? computeTrend(billedAmount, previous.overview.submitted.amount ?? 0)
+    : undefined;
+  return {
+    billedAmount,
+    billedCount: current?.overview.submitted.count ?? 0,
+    billedTrend,
+    pendingAmount: current?.overview.pending.amount ?? 0,
+    pendingCount: current?.overview.pending.count ?? 0,
+    atRiskAmount: current?.overview.atRisk.amount ?? 0,
+    payrollAmount,
+    payrollRunCount: payrollRuns.length,
+    payrollEmployeeCount: payrollRuns.reduce((max, run) => Math.max(max, run.employeeCount ?? 0), 0),
+    grossMarginPercent: billedAmount > 0 ? ((billedAmount - payrollAmount) / billedAmount) * 100 : null,
+  };
+}
+
 export function mapPayrollRunsToFinancialPayrollChart(
   runs: readonly PayrollRun[],
 ): FinancialPayrollChartData {
@@ -276,4 +315,35 @@ export function buildRecentActivity(
     .sort((left, right) => new Date(right.sortKey).getTime() - new Date(left.sortKey).getTime())
     .slice(0, limit)
     .map(({ sortKey: _sortKey, ...activity }) => activity);
+}
+
+const csvCell = (value: string | number) => {
+  const text = String(value);
+  // Neutralise spreadsheet formulas (numbers, including negative ones, stay numbers) and quote every cell.
+  const safe = typeof value === "string" && /^[=+\-@\t\r]/.test(text) && !/^-?\d+(\.\d+)?$/.test(text) ? `'${text}` : text;
+  return `"${safe.replace(/"/g, '""')}"`;
+};
+
+/** CSV of the overview as shown: the headline figures, then the recent activity rows. */
+export function financialSummaryCsv(
+  range: DateRangeValues,
+  kpis: FinancialKpis,
+  activity: readonly RecentActivity[],
+): string {
+  const money = (value: number) => value.toFixed(2);
+  const rows: (string | number)[][] = [
+    ["Period start", range.startDate],
+    ["Period end", range.endDate],
+    [],
+    ["Figure", "Value (USD)", "Count"],
+    ["Billed revenue", money(kpis.billedAmount), kpis.billedCount],
+    ["Pending claims", money(kpis.pendingAmount), kpis.pendingCount],
+    ["Claims at risk", money(kpis.atRiskAmount), ""],
+    ["Payroll this period", money(kpis.payrollAmount), kpis.payrollRunCount],
+    ["Gross margin (%)", kpis.grossMarginPercent === null ? "" : kpis.grossMarginPercent.toFixed(1), ""],
+    [],
+    ["Activity", "Type", "Amount (USD)", "Date", "Status"],
+    ...activity.map((row) => [row.description, row.module, money(row.amount), row.date, row.status]),
+  ];
+  return rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
 }

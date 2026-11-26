@@ -8,12 +8,13 @@ import { AgencyCareHome } from "./AgencyCareHome";
 
 vi.mock("./AgencyCareLayout", () => ({ useAgencyCare: vi.fn() }));
 vi.mock("@/utils/auth/context/AuthContext", () => ({ useAuth: () => ({ user: { uid: "sc" } }) }));
-vi.mock("@/lib/api/agencyCare", () => ({ agencyCareApi: { dashboard: vi.fn(), networks: vi.fn() } }));
+vi.mock("@/lib/api/agencyCare", () => ({ agencyCareApi: { dashboard: vi.fn(), networks: vi.fn(), unconnectedClients: vi.fn() } }));
 const client: CareDashboardClient = { networkId: "one", clientName: "John Smith", lifecycle: "active", pendingDocuments: 2, pendingUpdates: 1, publicationActionCount: 1 };
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(useAgencyCare).mockReturnValue({ scope: "sc|internal:sc|1", agencyKey: "internal:sc", organization: { name: "Test SC" } } as ReturnType<typeof useAgencyCare>);
+  vi.mocked(useAgencyCare).mockReturnValue({ scope: "sc|internal:sc|1", agencyKey: "internal:sc", organization: { name: "Test SC", canConnectClients: true } } as ReturnType<typeof useAgencyCare>);
   vi.mocked(agencyCareApi.dashboard).mockResolvedValue({ items: [client], nextCursor: null });
+  vi.mocked(agencyCareApi.unconnectedClients).mockResolvedValue({ items: [], nextCursor: null });
 });
 function metric(label: string) { return screen.getByText(label).closest("div")!; }
 
@@ -82,4 +83,26 @@ it("keeps the client list separate, paginated, and linked to client workspaces",
   expect(await screen.findByRole("link", { name: /John Smith/ })).toHaveAttribute("href", "/agency-care/networks/one/overview");
   fireEvent.click(screen.getByRole("button", { name: "Next page" }));
   await waitFor(() => expect(agencyCareApi.networks).toHaveBeenLastCalledWith(expect.objectContaining({ cursor: "next" })));
+});
+
+it("shows family members and the last update, and leaves the family column out for partner organizations", async () => {
+  vi.mocked(agencyCareApi.dashboard).mockResolvedValueOnce({ nextCursor: null, items: [
+    { ...client, lastActivityAt: "2026-11-20T15:00:00.000Z", familyContacts: [{ name: "Mary Smith", relationship: "Mother" }, { name: "Sam Smith" }] },
+    { ...client, networkId: "two", clientName: "Ada Jones", lastActivityAt: null, familyContacts: [] },
+  ] });
+  const { unmount } = render(<MemoryRouter><AgencyCareDashboard /></MemoryRouter>);
+  const john = (await screen.findByText("John Smith")).closest("tr")!;
+  expect(screen.getByRole("columnheader", { name: "Family members" })).toBeInTheDocument();
+  expect(within(john).getByText("Mary Smith")).toBeInTheDocument();
+  expect(within(john).getByText(/\+1/)).toBeInTheDocument();
+  expect(within(john).getByText(new Date("2026-11-20T15:00:00.000Z").toLocaleDateString(undefined, { dateStyle: "medium" }))).toBeInTheDocument();
+  const ada = screen.getByText("Ada Jones").closest("tr")!;
+  expect(within(ada).getByText("None added")).toBeInTheDocument();
+  expect(within(ada).getByText("No activity yet")).toBeInTheDocument();
+  unmount();
+  vi.mocked(agencyCareApi.dashboard).mockResolvedValueOnce({ nextCursor: null, items: [{ ...client, familyContacts: null }] });
+  render(<MemoryRouter><AgencyCareDashboard /></MemoryRouter>);
+  await screen.findByText("John Smith");
+  expect(screen.queryByRole("columnheader", { name: "Family members" })).not.toBeInTheDocument();
+  expect(screen.getByRole("columnheader", { name: "Last update" })).toBeInTheDocument();
 });

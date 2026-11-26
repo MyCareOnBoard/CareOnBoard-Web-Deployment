@@ -283,6 +283,12 @@ export default function GoalsAndDocumentsPage() {
                         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                             {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-[150px] rounded-[14px]" />)}
                         </div>
+                    ) : cards.length === 0 ? (
+                        <div className="flex flex-col items-center rounded-[14px] border border-dashed border-[#dcdfe2] px-6 py-10 text-center dark:border-white/15">
+                            <p className="text-base font-medium text-[#10141a] dark:text-[#f4f6f7]">No goals or documents apply to this client</p>
+                            <p className="mt-1 max-w-md text-sm text-[#5b636b] dark:text-[#9aa4a8]">Forms show here for the client's services: Community Inclusion, Day Habilitation, Prevocational Training, Career Planning and Natural Supports Training.</p>
+                            <Link to={`${Routes.agency.clientDetails.replace(":clientId", encodeURIComponent(clientId))}?tab=services`} className="mt-4 text-sm font-medium text-[#0b5c5d] underline underline-offset-2 dark:text-[#7fd3d3]">Review the client's services</Link>
+                        </div>
                     ) : visible.length === 0 ? (
                         <p className="rounded-[14px] border border-dashed border-[#dcdfe2] px-6 py-10 text-center text-sm text-[#5b636b] dark:border-white/15 dark:text-[#9aa4a8]">
                             {search ? "No forms match your search." : tab === "due" ? "Nothing is due for this client." : "No completed forms yet."}

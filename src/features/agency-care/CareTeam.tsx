@@ -16,6 +16,7 @@ import {
 } from "@/lib/api/agencyCare";
 import { useAgencyCare } from "./AgencyCareLayout";
 import type { CareWorkspaceProps } from "./AgencyCareClientWorkspace";
+import { CareSourceRecordFields } from "./CareSourceRecordFields";
 import { CareStaffAssignments } from "./CareStaffAssignments";
 import { careRoleLabel } from "./ui";
 import { hasCapability, useScopedMutation, useScopedRequest } from "./hooks";
@@ -443,6 +444,10 @@ export function TeamForm({
       setFormError("A reason is required.");
       return;
     }
+    if (modal.kind === "source" && !modal.target && organization.kind === "internal" && (!clientId || !programs.length)) {
+      setFormError(!clientId ? "Search for your client record and select it." : "Select at least one program to confirm.");
+      return;
+    }
     if (modal.kind === "source" && !confirmed) {
       setFormError("Confirm the intended client identity before continuing.");
       return;
@@ -829,81 +834,28 @@ export function TeamForm({
                     <dd>{careLabel(modal.target.state)}</dd>
                   </dl>
                 ) : organization.kind === "internal" ? (
-                  <>
-                    <div className="ac-actions">
-                      <label className="ac-field">
-                        <span>Find your existing client record</span>
-                        <Input
-                          value={queryInput}
-                          onChange={(event) => setQueryInput(event.target.value)}
-                          maxLength={80}
-                        />
-                      </label>
-                      <Button
-                        variant="outline"
-                        type="button"
-                        onClick={() => setQuery(queryInput.trim())}
-                        disabled={queryInput.trim().length < 2}
-                      >
-                        Search
-                      </Button>
-                    </div>
-                    {localClients.loading ? (
-                      <CareLoad rows={1} />
-                    ) : localClients.error ? (
-                      <CareFailure
-                        message={localClients.error}
-                        onRetry={localClients.reload}
-                      />
-                    ) : (
-                      <label className="ac-field">
-                        <span>Existing client record</span>
-                        <select
-                          required
-                          value={clientId}
-                          onChange={(event) => setClientId(event.target.value)}
-                        >
-                          <option value="">Select a record</option>
-                          {localClients.data?.map((client) => (
-                            <option key={client.id} value={client.id}>
-                              {[client.firstName, client.lastName]
-                                .filter(Boolean)
-                                .join(" ")}{" "}
-                              · {(client.servicePrograms || []).join(", ")}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    )}
-                    <fieldset>
-                      <legend>Programs to confirm</legend>
-                      <div className="ac-check-list">
-                        {["ddd", "hha"].map((value) => (
-                          <label key={value}>
-                            <input
-                              type="checkbox"
-                              checked={programs.includes(value)}
-                              onChange={(event) =>
-                                setPrograms((current) =>
-                                  event.target.checked
-                                    ? [...current, value]
-                                    : current.filter((item) => item !== value),
-                                )
-                              }
-                            />
-                            {value.toUpperCase()}
-                          </label>
-                        ))}
-                      </div>
-                    </fieldset>
-                  </>
+                  <CareSourceRecordFields
+                    careClientName={network.client.name}
+                    careAgencyName={organization.name}
+                    onSearch={setQuery}
+                    searching={localClients.loading}
+                    searchError={localClients.error}
+                    onRetry={localClients.reload}
+                    records={localClients.data}
+                    clientId={clientId}
+                    onClientId={setClientId}
+                    programs={programs}
+                    onPrograms={setPrograms}
+                    confirmed={confirmed}
+                    onConfirmed={setConfirmed}
+                  />
                 ) : (
                   <CareNotice>
                     An external care organization can participate without an
                     operational client record.
                   </CareNotice>
                 )}
-                <label className="ac-check">
+                {(modal.target || organization.kind !== "internal") && <label className="ac-check">
                   <input
                     type="checkbox"
                     required
@@ -915,7 +867,7 @@ export function TeamForm({
                       ? "I confirm withdrawal of this destination connection. Existing publication receipts remain in history."
                       : "I verified that these records refer to the same individual. The other agency must confirm before publication."}
                   </span>
-                </label>
+                </label>}
               </>
             )}
             {(modal.kind === "relationship" ||

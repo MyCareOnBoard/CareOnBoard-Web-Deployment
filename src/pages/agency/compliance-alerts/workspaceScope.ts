@@ -8,7 +8,8 @@ export type Source =
   | "unsigned_form485"
   | "shift_notes"
   | "documentation_patterns"
-  | "community_inclusion";
+  | "community_inclusion"
+  | "service_authorizations";
 export type Section = "staff" | "clients" | "shifts" | "patterns";
 export interface ComplianceView {
   initialRunId?: string;
@@ -59,6 +60,7 @@ export const sourceSection: Record<Source, Section> = {
   shift_notes: "shifts",
   documentation_patterns: "patterns",
   community_inclusion: "shifts",
+  service_authorizations: "clients",
 };
 export const sourceLabels: Record<Source, string> = {
   document_expiry: "Staff compliance",
@@ -69,6 +71,7 @@ export const sourceLabels: Record<Source, string> = {
   shift_notes: "Shift notes",
   documentation_patterns: "Patterns",
   community_inclusion: "Community inclusion",
+  service_authorizations: "Service authorizations",
 };
 const validPrograms = (value: unknown): value is string[] =>
   Array.isArray(value) &&
@@ -133,6 +136,7 @@ export function getComplianceSources(
     sources.push("shift_notes");
   if (mode !== "sc" && has("Notes")) sources.push("documentation_patterns");
   if (mode === "ddd" && has("Notes")) sources.push("community_inclusion");
+  if (mode !== "sc" && has("Client Management")) sources.push("service_authorizations");
   return sources;
 }
 export const validComplianceId = (value: string) =>
@@ -183,6 +187,8 @@ export function parseComplianceView(params: URLSearchParams): ViewParseResult {
               ? ["findingStatus", "severity", "ruleId", "employeeId"]
             : source === "community_inclusion"
               ? ["startDate"]
+            : source === "service_authorizations"
+              ? ["clientId", "condition"]
               : ["employeeId", "shiftId", "stateGroup", "startDate", "endDate"]),
   ];
   if (Object.keys(raw).some((key) => !allowed.includes(key) || raw[key] === ""))

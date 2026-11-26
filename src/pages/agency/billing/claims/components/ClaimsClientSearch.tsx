@@ -80,7 +80,7 @@ export default function ClaimsClientSearch({ onFilterChange }: ClaimsClientSearc
 
   return (
     <div className="relative w-full lg:w-[320px]">
-      <div className="flex h-11 items-center rounded-xl border border-[#cccccd] bg-white px-4">
+      <div className="flex h-10 items-center rounded-[10px] border border-[#dcdfe2] bg-white px-3.5 focus-within:border-[#007679] focus-within:ring-2 focus-within:ring-[#007679]/15 dark:border-white/15 dark:bg-[#151c22]">
         <input
           type="text"
           value={query}

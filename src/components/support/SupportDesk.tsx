@@ -45,7 +45,13 @@ const STATUS_FILTERS: { value: StatusFilter; label: string; count: keyof Support
  * knowledge base and the desk's reports. Used by agencies (desk "agency") and by
  * CareOnboard's super admins (desk "corporate").
  */
-export function SupportDesk({ desk, headerSlot }: { desk: Desk; headerSlot?: ReactNode }) {
+export function SupportDesk({ desk, headerSlot, variant = "default" }: {
+  desk: Desk;
+  headerSlot?: ReactNode;
+  /** "agency" is the agency Support look: one card split into the queue and the case. */
+  variant?: "default" | "agency";
+}) {
+  const agency = variant === "agency";
   const { user } = useAuth();
   const myUid = (user as { uid?: string } | null)?.uid;
   const [searchParams, setSearchParams] = useSearchParams();
@@ -145,10 +151,10 @@ export function SupportDesk({ desk, headerSlot }: { desk: Desk; headerSlot?: Rea
         <div className="flex flex-wrap items-center gap-3">
           {headerSlot}
           {!notOnTeam && (
-            <nav aria-label="Support desk sections" className="inline-flex rounded-full bg-[#eef2f3] p-1 dark:bg-white/10">
+            <nav aria-label="Support desk sections" className={cn("inline-flex p-1", agency ? "rounded-[10px] bg-[#f1f3f4] dark:bg-white/5" : "rounded-full bg-[#eef2f3] dark:bg-white/10")}>
               {(["cases", "articles", "reports"] as const).map((value) => (
                 <button key={value} type="button" aria-pressed={tab === value} onClick={() => setTab(value)}
-                  className={cn("inline-flex h-8 cursor-pointer items-center rounded-full px-3.5 text-[13px] font-medium", tab === value ? "bg-white text-[#10141a] shadow-[0_1px_2px_rgba(16,40,44,0.12)] dark:bg-[#2a3138] dark:text-[#f4f6f7]" : "text-[#5d6b73] hover:text-[#10141a] dark:text-[#9aa4a8]")}>
+                  className={cn("inline-flex h-8 cursor-pointer items-center px-3.5 text-[13px] font-medium", agency ? "rounded-[8px]" : "rounded-full", tab === value ? "bg-white text-[#10141a] shadow-[0_1px_2px_rgba(16,40,44,0.12)] dark:bg-[#2a3138] dark:text-[#f4f6f7]" : "text-[#5d6b73] hover:text-[#10141a] dark:text-[#9aa4a8]")}>
                   {value === "cases" ? "Cases" : value === "articles" ? "Knowledge base" : "Reports"}
                 </button>
               ))}
@@ -173,14 +179,14 @@ export function SupportDesk({ desk, headerSlot }: { desk: Desk; headerSlot?: Rea
       ) : tab === "reports" ? (
         <SupportReportsPanel desk={desk} />
       ) : (
-        <div className="grid min-h-[560px] flex-1 gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
-          <section aria-label="Cases" className={cn("min-h-0 flex-col", selectedId ? "hidden lg:flex" : "flex")}>
+        <div className={cn("grid min-h-[560px] flex-1", agency ? "overflow-hidden rounded-[16px] border border-[#e4e7ea] bg-white lg:grid-cols-[340px_minmax(0,1fr)] dark:border-white/10 dark:bg-[#1b232b]" : "gap-4 lg:grid-cols-[340px_minmax(0,1fr)]")}>
+          <section aria-label="Cases" className={cn("min-h-0 flex-col", agency && "p-3 lg:border-r lg:border-[#eceef0] dark:lg:border-white/10", selectedId ? "hidden lg:flex" : "flex")}>
             <div className="mb-2 flex flex-wrap gap-1.5" role="group" aria-label="Filter by status">
               {STATUS_FILTERS.map((option) => {
                 const active = (filters.status ?? "open") === option.value;
                 return (
                   <button key={option.value} type="button" aria-pressed={active} onClick={() => setFilters({ ...filters, status: option.value })}
-                    className={cn("inline-flex h-7 cursor-pointer items-center gap-1 rounded-full border px-2.5 text-[12px] font-medium", active ? "border-[#007679] bg-[#007679] text-white" : "border-[#e3e8ea] text-[#10141a] hover:bg-[#f3f5f6] dark:border-white/15 dark:text-[#f4f6f7]")}>
+                    className={cn("inline-flex h-7 cursor-pointer items-center gap-1 rounded-full border px-2.5 text-[12px] font-medium", active ? (agency ? "border-[#003839] bg-[#003839] text-white dark:border-[#00a3a7] dark:bg-[#00a3a7] dark:text-[#06292a]" : "border-[#007679] bg-[#007679] text-white") : "border-[#e3e8ea] text-[#10141a] hover:bg-[#f3f5f6] dark:border-white/15 dark:text-[#f4f6f7]")}>
                     {option.label}
                     {queue && <span className={cn("tabular-nums", active ? "text-white/85" : "text-[#5d6b73]")}>{queue.counts[option.count] ?? 0}</span>}
                   </button>
@@ -226,14 +232,15 @@ export function SupportDesk({ desk, headerSlot }: { desk: Desk; headerSlot?: Rea
               <label htmlFor={`${desk}-search`} className="sr-only">Search cases</label>
               <input id={`${desk}-search`} value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="Search by name, case number or text" className={cn(fieldClass, "pl-8")} />
             </span>
-            <CaseQueueList queue={queue} error={queueError?.message} selectedId={selectedId} onSelect={selectCase} desk={desk} />
+            <CaseQueueList queue={queue} error={queueError?.message} selectedId={selectedId} onSelect={selectCase} desk={desk} agency={agency} />
           </section>
 
-          <section aria-label="Case" className={cn("min-h-0 flex-col rounded-[16px] border border-[#e3e8ea] dark:border-white/10", selectedId ? "flex" : "hidden lg:flex")}>
+          <section aria-label="Case" className={cn("min-h-0 flex-col", agency ? "bg-[#f5f7f7] dark:bg-[#141b21]" : "rounded-[16px] border border-[#e3e8ea] dark:border-white/10", selectedId ? "flex" : "hidden lg:flex")}>
             {open ? (
               <CaseDetail
                 detail={open}
                 desk={desk}
+                agency={agency}
                 myUid={myUid}
                 team={queue?.team ?? []}
                 categories={queue?.categories ?? []}
@@ -270,7 +277,7 @@ export function SupportDesk({ desk, headerSlot }: { desk: Desk; headerSlot?: Rea
   );
 }
 
-function CaseQueueList({ queue, error, selectedId, onSelect, desk }: { queue: SupportQueue | null; error?: string; selectedId: string | null; onSelect: (id: string) => void; desk: Desk }) {
+function CaseQueueList({ queue, error, selectedId, onSelect, desk, agency }: { queue: SupportQueue | null; error?: string; selectedId: string | null; onSelect: (id: string) => void; desk: Desk; agency?: boolean }) {
   if (!queue) {
     return error
       ? <p className="rounded-[12px] bg-[#fde8e8] p-3 text-[13px] text-[#7a271a]">{error}</p>
@@ -278,12 +285,14 @@ function CaseQueueList({ queue, error, selectedId, onSelect, desk }: { queue: Su
   }
   if (!queue.cases.length) return <p className="rounded-[12px] bg-[#f4f6f7] p-4 text-[13px] text-[#5d6b73] dark:bg-white/5 dark:text-[#9aa4a8]">No cases match.</p>;
   return (
-    <ul className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
+    <ul className={cn("min-h-0 flex-1 overflow-y-auto", agency ? "-mx-3 -mb-3 divide-y divide-[#eceef0] border-t border-[#eceef0] dark:divide-white/10 dark:border-white/10" : "-mx-1 px-1")}>
       {queue.cases.map((item) => (
         <li key={item.id}>
           <button type="button" onClick={() => onSelect(item.id)} aria-current={item.id === selectedId ? "true" : undefined}
-            className={cn("mb-1.5 w-full cursor-pointer rounded-[12px] border px-3 py-2.5 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679]",
-              item.id === selectedId ? "border-[#007679] bg-[#f2fbfb] dark:bg-[#00686b]/15" : item.urgent && item.status !== "resolved" ? "border-[#f3c1bc] bg-[#fff8f7] dark:border-[#b42318]/40 dark:bg-[#b42318]/10" : "border-[#e3e8ea] hover:bg-[#f7f9f9] dark:border-white/10 dark:hover:bg-white/5")}>
+            className={cn("w-full cursor-pointer px-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-[#007679]",
+              agency ? cn("border-l-2 py-3 focus-visible:-outline-offset-2", item.id === selectedId ? "border-[#007679] bg-[#eef7f7] dark:bg-[#00a3a7]/15" : item.urgent && item.status !== "resolved" ? "border-[#b42318] bg-[#fff8f7] dark:bg-[#b42318]/10" : "border-transparent hover:bg-[#f6f8f8] dark:hover:bg-white/5")
+              : "mb-1.5 rounded-[12px] border py-2.5 focus-visible:outline-offset-2",
+              agency ? null : item.id === selectedId ? "border-[#007679] bg-[#f2fbfb] dark:bg-[#00686b]/15" : item.urgent && item.status !== "resolved" ? "border-[#f3c1bc] bg-[#fff8f7] dark:border-[#b42318]/40 dark:bg-[#b42318]/10" : "border-[#e3e8ea] hover:bg-[#f7f9f9] dark:border-white/10 dark:hover:bg-white/5")}>
             <span className="flex items-center gap-2">
               <span className="truncate text-[13.5px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">{item.requesterName}</span>
               {desk === "corporate" && item.agencyName && <span className="truncate text-[12px] text-[#5d6b73]">· {item.agencyName}</span>}
@@ -315,9 +324,10 @@ function DetailRow({ label, children }: { label: string; children: ReactNode }) 
   );
 }
 
-function CaseDetail({ detail, desk, myUid, team, categories, busy, onBack, onReply, onUpdate, onSaveArticle, onTransfer }: {
+function CaseDetail({ detail, desk, agency, myUid, team, categories, busy, onBack, onReply, onUpdate, onSaveArticle, onTransfer }: {
   detail: SupportCaseDetail;
   desk: Desk;
+  agency?: boolean;
   myUid?: string;
   team: SupportQueue["team"];
   categories: string[];
@@ -369,7 +379,7 @@ function CaseDetail({ detail, desk, myUid, team, categories, busy, onBack, onRep
   return (
     <div className="grid min-h-0 flex-1 xl:grid-cols-[minmax(0,1fr)_280px]">
       <div className="flex min-h-0 flex-col">
-        <header className="flex flex-wrap items-center gap-2 border-b border-[#e3e8ea] px-4 py-3 dark:border-white/10">
+        <header className={cn("flex flex-wrap items-center gap-2 border-b px-4 py-3 dark:border-white/10", agency ? "border-[#eceef0] bg-white dark:bg-[#1b232b]" : "border-[#e3e8ea]")}>
           <button type="button" onClick={onBack} aria-label="Back to cases" className="grid h-8 w-8 cursor-pointer place-items-center rounded-full hover:bg-[#f1f3f4] lg:hidden dark:hover:bg-white/10"><ArrowLeft aria-hidden="true" className="h-4 w-4" /></button>
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-[15px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">{item.subject}</h2>
@@ -390,9 +400,9 @@ function CaseDetail({ detail, desk, myUid, team, categories, busy, onBack, onRep
           </div>
         )}
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-          <SupportThread messages={messages} viewer="agent" />
+          <SupportThread messages={messages} viewer="agent" look={agency ? "agency" : "default"} />
         </div>
-        <div className="border-t border-[#e3e8ea] p-3 dark:border-white/10">
+        <div className={cn("border-t p-3 dark:border-white/10", agency ? "border-[#eceef0] bg-white dark:bg-[#1b232b]" : "border-[#e3e8ea]")}>
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <div className="inline-flex rounded-full bg-[#eef2f3] p-0.5 dark:bg-white/10" role="group" aria-label="Reply or internal note">
               {(["reply", "note"] as const).map((value) => (
@@ -411,6 +421,7 @@ function CaseDetail({ detail, desk, myUid, team, categories, busy, onBack, onRep
           <SupportComposer
             key={`${item.id}-${mode}`}
             tone={mode === "note" ? "note" : "default"}
+            look={agency ? "agency" : "default"}
             label={mode === "note" ? "Internal note" : "Reply"}
             busy={busy}
             initialValue={mode === "reply" ? suggestion : undefined}
@@ -424,7 +435,7 @@ function CaseDetail({ detail, desk, myUid, team, categories, busy, onBack, onRep
         </div>
       </div>
 
-      <aside aria-label="Case details" className="max-h-[40vh] min-h-0 overflow-y-auto border-t border-[#e3e8ea] px-4 py-3 xl:max-h-none xl:border-l xl:border-t-0 dark:border-white/10">
+      <aside aria-label="Case details" className={cn("max-h-[40vh] min-h-0 overflow-y-auto border-t px-4 py-3 xl:max-h-none xl:border-l xl:border-t-0 dark:border-white/10", agency ? "border-[#eceef0] bg-white dark:bg-[#1b232b]" : "border-[#e3e8ea]")}>
         <dl>
           <DetailRow label="Person">
             <span className="block font-semibold">{requester?.name || item.requesterName}</span>

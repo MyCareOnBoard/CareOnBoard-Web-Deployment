@@ -10,24 +10,56 @@
 .agency-care .ac-staff-table td:last-child { text-align: right; }
 .agency-care .ac-staff-table td .ac-status { margin-top: 5px; }
 .agency-care .ac-staff-source { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--ac-border); margin-bottom: 14px; }
-.ac-staff-dialog .ac-staff-search { display: flex; align-items: center; gap: 8px; }
-.ac-staff-dialog .ac-staff-search > svg { color: var(--ac-muted); flex-shrink: 0; }
-.ac-staff-dialog .ac-staff-search input { min-width: 0; }
-.ac-staff-dialog .ac-staff-search button { flex-shrink: 0; padding: 8px; }
-.ac-staff-dialog .ac-staff-roster { display: grid; gap: 8px; }
-.ac-staff-dialog .ac-staff-candidate { display: flex; align-items: center; gap: 12px; border: 1px solid var(--ac-border); border-radius: 12px; padding: 12px; cursor: pointer; }
-.ac-staff-dialog .ac-staff-candidate:has(input:disabled) { cursor: default; background: var(--ac-hover); }
-.ac-staff-dialog .ac-staff-candidate .ac-person { flex: 1; min-width: 0; }
-.ac-staff-dialog input[type=radio], .ac-staff-dialog input[type=checkbox] { accent-color: var(--ac-teal); width: 18px; height: 18px; flex-shrink: 0; }
-.ac-staff-dialog .ac-staff-selected { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border-radius: 12px; background: var(--ac-hover); }
-.ac-staff-dialog .ac-staff-presets { display: grid; gap: 8px; }
-.ac-staff-dialog .ac-staff-preset { display: flex; align-items: flex-start; gap: 10px; border: 1px solid var(--ac-border); border-radius: 12px; padding: 12px; cursor: pointer; }
-.ac-staff-dialog .ac-staff-preset:has(input:checked) { background: var(--ac-soft); border-color: var(--ac-teal); }
-.ac-staff-dialog .ac-staff-preset input, .ac-staff-dialog .ac-staff-primary input { margin-top: 3px; }
+/* Assign staff dialog: the agency design's option cards, matching the client record connection dialog. */
+.ac-staff-dialog { --ac-pick: #007679; --ac-pick-bg: #eef8f8; --ac-line: #e4e7ea; --ac-ink: #10141a; --ac-sub: #5b636b; --ac-strip: #f4f6f7; }
+.dark .ac-staff-dialog { --ac-pick: #7fd3d3; --ac-pick-bg: rgba(15, 126, 125, 0.15); --ac-line: rgba(255, 255, 255, 0.1); --ac-ink: #f4f6f7; --ac-sub: #9aa4a8; --ac-strip: rgba(255, 255, 255, 0.05); }
+.ac-staff-dialog .ac-dialog-body > fieldset.ac-stack { display: flex; flex-direction: column; gap: 20px; }
+.ac-staff-dialog .ac-dialog-body > fieldset.ac-stack > * { margin: 0; }
+.ac-staff-dialog .ac-field > span, .ac-staff-dialog legend { padding: 0; font-size: 13px; font-weight: 600; color: var(--ac-ink); }
+.ac-staff-dialog legend { margin-bottom: 8px; }
+.ac-staff-dialog .ac-field > small, .ac-staff-dialog p.ac-muted { font-size: 13px; font-weight: 400; color: var(--ac-sub); }
+.ac-staff-dialog p.ac-muted a { color: var(--ac-pick); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
+.ac-staff-dialog .ac-staff-search { position: relative; display: block; }
+.ac-staff-dialog .ac-staff-search > svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #6b737a; pointer-events: none; }
+.ac-staff-dialog .ac-staff-search input { width: 100%; min-width: 0; height: 44px; padding: 0 44px 0 40px; border: 1px solid #dcdfe2; border-radius: 10px; font-size: 14px; box-shadow: none; }
+.ac-staff-dialog .ac-staff-search input:focus { border-color: var(--ac-pick); outline: none; box-shadow: 0 0 0 2px rgba(0, 118, 121, 0.15); }
+.ac-staff-dialog .ac-staff-search input::-webkit-search-cancel-button { display: none; }
+.ac-staff-dialog .ac-staff-search button { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; min-height: 32px; padding: 0; border-radius: 8px; color: #6b737a; }
+.ac-staff-dialog .ac-staff-search input:placeholder-shown + button { display: none; }
+.ac-staff-dialog .ac-staff-roster, .ac-staff-dialog .ac-staff-presets { display: grid; gap: 8px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.ac-staff-dialog .ac-staff-roster { max-height: 304px; overflow-y: auto; padding-right: 4px; }
+.ac-staff-dialog .ac-staff-candidate, .ac-staff-dialog .ac-staff-preset, .ac-staff-dialog .ac-staff-primary {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--ac-line); border-radius: 12px; background: var(--ac-panel); cursor: pointer; transition: background-color 0.15s, border-color 0.15s; }
+.ac-staff-dialog .ac-staff-preset, .ac-staff-dialog .ac-staff-primary { align-items: flex-start; }
+.ac-staff-dialog .ac-staff-candidate:not(:has(input:disabled)):hover, .ac-staff-dialog .ac-staff-preset:hover, .ac-staff-dialog .ac-staff-primary:hover { background: var(--ac-strip); border-color: #c5cbd0; }
+.ac-staff-dialog :is(.ac-staff-candidate, .ac-staff-preset, .ac-staff-primary):has(input:focus-visible) { outline: 2px solid var(--ac-pick); outline-offset: 1px; }
+.ac-staff-dialog .ac-staff-candidate:has(input:disabled) { cursor: default; background: var(--ac-strip); border-color: transparent; }
+.ac-staff-dialog .ac-staff-candidate:has(input:disabled) .ac-person { opacity: 0.6; }
+.ac-staff-dialog .ac-staff-candidate .ac-person { flex: 1; min-width: 0; order: -1; }
+.ac-staff-dialog .ac-staff-candidate .ac-status { order: 1; border-radius: 6px; padding: 3px 8px; font-weight: 500; color: var(--ac-sub); background: transparent; border: 1px solid var(--ac-line); }
+.ac-staff-dialog .ac-person strong { font-size: 14px; font-weight: 500; color: var(--ac-ink); }
+.ac-staff-dialog .ac-person small { margin-top: 1px; font-size: 13px; color: var(--ac-sub); }
+.ac-staff-dialog .ac-avatar { background: #e0f3f3; color: #005c5e; font-weight: 500; }
+.dark .ac-staff-dialog .ac-avatar { background: rgba(15, 126, 125, 0.2); color: #7fd3d3; }
+/* Native radios and checkboxes, drawn as the design's round and square ticks. */
+.ac-staff-dialog input[type=radio], .ac-staff-dialog input[type=checkbox] {
+  appearance: none; flex-shrink: 0; width: 20px; height: 20px; margin: 0; border: 1px solid #c5cbd0; border-radius: 50%; background: var(--ac-panel) center / 12px no-repeat; cursor: inherit; outline: none; }
+.ac-staff-dialog input[type=checkbox] { border-radius: 6px; }
+.ac-staff-dialog input[type=radio]:checked, .ac-staff-dialog input[type=checkbox]:checked { border-color: #007679; background-color: #007679;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E"); }
+.ac-staff-dialog .ac-staff-candidate input { order: 2; }
+.ac-staff-dialog .ac-staff-candidate input:disabled { position: absolute; opacity: 0; pointer-events: none; }
+.ac-staff-dialog .ac-staff-preset input, .ac-staff-dialog .ac-staff-primary input { margin-top: 1px; }
+.ac-staff-dialog :is(.ac-staff-preset, .ac-staff-primary):has(input:checked) { background: var(--ac-pick-bg); border-color: var(--ac-pick); }
+.ac-staff-dialog .ac-staff-preset strong, .ac-staff-dialog .ac-staff-primary > span { font-size: 14px; font-weight: 500; color: var(--ac-ink); }
 .ac-staff-dialog .ac-staff-preset strong, .ac-staff-dialog .ac-staff-preset small, .ac-staff-dialog .ac-staff-primary small { display: block; }
-.ac-staff-dialog .ac-staff-preset small, .ac-staff-dialog .ac-staff-primary small { color: var(--ac-muted); margin-top: 3px; }
-.ac-staff-dialog .ac-staff-primary { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
-.ac-staff-dialog .ac-staff-remove { color: var(--ac-danger); justify-self: start; }
+.ac-staff-dialog .ac-staff-preset small, .ac-staff-dialog .ac-staff-primary small { margin-top: 1px; font-size: 13px; font-weight: 400; color: var(--ac-sub); }
+.ac-staff-dialog .ac-staff-selected { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border-radius: 14px; background: var(--ac-strip); }
+.ac-staff-dialog .ac-staff-selected button { min-height: 36px; color: var(--ac-pick); font-weight: 500; }
+.ac-staff-dialog select { height: 44px; padding: 0 12px; border-color: #dcdfe2; font-size: 14px; font-weight: 400; background: var(--ac-panel); }
+.ac-staff-dialog select:focus { border-color: var(--ac-pick); outline: none; box-shadow: 0 0 0 2px rgba(0, 118, 121, 0.15); }
+.ac-staff-dialog .ac-empty { padding: 28px 16px; border: 1px dashed var(--ac-line); border-radius: 12px; }
+.ac-staff-dialog .ac-staff-remove { color: var(--ac-danger); align-self: flex-start; }
 .ac-staff-dialog .ac-dialog-footer > small { margin-right: auto; color: var(--ac-muted); }
 @media (max-width: 600px) {
   .agency-care .ac-staff-table thead { display: none; }

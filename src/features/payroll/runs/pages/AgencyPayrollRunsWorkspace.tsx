@@ -4,10 +4,11 @@ import { Link } from "react-router";
 import { useAppDispatch } from "@/store/redux/hooks";
 import { PayrollOperationProvider } from "../../operations/PayrollOperationProvider";
 import { payrollRunEmployeeTag, payrollRunTag, payrollTag } from "../../api/cacheTags";
+import { Banknote } from "lucide-react";
+import { agencyPrimaryButton, agencyOutlineButton } from "@/components/agency/AgencyListKit";
+import { cn } from "@/lib/utils";
 import BillingDashboardHeader from "@/pages/agency/billing/components/BillingDashboardHeader";
-import PayrollOverviewCards, {
-  mapPayrollRunToOverviewStats,
-} from "@/pages/agency/billing/payroll/components/PayrollOverviewCards";
+import PayrollOverviewCards from "@/pages/agency/billing/payroll/components/PayrollOverviewCards";
 import { CurrentPayrollPanel } from "../components/CurrentPayrollPanel";
 import { PayrollTabSkeleton } from "../components/PayrollTabSkeleton";
 import { PayrollRunActions } from "../components/PayrollRunActions";
@@ -45,19 +46,12 @@ const agencyPayrollSetupHref = "/agency/agency-settings?tab=payrollSetup";
 function PayrollManagementHeader() {
   return (
     <BillingDashboardHeader
+      icon={Banknote}
       title="Payroll management"
       subtitle="Review current and upcoming pay periods, resolve exceptions, and approve payroll."
     />
   );
 }
-
-const emptyPayrollOverviewStats = [
-  { id: "total-due", label: "Total payroll due", value: "—" },
-  { id: "gross-earnings", label: "Gross earnings", value: "—" },
-  { id: "reimbursements", label: "Reimbursements", value: "—" },
-  { id: "adjustments", label: "Adjustments", value: "—" },
-  { id: "payday", label: "Payday", value: "—" },
-];
 
 export type PayrollWorkspaceEmptyStateProps =
   | {
@@ -74,24 +68,24 @@ export function PayrollWorkspaceEmptyState(props: PayrollWorkspaceEmptyStateProp
   const setupRequired = props.kind === "setup-required";
 
   return (
-    <div className="min-h-[calc(100vh-200px)] space-y-8 pb-8">
+    <div className="min-h-[calc(100vh-200px)] space-y-6 pb-8">
       <PayrollManagementHeader />
-      <PayrollOverviewCards stats={emptyPayrollOverviewStats} />
+      <PayrollOverviewCards run={null} />
       <section
         role={setupRequired ? undefined : "alert"}
         aria-labelledby="payroll-workspace-state-heading"
-        className="rounded-[16px] border border-[#d8e4e5] bg-white px-5 py-8 sm:px-8 sm:py-10"
+        className="rounded-[16px] border border-[#e4e7ea] bg-white px-5 py-8 sm:px-8 sm:py-10 dark:border-white/10 dark:bg-[#1b232b]"
       >
         <div className="max-w-2xl">
           <h2
             id="payroll-workspace-state-heading"
-            className="text-[20px] font-semibold leading-7 text-[#10141a]"
+            className="text-[20px] font-semibold leading-7 text-[#10141a] dark:text-[#f4f6f7]"
           >
             {setupRequired
               ? props.title ?? "Set up payroll to get started"
               : "Payroll couldn't be loaded"}
           </h2>
-          <p className="mt-2 text-[14px] leading-6 text-[#62686f]">
+          <p className="mt-2 text-[14px] leading-6 text-[#5b636b] dark:text-[#9aa4a8]">
             {setupRequired
               ? props.description
                 ?? "Connect your agency's payroll account before managing pay periods, employees, and approvals."
@@ -100,7 +94,7 @@ export function PayrollWorkspaceEmptyState(props: PayrollWorkspaceEmptyStateProp
           {setupRequired && props.canOpenSetup !== false ? (
             <Link
               to={props.setupHref ?? agencyPayrollSetupHref}
-              className="mt-5 inline-flex min-h-11 items-center justify-center rounded-full bg-[#00b4b8] px-5 text-[14px] font-semibold text-white transition-colors hover:bg-[#009da1] active:bg-[#009199] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2"
+              className={cn(agencyPrimaryButton, "mt-5")}
             >
               {props.actionLabel ?? "Open payroll setup"}
             </Link>
@@ -108,7 +102,7 @@ export function PayrollWorkspaceEmptyState(props: PayrollWorkspaceEmptyStateProp
             <button
               type="button"
               onClick={props.onRetry}
-              className="mt-5 inline-flex min-h-11 items-center justify-center rounded-full border border-[#00b4b8] bg-white px-5 text-[14px] font-semibold text-[#006f73] transition-colors hover:bg-[#eefafa] active:bg-[#e3f5f5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2"
+              className={cn(agencyOutlineButton, "mt-5")}
             >
               Try again
             </button>
@@ -269,20 +263,15 @@ function AgencyPayrollRunsWorkspaceContent({ scope, workspace }: {
     <div
       data-testid="payroll-workspace"
       aria-busy={workspace.freshness === "loading" && !workspace.runResponse}
-      className="min-h-[calc(100vh-200px)] space-y-8 pb-8"
+      className="min-h-[calc(100vh-200px)] space-y-6 pb-8"
     >
       <PayrollManagementHeader />
 
-      <PayrollOverviewCards
-        stats={projection ? mapPayrollRunToOverviewStats(projection.run) : emptyPayrollOverviewStats}
-        loading={workspace.freshness === "loading" && !workspace.runResponse}
-      />
-
-      <div className="min-w-0 space-y-4">
+      <div className="min-w-0 space-y-5">
         <div
           role="tablist"
           aria-label="Payroll management sections"
-          className="flex flex-wrap items-center gap-2"
+          className="flex items-center gap-6 overflow-x-auto border-b border-[#eceef0] dark:border-white/10"
         >
           {tabs.map(({ id, label }, index) => (
             <button
@@ -302,7 +291,12 @@ function AgencyPayrollRunsWorkspaceContent({ scope, workspace }: {
                   : (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
                 selectTab(tabs[nextIndex].id);
               }}
-              className={`min-h-11 shrink-0 cursor-pointer rounded-full border px-5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00b4b8] focus-visible:ring-offset-2 ${tab === id ? "border-[#00b4b8] bg-[#00b4b8] text-white" : "border-[#e5e5e6] text-[#10141a] hover:border-[#00b4b8]/40 hover:bg-[#eef4f5]"}`}
+              className={cn(
+                "-mb-px h-10 shrink-0 cursor-pointer border-b-2 text-[14px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#007679]",
+                tab === id
+                  ? "border-[#003839] font-medium text-[#10141a] dark:border-[#7fd3d3] dark:text-[#f4f6f7]"
+                  : "border-transparent text-[#5b636b] hover:text-[#10141a] dark:text-[#9aa4a8] dark:hover:text-[#f4f6f7]",
+              )}
             >
               {label}
             </button>
@@ -315,7 +309,11 @@ function AgencyPayrollRunsWorkspaceContent({ scope, workspace }: {
           className="min-w-0"
         >
           {tab === "current" ? (
-            <div className="space-y-6">
+            <div className="space-y-5">
+              <PayrollOverviewCards
+                run={projection?.run ?? null}
+                loading={workspace.freshness === "loading" && !workspace.runResponse}
+              />
               <CurrentPayrollPanel key={`current:${scopeKey}`} scope={scope} workspace={workspace} headingRef={currentHeadingRef} />
               {projection ? (
                 <CurrentPayrollControls
@@ -349,7 +347,7 @@ function AgencyPayrollRunsWorkspaceContent({ scope, workspace }: {
                   ? <PayrollTabSkeleton label="Loading audit timeline…" variant="timeline" />
                   : projection
                     ? <PayrollAuditPanel key={`audit:${scopeKey}`} scope={scope} runId={projection.runId} activeRevisionId={projection.activeRevisionId} />
-                    : <p className="py-8 text-sm text-[#62686f]">No active payroll is available for audit.</p>
+                    : <p className="py-8 text-sm text-[#5b636b] dark:text-[#9aa4a8]">No active payroll is available for audit.</p>
               ) : tab === "obligations" ? (
                 <PayrollObligationsPanel
                   key={`obligations:${scopeKey}`}

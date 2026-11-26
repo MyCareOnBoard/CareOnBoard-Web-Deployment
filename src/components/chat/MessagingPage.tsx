@@ -21,6 +21,7 @@ import { matchesAgencyMode } from "@/lib/roleLabel";
 import type { AgencyMode } from "@/store/redux/agencyModeSlice";
 import { useDebounce } from "@/hooks/useDebounce";
 import { withMessagingProvider } from "@/contexts/withMessagingProvider";
+import { AgencyPageHeader } from "@/components/agency/AgencyShell";
 
 export type FilterTab = "all" | "dsp" | "staff" | "administration" | "agency";
 
@@ -43,8 +44,17 @@ export interface MessagingPageProps {
      * roles (staff/admin/super) always appear. Omit to disable scoping.
      */
     programMode?: AgencyMode | null;
-    /** "panel" is the caregiver/DSP layout: two cards, round avatars, teal bubbles. */
-    variant?: "classic" | "panel";
+    /**
+     * "panel" is the caregiver/DSP layout: two cards, round avatars, teal bubbles.
+     * "agency" is the agency Support layout: the page header, then one card split
+     * into the conversation list and the chat.
+     */
+    variant?: "classic" | "panel" | "agency";
+    /** Agency variant: the header's icon and description. */
+    pageIcon?: React.ComponentType<{ className?: string }>;
+    pageDescription?: React.ReactNode;
+    /** Agency variant: link for the chat header's "View profile" button. */
+    getProfileHref?: (participant: { uid: string; role: string }) => string | null;
     /** Shown as a "Check our FAQs" link in the panel header. */
     faqHref?: string;
     /** Extra controls beside the title, such as a switch to the support desk. */
@@ -62,6 +72,9 @@ function MessagingPageContent({
     variant = "classic",
     faqHref,
     headerSlot,
+    pageIcon,
+    pageDescription,
+    getProfileHref,
 }: MessagingPageProps) {
     const panel = variant === "panel";
     const { conversationId } = useParams<{ conversationId?: string }>();
@@ -277,11 +290,30 @@ function MessagingPageContent({
         onSendMessage={handleSendMessage}
         onDelete={handleOpenDeleteDialog}
         variant={variant}
+        getProfileHref={getProfileHref}
     />;
 
     return (
         <>
-            {panel ? <div className="flex h-[calc(100dvh-160px)] min-h-[480px] flex-col rounded-[20px] bg-white p-4 shadow-[0_1px_2px_rgba(16,40,44,0.06)] sm:p-6 dark:bg-[#1b232b]">
+            {variant === "agency" ? <div className="flex h-[calc(100dvh-160px)] min-h-[560px] flex-col gap-5 px-4 py-4 sm:px-6">
+                <AgencyPageHeader
+                    icon={pageIcon}
+                    title={pageTitle}
+                    description={pageDescription}
+                    className="shrink-0"
+                    actions={<>
+                        {headerSlot}
+                        <button type="button" onClick={() => setIsNewMessageModalOpen(true)}
+                            className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[10px] bg-[#003839] px-4 text-[13.5px] font-medium text-white transition-colors hover:bg-[#00494a] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] dark:bg-[#00a3a7] dark:text-[#06292a] dark:hover:bg-[#33b5b8]">
+                            <Plus className="h-4 w-4" aria-hidden="true" />New message
+                        </button>
+                    </>}
+                />
+                <div className="flex min-h-0 flex-1 overflow-hidden rounded-[16px] border border-[#e4e7ea] bg-white dark:border-white/10 dark:bg-[#1b232b]">
+                    <div className={cn(showChatView ? "hidden" : "flex", "min-h-0 w-full shrink-0 flex-col lg:flex lg:w-[300px] lg:border-r lg:border-[#eceef0] xl:w-[340px] dark:lg:border-white/10")}>{conversationList}</div>
+                    {chatPanel}
+                </div>
+            </div> : panel ? <div className="flex h-[calc(100dvh-160px)] min-h-[480px] flex-col rounded-[20px] bg-white p-4 shadow-[0_1px_2px_rgba(16,40,44,0.06)] sm:p-6 dark:bg-[#1b232b]">
                 <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 pb-4">
                     <div className="flex flex-wrap items-center gap-3">
                         <h1 className="text-lg font-semibold text-[#10141a] dark:text-[#f4f6f7]">{pageTitle}</h1>
