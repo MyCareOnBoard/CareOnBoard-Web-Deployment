@@ -15,6 +15,7 @@ vi.mock("@/utils/auth/context/AuthContext", () => ({
 vi.mock("@/lib/hooks/useNotifications", () => ({
   useNotifications: vi.fn(() => { throw new Error("Native notifications must not mount in Agency Care"); }),
 }));
+vi.mock("@/components/agency/AgencyTopBarTools", () => ({ AgencyAnnouncementPill: () => null }));
 vi.mock("@/lib/api/agencyCare", () => ({
   agencyCareApi: { me: vi.fn(), notifications: vi.fn(), readNotification: vi.fn() },
 }));
@@ -89,7 +90,9 @@ it("uses the shared chrome, navigates and highlights care sections without nativ
   fireEvent.click(sidebar.getByRole("button", { name: "Clients" }));
   expect(screen.getByTestId("care-scope")).toHaveTextContent("/agency-care/clients");
   expect(sidebar.queryByRole("button", { name: "Settings" })).not.toBeInTheDocument();
-  for (const name of ["Review queue", "Reports", "Notifications", "Publication recovery"]) {
+  // Notifications carries the unread count in its name once the inbox loads.
+  await sidebar.findByRole("button", { name: "Notifications, 1 new" });
+  for (const name of ["Review queue", "Reports", "Notifications, 1 new", "Publication recovery"]) {
     fireEvent.click(sidebar.getByRole("button", { name }));
     expect(sidebar.getByRole("button", { name })).toHaveAttribute("aria-current", "page");
     expect(sidebar.getByRole("button", { name: "Clients" })).not.toHaveAttribute("aria-current");
@@ -129,12 +132,12 @@ it("switches the full care scope and inbox, exposes external settings, and retai
 it("keeps collapsed sidebar labels accessible and moves the content with the sidebar", async () => {
   renderLayout();
   await screen.findByTestId("care-scope");
-  expect(screen.getByRole("main")).toHaveClass("md:ml-[240px]");
+  expect(screen.getByRole("main")).toHaveClass("md:ml-[256px]");
   fireEvent.click(screen.getByRole("button", { name: "Collapse sidebar" }));
-  expect(screen.getByRole("main")).toHaveClass("md:ml-[112px]");
+  expect(screen.getByRole("main")).toHaveClass("md:ml-[96px]");
   expect(screen.getByRole("button", { name: "Clients" })).toHaveAttribute("aria-label", "Clients");
   fireEvent.click(screen.getByRole("button", { name: "Expand sidebar" }));
-  expect(screen.getByRole("main")).toHaveClass("md:ml-[240px]");
+  expect(screen.getByRole("main")).toHaveClass("md:ml-[256px]");
 });
 
 it("keeps the dashboard shell while organization access loads or fails", async () => {

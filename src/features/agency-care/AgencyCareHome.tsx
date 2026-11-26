@@ -1,73 +1,92 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { ArrowRight, LoaderCircle } from "lucide-react";
+import { ChevronRight, LoaderCircle, Users } from "lucide-react";
 import { useAuth } from "@/utils/auth/context/AuthContext";
 import { agencyCareApi } from "@/lib/api/agencyCare";
+import { AgencyListCard, AgencyPerson, AgencySearchField, agencyTd, agencyTh, agencyTheadRow, agencyTr } from "@/components/agency/AgencyListKit";
 import { useAgencyCare } from "./AgencyCareLayout";
 import { useScopedMutation, useScopedRequest } from "./hooks";
 import {
   CareButton as Button,
-  CareAvatar,
-  CareEmpty,
   CareFailure,
   CareHeading,
   CareLoad,
   CarePager,
-  CarePanel,
-  CareStatus,
+  CarePill,
+  careLabel,
 } from "./ui";
 
 export function AgencyCareHome() {
   const { scope, agencyKey } = useAgencyCare();
   const [cursor, setCursor] = useState("");
+  const [query, setQuery] = useState("");
   const list = useScopedRequest(`${scope}|networks|${cursor}`, (signal) =>
     agencyCareApi.networks({ agencyKey, cursor, signal }),
   );
+  const items = list.data?.items ?? [];
+  const needle = query.trim().toLowerCase();
+  const shown = needle ? items.filter((network) => network.client.name.toLowerCase().includes(needle)) : items;
   return (
-    <div className="ac-stack">
+    <div className="flex flex-col gap-6">
       <CareHeading
+        icon={Users}
         title="Clients"
-        description="Open a client’s care workspace to coordinate with their care team."
+        description="Client workspaces shared with families. You only see clients you have access to."
       />
       {list.loading ? (
         <CareLoad />
       ) : list.error ? (
         <CareFailure message={list.error} onRetry={list.reload} />
-      ) : (
+      ) : items.length ? (
         <>
-          <CarePanel title="Your connected clients">
-            {list.data?.items.length ? (
-              <ul className="ac-list">
-                {list.data.items.map((network) => (
-                  <li className="ac-person-row" key={network.id}>
-                    <div className="ac-row-main">
-                      <CareAvatar name={network.client.name} />
-                      <div className="ac-row-copy">
-                        <strong>{network.client.name}</strong>
-                        <small>Client care workspace</small>
-                      </div>
-                    </div>
-                    <CareStatus>{network.lifecycle}</CareStatus>
-                    <Button asChild variant="outline">
-                      <Link
-                        to={`/agency-care/networks/${encodeURIComponent(network.id)}/overview`}
-                        aria-label={`Open care workspace for ${network.client.name}`}
-                      >
-                        Open workspace <ArrowRight aria-hidden="true" size={16} />
-                      </Link>
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <CareEmpty title="No connected clients yet">
-                Your agency administrator must grant access to a connected
-                client. Organization membership alone does not open a workspace.
-              </CareEmpty>
-            )}
-          </CarePanel>
-          <CarePager cursor={list.data?.nextCursor} onNext={setCursor} />
+          <AgencyListCard label="Your connected clients">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+              <h2 className="text-base font-semibold text-[#10141a] dark:text-[#f4f6f7]">Your connected clients</h2>
+              <AgencySearchField label="Search clients" placeholder="Search clients" value={query} onChange={setQuery} className="w-full sm:w-[260px]" />
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[520px] border-collapse">
+                <thead>
+                  <tr className={agencyTheadRow}>
+                    <th scope="col" className={agencyTh}>Client workspace</th>
+                    <th scope="col" className={agencyTh}>Status</th>
+                    <th scope="col" className={agencyTh}><span className="sr-only">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shown.map((network) => (
+                    <tr className={agencyTr} key={network.id}>
+                      <td className={agencyTd}><AgencyPerson name={network.client.name} detail="Client care workspace" /></td>
+                      <td className={agencyTd}><CarePill>{careLabel(network.lifecycle)}</CarePill></td>
+                      <td className={`${agencyTd} text-right`}>
+                        <Link
+                          to={`/agency-care/networks/${encodeURIComponent(network.id)}/overview`}
+                          aria-label={`Open care workspace for ${network.client.name}`}
+                          className="inline-flex items-center gap-1 text-[14px] font-medium text-[#007679] hover:text-[#005c5e] dark:text-[#7fd3d3]"
+                        >
+                          Open workspace<ChevronRight className="h-4 w-4" aria-hidden="true" />
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                  {!shown.length && (
+                    <tr><td colSpan={3} className={`${agencyTd} text-center text-[#5b636b]`}>No clients on this page match “{query.trim()}”.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </AgencyListCard>
+          <CarePager cursor={list.data?.nextCursor} onNext={(next) => { setQuery(""); setCursor(next); }} />
         </>
+      ) : (
+        <AgencyListCard label="Your connected clients" className="flex flex-col items-center gap-2 px-6 py-14 text-center">
+          <span aria-hidden="true" className="mb-2 grid h-12 w-12 place-items-center rounded-full bg-[#f4f5f6] text-[#4b535b] dark:bg-white/10 dark:text-[#c9d1d4]"><Users className="h-5 w-5" /></span>
+          <h2 className="text-base font-semibold text-[#10141a] dark:text-[#f4f6f7]">No connected clients yet</h2>
+          <p className="max-w-[520px] text-sm text-[#5b636b] dark:text-[#9aa4a8]">
+            Your agency administrator must grant access to a connected
+            client. Organization membership alone does not open a workspace.
+          </p>
+        </AgencyListCard>
       )}
     </div>
   );

@@ -1,4 +1,6 @@
-import { useCallback, useRef, type ComponentProps, type ReactNode } from "react";
+import { useCallback, useRef, type ComponentProps, type ComponentType, type ReactNode } from "react";
+import { AgencyPageHeader } from "@/components/agency/AgencyShell";
+import { AgencyPill, type AgencyTone } from "@/components/agency/AgencyListKit";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, Info, X } from "lucide-react";
@@ -70,11 +72,15 @@ export function CareHeading({
   title,
   description,
   actions,
+  icon,
 }: {
   title: string;
-  description?: string;
+  description?: ReactNode;
   actions?: ReactNode;
+  /** The top-level pages pass an icon and get the agency panel's page header. */
+  icon?: ComponentType<{ className?: string }>;
 }) {
+  if (icon) return <AgencyPageHeader icon={icon} title={title} description={description} actions={actions} />;
   return (
     <header className="ac-heading">
       <div>
@@ -85,10 +91,18 @@ export function CareHeading({
     </header>
   );
 }
-export function CareStatus({ children, tone }: { children: ReactNode; tone?: "neutral" | "warning" | "danger" | "success" }) {
+type CareTone = "neutral" | "warning" | "danger" | "success";
+function careTone(children: ReactNode): CareTone {
   const label = typeof children === "string" ? children.toLowerCase().replace(/_/g, " ") : "";
-  const stateTone = tone ?? (/failed|rejected|revoked|expired|unavailable|declined/.test(label) ? "danger" : /pending|suspended|revision|withheld|processing|unverified/.test(label) ? "warning" : /\b(active|accepted|approved|verified|succeeded|published)\b/.test(label) ? "success" : "neutral");
-  return <span className={`ac-status ac-status-${stateTone}`}>{children}</span>;
+  return /failed|rejected|revoked|expired|unavailable|declined/.test(label) ? "danger" : /pending|suspended|revision|withheld|processing|unverified/.test(label) ? "warning" : /\b(active|accepted|approved|verified|succeeded|published)\b/.test(label) ? "success" : "neutral";
+}
+export function CareStatus({ children, tone }: { children: ReactNode; tone?: CareTone }) {
+  return <span className={`ac-status ac-status-${tone ?? careTone(children)}`}>{children}</span>;
+}
+const PILL_TONES: Record<CareTone, AgencyTone> = { danger: "red", warning: "amber", success: "green", neutral: "grey" };
+/** The redesigned pages' status: a small pill with a coloured dot (agency list style). */
+export function CarePill({ children, tone }: { children: ReactNode; tone?: CareTone }) {
+  return <AgencyPill tone={PILL_TONES[tone ?? careTone(children)]}>{children}</AgencyPill>;
 }
 export function CareInvitationDelivery({
   delivery,

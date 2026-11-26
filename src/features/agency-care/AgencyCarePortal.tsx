@@ -1,6 +1,9 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
-import { ClipboardCheck, Download, FileText, LoaderCircle, Mail, Plus } from "lucide-react";
+import { BarChart3, ClipboardCheck, Download, FileText, Hourglass, LoaderCircle, Mail, MailCheck, Plus, RotateCcw, Undo2, Users } from "lucide-react";
+import { AgencyPanel, AgencyProgressBar, AgencyStatCard } from "@/components/agency/AgencyShell";
+import { AgencyListCard, AgencyPerson, AgencyPill, AgencySegmented, agencyOutlineButton, agencyPrimaryButton, agencyTd, agencyTh, agencyTheadRow, agencyTr } from "@/components/agency/AgencyListKit";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/utils/auth/context/AuthContext";
@@ -11,6 +14,7 @@ import {
   type CareExternalProfile,
   type CareMember,
   type CareSubmission,
+  type CarePublicationOperation,
   type CarePage,
   type CareInvitation,
 } from "@/lib/api/agencyCare";
@@ -29,96 +33,184 @@ import {
   CareNotice,
   CarePager,
   CarePanel,
+  CarePill,
   CareStatus,
   careDate,
   careLabel,
 } from "./ui";
 import "./agency-care.css";
 
-function SubmissionQueue({ recovery = false }: { recovery?: boolean }) {
+const submissionLink = (item: CareSubmission) =>
+  `/agency-care/networks/${encodeURIComponent(item.networkId)}/${item.kind === "document" ? "documents" : "updates"}?submission=${encodeURIComponent(item.id)}`;
+const rowLink = "inline-flex items-center gap-1 text-[14px] font-medium text-[#007679] hover:text-[#005c5e] dark:text-[#7fd3d3]";
+const detailRow = "flex items-center justify-between gap-4 px-3.5 py-2.5 text-[14px]";
+const destinationProblem = (operation: CarePublicationOperation) => /failed|withheld|rejected|unavailable/i.test(operation.status);
+
+function useSubmissionPage(kind: "review" | "recovery") {
   const { scope, agencyKey } = useAgencyCare();
   const [cursor, setCursor] = useState("");
   const list = useScopedRequest(
-    `${scope}|${recovery ? "recovery" : "review"}|${cursor}`,
+    `${scope}|${kind}|${cursor}`,
     (signal) =>
-      recovery
+      kind === "recovery"
         ? agencyCareApi.recovery({ agencyKey, cursor, signal })
         : agencyCareApi.reviewQueue({ agencyKey, cursor, signal }),
   );
-  const destination = (item: CareSubmission) =>
-    `/agency-care/networks/${encodeURIComponent(item.networkId)}/${item.kind === "document" ? "documents" : "updates"}?submission=${encodeURIComponent(item.id)}`;
+  return { list, setCursor };
+}
+
+/** Review queue: the waiting submissions on the left, the selected one's details and preview on the right. */
+export function AgencyCareReviewQueue() {
+  const { list, setCursor } = useSubmissionPage("review");
+  const [tab, setTab] = useState<"document" | "care_update">("care_update");
+  const [selectedId, setSelectedId] = useState("");
+  const items = list.data?.items ?? [];
+  const counts = { document: items.filter((item) => item.kind === "document").length, care_update: items.filter((item) => item.kind === "care_update").length };
+  // Open on the tab that has work when the other one is empty.
+  const activeTab = counts[tab] === 0 && counts[tab === "document" ? "care_update" : "document"] > 0 ? (tab === "document" ? "care_update" : "document") : tab;
+  const shown = items.filter((item) => item.kind === activeTab);
+  const selected = shown.find((item) => item.id === selectedId) ?? shown[0];
+  const version = selected?.currentVersion;
   return (
-    <div className="ac-stack">
+    <div className="flex flex-col gap-6">
       <CareHeading
-        title={recovery ? "Publication recovery" : "Review queue"}
-        description={
-          recovery
-            ? "Resolve failed or withheld destinations while retaining successful publication receipts."
-            : "Review the exact current submitted version for clients within your current authority."
-        }
+        icon={ClipboardCheck}
+        title="Review queue"
+        description="Documents and care updates waiting for a reviewer before they publish to the family portal."
       />
       {list.loading ? (
         <CareLoad />
       ) : list.error ? (
         <CareFailure message={list.error} onRetry={list.reload} />
-      ) : (
+      ) : items.length ? (
         <>
-          <CarePanel
-            title={
-              recovery
-                ? "Destinations needing attention"
-                : "Awaiting your review"
-            }
-          >
-            {list.data?.items.length ? (
-              <ul className="ac-list">
-                {list.data.items.map((item) => (
-                  <li key={item.id}>
-                    <div className="ac-row-main">
-                      <span className="ac-row-icon" aria-hidden="true">{item.kind === "document" ? <FileText size={18} /> : <ClipboardCheck size={18} />}</span>
-                      <div className="ac-row-copy">
-                      <strong>{item.title}</strong>
-                      <div className="ac-actions ac-row-meta">
-                        <CareStatus>{careLabel(item.reviewStatus)}</CareStatus>
-                        <small>Publication: {careLabel(item.syncStatus || "not_required")}</small>
-                      </div>
-                      </div>
-                    </div>
-                    <Button asChild variant="outline">
-                      <Link to={destination(item)}>
-                        {recovery
-                          ? "Review destination status"
-                          : "Review submission"}
-                      </Link>
-                    </Button>
-                  </li>
-                ))}
+          <AgencySegmented label="Submission type" value={activeTab} onChange={(value) => { setTab(value); setSelectedId(""); }} className="self-start"
+            options={[{ value: "document", label: "Documents", count: counts.document }, { value: "care_update", label: "Updates", count: counts.care_update }]} />
+          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
+            <AgencyListCard label="Awaiting your review">
+              <ul>
+                {shown.map((item) => {
+                  const on = item.id === selected?.id;
+                  return (
+                    <li key={item.id} className="border-b border-[#eceef0] last:border-b-0 dark:border-white/10">
+                      <button type="button" aria-pressed={on} onClick={() => setSelectedId(item.id)}
+                        className={cn("flex min-h-0 w-full cursor-pointer items-center gap-3 border-l-2 px-4 py-3 text-left transition-colors",
+                          on ? "border-[#12b5b0] bg-[#eef8f8] dark:bg-white/5" : "border-transparent hover:bg-[#f8f9fa] dark:hover:bg-white/5")}>
+                        <span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#e0f3f3] text-[#005c5e] dark:bg-[#0f7e7d]/20 dark:text-[#7fd3d3]">
+                          {item.kind === "document" ? <FileText className="h-4 w-4" /> : <ClipboardCheck className="h-4 w-4" />}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-[14px] font-medium text-[#10141a] dark:text-[#f4f6f7]">{item.title}</span>
+                          <span className="block truncate text-[12px] text-[#6b737a] dark:text-[#9aa4a8]">{careLabel(item.category || item.kind)}{item.createdAt ? ` · Submitted ${careDate(item.createdAt)}` : ""}</span>
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
-            ) : (
-              <CareEmpty
-                title={
-                  recovery
-                    ? "No visible publication issues"
-                    : "No submissions awaiting your review"
-                }
-              >
-                {recovery
-                  ? "Currently authorized publication exceptions appear here."
-                  : "A new submission becomes reviewable immediately after it is submitted."}
-              </CareEmpty>
+            </AgencyListCard>
+            {selected && (
+              <section aria-label={`Selected: ${selected.title}`} className="flex min-w-0 flex-col gap-4 rounded-[16px] border border-[#e4e7ea] bg-white p-5 dark:border-white/10 dark:bg-[#1b232b]">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="text-[20px] font-medium text-[#10141a] dark:text-[#f4f6f7]">{selected.title}</h2>
+                  <CarePill>{careLabel(selected.reviewStatus)}</CarePill>
+                </div>
+                <dl className="divide-y divide-[#eceef0] rounded-[12px] bg-[#f4f5f6] dark:divide-white/10 dark:bg-white/5">
+                  <div className={detailRow}><dt className="text-[#5b636b] dark:text-[#9aa4a8]">Type</dt><dd className="text-[#10141a] dark:text-[#f4f6f7]">{selected.kind === "document" ? "Document" : "Care update"}</dd></div>
+                  {version?.body?.serviceDate && <div className={detailRow}><dt className="text-[#5b636b] dark:text-[#9aa4a8]">Covers</dt><dd className="text-[#10141a] dark:text-[#f4f6f7]">{version.body.serviceDate}</dd></div>}
+                  {version && <div className={detailRow}><dt className="text-[#5b636b] dark:text-[#9aa4a8]">Version</dt><dd className="text-[#10141a] dark:text-[#f4f6f7]">{version.number}</dd></div>}
+                  <div className={detailRow}><dt className="text-[#5b636b] dark:text-[#9aa4a8]">Will publish to</dt><dd className="text-right text-[#10141a] dark:text-[#f4f6f7]">{selected.audience.length} {selected.audience.length === 1 ? "agency" : "agencies"}</dd></div>
+                </dl>
+                {(version?.body?.summary || version?.file) && (
+                  <div className="flex flex-col gap-2">
+                    <p className="rounded-[8px] bg-[#f4f5f6] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#5b636b] dark:bg-white/5 dark:text-[#9aa4a8]">Submitted version</p>
+                    <p className="whitespace-pre-wrap rounded-[12px] bg-[#f4f5f6] px-4 py-3 text-[14px] leading-6 text-[#10141a] dark:bg-white/5 dark:text-[#e6eaec]">
+                      {version?.body?.summary ?? version?.file?.fileName}
+                    </p>
+                  </div>
+                )}
+                <Link to={submissionLink(selected)} className={cn(agencyPrimaryButton, "w-full")}>Open to review</Link>
+              </section>
             )}
-          </CarePanel>
-          <CarePager cursor={list.data?.nextCursor} onNext={setCursor} />
+          </div>
+          <CarePager cursor={list.data?.nextCursor} onNext={(next) => { setSelectedId(""); setCursor(next); }} />
         </>
+      ) : (
+        <AgencyListCard label="Awaiting your review" className="px-5 py-4">
+          <CareEmpty title="No submissions awaiting your review">A new submission becomes reviewable immediately after it is submitted.</CareEmpty>
+        </AgencyListCard>
       )}
     </div>
   );
 }
-export function AgencyCareReviewQueue() {
-  return <SubmissionQueue />;
-}
+
+/** Publication recovery: approved items whose delivery to a destination failed or was withheld. */
 export function AgencyCareRecovery() {
-  return <SubmissionQueue recovery />;
+  const { list, setCursor } = useSubmissionPage("recovery");
+  const items = list.data?.items ?? [];
+  return (
+    <div className="flex flex-col gap-6">
+      <CareHeading
+        icon={RotateCcw}
+        title="Publication recovery"
+        description="Approved updates that could not reach a destination. Open one to fix it and publish again."
+      />
+      {list.loading ? (
+        <CareLoad />
+      ) : list.error ? (
+        <CareFailure message={list.error} onRetry={list.reload} />
+      ) : items.length ? (
+        <>
+          <AgencyListCard label="Destinations needing attention">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] border-collapse">
+                <thead>
+                  <tr className={agencyTheadRow}>
+                    <th scope="col" className={agencyTh}>Update</th>
+                    <th scope="col" className={agencyTh}>Destination</th>
+                    <th scope="col" className={agencyTh}>Reason</th>
+                    <th scope="col" className={agencyTh}><span className="sr-only">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item) => {
+                    const problems = (item.publicationOperations ?? []).filter(destinationProblem);
+                    return (
+                      <tr className={agencyTr} key={item.id}>
+                        <td className={agencyTd}>
+                          <span className="block font-medium">{item.title}</span>
+                          <span className="block text-[12px] text-[#6b737a] dark:text-[#9aa4a8]">{careLabel(item.reviewStatus)} · Publication: {careLabel(item.syncStatus || "not_required")}</span>
+                        </td>
+                        <td className={agencyTd}>
+                          {problems.length ? problems.map((operation) => <span key={operation.id} className="block">{operation.destinationName || "Connected agency"}</span>) : "Not available"}
+                        </td>
+                        <td className={agencyTd}>
+                          <div className="flex flex-wrap gap-1.5">
+                            {problems.length ? problems.map((operation) => <AgencyPill key={operation.id} tone="red">{careLabel(operation.reason || operation.status)}</AgencyPill>) : <CarePill>{careLabel(item.syncStatus || "not_required")}</CarePill>}
+                          </div>
+                        </td>
+                        <td className={`${agencyTd} text-right`}>
+                          <Link to={submissionLink(item)} className={agencyOutlineButton}>Review destination status</Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <p className="border-t border-[#eceef0] px-4 py-3 text-[13px] text-[#4b535b] dark:border-white/10 dark:text-[#9aa4a8]">
+              {items.length} {items.length === 1 ? "failed publication" : "failed publications"}{list.data?.nextCursor ? " on this page" : ""}
+            </p>
+          </AgencyListCard>
+          <CarePager cursor={list.data?.nextCursor} onNext={setCursor} />
+        </>
+      ) : (
+        <AgencyListCard label="Destinations needing attention" className="px-5 py-4">
+          <CareEmpty title="No visible publication issues">Currently authorized publication exceptions appear here.</CareEmpty>
+        </AgencyListCard>
+      )}
+    </div>
+  );
 }
 
 export function AgencyCareReports() {
@@ -172,17 +264,25 @@ export function AgencyCareReports() {
     link.click();
     URL.revokeObjectURL(url);
   }
+  const rows = report.data?.items ?? [];
+  const sum = (pick: (row: (typeof rows)[number]) => number | null | undefined) => rows.reduce((total, row) => total + (pick(row) ?? 0), 0);
+  const samples = sum((row) => row.reviewTurnaround?.averageHours != null ? row.reviewTurnaround.sampleSize : 0);
+  const averageHours = samples ? sum((row) => row.reviewTurnaround?.averageHours != null ? row.reviewTurnaround.averageHours * row.reviewTurnaround.sampleSize : 0) / samples : null;
+  const issued = sum((row) => row.invitationAcceptance?.issued);
+  const accepted = sum((row) => row.invitationAcceptance?.accepted);
+  const scopeNote = report.data?.nextCursor ? "Totals cover the clients on this page." : "Totals cover the clients you can access.";
   return (
-    <div className="ac-stack">
+    <div className="flex flex-col gap-6">
       <CareHeading
-        title="Care reports"
-        description="Review coordination and publication across your connected clients."
+        icon={BarChart3}
+        title="Reports"
+        description="How quickly reviews happen and how care is coordinated across your connected clients."
         actions={
           report.data && (
-            <Button variant="outline" onClick={exportRows}>
-              <Download size={16} aria-hidden="true" />
-              Export displayed rows
-            </Button>
+            <button type="button" className={agencyPrimaryButton} onClick={exportRows}>
+              <Download className="h-4 w-4" aria-hidden="true" />
+              Export CSV
+            </button>
           )
         }
       />
@@ -192,32 +292,44 @@ export function AgencyCareReports() {
         <CareFailure message={report.error} onRetry={report.reload} />
       ) : (
         <>
-          <CarePanel title="Client care summary">
-            {report.data?.items.length ? (
-              <div className="ac-table-wrap">
-                <table>
+          {rows.length > 0 && (
+            <div className="flex flex-col gap-3">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <AgencyStatCard icon={Hourglass} label="Average review time" value={averageHours == null ? "—" : `${averageHours < 10 ? averageHours.toFixed(1) : Math.round(averageHours)} h`}
+                  footnote={averageHours == null ? "No approved versions to measure yet." : `Submission to approval, ${samples} approved ${samples === 1 ? "version" : "versions"}.`} />
+                <AgencyStatCard icon={ClipboardCheck} label="Awaiting review" value={sum((row) => row.pendingReviewCount)} footnote="Submissions waiting for a reviewer." />
+                <AgencyStatCard icon={Undo2} label="Returned" value={sum((row) => row.revisionCount) + sum((row) => row.rejectionCount)} footnote="Revision requests and rejections." />
+                <AgencyStatCard icon={MailCheck} label="Invitations accepted" value={issued ? `${Math.round((accepted / issued) * 100)}%` : "—"}
+                  footnote={issued ? `${accepted} of ${issued} invitation records (includes resends).` : "No invitations sent yet."}>
+                  {issued > 0 && <AgencyProgressBar value={(accepted / issued) * 100} label="Invitations accepted" />}
+                </AgencyStatCard>
+              </div>
+              <p className="text-[12px] text-[#5b636b] dark:text-[#9aa4a8]">{scopeNote}</p>
+            </div>
+          )}
+          <AgencyPanel icon={Users} title="Client care summary" bodyClassName="p-0">
+            {rows.length ? (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] border-collapse">
                   <thead>
-                    <tr>
-                      <th>Client</th>
-                      <th>Active agencies</th>
-                      <th>Pending review</th>
-                      <th>Publication actions</th>
+                    <tr className={agencyTheadRow}>
+                      <th scope="col" className={agencyTh}>Client</th>
+                      <th scope="col" className={agencyTh}>Active agencies</th>
+                      <th scope="col" className={agencyTh}>Pending review</th>
+                      <th scope="col" className={agencyTh}>Publication actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {report.data.items.map((item) => (
-                      <tr key={item.networkId}>
-                        <td>
-                          <div className="ac-row-main">
-                            <CareAvatar size="sm" name={item.clientName} />
-                            <Link to={`/agency-care/networks/${encodeURIComponent(item.networkId)}/overview`}>
-                              {item.clientName}
-                            </Link>
-                          </div>
+                    {rows.map((item) => (
+                      <tr className={agencyTr} key={item.networkId}>
+                        <td className={agencyTd}>
+                          <Link to={`/agency-care/networks/${encodeURIComponent(item.networkId)}/overview`} className="hover:underline">
+                            <AgencyPerson name={item.clientName} />
+                          </Link>
                         </td>
-                        <td>{item.activeAgencies}</td>
-                        <td>{item.pendingReviewCount}</td>
-                        <td>
+                        <td className={agencyTd}>{item.activeAgencies}</td>
+                        <td className={agencyTd}>{item.pendingReviewCount > 0 ? <AgencyPill tone="amber">{item.pendingReviewCount} to review</AgencyPill> : <AgencyPill tone="green">Up to date</AgencyPill>}</td>
+                        <td className={agencyTd}>
                           {item.publicationActionCount ?? "Not available"}
                           <details className="ac-report-details">
                             <summary>More coordination metrics</summary>
@@ -252,11 +364,13 @@ export function AgencyCareReports() {
                 </table>
               </div>
             ) : (
-              <CareEmpty title="No report rows available">
-                This report includes only clients you may currently access.
-              </CareEmpty>
+              <div className="px-5 py-4">
+                <CareEmpty title="No report rows available">
+                  This report includes only clients you may currently access.
+                </CareEmpty>
+              </div>
             )}
-          </CarePanel>
+          </AgencyPanel>
           <CarePager cursor={report.data?.nextCursor} onNext={setCursor} />
         </>
       )}

@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { Link, useNavigate } from "react-router";
-import { Bell, Check, ClipboardCheck, FileText, LoaderCircle, Mail, MessageCircle, RefreshCw, RotateCcw, Users } from "lucide-react";
+import { Bell, Check, CheckCheck, ClipboardCheck, FileText, LoaderCircle, Mail, MessageCircle, RefreshCw, RotateCcw, Users } from "lucide-react";
 import { HeaderActionButton } from "@/components/DashboardHeader";
 import BellIcon from "@/assets/icons/bell.svg?react";
 import { agencyCareApi, type CareNotification } from "@/lib/api/agencyCare";
@@ -18,7 +18,6 @@ import {
   CareFailure,
   CareHeading,
   CareLoad,
-  CarePanel,
   CareStatus,
   careDate,
 } from "./ui";
@@ -114,11 +113,16 @@ export function useCareNotificationPoll(scope: string, agencyKey: string) {
 }
 
 type Inbox = ReturnType<typeof useCareNotificationPoll> & {
-  read: (id: string) => Promise<void>;
+  read: (id: string) => Promise<boolean>;
   saving: boolean;
   saveError: string;
 };
 const Context = createContext<Inbox | null>(null);
+/** Unread care notifications in the loaded inbox (the sidebar's Notifications count). */
+export function useCareUnreadCount() {
+  const inbox = useContext(Context);
+  return inbox?.items.filter((item) => item.status === "unread").length ?? 0;
+}
 export function CareNotificationButton() {
   const inbox = useContext(Context);
   const navigate = useNavigate();
@@ -148,12 +152,13 @@ export function CareNotificationProvider({
   const inbox = useCareNotificationPoll(scope, agencyKey);
   const mutation = useScopedMutation(`${scope}|notification-read`);
   async function read(id: string) {
-    if (!inbox.items.some((item) => item.id === id)) return;
+    if (!inbox.items.some((item) => item.id === id)) return false;
     const result = await mutation.run(async (_operationId, signal) => {
       await agencyCareApi.readNotification(id, { agencyKey, signal });
       return true;
     });
     if (result) inbox.refresh();
+    return Boolean(result);
   }
   return (
     <Context.Provider
@@ -177,6 +182,7 @@ export function AgencyCareNotifications() {
   const inbox = useContext(Context);
   const [filter, setFilter] = useState<"all" | "unread">("all");
   const [readingId, setReadingId] = useState<string | null>(null);
+  const [markingAll, setMarkingAll] = useState(false);
   if (!inbox)
     return (
       <CareFailure
@@ -190,16 +196,34 @@ export function AgencyCareNotifications() {
     setReadingId(id);
     try { await inbox.read(id); } finally { setReadingId(current => current === id ? null : current); }
   };
+  // No bulk endpoint: mark the loaded unread items one at a time, stopping at the first failure.
+  const markAllRead = async () => {
+    setMarkingAll(true);
+    try {
+      for (const item of inbox.items.filter((entry) => entry.status === "unread")) {
+        if (!(await inbox.read(item.id))) break;
+      }
+    } finally { setMarkingAll(false); }
+  };
   return (
     <div className="ac-stack ac-inbox">
       <CareHeading
-        title="Care notifications"
-        description="Care updates, invitations and requests available to your agency."
+        icon={Bell}
+        title="Notifications"
+        description="Care updates, invitations, replies and delivery problems for your agency."
         actions={
-          <Button variant="outline" disabled={inbox.loading} onClick={inbox.retry}>
-            <RefreshCw size={16} aria-hidden="true" />
-            Refresh
-          </Button>
+          <>
+            {unreadCount > 0 && !inbox.loading && !inbox.error && (
+              <Button variant="outline" disabled={inbox.saving || markingAll} aria-busy={markingAll} onClick={() => void markAllRead()}>
+                {markingAll ? <LoaderCircle size={16} aria-hidden="true" className="motion-safe:animate-spin" /> : <CheckCheck size={16} aria-hidden="true" />}
+                Mark all as read
+              </Button>
+            )}
+            <Button variant="outline" disabled={inbox.loading} onClick={inbox.retry}>
+              <RefreshCw size={16} aria-hidden="true" />
+              Refresh
+            </Button>
+          </>
         }
       />
       {inbox.loading ? (
@@ -207,11 +231,11 @@ export function AgencyCareNotifications() {
       ) : inbox.error ? (
         <CareFailure message={inbox.error} onRetry={inbox.retry} />
       ) : (
-        <CarePanel>
+        <div className="ac-inbox-body">
           <div className="ac-inbox-toolbar">
             <div className="ac-inbox-filters" role="group" aria-label="Notification filters" aria-describedby="care-notification-count-scope">
-              <Button variant="ghost" aria-pressed={filter === "all"} onClick={() => setFilter("all")}>All <span>{inbox.items.length}</span></Button>
               <Button variant="ghost" aria-pressed={filter === "unread"} onClick={() => setFilter("unread")}>Unread <span>{unreadCount}</span></Button>
+              <Button variant="ghost" aria-pressed={filter === "all"} onClick={() => setFilter("all")}>All <span>{inbox.items.length}</span></Button>
             </div>
             <p className="ac-inbox-result-count" role="status">{visibleItems.length} {filter === "unread" ? "unread" : "recent"} {visibleItems.length === 1 ? "notification" : "notifications"}</p>
           </div>
@@ -278,7 +302,7 @@ export function AgencyCareNotifications() {
               {filter === "unread" && inbox.items.length > 0 && <Button variant="outline" onClick={() => setFilter("all")}>View all notifications</Button>}
             </div>
           )}
-        </CarePanel>
+        </div>
       )}
       {inbox.saveError && (
         <CareFailure message={inbox.saveError} onRetry={inbox.retry} />

@@ -216,3 +216,18 @@ it("describes the notification destination and marks an opened item read only af
   expect(agencyCareApi.readNotification).toHaveBeenCalledWith("conversation", expect.objectContaining({ agencyKey: "internal:care", signal: expect.any(AbortSignal) }));
   expect(agencyCareApi.readNotification).toHaveBeenCalledTimes(1);
 });
+
+it("marks every loaded unread notification read with Mark all as read", async () => {
+  const second = { ...row, id: "second", title: "Family replied" };
+  vi.mocked(agencyCareApi.readNotification).mockResolvedValue(undefined as never);
+  vi.mocked(agencyCareApi.notifications).mockResolvedValueOnce({ notifications: [row, second] }).mockResolvedValue({ notifications: [{ ...row, status: "read" }, { ...second, status: "read" }] });
+  renderInbox();
+  await flush();
+  fireEvent.click(screen.getByRole("button", { name: "Mark all as read" }));
+  await flush();
+  await flush();
+  await flush();
+  expect(agencyCareApi.readNotification).toHaveBeenCalledWith("notice", expect.objectContaining({ agencyKey: "internal:care" }));
+  expect(agencyCareApi.readNotification).toHaveBeenCalledWith("second", expect.objectContaining({ agencyKey: "internal:care" }));
+  expect(screen.queryByRole("button", { name: "Mark all as read" })).not.toBeInTheDocument();
+});

@@ -1,36 +1,44 @@
-.agency-care .ac-inbox .ac-heading { gap: 14px; }
+.agency-care .ac-inbox-body { display: flex; flex-direction: column; gap: 12px; }
 .agency-care .ac-inbox-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
-.agency-care .ac-inbox-filters { display: inline-flex; padding: 4px; gap: 4px; border: 1px solid var(--ac-border); border-radius: 12px; background: var(--ac-hover); }
-.agency-care .ac-inbox-filters .ac-button { border-radius: 8px; min-height: 36px; gap: 8px; padding: 8px 12px; }
-.agency-care .ac-inbox-filters .ac-button[aria-pressed="true"] { color: var(--ac-on-primary); background: var(--ac-primary); }
-.agency-care .ac-inbox-filters .ac-button[aria-pressed="true"]:hover { color: var(--ac-on-primary); background: var(--ac-primary-hover); }
+.agency-care .ac-inbox-filters { display: inline-flex; padding: 4px; gap: 4px; border-radius: 12px; background: #f4f5f6; }
+.dark .agency-care .ac-inbox-filters { background: #ffffff0d; }
+.agency-care .ac-inbox-filters .ac-button { border-radius: 8px; min-height: 36px; gap: 8px; padding: 8px 12px; color: #4b535b; }
+.dark .agency-care .ac-inbox-filters .ac-button { color: var(--ac-muted); }
+.agency-care .ac-inbox-filters .ac-button[aria-pressed="true"] { color: #ffffff; background: #003839; }
+.agency-care .ac-inbox-filters .ac-button[aria-pressed="true"]:hover { color: #ffffff; background: #0b4c4d; }
 .agency-care .ac-inbox-filters .ac-button > span { display: inline-grid; place-items: center; min-width: 22px; height: 20px; padding: 0 5px; border-radius: 6px; background: var(--ac-panel); color: var(--ac-muted); font-size: 11px; line-height: 1; }
 .agency-care .ac-inbox-filters .ac-button[aria-pressed="true"] > span { color: var(--ac-on-primary); background: #ffffff26; }
 .agency-care .ac-inbox-result-count, .agency-care .ac-inbox-scope { color: var(--ac-muted); font-size: 12px; }
-.agency-care .ac-inbox-scope { margin-top: 12px; line-height: 1.5; }
-.agency-care .ac-inbox-list { list-style: none; padding: 0; margin: 18px 0 0; }
-.agency-care .ac-inbox-list > li { border-top: 1px solid var(--ac-border); }
-.agency-care .ac-inbox-row { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: start; gap: 14px; padding: 20px 0; }
-.agency-care .ac-inbox-list > li:last-child .ac-inbox-row { padding-bottom: 0; }
-.agency-care .ac-inbox-icon { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 12px; color: var(--ac-muted); background: var(--ac-hover); }
-.agency-care .ac-inbox-unread .ac-inbox-icon { color: var(--ac-teal); background: var(--ac-soft); }
+.agency-care .ac-inbox-scope { margin: 0; line-height: 1.5; }
+.agency-care .ac-inbox-list { list-style: none; padding: 0; margin: 0; overflow: hidden; border: 1px solid #e4e7ea; border-radius: 16px; background: var(--ac-panel); }
+.dark .agency-care .ac-inbox-list { border-color: #ffffff1a; }
+.agency-care .ac-inbox-list > li + li { border-top: 1px solid #eceef0; }
+.dark .agency-care .ac-inbox-list > li + li { border-color: #ffffff1a; }
+.agency-care .ac-inbox-row { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: start; gap: 14px; padding: 14px 18px; }
+.agency-care .ac-inbox-row.ac-inbox-unread { background: #f2fafa; }
+.dark .agency-care .ac-inbox-row.ac-inbox-unread { background: #ffffff0a; }
+.agency-care .ac-inbox-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; color: #4b535b; background: #ffffff; border: 1px solid #e4e7ea; }
+.agency-care .ac-inbox-unread .ac-inbox-icon { color: #007679; }
+.dark .agency-care .ac-inbox-icon { color: var(--ac-muted); background: var(--ac-hover); border-color: #ffffff1a; }
+.dark .agency-care .ac-inbox-unread .ac-inbox-icon { color: var(--ac-teal); }
 .agency-care .ac-inbox-copy { min-width: 0; }
 .agency-care .ac-inbox-title { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.agency-care .ac-inbox-title h3 { font-size: 14px; font-weight: 550; line-height: 1.5; overflow-wrap: anywhere; }
+.agency-care .ac-inbox-title h3 { margin: 0; font-size: 14px; font-weight: 550; line-height: 1.5; overflow-wrap: anywhere; }
 .agency-care .ac-inbox-unread h3 { font-weight: 700; }
-.agency-care .ac-inbox-copy > p { color: var(--ac-muted); font-size: 13px; line-height: 1.6; margin-top: 5px; overflow-wrap: anywhere; }
-.agency-care .ac-inbox-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 9px; color: var(--ac-muted); font-size: 11px; }
+.agency-care .ac-inbox-copy > p { color: var(--ac-muted); font-size: 13px; line-height: 1.5; margin: 2px 0 0; overflow-wrap: anywhere; }
+.agency-care .ac-inbox-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 6px; color: var(--ac-muted); font-size: 11px; }
 .agency-care .ac-inbox-read-state { display: inline-flex; align-items: center; gap: 5px; }
 .agency-care .ac-inbox-read-state-unread { color: var(--ac-teal); }
 .agency-care .ac-inbox-unread-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .agency-care .ac-inbox-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; padding-top: 2px; }
 .agency-care .ac-inbox-actions .ac-button { font-size: 12px; padding: 7px 10px; }
-.agency-care .ac-inbox-empty { display: grid; justify-items: center; padding: 42px 16px 28px; text-align: center; }
-.agency-care .ac-inbox-empty-icon { display: grid; place-items: center; width: 60px; height: 60px; background: var(--ac-soft); color: var(--ac-teal); border-radius: 18px; }
+.agency-care .ac-inbox-empty { display: grid; justify-items: center; padding: 42px 16px 28px; text-align: center; border: 1px solid #e4e7ea; border-radius: 16px; }
+.dark .agency-care .ac-inbox-empty { border-color: #ffffff1a; }
+.agency-care .ac-inbox-empty-icon { display: grid; place-items: center; width: 52px; height: 52px; background: #f4f5f6; color: #4b535b; border-radius: 50%; }
+.dark .agency-care .ac-inbox-empty-icon { background: var(--ac-hover); color: var(--ac-muted); }
 .agency-care .ac-inbox-empty .ac-empty { border: 0; background: transparent; padding: 16px 0; max-width: 400px; }
 @media (max-width: 760px) {
-  .agency-care .ac-inbox-row { grid-template-columns: 38px minmax(0, 1fr); gap: 12px; }
-  .agency-care .ac-inbox-icon { width: 38px; height: 38px; border-radius: 10px; }
+  .agency-care .ac-inbox-row { grid-template-columns: 36px minmax(0, 1fr); gap: 12px; padding-inline: 14px; }
   .agency-care .ac-inbox-actions { grid-column: 2; justify-content: flex-start; padding: 0; }
   .agency-care .ac-inbox-empty { padding-inline: 0; }
 }
