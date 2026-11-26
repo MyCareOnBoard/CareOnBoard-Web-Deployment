@@ -123,7 +123,7 @@ export const EVV_MODE_LABELS: Record<EvvMode, string> = {
 export const EVV_SOURCE_LABELS: Record<EvvSource, string> = {
   service: "Set on this service",
   sdr: "From the SDR",
-  hha_default: "HHA default",
+  hha_default: "HHA default (Individual Support and CBS only)",
   client: "Client EVV setting",
 };
 
