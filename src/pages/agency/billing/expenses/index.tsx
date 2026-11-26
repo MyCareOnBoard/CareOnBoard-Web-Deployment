@@ -29,6 +29,7 @@ import {
   STATUS_LABEL_TO_FILTER,
 } from "./utils/expensesDashboardUtils";
 import ExpenseDetailsDrawer from "./components/ExpenseDetailsDrawer";
+import ExpenseSettingsDialog from "./components/ExpenseSettingsDialog";
 
 const RejectExpenseModal = lazy(() => import("./components/RejectExpenseModal"));
 
@@ -47,6 +48,7 @@ export function ExpensesDashboardContent() {
   const [approveTarget, setApproveTarget] = useState<AgencyExpenseListItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AgencyExpenseListItem | null>(null);
   const [viewTarget, setViewTarget] = useState<AgencyExpenseListItem | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const lastDashboardErrorRef = useRef<string | null>(null);
   const lastListErrorRef = useRef<string | null>(null);
   const activeAgencyRef = useRef(agencyId);
@@ -336,10 +338,21 @@ export function ExpensesDashboardContent() {
   }, [activeTab, allQuery.error, allQuery.isError, toast]);
 
   const actionsDisabled = isApproving || isDeclining || isDeleting;
+  const knownCategories = useMemo(
+    () => [...(pendingQuery.data?.expenses ?? []), ...(allQuery.data?.expenses ?? [])]
+      .map((expense) => expense.category)
+      .filter((category): category is string => Boolean(category)),
+    [allQuery.data?.expenses, pendingQuery.data?.expenses],
+  );
 
   return (
     <div className="min-h-[calc(100vh-200px)] space-y-6 pb-8">
-      <ExpensesDashboardHeader dateRange={dateRange} onDateRangeChange={handleDateRangeChange} noun={staffNoun} />
+      <ExpensesDashboardHeader
+        dateRange={dateRange}
+        onDateRangeChange={handleDateRangeChange}
+        noun={staffNoun}
+        onOpenSettings={hasAgency ? () => setSettingsOpen(true) : undefined}
+      />
       <ExpensesOverviewCards stats={overviewStats} loading={dashboardLoading} />
       <ExpensesByStatusChart
         chart={statusChart}
@@ -427,11 +440,20 @@ export function ExpensesDashboardContent() {
 
       <ExpenseDetailsDrawer
         expense={viewTarget}
+        agencyId={agencyId}
         onClose={() => setViewTarget(null)}
         onApprove={(expense) => void handleDrawerApprove(expense)}
         onDecline={(expense, notes) => void handleDrawerDecline(expense, notes)}
         approving={isApproving}
         declining={isDeclining}
+        noun={staffNoun}
+      />
+
+      <ExpenseSettingsDialog
+        open={settingsOpen}
+        agencyId={agencyId}
+        knownCategories={knownCategories}
+        onClose={() => setSettingsOpen(false)}
         noun={staffNoun}
       />
 

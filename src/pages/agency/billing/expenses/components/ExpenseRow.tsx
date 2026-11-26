@@ -26,7 +26,8 @@ type ExpenseRowProps =
 
 function formatExpenseDate(value: string | null) {
   if (!value) return "—";
-  const parsed = new Date(value);
+  // Date-only values are calendar days; read them as local midnight, not UTC.
+  const parsed = new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00` : value);
   return Number.isNaN(parsed.getTime())
     ? value
     : parsed.toLocaleDateString("en-US");

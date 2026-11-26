@@ -38,6 +38,50 @@ export type AgencyExpenseListItem = {
   reviewedAt: string | null;
   reviewerNotes: string | null;
   payrollInvoiceId: string | null;
+  /** Shift the DSP linked the expense to, when the app sent one. */
+  shiftId?: string | null;
+};
+
+export type ExpensePerShiftLimit = { category: string; amount: number };
+
+export type ExpenseSettings = {
+  perShiftLimits: ExpensePerShiftLimit[];
+  updatedAt?: string | null;
+};
+
+export type ExpenseReceiptCheck = {
+  /** match / mismatch: the receipt's total vs the claimed amount. unavailable: receipt reading is off. */
+  status: "match" | "mismatch" | "unreadable" | "missing" | "unavailable";
+  total?: number | null;
+  merchant?: string | null;
+  date?: string | null;
+  summary?: string | null;
+  checkedAt?: string | null;
+};
+
+export type ExpenseReview = {
+  expenseId: string;
+  shift: {
+    id: string;
+    date: string | null;
+    startTime: string | null;
+    endTime: string | null;
+    timezone: string | null;
+    clientId: string | null;
+    clientName: string | null;
+  } | null;
+  /** "shift": linked by the app. "date": the DSP's only shift that day. */
+  shiftMatchedBy: "shift" | "date" | null;
+  sameDayShiftCount: number;
+  receipt: ExpenseReceiptCheck;
+  limit: {
+    category: string;
+    limit: number;
+    spent: number;
+    otherExpenseCount: number;
+    scope: "shift" | "day";
+    withinLimit: boolean;
+  } | null;
 };
 
 export type ExpensesDashboardQuery = {
@@ -62,7 +106,7 @@ export type ExpensesListResponse = {
   hasMore: boolean;
 };
 
-type BillingExpenseTagType = "ExpensesDashboard" | "ExpensesList";
+type BillingExpenseTagType = "ExpensesDashboard" | "ExpensesList" | "ExpenseSettings" | "ExpenseReview";
 
 export function billingExpenseTag(type: BillingExpenseTagType, agencyId: string) {
   return { type, id: operationalAgencyId({ agencyId }) } as const;
@@ -144,7 +188,7 @@ export function buildExpensesMutationRequest(
 export const billingExpensesApi = createApi({
   reducerPath: "billingExpensesApi",
   baseQuery: customBaseQuery,
-  tagTypes: ["ExpensesDashboard", "ExpensesList"],
+  tagTypes: ["ExpensesDashboard", "ExpensesList", "ExpenseSettings", "ExpenseReview"],
   endpoints: (builder) => ({
     getExpensesDashboard: builder.query<ExpensesDashboardSummary, ExpensesDashboardQuery>({
       query: buildExpensesDashboardRequest,
@@ -186,6 +230,37 @@ export const billingExpensesApi = createApi({
         billingExpenseTag("ExpensesList", agencyId),
       ],
     }),
+    getExpenseReview: builder.query<ExpenseReview, { agencyId: string; expenseId: string }>({
+      query: ({ agencyId, expenseId }) => ({
+        url: `/billing/expenses/${encodeURIComponent(expenseId)}/review?agencyId=${encodeURIComponent(operationalAgencyId({ agencyId }))}`,
+        method: "GET",
+        requiresAuth: true,
+      }),
+      transformResponse: (response: { success: boolean; data: ExpenseReview }) => response.data,
+      providesTags: (_result, _error, { agencyId }) => [billingExpenseTag("ExpenseReview", agencyId)],
+    }),
+    getExpenseSettings: builder.query<ExpenseSettings, { agencyId: string }>({
+      query: ({ agencyId }) => ({
+        url: `/billing/expenses/settings?agencyId=${encodeURIComponent(operationalAgencyId({ agencyId }))}`,
+        method: "GET",
+        requiresAuth: true,
+      }),
+      transformResponse: (response: { success: boolean; data: ExpenseSettings }) => response.data,
+      providesTags: (_result, _error, { agencyId }) => [billingExpenseTag("ExpenseSettings", agencyId)],
+    }),
+    updateExpenseSettings: builder.mutation<ExpenseSettings, { agencyId: string; perShiftLimits: ExpensePerShiftLimit[] }>({
+      query: ({ agencyId, perShiftLimits }) => ({
+        url: `/billing/expenses/settings?agencyId=${encodeURIComponent(operationalAgencyId({ agencyId }))}`,
+        method: "PUT",
+        data: { perShiftLimits },
+        requiresAuth: true,
+      }),
+      transformResponse: (response: { success: boolean; data: ExpenseSettings }) => response.data,
+      invalidatesTags: (_result, error, { agencyId }) => (error ? [] : [
+        billingExpenseTag("ExpenseSettings", agencyId),
+        billingExpenseTag("ExpenseReview", agencyId),
+      ]),
+    }),
     approveExpense: builder.mutation<
       { success: boolean; message: string; data: { id: string; status: string } },
       { agencyId: string; expenseId: string }
@@ -225,4 +300,7 @@ export const {
   useApproveExpenseMutation,
   useRejectExpenseMutation,
   useDeleteExpenseMutation,
+  useGetExpenseReviewQuery,
+  useGetExpenseSettingsQuery,
+  useUpdateExpenseSettingsMutation,
 } = billingExpensesApi;

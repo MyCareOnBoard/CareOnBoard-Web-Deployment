@@ -1,14 +1,16 @@
 import { useEffect, useId, useState, type ReactNode } from "react";
-import { CalendarDays, CircleDot, Coins, FileText, LayoutGrid, Loader2, MessageSquareText, ReceiptText, UserRound, Wallet, X } from "lucide-react";
+import { AlertTriangle, CalendarClock, CalendarDays, CircleCheck, CircleDot, Coins, FileText, LayoutGrid, Loader2, MessageSquareText, ReceiptText, UserRound, Wallet, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { AgencyPill, type AgencyTone } from "@/components/agency/AgencyListKit";
-import type { AgencyExpenseListItem } from "@/lib/api/billing-expenses";
+import { useGetExpenseReviewQuery, type AgencyExpenseListItem, type ExpenseReview } from "@/lib/api/billing-expenses";
 import { formatCurrency } from "@/pages/agency/billing-and-approvals/billingUtils";
 import { cn } from "@/lib/utils";
 import { MIN_REJECTION_REASON_LENGTH } from "../utils/expensesDashboardUtils";
 
 type ExpenseDetailsDrawerProps = {
   expense: AgencyExpenseListItem | null;
+  /** Loads the shift, client, receipt check and limit for the expense. */
+  agencyId?: string;
   /** Agency of the expense, shown on the network (super-admin) pages. */
   agencyName?: string;
   /** Approve and Decline show only for pending expenses when both handlers are given. */
@@ -41,7 +43,8 @@ export function receiptFileName(url: string): string {
 
 function formatDateTime(value: string | null, withTime: boolean) {
   if (!value) return null;
-  const parsed = new Date(value);
+  // A bare "2026-11-21" is a calendar day; read it as local midnight so it doesn't slip a day west of UTC.
+  const parsed = new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00` : value);
   if (Number.isNaN(parsed.getTime())) return value;
   return parsed.toLocaleString("en-US", {
     day: "numeric",
@@ -126,9 +129,96 @@ function Receipt({ url: rawUrl, summary }: { url: string | null; summary: string
   );
 }
 
+function formatShift(shift: NonNullable<ExpenseReview["shift"]>) {
+  const day = shift.date ? formatDateTime(shift.date, false)?.replace(/, \d{4}$/, "") : null;
+  const times = [shift.startTime, shift.endTime].filter(Boolean).join(" – ");
+  return [day, times].filter(Boolean).join(" · ") || "Shift";
+}
+
+function ShiftValue({ review, loading }: { review: ExpenseReview | undefined; loading: boolean }) {
+  if (loading) return <span className="inline-block h-4 w-28 animate-pulse rounded bg-[#e9ecee] dark:bg-white/10" aria-label="Loading" />;
+  if (!review) return <>—</>;
+  if (review.shift) {
+    return (
+      <>
+        {formatShift(review.shift)}
+        {review.shiftMatchedBy === "date" ? (
+          <span className="block text-[12px] font-normal text-[#6b737a] dark:text-[#9aa4a8]">Their only shift that day</span>
+        ) : null}
+      </>
+    );
+  }
+  return (
+    <span className="font-normal text-[#6b737a] dark:text-[#9aa4a8]">
+      {review.sameDayShiftCount > 1 ? `${review.sameDayShiftCount} shifts that day` : "No shift that day"}
+    </span>
+  );
+}
+
+type CheckLine = { tone: "good" | "warn" | "muted"; title: string; detail?: string };
+
+/** The receipt and limit lines under the receipt, worst tone first. */
+export function reviewCheckLines(review: ExpenseReview | undefined, amount: number): CheckLine[] {
+  if (!review) return [];
+  const lines: CheckLine[] = [];
+  const { receipt, limit } = review;
+  const receiptDetail = [receipt.merchant, receipt.summary].filter(Boolean).join(" · ") || undefined;
+  if (receipt.status === "match") {
+    lines.push({ tone: "good", title: "Amount matches the receipt", detail: receiptDetail });
+  } else if (receipt.status === "mismatch" && receipt.total != null) {
+    lines.push({
+      tone: "warn",
+      title: `Receipt shows ${formatCurrency(receipt.total)}, not ${formatCurrency(amount)}`,
+      detail: receiptDetail,
+    });
+  } else if (receipt.status === "unreadable") {
+    lines.push({ tone: "muted", title: "Couldn't read the total on the receipt", detail: "Check the amount against the receipt yourself." });
+  }
+  if (limit) {
+    const label = `${formatCurrency(limit.limit)} per-shift ${limit.category.toLowerCase()} limit`;
+    const where = limit.scope === "shift" ? "on this shift" : "that day (no shift linked)";
+    const spent = limit.otherExpenseCount
+      ? `${formatCurrency(limit.spent)} spent ${where}, with ${limit.otherExpenseCount} other ${limit.otherExpenseCount === 1 ? "expense" : "expenses"}.`
+      : undefined;
+    lines.push(
+      limit.withinLimit
+        ? { tone: "good", title: `Inside the ${label}`, detail: spent }
+        : { tone: "warn", title: `Over the ${label}`, detail: spent ?? `${formatCurrency(limit.spent)} spent ${where}.` },
+    );
+  }
+  return lines.sort((left, right) => (left.tone === "warn" ? -1 : 0) - (right.tone === "warn" ? -1 : 0));
+}
+
+const CHECK_TONE: Record<CheckLine["tone"], string> = {
+  good: "bg-[#ecfdf3] text-[#05603a] dark:bg-[#0eaf52]/10 dark:text-[#7fe0a7]",
+  warn: "bg-[#fffaeb] text-[#93370d] dark:bg-[#f59e0b]/10 dark:text-[#fcd34d]",
+  muted: "bg-[#f4f5f6] text-[#4b535b] dark:bg-white/5 dark:text-[#c9d1d4]",
+};
+
+function ReviewChecks({ lines }: { lines: CheckLine[] }) {
+  if (!lines.length) return null;
+  return (
+    <ul className="space-y-2" aria-label="Checks">
+      {lines.map((line) => {
+        const Icon = line.tone === "good" ? CircleCheck : AlertTriangle;
+        return (
+          <li key={line.title} className={cn("flex gap-2.5 rounded-[12px] px-3 py-2.5 text-[13px]", CHECK_TONE[line.tone])}>
+            <Icon aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              <span className="block font-semibold">{line.title}</span>
+              {line.detail ? <span className="block opacity-90">{line.detail}</span> : null}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 /** Side drawer with an expense's details and receipt, where a pending expense can be approved or declined. */
 export default function ExpenseDetailsDrawer({
   expense,
+  agencyId,
   agencyName,
   onApprove,
   onDecline,
@@ -141,6 +231,12 @@ export default function ExpenseDetailsDrawer({
   const [note, setNote] = useState("");
   const [noteError, setNoteError] = useState<string | null>(null);
   const expenseId = expense?.id;
+  const reviewQuery = useGetExpenseReviewQuery(
+    { agencyId: agencyId ?? "", expenseId: expenseId ?? "" },
+    { skip: !agencyId || !expenseId },
+  );
+  const review = reviewQuery.currentData;
+  const reviewLoading = Boolean(agencyId) && reviewQuery.isFetching && !review;
 
   useEffect(() => {
     setNote("");
@@ -203,6 +299,14 @@ export default function ExpenseDetailsDrawer({
             <dl className="rounded-[12px] bg-[#f8f9fa] px-3 py-1 dark:bg-white/5">
               {agencyName ? <DetailRow icon={UserRound} label="Agency">{agencyName}</DetailRow> : null}
               <DetailRow icon={UserRound} label={noun}>{expense.employeeName || "—"}</DetailRow>
+              {agencyId ? (
+                <>
+                  <DetailRow icon={UserRound} label="Client">
+                    {reviewLoading ? <ShiftValue review={undefined} loading /> : review?.shift?.clientName || "—"}
+                  </DetailRow>
+                  <DetailRow icon={CalendarClock} label="Shift"><ShiftValue review={review} loading={reviewLoading} /></DetailRow>
+                </>
+              ) : null}
               <DetailRow icon={CalendarDays} label="Expense date">{formatDateTime(expense.date, false) ?? "—"}</DetailRow>
               <DetailRow icon={LayoutGrid} label="Category">{expense.category || "—"}</DetailRow>
               <DetailRow icon={Coins} label="Amount"><span className="tabular-nums">{amount}</span></DetailRow>
@@ -222,6 +326,17 @@ export default function ExpenseDetailsDrawer({
           <section aria-label="Receipt" className="space-y-2">
             <SectionTitle>Receipt</SectionTitle>
             <Receipt url={expense.receiptUrl} summary={[expense.category, amount].filter(Boolean).join(" · ")} />
+            {reviewLoading ? (
+              <p className="flex items-center gap-2 text-[12px] text-[#6b737a] dark:text-[#9aa4a8]">
+                <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin" />
+                Checking the receipt…
+              </p>
+            ) : (
+              <ReviewChecks lines={reviewCheckLines(review, expense.amount)} />
+            )}
+            {reviewQuery.isError && !review ? (
+              <p className="text-[12px] text-[#6b737a] dark:text-[#9aa4a8]">Couldn&apos;t load the shift and receipt check.</p>
+            ) : null}
           </section>
 
           {expense.status !== "pending" ? (

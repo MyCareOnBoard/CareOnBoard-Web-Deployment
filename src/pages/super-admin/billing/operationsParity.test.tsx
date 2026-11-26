@@ -56,6 +56,9 @@ vi.mock("@/lib/api/billing-expenses", () => ({
   useApproveExpenseMutation: () => [expenseApi.approve, { isLoading: false }],
   useRejectExpenseMutation: () => [expenseApi.reject, { isLoading: false }],
   useDeleteExpenseMutation: () => [expenseApi.remove, { isLoading: false }],
+  useGetExpenseReviewQuery: () => ({ currentData: undefined, isFetching: false, isError: false }),
+  useGetExpenseSettingsQuery: () => ({ currentData: undefined, isError: false }),
+  useUpdateExpenseSettingsMutation: () => [vi.fn(), { isLoading: false }],
 }));
 vi.mock("@/lib/api/staff-timesheets", () => ({
   listStaffTimesheets: timesheetApi.list,
