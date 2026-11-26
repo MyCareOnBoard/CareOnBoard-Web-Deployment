@@ -14,7 +14,7 @@ describe('compliance patterns URL', () => {
 describe('workspace access and URL boundary', () => {
   it('intersects workspace with independent source grants', () => {
     expect(getComplianceSources(staff(['Compliance Alerts', 'Trainings']), 'ddd')).toEqual(['document_expiry', 'training']);
-    expect(getComplianceSources(staff(['Compliance Alerts', 'Client Management']), 'hha')).toEqual(['client_documents', 'manual_audits', 'unsigned_form485']);
+    expect(getComplianceSources(staff(['Compliance Alerts', 'Client Management']), 'hha')).toEqual(['client_documents', 'manual_audits', 'unsigned_form485', 'service_authorizations']);
     expect(getComplianceSources(staff(['Compliance Alerts', 'Notes', 'Scheduling']), 'ddd')).toEqual(['shift_notes', 'documentation_patterns', 'community_inclusion']);
     expect(getComplianceSources(staff(['Compliance Alerts', 'Notes', 'Shift Management']), 'ddd')).toEqual(['shift_notes', 'documentation_patterns', 'community_inclusion']);
     expect(getComplianceSources(staff(['Compliance Alerts', 'Notes']), 'ddd')).toEqual(['documentation_patterns', 'community_inclusion']);
@@ -22,6 +22,8 @@ describe('workspace access and URL boundary', () => {
     expect(getComplianceSources(staff(['Compliance Alerts', 'Notes']), 'sc')).toEqual([]);
     expect(getComplianceSources(staff(['Compliance Alerts']), 'ddd')).toEqual([]);
     expect(getComplianceSources(staff(['Trainings']), 'ddd')).toEqual([]);
+    expect(parseComplianceView(new URLSearchParams('section=clients&source=service_authorizations&clientId=c1&condition=expired'))).toMatchObject({ok: true, view: {source: 'service_authorizations', section: 'clients', clientId: 'c1', condition: 'expired'}});
+    expect(parseComplianceView(new URLSearchParams('source=service_authorizations&startDate=2026-09-01')).ok).toBe(false);
     expect(getComplianceSources(staff(['Compliance Alerts', 'Client Management']), 'ddd')).toContain('manual_audits');
     expect(getComplianceSources(staff(['Compliance Alerts', 'Client Management']), 'hha')).toContain('manual_audits');
     expect(getComplianceSources(staff(['Compliance Alerts', 'Client Management']), 'sc')).not.toContain('manual_audits');
@@ -35,7 +37,7 @@ describe('workspace access and URL boundary', () => {
     }
   });
   it('retains owner and SC staff capabilities without broadening explicit grants', () => {
-    expect(getComplianceSources({userType: 'agency', agency: {supportedClientTypes: ['ddd']}}, 'ddd')).toEqual(['document_expiry', 'training', 'client_documents', 'manual_audits', 'shift_notes', 'documentation_patterns', 'community_inclusion']);
+    expect(getComplianceSources({userType: 'agency', agency: {supportedClientTypes: ['ddd']}}, 'ddd')).toEqual(['document_expiry', 'training', 'client_documents', 'manual_audits', 'shift_notes', 'documentation_patterns', 'community_inclusion', 'service_authorizations']);
     expect(getComplianceSources(staff(['Compliance Alerts', 'DSP Management', 'Trainings', 'Client Management']), 'sc')).toEqual(['document_expiry', 'training']);
     for (const grant of [[], 'ddd', ['bad'], ['ddd', 'ddd']]) expect(getComplianceSources(staff(['Compliance Alerts', 'Trainings'], grant), 'ddd')).toEqual([]);
   });

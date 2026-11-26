@@ -4,12 +4,16 @@ import { ChevronRight, Receipt, Wallet } from "lucide-react";
 import { AgencyPanel } from "@/components/agency/AgencyShell";
 import { useToast } from "@/hooks/use-toast";
 import { useOperationalAgency } from "@/lib/operational-agency/OperationalAgencyProvider";
+import { canAccessBillingChild } from "@/lib/agency/agency-billing-permissions";
 import { Routes } from "@/routes/constants";
+import { useAuth } from "@/utils/auth";
+import { UserType } from "@/utils/auth/types/user.types";
 import { useOptionalBillingWorkspaceContext } from "@/pages/super-admin/billing/BillingWorkspaceContext";
 import BillingStatusBreakdown from "../components/BillingStatusBreakdown";
 import { getCurrentWeekDateRange } from "../claims/utils/claimsDashboardUtils";
 import FinancialOverviewCards from "./components/FinancialOverviewCards";
 import FinancialOverviewHeader from "./components/FinancialOverviewHeader";
+import ProfitLossPanel from "./components/ProfitLossPanel";
 import RecentActivityTable from "./components/RecentActivityTable";
 import { useFinancialOverview } from "./hooks/useFinancialOverview";
 import { financialSummaryCsv } from "./utils/financialOverviewUtils";
@@ -42,6 +46,12 @@ function FinancialOverviewContent() {
     : standaloneDateRange;
   const onDateRangeChange = workspace?.onDateRangeChange ?? setStandaloneDateRange;
   const overview = useFinancialOverview(dateRange);
+  const { agencyId, mode } = useOperationalAgency();
+  const { user } = useAuth();
+  const accessList = user?.profile?.accessList ?? [];
+  const isSuperAdmin = user?.userType === UserType.SUPER_ADMIN;
+  const canViewLedger = isSuperAdmin || canAccessBillingChild(user?.userType, accessList, "Expenses View");
+  const canManageLedger = isSuperAdmin || canAccessBillingChild(user?.userType, accessList, "Expenses Management");
   // The links lead to the agency billing pages; the super-admin workspace has its own navigation.
   const showLinks = !workspace;
 
@@ -127,6 +137,10 @@ function FinancialOverviewContent() {
           />
         </AgencyPanel>
       </div>
+
+      {agencyId && (
+        <ProfitLossPanel agencyId={agencyId} mode={mode} canViewLedger={canViewLedger} canManageLedger={canManageLedger} />
+      )}
 
       <RecentActivityTable activity={overview.recentActivity} loading={overview.loading} />
     </div>

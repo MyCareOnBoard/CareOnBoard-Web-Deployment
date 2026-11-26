@@ -22,6 +22,7 @@ import ClientChecks from "./ClientChecks";
 import ShiftNotesSection from "./ShiftNotesSection";
 import ManualAuditsSection from "./ManualAuditsSection";
 import CommunityInclusionSection from "./CommunityInclusionSection";
+import ServiceAuthorizationsSection from "./ServiceAuthorizationsSection";
 import AgencyFindings from "./AgencyFindings";
 const restricted =
   "You do not have access to these records. Ask your agency administrator.";
@@ -321,6 +322,9 @@ function Workspace({
         )}
         {source === "community_inclusion" && (
           <CommunityInclusionSection key={source} {...props} />
+        )}
+        {source === "service_authorizations" && (
+          <ServiceAuthorizationsSection key={source} view={view} mode={mode} onApply={onApply} />
         )}
       </div>
     </>
