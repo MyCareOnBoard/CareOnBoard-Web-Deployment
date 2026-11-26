@@ -6,6 +6,7 @@ import { assignmentReviewMetadata, assignmentSaveMessage, type AssignmentReviewE
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { X, ChevronDown, Calendar, Upload, ChevronLeft, ChevronRight, FileText, Loader2, ExternalLink, Clock, UserRound } from "lucide-react";
 import { DrawerNote, DrawerSection, DrawerSegmented, DRAWER_FIELD, DRAWER_PRIMARY, DRAWER_SECONDARY } from "@/components/agency/ScheduleDrawerParts";
+import { ServiceHoursRemaining } from "./ServiceHoursRemaining";
 import { clock24, formatDuration, scheduledMinutes } from "../shift-board";
 import { Button } from "@/components/ui/button";
 import TimePicker from "@/components/TimePicker";
@@ -2613,6 +2614,16 @@ export default function AddScheduleModal({
                     <span className="text-[12px] font-normal text-[#808081]">
                       Authorization: {formatServiceAuthorizationDatesSummary(selectedService)}
                     </span>
+                  ) : null}
+                  {selectedService && formData.clientId ? (
+                    <ServiceHoursRemaining
+                      agencyId={agencyId}
+                      clientId={formData.clientId}
+                      serviceCode={formData.serviceCode}
+                      serviceAuthorizationId={formData.serviceAuthorizationId}
+                      date={formData.schedulingType === "recurring" ? formData.startDate : formData.date}
+                      excludeShiftId={mode === "edit" ? formData.shiftId : undefined}
+                    />
                   ) : null}
                   {selectedService && (selectedService.clientRate || selectedService.clientPayType) && (
                     <span className="text-[12px] font-normal text-[#808081]">

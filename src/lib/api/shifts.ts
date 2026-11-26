@@ -760,6 +760,54 @@ export const updateShift = async (
     }
 };
 
+export interface ServiceHoursUsage {
+    service: { id: string | null; code: string | null; name: string | null } | null;
+    /** Weekly limit (service hours per week or the matching SDR week); null when none applies. */
+    weekly: {
+        capHours: number;
+        usedHours: number;
+        remainingHours: number;
+        weekStart: string;
+        weekEnd: string;
+    } | null;
+    /** Total limit for the authorization window; units are set when the unit type is time-based. */
+    total: {
+        capHours: number;
+        usedHours: number;
+        remainingHours: number;
+        unitType: string | null;
+        capUnits: number | null;
+        usedUnits: number | null;
+        remainingUnits: number | null;
+        startDate: string;
+        endDate: string;
+        source: "hours" | "units";
+    } | null;
+}
+
+export interface ServiceHoursUsageQuery {
+    agencyId: string;
+    clientId: string;
+    serviceCode: string;
+    /** YYYY-MM-DD; picks the week and authorization window. */
+    date: string;
+    serviceAuthorizationId?: string;
+    /** Leave this shift's own hours out (editing). */
+    excludeShiftId?: string;
+}
+
+/** Authorized vs already-scheduled hours and units for one client service. */
+export const getServiceHoursUsage = async (
+    query: ServiceHoursUsageQuery,
+    options?: { signal?: AbortSignal },
+): Promise<ServiceHoursUsage> => {
+    const response = await axiosClient.get<{ success: boolean; data: ServiceHoursUsage }>(
+        `${SHIFT_BASE}/service-hours-usage`,
+        { params: query, signal: options?.signal },
+    );
+    return response.data.data;
+};
+
 /**
  * Delete a shift permanently
  * @param shiftId - The ID of the shift to delete
