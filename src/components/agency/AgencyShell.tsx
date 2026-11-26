@@ -6,7 +6,7 @@ import LogoMarkIcon from "@/assets/icons/logo.svg?react";
 
 /** Agency sidebar logo: smaller than the user panel's, as in the design. The mark alone when collapsed. */
 export const agencySidebarLogo = (collapsed: boolean) => collapsed
-    ? <LogoMarkIcon aria-label="Care on Board" role="img" className="h-9 w-auto" />
+    ? <LogoMarkIcon aria-label="Care on Board" role="img" className="w-auto h-9" />
     : <LogoNameIcon aria-label="Care on Board" role="img" className="h-auto w-[164px]" />;
 
 /**
@@ -15,9 +15,9 @@ export const agencySidebarLogo = (collapsed: boolean) => collapsed
  */
 
 const programNames: Record<AgencyMode, { full: string; short: string }> = {
-    ddd: { full: "DDD program", short: "DDD" },
-    hha: { full: "HHA program", short: "HHA" },
-    sc: { full: "SC program", short: "SC" },
+    ddd: { full: "DDD", short: "DDD" },
+    hha: { full: "HHA", short: "HHA" },
+    sc: { full: "SC", short: "SC" },
 };
 
 /** DDD / HHA (/ SC) switch under the logo. Shows short labels when the sidebar is collapsed. */
@@ -86,7 +86,7 @@ export function AgencyPageHeader({ icon: Icon, title, description, actions, clas
 }) {
     return (
         <div className={cn("flex flex-col gap-4 border-b border-[#eceef0] pb-6 sm:flex-row sm:items-center sm:justify-between dark:border-white/10", className)}>
-            <div className="flex min-w-0 items-center gap-4">
+            <div className="flex items-center min-w-0 gap-4">
                 {Icon && (
                     <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-[#dcdfe2] text-[#007679] dark:border-white/15 dark:text-[#7fd3d3]">
                         <Icon aria-hidden="true" className="h-[22px] w-[22px]" />
@@ -118,7 +118,7 @@ export function AgencyStatCard({ icon: Icon, label, value, extra, footnote, chil
             <div className="rounded-[12px] bg-[#f4f5f6] px-4 pb-4 pt-3.5 dark:bg-white/5">
                 <p className="flex items-center gap-2.5 text-sm font-medium text-[#2a3138] dark:text-[#c9d1d4]">
                     {Icon && (
-                        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white dark:bg-white/10">
+                        <span className="grid bg-white rounded-full h-7 w-7 shrink-0 place-items-center dark:bg-white/10">
                             <Icon aria-hidden="true" className="h-4 w-4 text-[#007679] dark:text-[#7fd3d3]" />
                         </span>
                     )}
@@ -191,7 +191,7 @@ export function AgencyPanel({ icon: Icon, title, action, children, divider = tru
                     {Icon && <Icon aria-hidden="true" className="h-5 w-5 shrink-0 text-[#007679] dark:text-[#7fd3d3]" />}
                     <span className="truncate">{title}</span>
                 </h2>
-                {action && <div className="flex shrink-0 items-center">{action}</div>}
+                {action && <div className="flex items-center shrink-0">{action}</div>}
             </div>
             <div className={cn("flex-1 px-5 py-4", bodyClassName)}>{children}</div>
         </section>
