@@ -54,6 +54,8 @@ export type CareOrganization = {
   name: string;
   kind: "internal" | "external";
   role: string;
+  /** True for the support coordination agency's owner and its coordinators, who create care workspaces. */
+  canConnectClients?: boolean;
 };
 export type CareMe = {
   uid?: string;

@@ -80,9 +80,9 @@ function ConnectClientRow({ client, onStale }: { client: CareUnconnectedClient; 
 }
 
 export function AgencyCareHome() {
-  const { scope, agencyKey } = useAgencyCare();
-  // Invitations and new workspaces belong to the agency that owns the client, so partner organizations keep the plain list.
-  const internal = agencyKey.startsWith("internal:");
+  const { scope, agencyKey, organization } = useAgencyCare();
+  // Invitations and new workspaces belong to support coordination, so every other account keeps the plain list.
+  const internal = organization.canConnectClients === true;
   const [tab, setTab] = useState<ClientsTab>("connected");
   const [cursor, setCursor] = useState("");
   const [waitingCursor, setWaitingCursor] = useState("");

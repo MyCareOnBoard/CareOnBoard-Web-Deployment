@@ -19,7 +19,7 @@ const submission = (id: string, kind: CareSubmission["kind"], title: string, ext
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(useAgencyCare).mockReturnValue({ scope: "sc|internal:sc|1", agencyKey: "internal:sc", organization: { name: "Test SC" } } as ReturnType<typeof useAgencyCare>);
+  vi.mocked(useAgencyCare).mockReturnValue({ scope: "sc|internal:sc|1", agencyKey: "internal:sc", organization: { name: "Test SC", canConnectClients: true } } as ReturnType<typeof useAgencyCare>);
   vi.mocked(agencyCareApi.networks).mockResolvedValue({ items: [], nextCursor: null });
   vi.mocked(agencyCareApi.dashboard).mockResolvedValue({ items: [], nextCursor: null });
   vi.mocked(agencyCareApi.unconnectedClients).mockResolvedValue({ items: [], nextCursor: null });
@@ -122,8 +122,11 @@ it("connects a client from Ready to connect and opens the new workspace", async 
   expect(agencyCareApi.createNetwork).toHaveBeenCalledWith("c3", expect.any(String), expect.objectContaining({ agencyKey: "internal:sc" }));
 });
 
-it("keeps partner organizations on the plain client list", async () => {
-  vi.mocked(useAgencyCare).mockReturnValue({ scope: "p|external:org|1", agencyKey: "external:org", organization: { name: "Partner" } } as ReturnType<typeof useAgencyCare>);
+it.each([
+  ["a partner organization", { scope: "p|external:org|1", agencyKey: "external:org", organization: { name: "Partner" } }],
+  ["a DDD agency", { scope: "d|internal:ddd|1", agencyKey: "internal:ddd", organization: { name: "DDD provider", canConnectClients: false } }],
+])("keeps %s on the plain client list", async (_label, context) => {
+  vi.mocked(useAgencyCare).mockReturnValue(context as ReturnType<typeof useAgencyCare>);
   render(<MemoryRouter><AgencyCareHome /></MemoryRouter>);
   await screen.findByRole("heading", { name: "No connected clients yet" });
   expect(screen.queryByRole("group", { name: "Client connection" })).not.toBeInTheDocument();

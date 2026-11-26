@@ -12,7 +12,7 @@ vi.mock("@/lib/api/agencyCare", () => ({ agencyCareApi: { dashboard: vi.fn(), ne
 const client: CareDashboardClient = { networkId: "one", clientName: "John Smith", lifecycle: "active", pendingDocuments: 2, pendingUpdates: 1, publicationActionCount: 1 };
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(useAgencyCare).mockReturnValue({ scope: "sc|internal:sc|1", agencyKey: "internal:sc", organization: { name: "Test SC" } } as ReturnType<typeof useAgencyCare>);
+  vi.mocked(useAgencyCare).mockReturnValue({ scope: "sc|internal:sc|1", agencyKey: "internal:sc", organization: { name: "Test SC", canConnectClients: true } } as ReturnType<typeof useAgencyCare>);
   vi.mocked(agencyCareApi.dashboard).mockResolvedValue({ items: [client], nextCursor: null });
   vi.mocked(agencyCareApi.unconnectedClients).mockResolvedValue({ items: [], nextCursor: null });
 });
