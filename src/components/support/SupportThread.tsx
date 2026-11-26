@@ -1,7 +1,8 @@
-import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
-import { BookOpen, Bot, Loader2, Send } from "lucide-react";
+import { Fragment, useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
+import { toast } from "sonner";
+import { BookOpen, Bot, FileText, Loader2, Paperclip, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { SupportMessage, SupportStatus } from "@/lib/api/support";
+import { openSupportFile, supportErrorMessage, type SupportMessage, type SupportSource, type SupportStatus } from "@/lib/api/support";
 
 export function formatTime(value: string | null | undefined) {
   if (!value) return "";
@@ -17,6 +18,51 @@ export function relativeDue(value: string | null | undefined) {
   const minutes = Math.round((new Date(value).getTime() - Date.now()) / 60000);
   const span = (m: number) => (m >= 120 ? `${Math.round(m / 60)} h` : m >= 60 ? "1 h" : `${m} min`);
   return minutes < 0 ? `${span(-minutes)} overdue` : `due in ${span(minutes)}`;
+}
+
+/** Open a knowledge base file, with a message if it can't be. */
+export function openKnowledgeFile(articleId: string, fileName: string, attachmentId?: string) {
+  openSupportFile(articleId, fileName, attachmentId).catch((error) => toast.error(supportErrorMessage(error, "The file couldn't be opened.")));
+}
+
+const sourceChip = "inline-flex max-w-full items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[12px] text-[#00686b] dark:bg-white/10 dark:text-[#7fd3d3]";
+const sourceButton = cn(sourceChip, "cursor-pointer hover:underline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#007679]");
+
+/**
+ * What an assistant answer came from. A document section names its section and opens the
+ * document; an article's attached files open too.
+ */
+export function SourceList({ sources }: { sources: SupportSource[] }) {
+  return (
+    <div className="mt-2 border-t border-[#cfeaea] pt-2 dark:border-[#00686b]/50">
+      <p className="text-[11.5px] font-medium text-[#5d6b73] dark:text-[#9aa4a8]">From the help articles</p>
+      <ul className="mt-1 flex flex-wrap gap-1.5">
+        {sources.map((source) => {
+          const label = source.section ? `${source.title} · ${source.section}` : source.title;
+          return (
+            <Fragment key={`${source.id}|${source.section ?? ""}`}>
+              <li className="max-w-full">
+                {source.kind === "document" && source.fileName ? (
+                  <button type="button" className={sourceButton} onClick={() => openKnowledgeFile(source.id, source.fileName ?? "document")} aria-label={`Open ${source.fileName}: ${label}`}>
+                    <FileText aria-hidden="true" className="h-3 w-3 shrink-0" /><span className="truncate">{label}</span>
+                  </button>
+                ) : (
+                  <span className={sourceChip}><BookOpen aria-hidden="true" className="h-3 w-3 shrink-0" /><span className="truncate">{label}</span></span>
+                )}
+              </li>
+              {source.attachments?.map((file) => (
+                <li key={`${source.id}|${file.id}`} className="max-w-full">
+                  <button type="button" className={sourceButton} onClick={() => openKnowledgeFile(source.id, file.name, file.id)} aria-label={`Open ${file.name}`}>
+                    <Paperclip aria-hidden="true" className="h-3 w-3 shrink-0" /><span className="truncate">{file.name}</span>
+                  </button>
+                </li>
+              ))}
+            </Fragment>
+          );
+        })}
+      </ul>
+    </div>
+  );
 }
 
 const STATUS_STYLES: Record<SupportStatus, string> = {
@@ -80,18 +126,7 @@ export function SupportThread({ messages, viewer, renderAfter, className, look =
                   {ai && <Bot aria-hidden="true" className="h-3.5 w-3.5 text-[#007679] dark:text-[#7fd3d3]" />}{message.senderName}
                 </span>}
                 {message.content}
-                {ai && !!message.aiMeta?.sources?.length && (
-                  <div className="mt-2 border-t border-[#cfeaea] pt-2 dark:border-[#00686b]/50">
-                    <p className="text-[11.5px] font-medium text-[#5d6b73] dark:text-[#9aa4a8]">From the help articles</p>
-                    <ul className="mt-1 flex flex-wrap gap-1.5">
-                      {message.aiMeta.sources.map((source) => (
-                        <li key={source.id} className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[12px] text-[#00686b] dark:bg-white/10 dark:text-[#7fd3d3]">
-                          <BookOpen aria-hidden="true" className="h-3 w-3" />{source.title}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+                {ai && !!message.aiMeta?.sources?.length && <SourceList sources={message.aiMeta.sources} />}
                 <span className={cn("mt-1 block text-[11px]", mine ? "text-white/70" : "text-[#8a979d] dark:text-[#9aa4a8]")}>
                   {mine && viewer === "requester" ? "You · " : mine && message.senderName ? `${message.senderName} · ` : ""}
                   <time dateTime={message.createdAt ?? undefined}>{formatTime(message.createdAt)}</time>
@@ -114,18 +149,7 @@ export function SupportThread({ messages, viewer, renderAfter, className, look =
               mine ? "rounded-br-[4px] bg-[#007679] text-white" : ai ? "rounded-bl-[4px] border border-[#cfeaea] bg-[#f2fbfb] text-[#10141a] dark:border-[#00686b]/50 dark:bg-[#00686b]/15 dark:text-[#f4f6f7]" : "rounded-bl-[4px] bg-[#f1f3f4] text-[#10141a] dark:bg-white/10 dark:text-[#f4f6f7]",
             )}>
               {message.content}
-              {ai && !!message.aiMeta?.sources?.length && (
-                <div className="mt-2 border-t border-[#cfeaea] pt-2 dark:border-[#00686b]/50">
-                  <p className="text-[11.5px] font-medium text-[#5d6b73] dark:text-[#9aa4a8]">From the help articles</p>
-                  <ul className="mt-1 flex flex-wrap gap-1.5">
-                    {message.aiMeta.sources.map((source) => (
-                      <li key={source.id} className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[12px] text-[#00686b] dark:bg-white/10 dark:text-[#7fd3d3]">
-                        <BookOpen aria-hidden="true" className="h-3 w-3" />{source.title}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              {ai && !!message.aiMeta?.sources?.length && <SourceList sources={message.aiMeta.sources} />}
             </div>
             {renderAfter?.(message, index)}
           </li>

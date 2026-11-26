@@ -58,7 +58,7 @@ export interface SupportMessage {
   senderRole: string;
   senderType: "user" | "agent" | "ai" | "system";
   content: string;
-  aiMeta: { articleIds?: string[]; sources?: { id: string; title: string }[]; confidence?: number } | null;
+  aiMeta: { articleIds?: string[]; sources?: SupportSource[]; confidence?: number } | null;
   feedback: "helpful" | "not_helpful" | null;
   createdAt: string | null;
 }
@@ -113,10 +113,52 @@ export interface EligibleMember {
   title: string;
 }
 
-export interface SupportArticle {
+/** What an assistant answer was based on: an article, or a section of an uploaded document. */
+export interface SupportSource {
   id: string;
   title: string;
+  /** The document section, such as "Handbook > Sick days". */
+  section?: string;
+  kind?: "document";
+  fileName?: string;
+  /** Files attached to the article, offered for download. */
+  attachments?: { id: string; name: string }[];
+}
+
+export interface SupportFile {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  uploadedAt: string | null;
+}
+
+export type DocumentProcessingStatus = "queued" | "processing" | "ready" | "failed";
+
+export interface SupportArticle {
+  id: string;
+  /** "document": an uploaded file the assistant answers from, section by section. */
+  kind: "article" | "document";
+  title: string;
   body: string;
+  /** Documents: the start of the text, once read. */
+  preview: string | null;
+  /** Documents: the uploaded file. */
+  file: SupportFile | null;
+  processing: {
+    status: DocumentProcessingStatus;
+    error: string | null;
+    /** When reading was queued or started. */
+    since: string | null;
+    /** Queued or processing for over 15 minutes: the background job likely failed, so Retry is offered. */
+    stuck: boolean;
+    sectionCount: number;
+    /** Only the first part of a very long document is searched. */
+    truncated: boolean;
+    finishedAt: string | null;
+  } | null;
+  /** Written articles: files offered for download (not searched). */
+  attachments: SupportFile[];
   category: string | null;
   tags: string[];
   audience: SupportAudience;
@@ -231,6 +273,71 @@ export const createSupportArticle = (desk: SupportDesk, input: ArticleInput) => 
 export const updateSupportArticle = (desk: SupportDesk, id: string, input: ArticleInput) =>
   data<SupportArticle>(axiosClient.patch(`${BASE}/articles/${id}`, input, { params: { desk } }));
 export const archiveSupportArticle = (desk: SupportDesk, id: string) => data<SupportArticle>(axiosClient.delete(`${BASE}/articles/${id}`, { params: { desk } }));
+
+/** Largest file the knowledge base takes, in bytes. */
+export const MAX_SUPPORT_FILE_BYTES = 10 * 1024 * 1024;
+/** Files the assistant can read. */
+export const DOCUMENT_ACCEPT = ".pdf,.docx,.txt,.md";
+/** Files an article can offer for download. */
+export const ATTACHMENT_ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.md,.png,.jpg,.jpeg";
+export const MAX_ARTICLE_ATTACHMENTS = 5;
+
+export type DocumentFields = Partial<Pick<SupportArticle, "title" | "audience" | "category" | "status">>;
+
+const fileForm = (file: File, fields: Record<string, string | null | undefined> = {}) => {
+  const form = new FormData();
+  for (const [key, value] of Object.entries(fields)) if (value) form.append(key, value);
+  form.append("file", file);
+  return form;
+};
+const multipart = { headers: { "Content-Type": "multipart/form-data" } };
+
+export const uploadSupportDocument = (desk: SupportDesk, file: File, fields: DocumentFields) =>
+  data<SupportArticle>(axiosClient.post(`${BASE}/documents`, fileForm(file, { title: fields.title, audience: fields.audience, category: fields.category, status: fields.status }), { ...multipart, params: { desk } }));
+export const replaceSupportDocumentFile = (desk: SupportDesk, id: string, file: File) =>
+  data<SupportArticle>(axiosClient.put(`${BASE}/documents/${id}/file`, fileForm(file), { ...multipart, params: { desk } }));
+export const reindexSupportDocument = (desk: SupportDesk, id: string) =>
+  data<SupportArticle>(axiosClient.post(`${BASE}/documents/${id}/reindex`, null, { params: { desk } }));
+export const deleteSupportDocument = (desk: SupportDesk, id: string) =>
+  data<{ id: string; deleted: boolean }>(axiosClient.delete(`${BASE}/documents/${id}`, { params: { desk } }));
+export const addArticleAttachment = (desk: SupportDesk, id: string, file: File) =>
+  data<SupportArticle>(axiosClient.post(`${BASE}/articles/${id}/attachments`, fileForm(file), { ...multipart, params: { desk } }));
+export const removeArticleAttachment = (desk: SupportDesk, id: string, attachmentId: string) =>
+  data<SupportArticle>(axiosClient.delete(`${BASE}/articles/${id}/attachments/${attachmentId}`, { params: { desk } }));
+
+/**
+ * Open a document's file, or an article attachment, in a new tab (PDFs, text and images)
+ * or as a download. The file comes through the API so access is checked every time.
+ * The tab is opened before the request so popup blockers allow it; if it was blocked,
+ * the file downloads instead.
+ */
+export async function openSupportFile(articleId: string, fileName: string, attachmentId?: string): Promise<void> {
+  const viewable = /\.(pdf|txt|png|jpe?g)$/i.test(fileName);
+  const tab = viewable ? window.open("", "_blank") : null;
+  try {
+    const response = await axiosClient.get<Blob>(`${BASE}/files/${articleId}`, {
+      params: attachmentId ? { attachment: attachmentId } : undefined,
+      responseType: "blob",
+    });
+    const blob = response.data;
+    const url = URL.createObjectURL(blob);
+    if (tab) {
+      tab.location.href = url;
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      return;
+    }
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  } catch (error) {
+    tab?.close();
+    throw error;
+  }
+}
 
 export const listSupportGaps = (desk: SupportDesk) => data<SupportGap[]>(axiosClient.get(`${BASE}/gaps`, { params: { desk } }));
 export const dismissSupportGap = (desk: SupportDesk, id: string) => data<unknown>(axiosClient.post(`${BASE}/gaps/${id}/dismiss`, null, { params: { desk } }));
