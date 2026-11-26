@@ -10,7 +10,7 @@ import axiosClient from "../axios";
 const BASE = "/clientManagement/service-authorizations";
 
 export type EvvMode = "required" | "exempt" | "intermittent";
-export type EvvSource = "service" | "sdr" | "hha_default" | "client";
+export type EvvSource = "service" | "sdr" | "default" | "client";
 export type AuthorizationStatus = "active" | "expiring" | "expired" | "undated";
 export type RenewalStatus = "active" | "renewal_in_progress" | "renewal_submitted" | "not_renewing";
 
@@ -123,7 +123,7 @@ export const EVV_MODE_LABELS: Record<EvvMode, string> = {
 export const EVV_SOURCE_LABELS: Record<EvvSource, string> = {
   service: "Set on this service",
   sdr: "From the SDR",
-  hha_default: "HHA default (Individual Support and CBS only)",
+  default: "Default (only Individual Support and CBS use EVV)",
   client: "Client EVV setting",
 };
 
