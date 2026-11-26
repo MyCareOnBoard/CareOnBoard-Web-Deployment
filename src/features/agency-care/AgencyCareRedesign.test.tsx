@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { MemoryRouter, useNavigate } from "react-router";
 import { beforeEach, expect, it, vi } from "vitest";
 import { agencyCareApi, type CareSubmission } from "@/lib/api/agencyCare";
 import { useAgencyCare } from "./AgencyCareLayout";
@@ -10,7 +10,7 @@ vi.mock("./AgencyCareLayout", () => ({ useAgencyCare: vi.fn() }));
 vi.mock("@/utils/auth/context/AuthContext", () => ({ useAuth: () => ({ user: { uid: "sc" } }) }));
 vi.mock("@/utils/auth/components/AgencyCareRegistrationForm", () => ({ AgencyCareRegistrationForm: () => null }));
 vi.mock("@/utils/auth/components/AgencyCareEmailVerification", () => ({ AgencyCareEmailVerification: () => null }));
-vi.mock("@/lib/api/agencyCare", () => ({ agencyCareApi: { reviewQueue: vi.fn(), recovery: vi.fn(), reports: vi.fn(), networks: vi.fn() } }));
+vi.mock("@/lib/api/agencyCare", () => ({ agencyCareApi: { reviewQueue: vi.fn(), recovery: vi.fn(), reports: vi.fn(), networks: vi.fn(), dashboard: vi.fn(), unconnectedClients: vi.fn(), createNetwork: vi.fn() } }));
 
 const submission = (id: string, kind: CareSubmission["kind"], title: string, extra: Partial<CareSubmission> = {}): CareSubmission => ({
   id, networkId: "net", kind, title, category: kind === "document" ? "plan" : "service_update", audience: [{ agencyKey: "a" }],
@@ -20,6 +20,9 @@ const submission = (id: string, kind: CareSubmission["kind"], title: string, ext
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(useAgencyCare).mockReturnValue({ scope: "sc|internal:sc|1", agencyKey: "internal:sc", organization: { name: "Test SC" } } as ReturnType<typeof useAgencyCare>);
+  vi.mocked(agencyCareApi.networks).mockResolvedValue({ items: [], nextCursor: null });
+  vi.mocked(agencyCareApi.dashboard).mockResolvedValue({ items: [], nextCursor: null });
+  vi.mocked(agencyCareApi.unconnectedClients).mockResolvedValue({ items: [], nextCursor: null });
 });
 
 it("splits the review queue into documents and updates and previews the selected submission", async () => {
@@ -84,4 +87,47 @@ it("filters the loaded clients by name", async () => {
   fireEvent.change(screen.getByRole("searchbox", { name: "Search clients" }), { target: { value: "ada" } });
   expect(screen.queryByText("John Smith")).not.toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Open care workspace for Ada Jones" })).toBeInTheDocument();
+});
+
+const dashboardClient = (networkId: string, clientName: string, pendingInvitations: number | null) =>
+  ({ networkId, clientName, lifecycle: "active", pendingDocuments: 0, pendingUpdates: 0, publicationActionCount: 0, pendingInvitations });
+
+it("counts the client tabs and lists workspaces with invitations still waiting", async () => {
+  vi.mocked(agencyCareApi.networks).mockResolvedValue({ nextCursor: null, items: [{ id: "one", client: { name: "John Smith" }, lifecycle: "active" }] } as never);
+  vi.mocked(agencyCareApi.dashboard).mockResolvedValue({ nextCursor: null, items: [dashboardClient("one", "John Smith", 0), dashboardClient("two", "Ada Jones", 2)] });
+  vi.mocked(agencyCareApi.unconnectedClients).mockResolvedValue({ nextCursor: null, items: [{ clientId: "c3", clientName: "Bo Kim", familyContactCount: 1 }] });
+  render(<MemoryRouter><AgencyCareHome /></MemoryRouter>);
+  await screen.findByText("John Smith");
+  const tabs = within(screen.getByRole("group", { name: "Client connection" }));
+  await waitFor(() => expect(tabs.getByRole("button", { name: /^Connected\s*2$/ })).toBeInTheDocument());
+  expect(tabs.getByRole("button", { name: /^Not connected\s*1$/ })).toBeInTheDocument();
+  fireEvent.click(tabs.getByRole("button", { name: /^Invited\s*1$/ }));
+  expect(screen.getByText("2 invitations pending")).toBeInTheDocument();
+  expect(screen.queryByText("John Smith")).not.toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Open care team for Ada Jones" })).toHaveAttribute("href", "/agency-care/networks/two/team");
+});
+
+it("connects a client from Ready to connect and opens the new workspace", async () => {
+  vi.mocked(agencyCareApi.unconnectedClients).mockResolvedValue({ nextCursor: null, items: [{ clientId: "c3", clientName: "Bo Kim", familyContactCount: 2 }] });
+  vi.mocked(agencyCareApi.createNetwork).mockResolvedValue({ networkId: "net 3" });
+  // The shared test setup stubs useNavigate, so the destination is checked on the stub.
+  const navigate = vi.fn();
+  vi.mocked(useNavigate).mockReturnValue(navigate);
+  render(<MemoryRouter><AgencyCareHome /></MemoryRouter>);
+  fireEvent.click(await screen.findByRole("button", { name: "Connect a client" }));
+  expect(screen.getByRole("region", { name: "Ready to connect" })).toBeInTheDocument();
+  expect(screen.getByText("2 family contacts on file")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Connect Bo Kim" }));
+  await waitFor(() => expect(navigate).toHaveBeenCalledWith("/agency-care/networks/net%203/overview"));
+  expect(agencyCareApi.createNetwork).toHaveBeenCalledWith("c3", expect.any(String), expect.objectContaining({ agencyKey: "internal:sc" }));
+});
+
+it("keeps partner organizations on the plain client list", async () => {
+  vi.mocked(useAgencyCare).mockReturnValue({ scope: "p|external:org|1", agencyKey: "external:org", organization: { name: "Partner" } } as ReturnType<typeof useAgencyCare>);
+  render(<MemoryRouter><AgencyCareHome /></MemoryRouter>);
+  await screen.findByRole("heading", { name: "No connected clients yet" });
+  expect(screen.queryByRole("group", { name: "Client connection" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Connect a client" })).not.toBeInTheDocument();
+  expect(agencyCareApi.unconnectedClients).not.toHaveBeenCalled();
+  expect(agencyCareApi.dashboard).not.toHaveBeenCalled();
 });
