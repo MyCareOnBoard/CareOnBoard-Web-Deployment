@@ -11,6 +11,7 @@ import { useAuth } from "@/utils/auth";
 import ShiftsListPage from "@/pages/agency/scheduling/shifts";
 import ApprovalsPage from "@/pages/agency/scheduling/approvals";
 import ActivityLogsPage from "@/pages/agency/scheduling/activity-logs";
+import { APP_TIME_ZONE } from "@/lib/shift-time";
 
 interface SuperAdminShiftScopeProps {
   children: ReactNode;
@@ -23,7 +24,7 @@ const ALL_AGENCIES: OperationalAgencySummary = {
   name: "All agencies",
   status: "active",
   supportedClientTypes: ["ddd", "hha"],
-  timezone: "UTC",
+  timezone: APP_TIME_ZONE,
 };
 
 function isAbort(error: unknown): boolean {

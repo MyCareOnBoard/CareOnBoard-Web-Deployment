@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { APP_TIME_ZONE } from '@/lib/shift-time';
 
 export function useScMonitoringRefresh({ scopeKey, timezone, refresh, enabled }: {
   scopeKey: string; timezone?: string | null; refresh: (signal: AbortSignal) => Promise<unknown>; enabled: boolean;
@@ -7,7 +8,7 @@ export function useScMonitoringRefresh({ scopeKey, timezone, refresh, enabled }:
   useEffect(() => {
     if (!enabled) return;
     let pending: AbortController | null = null;
-    const date = () => { try { return new Intl.DateTimeFormat('en-CA', { timeZone: timezone || 'UTC' }).format(new Date()); } catch { return null; } };
+    const date = () => { try { return new Intl.DateTimeFormat('en-CA', { timeZone: timezone || APP_TIME_ZONE }).format(new Date()); } catch { return null; } };
     let day = date();
     const run = () => {
       if (pending || document.visibilityState === 'hidden') return;

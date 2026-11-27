@@ -14,7 +14,8 @@ import {
 } from "./api";
 import {UserType} from "@/utils/auth/types/user.types";
 import {SaveDraftModal} from "./SaveDraftModal";
-import Step1AgencyIdentity, { isIanaTimezone } from "@/pages/super-admin/agencies/components/StepOne";
+import Step1AgencyIdentity from "@/pages/super-admin/agencies/components/StepOne";
+import { APP_TIME_ZONE } from "@/lib/shift-time";
 import Step3Leadership from "@/pages/super-admin/agencies/components/StepTwo";
 import Step5Operational from "@/pages/super-admin/agencies/components/StepThree";
 import Step6AISettings from "@/pages/super-admin/agencies/components/StepFour";
@@ -142,7 +143,6 @@ const STEPS = [
         requiredFields: [
             "agencyName",
             "agencyType",
-            "timezone",
             "primaryAddress",
             "county_or_state",
             "zipCode",
@@ -268,7 +268,7 @@ export default function AddAgencyWizard() {
         legalBusinessName: "",
         dba: "",
         agencyType: "",
-        timezone: "",
+        timezone: APP_TIME_ZONE,
         npi: "",
         providerId: "",
         medicaidProviderId: "",
@@ -362,7 +362,7 @@ export default function AddAgencyWizard() {
             legalBusinessName: responseData.agencyData?.legalBusinessName || "",
             dba: responseData.agencyData?.dba || "",
             agencyType: responseData.agencyData?.agencyType || "",
-            timezone: responseData.agencyData?.timezone || "",
+            timezone: APP_TIME_ZONE,
             npi: responseData.agencyData?.npi || "",
             providerId: responseData.agencyData?.providerId ?? "",
             medicaidProviderId: responseData.agencyData?.medicaidProviderId || "",
@@ -513,7 +513,8 @@ export default function AddAgencyWizard() {
         legalBusinessName: formData.legalBusinessName,
         dba: formData.dba,
         agencyType: formData.agencyType,
-        timezone: formData.timezone,
+        // Every agency runs on Eastern time; the API stores it whatever is sent.
+        timezone: APP_TIME_ZONE,
         npi: formData.npi,
         providerId: formData.providerId,
         medicaidProviderId: formData.medicaidProviderId,
@@ -594,7 +595,6 @@ export default function AddAgencyWizard() {
         if (isEditFieldDirty("legalBusinessName")) agency.legalBusinessName = formData.legalBusinessName;
         if (isEditFieldDirty("dba")) agency.dba = formData.dba;
         if (isEditFieldDirty("agencyType")) agency.agencyType = formData.agencyType;
-        if (isEditFieldDirty("timezone")) agency.timezone = formData.timezone;
         if (isEditFieldDirty("npi")) agency.npi = formData.npi;
         if (isEditFieldDirty("providerId")) agency.providerId = formData.providerId;
         if (isEditFieldDirty("medicaidProviderId")) agency.medicaidProviderId = formData.medicaidProviderId;
@@ -675,12 +675,6 @@ export default function AddAgencyWizard() {
     // so this is a safe partial update (no full-form validation required).
     const handleSaveEdit = async () => {
         if (!agencyId) return;
-        if (!isIanaTimezone(formData.timezone)) {
-            setCurrentStep(1);
-            setFieldsWithErrors(["timezone"]);
-            toast({ title: "Agency timezone required", description: "Select a valid IANA timezone.", variant: "destructive" });
-            return;
-        }
         const contactErrors = identityErrors();
         if (Object.keys(contactErrors).length > 0) {
             setCurrentStep(1);
@@ -766,7 +760,6 @@ export default function AddAgencyWizard() {
             if (field === "logo" && imagesPreview.logo && !!agencyId) return false;
             if (field === "letterhead" && imagesPreview.letterHead && !!agencyId) return false;
             const value = formData[field as keyof AgencyFormData];
-            if (field === "timezone") return !isIanaTimezone(String(value ?? ""));
             return value === '' || value === null || value === undefined || 
                    (Array.isArray(value) && value.length === 0);
         });
@@ -836,7 +829,6 @@ export default function AddAgencyWizard() {
                     if (field === "logo" && imagesPreview.logo && !!agencyId) return false;
                     if (field === "letterhead" && imagesPreview.letterHead && !!agencyId) return false;
                     const value = formData[field as keyof AgencyFormData];
-                    if (field === "timezone") return !isIanaTimezone(String(value ?? ""));
                     return value === '' || value === null || value === undefined || 
                            (Array.isArray(value) && value.length === 0);
                 });

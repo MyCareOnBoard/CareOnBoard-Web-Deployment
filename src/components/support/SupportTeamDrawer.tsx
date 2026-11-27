@@ -50,7 +50,6 @@ export function SideDrawer({ open, onOpenChange, title, description, children, f
 }
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const ZONES = ["America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles", "America/Phoenix", "UTC"];
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (
@@ -271,11 +270,9 @@ export function SupportTeamDrawer({ desk, open, onOpenChange, onSaved }: {
                 <div className="mt-3 grid grid-cols-3 gap-2">
                   <label className="text-[12.5px] font-medium text-[#5d6b73] dark:text-[#9aa4a8]">From<input type="time" value={settings.hours.start} onChange={(e) => patch({ hours: { ...settings.hours, start: e.target.value } })} className={cn(fieldClass, "mt-1")} /></label>
                   <label className="text-[12.5px] font-medium text-[#5d6b73] dark:text-[#9aa4a8]">To<input type="time" value={settings.hours.end} onChange={(e) => patch({ hours: { ...settings.hours, end: e.target.value } })} className={cn(fieldClass, "mt-1")} /></label>
-                  <label className="text-[12.5px] font-medium text-[#5d6b73] dark:text-[#9aa4a8]">Time zone
-                    <select value={settings.hours.timezone} onChange={(e) => patch({ hours: { ...settings.hours, timezone: e.target.value } })} className={cn(fieldClass, "mt-1")}>
-                      {[...new Set([settings.hours.timezone, ...ZONES])].map((zone) => <option key={zone} value={zone}>{zone.replace("America/", "").replace("_", " ")}</option>)}
-                    </select>
-                  </label>
+                  <div className="text-[12.5px] font-medium text-[#5d6b73] dark:text-[#9aa4a8]">Time zone
+                    <p className={cn(fieldClass, "mt-1 flex items-center bg-[#f6f8f9] font-normal dark:bg-white/5")}>Eastern Time</p>
+                  </div>
                 </div>
               </>
             )}

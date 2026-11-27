@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+  APP_TIME_ZONE,
+  appZoneDay,
+  appZoneToday,
   clockMinutes,
+  dateKeyIn,
+  formatClockTime,
   shiftDateTime,
   shiftEndOrEndOfDay,
   shiftInstants,
   shiftTimeLabel,
+  shiftTimeZone,
   shiftViewerDate,
   shiftZoneSuffix,
   viewerShiftRange,
@@ -22,7 +28,7 @@ describe("shift-time", () => {
     expect(clockMinutes("nope")).toBeNull();
   });
 
-  it("reads shift times in the shift's zone, whatever the browser zone", () => {
+  it("reads shift times in the given zone, whatever the browser zone", () => {
     expect(shiftDateTime("2026-11-16", "09:00 AM", "America/New_York")?.toISOString()).toBe("2026-11-16T14:00:00.000Z");
     expect(shiftDateTime("2026-11-16", "09:00 AM", "America/Los_Angeles")?.toISOString()).toBe("2026-11-16T17:00:00.000Z");
     // Missing zone falls back to New York.
@@ -46,22 +52,38 @@ describe("shift-time", () => {
     expect(shiftZoneSuffix(ny, "America/New_York")).toBe("");
   });
 
-  it("converts for a viewer in another zone", () => {
+  it("shows Eastern times to a viewer in another zone, tagged where the label is raw text", () => {
     const t = viewerShiftTimes(ny, "America/Los_Angeles");
-    expect(t.converted).toBe(true);
-    expect(viewerShiftRange(ny, "America/Los_Angeles")).toBe("6:00 AM – 2:00 PM");
-    expect(t.startMinutes).toBe(360);
-    expect(t.endMinutes).toBe(14 * 60);
-    expect(t.agencyLabel).toBe("9:00 AM – 5:00 PM EST");
+    expect(t.converted).toBe(false);
+    expect(viewerShiftRange(ny, "America/Los_Angeles")).toBe("9:00 AM – 5:00 PM");
+    expect(t.startMinutes).toBe(540);
+    expect(t.endMinutes).toBe(17 * 60);
+    expect(t.agencyLabel).toBeNull();
     expect(shiftTimeLabel(ny, ny.startTime, "America/Los_Angeles")).toBe("09:00 AM EST");
+    expect(shiftZoneSuffix(ny, "America/Los_Angeles")).toBe(" EST");
   });
 
-  it("moves the shift to the viewer's calendar day", () => {
+  it("keeps the shift on its Eastern calendar day for every viewer", () => {
     const late = { date: "2026-11-16", startTime: "10:00 PM", endTime: "11:30 PM", timeZone: "America/New_York" };
-    expect(shiftViewerDate(late, "Europe/London")).toBe("2026-11-17");
+    expect(shiftViewerDate(late, "Europe/London")).toBe("2026-11-16");
     expect(shiftViewerDate(late, "America/New_York")).toBe("2026-11-16");
     const t = viewerShiftTimes({ ...late, endTime: "02:00 AM" }, "America/Chicago");
-    expect(t.startMinutes).toBe(21 * 60);
-    expect(t.endMinutes).toBe(25 * 60); // ends 1:00 AM the next day on the viewer's clock
+    expect(t.startMinutes).toBe(22 * 60);
+    expect(t.endMinutes).toBe(26 * 60); // ends 2:00 AM Eastern the next day
+  });
+
+  it("ignores a zone stamped on an older shift", () => {
+    const stamped = { ...ny, timeZone: "America/Los_Angeles" };
+    expect(shiftTimeZone(stamped)).toBe(APP_TIME_ZONE);
+    expect(shiftInstants(stamped)?.start.toISOString()).toBe("2026-11-16T14:00:00.000Z");
+  });
+
+  it("reads today's date in Eastern time", () => {
+    // 03:00 UTC on Nov 16 is still Nov 15 in New York.
+    expect(appZoneToday(new Date("2026-11-16T03:00:00Z"))).toBe("2026-11-15");
+    expect(dateKeyIn(new Date("2026-11-16T03:00:00Z"))).toBe("2026-11-15");
+    expect(formatClockTime(new Date("2026-11-16T14:00:00Z"))).toBe("9:00 AM");
+    const day = appZoneDay(new Date("2026-11-16T03:00:00Z"));
+    expect([day.getFullYear(), day.getMonth(), day.getDate(), day.getHours()]).toEqual([2026, 10, 15, 0]);
   });
 });

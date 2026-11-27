@@ -1,5 +1,5 @@
 import type { AssignmentReviewEnvelope } from "./assignment-review";
-import { shiftEndAt, shiftInstants, shiftStartAt, shiftViewerDate } from "@/lib/shift-time";
+import { appZoneToday, shiftEndAt, shiftInstants, shiftStartAt, shiftViewerDate } from "@/lib/shift-time";
 import type { AssignmentAcknowledgment, AssignmentDecisionEnvelope } from "./assignment-decision";
 /**
  * Shift Management API Service
@@ -508,9 +508,8 @@ export interface CategorizedShifts {
 
 export const categorizeShifts = (shifts: Shift[]): CategorizedShifts => {
     const now = new Date();
-    // "Today" on the viewer's clock; each shift's day is its start on the viewer's clock
-    // (shift times are written in the agency's zone and converted).
-    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    // "Today" and each shift's day are both read in Eastern time, the one zone the app runs on.
+    const today = appZoneToday(now);
     const dayOf = (shift: Shift) => shiftViewerDate(shift);
     const startMs = (shift: Shift) => shiftStartAt(shift)?.getTime() ?? Number.POSITIVE_INFINITY;
 

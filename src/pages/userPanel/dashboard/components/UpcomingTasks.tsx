@@ -3,8 +3,7 @@ import {CalendarClock} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Skeleton} from '@/components/ui/skeleton';
 import {ShiftStatus, type Shift} from '@/lib/api/shifts';
-import {shiftViewerDate, viewerShiftRange} from '@/lib/shift-time';
-import {toDateKey} from '../overviewStats';
+import {appZoneToday, shiftViewerDate, viewerShiftRange} from '@/lib/shift-time';
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
@@ -27,7 +26,7 @@ interface Props {
 }
 
 export default function UpcomingTasks({shifts, loading, error, onRetry, viewAllPath, limit = 4}: Props) {
-    const today = toDateKey(new Date());
+    const today = appZoneToday();
     const visible = shifts.slice(0, limit);
     return <section aria-labelledby="dashboard-upcoming" className="rounded-[12px] border border-[#e8edef] bg-white p-5 dark:border-white/10 dark:bg-[#1b232b]">
         <div className="flex items-center justify-between gap-3">

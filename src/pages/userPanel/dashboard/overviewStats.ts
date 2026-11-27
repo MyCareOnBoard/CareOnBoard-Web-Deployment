@@ -1,5 +1,5 @@
 import {ShiftStatus, type Shift} from '@/lib/api/shifts';
-import {shiftInstants, shiftViewerDate} from '@/lib/shift-time';
+import {appZoneDay, appZoneToday, shiftInstants, shiftViewerDate} from '@/lib/shift-time';
 
 export interface OverviewStats {
     completedThisMonth: number;
@@ -69,11 +69,13 @@ export function workedHours(shift: Shift, now: Date) {
 }
 
 export function computeOverviewStats(shifts: Shift[], now: Date = new Date()): OverviewStats {
-    const today = toDateKey(now);
+    const today = appZoneToday(now);
     const monthPrefix = today.slice(0, 7);
-    const lastMonth = toDateKey(new Date(now.getFullYear(), now.getMonth() - 1, 1)).slice(0, 7);
-    const weekStart = toDateKey(startOfWeek(now));
-    const weekEndDate = startOfWeek(now);
+    // Week and month bounds follow the Eastern calendar day, like `today`.
+    const day = appZoneDay(now);
+    const lastMonth = toDateKey(new Date(day.getFullYear(), day.getMonth() - 1, 1)).slice(0, 7);
+    const weekStart = toDateKey(startOfWeek(day));
+    const weekEndDate = startOfWeek(day);
     weekEndDate.setDate(weekEndDate.getDate() + 6);
     const weekEnd = toDateKey(weekEndDate);
 

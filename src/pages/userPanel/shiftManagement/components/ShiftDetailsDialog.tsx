@@ -6,7 +6,7 @@ import {Dialog, DialogContent, DialogDescription, DialogTitle} from '@/component
 import {CloseButton, PANEL_BODY, SIDE_PANEL, SIDE_PANEL_OVERLAY} from '@/pages/userPanel/records/RecordsKit';
 import type {Shift} from '@/lib/api/shifts';
 import {Routes} from '@/routes/constants';
-import {viewerShiftRange, viewerShiftTimes} from '@/lib/shift-time';
+import {shiftZoneSuffix, viewerShiftRange, viewerShiftTimes} from '@/lib/shift-time';
 import {useGetShiftNoteComplianceDetailQuery} from '@/pages/agency/compliance-alerts/api';
 import type {ShiftNoteState} from '@/pages/agency/compliance-alerts/apiTypes';
 import {cn} from '@/lib/utils';
@@ -127,8 +127,10 @@ function ShiftPanel({shift, onClose, actionLabel, onAction, actionDisabled, onNo
     const span = shiftSpan(shift);
     const scheduled = span ? span.end - span.start : null;
     const worked = workedMinutes(shift, now);
-    // The shift's day on the viewer's clock (times are converted to the viewer's zone).
+    // The shift's day and times in Eastern time, whatever zone this device is set to.
     const times = viewerShiftTimes(shift);
+    // "EST"/"EDT" when this device is not on Eastern time, else "".
+    const easternNote = shiftZoneSuffix(shift).trim();
     const day = /^\d{4}-\d{2}-\d{2}$/.test(times.dateKey) ? new Date(`${times.dateKey}T12:00:00`) : null;
     const address = shiftAddress(shift);
     const directions = directionsUrl(shift);
@@ -269,7 +271,7 @@ function ShiftPanel({shift, onClose, actionLabel, onAction, actionDisabled, onNo
                         <span className="text-[24px] font-semibold leading-tight text-[#10141a] tabular-nums dark:text-[#f4f6f7]">{end.time} <span className="text-[14px] font-normal text-[#5d6b73] dark:text-[#9aa4a8]">{end.period}</span></span>
                     </div>
                 </div> : <p className="text-[16px] font-semibold text-[#10141a] dark:text-[#f4f6f7]">{viewerShiftRange(shift)}</p>}
-                {times.agencyLabel && <p className="mt-2 text-[12px] text-[#5d6b73] dark:text-[#9aa4a8]">Shown in your time zone. Agency time: {times.agencyLabel}</p>}
+                {easternNote && <p className="mt-2 text-[12px] text-[#5d6b73] dark:text-[#9aa4a8]">Times are in Eastern time ({easternNote}). Your device is set to a different time zone.</p>}
             </div>
 
             {address && <div className="overflow-hidden rounded-[12px] border border-[#e8edef] dark:border-white/10">

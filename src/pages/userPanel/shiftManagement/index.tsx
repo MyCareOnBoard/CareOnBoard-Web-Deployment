@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router";
 import { CalendarDays, CirclePlus } from "lucide-react";
 import { addDays, differenceInCalendarDays, format, startOfDay } from "date-fns";
 import { Shift, ShiftActionStatus, ShiftStatus, formatShiftLocation, categorizeShifts, clockIn as apiClockIn, clockOut as apiClockOut } from "@/lib/api/shifts";
-import { shiftInstants, shiftViewerDate } from "@/lib/shift-time";
+import { appZoneDay, appZoneToday, shiftInstants, shiftViewerDate } from "@/lib/shift-time";
 import { ClockOutModal } from "./ClockOutModal";
 import { ClockInModal } from "./ClockInModal";
 import { LocationErrorModal } from "./LocationErrorModal";
@@ -92,8 +92,8 @@ export default function ShiftManagementPage() {
   // "Write shift note" goes straight to the note page, like "Fill now" on the Notes page.
   const { open: openNote, startingShift: noteStartingShiftId } = useOpenNote();
 
-  const [selectedDay, setSelectedDay] = useState(() => startOfDay(new Date()));
-  const [windowStart, setWindowStart] = useState(() => addDays(startOfDay(new Date()), -DAYS_BEFORE));
+  const [selectedDay, setSelectedDay] = useState(() => appZoneDay());
+  const [windowStart, setWindowStart] = useState(() => addDays(appZoneDay(), -DAYS_BEFORE));
   const [openShift, setOpenShift] = useState<Shift | null>(null);
   const [timesheetOpen, setTimesheetOpen] = useState(false);
 
@@ -118,10 +118,10 @@ export default function ShiftManagementPage() {
     // from the viewer's by a day; shifts are placed on the viewer's day below.
     startDate: toDateKey(addDays(windowStart, -1)), endDate: toDateKey(addDays(windowStart, STRIP_DAYS)),
   });
-  const todayKey = toDateKey(new Date());
+  const todayKey = appZoneToday();
   const todayLoad = useEmployeeShifts({
     agencyId: user?.agencyId, employeeId: user?.profile?.id, client: true,
-    startDate: toDateKey(addDays(new Date(), -1)), endDate: toDateKey(addDays(new Date(), 1)),
+    startDate: toDateKey(addDays(appZoneDay(), -1)), endDate: toDateKey(addDays(appZoneDay(), 1)),
   });
   const todayList = useMemo(
     () => todayLoad.shifts.filter(shift => shiftViewerDate(shift) === todayKey),

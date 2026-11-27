@@ -35,6 +35,7 @@ import BillingDashboardHeader from "../components/BillingDashboardHeader";
 import { StaffTimesheetStatusPill } from "./StaffTimesheetsTable";
 import SubmittedTimesheetsBoard from "./SubmittedTimesheetsBoard";
 import ApprovalsPage from "@/pages/agency/scheduling/approvals";
+import { APP_TIME_ZONE } from "@/lib/shift-time";
 
 
 function fmtPeriod(start: string, end: string) {
@@ -449,7 +450,7 @@ export function AgencyStaffTimesheetsApprovalPage() {
         name: user?.agency?.name || user?.fullName || "Agency",
         status: "active",
         supportedClientTypes,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        timezone: APP_TIME_ZONE,
       }}
       mode={mode}
       capabilities={{

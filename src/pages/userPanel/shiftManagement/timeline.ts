@@ -24,9 +24,9 @@ export function formatClock(minutes: number) {
     return `${display}:${String(minutes % 60).padStart(2, '0')} ${hours < 12 ? 'am' : 'pm'}`;
 }
 
-/** Start/end minutes for a shift on the viewer's clock; overnight shifts are cut at midnight, missing ends get an hour. */
+/** Start/end minutes for a shift in Eastern time; overnight shifts are cut at midnight, missing ends get an hour. */
 export function shiftSpan(shift: Shift): {start: number; end: number} | null {
-    // Minutes on the viewer's clock: converted when the viewer is in another time zone.
+    // Minutes after Eastern midnight, whatever zone this device is set to.
     const times = viewerShiftTimes(shift);
     const start = times.startMinutes;
     if (start === null) return null;

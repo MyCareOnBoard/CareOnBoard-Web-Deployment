@@ -1,12 +1,18 @@
 /**
- * Shift times are stored as wall-clock text ("09:00 AM") on a YYYY-MM-DD date, in the
- * agency's time zone. The API sends that zone as `shift.timeZone`. These helpers turn
- * them into real instants and into the viewer's own clock, so someone in another zone
- * sees the right time.
+ * Shift times are stored as wall-clock text ("09:00 AM") on a YYYY-MM-DD date.
+ * CareOnboard runs on one time zone, US Eastern, so every shift is read and shown in
+ * Eastern time whatever zone the viewer's device is set to. These helpers turn the
+ * stored text into real instants and into labels.
  */
 
-/** Zone used when a shift has none (CareOnboard agencies are in New Jersey). */
-export const DEFAULT_SHIFT_TIME_ZONE = "America/New_York";
+/**
+ * The one time zone the app runs on: US Eastern (EST in winter, EDT in summer).
+ * Agencies cannot choose another zone.
+ */
+export const APP_TIME_ZONE = "America/New_York";
+
+/** Zone shift times are written in. Always {@link APP_TIME_ZONE}. */
+export const DEFAULT_SHIFT_TIME_ZONE = APP_TIME_ZONE;
 
 type ZonedShift = {
   date?: string | null;
@@ -54,9 +60,13 @@ export function viewerTimeZone(): string {
   }
 }
 
-/** Zone a shift's times are written in. */
-export function shiftTimeZone(shift?: { timeZone?: string | null } | null): string {
-  return isValidTimeZone(shift?.timeZone) ? shift!.timeZone!.trim() : DEFAULT_SHIFT_TIME_ZONE;
+/**
+ * Zone a shift's times are written in. Always {@link APP_TIME_ZONE}: a `timeZone`
+ * stamped on an older shift is ignored. The argument is kept so callers need no change.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function shiftTimeZone(_shift?: { timeZone?: string | null } | null): string {
+  return APP_TIME_ZONE;
 }
 
 function zonedParts(date: Date, timeZone: string) {
@@ -139,10 +149,25 @@ export function shiftEndOrEndOfDay(shift: ZonedShift): Date | null {
   return nextStart ? new Date(nextStart.getTime() - 1000) : null;
 }
 
-/** YYYY-MM-DD of `date` in `timeZone` (the viewer's by default). */
-export function dateKeyIn(date: Date, timeZone: string = viewerTimeZone()): string {
+/** YYYY-MM-DD of `date` in `timeZone` (Eastern by default). */
+export function dateKeyIn(date: Date, timeZone: string = APP_TIME_ZONE): string {
   const p = zonedParts(date, timeZone);
   return `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
+}
+
+/** Today's date in Eastern time, as YYYY-MM-DD (how shift `date` fields are written). */
+export function appZoneToday(now: Date = new Date()): string {
+  return dateKeyIn(now, APP_TIME_ZONE);
+}
+
+/**
+ * The Eastern calendar day at `now`, as a Date at the device's local midnight of that
+ * same calendar date. Use it where date pickers and date-fns work on local Dates, so
+ * "today" is the Eastern day even on a device set to another zone.
+ */
+export function appZoneDay(now: Date = new Date()): Date {
+  const p = zonedParts(now, APP_TIME_ZONE);
+  return new Date(p.year, p.month - 1, p.day);
 }
 
 /** Today's date in the shift's zone (how its `date` field is written). */
@@ -169,33 +194,34 @@ export function zoneAbbreviation(date: Date, timeZone: string): string {
   }
 }
 
-/** "9:00 AM" for an instant on the viewer's clock (or `timeZone`). */
-export function formatClockTime(date: Date, timeZone?: string): string {
-  return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", ...(timeZone ? { timeZone } : {}) });
+/** "9:00 AM" for an instant in Eastern time (or `timeZone`). */
+export function formatClockTime(date: Date, timeZone: string = APP_TIME_ZONE): string {
+  return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone });
 }
 
 export type ViewerShiftTimes = {
-  /** Viewer-local date of the start (YYYY-MM-DD); the shift's date when unreadable. */
+  /** Eastern date of the start (YYYY-MM-DD); the shift's date when unreadable. */
   dateKey: string;
   start: Date | null;
   end: Date | null;
-  /** "9:00 AM" on the viewer's clock, or the stored text when unreadable. */
+  /** "9:00 AM" in Eastern time, or the stored text when unreadable. */
   startLabel: string;
   endLabel: string;
-  /** Minutes after viewer-local midnight on `dateKey`. */
+  /** Minutes after Eastern midnight on `dateKey`. */
   startMinutes: number | null;
   endMinutes: number | null;
-  /** True when the viewer is in another zone, so the times were converted. */
+  /** Always false: times are never converted to the viewer's device zone. */
   converted: boolean;
-  /** The agency's own reading, e.g. "9:00 AM – 5:00 PM EST", when converted. */
+  /** Always null: there is no second reading to show. */
   agencyLabel: string | null;
 };
 
 /**
- * Shift times on the viewer's clock. Viewers in the shift's own zone see the stored
- * times unchanged; viewers elsewhere see them converted (with `agencyLabel` for reference).
+ * Shift times as shown to every viewer: in Eastern time, whatever zone their device is
+ * set to. `_viewerZone` is ignored and kept only so callers need no change.
  */
-export function viewerShiftTimes(shift: ZonedShift, viewerZone: string = viewerTimeZone()): ViewerShiftTimes {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function viewerShiftTimes(shift: ZonedShift, _viewerZone?: string): ViewerShiftTimes {
   const instants = shiftInstants(shift);
   const zone = shiftTimeZone(shift);
   const rawStart = shift.startTime ?? "";
@@ -213,8 +239,7 @@ export function viewerShiftTimes(shift: ZonedShift, viewerZone: string = viewerT
       agencyLabel: null,
     };
   }
-  const converted = !isViewerInShiftZone(shift, viewerZone);
-  const labelZone = converted ? viewerZone : zone;
+  const labelZone = zone;
   const dateKey = dateKeyIn(instants.start, labelZone);
   const minutesOf = (d: Date) => {
     const p = zonedParts(d, labelZone);
@@ -222,7 +247,6 @@ export function viewerShiftTimes(shift: ZonedShift, viewerZone: string = viewerT
   };
   let endMinutes = instants.end ? minutesOf(instants.end) : null;
   if (endMinutes !== null && instants.end && dateKeyIn(instants.end, labelZone) !== dateKey) endMinutes += 24 * 60;
-  const agencyRange = `${formatClockTime(instants.start, zone)}${instants.end ? ` – ${formatClockTime(instants.end, zone)}` : ""}`;
   return {
     dateKey,
     start: instants.start,
@@ -231,12 +255,12 @@ export function viewerShiftTimes(shift: ZonedShift, viewerZone: string = viewerT
     endLabel: instants.end ? formatClockTime(instants.end, labelZone) : rawEnd,
     startMinutes: minutesOf(instants.start),
     endMinutes,
-    converted,
-    agencyLabel: converted ? `${agencyRange} ${zoneAbbreviation(instants.start, zone)}` : null,
+    converted: false,
+    agencyLabel: null,
   };
 }
 
-/** "9:00 AM – 5:00 PM" on the viewer's clock. */
+/** "9:00 AM – 5:00 PM" in Eastern time. */
 export function viewerShiftRange(shift: ZonedShift, viewerZone?: string): string {
   const t = viewerShiftTimes(shift, viewerZone);
   return `${t.startLabel}${t.endLabel ? ` – ${t.endLabel}` : ""}`;
@@ -271,7 +295,7 @@ export function shiftEndAt(shift: ZonedShift): Date | null {
   return shiftDateTime(shift.date, shift.endTime, shiftTimeZone(shift));
 }
 
-/** The viewer's calendar day for a shift (its start on the viewer's clock). */
+/** The calendar day a shift starts on, in Eastern time. */
 export function shiftViewerDate(shift: ZonedShift, viewerZone?: string): string {
   return viewerShiftTimes(shift, viewerZone).dateKey;
 }

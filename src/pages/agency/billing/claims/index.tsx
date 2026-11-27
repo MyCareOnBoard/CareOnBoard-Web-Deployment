@@ -60,6 +60,7 @@ import {
   buildRecentClaimFromBillingDetail,
   STATUS_LABEL_TO_FILTER,
 } from "./utils/savedClaimUtils";
+import { APP_TIME_ZONE } from "@/lib/shift-time";
 
 const PROGRAM_NAMES = { ddd: "DDD", hha: "HHA", sc: "Support Coordination" } as const;
 // Ids from the ?claimId=&clientId= deep link become path segments, so reject slashes and control characters.
@@ -852,7 +853,7 @@ export function AgencyClaimsDashboardPage() {
         name: user?.agency?.name || user?.fullName || "Agency",
         status: "active",
         supportedClientTypes,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        timezone: APP_TIME_ZONE,
       }}
       mode={mode}
       capabilities={{

@@ -1,21 +1,12 @@
 import {Label} from "@/components/ui/label";
 import {Input} from "@/components/ui/input";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import React, {useEffect, useMemo, useRef, useState} from "react";
+import {useEffect, useRef} from "react";
 import {cn} from "@/lib/utils";
-import { IANA_TIMEZONES, isIanaTimezone } from "@/lib/timezones";
 import {useGooglePlacesAutocomplete} from "@/hooks/useGooglePlacesAutocomplete";
-
-export { IANA_TIMEZONES, isIanaTimezone } from "@/lib/timezones";
 
 export default function Step1AgencyIdentity({formData, onChange, fieldsWithErrors}: any) {
     const addressInputRef = useRef<HTMLDivElement>(null);
-    const timezoneInputRef = useRef<HTMLDivElement>(null);
-    const timezoneOptionRefs = useRef(new Map<string, HTMLButtonElement>());
-    const reportedTimezoneRef = useRef(formData.timezone ?? "");
-    const [timezoneSearch, setTimezoneSearch] = useState(formData.timezone ?? "");
-    const [timezoneOpen, setTimezoneOpen] = useState(false);
-    const [timezoneActiveIndex, setTimezoneActiveIndex] = useState(-1);
     const {
         suggestions,
         isSearching,
@@ -30,73 +21,10 @@ export default function Step1AgencyIdentity({formData, onChange, fieldsWithError
             if (addressInputRef.current && !addressInputRef.current.contains(event.target as Node)) {
                 setShowSuggestions(false);
             }
-            if (timezoneInputRef.current && !timezoneInputRef.current.contains(event.target as Node)) {
-                setTimezoneOpen(false);
-                setTimezoneActiveIndex(-1);
-            }
         };
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [setShowSuggestions]);
-
-    useEffect(() => {
-        const timezone = formData.timezone ?? "";
-        if (timezone !== reportedTimezoneRef.current) {
-            setTimezoneSearch(timezone);
-            setTimezoneActiveIndex(-1);
-        }
-        reportedTimezoneRef.current = timezone;
-    }, [formData.timezone]);
-
-    const timezoneOptions = useMemo(() => {
-        const query = timezoneSearch.trim().toLocaleLowerCase();
-        return IANA_TIMEZONES
-            .filter((timezone) => !query || timezone.toLocaleLowerCase().includes(query))
-            .slice(0, 50);
-    }, [timezoneSearch]);
-
-    useEffect(() => {
-        if (!timezoneOpen || timezoneActiveIndex < 0) return;
-        const activeTimezone = timezoneOptions[timezoneActiveIndex];
-        if (activeTimezone) {
-            timezoneOptionRefs.current.get(activeTimezone)?.scrollIntoView?.({block: "nearest"});
-        }
-    }, [timezoneActiveIndex, timezoneOpen, timezoneOptions]);
-
-    const closeTimezoneOptions = () => {
-        setTimezoneOpen(false);
-        setTimezoneActiveIndex(-1);
-    };
-
-    const selectTimezone = (timezone: string) => {
-        setTimezoneSearch(timezone);
-        reportedTimezoneRef.current = timezone;
-        onChange("timezone", timezone);
-        closeTimezoneOptions();
-    };
-
-    const handleTimezoneKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-        if (event.key === "Escape" && timezoneOpen) {
-            event.preventDefault();
-            closeTimezoneOptions();
-            return;
-        }
-        if ((event.key === "ArrowDown" || event.key === "ArrowUp") && timezoneOptions.length > 0) {
-            event.preventDefault();
-            setTimezoneOpen(true);
-            setTimezoneActiveIndex((index) => event.key === "ArrowDown"
-                ? (index + 1) % timezoneOptions.length
-                : (index <= 0 ? timezoneOptions.length - 1 : index - 1));
-            return;
-        }
-        if (event.key === "Enter" && timezoneOpen && timezoneActiveIndex >= 0) {
-            const timezone = timezoneOptions[timezoneActiveIndex];
-            if (timezone) {
-                event.preventDefault();
-                selectTimezone(timezone);
-            }
-        }
-    };
 
     const handleSelectAddressSuggestion = async (placeId: string) => {
         const details = await selectSuggestion(placeId);
@@ -112,8 +40,6 @@ export default function Step1AgencyIdentity({formData, onChange, fieldsWithError
     };
     const mainPhone = formData.mainPhone ?? "";
     const mainPhoneError = fieldsWithErrors.includes("mainPhone") || Boolean(mainPhone && !/^\d{10}$/.test(mainPhone));
-    const timezoneValueInvalid = Boolean(timezoneSearch && !isIanaTimezone(formData.timezone ?? ""));
-    const timezoneHasError = fieldsWithErrors.includes("timezone") || timezoneValueInvalid;
 
     return (
         <div>
@@ -197,84 +123,21 @@ export default function Step1AgencyIdentity({formData, onChange, fieldsWithError
                     )}
                 </div>
 
-                {/* Agency timezone */}
-                <div ref={timezoneInputRef} className="relative">
+                {/* Time zone: fixed, every agency runs on Eastern time */}
+                <div>
                     <Label htmlFor="agencyTimezone" className="mb-2 text-[14px] font-medium text-[#10141a]">
-                        Agency timezone
+                        Time zone
                     </Label>
                     <Input
                         id="agencyTimezone"
-                        role="combobox"
-                        aria-autocomplete="list"
-                        aria-controls="agency-timezone-options"
-                        aria-expanded={timezoneOpen}
-                        aria-activedescendant={timezoneOpen && timezoneActiveIndex >= 0
-                            ? `agency-timezone-option-${timezoneActiveIndex}`
-                            : undefined}
-                        aria-invalid={timezoneHasError}
-                        aria-describedby={timezoneHasError ? "agency-timezone-error" : "agency-timezone-help"}
-                        autoComplete="off"
-                        value={timezoneSearch}
-                        onFocus={() => setTimezoneOpen(true)}
-                        onKeyDown={handleTimezoneKeyDown}
-                        onChange={(event) => {
-                            const value = event.target.value;
-                            const reportedTimezone = isIanaTimezone(value) ? value : "";
-                            setTimezoneSearch(value);
-                            setTimezoneOpen(true);
-                            setTimezoneActiveIndex(-1);
-                            reportedTimezoneRef.current = reportedTimezone;
-                            onChange("timezone", reportedTimezone);
-                        }}
-                        placeholder="Search IANA timezones"
-                        className={cn(
-                            "h-[44px] rounded-[8px] border-[#e5e5e6] focus:border-[#00b4b8] focus:ring-[#00b4b8]",
-                            fieldsWithErrors.includes("timezone") && "border-red-500"
-                        )}
+                        value="Eastern Time (New York)"
+                        readOnly
+                        aria-describedby="agency-timezone-help"
+                        className="h-[44px] rounded-[8px] border-[#e5e5e6] bg-[#f8f9fa] text-[#10141a]"
                     />
                     <p id="agency-timezone-help" className="mt-1 text-xs text-[#808081]">
-                        Select the timezone used for agency dates and times.
+                        CareOnboard runs on Eastern Time for every agency.
                     </p>
-                    {timezoneHasError && (
-                        <p id="agency-timezone-error" role="alert" className="mt-1 text-sm text-red-500">
-                            Select a valid IANA timezone.
-                        </p>
-                    )}
-                    {timezoneOpen && (
-                        <div
-                            id="agency-timezone-options"
-                            role="listbox"
-                            aria-label="IANA timezones"
-                            className="absolute z-50 mt-1 max-h-[220px] w-full overflow-y-auto rounded-md border border-[#e5e5e6] bg-white shadow-lg"
-                        >
-                            {timezoneOptions.length > 0 ? timezoneOptions.map((timezone, index) => (
-                                <button
-                                    key={timezone}
-                                    ref={(node) => {
-                                        if (node) timezoneOptionRefs.current.set(timezone, node);
-                                        else timezoneOptionRefs.current.delete(timezone);
-                                    }}
-                                    id={`agency-timezone-option-${index}`}
-                                    type="button"
-                                    role="option"
-                                    aria-selected={timezoneActiveIndex === index
-                                        || (timezoneActiveIndex < 0 && formData.timezone === timezone)}
-                                    tabIndex={-1}
-                                    onMouseDown={(event) => event.preventDefault()}
-                                    onMouseEnter={() => setTimezoneActiveIndex(index)}
-                                    onClick={() => selectTimezone(timezone)}
-                                    className={cn(
-                                        "block w-full px-4 py-3 text-left text-sm text-[#10141a] hover:bg-[#f8f9fa]",
-                                        timezoneActiveIndex === index && "bg-[#eafafa]"
-                                    )}
-                                >
-                                    {timezone}
-                                </button>
-                            )) : (
-                                <p role="status" className="px-4 py-3 text-sm text-[#808081]">No matching IANA timezone.</p>
-                            )}
-                        </div>
-                    )}
                 </div>
 
                 {/* NPI Number */}

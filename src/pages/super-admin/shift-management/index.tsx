@@ -22,6 +22,7 @@ import { resolveShiftMaintenanceDateRange } from "@/pages/shared/shift-maintenan
 import ShiftCategoryFilter from "./ShiftCategoryFilter";
 import { parseShiftCategory, type ShiftCategory } from "@/lib/shift-category";
 import { Skeleton } from "@/components/ui/skeleton";
+import { APP_TIME_ZONE } from "@/lib/shift-time";
 
 const OPERATIONAL_AGENCY_SUMMARY_FEATURES = [
   "id",
@@ -89,7 +90,7 @@ export default function ShiftManagementWorkspace() {
     name: agency.name,
     status: agency.status,
     supportedClientTypes: agency.supportedClientTypes ?? ["ddd", "hha"],
-    timezone: agency.timezone ?? "UTC",
+    timezone: APP_TIME_ZONE,
   }));
   const agencies = activeSorted(new Map(
     [...queriedAgencies, ...discoveredAgencies].map((agency) => [agency.id, agency]),

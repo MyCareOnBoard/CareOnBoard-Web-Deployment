@@ -11,6 +11,7 @@ import FinancialOverviewPage from "./financial-overview";
 import ClaimsDashboardPage from "./claims";
 import PayrollDashboardPage from "./payroll";
 import ExpensesDashboardPage from "./expenses";
+import { APP_TIME_ZONE } from "@/lib/shift-time";
 
 function AgencyBillingScope({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -35,7 +36,7 @@ function AgencyBillingScope({ children }: { children: ReactNode }) {
         name: user?.agency?.name || user?.fullName || "Agency",
         status: "active",
         supportedClientTypes,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        timezone: APP_TIME_ZONE,
       }}
       mode={mode}
       capabilities={{

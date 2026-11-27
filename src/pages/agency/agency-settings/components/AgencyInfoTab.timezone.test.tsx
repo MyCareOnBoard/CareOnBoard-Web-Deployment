@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import AgencyInfoTab from "./AgencyInfoTab";
 vi.mock('./AssignmentPolicySection', () => ({ default: () => null }));
@@ -32,76 +32,42 @@ describe("AgencyInfoTab timezone", () => {
     updateAgency.mockReset();
   });
 
-  it("lets agency owners search and select the required IANA time zone", async () => {
+  it("shows Eastern Time as a fixed value with nothing to pick", async () => {
     const interaction = userEvent.setup();
+    getAgencyById.mockResolvedValue({ id: "agency-1", name: "Able Care", email: "hello@able.example", timezone: "America/Chicago" });
     render(<AgencyInfoTab />);
 
     await interaction.click(await screen.findByRole("button", { name: /contact & location/i }));
-    const timezone = screen.getByRole("combobox", { name: "Agency time zone" });
-    expect(timezone).toHaveValue("America/New_York");
-    expect(screen.getByText("Payroll uses this time zone to determine when your local pay period closes and which pay period appears as upcoming.")).toBeVisible();
-    expect(timezone).toHaveAccessibleDescription("Payroll uses this time zone to determine when your local pay period closes and which pay period appears as upcoming.");
-
-    await interaction.clear(timezone);
-    await interaction.type(timezone, "Chicago");
-    await interaction.click(screen.getByRole("option", { name: "America/Chicago" }));
-
-    expect(timezone).toHaveValue("America/Chicago");
+    expect(screen.queryByRole("combobox", { name: /time zone/i })).not.toBeInTheDocument();
+    expect(screen.getByText("Eastern Time (New York)")).toBeVisible();
+    expect(screen.getByText("Eastern Time (New York)")).toHaveAccessibleDescription(
+      "CareOnboard runs on Eastern Time for every agency. Shifts, timesheets, reminders and pay periods all use it, so there is nothing to set here.",
+    );
+    expect(screen.queryByText("America/Chicago")).not.toBeInTheDocument();
   });
 
-  it("closes the time zone options when keyboard focus leaves the combobox", async () => {
-    const interaction = userEvent.setup();
-    render(<AgencyInfoTab />);
-
-    await interaction.click(await screen.findByRole("button", { name: /contact & location/i }));
-    const timezone = screen.getByRole("combobox", { name: "Agency time zone" });
-    await interaction.click(timezone);
-
-    expect(timezone).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("listbox", { name: "IANA time zones" })).toBeVisible();
-
-    await interaction.tab();
-
-    expect(timezone).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByRole("listbox", { name: "IANA time zones" })).not.toBeInTheDocument();
-  });
-
-  it("keeps the helper and validation error associated with the combobox", async () => {
-    const interaction = userEvent.setup();
-    render(<AgencyInfoTab />);
-
-    await interaction.click(await screen.findByRole("button", { name: /contact & location/i }));
-    const timezone = screen.getByRole("combobox", { name: "Agency time zone" });
-    await interaction.clear(timezone);
-    await interaction.type(timezone, "Mars/Olympus_Mons");
-
-    expect(timezone).toHaveAttribute("aria-invalid", "true");
-    expect(timezone).toHaveAccessibleDescription("Payroll uses this time zone to determine when your local pay period closes and which pay period appears as upcoming. Select a valid IANA time zone.");
-    expect(screen.getByRole("alert")).toHaveTextContent("Select a valid IANA time zone.");
-  });
-
-  it("blocks a legacy agency with no time zone even while Contact & Location is collapsed", async () => {
+  it("saves a legacy agency with no time zone without asking for one or sending one", async () => {
     const interaction = userEvent.setup();
     getAgencyById.mockResolvedValue({ id: "agency-1", name: "Able Care", email: "hello@able.example", timezone: "" });
+    updateAgency.mockResolvedValue({ id: "agency-1", name: "Updated Able Care", email: "hello@able.example" });
     render(<AgencyInfoTab />);
 
     const name = await screen.findByDisplayValue("Able Care");
     await interaction.clear(name);
     await interaction.type(name, "Updated Able Care");
-    expect(screen.queryByRole("combobox", { name: "Agency time zone" })).not.toBeInTheDocument();
-
     await interaction.click(screen.getByRole("button", { name: "Save Changes" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Agency time zone is required.");
-    expect(updateAgency).not.toHaveBeenCalled();
+    await waitFor(() => expect(updateAgency).toHaveBeenCalledTimes(1));
+    expect(JSON.stringify(updateAgency.mock.calls[0])).not.toMatch(/timezone/);
+    expect(screen.queryByText("Agency time zone is required.")).not.toBeInTheDocument();
   });
 
-  it("keeps the time zone readable but disabled for agency staff", async () => {
+  it("shows the same fixed time zone to agency staff", async () => {
     user = { agencyId: "agency-1", userType: UserType.AGENCY_STAFF };
     const interaction = userEvent.setup();
     render(<AgencyInfoTab />);
 
     await interaction.click(await screen.findByRole("button", { name: /contact & location/i }));
-    expect(screen.getByRole("combobox", { name: "Agency time zone" })).toBeDisabled();
+    expect(screen.getByText("Eastern Time (New York)")).toBeVisible();
   });
 });

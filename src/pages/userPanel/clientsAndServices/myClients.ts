@@ -1,6 +1,5 @@
 import {ShiftStatus, type Shift} from '@/lib/api/shifts';
-import {shiftEndOrEndOfDay, shiftInstants, shiftStartAt, shiftViewerDate} from '@/lib/shift-time';
-import {toDateKey} from '@/pages/userPanel/dashboard/overviewStats';
+import {appZoneToday, shiftEndOrEndOfDay, shiftInstants, shiftStartAt, shiftViewerDate} from '@/lib/shift-time';
 import {shortClientId} from '@/pages/userPanel/dashboard/components/UpcomingTasks';
 import {shiftTitle} from '@/pages/userPanel/shiftManagement/timeline';
 
@@ -90,7 +89,7 @@ export function buildClientRows(shifts: Shift[], now: Date = new Date()): Client
 
 /** Overview counts: clients in your care, services you're delivering this month or later, and visits today. */
 export function clientsOverview(rows: ClientRow[], shifts: Shift[], now: Date = new Date()): ClientsOverview {
-    const today = toDateKey(now);
+    const today = appZoneToday(now);
     const monthStart = today.slice(0, 8) + '01';
     const services = new Set(shifts
         .filter(shift => shift.clientId && shiftViewerDate(shift) >= monthStart)

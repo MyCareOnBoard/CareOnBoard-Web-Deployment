@@ -6,7 +6,7 @@ import {cn} from '@/lib/utils';
 import {useAuth} from '@/utils/auth';
 import {useEmployeeShifts} from '@/hooks/useEmployeeShifts';
 import {useGetShiftNoteComplianceQuery} from '@/pages/agency/compliance-alerts/api';
-import {shiftStartAt, shiftViewerDate} from '@/lib/shift-time';
+import {appZoneToday, shiftStartAt, shiftViewerDate} from '@/lib/shift-time';
 import {toDateKey} from '@/pages/userPanel/dashboard/overviewStats';
 import {formatClock, shiftSpan} from '@/pages/userPanel/shiftManagement/timeline';
 import {ShiftStatus, type Shift} from '@/lib/api/shifts';
@@ -48,7 +48,7 @@ function nextVisitLabel(shift: Shift | null, now: Date) {
     const start = shiftStartAt(shift) ?? new Date(`${shift.date}T00:00:00`);
     if (Number.isNaN(start.getTime())) return 'Not scheduled';
     const span = shiftSpan(shift);
-    if (shiftViewerDate(shift) === toDateKey(now)) return span ? `Today, ${formatClock(span.start)}` : 'Today';
+    if (shiftViewerDate(shift) === appZoneToday(now)) return span ? `Today, ${formatClock(span.start)}` : 'Today';
     return format(start, 'MMM d, yyyy');
 }
 

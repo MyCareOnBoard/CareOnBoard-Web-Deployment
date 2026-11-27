@@ -107,111 +107,15 @@ beforeEach(() => {
 });
 
 describe("AddAgencyWizard agency onboarding", () => {
-  it("starts with no browser-derived timezone and exposes a searchable IANA control", async () => {
-    const user = userEvent.setup();
+  it("shows a fixed Eastern time zone with nothing to pick", () => {
     render(<AddAgencyWizard />);
 
-    const timezone = screen.getByRole("combobox", { name: "Agency timezone" });
-    expect(timezone).toHaveValue("");
-    fireEvent.change(timezone, { target: { value: "New_York" } });
-    expect(timezone).toHaveAccessibleDescription("Select a valid IANA timezone.");
-    expect(screen.getByRole("alert")).toHaveTextContent("Select a valid IANA timezone.");
-    await user.click(screen.getByRole("option", { name: "America/New_York" }));
-    expect(timezone).toHaveValue("America/New_York");
-
-    fireEvent.change(timezone, { target: { value: "Mars/Olympus_Mons" } });
-    expect(timezone).toHaveValue("Mars/Olympus_Mons");
-    expect(timezone).toHaveAccessibleDescription("Select a valid IANA timezone.");
+    expect(screen.queryByRole("combobox", { name: /time ?zone/i })).not.toBeInTheDocument();
+    const timezone = screen.getByLabelText("Time zone");
+    expect(timezone).toHaveValue("Eastern Time (New York)");
+    expect(timezone).toHaveAttribute("readonly");
+    expect(timezone).toHaveAccessibleDescription("CareOnboard runs on Eastern Time for every agency.");
   });
-
-  it("keeps focus on the timezone combobox while navigating and selecting an active option", async () => {
-    const user = userEvent.setup();
-    render(<AddAgencyWizard />);
-
-    const timezone = screen.getByRole("combobox", { name: "Agency timezone" });
-    await user.click(timezone);
-    fireEvent.change(timezone, { target: { value: "New_York" } });
-    const option = screen.getByRole("option", { name: "America/New_York" });
-
-    await user.keyboard("{ArrowDown}");
-    expect(timezone).toHaveFocus();
-    expect(timezone).toHaveAttribute("aria-activedescendant", option.id);
-    expect(option).toHaveAttribute("aria-selected", "true");
-
-    await user.keyboard("{ArrowUp}");
-    expect(timezone).toHaveAttribute("aria-activedescendant", option.id);
-
-    await user.keyboard("{Enter}");
-    expect(timezone).toHaveValue("America/New_York");
-    expect(screen.queryByRole("listbox", { name: "IANA timezones" })).not.toBeInTheDocument();
-    expect(timezone).toHaveFocus();
-  });
-
-  it("scrolls the active timezone option into view during keyboard navigation", async () => {
-    const scrollIntoView = vi.fn();
-    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
-    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
-      configurable: true,
-      value: scrollIntoView,
-    });
-    try {
-      const user = userEvent.setup();
-      render(<AddAgencyWizard />);
-
-      const timezone = screen.getByRole("combobox", { name: "Agency timezone" });
-      await user.click(timezone);
-      fireEvent.change(timezone, { target: { value: "America/" } });
-      expect(screen.getAllByRole("option").length).toBeGreaterThan(5);
-
-      await user.keyboard("{ArrowDown}{ArrowDown}{ArrowDown}{ArrowDown}{ArrowDown}{ArrowDown}");
-
-      const activeId = timezone.getAttribute("aria-activedescendant");
-      const activeOption = activeId ? document.getElementById(activeId) : null;
-      expect(activeOption).not.toBeNull();
-      expect(scrollIntoView).toHaveBeenLastCalledWith({ block: "nearest" });
-      expect(scrollIntoView.mock.contexts.at(-1)).toBe(activeOption);
-    } finally {
-      if (originalScrollIntoView) {
-        Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
-          configurable: true,
-          value: originalScrollIntoView,
-        });
-      } else {
-        Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
-      }
-    }
-  });
-
-  it("closes timezone options with Escape without moving focus from the combobox", async () => {
-    const user = userEvent.setup();
-    render(<AddAgencyWizard />);
-
-    const timezone = screen.getByRole("combobox", { name: "Agency timezone" });
-    await user.click(timezone);
-    fireEvent.change(timezone, { target: { value: "New_York" } });
-    await user.keyboard("{ArrowDown}{Escape}");
-
-    expect(screen.queryByRole("listbox", { name: "IANA timezones" })).not.toBeInTheDocument();
-    expect(timezone).not.toHaveAttribute("aria-activedescendant");
-    expect(timezone).toHaveFocus();
-  });
-
-  it("does not advance or submit with an empty or invalid timezone", async () => {
-    const user = userEvent.setup();
-    render(<AddAgencyWizard />);
-    await user.click(screen.getByRole("button", { name: "Fill identity" }));
-    const timezone = screen.getByRole("combobox", { name: "Agency timezone" });
-
-    fireEvent.change(timezone, { target: { value: "" } });
-    await user.click(screen.getByRole("button", { name: "Next" }));
-    expect(screen.queryByRole("button", { name: "Fill leadership" })).not.toBeInTheDocument();
-    expect(mocks.create).not.toHaveBeenCalled();
-
-    fireEvent.change(timezone, { target: { value: "Mars/Olympus_Mons" } });
-    await user.click(screen.getByRole("button", { name: "Next" }));
-    expect(screen.queryByRole("button", { name: "Fill leadership" })).not.toBeInTheDocument();
-    expect(mocks.create).not.toHaveBeenCalled();
-  }, 15_000);
 
   it("sends a blank needs-information profile through the draft endpoint without empty nested groups", async () => {
     const user = userEvent.setup();
@@ -227,39 +131,23 @@ describe("AddAgencyWizard agency onboarding", () => {
     expect(JSON.stringify(mocks.draft.mock.calls[0][0])).not.toMatch(/einStatus|designatedSignerUserUid|payrollSchedule|nextPayoutDate|last4/);
   }, 15_000);
 
-  it("sends exactly the changed timezone after hydration and skips unrelated payroll validation", async () => {
+  it("shows Eastern for an agency saved with another zone and never sends a timezone edit", async () => {
     mocks.search = "?agencyId=agency-1";
     mocks.currentAgency = {
-      agencyData: {
-        name: "Able Care",
-        email: "hello@able.example",
-        timezone: "America/Denver",
-        checkPayrollProfile: {
-          legalName: "Able Care LLC",
-          einStatus: { present: true, last4: "6789" },
-          payrollContact: { name: "Payroll Contact", email: "payroll@able.example", phone: "+441234567890" },
-        },
-      },
+      agencyData: { name: "Able Care", email: "hello@able.example", timezone: "America/Denver", checkPayrollProfile: {} },
       user: { fullName: "Agency Owner", email: "owner@able.example", phone: "+15125550125", userType: "agency" },
     };
     const user = userEvent.setup();
     render(<AddAgencyWizard />);
 
-    await screen.findByDisplayValue("America/Denver");
-    expect(screen.queryByLabelText("EIN")).not.toBeInTheDocument();
-    expect(screen.queryByText("Payroll prerequisites")).not.toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Agency timezone" })).toHaveValue("America/Denver");
-    expect(screen.queryByText("6789")).not.toBeInTheDocument();
-    fireEvent.change(screen.getByRole("combobox", { name: "Agency timezone" }), { target: { value: "America/New_York" } });
+    const name = await screen.findByDisplayValue("Able Care");
+    expect(screen.getByLabelText("Time zone")).toHaveValue("Eastern Time (New York)");
+    expect(screen.queryByDisplayValue("America/Denver")).not.toBeInTheDocument();
+    await user.type(name, " Group");
     await user.click(screen.getByRole("button", { name: "Save Changes" }));
 
     await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
-    expect(mocks.update.mock.calls[0][0]).toEqual({
-      agencyId: "agency-1",
-      data: { agency: { timezone: "America/New_York" } },
-    });
-    expect(mocks.upload).not.toHaveBeenCalled();
-    expect(JSON.stringify(mocks.update.mock.calls[0][0])).not.toMatch(/einStatus|designatedSignerUserUid|payrollSchedule|nextPayoutDate|last4/);
+    expect(mocks.update.mock.calls[0][0].data.agency).not.toHaveProperty("timezone");
   }, 15_000);
 
   it("omits a field that is changed and then restored to its hydrated value", async () => {
@@ -344,7 +232,7 @@ describe("AddAgencyWizard agency onboarding", () => {
     expect(screen.getAllByText("+1")).toHaveLength(1);
   });
 
-  it("retains a saved draft timezone when hydrating and saving again", async () => {
+  it("saves a draft on Eastern time even when it was stored with another zone", async () => {
     mocks.search = "?draftId=draft-1";
     mocks.currentDraft = {
       agencyData: { name: "Draft Care", email: "draft@example.com", timezone: "America/Los_Angeles", checkPayrollProfile: {} },
@@ -353,14 +241,15 @@ describe("AddAgencyWizard agency onboarding", () => {
     const user = userEvent.setup();
     render(<AddAgencyWizard />);
 
-    expect(await screen.findByRole("combobox", { name: "Agency timezone" })).toHaveValue("America/Los_Angeles");
+    await screen.findByDisplayValue("Draft Care");
+    expect(screen.getByLabelText("Time zone")).toHaveValue("Eastern Time (New York)");
     await user.click(screen.getByRole("button", { name: "Save" }));
     const dialog = screen.getByRole("dialog");
     await user.type(within(dialog).getByLabelText("Save Name"), "Draft with timezone");
     await user.click(within(dialog).getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(mocks.draft).toHaveBeenCalledTimes(1));
-    expect(mocks.draft.mock.calls[0][0].agency.timezone).toBe("America/Los_Angeles");
+    expect(mocks.draft.mock.calls[0][0].agency.timezone).toBe("America/New_York");
   });
 
   it("keeps a malformed company phone visible and invalid until it is explicitly replaced", async () => {
@@ -394,7 +283,8 @@ describe("AddAgencyWizard agency onboarding", () => {
     expect(mocks.upload).toHaveBeenCalledWith({ agencyId: "created-agency", file: expect.any(File), fileType: "logo" });
     expect(mocks.create.mock.invocationCallOrder[0]).toBeLessThan(mocks.upload.mock.invocationCallOrder[0]);
     expect(mocks.upload.mock.invocationCallOrder[0]).toBeLessThan(mocks.update.mock.invocationCallOrder[0]);
-    expect(mocks.create.mock.calls[0][0].agency.timezone).toBe("America/Chicago");
+    // "Fill identity" tries to set America/Chicago; the wizard always sends Eastern.
+    expect(mocks.create.mock.calls[0][0].agency.timezone).toBe("America/New_York");
     expect(mocks.create.mock.calls[0][0].agency.checkPayrollProfile).toBeUndefined();
     expect(mocks.create.mock.calls[0][0].user).toEqual({
       fullName: "Agency Owner", email: "owner@able.example", password: "StrongPass1!", phone: "+15125550125", userType: "agency",

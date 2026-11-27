@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { createScContact, type ScAnswer, type ScContactInput, type ScIssueDecision, type ScOverview } from '@/lib/api/sc-monitoring';
 import Finding from './Finding';
 import { useAuth } from '@/utils/auth';
+import { APP_TIME_ZONE, clockMinutes, dateKeyIn, zonedDateTime } from '@/lib/shift-time';
 
 const MonitoringDraftEvidence = lazy(() => import('@/features/agency-care/MonitoringCareBridge').then(module => ({ default: module.MonitoringDraftEvidence })));
 
@@ -28,7 +29,11 @@ const cleanAnswer = (answer: Answer): Answer => {
   const { notReviewedReason, ...rest } = answer;
   return answer.status === 'not_reviewed' ? { ...rest, notReviewedReason } : rest;
 };
-const today = () => { const now = new Date(); const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000); return local.toISOString().slice(0, 16); };
+// Contact dates and times are entered and shown in Eastern time, whatever zone this device is set to.
+/** "YYYY-MM-DDTHH:mm" for the current moment in Eastern time. */
+const today = () => { const now = new Date(); return `${dateKeyIn(now)}T${now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: APP_TIME_ZONE })}`; };
+/** The instant for a date and HH:mm typed in Eastern time; an invalid Date when unreadable. */
+const easternInstant = (date: string, time: string) => { const minutes = clockMinutes(time); return (minutes === null ? null : zonedDateTime(date, minutes, APP_TIME_ZONE)) ?? new Date(NaN); };
 const steps = [
   { label: 'Contact details', hint: 'When, how and who', title: 'Contact details' },
   { label: 'Services & goals', hint: 'Delivery and progress', title: 'Services & goal progress' },
@@ -101,7 +106,7 @@ function ContactEditor({ overview, onCancel, onSaved, onUnavailable }: ContactFo
   const schedule = overview.monitoringSchedule;
   const eligible = schedule?.qualifyingMethods && schedule.status !== 'disabled' && schedule.status !== 'not_configured' && schedule.status !== 'unavailable';
   const qualifies = eligible && schedule.qualifyingMethods?.includes(method) && (!schedule.requireDirectContact || directContact);
-  const contactAt = new Date(`${contactDate}T${contactTime}`);
+  const contactAt = easternInstant(contactDate, contactTime);
   const validContactTime = Number.isFinite(contactAt.getTime()) && contactAt <= new Date();
   const qualification = !eligible ? 'Scheduling is unavailable or disabled. You can still save this contact.' : !validContactTime ? 'Enter a valid contact date and time that has already passed to check qualification.' : qualifies ? 'This contact would qualify under the current monitoring rules. The deadline changes only after saving.' : !schedule.qualifyingMethods?.includes(method) ? 'This method does not qualify for the monitoring schedule.' : 'Direct contact is required to qualify for the monitoring schedule.';
   const issueKeys = [
@@ -117,7 +122,7 @@ function ContactEditor({ overview, onCancel, onSaved, onUnavailable }: ContactFo
 
   const stepError = (index: number): string => {
     if (index === 0) {
-      const at = new Date(`${contactDate}T${contactTime}`);
+      const at = easternInstant(contactDate, contactTime);
       if (!contactDate || !contactTime || !Number.isFinite(at.getTime()) || at > new Date()) return 'Enter a contact time that has already passed.';
       if (!participants.trim()) return 'Enter who took part in this contact.';
       if (!purpose.trim()) return 'Enter the purpose of this contact.';
@@ -170,7 +175,7 @@ function ContactEditor({ overview, onCancel, onSaved, onUnavailable }: ContactFo
       const message = stepError(index);
       if (message) { setStep(index); setError(message); return; }
     }
-    const at = new Date(`${contactDate}T${contactTime}`);
+    const at = easternInstant(contactDate, contactTime);
     const issueDecisions: ScIssueDecision[] = issueKeys.map(issue => {
       const draft = decisions[issue.key];
       return draft.decision === 'follow_up'
@@ -220,7 +225,7 @@ function ContactEditor({ overview, onCancel, onSaved, onUnavailable }: ContactFo
           <AddressAutocompleteField id="sc-contact-location" label="Where did the contact take place? (if relevant)" value={location} onChange={setLocation} maxLength={200} disabled={saving || uncertain} placeholder="Search for a location" suggestionsClassName="[&_span]:text-[13px] [&_span.font-medium]:text-[15px]" />
           <label className="scm-field scm-span2">What was the purpose of this contact?<Input required maxLength={500} value={purpose} onChange={event => setPurpose(event.target.value)} /></label></div>
         <div className="scm-question"><div className="scm-question-head"><strong>Did you communicate directly with {overview.name}?</strong></div><Choices label="Direct contact" choices={[{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }]} value={directContact ? 'yes' : 'no'} onChange={value => setDirectContact(value === 'yes')} />
-          <p className="scm-help">Choose No if you received information only from a family member, provider, or someone else. Times are shown in {Intl.DateTimeFormat().resolvedOptions().timeZone}.</p></div>
+          <p className="scm-help">Choose No if you received information only from a family member, provider, or someone else. Times are in Eastern time.</p></div>
 
         <p role="status" className="scm-note">{qualification}</p>
       </section>}
@@ -262,7 +267,7 @@ function ContactEditor({ overview, onCancel, onSaved, onUnavailable }: ContactFo
       </section>}
       {step === 4 && <section className="scm-form-card scm-wizard-review" aria-label="Contact review"><p>Check the contact details, findings, and follow-up decisions before saving. Select Edit to correct a section.</p>
         <section><div className="scm-wizard-review-heading"><h3>Contact details</h3><Button type="button" variant="ghost" aria-label="Edit contact details" onClick={() => goTo(0)}>Edit</Button></div><dl>
-          <div className="scm-keyval"><dt>Date and time</dt><dd>{contactAt.toLocaleString()} · {Intl.DateTimeFormat().resolvedOptions().timeZone}</dd></div>
+          <div className="scm-keyval"><dt>Date and time</dt><dd>{contactAt.toLocaleString('en-US', { timeZone: APP_TIME_ZONE })} · Eastern time</dd></div>
           <div className="scm-keyval"><dt>Method</dt><dd>{method.replaceAll('_', ' ')}</dd></div>
           <div className="scm-keyval"><dt>People present</dt><dd>{participants}</dd></div>
           {location && <div className="scm-keyval"><dt>Location</dt><dd>{location}</dd></div>}

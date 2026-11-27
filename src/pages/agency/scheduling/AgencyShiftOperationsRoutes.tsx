@@ -9,6 +9,7 @@ import ShiftsListPage from "./shifts";
 import ApprovalsPage from "./approvals";
 import ActivityLogsPage from "./activity-logs";
 import AgencyShiftDetailsPage from "@/pages/agency/shift-details";
+import { APP_TIME_ZONE } from "@/lib/shift-time";
 
 function AgencyShiftOperationsScope({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -34,7 +35,7 @@ function AgencyShiftOperationsScope({ children }: { children: ReactNode }) {
         name: user?.agency?.name || user?.fullName || "Agency",
         status: "active",
         supportedClientTypes,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        timezone: APP_TIME_ZONE,
       }}
       mode={mode}
       capabilities={{ canManageShifts: true, canManageBilling: true, shiftMaintenance: true }}

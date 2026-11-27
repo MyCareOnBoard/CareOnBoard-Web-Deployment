@@ -39,6 +39,7 @@ import {
   summarizeChanges,
 } from "@/pages/shared/shift-maintenance/audit-display";
 import { resolveShiftMaintenanceDateRange } from "./shiftMaintenanceDateRange";
+import { APP_TIME_ZONE } from "@/lib/shift-time";
 
 const ShiftDetailsModal = lazy(() => import("@/components/ShiftDetailsModal"));
 
@@ -208,7 +209,7 @@ export default function ShiftMaintenancePage({
           name: (agency.name || "").trim() || "Unnamed agency",
           status: "active",
           supportedClientTypes: agency.supportedClientTypes ?? ["ddd", "hha"],
-          timezone: agency.timezone ?? "UTC",
+          timezone: APP_TIME_ZONE,
         })));
       })
       .catch(() => {

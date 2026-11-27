@@ -499,7 +499,7 @@ export default function ShiftDetailsModal({
               </div>
               {shiftZoneSuffix(resolvedShift) ? (
                 <p className="mt-1 text-[11px] text-[#808081]">
-                  Clock times are in the agency's time zone ({shiftZoneSuffix(resolvedShift).trim()}).
+                  Clock times are in Eastern time ({shiftZoneSuffix(resolvedShift).trim()}).
                 </p>
               ) : null}
               {showResolveLateClockIn ? (

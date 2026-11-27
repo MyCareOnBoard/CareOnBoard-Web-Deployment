@@ -18,6 +18,7 @@ import {ReviewFacts, ReviewTags} from '../components/ReviewDrawer';
 import {SectionRequests} from '../components/NoteThread';
 import {useNoteVisit} from '../useNoteVisit';
 import type {SaveState, SubmitResult} from '../useSingleRowNote';
+import {APP_TIME_ZONE} from '@/lib/shift-time';
 
 const TITLE = noteListLabel('community-based');
 const NOTE_TYPE = 'community-based';
@@ -92,7 +93,7 @@ function CommunityBasedForm({activityLogId}: {activityLogId: string}) {
         if (!activityLog || hydrated.current) return;
         hydrated.current = true;
         const notes = [...activityLog.notes, ...(activityLog.submittedNotes ?? []), ...(activityLog.approvedNotes ?? [])];
-        const zone = activityLog.timezone ?? (!activityLog.shiftId ? Intl.DateTimeFormat().resolvedOptions().timeZone : undefined);
+        const zone = activityLog.timezone ?? (!activityLog.shiftId ? APP_TIME_ZONE : undefined);
         const rows = notes.map(note => {
             const start = noteTimedFields(note.startDate, zone);
             const end = noteTimedFields(note.endDate, zone);
