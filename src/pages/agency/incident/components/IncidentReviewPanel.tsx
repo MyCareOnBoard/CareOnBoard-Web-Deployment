@@ -22,6 +22,7 @@ function SectionLabel({ children }: { children: ReactNode }) {
   );
 }
 
+const linkLabel: Record<string, string> = { note: "Open note", shift: "Open shift", document: "Open profile", training: "Open profile" };
 const evidenceWhen = (at: string | null) => (at ? new Date(at).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "Unknown date");
 
 /** The records that triggered a system-opened incident, each with a way to open it. */
@@ -38,7 +39,7 @@ function EvidenceList({ evidence }: { evidence: NonNullable<IncidentReport["evid
               {item.problems.length > 0 && <span> · {item.problems.join(", ")}</span>}
               {item.minutesLate !== null && item.minutesLate > 0 && <span> · {item.minutesLate} min late</span>}
             </span>
-            {item.link && <a href={item.link} className="shrink-0 font-semibold text-[#007679] underline dark:text-[#7fd3d3]">Open note</a>}
+            {item.link && <a href={item.link} className="shrink-0 font-semibold text-[#007679] underline dark:text-[#7fd3d3]">{linkLabel[item.kind] || "Open record"}</a>}
           </li>
         ))}
       </ul>
