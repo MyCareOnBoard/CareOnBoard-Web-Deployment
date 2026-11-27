@@ -50,6 +50,10 @@ export interface IncidentReport {
     createdAt: string;
     updatedAt: string;
     reportedDate?: string;
+    /** 'compliance_pattern' when the system opened it from a compliance pattern. */
+    source?: string;
+    /** For a system-opened incident: the records that triggered it. */
+    evidence?: Array<{kind: string; at: string | null; what: string | null; problems: string[]; minutesLate: number | null; shiftId: string | null; link: string | null}>;
     employee?: {
         id: string;
         fullName?: string;

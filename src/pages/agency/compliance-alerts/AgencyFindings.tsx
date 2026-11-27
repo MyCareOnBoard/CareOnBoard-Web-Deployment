@@ -1,17 +1,18 @@
 import {complianceAlertsApi} from './api';
 import {Button} from '@/components/ui/button';
 import {FindingActions} from './FindingActions';
-import {RULE_LABELS, fieldLabel, nextStep, ruleLabel, trendLine} from './findingLabels';
+import {RULE_LABELS, concentrationLine, fieldLabel, nextStep, ruleLabel, trendLine} from './findingLabels';
 import {EvidenceList, useStaffFindingsQuery} from './StaffFindings';
 import {useState} from 'react';
 import {ComplianceBadge, ComplianceSkeleton} from './CompliancePresentation';
 import {SourcePage, type SourceProps} from './SourceControls';
+import WhatWeCheck from './WhatWeCheck';
 
 export type AgencyFinding = {
   id: string; ruleId?: string; employeeId: string; employeeName: string | null; status: 'open' | 'recurred' | 'resolved' | 'dismissed';
   severity: 'low' | 'medium' | 'high' | null; metrics: {numerator: number; denominator: number} | null;
   topFields: Array<{key: string; count: number}>; recurrenceCount: number; lastSeenAt: string | null; explanation: string | null;
-  trend?: string | null; priorWindow?: {numerator: number; denominator: number} | null; recommendationKey?: string | null;
+  trend?: string | null; concentration?: {dimension: 'client' | 'weekday'; count: number; of: number; weekday?: number} | null; priorWindow?: {numerator: number; denominator: number} | null; recommendationKey?: string | null;
 };
 type Args = {agencyId: string; mode: string; scopeKey: string; status: string; severity?: string; ruleId?: string; cursor?: string};
 type Page = {items: AgencyFinding[]; total: number; truncated: boolean; nextCursor: string | null};
@@ -59,6 +60,7 @@ function PatternCard({item, scope, focused, onOpenStaff, onDone}: {item: AgencyF
     </div>
     {summary && <p className="text-sm">{summary}</p>}
     {trend && <p className="text-xs text-[#5e7378]">{trend}</p>}
+    {item.concentration && <p className="text-xs text-[#5e7378]">{concentrationLine(item.concentration)}</p>}
     {step && (item.status === 'open' || item.status === 'recurred') && <p className="text-sm"><span className="font-semibold">Next step:</span> {step}</p>}
     <details open={open} onToggle={event => setOpen(event.currentTarget.open)}>
       <summary className="cursor-pointer text-sm font-semibold">Records behind this</summary>
@@ -77,6 +79,7 @@ export default function AgencyFindings({view, scopeKey, agencyId, mode, onApply,
   return <section aria-label="Patterns" className="p-4 sm:p-6">
     <h2 className="text-xl font-bold">Patterns</h2>
     <p className="mt-2 text-sm text-[#5e7378]">Staff who keep missing the same requirement: service notes, shift attendance, documents or training. Most serious first. These are advisory: nothing is sent to the staff member until you act.</p>
+    <WhatWeCheck {...scope}/>
     {view.employeeId && <div className="mt-3 flex flex-wrap items-center gap-2 text-sm"><span>Showing the selected staff member first.</span><Button type="button" variant="outline" size="sm" onClick={() => onApply({employeeId: undefined})}>Show everyone</Button></div>}
     <div className="my-4 flex flex-wrap gap-3">
       <label className="text-sm">Status <select aria-label="Pattern status" className="ml-2 rounded border border-[#dce7e8] p-1" value={status} onChange={event => onApply({findingStatus: event.target.value as 'active'})}>

@@ -38,7 +38,11 @@ const STATUS_TONE: Record<string, AgencyTone> = { active: "green", pending: "amb
 const smallButton = "inline-flex h-8 cursor-pointer items-center justify-center rounded-[8px] px-3 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007679] disabled:cursor-not-allowed disabled:opacity-50";
 
 function DSPProfileContent({ dsp, onBack, sectionLabel = "DSP management" }: DSPProfileProps) {
-  const [activeTab, setActiveTab] = useState<"Activity" | "Shifts" | "Profile" | "Training">("Activity");
+  // A link may name the tab to open, for example ?tab=Training from a compliance incident.
+  const [activeTab, setActiveTab] = useState<"Activity" | "Shifts" | "Profile" | "Training">(() => {
+    const requested = new URLSearchParams(window.location.search).get("tab");
+    return PROFILE_TABS.find(tab => tab === requested) ?? "Activity";
+  });
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showRequestDocument, setShowRequestDocument] = useState(false);
   const [isOpeningChat, setIsOpeningChat] = useState(false);
