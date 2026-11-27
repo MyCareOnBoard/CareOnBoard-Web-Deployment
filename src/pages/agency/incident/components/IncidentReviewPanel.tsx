@@ -22,6 +22,31 @@ function SectionLabel({ children }: { children: ReactNode }) {
   );
 }
 
+const linkLabel: Record<string, string> = { note: "Open note", shift: "Open shift", document: "Open profile", training: "Open profile" };
+const evidenceWhen = (at: string | null) => (at ? new Date(at).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "Unknown date");
+
+/** The records that triggered a system-opened incident, each with a way to open it. */
+function EvidenceList({ evidence }: { evidence: NonNullable<IncidentReport["evidence"]> }) {
+  return (
+    <section className="space-y-2">
+      <SectionLabel>Records behind this</SectionLabel>
+      <ul className="divide-y divide-[#e6eaec] px-1 text-[14px] dark:divide-white/10">
+        {evidence.map((item, index) => (
+          <li key={`${item.shiftId || "record"}-${index}`} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-2">
+            <span>
+              <span className="font-medium">{evidenceWhen(item.at)}</span>
+              {item.what && <span className="text-[#4b535b] dark:text-[#9aa4a8]"> · {item.what}</span>}
+              {item.problems.length > 0 && <span> · {item.problems.join(", ")}</span>}
+              {item.minutesLate !== null && item.minutesLate > 0 && <span> · {item.minutesLate} min late</span>}
+            </span>
+            {item.link && <a href={item.link} className="shrink-0 font-semibold text-[#007679] underline dark:text-[#7fd3d3]">{linkLabel[item.kind] || "Open record"}</a>}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function Narrative({ label, text }: { label: string; text?: string | null }) {
   return (
     <section className="space-y-2">
@@ -117,6 +142,7 @@ export default function IncidentReviewPanel({ incident, staffNoun, onDecided }: 
           </section>
 
           <Narrative label="What happened" text={incident.whatHappened} />
+          {!!incident.evidence?.length && <EvidenceList evidence={incident.evidence} />}
           <Narrative label="Actions taken" text={incident.whatActionsTaken || incident.actionsTaken} />
           <Narrative label="What the staff did" text={incident.whatDidYouDo || incident.staffAction} />
 
